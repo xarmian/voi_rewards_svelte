@@ -38,6 +38,9 @@
             if (typeof item.nfd === 'undefined') {
               item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
             }
+            if (typeof item.rank === 'undefined') {
+              item.rank = i + 1;
+            }
             $sortItems[i] = item;
           }
           
@@ -156,6 +159,17 @@
       const key = $sortKey;
       const direction = $sortDirection;
       const sorted = [...$sortItems].sort((a, b) => {
+        if (key == 'proposer') {
+          const aVal = a.nfd !== undefined ? a.nfd.toUpperCase() : a.proposer;
+          const bVal = b.nfd !== undefined ? b.nfd.toUpperCase() : b.proposer;
+          if (aVal > bVal) {
+            return -direction;
+          } else if (aVal < bVal) {
+            return direction;
+          }
+          return 0;
+        }
+
         const aVal = a[key];
         const bVal = b[key];
         if (aVal > bVal) {
@@ -172,6 +186,7 @@
     // $: pageItems = filterItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const columns = [
+        { id: 'rank', desc: 'Rank' },
         { id: 'proposer', desc: 'Wallet' },
         { id: 'block_count', desc: 'Total Blocks' },
         { id: 'block_rewards', desc: 'Block Rewards' },
@@ -195,6 +210,9 @@
 <TableBody tableBodyClass="divide-y">
     {#each filterItems as item}
     <TableBodyRow>
+        <TableBodyCell>
+          {item.rank}
+        </TableBodyCell>
         <TableBodyCell class='whitespace-nowrap' title='{item.proposer}'>
           {#if item.nfd !== undefined}
             {item.nfd}
@@ -212,9 +230,10 @@
         <TableBodyCell>{item.block_rewards}</TableBodyCell>
         <TableBodyCell>
           <div>{item.health_rewards}</div>
-          {#if item.node}
-            <div title="Node Name: {item.node.node_name}{'\r'}Health Score: {item.node.health_score}{'\r'}Health Divisor: {item.node.health_divisor}">
-              {item.node.node_name} - {item.node.health_score}
+          {#if item.node && item.node != null}
+            <div class="whitespace-nowrap flex" title="Node Name: {item.node.node_name}{'\r'}Health Score: {item.node.health_score}{'\r'}Health Divisor: {item.node.health_divisor}">
+              <div class="node_name truncate">{item.node.node_name}</div>
+              <div class='node_health'> - {item.node.health_score}</div>
             </div>
           {/if}
         </TableBodyCell>
@@ -223,3 +242,8 @@
     {/each}
 </TableBody>
 </TableSearch>
+<style>
+  .node_name {
+    max-width: 200px;
+  }
+</style>

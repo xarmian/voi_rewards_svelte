@@ -104,7 +104,6 @@
                     totalWallets++;
                     totalBlocks += row.block_count;
                 });
-                console.log(dataArrays);
 
 				//calcRewards();
 				block_height = data.block_height;
