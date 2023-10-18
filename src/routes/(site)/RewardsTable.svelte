@@ -14,12 +14,16 @@
     $: totalHealthRewards = 0;
     $: totalHealthyNodes = 0;
     $: totalBlocks = 0;
-    let unsubRewardParams: any;
+    $: unsubRewardParams = function() {};
 
     let nfdData: any[] = [];
 
     onMount(async () => {
-      const unsubRewardParams = rewardParams.subscribe((value) => {
+      // convert to NFDs
+      const allAddresses = items.map((row: any) => row.proposer);
+      nfdData = await getNFD(allAddresses);
+
+      unsubRewardParams = rewardParams.subscribe(async (value) => {
         totalBlockRewards = value.block_reward_pool;
         totalHealthRewards = value.health_reward_pool;
         totalHealthyNodes = value.total_healthy_nodes;
@@ -28,20 +32,22 @@
         if ($sortItems) {
           for (let i = 0; i < $sortItems.length; i++) {
             const item = $sortItems[i];
-            $sortItems[i].block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
-            $sortItems[i].health_rewards = Math.round(totalHealthRewards / totalHealthyNodes * Math.pow(10,6)) / Math.pow(10,6);
-            $sortItems[i].total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
-            $sortItems = $sortItems;
+            item.block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
+            item.health_rewards = Math.round(totalHealthRewards / totalHealthyNodes * Math.pow(10,6)) / Math.pow(10,6);
+            item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
+            if (typeof item.nfd === 'undefined') {
+              item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
+            }
+            $sortItems[i] = item;
           }
+          
+          $sortItems = $sortItems;
         }
       });
 
-      // convert to NFDs
-      const allAddresses = items.map((row: any) => row.proposer);
-      nfdData = await getNFD(allAddresses);
     });
 
-    onDestroy(unsubRewardParams);
+    $: onDestroy(unsubRewardParams);
 
     async function getNFD(data: any) {
         const aggregatedNFDs: any[] = [];
@@ -162,7 +168,7 @@
       sortItems.set(sorted);
     }
 
-    $: filterItems = $sortItems.filter((item) => item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1);
+    $: filterItems = $sortItems.filter((item) => (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1));
     // $: pageItems = filterItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const columns = [
@@ -190,8 +196,8 @@
     {#each filterItems as item}
     <TableBodyRow>
         <TableBodyCell class='whitespace-nowrap' title='{item.proposer}'>
-          {#if nfdData.find((nfd) => nfd.key === item.proposer)}
-            {nfdData.find((nfd) => nfd.key === item.proposer).replacementValue}
+          {#if item.nfd !== undefined}
+            {item.nfd}
           {:else}
             {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
           {/if}
@@ -204,14 +210,16 @@
         </TableBodyCell>
         <TableBodyCell>{item.block_count}</TableBodyCell>
         <TableBodyCell>{item.block_rewards}</TableBodyCell>
-        <TableBodyCell>{item.health_rewards}</TableBodyCell>
+        <TableBodyCell>
+          <div>{item.health_rewards}</div>
+          {#if item.node}
+            <div title="Node Name: {item.node.node_name}{'\r'}Health Score: {item.node.health_score}{'\r'}Health Divisor: {item.node.health_divisor}">
+              {item.node.node_name} - {item.node.health_score}
+            </div>
+          {/if}
+        </TableBodyCell>
         <TableBodyCell>{item.total_rewards}</TableBodyCell>
     </TableBodyRow>
     {/each}
 </TableBody>
 </TableSearch>
-{#if (toast)}
-  <Toast dismissable={false} contentClass="flex space-x-4 divide-x divide-gray-200 dark:divide-gray-700">
-    Address copied to clipboard!
-  </Toast>
-{/if}
