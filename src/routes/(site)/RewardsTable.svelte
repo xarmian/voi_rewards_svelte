@@ -103,6 +103,48 @@
         sortDirection.set(1);
       }
     };
+
+    function downloadCSV(type = 'all') {
+      //if (typeof event !== 'undefined') event.stopPropagation(); // Stop event propagation
+
+      // Get the table data
+      const rows = filterItems.filter(row => row.total_rewards > 0);
+      const data = rows.map(row => {
+        const address = row.proposer;
+        let tokenAmount;
+        let note;
+        if (type === 'block_rewards') {
+          tokenAmount = row.block_rewards;
+          note = JSON.stringify({blockRewards: tokenAmount});
+        } else if (type === 'health_rewards') {
+          tokenAmount = row.health_rewards;
+          note = JSON.stringify({healthRewards: tokenAmount});
+        } else {
+          tokenAmount = row.total_rewards;
+          note = JSON.stringify({blockRewards: row.block_rewards, healthRewards: row.health_rewards});
+        }
+        note = '"' + note.replace(/"/g, '""') + '"';
+        tokenAmount = Math.round(tokenAmount * Math.pow(10,6));
+
+        return [address, 'node', tokenAmount, note];
+      });
+
+      // Create the CSV content
+      const headers = ['account', 'userType', 'tokenAmount', 'note'];
+      const csvContent = headers.join(',') + '\n' + data.map(row => row.join(',')).join('\n');
+
+      // Download the CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const filename = type === 'block_rewards' ? 'block_rewards.csv' : type === 'health_rewards' ? 'health_rewards.csv' : 'all_rewards.csv';
+      link.setAttribute('download', filename);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   
     $: {
       const key = $sortKey;
@@ -138,6 +180,9 @@
     {#each columns as column}
         <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
             {column.desc}
+            {#if column.id === 'block_rewards' || column.id === 'health_rewards' || column.id === 'total_rewards'}
+              <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)}></button>
+            {/if}
         </RewardsTableHeader>
     {/each}
 </TableHead>
