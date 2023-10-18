@@ -16,7 +16,9 @@
     $: totalBlocks = 0;
     let unsubRewardParams: any;
 
-    onMount(() => {
+    let nfdData: any[] = [];
+
+    onMount(async () => {
       const unsubRewardParams = rewardParams.subscribe((value) => {
         totalBlockRewards = value.block_reward_pool;
         totalHealthRewards = value.health_reward_pool;
@@ -33,9 +35,53 @@
           }
         }
       });
+
+      // convert to NFDs
+      const allAddresses = items.map((row: any) => row.proposer);
+      nfdData = await getNFD(allAddresses);
     });
 
     onDestroy(unsubRewardParams);
+
+    async function getNFD(data: any) {
+        const aggregatedNFDs: any[] = [];
+        let addressChunks = [];
+        let chunkSize = 20;
+
+        for (let i = 0; i < data.length; i += chunkSize) {
+            addressChunks.push(data.slice(i, i + chunkSize));
+        }
+
+        const allFetches = addressChunks.map((addressChunk, index) => {
+            let url = "https://api.nf.domains/nfd/lookup?";
+            let params = new URLSearchParams();
+
+            addressChunk.forEach((address: string) => {
+                params.append("address", address);
+            });
+
+            params.append("view", "tiny");
+            params.append("allowUnverified", "true");
+
+            url += params.toString();
+
+            return fetch(url)
+                .then(response => response.json())
+                .then(additionalData => {
+                    Object.entries(additionalData).forEach((val) => {
+                        const key = val[0];
+                        const value: any = val[1];
+
+                        const replacementValue = value.name;
+                        aggregatedNFDs.push({ key, replacementValue });
+                    });
+                })
+                .catch(error => {}); // suppress error //console.error("Error fetching additional data:", error));
+        });
+
+        await Promise.all(allFetches);
+        return aggregatedNFDs;
+    }
 
     let searchTerm: string = '';
 
@@ -99,7 +145,11 @@
     {#each filterItems as item}
     <TableBodyRow>
         <TableBodyCell class='whitespace-nowrap' title='{item.proposer}'>
-          {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
+          {#if nfdData.find((nfd) => nfd.key === item.proposer)}
+            {nfdData.find((nfd) => nfd.key === item.proposer).replacementValue}
+          {:else}
+            {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
+          {/if}
           <button use:copy={item.proposer} on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}>
             <CopySolid size='sm' class='inline' />
           </button> 

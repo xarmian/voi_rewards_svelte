@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import RewardsTable from './RewardsTable.svelte';
 	import { rewardParams } from '../../stores/dataTable';
-
+    
 	$: totalBlocks = 0;
 	$: totalWallets = 0;
 	$: block_height = 0;
@@ -82,7 +82,7 @@
 
 		fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
-			.then((data) => {
+			.then(async (data) => {
 				// check if the end date selected in dropdown is more than maxTimestamp. If so, add notice below date selection that data is incomplete
 				const checkDate = new Date(
 					Date.UTC(
@@ -100,10 +100,11 @@
 				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
 				dataArrays = data.data;
 
-				dataArrays.forEach((row: any) => {
-					totalWallets++;
-					totalBlocks += row.block_count;
-				});
+                dataArrays.forEach((row: any) => {
+                    totalWallets++;
+                    totalBlocks += row.block_count;
+                });
+                console.log(dataArrays);
 
 				//calcRewards();
 				block_height = data.block_height;
@@ -126,7 +127,6 @@
 			total_blocks: totalBlocks,
 			total_healthy_nodes: totalHealthyNodes
 		});
-		console.log(block_reward_pool);
 	}
 </script>
 
@@ -141,6 +141,10 @@
 			<option value={date.id}>{date.desc}</option>
 		{/each}
 	</select>
+    <button class='m-6'
+        on:click={() => loadDashboardData(selectedDate)}>
+        <i class="fas fa-refresh fa-lg"></i>
+    </button>
 </div>
 {#if dataIncomplete}
 	<div class="mb6 flex justify-center">
