@@ -9,6 +9,7 @@
 	$: block_height = 0;
 	$: block_height_timestamp = '';
 	$: totalHealthyNodes = 0;
+	$: totalEmptyNodes = 0;
 	$: block_reward_pool = 12500000;
 	$: health_reward_pool = 10000000;
 	$: selectedDate = '';
@@ -77,7 +78,6 @@
 		// reinitialize totals
 		totalWallets = 0;
 		totalBlocks = 0;
-		totalHealthyNodes = 0;
 		block_height = 0;
 
 		fetch(url, { cache: 'no-store' })
@@ -111,6 +111,7 @@
 					timeZone: 'UTC'
 				});
 				totalHealthyNodes = data.healthy_node_count;
+				totalEmptyNodes = data.empty_node_count;
 			});
 	};
 
@@ -124,7 +125,7 @@
 			block_reward_pool: block_reward_pool,
 			health_reward_pool: health_reward_pool,
 			total_blocks: totalBlocks,
-			total_healthy_nodes: totalHealthyNodes
+			total_healthy_nodes: totalHealthyNodes - totalEmptyNodes,
 		});
 	}
 </script>

@@ -33,7 +33,7 @@
           for (let i = 0; i < $sortItems.length; i++) {
             const item = $sortItems[i];
             item.block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
-            item.health_rewards = (item.node.health_score >= 5.0) ? Math.round(totalHealthRewards / totalHealthyNodes * Math.pow(10,6)) / Math.pow(10,6) : 0;
+            item.health_rewards = (item.node && item.node.health_score >= 5.0) ? Math.round(totalHealthRewards / totalHealthyNodes / item.node.health_divisor * Math.pow(10,6)) / Math.pow(10,6) : 0;
             item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
             if (typeof item.nfd === 'undefined') {
               item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
