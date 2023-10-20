@@ -15,7 +15,7 @@
 
 </script>
 
-<TableHeadCell on:click={() => sortTable()}>
+<TableHeadCell on:click={() => sortTable()} padding='px-2 py-2'>
     <div class="flex justify-between">
         <slot />
         {#if sortKey == columnId}

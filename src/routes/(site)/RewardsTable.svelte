@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Toast } from 'flowbite-svelte';
+    import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch } from 'flowbite-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { writable } from 'svelte/store';
     import RewardsTableHeader from './RewardsTableHeader.svelte';
@@ -7,7 +7,10 @@
 	  import { CopySolid, LinkSolid } from 'flowbite-svelte-icons';
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
-  
+	  import { slide } from 'svelte/transition';
+    //@ts-ignore
+    import Device from 'svelte-device-info';
+
     export let items: any[] = [];
 
     $: totalBlockRewards = 0;
@@ -17,6 +20,15 @@
     $: unsubRewardParams = function() {};
 
     let nfdData: any[] = [];
+    let expandedRow: number | null = null;
+
+    const toggleRow = (row: number) => {
+      if (expandedRow === row) {
+        expandedRow = null;
+      } else {
+        expandedRow = row;
+      }
+    }
 
     onMount(async () => {
       // convert to NFDs
@@ -182,68 +194,148 @@
       sortItems.set(sorted);
     }
 
-    $: filterItems = $sortItems.filter((item) => (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1));
+    $: filterItems = $sortItems.filter((item) => 
+      (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) 
+      || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)
+      || (item.node?.node_name !== null && item.node?.node_name?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1));
     // $: pageItems = filterItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-    const columns = [
+    let columns = [
         { id: 'rank', desc: 'Rank' },
         { id: 'proposer', desc: 'Wallet' },
-        { id: 'block_count', desc: 'Total Blocks' },
-        { id: 'block_rewards', desc: 'Block Rewards' },
-        { id: 'health_rewards', desc: 'Health Rewards' },
-        { id: 'total_rewards', desc: 'Total Rewards' },
     ];
 
+    if (!Device.isMobile) {
+      columns.push({ id: 'block_count', desc: 'Total Blocks' });
+      columns.push({ id: 'block_rewards', desc: 'Block Rewards' });
+      columns.push({ id: 'health_rewards', desc: 'Health Rewards' });
+    }
+
+    columns.push({ id: 'total_rewards', desc: 'Total Rewards' });
+
 </script>
-  
-<TableSearch placeholder="Filter by wallet of NFD" hoverable={true} bind:inputValue={searchTerm}>
-<TableHead>
-    {#each columns as column}
-        <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
-            {column.desc}
-            {#if column.id === 'block_rewards' || column.id === 'health_rewards' || column.id === 'total_rewards'}
-              <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)}></button>
+
+<div class="overflow-auto {!Device.isMobile ? 'ml-6 mr-6' : ''}">
+  <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm}></TableSearch>
+  <Table>
+    <TableHead>
+        {#each columns as column}
+            <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
+                {column.desc}
+                {#if column.id === 'block_rewards' || column.id === 'health_rewards' || column.id === 'total_rewards'}
+                  <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)}></button>
+                {/if}
+            </RewardsTableHeader>
+        {/each}
+    </TableHead>
+    <TableBody tableBodyClass="divide-y">
+        {#each filterItems as item, i}
+        <TableBodyRow on:click={() => toggleRow(i)}>
+            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
+              {item.rank}
+            </TableBodyCell>
+            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
+              {#if item.nfd !== undefined}
+                <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,16)+'...' : item.nfd}</span>
+              {:else}
+                {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
+              {/if}
+              <button use:copy={item.proposer} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}>
+                <CopySolid size='sm' class='inline' />
+              </button> 
+              <a on:click|stopPropagation href='https://voitest-explorer.k1-fi.a-wallet.net/explorer/account/{item.proposer}/transactions' target='_blank'>
+                <LinkSolid size='sm' class='inline' />
+              </a>
+            </TableBodyCell>
+            {#if !Device.isMobile}
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_rewards}</TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
+                <div>{item.health_rewards}</div>
+                {#if item.node && item.node != null && item.node.health_score != null}
+                  <div class="whitespace-nowrap flex" title="Node Name: {item.node.node_name}{'\r'}Health Score: {item.node.health_score}{'\r'}Health Divisor: {item.node.health_divisor}">
+                    <div class="node_name truncate">{item.node.node_name}</div>
+                    <div class='node_health'> - {item.node.health_score}</div>
+                  </div>
+                {:else}
+                  <div style='font-size:10px'>(No Telemetry Data)</div>
+                {/if}
+              </TableBodyCell>
             {/if}
-        </RewardsTableHeader>
-    {/each}
-</TableHead>
-<TableBody tableBodyClass="divide-y">
-    {#each filterItems as item}
-    <TableBodyRow>
-        <TableBodyCell>
-          {item.rank}
-        </TableBodyCell>
-        <TableBodyCell class='whitespace-nowrap' title='{item.proposer}'>
-          {#if item.nfd !== undefined}
-            {item.nfd}
-          {:else}
-            {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
-          {/if}
-          <button use:copy={item.proposer} on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}>
-            <CopySolid size='sm' class='inline' />
-          </button> 
-          <a href='https://voitest-explorer.k1-fi.a-wallet.net/explorer/account/{item.proposer}/transactions' target='_blank'>
-            <LinkSolid size='sm' class='inline' />
-          </a>
-        </TableBodyCell>
-        <TableBodyCell>{item.block_count}</TableBodyCell>
-        <TableBodyCell>{item.block_rewards}</TableBodyCell>
-        <TableBodyCell>
-          <div>{item.health_rewards}</div>
-          {#if item.node && item.node != null}
-            <div class="whitespace-nowrap flex" title="Node Name: {item.node.node_name}{'\r'}Health Score: {item.node.health_score}{'\r'}Health Divisor: {item.node.health_divisor}">
-              <div class="node_name truncate">{item.node.node_name}</div>
-              <div class='node_health'> - {item.node.health_score}</div>
-            </div>
-          {/if}
-        </TableBodyCell>
-        <TableBodyCell>{item.total_rewards}</TableBodyCell>
-    </TableBodyRow>
-    {/each}
-</TableBody>
-</TableSearch>
+            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.total_rewards}</TableBodyCell>
+        </TableBodyRow>
+        {#if expandedRow === i}
+          <TableBodyRow>
+            <TableBodyCell colspan={Device.isMobile ? 3 : 6} class="p-0" on:click={() => toggleRow(i)}>
+              <div class="px-2 py-3 m-4" transition:slide={{ duration: 300, axis: 'y' }}>
+                <div>
+                  <!-- address and nfd -->
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Wallet:</Label>
+                    <a on:click|stopPropagation href='https://voitest-explorer.k1-fi.a-wallet.net/explorer/account/{item.proposer}/transactions' target='_blank'>
+                      {Device.isMobile ? item.proposer.substring(0,20) : item.proposer}...
+                    </a>
+                  </div>
+                  {#if item.nfd}
+                    <div>
+                      <Label defaultClass="text-sm font-medium inline-block w-28">NFD:</Label>
+                      <a on:click|stopPropagation href="https://app.nf.domains/name/{item.nfd}" target="_blank" class="hover:underline active:text-gray-500">{item.nfd}</a>
+                    </div>
+                  {/if}
+                </div>
+                <br/>
+                {#if Device.isMobile}
+                <div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Total Blocks:</Label>
+                    <span>{item.block_count}</span>
+                  </div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Block Rewards:</Label>
+                    <span>{item.block_rewards}</span>
+                  </div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Health Rewards:</Label>
+                    <span>{item.health_rewards}</span>
+                  </div>
+                </div>
+                {/if}
+                <div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Node Name:</Label>
+                    <span>{item.node.node_name}</span>
+                  </div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Health Score:</Label>
+                    <span>{item.node.health_score}</span>
+                  </div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Health Divisor:</Label>
+                    <span>{item.node.health_divisor}</span>
+                  </div>
+                </div>
+              </div>
+            </TableBodyCell>
+          </TableBodyRow>
+        {/if}
+      {/each}
+    </TableBody>
+  </Table>
+</div>
 <style>
   .node_name {
     max-width: 200px;
+  }
+  a {
+    color: #007bff;
+    text-decoration: none;
+    background-color: transparent;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+
+  a:active {
+    color: #6b7280;
   }
 </style>

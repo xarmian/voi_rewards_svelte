@@ -155,7 +155,7 @@
 	</div>
 {/if}
 <div class="dashboard justify-evenly">
-	<Card class="dark:bg-gray-700 h-42 w-60 m-2">
+	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
 				Total Blocks
@@ -165,7 +165,7 @@
 			</p>
 		</div>
 	</Card>
-	<Card class="dark:bg-gray-700 h-42 w-60 m-2">
+	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
 				Last Block
@@ -183,7 +183,7 @@
 			</p>
 		</div>
 	</Card>
-	<Card class="dark:bg-gray-700 h-42 w-60 m-2">
+	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
 				Total Wallets
@@ -193,7 +193,7 @@
 			</p>
 		</div>
 	</Card>
-	<Card class="dark:bg-gray-700 h-42 w-60 m-2">
+	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
 				Total Healthy Nodes
@@ -203,14 +203,14 @@
 			</p>
 		</div>
 	</Card>
-	<Card class="dark:bg-gray-700 h-42 w-60 m-2">
+	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Block Rewards</h5>
 			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-sm">
 				<input
 					type="text"
 					id="blockVoiPoolTotal"
-					class="w-36 text-right ml-2"
+					class="w-36 text-right ml-2 bg-gray-50 dark:bg-gray-600"
 					bind:value={block_reward_pool}
                     /><span class="text-sm"> / wk</span>
                 </p>
@@ -219,7 +219,7 @@
 				<input
 					type="text"
 					id="healthVoiPoolTotal"
-					class="w-36 text-right ml-2"
+					class="w-36 text-right ml-2 bg-gray-50 dark:bg-gray-600"
 					bind:value={health_reward_pool}
 				/><span class="text-sm"> / wk</span>
 			</p>
@@ -255,9 +255,7 @@
 	</div>
 </div>
 {#if dataArrays.length > 0}
-<div class="w-screen overflow-auto">
 	<RewardsTable items={dataArrays} />
-</div>
 {/if}
 
 <style>
