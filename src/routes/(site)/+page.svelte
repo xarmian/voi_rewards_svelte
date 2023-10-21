@@ -158,7 +158,9 @@
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Total Blocks
+				Rewarded Blocks
+				<br />
+				<span class="text-sm">(in epoch)</span>
 			</h5>
 			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
 				{totalBlocks == 0 ? '...Loading...' : totalBlocks}
