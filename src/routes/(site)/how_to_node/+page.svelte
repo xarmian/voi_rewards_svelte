@@ -6,19 +6,19 @@
         heading: 'Participation Node Setup Guides',
         links: [
             {
-                text: 'Official VOI Technical Documentation',
+                text: 'Official VOI *Technical Documentation*',
                 url: 'https://docs.voi.network/',
             },
             {
-                text: 'Guide to Setting up a Participation Node on Ubuntu by D13',
+                text: 'Guide to Setting up a *Participation Node* on Ubuntu by D13',
                 url: 'https://d13.co/posts/set-up-voi-participation-node/',
             },
             {
-                text: 'Guide to Setting up an Aust One-Click Node on Windows',
+                text: 'Guide to Setting up an *Aust One-Click Node* on Windows',
                 url: 'https://github.com/AustP/austs-one-click-node',
             },
             {
-                text: 'Guide to Setting up a Participation Node on DappNode',
+                text: 'Guide to Setting up a Participation Node on *DappNode*',
                 url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
             }
         ]
@@ -27,11 +27,11 @@
         heading: 'Additional Resources and Guides',
         links: [
             {
-                text: 'VOI Node Metrics (Node Stats)',
+                text: 'VOI Node Metrics (Node Health Stats and History)',
                 url: 'https://voi-node-info.boeieruurd.com/',
             },
             {
-                text: 'Guide to Set up a Relay Node',
+                text: 'Guide to Setting up a *Relay Node*',
                 url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
             },
         ]
@@ -78,7 +78,15 @@
                 <li>
                     <A href={link.url} target="_blank">
                         <LinkOutline class="inline" />
-                        <span class="m-2">{link.text}</span>
+                        <span class='m-2'>
+                            {#each link.text.split('*') as text, i}
+                                {#if i % 2 === 0}
+                                    <span> {text} </span>
+                                {:else}
+                                    <span class="font-bold"> {text} </span>
+                                {/if}
+                            {/each}
+                        </span>
                     </A>
                 </li>
             {/each}
