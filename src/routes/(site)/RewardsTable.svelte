@@ -243,7 +243,7 @@
               <button use:copy={item.proposer} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}>
                 <CopySolid size='sm' class='inline' />
               </button> 
-              <a on:click|stopPropagation href='https://voitest-explorer.k1-fi.a-wallet.net/explorer/account/{item.proposer}/transactions' target='_blank'>
+              <a on:click|stopPropagation href='https://voi.observer/explorer/account/{item.proposer}/transactions' target='_blank'>
                 <LinkSolid size='sm' class='inline' />
               </a>
             </TableBodyCell>
@@ -272,7 +272,7 @@
                   <!-- address and nfd -->
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Wallet:</Label>
-                    <a on:click|stopPropagation href='https://voitest-explorer.k1-fi.a-wallet.net/explorer/account/{item.proposer}/transactions' target='_blank'>
+                    <a on:click|stopPropagation href='https://voi.observer/explorer/account/{item.proposer}/transactions' target='_blank'>
                       {Device.isMobile ? item.proposer.substring(0,20) : item.proposer}...
                     </a>
                   </div>
