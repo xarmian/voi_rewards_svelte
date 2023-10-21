@@ -9,7 +9,7 @@
         <h2 class="text-lg font-medium text-gray-600">What is the Voi Rewards Auditor?</h2>
     </header>
     <p class="m-5">
-        <span class="text-blue-800 dark:text-blue-200">VOI Rewards Auditor</span> is a tool to help estimate calculate rewards for running a node on the VOI network.
+        <span class="text-blue-800 dark:text-blue-200">VOI Rewards Auditor</span> is a tool to help estimate and calculate rewards for running a node on the VOI network.
     </p>
     <p class="m-5">
         The network is currently in TestNet, and TestNet is a game. Token amounts will reset prior to MainNet.
