@@ -18,6 +18,10 @@
                 url: 'https://github.com/AustP/austs-one-click-node',
             },
             {
+                text: 'Guide to Setting up a Participation Node on *Docker*',
+                url: 'https://github.com/xarmian/voinode',
+            },
+            {
                 text: 'Guide to Setting up a Participation Node on *DappNode*',
                 url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
             }
