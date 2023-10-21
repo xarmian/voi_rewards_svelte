@@ -52,6 +52,10 @@
                 text: '@Voi_Net Twitter',
                 url: 'https://twitter.com/Voi_Net',
             },
+            {
+                text: 'Voi Subreddit',
+                url: 'https://www.reddit.com/r/Voi_Net/',
+            }
         ]
     }];
     
@@ -64,7 +68,7 @@
     </header>
     <div class="m-10">
         Node Runners earn rewards based on the number of blocks they produce and the health of their node.
-        <A href="https://docs.google.com/document/d/1tgU9Ytd4YxHGOsnFBIuEV75sclpI92AeYPxVZcBxvE0" target="_blank">See this proposal</A> for more specific details on how node runners are rewarded.
+        <A href="https://docs.google.com/document/d/1tgU9Ytd4YxHGOsnFBIuEV75sclpI92AeYPxVZcBxvE0" target="_blank">See this approved proposal</A> for more specific details on how node runners are rewarded.
     </div>
     {#each categories as category}
         <ul class="m-10">
@@ -75,7 +79,7 @@
                 {/if}
             </header>
             {#each category.links as link}
-                <li>
+                <li class='ml-10'>
                     <A href={link.url} target="_blank">
                         <LinkOutline class="inline" />
                         <span class='m-2'>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TwitterSolid, DiscordSolid, GlobeOutline } from 'flowbite-svelte-icons';
+	import { TwitterSolid, DiscordSolid, GlobeOutline, LinkOutline } from 'flowbite-svelte-icons';
     import { A } from 'flowbite-svelte';
 </script>
 
@@ -36,5 +36,10 @@
                 <span class="m-2">@Voi_Net Twitter</span>
             </A>
 		</li>
+        <li>
+            <A href="https://www.reddit.com/r/Voi_Net/" target="_blank"><LinkOutline class="inline" />
+                <span class="m-2">Voi Subreddit</span>
+            </A>
+        </li>
 	</ul>
 </div>
