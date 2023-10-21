@@ -1,6 +1,60 @@
 <script lang="ts">
 	import { TwitterSolid, DiscordSolid, GlobeOutline, LinkSolid, LinkOutline } from 'flowbite-svelte-icons';
     import { A } from 'flowbite-svelte';
+
+    let categories = [{
+        heading: 'Participation Node Setup Guides',
+        links: [
+            {
+                text: 'Official VOI Technical Documentation',
+                url: 'https://docs.voi.network/',
+            },
+            {
+                text: 'Guide to Setting up a Participation Node on Ubuntu by D13',
+                url: 'https://d13.co/posts/set-up-voi-participation-node/',
+            },
+            {
+                text: 'Guide to Setting up an Aust One-Click Node on Windows',
+                url: 'https://github.com/AustP/austs-one-click-node',
+            },
+            {
+                text: 'Guide to Setting up a Participation Node on DappNode',
+                url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
+            }
+        ]
+    },
+    {
+        heading: 'Additional Resources and Guides',
+        links: [
+            {
+                text: 'VOI Node Metrics (Node Stats)',
+                url: 'https://voi-node-info.boeieruurd.com/',
+            },
+            {
+                text: 'Guide to Set up a Relay Node',
+                url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
+            },
+        ]
+    },
+    {
+        heading: 'Need Help?',
+        subheading: 'More Links and Resources',
+        links: [
+            {
+                text: 'VOI Website',
+                url: 'https://voi.network',
+            },
+            {
+                text: 'VOI Discord',
+                url: 'https://t.co/mXYdYkWE6i',
+            },
+            {
+                text: '@Voi_Net Twitter',
+                url: 'https://twitter.com/Voi_Net',
+            },
+        ]
+    }];
+    
 </script>
 
 <div class="about">
@@ -12,72 +66,22 @@
         Node Runners earn rewards based on the number of blocks they produce and the health of their node.
         <A href="https://docs.google.com/document/d/1tgU9Ytd4YxHGOsnFBIuEV75sclpI92AeYPxVZcBxvE0" target="_blank">See this proposal</A> for more specific details on how node runners are rewarded.
     </div>
-    <ul class="m-10">
-        <header class="bg-gray-50 py-4 px-8">
-            <h1 class="text-xl font-bold">Participation Node Setup Guides</h1>
-        </header>
-        <li>
-            <A href="https://docs.voi.network/" target="_blank">
-                <LinkOutline class="inline" />
-                <span class="m-2">Official VOI Technical Documentation</span>
-            </A>
-        </li>
-        <li>
-			<A href="https://d13.co/posts/set-up-voi-participation-node/" target="_blank">
-                <LinkOutline class="inline" />
-                <span class="m-2">Guide to Setting up a <b>Paricipation Node</b> on Ubuntu</span>
-            </A>
-		</li>
-        <li>
-			<A href="https://github.com/AustP/austs-one-click-node" target="_blank">
-                <LinkOutline class="inline" />
-                <span class="m-2">Guide to Setting up an <b>Aust One-Click Node</b> on Windows</span>
-            </A>
-		</li>
-		<li>
-            <A href="https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md" target="_blank">
-                <LinkOutline class="inline" />
-                <span class="m-2">Guide to Setting up a Participation Node on <b>DappNode</b></span>
-            </A>
-        </li>
-    </ul>
-    <ul class="m-10">
-        <header class="bg-gray-50 py-4 px-8">
-            <h1 class="text-xl font-bold">Additional Resources and Guides</h1>
-        </header>
-        <li>
-            <A href="https://voi-node-info.boeieruurd.com/" target="_blank">
-                <LinkOutline class="inline" />
-                <span class="m-2">VOI Node Metrics (Node Stats)</span>
-            </A>
-        </li>
-        <li>
-			<A href="https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md" target="_blank">
-                <LinkOutline class="inline" />
-                <span class="m-2">Guide to Set up a <b>Relay Node</b></span>
-            </A>
-            <div class="ml-7 text-sm">Relay nodes are the backbone of the network.</div>
-		</li>
-	</ul>
-    <ul class="m-10">
-        <header class="bg-gray-50 py-4 px-8">
-            <h1 class="text-xl font-bold">Need Help?</h1>
-            <h2 class="text-lg font-medium text-gray-600">More Links and Resources</h2>
-        </header>
-		<li>
-			<A href="https://voi.network" target="_blank"><GlobeOutline class="inline" />
-                <span class="m-2">VOI Website</span>
-            </A>
-		</li>
-		<li>
-            <A href="https://t.co/mXYdYkWE6i" target="_blank"><DiscordSolid class="inline" />
-                <span class="m-2">VOI Discord</span>
-            </A>
-        </li>
-		<li>
-			<A href="https://twitter.com/Voi_Net" target="_blank"><TwitterSolid class="inline" />
-                <span class="m-2">@Voi_Net Twitter</span>
-            </A>
-		</li>
-	</ul>
+    {#each categories as category}
+        <ul class="m-10">
+            <header class="bg-gray-50 py-4 px-8">
+                <h1 class="text-xl font-bold">{category.heading}</h1>
+                {#if category.subheading}
+                    <h2 class="text-lg font-medium text-gray-600">{category.subheading}</h2>
+                {/if}
+            </header>
+            {#each category.links as link}
+                <li>
+                    <A href={link.url} target="_blank">
+                        <LinkOutline class="inline" />
+                        <span class="m-2">{link.text}</span>
+                    </A>
+                </li>
+            {/each}
+        </ul>
+    {/each}
 </div>
