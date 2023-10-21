@@ -4,6 +4,10 @@
 </script>
 
 <div class="about">
+    <header class="bg-gray-100 py-4 px-8">
+        <h1 class="text-2xl font-bold">About</h1>
+        <h2 class="text-lg font-medium text-gray-600">What is the Voi Rewards Auditor?</h2>
+    </header>
     <p class="m-5">
         <span class="text-blue-800 dark:text-blue-200">VOI Rewards Auditor</span> is a tool to help estimate calculate rewards for running a node on the VOI network.
     </p>

@@ -4,6 +4,10 @@
 </script>
 
 <div class="about">
+    <header class="bg-gray-100 py-4 px-8">
+        <h1 class="text-2xl font-bold">What is Voi?</h1>
+        <!--<h2 class="text-lg font-medium text-gray-600"></h2>-->
+    </header>
     <p class="m-5">
         <A href="https://voi.network" target="_blank" class="text-blue-800 dark:text-blue-200">VOI</A> is a a Layer-1 Blockchain Network built using
         <A href="https://algorand.com" target="_blank" class="text-blue-800 dark:text-blue-200">Algorand</A> technology.
