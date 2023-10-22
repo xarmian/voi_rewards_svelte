@@ -66,7 +66,7 @@
 </script>
 
 <div class="about">
-    <header class="bg-gray-100 py-4 px-8">
+    <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8">
         <h1 class="text-2xl font-bold">Node Running Resources</h1>
         <h2 class="text-lg font-medium text-gray-600">Interested in Running a Node? Check out the resources and links below:</h2>
     </header>
@@ -76,7 +76,7 @@
     </div>
     {#each categories as category}
         <ul class="m-10">
-            <header class="bg-gray-50 py-4 px-8">
+            <header class="bg-gray-50 dark:bg-gray-700 py-4 px-8">
                 <h1 class="text-xl font-bold">{category.heading}</h1>
                 {#if category.subheading}
                     <h2 class="text-lg font-medium text-gray-600">{category.subheading}</h2>

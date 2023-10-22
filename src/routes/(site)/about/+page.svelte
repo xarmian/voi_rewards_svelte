@@ -4,7 +4,7 @@
 </script>
 
 <div class="about">
-    <header class="bg-gray-100 py-4 px-8">
+    <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8">
         <h1 class="text-2xl font-bold">About</h1>
         <h2 class="text-lg font-medium text-gray-600">What is the Voi Rewards Auditor?</h2>
     </header>
