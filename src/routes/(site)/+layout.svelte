@@ -26,7 +26,7 @@
 			<FooterLink href="https://twitter.com/xarmian" target="_blank">My Twitter</FooterLink>
 			<FooterLink href="https://twitter.com/Voi_Net" target="_blank">Voi Twitter</FooterLink>
 			<FooterLink href="https://t.co/mXYdYkWE6i" target="_blank">Voi Discord</FooterLink>
-			<FooterLink href="https://github.com/xarmian/voi_rewards_svelte">Source Code</FooterLink>
+			<FooterLink href="https://github.com/xarmian/voi_rewards_svelte" target="_blank">Source Code</FooterLink>
 		  </FooterLinkGroup>
 		</div>
 		<hr class="my-6 border-gray-200 sm:mx-auto dark:border-gray-700 lg:my-8" />

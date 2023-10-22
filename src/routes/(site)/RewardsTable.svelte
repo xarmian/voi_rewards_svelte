@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch } from 'flowbite-svelte';
+    import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Tooltip } from 'flowbite-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { writable } from 'svelte/store';
     import RewardsTableHeader from './RewardsTableHeader.svelte';
@@ -200,15 +200,15 @@
       || (item.node?.node_name !== null && item.node?.node_name?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1));
     // $: pageItems = filterItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-    let columns = [
-        { id: 'rank', desc: 'Rank' },
-        { id: 'proposer', desc: 'Wallet' },
+    let columns: any = [
+        { id: 'rank', desc: 'Rank', tooltip: null },
+        { id: 'proposer', desc: 'Wallet', tooltip: null },
     ];
 
     if (!Device.isMobile) {
-      columns.push({ id: 'block_count', desc: 'Total Blocks' });
-      columns.push({ id: 'block_rewards', desc: 'Block Rewards' });
-      columns.push({ id: 'health_rewards', desc: 'Health Rewards' });
+      columns.push({ id: 'block_count', desc: 'Total Blocks', tooltip: 'Total blocks produced by each wallet during the Epoch' });
+      columns.push({ id: 'block_rewards', desc: 'Block Rewards', tooltip: 'Total expected rewards based on blocks produced during the Epoch' });
+      columns.push({ id: 'health_rewards', desc: 'Health Rewards', tooltip: 'Health rewards are distributed to all nodes with a Health Score of 5.0 or higher by the end of the Epoch.' });
     }
 
     columns.push({ id: 'total_rewards', desc: 'Total Rewards' });
@@ -219,9 +219,15 @@
   <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm}></TableSearch>
   <Table>
     <TableHead>
-        {#each columns as column}
+        {#each columns as column, i}
             <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
-                {column.desc}
+                <span>
+                  {column.desc}
+                  {#if column.tooltip}
+                    <i id="tooltip_{i}" class="fas fa-info-circle ml-2"></i>
+                    <Tooltip defaultClass="py-2 px-3 text-sm font-medium w-64" triggeredBy="#tooltip_{i}" type="auto">{column.tooltip}</Tooltip>
+                  {/if}
+                </span>
                 {#if column.id === 'block_rewards' || column.id === 'health_rewards' || column.id === 'total_rewards'}
                   <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)}></button>
                 {/if}
