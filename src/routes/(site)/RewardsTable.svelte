@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Tooltip } from 'flowbite-svelte';
+    import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Toggle, Tooltip } from 'flowbite-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { writable } from 'svelte/store';
     import RewardsTableHeader from './RewardsTableHeader.svelte';
@@ -21,6 +21,7 @@
 
     let nfdData: any[] = [];
     let expandedRow: number | null = null;
+    let showWalletNFD: boolean = true;
 
     const toggleRow = (row: number) => {
       if (expandedRow === row) {
@@ -45,14 +46,26 @@
           for (let i = 0; i < $sortItems.length; i++) {
             const item = $sortItems[i];
             item.block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
-            item.health_rewards = (item.node && item.node.health_score >= 5.0) ? Math.round(totalHealthRewards / totalHealthyNodes / item.node.health_divisor * Math.pow(10,6)) / Math.pow(10,6) : 0;
+
+            // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
+            item.health_rewards = 0;
+            if (item.nodes) {
+              item.nodes.forEach((node: any) => {
+                if (node.health_score >= 5) {
+                  item.health_rewards += Math.round(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,6)) / Math.pow(10,6);
+                }
+              });
+            }
+
             item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
+
             if (typeof item.nfd === 'undefined') {
               item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
             }
             if (typeof item.rank === 'undefined') {
               item.rank = i + 1;
             }
+
             $sortItems[i] = item;
           }
           
@@ -197,7 +210,8 @@
     $: filterItems = $sortItems.filter((item) => 
       (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) 
       || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)
-      || (item.node?.node_name !== null && item.node?.node_name?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1));
+      || (item.nodes?.some((node: { node_name: string | null; }) => node.node_name !== null && node.node_name?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)));
+      
     // $: pageItems = filterItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     let columns: any = [
@@ -216,13 +230,21 @@
 </script>
 
 <div class="overflow-auto {!Device.isMobile ? 'ml-6 mr-6' : ''}">
-  <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm}></TableSearch>
+  <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm}>
+  </TableSearch>
   <Table>
     <TableHead>
         {#each columns as column, i}
             <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
                 <span>
-                  {column.desc}
+                  {#if column.id === 'proposer'}
+                    <span class="inline-block negTranslate">{column.desc}</span>
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                    <span class="inline-block ml-4" on:click|stopPropagation><Toggle bind:checked={showWalletNFD}>NFD</Toggle></span>
+                  {:else}
+                    {column.desc}
+                  {/if}
                   {#if column.tooltip}
                     <i id="tooltip_{i}" class="fas fa-info-circle ml-2"></i>
                     <Tooltip defaultClass="py-2 px-3 text-sm font-medium w-64" triggeredBy="#tooltip_{i}" type="auto">{column.tooltip}</Tooltip>
@@ -241,7 +263,7 @@
               {item.rank}
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
-              {#if item.nfd !== undefined}
+              {#if showWalletNFD && item.nfd !== undefined}
                 <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,16)+'...' : item.nfd}</span>
               {:else}
                 {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
@@ -258,11 +280,13 @@
               <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_rewards}</TableBodyCell>
               <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
                 <div>{item.health_rewards}</div>
-                {#if item.node && item.node != null && item.node.health_score != null}
-                  <div class="whitespace-nowrap flex" title="Node Name: {item.node.node_name}{'\r'}Health Score: {item.node.health_score}{'\r'}Health Divisor: {item.node.health_divisor}">
-                    <div class="node_name truncate">{item.node.node_name}</div>
-                    <div class='node_health'> - {item.node.health_score}</div>
+                {#if item.nodes && item.nodes.length > 0}
+                  {#each item.nodes as node}
+                  <div class="whitespace-nowrap flex" title="Node Name: {node.node_name}{'\r'}Health Score: {node.health_score}{'\r'}Health Divisor: {node.health_divisor}">
+                    <div class="node_name truncate">{node.node_name}</div>
+                    <div class='node_health'> - {node.health_score}</div>
                   </div>
+                  {/each}
                 {:else}
                   <div style='font-size:10px'>(No Telemetry Data)</div>
                 {/if}
@@ -306,20 +330,26 @@
                   </div>
                 </div>
                 {/if}
+                {#each item.nodes as node}
                 <div>
                   <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Node ID:</Label>
+                    <span>{node.node_host}</span>
+                  </div>
+                  <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Node Name:</Label>
-                    <span>{item.node.node_name}</span>
+                    <span>{node.node_name}</span>
                   </div>
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Health Score:</Label>
-                    <span>{item.node.health_score}</span>
+                    <span>{node.health_score}</span>
                   </div>
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Health Divisor:</Label>
-                    <span>{item.node.health_divisor}</span>
+                    <span>{node.health_divisor}</span>
                   </div>
                 </div>
+                {/each}
               </div>
             </TableBodyCell>
           </TableBodyRow>
@@ -343,5 +373,8 @@
 
   a:active {
     color: #6b7280;
+  }
+  .negTranslate {
+    transform: translateY(-6px);
   }
 </style>
