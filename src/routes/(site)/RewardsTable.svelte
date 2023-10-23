@@ -152,19 +152,25 @@
     $: {
       sortItems = writable(items.slice()); // make a copy of the items array
 
+      let blockTotal = 0;
+      let healthTotal = 0;
+
       for (let i = 0; i < $sortItems.length; i++) {
         const item = $sortItems[i];
-        item.block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
+        item.block_rewards = Math.round(Math.floor(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
 
         // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
         item.health_rewards = 0;
         if (item.nodes) {
           item.nodes.forEach((node: any) => {
             if (node.health_score >= 5) {
-              item.health_rewards += Math.round(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,6)) / Math.pow(10,6);
+              item.health_rewards += Math.round(Math.floor(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
             }
           });
         }
+
+        blockTotal += item.block_rewards;
+        healthTotal += item.health_rewards;
 
         item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
 
@@ -177,6 +183,32 @@
 
         $sortItems[i] = item;
       }
+
+      /*// calculate the difference between totalBlockRewards and blockTotal, and add or subtract from the first X wallets
+      let remain = totalBlockRewards - blockTotal;
+      if (remain !== 0) {
+        for (let i = 0; i < $sortItems.length; i++) {
+          const item = $sortItems[i];
+          const adj = remain/Math.abs(remain);
+          item.block_rewards += adj;
+          item.total_rewards += adj;
+          $sortItems[i] = item;
+          remain -= adj;
+        }
+      }
+
+      // do the same for health rewards
+      remain = totalHealthRewards - healthTotal;
+      if (remain !== 0) {
+        for (let i = 0; i < $sortItems.length; i++) {
+          const item = $sortItems[i];
+          const adj = remain/Math.abs(remain);
+          item.health_rewards += adj;
+          item.total_rewards += adj;
+          $sortItems[i] = item;
+          remain -= adj;
+        }
+      }*/
 
       const key = $sortKey;
       const direction = $sortDirection;
