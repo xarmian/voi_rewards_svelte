@@ -12,16 +12,17 @@
     import Device from 'svelte-device-info';
 
     export let items: any[] = [];
-
+    
     $: totalBlockRewards = 0;
     $: totalHealthRewards = 0;
     $: totalHealthyNodes = 0;
     $: totalBlocks = 0;
-    $: unsubRewardParams = function() {};
 
     let nfdData: any[] = [];
     let expandedRow: number | null = null;
     let showWalletNFD: boolean = true;
+    let sortItems = writable<any[]>([]);
+    let filterItems = <any[]>([]);
 
     const toggleRow = (row: number) => {
       if (expandedRow === row) {
@@ -35,44 +36,13 @@
       // convert to NFDs
       const allAddresses = items.map((row: any) => row.proposer);
       nfdData = await getNFD(allAddresses);
+    });
 
-      unsubRewardParams = rewardParams.subscribe(async (value) => {
-        totalBlockRewards = value.block_reward_pool;
-        totalHealthRewards = value.health_reward_pool;
-        totalHealthyNodes = value.total_healthy_nodes;
-        totalBlocks = value.total_blocks;
-
-        if ($sortItems) {
-          for (let i = 0; i < $sortItems.length; i++) {
-            const item = $sortItems[i];
-            item.block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
-
-            // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
-            item.health_rewards = 0;
-            if (item.nodes) {
-              item.nodes.forEach((node: any) => {
-                if (node.health_score >= 5) {
-                  item.health_rewards += Math.round(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,6)) / Math.pow(10,6);
-                }
-              });
-            }
-
-            item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
-
-            if (typeof item.nfd === 'undefined') {
-              item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
-            }
-            if (typeof item.rank === 'undefined') {
-              item.rank = i + 1;
-            }
-
-            $sortItems[i] = item;
-          }
-          
-          $sortItems = $sortItems;
-        }
-      });
-
+    $: unsubRewardParams = rewardParams.subscribe(async (value) => {
+      totalBlockRewards = value.block_reward_pool;
+      totalHealthRewards = value.health_reward_pool;
+      totalHealthyNodes = value.total_healthy_nodes;
+      totalBlocks = value.total_blocks;
     });
 
     $: onDestroy(unsubRewardParams);
@@ -125,8 +95,7 @@
 
     const sortKey = writable('block_count'); // default sort key
     const sortDirection = writable(1); // default sort direction (descending)
-    const sortItems = writable(items.slice()); // make a copy of the items array
-  
+
     // Define a function to sort the items
     const sortTable = (key: any) => {
       // If the same key is clicked, reverse the sort direction
@@ -142,8 +111,8 @@
       //if (typeof event !== 'undefined') event.stopPropagation(); // Stop event propagation
 
       // Get the table data
-      const rows = filterItems.filter(row => row.total_rewards > 0);
-      const data = rows.map(row => {
+      const rows = filterItems.filter((row: { total_rewards: number; }) => row.total_rewards > 0);
+      const data = rows.map((row: { proposer: any; block_rewards: any; health_rewards: any; total_rewards: any; }) => {
         const address = row.proposer;
         let tokenAmount;
         let note;
@@ -165,7 +134,7 @@
 
       // Create the CSV content
       const headers = ['account', 'userType', 'tokenAmount', 'note'];
-      const csvContent = headers.join(',') + '\n' + data.map(row => row.join(',')).join('\n');
+      const csvContent = headers.join(',') + '\n' + data.map((row: any[]) => row.join(',')).join('\n');
 
       // Download the CSV file
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -181,6 +150,34 @@
     }
   
     $: {
+      sortItems = writable(items.slice()); // make a copy of the items array
+
+      for (let i = 0; i < $sortItems.length; i++) {
+        const item = $sortItems[i];
+        item.block_rewards = Math.round(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
+
+        // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
+        item.health_rewards = 0;
+        if (item.nodes) {
+          item.nodes.forEach((node: any) => {
+            if (node.health_score >= 5) {
+              item.health_rewards += Math.round(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,6)) / Math.pow(10,6);
+            }
+          });
+        }
+
+        item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
+
+        if (typeof item.nfd === 'undefined') {
+          item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
+        }
+        if (typeof item.rank === 'undefined') {
+          item.rank = i + 1;
+        }
+
+        $sortItems[i] = item;
+      }
+
       const key = $sortKey;
       const direction = $sortDirection;
       const sorted = [...$sortItems].sort((a, b) => {
@@ -205,14 +202,12 @@
         return 0;
       });
       sortItems.set(sorted);
-    }
-
-    $: filterItems = $sortItems.filter((item) => 
+   
+      filterItems = $sortItems.filter((item: { proposer: string; nfd: string | undefined; nodes: { node_name: string | null; }[]; }) => 
       (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) 
       || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)
       || (item.nodes?.some((node: { node_name: string | null; }) => node.node_name !== null && node.node_name?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)));
-      
-    // $: pageItems = filterItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    }
 
     let columns: any = [
         { id: 'rank', desc: 'Rank', tooltip: null },
