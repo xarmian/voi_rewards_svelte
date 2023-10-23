@@ -157,14 +157,14 @@
 
       for (let i = 0; i < $sortItems.length; i++) {
         const item = $sortItems[i];
-        item.block_rewards = Math.round(Math.floor(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
+        item.block_rewards = Math.floor(Math.ceil(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
 
         // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
         item.health_rewards = 0;
         if (item.nodes) {
           item.nodes.forEach((node: any) => {
             if (node.health_score >= 5) {
-              item.health_rewards += Math.round(Math.floor(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
+              item.health_rewards += Math.floor(Math.ceil(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
             }
           });
         }
