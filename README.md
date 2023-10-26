@@ -7,7 +7,7 @@ The network is currently in TestNet, and TestNet is a game. Token amounts will r
 This is the source code for the website, located at [https://voirewards.com](https://voirewards.com).
 This website is an unofficial resource. It is not affiliated with the VOI Core Team.
 
-The website is written using the [https://svelte.dev](Svelte framework).
+The website is written using the [Svelte framework](https://svelte.dev).
 
 To run locally:
 ```
