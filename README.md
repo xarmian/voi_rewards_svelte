@@ -1,6 +1,6 @@
 # Voi Rewards Auditor
 
-VOI Rewards Auditor is a tool to help estimate and calculate rewards for running a node on the VOI network.
+VOI Rewards Auditor is a tool to help estimate and calculate rewards for running a node on the VOI blockchain network.
 
 The network is currently in TestNet, and TestNet is a game. Token amounts will reset prior to MainNet.
 
