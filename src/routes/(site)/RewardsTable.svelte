@@ -17,6 +17,7 @@
     $: totalHealthRewards = 0;
     $: totalHealthyNodes = 0;
     $: totalBlocks = 0;
+    $: totalExtraNodes = 0;
 
     let nfdData: any[] = [];
     let expandedRow: number | null = null;
@@ -43,6 +44,7 @@
       totalHealthRewards = value.health_reward_pool;
       totalHealthyNodes = value.total_healthy_nodes;
       totalBlocks = value.total_blocks;
+      totalExtraNodes = value.total_extra_nodes;
     });
 
     $: onDestroy(unsubRewardParams);
@@ -154,6 +156,7 @@
 
       let blockTotal = 0;
       let healthTotal = 0;
+      let totalRewardedNodes = totalHealthyNodes - totalExtraNodes;
 
       for (let i = 0; i < $sortItems.length; i++) {
         const item = $sortItems[i];
@@ -162,11 +165,14 @@
         // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
         item.health_rewards = 0;
         if (item.nodes) {
-          item.nodes.forEach((node: any) => {
-            if (node.health_score >= 5) {
-              item.health_rewards += Math.floor(Math.ceil(totalHealthRewards / totalHealthyNodes / node.health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
-            }
-          });
+          // sort elements in item.nodes from lowest health_divisor to highest
+          item.nodes.sort((a: any, b: any) => a.health_divisor - b.health_divisor);
+
+          // try to get the first index of an element in item.nodes with a health_score >= 5.0
+          const healthyNodeIndex = item.nodes.findIndex((node: any) => node.health_score >= 5.0);
+          if (healthyNodeIndex !== -1) {
+            item.health_rewards += Math.floor(Math.ceil(totalHealthRewards / totalRewardedNodes / item.nodes[healthyNodeIndex].health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
+          }
         }
 
         blockTotal += item.block_rewards;
@@ -382,6 +388,26 @@
           </TableBodyRow>
         {/if}
       {/each}
+      <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
+        <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
+        <TableBodyCell colspan="2" class="p-2">
+          Totals:
+        </TableBodyCell>
+        {#if !Device.isMobile}
+          <TableBodyCell class="p-2">
+            {items.reduce((sum, item) => sum + item.block_count, 0)}
+          </TableBodyCell>
+          <TableBodyCell class="p-2">
+            {Math.round(items.reduce((sum, item) => sum + item.block_rewards, 0))}
+          </TableBodyCell>
+          <TableBodyCell class="p-2">
+            {Math.round(items.reduce((sum, item) => sum + item.health_rewards, 0))}
+          </TableBodyCell>
+        {/if}
+        <TableBodyCell class="p-2">
+          {Math.round(items.reduce((sum, item) => sum + item.block_rewards + item.health_rewards, 0))}
+        </TableBodyCell>
+      </TableBodyRow>
     </TableBody>
   </Table>
 </div>

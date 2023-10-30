@@ -10,6 +10,7 @@
 	$: block_height_timestamp = '';
 	$: totalHealthyNodes = 0;
 	$: totalEmptyNodes = 0;
+	$: totalExtraNodes = 0;
 	$: block_reward_pool = 12500000;
 	$: health_reward_pool = 10000000;
 	$: selectedDate = '';
@@ -112,6 +113,7 @@
 				});
 				totalHealthyNodes = data.healthy_node_count;
 				totalEmptyNodes = data.empty_node_count;
+				totalExtraNodes = data.extra_node_count;
 			});
 	};
 
@@ -126,6 +128,7 @@
 			health_reward_pool: health_reward_pool,
 			total_blocks: totalBlocks,
 			total_healthy_nodes: totalHealthyNodes - totalEmptyNodes,
+			total_extra_nodes: totalExtraNodes,
 		});
 	}
 </script>
