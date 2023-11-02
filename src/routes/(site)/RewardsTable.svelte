@@ -374,6 +374,10 @@
                     <span>{node.node_name}</span>
                   </div>
                   <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Algod Version:</Label>
+                    <span>{node.ver}</span>
+                  </div>
+                  <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Health Score:</Label>
                     <span>{node.health_score}</span>
                   </div>
