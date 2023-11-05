@@ -78,10 +78,10 @@
     </div>
     <ul class="m-10">
         <header class="bg-gray-50 dark:bg-gray-700 py-4 px-8">
-            <h1 class="text-xl font-bold">Quick Start</h1>
+            <h1 class="text-xl font-bold">Quick Start Guide</h1>
         </header>
         <li class='ml-10 m-2'>
-            1. Set up a Node using one of the <b>Guides</b> below.
+            1. Set up a Node using one of the <b>Participation Node Setup Guides</b> below.
         </li>
         <li class='ml-10 m-2'>
             2. Go to the <A href="htps://discord.gg/voinetwork" target="_blank">VOI Discord</A>, and request the <b>Node Runner</b> role in the <A href="https://discord.com/channels/1055863853633785857/1157678590196973728" target="_blank">#rules-and-roles</A> channel.
@@ -97,13 +97,17 @@
             5. Bring your wallet "online" as explained in the Guide you used to set up your node. 
         </li>
         <li class='ml-10 m-2'>
-            6. Once your wallet is online, <b>repeat step 4</b> to receive a "top-up" to 80 or more VOI tokens. These extra tokens will help "seed" your node, allowing metrics to be captured to calculate your Health Score.
+            6. Once your wallet is online, <b>repeat step 3 and 4</b> to receive a "top-up" to 80 or more VOI tokens. These extra tokens will help "seed" your node to begin voting in concensus, which allows metrics to be captured to calculate your Health Score.
         </li>
         <li class='ml-10 m-2'>
-            7. Wait a few hours for it to appear, and then monitor your node's health on the <A href="https://voi-node-info.boeieruurd.com/">Voi-Node Metrics Dashboard</A>. On the Monday following a Healthy weekly score of 5.0 or higher, you will receive your first Health rewards.
+            7. Wait a few hours for it to appear on the <A href="https://voi-node-info.boeieruurd.com/">Voi-Node Metrics Dashboard</A>, then periodically monitor your node's health. On the Monday following a Healthy <b>weekly</b> score of 5.0 or higher, you will receive your first Health rewards directly to your wallet.
         </li>
         <li class='ml-10 m-2'>
-            8. After receiving your first Health rewards, your node should begin producing blocks. Each following week you should be eligible to receive both Health and Block rewards.
+            8. After receiving your first Health rewards, your node should begin producing blocks. No additional steps are needed to increase your "stake". Each following week you should be eligible to receive both Health and Block rewards.
+        </li>
+        <li class='ml-10 m-2'>
+            <b>NOTE:</b> All Healthy Nodes receive an equal share of the <i>Health Rewards</i> each week. <i>Block Rewards</i> are based on blocks produced by your node as a fraction of the total eligible blocks produced during the week.
+            Visit the <A href='/'>Home</A> page to see an estimate of rewards expected for your wallet based on each week's metrics.
         </li>
     </ul>
     {#each categories as category}
