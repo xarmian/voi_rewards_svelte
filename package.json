@@ -36,6 +36,7 @@
 	"dependencies": {
 		"@fortawesome/fontawesome-free": "^6.4.2",
 		"@vercel/analytics": "^1.1.1",
+		"algosdk": "^2.7.0",
 		"flowbite-svelte": "^0.44.18",
 		"flowbite-svelte-icons": "^0.4.4",
 		"svelte-device-info": "^1.0.0"

@@ -3,7 +3,8 @@
 	import { onMount } from 'svelte';
 	import RewardsTable from './RewardsTable.svelte';
 	import { rewardParams } from '../../stores/dataTable';
-    
+    import { algodClient } from '$lib/utils/algod';
+
 	$: totalBlocks = 0;
 	$: totalWallets = 0;
 	$: block_height = 0;
@@ -19,6 +20,9 @@
 
 	let dates: any;
 	$: dates = [];
+
+	let supply: any;
+	$: supply = {};
 
 	const populateDateDropdown = async () => {
 		const url = 'https://socksfirstgames.com/proposers/';
@@ -120,6 +124,9 @@
 	onMount(async () => {
 		await populateDateDropdown();
 		loadDashboardData(selectedDate);
+
+		// get online stake
+		supply = await algodClient.supply().do();
 	});
 
 	$: {
@@ -166,7 +173,7 @@
 				<span class="text-sm">(in epoch)</span>
 			</h5>
 			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{totalBlocks == 0 ? '...Loading...' : totalBlocks}
+				{totalBlocks == 0 ? '...Loading...' : totalBlocks.toLocaleString()}
 			</p>
 		</div>
 	</Card>
@@ -179,7 +186,7 @@
 				{#if block_height == 0}
 					...Loading...
 				{:else}
-					{block_height}
+					{block_height.toLocaleString()}
 					<br />
 					<div class="text-sm my-1">
 						{block_height_timestamp} UTC
@@ -191,10 +198,19 @@
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Total Wallets
+				Participating Wallets
 			</h5>
 			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
 				{totalWallets == 0 ? '...Loading...' : totalWallets}
+			</p>
+		</div>
+		<br/>
+		<div class="cardInner">
+			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+				Online Stake
+			</h5>
+			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+				{(supply['online-money']??0) == 0 ? '...Loading...' : Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString()+' VOI'}
 			</p>
 		</div>
 	</Card>
