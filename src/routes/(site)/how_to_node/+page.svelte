@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { TwitterSolid, DiscordSolid, GlobeOutline, LinkSolid, LinkOutline } from 'flowbite-svelte-icons';
     import { A } from 'flowbite-svelte';
+    import faucetImg from '$lib/assets/voi-testnet-faucet.png';
 
     let categories = [{
         heading: 'Participation Node Setup Guides',
@@ -50,7 +51,7 @@
             },
             {
                 text: 'VOI Discord',
-                url: 'https://t.co/mXYdYkWE6i',
+                url: 'htps://discord.gg/voinetwork',
             },
             {
                 text: '@Voi_Net Twitter',
@@ -73,7 +74,38 @@
     <div class="m-10">
         Node Runners earn rewards based on the number of blocks they produce and the health of their node.
         <A href="https://docs.google.com/document/d/1tgU9Ytd4YxHGOsnFBIuEV75sclpI92AeYPxVZcBxvE0" target="_blank">See this approved proposal</A> for more specific details on how node runners are rewarded.
+        Rewards are distributed each Monday based on the previous week's Health score and block proposal count.
     </div>
+    <ul class="m-10">
+        <header class="bg-gray-50 dark:bg-gray-700 py-4 px-8">
+            <h1 class="text-xl font-bold">Quick Start</h1>
+        </header>
+        <li class='ml-10 m-2'>
+            1. Set up a Node using one of the <b>Guides</b> below.
+        </li>
+        <li class='ml-10 m-2'>
+            2. Go to the <A href="htps://discord.gg/voinetwork" target="_blank">VOI Discord</A>, and request the <b>Node Runner</b> role in the <A href="https://discord.com/channels/1055863853633785857/1157678590196973728" target="_blank">#rules-and-roles</A> channel.
+        </li>
+        <li class='ml-10 m-2'>
+            3. Go to the <A href="https://discord.com/channels/1055863853633785857/1128672413048115250" target="_blank">#node-runner-help</A> channel and start to type <b>/voi-testnet-faucet</b> until you see this:
+            <img src="{faucetImg}" style='max-height:200px;'/>
+        </li>
+        <li class='ml-10 m-2'>
+            4. Click <b>/voi-testnet-faucet</b> and paste your wallet address directly after it, like this: <span class='faucet-text'>/voi-testnet-faucet YOUR_WALLET_ADDRESS</span> and hit Enter to receive one VOI token.
+        </li>
+        <li class='ml-10 m-2'>
+            5. Bring your wallet "online" as explained in the Guide you used to set up your node. 
+        </li>
+        <li class='ml-10 m-2'>
+            6. Once your wallet is online, <b>repeat step 4</b> to receive a "top-up" to 80 or more VOI tokens. These extra tokens will help "seed" your node, allowing metrics to be captured to calculate your Health Score.
+        </li>
+        <li class='ml-10 m-2'>
+            7. Wait a few hours for it to appear, and then monitor your node's health on the <A href="https://voi-node-info.boeieruurd.com/">Voi-Node Metrics Dashboard</A>. On the Monday following a Healthy weekly score of 5.0 or higher, you will receive your first Health rewards.
+        </li>
+        <li class='ml-10 m-2'>
+            8. After receiving your first Health rewards, your node should begin producing blocks. Each following week you should be eligible to receive both Health and Block rewards.
+        </li>
+    </ul>
     {#each categories as category}
         <ul class="m-10">
             <header class="bg-gray-50 dark:bg-gray-700 py-4 px-8">
@@ -101,3 +133,16 @@
         </ul>
     {/each}
 </div>
+
+<style>
+    .faucet-text {
+        background-color: #f7fafc;
+        border-radius: 0.25rem;
+        color: #4a5568;
+        display: inline-block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        line-height: 1.25rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
