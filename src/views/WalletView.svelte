@@ -4,6 +4,9 @@
 	import { algodClient } from '$lib/utils/algod';
     //@ts-ignore
     import Device from 'svelte-device-info';
+    import { getNFD } from '$lib/utils/nfd'
+    import { copy } from 'svelte-copy';
+    import { toast } from '@zerodevx/svelte-toast';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
@@ -19,6 +22,7 @@
     let apiData: any;
     $: apiData = {};
     $: nodeData = (apiData.data) ? apiData.data[0] : {};
+    $: nfDomain = '';
 
     $: {
         balance = Number(accountInfo?.amount??0);
@@ -50,6 +54,10 @@
             .catch((error) => {
                 console.error(error);
             });
+
+        const nfdData: any = await getNFD([walletId]);
+        nfDomain = nfdData.find((nfd: any) => nfd.key === walletId)?.replacementValue;
+        
         isMobile = Device.isMobile;
     });
 </script>
@@ -58,11 +66,16 @@
     <Card padding="md" size="lg">
         <h3>
             Account
-            {#if isModal}
-                <a href="/wallet/{walletId}" target="_blank" style="float:right;" title="Open Wallet View in new page">
-                    <i class="fas fa-external-link-alt"></i>
-                </a>
-            {/if}
+            <div style="float:right;">
+                <button class="inline mr-1" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
+                    <i class="fas fa-copy"></i>
+                </button>
+                {#if isModal}
+                    <a href="/wallet/{walletId}" target="_blank" title="Open Wallet View in new page">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                {/if}
+            </div>
         </h3>
         <h1 class="font-bold">
             <a href='https://voi.observer/explorer/account/{walletId}/transactions'
@@ -75,6 +88,15 @@
                 {/if}
             </a>
         </h1>
+        {#if nfDomain}
+            <p class="text-center">
+                <span>
+                    <a href='https://app.nf.domains/name/{nfDomain}' target='_blank' class="text-blue-500 hover:text-blue-800 hover:underline">
+                        {nfDomain}
+                    </a>
+                </span>
+            </p>
+        {/if}
         <br/>
         <div class="cardContents">
             {#if !accountInfo}
@@ -149,8 +171,9 @@
                     <span>
                         {#if typeof apiData.total_blocks != 'undefined'}
                             {(estimatedBlocks - apiData.total_blocks)*-1} 
-                            ({apiData.estimatedBlocks > 0 ?
-                                Math.round((estimatedBlocks - apiData.total_blocks) / estimatedBlocks * 10000)/100*(-1) : '0'}%)
+                            ({estimatedBlocks > 0 ?
+                                (estimatedBlocks < apiData.total_blocks ? '+' : '-') +
+                                Math.abs(Math.round((estimatedBlocks - apiData.total_blocks) / estimatedBlocks * 10000)/100) : '0'}%)
                         {:else}
                             Loading...
                         {/if}

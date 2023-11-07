@@ -9,6 +9,7 @@
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
 	  import { slide } from 'svelte/transition';
+    import { getNFD } from '$lib/utils/nfd';
     //@ts-ignore
     import Device from 'svelte-device-info';
 	  import WalletView from '../../views/WalletView.svelte';
@@ -53,46 +54,6 @@
     });
 
     $: onDestroy(unsubRewardParams);
-
-    async function getNFD(data: any) {
-        const aggregatedNFDs: any[] = [];
-        let addressChunks = [];
-        let chunkSize = 20;
-
-        for (let i = 0; i < data.length; i += chunkSize) {
-            addressChunks.push(data.slice(i, i + chunkSize));
-        }
-
-        const allFetches = addressChunks.map((addressChunk, index) => {
-            let url = "https://api.nf.domains/nfd/lookup?";
-            let params = new URLSearchParams();
-
-            addressChunk.forEach((address: string) => {
-                params.append("address", address);
-            });
-
-            params.append("view", "tiny");
-            params.append("allowUnverified", "true");
-
-            url += params.toString();
-
-            return fetch(url)
-                .then(response => response.json())
-                .then(additionalData => {
-                    Object.entries(additionalData).forEach((val) => {
-                        const key = val[0];
-                        const value: any = val[1];
-
-                        const replacementValue = value.name;
-                        aggregatedNFDs.push({ key, replacementValue });
-                    });
-                })
-                .catch(error => {}); // suppress error //console.error("Error fetching additional data:", error));
-        });
-
-        await Promise.all(allFetches);
-        return aggregatedNFDs;
-    }
 
     let searchTerm: string = '';
 
