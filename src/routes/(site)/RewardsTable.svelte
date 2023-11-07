@@ -5,11 +5,13 @@
     import RewardsTableHeader from './RewardsTableHeader.svelte';
     import { rewardParams } from '../../stores/dataTable';
 	  import { CopySolid, LinkSolid } from 'flowbite-svelte-icons';
+    import { Modal } from 'flowbite-svelte';
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
 	  import { slide } from 'svelte/transition';
     //@ts-ignore
     import Device from 'svelte-device-info';
+	  import WalletView from '../../views/WalletView.svelte';
 
     export let items: any[] = [];
     
@@ -24,6 +26,9 @@
     let showWalletNFD: boolean = true;
     let sortItems = writable<any[]>([]);
     let filterItems = <any[]>([]);
+    
+    let viewWallet = false;
+    let viewWalletId = '';
 
     const toggleRow = (row: number) => {
       if (expandedRow === row) {
@@ -272,8 +277,6 @@
                 <span>
                   {#if column.id === 'proposer'}
                     <span class="inline-block negTranslate">{column.desc}</span>
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <!-- svelte-ignore a11y-no-static-element-interactions -->
                     <span class="inline-block ml-4" on:click|stopPropagation><Toggle bind:checked={showWalletNFD}>NFD</Toggle></span>
                   {:else}
                     {column.desc}
@@ -296,11 +299,16 @@
               {item.rank}
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
-              {#if showWalletNFD && item.nfd !== undefined}
-                <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,16)+'...' : item.nfd}</span>
-              {:else}
-                {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
-              {/if}
+              <button on:click|stopPropagation={() => {
+                viewWallet = true;
+                if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+              }} class="text-blue-500 hover:text-blue-800 hover:underline">
+                {#if showWalletNFD && item.nfd !== undefined}
+                  <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,16)+'...' : item.nfd}</span>
+                {:else}
+                  {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
+                {/if}
+              </button>
               <button use:copy={item.proposer} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}>
                 <CopySolid size='sm' class='inline' />
               </button> 
@@ -415,6 +423,9 @@
     </TableBody>
   </Table>
 </div>
+<Modal bind:open={viewWallet} autoclose size='lg' outsideclose>
+  <WalletView walletId={viewWalletId}></WalletView>
+</Modal>
 <style>
   .node_name {
     max-width: 200px;
