@@ -64,9 +64,9 @@
 
 <div class='cardContainer' style='margin:0;margin-top:18px;'>
     <Card padding="md" size="lg">
-        <h3>
-            Account
-            <div style="float:right;">
+        <h3 class="relative flex items-center justify-center">
+            <span>Account</span>
+            <div class="absolute right-0">
                 <button class="inline mr-1" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
                     <i class="fas fa-copy"></i>
                 </button>
