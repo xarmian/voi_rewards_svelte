@@ -1,6 +1,6 @@
 export async function getAddressesForNFD(nfdName: string): Promise<string[]> {
     // Define the API endpoint
-    const url = `https://api.nf.domains/nfd/${nfdName}?view=brief&poll=false&nocache=false`;
+    const url = `https://api.nf.domains/nfd/${nfdName.toLocaleLowerCase()}?view=brief&poll=false&nocache=false`;
 
     try {
         // Make a GET request to the API

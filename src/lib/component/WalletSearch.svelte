@@ -117,7 +117,7 @@
             <ul class="inline-block text-left">
                 {#each addressList as address, index}
                     <li>
-                        <button class="p-1 border border-solid text-left w-screen md:w-full lg:w-full"
+                        <button class="p-1 border border-solid text-left w-screen md:w-full lg:w-full text-lg"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => {
                                 searchText = address;
