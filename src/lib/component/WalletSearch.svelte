@@ -15,6 +15,7 @@
     */
 
 	import { getAddressesForNFD } from '$lib/utils/nfd';
+	import { toast } from '@zerodevx/svelte-toast';
 	import { onMount, onDestroy } from 'svelte';
 
 	let searchText = '';
@@ -25,22 +26,6 @@
 	let selectedAddressIndex = -1;
 	let windowDefined = false;
     let componentElement: any;
-
-	// Function to handle text input changes
-	function handleInput() {
-		// Implement logic to search NFDomain and update addressList
-		if (searchText.includes('.algo')) {
-			getAddressesForNFD(searchText).then((data) => {
-				addressList = data;
-			});
-		}
-	}
-
-	// Function to handle address selection or submit
-	function handleSubmit(addr?: string) {
-        localStorage.setItem('searchText', searchText);
-		goto(`/wallet/${addr??searchText}`);
-	}
 
 	onMount(() => {
         windowDefined = typeof window !== 'undefined';
@@ -63,8 +48,40 @@
 		}
 	});
 
+	// Function to handle text input changes
+	function handleInput() {
+		// Implement logic to search NFDomain and update addressList
+		if (searchText.includes('.algo')) {
+			getAddressesForNFD(searchText).then((data) => {
+				addressList = data;
+			});
+		}
+        else {
+            addressList = [];
+        }
+	}
+
+	// Function to handle address selection or submit
+	function handleSubmit(addr?: string) {
+        localStorage.setItem('searchText', searchText);
+
+        if (selectedAddressIndex >= 0) {
+            addr = addressList[selectedAddressIndex];
+        }
+
+        if (!addr && searchText.length != 58) {
+            if (addressList.length == 0) {
+                toast.push('Invalid address');
+            }
+            else {
+                toast.push('Please select an address');
+            }
+            return;
+        }
+		goto(`/wallet/${addr??searchText.toUpperCase()}`);
+	}
+
     function handleClickOutside(event: MouseEvent) {
-        console.log(componentElement);
         if (!componentElement.contains(event.target)) {
             addressList = [];
         }
@@ -110,7 +127,7 @@
             class="dark:bg-gray-700 bg-gray-100 flex-grow"
             placeholder="Select wallet by Address or NFD"
         />
-        <button on:click={() => handleSubmit} class="dark:bg-blue-500 bg-blue-300 p-2"> Submit </button>
+        <button on:click={() => handleSubmit(undefined)} class="dark:bg-blue-500 bg-blue-300 p-2"> Submit </button>
     </div>
 
     {#if addressList.length > 0}
