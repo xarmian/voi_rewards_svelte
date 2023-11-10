@@ -196,6 +196,17 @@
           return 0;
         }
 
+        if (key === 'health_rewards') {
+          const aVal = Number(a.nodes?.[0]?.health_score??0);
+          const bVal = Number(b.nodes?.[0]?.health_score??0);
+          if (aVal > bVal) {
+            return -direction;
+          } else if (aVal < bVal) {
+            return direction;
+          }
+          return 0;
+        }
+
         const aVal = a[key];
         const bVal = b[key];
         if (aVal > bVal) {
