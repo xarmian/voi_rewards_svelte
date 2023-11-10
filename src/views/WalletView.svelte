@@ -60,6 +60,24 @@
         
         isMobile = Device.isMobile;
     });
+
+    function formatTime(seconds: number) {
+        const days = seconds / (24 * 60 * 60);
+        if (days > 3) {
+            return `${days.toFixed(1)} days`;
+        } else {
+            const hours = Math.floor(seconds / (60 * 60));
+            seconds %= 60 * 60;
+            const minutes = Math.floor(seconds / 60);
+            return `${hours} hours, ${minutes} minutes`;
+        }
+    }
+
+    function dateFromSeconds(seconds: number) {
+        const date = new Date();
+        date.setSeconds(date.getSeconds() + seconds);
+        return date.toLocaleString();
+    }
 </script>
 
 <div class='cardContainer' style='margin:0;margin-top:18px;'>
@@ -182,6 +200,27 @@
             </div>
         </Card>
     </div>
+    {#if accountInfo && accountInfo.status=='Online'}
+        <div class='cardContainer'>
+            <Card padding="md" size="lg">
+                <h3>Consensus</h3>
+                <div class="cardContents">
+                    <p>
+                        <span class="label">Vote Key Expires:</span>
+                        <span>{accountInfo ? (formatTime((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)) : 'Loading...'}</span>
+                    </p>
+                    <p>
+                        <span class="label"></span>
+                        <span>{accountInfo ? (dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)) : 'Loading...'}</span>
+                    </p>
+                    <p>
+                        <span class="label">Block:</span>
+                        <span>{accountInfo ? accountInfo['participation']['vote-last-valid'].toLocaleString() : 'Loading...'}</span>
+                    </p>
+                </div>
+            </Card>
+        </div>
+    {/if}
 </div>
 
 <style>
