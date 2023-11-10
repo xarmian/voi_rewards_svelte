@@ -27,9 +27,6 @@
     let componentElement: any;
 
 	// Function to handle text input changes
-	/**
-	 * @param {{ target: { value: string; }; }} event
-	 */
 	function handleInput() {
 		// Implement logic to search NFDomain and update addressList
 		if (searchText.includes('.algo')) {
@@ -40,18 +37,23 @@
 	}
 
 	// Function to handle address selection or submit
-	function handleSubmit() {
-		// Navigate to /wallet/<searchText>
-		goto(`/wallet/${searchText}`);
+	function handleSubmit(addr?: string) {
+        localStorage.setItem('searchText', searchText);
+		goto(`/wallet/${addr??searchText}`);
 	}
 
 	onMount(() => {
-		windowDefined = typeof window !== 'undefined';
-		if (windowDefined) {
-			// You can safely use window here
-			window.addEventListener('keydown', handleKeydown);
+        windowDefined = typeof window !== 'undefined';
+        if (windowDefined) {
+            window.addEventListener('keydown', handleKeydown);
             document.addEventListener('click', handleClickOutside);
-		}
+
+            // Read searchText from local storage
+            const storedSearchText = localStorage.getItem('searchText');
+            if (storedSearchText) {
+                searchText = storedSearchText;
+            }
+        }
 	});
 
 	onDestroy(() => {
@@ -85,8 +87,8 @@
             }
             event.preventDefault();
         } else if (event.key === 'Enter' && selectedAddressIndex >= 0) {
-            searchText = addressList[selectedAddressIndex];
-            handleSubmit();
+            //searchText = addressList[selectedAddressIndex];
+            handleSubmit(addressList[selectedAddressIndex]);
             event.preventDefault();
         }
     }
@@ -108,7 +110,7 @@
             class="dark:bg-gray-700 bg-gray-100 flex-grow"
             placeholder="Select wallet by Address or NFD"
         />
-        <button on:click={handleSubmit} class="dark:bg-blue-500 bg-blue-300 p-2"> Submit </button>
+        <button on:click={() => handleSubmit} class="dark:bg-blue-500 bg-blue-300 p-2"> Submit </button>
     </div>
 
     {#if addressList.length > 0}
@@ -120,8 +122,7 @@
                         <button class="p-1 border border-solid text-left w-screen md:w-full lg:w-full text-lg"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => {
-                                searchText = address;
-                                handleSubmit();
+                                handleSubmit(address);
                             }}>{address}</button
                         >
                     </li>
