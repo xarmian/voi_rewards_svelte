@@ -65,8 +65,8 @@ export async function getNFD(data: string[]) {
                     const replacementValue = value.name;
                     aggregatedNFDs.push({ key, replacementValue });
                 });
-            });
-            // .catch(error => {}); //console.error("Error fetching additional data:", error));
+            })
+            .catch(error => {}); //console.error("Error fetching additional data:", error));
     });
 
     await Promise.all(allFetches);
