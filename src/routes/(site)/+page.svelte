@@ -4,6 +4,7 @@
 	import RewardsTable from './RewardsTable.svelte';
 	import { rewardParams } from '../../stores/dataTable';
     import { algodClient } from '$lib/utils/algod';
+	import WalletSearch from '$lib/component/WalletSearch.svelte';
 
 	$: totalBlocks = 0;
 	$: totalWallets = 0;
@@ -164,6 +165,9 @@
 		</div>
 	</div>
 {/if}
+<div class="text-center">
+	<WalletSearch />
+</div>
 <div class="dashboard justify-evenly">
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
@@ -330,9 +334,9 @@
 		align-items: center;
 		transition: all 0.3s ease-in-out;
 	}
-	.cardInner:hover {
+	/*.cardInner:hover {
 		transform: translateY(-5px);
-	}
+	}*/
 	.cardInner h5 {
 		font-size: 18px;
 		margin-bottom: 5px;
