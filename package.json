@@ -14,6 +14,7 @@
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^2.0.0",
 		"@sveltejs/kit": "^1.20.4",
+		"@types/d3-scale": "^4.0.8",
 		"@typescript-eslint/eslint-plugin": "^6.0.0",
 		"@typescript-eslint/parser": "^6.0.0",
 		"@zerodevx/svelte-toast": "^0.9.5",
@@ -37,8 +38,10 @@
 		"@fortawesome/fontawesome-free": "^6.4.2",
 		"@vercel/analytics": "^1.1.1",
 		"algosdk": "^2.7.0",
+		"d3-scale": "github:d3/d3-scale",
 		"flowbite-svelte": "^0.44.18",
 		"flowbite-svelte-icons": "^0.4.4",
+		"layerchart": "^0.25.1",
 		"svelte-device-info": "^1.0.0"
 	}
 }

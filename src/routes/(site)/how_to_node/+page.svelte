@@ -97,10 +97,10 @@
             5. Bring your wallet "online" as explained in the Guide you used to set up your node. 
         </li>
         <li class='ml-10 m-2'>
-            6. Once your wallet is online, <b>repeat step 3 and 4</b> to receive a "top-up" to 80 or more VOI tokens. These extra tokens will help "seed" your node to begin voting in concensus, which allows metrics to be captured to calculate your Health Score.
+            6. Once your wallet is online, <b>repeat step 3 and 4</b> to receive a "top-up" of additional VOI tokens. These extra tokens will help "seed" your node with tokens to begin voting in consensus, which allows metrics to be captured to calculate your Health Score.
         </li>
         <li class='ml-10 m-2'>
-            7. Wait a few hours for it to appear on the <A href="https://voi-node-info.boeieruurd.com/">Voi-Node Metrics Dashboard</A>, then periodically monitor your node's health. On the Monday following a Healthy <b>weekly</b> score of 5.0 or higher, you will receive your first Health rewards directly to your wallet.
+            7. Wait a few hours for your node to appear on the <A href="https://voi-node-info.boeieruurd.com/">Voi-Node Metrics Dashboard</A>, then periodically monitor your node's health. On the Monday following a Healthy <b>weekly</b> score of 5.0 or higher, you will receive your first Health rewards directly to your wallet.
         </li>
         <li class='ml-10 m-2'>
             8. After receiving your first Health rewards, your node should begin producing blocks. No additional steps are needed to increase your "stake". Each following week you should be eligible to receive both Health and Block rewards.
