@@ -57,13 +57,22 @@
             tooltip={{ mode: "band" }}
           >
             <Svg>
-              <Axis placement="left" grid rule />
-              <Axis
-                placement="bottom"
-                format={(d) => formatDate(d, PeriodType.Day, "short")}
-                rule
+              <Axis placement="left" grid rule 
+              labelProps={{
+                class: "fill-black stroke-white dark:fill-gray-200 dark:stroke-gray-800",
+              }}
               />
-              <Bars
+              <Axis
+              placement="bottom"
+              rule
+              format={(d) => formatDate(d, PeriodType.Day, "short")}
+              labelProps={{
+                rotate: 315,
+                textAnchor: "end",
+                class: "fill-black stroke-white dark:fill-gray-200 dark:stroke-gray-800",
+              }}
+            />
+            <Bars
                 radius={4}
                 strokeWidth={1}
                 class="fill-accent-500 group-hover:fill-gray-300 transition-colors"
