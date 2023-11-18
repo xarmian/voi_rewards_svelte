@@ -33,7 +33,7 @@
         supply = await algodClient.supply().do();
 
         // get node information
-        const url = `https://socksfirstgames.com/proposers/index_v2.php?action=walletDetails&wallet=${walletId}`;
+        const url = `https://api.voirewards.com/proposers/index_v2.php?action=walletDetails&wallet=${walletId}`;
         await fetch(url, { cache: 'no-store' })
             .then((response) => response.json())
             .then((data) => {
