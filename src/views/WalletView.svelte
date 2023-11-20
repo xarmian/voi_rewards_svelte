@@ -28,6 +28,8 @@
     }
 
     onMount(async () => {
+        isMobile = Device.isMobile;
+
         try {
             // Get account information
             accountInfo = await algodClient.accountInformation(walletId).do();
@@ -37,8 +39,6 @@
 
         const nfdData: any = await getNFD([walletId]);
         nfDomain = nfdData.find((nfd: any) => nfd.key === walletId)?.replacementValue;
-        
-        isMobile = Device.isMobile;
     });
 
     const tabs: any = [
