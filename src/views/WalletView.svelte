@@ -11,10 +11,13 @@
     import { getNFD } from '$lib/utils/nfd'
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
+    import { page } from '$app/stores';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
     }
+
+    const urlParams = $page.url.searchParams;
 
     export let walletId: string;
     export let isModal = true;
@@ -47,7 +50,7 @@
         {name: 'Rewards', component: RewardsComponent},
     ];
 
-    $: selectedTab = 'Node';
+    $: selectedTab = (urlParams.has('tab')) ? urlParams.get('tab') : 'Node';
     $: selectedTabComponent = tabs.find((tab: { name: string; }) => tab.name === selectedTab);
 
 </script>
