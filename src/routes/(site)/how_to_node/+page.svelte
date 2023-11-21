@@ -39,6 +39,10 @@
                 text: 'Guide to Setting up a *Relay Node*',
                 url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
             },
+            {
+                text: 'VOI Node Running Guides, Details, and Specifications Document',
+                url: 'https://docs.google.com/document/d/16n0yEivEUjFtSypiZ4TRaZQmRi_emMtFPrgAarsSNSE/edit#heading=h.fx33lxdr6ymi',
+            },
         ]
     },
     {

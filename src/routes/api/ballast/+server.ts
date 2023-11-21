@@ -60,8 +60,6 @@ export async function GET({ url }) {
     // get a list of items in ballast that are not in voted_ballast
     const diff = ballast.filter((x: any) => !voted_ballast.includes(x));
 
-    console.log(diff);
-    
     return new Response(JSON.stringify(diff), {
         headers: {
           'Content-Type': 'application/json'
