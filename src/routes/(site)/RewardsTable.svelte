@@ -226,6 +226,12 @@
           return 0;
         }
 
+        if (key === 'status') {
+          const aVal = Number(a.expires_in_hrs??0);
+          const bVal = Number(b.expires_in_hrs??0);
+          return (aVal < bVal) ? direction : (aVal > bVal) ? -direction : 0;
+        }
+
         const aVal = a[key];
         const bVal = b[key];
         if (aVal > bVal) {
@@ -322,6 +328,13 @@
                   <div class="text-red-500 bg-yellow-200 p-1 rounded-lg inline">Key Expired</div>
                 {:else if item.key_expiring7d}
                   <div class="text-yellow-400" title="Participation key expires in {item.expires_in_hrs} hours">Key Expiring Soon</div>
+                {/if}
+                {#if $sortKey == 'status'}
+                  {#if item.expires_in_hrs > 0}
+                    <div class="text-gray-500" title="Participation key expires in {item.expires_in_hrs} hours">Expires in {item.expires_in_hrs} hours</div>
+                  {:else if item.expires_in_hrs <= 0}
+                    <div class="text-gray-500">Key Expired {-item.expires_in_hrs} hours ago</div>
+                  {/if}
                 {/if}
               </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
