@@ -27,6 +27,7 @@
     let showWalletNFD: boolean = true;
     let sortItems = writable<any[]>([]);
     let filterItems = <any[]>([]);
+    let consensusData = <any[]>([]);
     
     let viewWallet = false;
     let viewWalletId = '';
@@ -43,6 +44,14 @@
       // convert to NFDs
       const allAddresses = items.map((row: any) => row.proposer);
       nfdData = await getNFD(allAddresses);
+
+      try {
+        const response = await fetch('https://analytics.testnet.voi.nodly.io/v0/consensus/online');
+        consensusData = await response.json();
+      } catch (error) {
+        console.error('Failed to fetch consensus data:', error);
+      }
+      
     });
 
     $: unsubRewardParams = rewardParams.subscribe(async (value) => {
@@ -123,6 +132,16 @@
       let blockTotal = 0;
       let healthTotal = 0;
       let totalRewardedNodes = totalHealthyNodes - totalExtraNodes;
+
+      consensusData.map((row: any) => {
+        const item = $sortItems.find((item) => item.proposer === row.addr);
+        if (item) {
+          item.key_active = row.key_active;
+          item.key_voting = row.key_voting;
+          item.key_expiring7d = row.key_expiring7d;
+          item.expires_in_hrs = row.expires_in_hrs;
+        }
+      });
 
       for (let i = 0; i < $sortItems.length; i++) {
         const item = $sortItems[i];
@@ -230,6 +249,7 @@
     ];
 
     if (!Device.isMobile) {
+      columns.push({ id: 'status', desc: 'Consensus Status', tooltip: 'Consensus Voting Status' });
       columns.push({ id: 'block_count', desc: 'Total Blocks', tooltip: 'Total blocks produced by each wallet during the Epoch' });
       columns.push({ id: 'block_rewards', desc: 'Block Rewards', tooltip: 'Total expected rewards based on blocks produced during the Epoch' });
       columns.push({ id: 'health_rewards', desc: 'Health Rewards', tooltip: 'Health rewards are distributed to all nodes with a Health Score of 5.0 or higher by the end of the Epoch.' });
@@ -269,6 +289,11 @@
         <TableBodyRow on:click={() => toggleRow(i)}>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
               {item.rank}
+              {#if item.expires_in_hrs <= 0}
+                <i class="fas fa-ban text-red-500 ml-2" title="Consensus Participation Key has Expired"></i>
+              {:else if item.key_expiring7d}
+                <i class="fas fa-exclamation-triangle text-yellow-400 ml-2" title="Consensus Participation Key is Expiring Soon"></i>
+              {/if}
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
               <button on:click|stopPropagation={() => {
@@ -289,7 +314,17 @@
               </a>
             </TableBodyCell>
             {#if !Device.isMobile}
-              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
+                <div class="{(item.key_active && item.key_voting) ? 'text-green-500' : (item.key_active && !item.key_voting) ? 'text-red-500' : 'text-gray-500'}">
+                  {item.key_active ? (item.key_voting ? 'Active/Voting' : 'Active/Not Voting') : 'Not Active/Not Voting'}
+                </div>
+                {#if item.expires_in_hrs <= 0}
+                  <div class="text-red-500 bg-yellow-200 p-1 rounded-lg inline">Key Expired</div>
+                {:else if item.key_expiring7d}
+                  <div class="text-yellow-400" title="Participation key expires in {item.expires_in_hrs} hours">Key Expiring Soon</div>
+                {/if}
+              </TableBodyCell>
+            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
               <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_rewards}</TableBodyCell>
               <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
                 <div>{item.health_rewards}</div>
@@ -329,6 +364,19 @@
                 <br/>
                 {#if Device.isMobile}
                 <div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-28">Consensus:</Label>
+                    <span>
+                      <span class="{(item.key_active && item.key_voting) ? 'text-green-500' : (item.key_active && !item.key_voting) ? 'text-red-500' : 'text-gray-500'}">
+                        {item.key_active ? (item.key_voting ? 'Active/Voting' : 'Active/Not Voting') : 'Not Active/Not Voting'}
+                      </span>
+                      {#if item.expires_in_hrs <= 0}
+                        <span class="text-red-500 bg-yellow-200 p-1 rounded-lg inline">Key Expired</span>
+                      {:else if item.key_expiring7d}
+                        <span class="text-yellow-500">Key Expiring Soon</span>
+                      {/if}
+                    </span>
+                  </div>
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Total Blocks:</Label>
                     <span>{item.block_count}</span>
