@@ -422,7 +422,7 @@
       {/each}
       <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
         <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
-        <TableBodyCell colspan="2" class="p-2">
+        <TableBodyCell colspan="3" class="p-2">
           Totals:
         </TableBodyCell>
         {#if !Device.isMobile}
