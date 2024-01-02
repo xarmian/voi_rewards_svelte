@@ -13,8 +13,8 @@
 	$: totalHealthyNodes = 0;
 	$: totalEmptyNodes = 0;
 	$: totalExtraNodes = 0;
-	$: block_reward_pool = 12500000;
-	$: health_reward_pool = 10000000;
+	$: block_reward_pool = 25000000;
+	$: health_reward_pool = 20000000;
 	$: selectedDate = '';
 	$: dataArrays = [];
 	$: dataIncomplete = false;
