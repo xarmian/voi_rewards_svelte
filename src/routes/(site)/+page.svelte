@@ -81,6 +81,18 @@
 			selectedDate.substring(15, 17);
 		const url = `https://api.voirewards.com/proposers/index_v2.php?start=${startDate}&end=${endDate}`;
 
+		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
+		const endOfEpoch = new Date(
+			Date.UTC(
+				parseInt(selectedDate.substring(9, 13)),
+				parseInt(selectedDate.substring(13, 15)) - 1,
+				parseInt(selectedDate.substring(15, 17))
+			)
+		);
+		endOfEpoch.setUTCHours(23, 59, 59, 999);
+		block_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 25000000 : 12500000;
+		health_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 20000000 : 10000000;
+
 		// reinitialize totals
 		totalWallets = 0;
 		totalBlocks = 0;
