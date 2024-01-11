@@ -14,7 +14,7 @@
     import Device from 'svelte-device-info';
 	  import WalletView from '../../views/WalletView.svelte';
 
-    const LATEST_ALGOD_VERSION = '3.21.0';
+    const MIN_ALGOD_VERSION = '3.21.0';
 
     export let items: any[] = [];
     
@@ -348,7 +348,7 @@
                 {/if}
               </TableBodyCell>
               <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
-                <div class="{(item.nodes[0]?.ver != LATEST_ALGOD_VERSION) ? 'text-red-500' : ''}">
+                <div class="{(item.nodes[0]?.ver < MIN_ALGOD_VERSION) ? 'text-red-500' : ''}">
                   {item.nodes[0]?.ver??''}
                 </div>
               </TableBodyCell>
