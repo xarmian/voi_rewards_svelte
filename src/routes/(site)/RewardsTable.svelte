@@ -14,6 +14,8 @@
     import Device from 'svelte-device-info';
 	  import WalletView from '../../views/WalletView.svelte';
 
+    const LATEST_ALGOD_VERSION = '3.21.0';
+
     export let items: any[] = [];
     
     $: totalBlockRewards = 0;
@@ -214,8 +216,7 @@
           }
           return 0;
         }
-
-        if (key === 'health_rewards') {
+        else if (key === 'health_rewards') {
           const aVal = Number(a.nodes?.[0]?.health_score??0);
           const bVal = Number(b.nodes?.[0]?.health_score??0);
           if (aVal > bVal) {
@@ -225,11 +226,19 @@
           }
           return 0;
         }
-
-        if (key === 'status') {
+        else if (key === 'status') {
           const aVal = Number(a.expires_in_hrs??0);
           const bVal = Number(b.expires_in_hrs??0);
           return (aVal < bVal) ? direction : (aVal > bVal) ? -direction : 0;
+        }
+        else if (key == 'algod') {
+          const aVal = a.nodes[0]?.ver??0;
+          const bVal = b.nodes[0]?.ver??0;
+          if (aVal > bVal) {
+            return -direction;
+          } else if (aVal < bVal) {
+            return direction;
+          }
         }
 
         const aVal = a[key];
@@ -255,8 +264,9 @@
     ];
 
     if (!Device.isMobile) {
-      columns.push({ id: 'status', desc: 'Consensus Status', tooltip: 'Consensus Voting Status' });
-      columns.push({ id: 'block_count', desc: 'Total Blocks', tooltip: 'Total blocks produced by each wallet during the Epoch' });
+      columns.push({ id: 'status', desc: 'Consensus', tooltip: 'Consensus Voting Status' });
+      columns.push({ id: 'algod', desc: 'Algod', tooltip: 'Algod Node Version' });
+      columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet during the Epoch' });
       columns.push({ id: 'block_rewards', desc: 'Block Rewards', tooltip: 'Total expected rewards based on blocks produced during the Epoch' });
       columns.push({ id: 'health_rewards', desc: 'Health Rewards', tooltip: 'Health rewards are distributed to all nodes with a Health Score of 5.0 or higher by the end of the Epoch.' });
     }
@@ -337,16 +347,21 @@
                   {/if}
                 {/if}
               </TableBodyCell>
-            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
-              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_rewards}</TableBodyCell>
               <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
-                <div>{item.health_rewards}</div>
-                {#if item.nodes && item.nodes.length > 0}
-                  {#each item.nodes as node}
-                  <div class="whitespace-nowrap flex" title="Node Name: {node.node_name}{'\r'}Health Score: {node.health_score}{'\r'}Health Divisor: {node.health_divisor}">
-                    <div class="node_name truncate">{node.node_name}</div>
-                    <div class='node_health'> - {node.health_score}</div>
-                  </div>
+                <div class="{(item.nodes[0]?.ver != LATEST_ALGOD_VERSION) ? 'text-red-500' : ''}">
+                  {item.nodes[0]?.ver??''}
+                </div>
+              </TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
+                <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_rewards}</TableBodyCell>
+                <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
+                  <div>{item.health_rewards}</div>
+                  {#if item.nodes && item.nodes.length > 0}
+                    {#each item.nodes as node}
+                    <div class="whitespace-nowrap flex" title="Node Name: {node.node_name}{'\r'}Health Score: {node.health_score}{'\r'}Health Divisor: {node.health_divisor}">
+                      <div class="node_name truncate">{node.node_name}</div>
+                      <div class='node_health'> - {node.health_score}</div>
+                    </div>
                   {/each}
                 {:else}
                   <div style='font-size:10px'>(No Telemetry Data)</div>
