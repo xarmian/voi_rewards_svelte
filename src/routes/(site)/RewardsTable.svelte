@@ -13,8 +13,9 @@
     //@ts-ignore
     import Device from 'svelte-device-info';
 	  import WalletView from '../../views/WalletView.svelte';
+    import { compareVersions } from 'compare-versions';
 
-    const MIN_ALGOD_VERSION = '3.21.0';
+    $: MIN_ALGOD_VERSION = '3.0.0'; // default value for lowest possible epoch
 
     export let items: any[] = [];
     
@@ -53,7 +54,6 @@
       } catch (error) {
         console.error('Failed to fetch consensus data:', error);
       }
-      
     });
 
     $: unsubRewardParams = rewardParams.subscribe(async (value) => {
@@ -129,6 +129,20 @@
     }
   
     $: {
+      // iterate through items and items.nodes and find the highest items.nodes.ver value, assign to MIN_ALGOD_VERSION
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.nodes) {
+          for (let j = 0; j < item.nodes.length; j++) {
+            const node = item.nodes[j];
+            if (compareVersions(node.ver,MIN_ALGOD_VERSION)) {
+              MIN_ALGOD_VERSION = node.ver;
+            }
+          }
+        }
+      }
+      if (compareVersions(MIN_ALGOD_VERSION,'3.21.0')) MIN_ALGOD_VERSION = '3.18.0';
+
       sortItems = writable(items.slice()); // make a copy of the items array
 
       let blockTotal = 0;
@@ -156,7 +170,7 @@
           item.nodes.sort((a: any, b: any) => a.health_divisor - b.health_divisor);
 
           // try to get the first index of an element in item.nodes with a health_score >= 5.0
-          const healthyNodeIndex = item.nodes.findIndex((node: any) => node.health_score >= 5.0);
+          const healthyNodeIndex = item.nodes.findIndex((node: any) => node.health_score >= 5.0 && compareVersions(node.ver,MIN_ALGOD_VERSION) >= 0);
           if (healthyNodeIndex !== -1) {
             item.health_rewards += Math.floor(Math.ceil(totalHealthRewards / totalRewardedNodes / item.nodes[healthyNodeIndex].health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
           }
@@ -205,53 +219,36 @@
 
       const key = $sortKey;
       const direction = $sortDirection;
+      let aVal, bVal;
       const sorted = [...$sortItems].sort((a, b) => {
-        if (key == 'proposer') {
-          const aVal = a.nfd !== undefined ? a.nfd.toUpperCase() : a.proposer;
-          const bVal = b.nfd !== undefined ? b.nfd.toUpperCase() : b.proposer;
-          if (aVal > bVal) {
-            return -direction;
-          } else if (aVal < bVal) {
-            return direction;
-          }
-          return 0;
+        switch (key) {
+          case 'proposer':
+            aVal = a.nfd !== undefined ? a.nfd.toUpperCase() : a.proposer;
+            bVal = b.nfd !== undefined ? b.nfd.toUpperCase() : b.proposer;
+            break;
+          case 'health_rewards':
+            aVal = Number(a.nodes?.[0]?.health_score ?? 0);
+            bVal = Number(b.nodes?.[0]?.health_score ?? 0);
+            break;
+          case 'status':
+            aVal = Number(a.expires_in_hrs ?? 0);
+            bVal = Number(b.expires_in_hrs ?? 0);
+            break;
+          case 'algod':
+            //aVal = a.nodes[0]?.ver?.split('.').map(Number) ?? [-1];
+            //bVal = b.nodes[0]?.ver?.split('.').map(Number) ?? [-1];
+            aVal = a.nodes[0]?.ver??'0.0.0';
+            bVal = b.nodes[0]?.ver??'0.0.0';
+            return compareVersions(aVal,bVal) * -direction;
+            break;
+          default:
+            aVal = a[key];
+            bVal = b[key];
         }
-        else if (key === 'health_rewards') {
-          const aVal = Number(a.nodes?.[0]?.health_score??0);
-          const bVal = Number(b.nodes?.[0]?.health_score??0);
-          if (aVal > bVal) {
-            return -direction;
-          } else if (aVal < bVal) {
-            return direction;
-          }
-          return 0;
-        }
-        else if (key === 'status') {
-          const aVal = Number(a.expires_in_hrs??0);
-          const bVal = Number(b.expires_in_hrs??0);
-          return (aVal < bVal) ? direction : (aVal > bVal) ? -direction : 0;
-        }
-        else if (key == 'algod') {
-          const aVal = a.nodes[0]?.ver??0;
-          const bVal = b.nodes[0]?.ver??0;
-          if (aVal > bVal) {
-            return -direction;
-          } else if (aVal < bVal) {
-            return direction;
-          }
-        }
-
-        const aVal = a[key];
-        const bVal = b[key];
-        if (aVal > bVal) {
-          return -direction;
-        } else if (aVal < bVal) {
-          return direction;
-        }
-        return 0;
+        return (aVal < bVal) ? direction : (aVal > bVal) ? -direction : 0;
       });
       sortItems.set(sorted);
-   
+
       filterItems = $sortItems.filter((item: { proposer: string; nfd: string | undefined; nodes: { node_name: string | null; }[]; }) => 
       (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) 
       || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)
@@ -450,7 +447,7 @@
       {/each}
       <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
         <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
-        <TableBodyCell colspan="2" class="p-2">
+        <TableBodyCell colspan="{!Device.isMobile ? 4 : 2}" class="p-2">
           Totals:
         </TableBodyCell>
         {#if !Device.isMobile}

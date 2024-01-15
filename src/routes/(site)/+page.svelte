@@ -26,7 +26,7 @@
 	$: supply = {};
 
 	const populateDateDropdown = async () => {
-		const url = 'https://api.voirewards.com/proposers/index_v2.php';
+		const url = 'https://api.voirewards.com/proposers/index_v3.php';
 		await fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
 			.then((data) => {
@@ -79,7 +79,7 @@
 			selectedDate.substring(13, 15) +
 			'-' +
 			selectedDate.substring(15, 17);
-		const url = `https://api.voirewards.com/proposers/index_v2.php?start=${startDate}&end=${endDate}`;
+		const url = `https://api.voirewards.com/proposers/index_v3.php?start=${startDate}&end=${endDate}`;
 
 		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
 		const endOfEpoch = new Date(

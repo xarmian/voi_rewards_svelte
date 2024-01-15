@@ -38,6 +38,7 @@
 		"@fortawesome/fontawesome-free": "^6.4.2",
 		"@vercel/analytics": "^1.1.1",
 		"algosdk": "^2.7.0",
+		"compare-versions": "^6.1.0",
 		"d3-scale": "github:d3/d3-scale",
 		"flowbite-svelte": "^0.44.18",
 		"flowbite-svelte-icons": "^0.4.4",
