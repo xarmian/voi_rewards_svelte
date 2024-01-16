@@ -135,13 +135,13 @@
         if (item.nodes) {
           for (let j = 0; j < item.nodes.length; j++) {
             const node = item.nodes[j];
-            if (compareVersions(node.ver,MIN_ALGOD_VERSION)) {
+            if (compareVersions(node.ver,MIN_ALGOD_VERSION) > 0) {
               MIN_ALGOD_VERSION = node.ver;
             }
           }
         }
       }
-      if (compareVersions(MIN_ALGOD_VERSION,'3.21.0')) MIN_ALGOD_VERSION = '3.18.0';
+      if (compareVersions(MIN_ALGOD_VERSION,'3.21.0') == -1) MIN_ALGOD_VERSION = '3.18.0';
 
       sortItems = writable(items.slice()); // make a copy of the items array
 
