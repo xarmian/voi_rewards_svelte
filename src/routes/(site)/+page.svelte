@@ -157,15 +157,12 @@
 	<p class="font-bold">Notice:</p>
 	<p>A consensus upgrade has occurred on the Voi network. As a result, your node will stop proposing
 		blocks until you upgrade to Algod version 3.21.0. As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
-		for more specific help.
+		for more specific help. Nodes installed using D13's guide should update automatically but may need to be restarted. Use the link below to download the latest A1CN:
 		Please see the links below for additional resources:
 	</p>
 	<ul class="list-disc list-inside">
 		<li>
 			<a href="https://github.com/AustP/austs-one-click-node/releases/tag/v1.4.2" target="_blank" class="underline text-yellow-700">Using Aust's One-click Node?</a> - Download latest version of Aust's One-click Node
-		</li>
-		<li>
-			<a href="https://discord.com/channels/1055863853633785857/1128672413048115250/1166905101521272964" target="_blank" class="underline text-yellow-700">Set up node using d13's guide?</a> - Additional insructions if node did not auto update
 		</li>
 		<!-- Add more links as needed -->
 	</ul>
