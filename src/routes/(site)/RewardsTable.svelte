@@ -62,6 +62,7 @@
       totalHealthyNodes = value.total_healthy_nodes;
       totalBlocks = value.total_blocks;
       totalExtraNodes = value.total_extra_nodes;
+      MIN_ALGOD_VERSION = value.minimum_algod;
     });
 
     $: onDestroy(unsubRewardParams);
@@ -130,7 +131,7 @@
   
     $: {
       // iterate through items and items.nodes and find the highest items.nodes.ver value, assign to MIN_ALGOD_VERSION
-      for (let i = 0; i < items.length; i++) {
+      /*for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.nodes) {
           for (let j = 0; j < item.nodes.length; j++) {
@@ -141,7 +142,7 @@
           }
         }
       }
-      if (compareVersions(MIN_ALGOD_VERSION,'3.21.0') == -1) MIN_ALGOD_VERSION = '3.18.0';
+      if (compareVersions(MIN_ALGOD_VERSION,'3.21.0') == -1) MIN_ALGOD_VERSION = '3.18.0';*/
 
       sortItems = writable(items.slice()); // make a copy of the items array
 
@@ -170,7 +171,8 @@
           item.nodes.sort((a: any, b: any) => a.health_divisor - b.health_divisor);
 
           // try to get the first index of an element in item.nodes with a health_score >= 5.0
-          const healthyNodeIndex = item.nodes.findIndex((node: any) => node.health_score >= 5.0 && compareVersions(node.ver,MIN_ALGOD_VERSION) >= 0);
+          // const healthyNodeIndex = item.nodes.findIndex((node: any) => node.health_score >= 5.0 && compareVersions(node.ver,MIN_ALGOD_VERSION) >= 0);
+          const healthyNodeIndex = item.nodes.findIndex((node: any) => node.is_healthy);
           if (healthyNodeIndex !== -1) {
             item.health_rewards += Math.floor(Math.ceil(totalHealthRewards / totalRewardedNodes / item.nodes[healthyNodeIndex].health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
           }

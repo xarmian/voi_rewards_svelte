@@ -15,7 +15,7 @@
 
     onMount(async () => {
         // get proposal data for walletId
-        const url = `https://api.voirewards.com/proposers/index_v3.php?action=proposals&wallet=${walletId}`;
+        const url = `https://api.voirewards.com/proposers/index.php?action=proposals&wallet=${walletId}`;
         await fetch(url, { cache: 'no-store' })
             .then((response) => response.json())
             .then((data) => {

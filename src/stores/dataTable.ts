@@ -6,6 +6,7 @@ export const rewardParams = writable({
     total_blocks: 0,
     total_healthy_nodes: 0,
     total_extra_nodes: 0,
+    minimum_algod: '3.0.0',
 });
 
 function createDataTable() {

@@ -15,6 +15,7 @@
 	$: totalExtraNodes = 0;
 	$: block_reward_pool = 25000000;
 	$: health_reward_pool = 20000000;
+	$: minimumAlgod = '3.0.0';
 	$: selectedDate = '';
 	$: dataArrays = [];
 	$: dataIncomplete = false;
@@ -26,7 +27,7 @@
 	$: supply = {};
 
 	const populateDateDropdown = async () => {
-		const url = 'https://api.voirewards.com/proposers/index_v3.php';
+		const url = 'https://api.voirewards.com/proposers/index.php';
 		await fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
 			.then((data) => {
@@ -79,7 +80,7 @@
 			selectedDate.substring(13, 15) +
 			'-' +
 			selectedDate.substring(15, 17);
-		const url = `https://api.voirewards.com/proposers/index_v3.php?start=${startDate}&end=${endDate}`;
+		const url = `https://api.voirewards.com/proposers/index.php?start=${startDate}&end=${endDate}`;
 
 		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
 		const endOfEpoch = new Date(
@@ -131,6 +132,7 @@
 				totalHealthyNodes = data.healthy_node_count;
 				totalEmptyNodes = data.empty_node_count;
 				totalExtraNodes = data.extra_node_count;
+				minimumAlgod = data.minimum_algod;
 			});
 	};
 
@@ -149,6 +151,7 @@
 			total_blocks: totalBlocks,
 			total_healthy_nodes: totalHealthyNodes - totalEmptyNodes,
 			total_extra_nodes: totalExtraNodes,
+			minimum_algod: minimumAlgod,
 		});
 	}
 </script>
