@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	/*
         A Svelte component containing an input field and submit button.
 
@@ -26,6 +25,7 @@
 	let selectedAddressIndex = -1;
 	let windowDefined = false;
     let componentElement: any;
+    export let onSubmit: (addr: string) => void;
 
 	onMount(() => {
         windowDefined = typeof window !== 'undefined';
@@ -78,7 +78,10 @@
             }
             return;
         }
-		goto(`/wallet/${addr??searchText.toUpperCase()}`);
+		if (addr) {
+            onSubmit(addr);
+            addressList = [];
+        }
 	}
 
     function handleClickOutside(event: MouseEvent) {

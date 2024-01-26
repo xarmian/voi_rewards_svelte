@@ -5,6 +5,7 @@
 	import { rewardParams } from '../../stores/dataTable';
     import { algodClient } from '$lib/utils/algod';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
+	import { goto } from '$app/navigation';
 
 	$: totalBlocks = 0;
 	$: totalWallets = 0;
@@ -194,7 +195,7 @@
 	</div>
 {/if}
 <div class="text-center">
-	<WalletSearch />
+	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} />
 </div>
 <div class="dashboard justify-evenly">
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
