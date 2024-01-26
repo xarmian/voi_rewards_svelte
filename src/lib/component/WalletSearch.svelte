@@ -26,6 +26,7 @@
 	let windowDefined = false;
     let componentElement: any;
     export let onSubmit: (addr: string) => void;
+    export let loadPreviousValue: boolean = true;
 
 	onMount(() => {
         windowDefined = typeof window !== 'undefined';
@@ -34,9 +35,11 @@
             document.addEventListener('click', handleClickOutside);
 
             // Read searchText from local storage
-            const storedSearchText = localStorage.getItem('searchText');
-            if (storedSearchText) {
-                searchText = storedSearchText;
+            if (loadPreviousValue) {
+                const storedSearchText = localStorage.getItem('searchText');
+                if (storedSearchText) {
+                    searchText = storedSearchText;
+                }
             }
         }
 	});
@@ -63,7 +66,9 @@
 
 	// Function to handle address selection or submit
 	function handleSubmit(addr?: string) {
-        localStorage.setItem('searchText', searchText);
+        if (loadPreviousValue) {
+            localStorage.setItem('searchText', searchText);
+        }
 
         if (selectedAddressIndex >= 0) {
             addr = addressList[selectedAddressIndex];
