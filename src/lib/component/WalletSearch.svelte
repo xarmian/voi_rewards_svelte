@@ -83,10 +83,9 @@
             }
             return;
         }
-		if (addr) {
-            onSubmit(addr);
-            addressList = [];
-        }
+
+        onSubmit(addr??searchText);
+        addressList = [];
 	}
 
     function handleClickOutside(event: MouseEvent) {
