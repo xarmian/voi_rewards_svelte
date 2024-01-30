@@ -138,7 +138,7 @@
     </div>
 
     {#if addressList.length > 0}
-    <div class="absolute">
+    <div class="absolute z-50">
         <div class="bg-white dark:bg-gray-800 overflow-hidden max-h-64">
             <ul class="inline-block text-left">
                 {#each addressList as address, index}

@@ -20,10 +20,20 @@ export interface Transfer {
 }
 
 export interface Collection {
+	firstToken: RawToken;
     contractId: number;
     totalSupply: number;
     mintRound: number;
     tokens: Token[];
+}
+
+export interface RawToken {
+    owner: string;
+    contractId: number;
+    tokenId: number;
+    "mint-round": number;
+    metadata: string;
+    metadataURI: string;
 }
 
 export interface Metadata {

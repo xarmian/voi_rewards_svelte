@@ -29,7 +29,7 @@
     <img src={token.metadata.image} class="w-48 h-48 mr-3"/>
     <div class="">
         <div class="text-2xl font-bold mb-2">{token.metadata.name}</div>
-        <div class="mb-2">Owned by <A href="https://voi.observer/explorer/account/{token.owner}" target="_blank">{formattedOwner}</A></div>
+        <div class="mb-2">Owned by <A href="/arc72/portfolio/{token.owner}">{formattedOwner}</A></div>
         <div class="flex flex-wrap">
             {#each propGroups as group (group)}
                 <div class="mr-5">

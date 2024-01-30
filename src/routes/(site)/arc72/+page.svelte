@@ -1,10 +1,13 @@
 <script lang="ts">
-    import type { Token, Collection } from '$lib/data/types';
+    import type { Collection, Token } from '$lib/data/types';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { onMount } from 'svelte';
     import CollectionComponent from '$lib/component/ui/Collection.svelte';
+    import TokenComponent from '$lib/component/ui/Token.svelte';
+    import { goto } from '$app/navigation';
+    import { viewCollection, tokenGroup } from '../../../stores/collection';
+    import { Modal } from 'flowbite-svelte';
     
-    $: selectedAddress = '';
     let collections: Collection[] = [];
 
     onMount(() => {
@@ -12,33 +15,15 @@
     });
 
     const onSearch = (addr: string) => {
-        console.log(addr);
-        selectedAddress = addr;
-        getTokens();
+        goto(`/arc72/portfolio/${addr}`);
     }
 
     const getCollections = async () => {
         let url = `https://arc72-idx.voirewards.com/nft-indexer/v1/collections`;
 
         try {
-            const data = await fetch(url, { cache: 'no-store' }).then((response) => response.json());
+            const data = await fetch(url).then((response) => response.json());
             collections = data.collections;
-        }
-        catch(err) {
-            console.error(err);
-        }
-    }
-
-    const getTokens = async () => {
-        let url = `https://arc72-idx.voirewards.com/nft-indexer/v1/tokens`;
-
-        if (selectedAddress.length > 0) {
-            url += `?owner=${selectedAddress}`;
-        }
-
-        try {
-            const data = await fetch(url, { cache: 'no-store' }).then((response) => response.json());
-            console.log(data);
         }
         catch(err) {
             console.error(err);
@@ -48,17 +33,24 @@
 
 <div>
     <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8 flex">
-        <h1 class="text-2xl font-bold">ARC-72 NFT Explorer</h1>
+        <h1 class="text-2xl font-bold">NFT Navigator</h1>
         <div class="flex-grow">
-            <!--<WalletSearch onSubmit={onSearch} loadPreviousValue={false}/>-->
+            <WalletSearch onSubmit={onSearch} loadPreviousValue={true}/>
         </div>
     </header>
     <br />
     <div class="flex flex-wrap justify-center">
         {#each collections as collection}
             <div class="inline-block">
-                <CollectionComponent styleClass="m-16" collection={collection} selectedAddress={selectedAddress}></CollectionComponent>
+                <CollectionComponent styleClass="m-16" collection={collection}></CollectionComponent>
             </div>
         {/each}
     </div>
 </div>
+<Modal bind:open={$viewCollection} autoclose size='lg' outsideclose>
+    {#each $tokenGroup as token}
+        <div>
+            <TokenComponent token={token}></TokenComponent>
+        </div>
+    {/each}
+</Modal>

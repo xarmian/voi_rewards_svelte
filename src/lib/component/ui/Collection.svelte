@@ -3,15 +3,13 @@
 	import { onMount } from 'svelte';
     import { Card } from 'flowbite-svelte';
     import { getNFD } from '$lib/utils/nfd';
-    import { Modal } from 'flowbite-svelte';
-    import TokenComponent from '$lib/component/ui/Token.svelte';
+    import { viewCollection, tokenGroup } from '../../../stores/collection';
 
     export let collection: Collection;
     export let selectedAddress: string = '';
     export let styleClass = '';
     let tokens: Token[] = [];
     $: holders = [...new Set(tokens.map((t) => t.owner))]; // unique holders
-    $: showCollectionModal = false;
 
     onMount(() => {
         getTokens();
@@ -24,7 +22,7 @@
         }
 
         try {
-            const data = await fetch(url, { cache: 'no-store' }).then((response) => response.json());
+            const data = await fetch(url).then((response) => response.json());
             tokens = data.tokens.map((token: any) => {
                 return {
                     contractId: token.contractId,
@@ -42,7 +40,7 @@
         }
     }
 
-    async function displayCollection() {
+    async function displayCollection(c: Collection) {
         let owners = [...new Set(tokens.map((t: Token) => t.owner))];
 
         if (owners.length > 0) {
@@ -58,20 +56,21 @@
             });
         }
 
-        showCollectionModal = true;
+        tokenGroup.set(tokens);
+        viewCollection.set(true);
     }
 </script>
 
-<div class="relative cursor-pointer transform hover:scale-110 transition-transform duration-200" on:click={displayCollection}>
+<div class="relative cursor-pointer transform hover:scale-110 transition-transform duration-200" on:click={() => displayCollection(collection)}>
     {#if tokens && tokens.length >= 1}
         <div class="{styleClass}">
             <div class="flex justify-center -space-x-64 group-hover:-space-x-48 transition-all duration-500">
-                <div class="transform -rotate-12 z-40">
+                <div class="transform -rotate-12 z-30">
                     <Card>
                         <img src={tokens[0].metadata.image} class="w-48 h-48" />
                     </Card>
                 </div>
-                <div class="z-30">
+                <div class="z-20">
                     <Card>
                         {#if tokens.length >= 2}
                             <img src={tokens[1].metadata.image} class="w-48 h-48" />
@@ -80,7 +79,7 @@
                         {/if}
                     </Card>
                 </div>
-                <div class="transform rotate-12 z-20">
+                <div class="transform rotate-12 z-10">
                     <Card>
                         {#if tokens.length >= 3}
                             <img src={tokens[2].metadata.image} class="w-48 h-48" />
@@ -91,17 +90,11 @@
                 </div>
             </div>    
         </div>
-        <div class="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-4 z-50 rounded-md">
+        <div class="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-4 z-40 rounded-md">
             <div>{tokens[0].metadata.name.replace(/[1#]/g, '')}</div>
+            <div>ID: {tokens[0].contractId}</div>
             <div>Tokens: {tokens.length}</div>
             <div>Unique holders: {holders.length}</div>
         </div>
     {/if}
 </div>
-<Modal bind:open={showCollectionModal} autoclose size='lg' outsideclose>
-    {#each tokens as token}
-        <div>
-            <TokenComponent token={token}></TokenComponent>
-        </div>
-    {/each}
-</Modal>
