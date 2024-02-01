@@ -2,6 +2,7 @@
     import type { Token } from '$lib/data/types';
     import { A } from 'flowbite-svelte';
     export let token: Token;
+    console.log(token);
 
     let tokenProps: any[] = [];
     // map token.metadata.properties object of the form {"BACKGROUND":"Aquamarine","BODY":"Red","ON BODY":"Scar"}
@@ -23,13 +24,22 @@
     let formattedOwner = token.ownerNFD ? token.ownerNFD : token.owner.length > 8
         ? `${token.owner.slice(0, 8)}...${token.owner.slice(-8)}`
         : token.owner;
+    let formattedApproved = token.approved ? token.approved.length > 8
+        ? `${token.approved.slice(0, 8)}...${token.approved.slice(-8)}`
+        : token.approved : '';
 </script>
 
 <div class="flex">
     <img src={token.metadata.image} class="w-48 h-48 mr-3"/>
-    <div class="">
+    <div class="text-left">
         <div class="text-2xl font-bold mb-2">{token.metadata.name}</div>
-        <div class="mb-2">Owned by <A href="/arc72/portfolio/{token.owner}">{formattedOwner}</A></div>
+        <div class="mb-2">
+            <div>Token ID: {token.tokenId}</div>
+            <div>Owned by: <A href="/arc72/portfolio/{token.owner}">{formattedOwner}</A></div>
+            {#if token.approved && token.approved != 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ'}
+                <div>Approved Spender: <A href="/arc72/portfolio/{token.approved}">{formattedApproved}</A></div>
+            {/if}
+        </div>
         <div class="flex flex-wrap">
             {#each propGroups as group (group)}
                 <div class="mr-5">

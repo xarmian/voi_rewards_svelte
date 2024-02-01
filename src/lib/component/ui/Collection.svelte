@@ -30,7 +30,8 @@
                     owner: token.owner,
                     metadataURI: token.metadataURI,
                     metadata: JSON.parse(token.metadata),
-                    mintRound: token['mint-round']
+                    mintRound: token['mint-round'],
+                    approved: token.approved,
                 }
             });
 

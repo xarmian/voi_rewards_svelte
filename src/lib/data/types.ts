@@ -7,6 +7,7 @@ export interface Token {
     mintRound: number;
     metadata: Metadata;
     metadataURI: string;
+    approved: string;
 }
 
 export interface Transfer {
@@ -34,6 +35,7 @@ export interface RawToken {
     "mint-round": number;
     metadata: string;
     metadataURI: string;
+    approved: string;
 }
 
 export interface Metadata {
