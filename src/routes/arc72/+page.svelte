@@ -5,7 +5,7 @@
     import CollectionComponent from '$lib/component/ui/Collection.svelte';
     import TokenComponent from '$lib/component/ui/TokenDetail.svelte';
     import { goto } from '$app/navigation';
-    import { viewCollection, tokenGroup } from '../../../stores/collection';
+    import { viewCollection, tokenGroup } from '../../stores/collection';
     import { Modal } from 'flowbite-svelte';
     
     let collections: Collection[] = [];
@@ -32,13 +32,6 @@
 </script>
 
 <div>
-    <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8 flex">
-        <h1 class="text-2xl font-bold">NFT Navigator</h1>
-        <div class="flex-grow">
-            <WalletSearch onSubmit={onSearch} loadPreviousValue={true}/>
-        </div>
-    </header>
-    <br />
     <div class="flex flex-wrap justify-center">
         {#each collections as collection}
             <div class="inline-block">
