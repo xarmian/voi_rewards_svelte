@@ -16,8 +16,8 @@
 
 <div class="app dark:text-white">
     <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8 flex">
-		<img src="{Icon}" class="mr-3 h-12 overflow-hidden rounded-2xl" alt="Logo" />
-        <div on:click={() => goto('/arc72')} class="cursor-pointer text-2xl font-bold content-center">NFT Navigator</div>
+		<img src="{Icon}" class="mr-3 h-12 rounded-2xl" alt="Logo" />
+		<div on:click={() => goto('/arc72')} class="cursor-pointer text-2xl font-bold content-center hide-on-mobile">NFT Navigator</div>
         <div class="flex-grow content-center">
             <WalletSearch onSubmit={onSearch} loadPreviousValue={true}/>
         </div>
@@ -44,3 +44,10 @@
 		<hr class="my-6 border-gray-200 sm:mx-auto dark:border-gray-700 lg:my-8" />
 	 </Footer>-->
 </div>
+<style>
+    @media (max-width: 600px) {
+        .hide-on-mobile {
+            display: none;
+        }
+    }
+</style>
