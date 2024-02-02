@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Token } from '$lib/data/types';
+	import { getNFD } from '$lib/utils/nfd';
     import { A } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
     export let token: Token;
@@ -7,9 +8,22 @@
     import Device from 'svelte-device-info';
 
     $: isMobile = false;
+    $: formattedOwner = '';
 
     onMount(async () => {
         isMobile = Device.isMobile;
+
+        if (token) {
+            const nfd = await getNFD([token.owner]); // nfd is array of objects with key = owner, replacementValue = nfd
+            const nfdObj: any = nfd.find((n: any) => n.key === token?.owner);
+            if (nfdObj) {
+                token.ownerNFD = nfdObj.replacementValue;
+            }
+        }
+
+        formattedOwner = token.ownerNFD ? token.ownerNFD as string : token.owner.length > 16
+        ? `${token.owner.slice(0, 8)}...${token.owner.slice(-8)}`
+        : token.owner;
     });
 
     let tokenProps: any[] = [];
@@ -29,9 +43,6 @@
         return result;
     }
 
-    let formattedOwner = token.ownerNFD ? token.ownerNFD : token.owner.length > 8
-        ? `${token.owner.slice(0, 8)}...${token.owner.slice(-8)}`
-        : token.owner;
     let formattedApproved = token.approved ? token.approved.length > 8
         ? `${token.approved.slice(0, 8)}...${token.approved.slice(-8)}`
         : token.approved : '';

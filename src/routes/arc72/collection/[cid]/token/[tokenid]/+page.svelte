@@ -5,6 +5,7 @@
     import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
     import { HomeOutline, ChevronDoubleRightOutline } from 'flowbite-svelte-icons';
 	import TokenDetail from '$lib/component/ui/TokenDetail.svelte';
+	import { getNFD } from '$lib/utils/nfd';
 
     export let data: PageData;
     let contractId = data.contractId;
@@ -39,26 +40,15 @@
                     tokenName = token?.metadata.name??'';
                     collectionName = token?.metadata.name.replace(/(\d+|#)/g, '')??'';
                 }
+
+
             }
             catch(err) {
                 console.error(err);
             }
 
-            /*try {
-                const nfd = await getNFD([walletId]); // nfd is array of objects with key = owner, replacementValue = nfd
-                const nfdObj: any = nfd.find((n: any) => n.key === walletId);
-                if (nfdObj) {
-                    walletNFD = nfdObj.replacementValue;
-                }
-
-            }
-            catch(err) {
-                console.error(err);
-            }*/
         }
     }
-
-    console.log(token);
 </script>
 
 <Breadcrumb aria-label="Navigation breadcrumb" solid>
