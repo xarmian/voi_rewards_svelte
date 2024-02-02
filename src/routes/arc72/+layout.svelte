@@ -17,7 +17,7 @@
 <div class="app dark:text-white">
     <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8 flex">
 		<img src="{Icon}" class="mr-3 h-12 overflow-hidden rounded-2xl" alt="Logo" />
-        <h1 class="text-2xl font-bold content-center">NFT Navigator</h1>
+        <div on:click={() => goto('/arc72')} class="cursor-pointer text-2xl font-bold content-center">NFT Navigator</div>
         <div class="flex-grow content-center">
             <WalletSearch onSubmit={onSearch} loadPreviousValue={true}/>
         </div>
