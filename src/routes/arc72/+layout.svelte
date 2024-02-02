@@ -19,7 +19,7 @@
 		<img src="{Icon}" class="mr-3 h-12 rounded-2xl" alt="Logo" />
 		<div on:click={() => goto('/arc72')} class="cursor-pointer text-2xl font-bold content-center hide-on-mobile">NFT Navigator</div>
         <div class="flex-grow content-center">
-            <WalletSearch onSubmit={onSearch} loadPreviousValue={true}/>
+            <WalletSearch onSubmit={onSearch} loadPreviousValue={false}/>
         </div>
 		<DarkMode />
     </header>
