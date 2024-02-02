@@ -3,7 +3,7 @@
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { onMount } from 'svelte';
     import CollectionComponent from '$lib/component/ui/Collection.svelte';
-    import TokenComponent from '$lib/component/ui/Token.svelte';
+    import TokenComponent from '$lib/component/ui/TokenDetail.svelte';
     import { goto } from '$app/navigation';
     import { viewCollection, tokenGroup } from '../../../stores/collection';
     import { Modal } from 'flowbite-svelte';

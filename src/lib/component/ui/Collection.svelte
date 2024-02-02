@@ -4,6 +4,7 @@
     import { Card } from 'flowbite-svelte';
     import { getNFD } from '$lib/utils/nfd';
     import { viewCollection, tokenGroup } from '../../../stores/collection';
+	import { goto } from '$app/navigation';
 
     export let collection: Collection;
     export let selectedAddress: string = '';
@@ -42,6 +43,9 @@
     }
 
     async function displayCollection(c: Collection) {
+        goto(`/arc72/collection/${c.contractId}`);
+        return;
+
         let owners = [...new Set(tokens.map((t: Token) => t.owner))];
 
         if (owners.length > 0) {

@@ -27,14 +27,17 @@
     let formattedApproved = token.approved ? token.approved.length > 8
         ? `${token.approved.slice(0, 8)}...${token.approved.slice(-8)}`
         : token.approved : '';
+
+    const collectionName = token?.metadata.name.replace(/(\d+|#)/g, '')??'';
 </script>
 
 <div class="flex">
-    <img src={token.metadata.image} class="w-48 h-48 mr-3"/>
+    <img src={token.metadata.image} class="w-72 h-72 mr-3"/>
     <div class="text-left">
-        <div class="text-2xl font-bold mb-2">{token.metadata.name}</div>
+        <div class="text-2xl font-bold mb-2 text-purple-900 dark:text-purple-100">{token.metadata.name}</div>
         <div class="mb-2">
             <div>Token ID: {token.tokenId}</div>
+            <div>Collection: <A href="/arc72/collection/{token.contractId}">{collectionName}</A></div>
             <div>Owned by: <A href="/arc72/portfolio/{token.owner}">{formattedOwner}</A></div>
             {#if token.approved && token.approved != 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ'}
                 <div>Approved Spender: <A href="/arc72/portfolio/{token.approved}">{formattedApproved}</A></div>

@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
     import type { Token } from '$lib/data/types';
-    import TokenComponent from '$lib/component/ui/Token.svelte';
+    import TokenComponent from '$lib/component/ui/TokenDetail.svelte';
 	import { onMount } from 'svelte';
     import { getNFD } from '$lib/utils/nfd';
 	import { A } from 'flowbite-svelte';
@@ -33,7 +33,7 @@
 
             // owned tokens
             const url = `https://arc72-idx.voirewards.com/nft-indexer/v1/tokens?owner=${walletId}`;
-            const data = await fetch(url, { cache: 'no-store' }).then((response) => response.json());
+            const data = await fetch(url).then((response) => response.json());
             data.tokens.forEach((token: any) => {
                 tokens.push({
                     contractId: token.contractId,
@@ -49,7 +49,7 @@
 
             // approved tokens
             const aurl = `https://arc72-idx.voirewards.com/nft-indexer/v1/tokens?approved=${walletId}`;
-            const adata = await fetch(aurl, { cache: 'no-store' }).then((response) => response.json());
+            const adata = await fetch(aurl).then((response) => response.json());
             adata.tokens.forEach((token: any) => {
                 approvals.push({
                     contractId: token.contractId,
