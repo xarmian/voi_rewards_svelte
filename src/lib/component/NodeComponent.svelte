@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-    import { Card } from 'flowbite-svelte';
+    import { A, Card } from 'flowbite-svelte';
 	import { algodClient } from '$lib/utils/algod';
 
     export let walletId: string;
@@ -81,7 +81,7 @@
                     </p>
                     <p>
                         <span class="label">Telemetry ID:</span>
-                        <span>{nodeData.node_host??'Loading...'}</span>
+                        <span><A href="https://voi-nodes.dev/node/{nodeData.node_host}" target="_blank">{nodeData.node_host??'Loading...'}</A></span>
                     </p>
                     <p>
                         <span class="label">Telemetry Name:</span>

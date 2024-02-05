@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Toggle, Tooltip } from 'flowbite-svelte';
+    import { A, Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Toggle, Tooltip } from 'flowbite-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { writable } from 'svelte/store';
     import RewardsTableHeader from './RewardsTableHeader.svelte';
@@ -358,7 +358,7 @@
                   {#if item.nodes && item.nodes.length > 0}
                     {#each item.nodes as node}
                     <div class="whitespace-nowrap flex" title="Node Name: {node.node_name}{'\r'}Health Score: {node.health_score}{'\r'}Health Divisor: {node.health_divisor}">
-                      <div class="node_name truncate">{node.node_name}</div>
+                      <div class="node_name truncate" on:click|stopPropagation><a href="https://voi-nodes.dev/node/{node.node_host}" target="_blank">{node.node_name}</a></div>
                       <div class='node_health'> - {node.health_score}</div>
                     </div>
                   {/each}
@@ -422,7 +422,7 @@
                 <div>
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Node ID:</Label>
-                    <span>{node.node_host}</span>
+                    <span on:click|stopPropagation><a href="https://voi-nodes.dev/node/{node.node_host}" target="_blank">{node.node_host}</a></span>
                   </div>
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-28">Node Name:</Label>
