@@ -33,7 +33,7 @@
         links: [
             {
                 text: 'VOI Node Metrics (Node Health Stats and History)',
-                url: 'https://voi-node-info.boeieruurd.com/',
+                url: 'https://voi-node.dev/',
             },
             {
                 text: 'Guide to Setting up a *Relay Node*',
