@@ -5,14 +5,19 @@
     import { getNFD } from '$lib/utils/nfd';
     import { viewCollection, tokenGroup } from '../../../stores/collection';
 	import { goto } from '$app/navigation';
+    //@ts-ignore
+    import Device from 'svelte-device-info';
 
     export let collection: Collection;
     export let selectedAddress: string = '';
     export let styleClass = '';
     let tokens: Token[] = [];
     $: holders = [...new Set(tokens.map((t) => t.owner))]; // unique holders
+    $: isMobile = false;
 
     onMount(() => {
+        isMobile = Device.isMobile;
+
         getTokens();
     });
 
@@ -95,7 +100,7 @@
                 </div>
             </div>    
         </div>
-        <div class="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-4 z-40 rounded-md">
+        <div class="absolute -top-4 left-4 bg-black bg-opacity-50 text-white p-4 z-40 rounded-md">
             <div>{tokens[0].metadata.name.replace(/[1#]/g, '')}</div>
             <div>ID: {tokens[0].contractId}</div>
             <div>Tokens: {tokens.length}</div>

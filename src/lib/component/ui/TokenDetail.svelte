@@ -11,6 +11,7 @@
     $: isMobile = false;
     $: formattedOwner = '';
     let collection: Collection | undefined;
+    let royaltyPercentage: number = 0;
 
     let isMenuOpen = false;
 
@@ -65,6 +66,19 @@
         formattedOwner = token.ownerNFD ? token.ownerNFD as string : token.owner.length > 16
         ? `${token.owner.slice(0, 8)}...${token.owner.slice(-8)}`
         : token.owner;
+
+        if (token.metadata.royalties) {
+            const decodedRoyalties = atob(token.metadata.royalties);
+
+            // Convert the binary string to an array of bytes
+            const bytes = new Uint8Array(decodedRoyalties.length);
+            for (let i = 0; i < decodedRoyalties.length; i++) {
+                bytes[i] = decodedRoyalties.charCodeAt(i);
+            }
+
+            // Extract the first two bytes and convert them to a number
+            royaltyPercentage = (bytes[0] << 8) | bytes[1];
+        }
     });
 
     let tokenProps: any[] = [];
@@ -74,16 +88,6 @@
         const colors = propColor(token.metadata.properties[key as keyof typeof token.metadata.properties]);
         return { trait_type: key, value: token.metadata.properties[key as keyof typeof token.metadata.properties], fgcolor: colors[1], bgcolor: colors[0]};
     });
-
-    //let propGroups = chunkArray(tokenProps, 5);
-
-    function chunkArray(array: any[], size: number): any[] {
-        let result = [];
-        for (let i = 0; i < array.length; i += size) {
-            result.push(array.slice(i, i + size));
-        }
-        return result;
-    }
 
     // return a tuple of the bg color from bgcolor if value is in the bgcolor array, and its corresponding fg color
     // if value is not in the bgcolors array, return a random bgcolor and its corresponding foreground color
@@ -164,6 +168,10 @@
             <div>Owned by: <A href="/arc72/portfolio/{token.owner}">{formattedOwner}</A></div>
             {#if token.approved && token.approved != 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ'}
                 <div>Approved Spender: <A href="/arc72/portfolio/{token.approved}">{formattedApproved}</A></div>
+            {/if}
+            <div>Mint Round: <A href="https://voi.observer/explorer/block/{token.mintRound}/transactions" target="_blank">{token.mintRound}</A></div>
+            {#if royaltyPercentage > 0}
+                <div>Royalties: {royaltyPercentage / 100}%</div>
             {/if}
         </div>
         <div class="flex flex-wrap">

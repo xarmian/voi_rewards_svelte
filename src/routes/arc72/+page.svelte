@@ -35,7 +35,7 @@
     <div class="flex flex-wrap justify-center">
         {#each collections as collection}
             <div class="inline-block">
-                <CollectionComponent styleClass="m-16" collection={collection}></CollectionComponent>
+                <CollectionComponent styleClass="ml-16 mr-16 mt-16" collection={collection}></CollectionComponent>
             </div>
         {/each}
     </div>
