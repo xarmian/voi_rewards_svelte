@@ -69,25 +69,25 @@
 <div class="relative cursor-pointer transform hover:scale-110 transition-transform duration-200" on:click={() => displayCollection(collection)}>
     {#if tokens && tokens.length >= 1}
         <div class="{styleClass}">
-            <div class="flex justify-center -space-x-64 group-hover:-space-x-48 transition-all duration-500">
+            <div class="flex justify-center -space-x-36 group-hover:-space-x-48 transition-all duration-500">
                 <div class="transform -rotate-12 z-30">
-                    <Card>
-                        <img src={tokens[0].metadata.image} class="w-48 h-48" />
+                    <Card padding="none" class="rounded-xl">
+                        <img src={tokens[0].metadata.image} class="w-48 h-48 rounded-xl" />
                     </Card>
                 </div>
                 <div class="z-20">
-                    <Card>
+                    <Card padding="none" class="rounded-xl">
                         {#if tokens.length >= 2}
-                            <img src={tokens[1].metadata.image} class="w-48 h-48" />
+                            <img src={tokens[1].metadata.image} class="w-48 h-48 rounded-xl" />
                         {:else}
                             <div class="w-48 h-48"></div>
                         {/if}
                     </Card>
                 </div>
                 <div class="transform rotate-12 z-10">
-                    <Card>
+                    <Card padding="none" class="rounded-xl">
                         {#if tokens.length >= 3}
-                            <img src={tokens[2].metadata.image} class="w-48 h-48" />
+                            <img src={tokens[2].metadata.image} class="w-48 h-48 rounded-xl" />
                         {:else}
                             <div class="w-48 h-48"></div>
                         {/if}

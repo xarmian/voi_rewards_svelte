@@ -44,6 +44,7 @@
                     metadata: JSON.parse(token.metadata),
                     mintRound: token['mint-round'],
                     approved: token.approved,
+                    marketData: undefined,
                 });
             });
 
@@ -60,6 +61,7 @@
                     metadata: JSON.parse(token.metadata),
                     mintRound: token['mint-round'],
                     approved: token.approved,
+                    marketData: undefined,
                 });
             });
 

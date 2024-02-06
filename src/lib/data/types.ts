@@ -1,5 +1,6 @@
 // types.ts
 export interface Token {
+	marketData: object | null | undefined;
     owner: string;
     ownerNFD: string | unknown;
     contractId: number;

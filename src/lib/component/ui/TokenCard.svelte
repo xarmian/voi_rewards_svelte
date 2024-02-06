@@ -5,20 +5,10 @@
 
     export let token: Token = {} as Token;
 
-    function chunkArray(array: any[], size: number): any[] {
-        let result = [];
-        for (let i = 0; i < array.length; i += size) {
-            result.push(array.slice(i, i + size));
-        }
-        return result;
-    }
-
     let tokenProps: any[] = [];
     tokenProps = Object.keys(token.metadata.properties).map((key) => {
         return { trait_type: key, value: token.metadata.properties[key as keyof typeof token.metadata.properties] };
     });
-
-    let propGroups = chunkArray(tokenProps, 5);
 
     let flipped = false
 	
@@ -36,7 +26,9 @@
 		};
 	}
 
-    let url = `/arc72/collection/${token.contractId}/token/${token.tokenId}`;
+    let infourl = `/arc72/collection/${token.contractId}/token/${token.tokenId}`;
+    let marketurl = `https://shellyssandbox.xyz/#/nft/collection/${token.contractId}/token/${token.tokenId}`;
+    let contracturl = `https://voi.observer/explorer/application/${token.contractId}/transactions`;
 
 </script>
 
@@ -44,19 +36,42 @@
     <div class="card">
         {#if flipped}
             <div class="side" transition:flip={{}}>
-                <Card class="overflow-y cursor-pointer" style="height: 270px; width:240px;" on:click={() => goto(url)}>
-                    <div class="text-2xl font-bold mb-2">{token.metadata.name}</div>
-                    {#each tokenProps as prop}
-                        <div class="text-sm">
-                            <div class="font-bold inline">{prop.trait_type}</div>: {prop.value}
+                <Card class="flex justify-between" style="height: 270px; width:240px;">
+                    <div class="overflow-auto h-5/6">
+                        <div class="text-2xl font-bold mb-2"><A on:click={() => goto(infourl)}>{token.metadata.name}</A></div>
+                        {#each tokenProps as prop}
+                            <div class="text-sm">
+                                <div class="font-bold inline">{prop.trait_type}</div>: {prop.value}
+                            </div>
+                        {/each}
+                    </div>
+                    <hr class="w-full my-2"/>
+                    <div class="flex justify-between">
+                        <div class="text-center">
+                            <button class="cursor-pointer p-1 bg-blue-400 hover:bg-blue-500 text-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 w-14" on:click={() => window.open(marketurl,'_blank')}>
+                                <i class="fas fa-store" aria-details="Marketplace"></i>
+                                <div class="text-xs">Market</div>
+                            </button>
                         </div>
-                    {/each}
+                        <div class="text-center">
+                            <button class="cursor-pointer p-1 bg-blue-400 hover:bg-blue-500 text-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 w-14" on:click={() => goto(infourl)}>
+                                <i class="fas fa-info-circle" aria-details="Info"></i>
+                                <div class="text-xs">Detail</div>
+                            </button>
+                        </div>
+                        <div class="text-center">
+                            <button class="cursor-pointer p-1 bg-blue-400 hover:bg-blue-500 text-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 w-14" on:click={() => window.open(contracturl,'_blank')}>
+                                <i class="fas fa-file-contract" aria-details="Contract"></i>
+                                <div class="text-xs">Contract</div>
+                            </button>
+                        </div>
+                    </div>
                 </Card>
             </div>
 		{:else}
             <div class="side back" transition:flip={{}}>
-                <Card>
-                    <img src={token.metadata.image} alt={token.metadata.name} title={token.metadata.name} class="w-48 h-48" />
+                <Card padding="none">
+                    <img src={token.metadata.image} alt={token.metadata.name} title={token.metadata.name} class="rounded-t-lg"/>
                     <div class="text-center">{token.metadata.name}</div>
                 </Card>
             </div>
