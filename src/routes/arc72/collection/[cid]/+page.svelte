@@ -7,7 +7,7 @@
 	import TokenCard from '$lib/component/ui/TokenCard.svelte';
     import BreadcrumbCustom from '$lib/component/ui/BreadcrumbCustom.svelte';
     //@ts-ignore
-    import { mp as Contract } from 'ulujs';
+    // import { mp as Contract } from 'ulujs';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
 
     export let data: PageData;
@@ -20,7 +20,7 @@
         getTokens();
     });
 
-    const getMarketplaceData = async (token: Token) => {
+    /*const getMarketplaceData = async (token: Token) => {
         if (token.approved == zeroAddress || token.approved == token.owner) return null;
         console.log(token);
 
@@ -49,7 +49,7 @@
             console.error('Error searching transactions:', error);
         }
         return null;
-    }
+    }*/
 
     const getTokens = async () => {
         if (contractId) {
@@ -74,10 +74,10 @@
                     collectionName = tokens[0].metadata.name.replace(/[1#]/g, '');
 
                     // for each token in tokens, get the marketplace data
-                    for (let token of tokens) {
+                    /*for (let token of tokens) {
                         let mpData = await getMarketplaceData(token);
                         if (mpData) break;
-                    }
+                    }*/
 
                     tokens = tokens;
                 }

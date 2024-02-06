@@ -43,7 +43,6 @@
 		"flowbite-svelte": "^0.44.18",
 		"flowbite-svelte-icons": "^0.4.4",
 		"layerchart": "^0.25.1",
-		"svelte-device-info": "^1.0.0",
-		"ulujs": "^0.1.1"
+		"svelte-device-info": "^1.0.0"
 	}
 }
