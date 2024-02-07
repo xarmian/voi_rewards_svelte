@@ -13,12 +13,6 @@
     let collection: Collection | undefined;
     let royaltyPercentage: number = 0;
 
-    let isMenuOpen = false;
-
-    function toggleMenu() {
-        isMenuOpen = !isMenuOpen;
-    }
-
     const getCollection = async (contractId: number) => {
         if (contractId) {
             const url = `https://arc72-idx.voirewards.com/nft-indexer/v1/collections/?contractId=${contractId}`;
@@ -32,22 +26,6 @@
                 console.error(err);
             }
         }
-    }
-
-    const goToMarketplace = () => {
-        window.open(`https://shellyssandbox.xyz/#/nft/collection/${token.contractId}/token/${token.tokenId}`,'_blank');
-    }
-
-    const goToContract = () => {
-        window.open(`https://voi.observer/explorer/application/${token.contractId}/transactions`, '_blank');
-    }
-
-    const goToProjectPage = () => {
-        //window.location.href = token.metadata.image;
-    }
-
-    const goToCollection = () => {
-        goto(`/arc72/collection/${token.contractId}`);
     }
 
     onMount(async () => {
@@ -115,49 +93,19 @@
         return [softBgColors[index], softFgColors[index]];
     }
 
-    function closeMenu(event: any) {
-        if (isMenuOpen && !event.target.closest('.hamburger-container')) {
-            isMenuOpen = false;
-        }
-    }
-
     let formattedApproved = token.approved ? token.approved.length > 8
         ? `${token.approved.slice(0, 8)}...${token.approved.slice(-8)}`
         : token.approved : '';
 
     const collectionName = token?.metadata.name.replace(/(\d+|#)/g, '')??'';
 </script>
-<svelte:window on:click={closeMenu} />
-<div class="button-bar">
-    {#if isMobile}
-        <div class="hamburger-container">
-            <button class="hamburger-button" on:click={toggleMenu}>
-                <span class="hamburger-icon"></span>
-                <span class="hamburger-icon"></span>
-                <span class="hamburger-icon"></span>
-            </button>
-            {#if isMenuOpen}
-                <div class="menu">
-                    <button class="mb-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToMarketplace}>Marketplace</button>
-                    <button class="mb-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToContract}>Contract</button>
-                    <button class="bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToProjectPage}>Project Page</button>
-                </div>
-            {/if}
-        </div>
-    {:else}
-        <button class="mr-2 mb-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToCollection}><i class='fas fa-arrow-left'></i> Collection</button>
-        <button class="mr-2 mb-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToMarketplace}>Marketplace</button>
-        <button class="mr-2 mb-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToContract}>Contract</button>
-        <button class="mr-2 mb-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500" on:click={goToProjectPage}>Project Page</button>
-    {/if}
-</div>
 <div class="flex" class:flex-col={isMobile}>
     <img src={token.metadata.image} class="w-72 h-72 mr-3 rounded-xl"/>
     <div class="text-left">
         <div class="mb-2">
             {token.metadata?.description??''}
         </div>
-        <div class="text-2xl font-bold mb-2 text-purple-900 dark:text-purple-100">{token.metadata.name}</div>
+        <div class="text-2xl font-bold mb-2 text-purple-900 dark:text-purple-100"><A href="/arc72/collection/{token.contractId}/token/{token.tokenId}">{token.metadata.name}</A></div>
         <div class="mb-2">
             <div>Token ID: {token.tokenId}
             {#if collection}
@@ -181,60 +129,3 @@
         </div>
     </div>
 </div>
-<style>
-    .button-bar {
-        display: flex;
-        justify-content:left;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-    button {
-        padding: 0.5rem 1rem;
-        border: none;
-        border-radius: 0.5rem;
-        cursor: pointer;
-    }
-    .hamburger-container {
-        position: relative;
-    }
-    .hamburger-button {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-around;
-        width: 1.5rem;
-        height: 1.5rem;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        padding: 0;
-        z-index: 10;
-    }
-    .hamburger-icon {
-        width: 1.5rem;
-        height: 0.2rem;
-        background: #333;
-    }
-    .menu {
-        position: absolute;
-        top: 0rem;
-        left: 2rem;
-        background-color: #f0f0f0;
-        border: 1px solid #e0e0e0;
-        border-radius: 0.5rem;
-        padding: 0.5rem;
-        display: flex;
-        flex-direction: column;
-        z-index: 9;
-        white-space: nowrap;
-    }
-    @media (prefers-color-scheme: dark) {
-        button {
-            background-color: #333;
-            color: #f0f0f0;
-        }
-
-        button:hover {
-            background-color: #444;
-        }
-    }
-</style>
