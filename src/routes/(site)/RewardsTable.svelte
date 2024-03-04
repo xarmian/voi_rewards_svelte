@@ -162,7 +162,7 @@
 
       for (let i = 0; i < $sortItems.length; i++) {
         const item = $sortItems[i];
-        item.block_rewards = Math.floor(Math.ceil(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
+        item.block_rewards = Math.floor(Math.floor(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
 
         // iterate over item.nodes, and if the health_score is >= 5 add to health_rewards
         item.health_rewards = 0;
@@ -174,7 +174,7 @@
           // const healthyNodeIndex = item.nodes.findIndex((node: any) => node.health_score >= 5.0 && compareVersions(node.ver,MIN_ALGOD_VERSION) >= 0);
           const healthyNodeIndex = item.nodes.findIndex((node: any) => node.is_healthy);
           if (healthyNodeIndex !== -1) {
-            item.health_rewards += Math.floor(Math.ceil(totalHealthRewards / totalRewardedNodes / item.nodes[healthyNodeIndex].health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
+            item.health_rewards += Math.floor(Math.floor(totalHealthRewards / totalRewardedNodes / item.nodes[healthyNodeIndex].health_divisor * Math.pow(10,7)) / 10) / Math.pow(10,6);
           }
         }
 
