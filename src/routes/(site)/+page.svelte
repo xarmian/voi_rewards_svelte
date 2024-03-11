@@ -91,9 +91,22 @@
 				parseInt(selectedDate.substring(15, 17))
 			)
 		);
+
+		// set default rewards based on epoch
 		endOfEpoch.setUTCHours(23, 59, 59, 999);
-		block_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 25000000 : 12500000;
-		health_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 20000000 : 10000000;
+		if (endOfEpoch >= new Date('2023-12-31T23:59:59.999Z')) {
+			block_reward_pool = 25000000;
+			health_reward_pool = 20000000;
+		} else if (endOfEpoch >= new Date('2024-03-01T23:59:59.999Z')) {
+			block_reward_pool = 35000000;
+			health_reward_pool = 10000000;
+		}
+		else {
+			block_reward_pool = 12500000;
+			health_reward_pool = 10000000;
+		}
+		//block_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 25000000 : 12500000;
+		//health_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 20000000 : 10000000;
 
 		// reinitialize totals
 		totalWallets = 0;
