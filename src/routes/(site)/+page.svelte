@@ -159,8 +159,8 @@
 
 <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
 	<p class="font-bold">Notice:</p>
-	<p>A consensus upgrade has occurred on the Voi network. As a result, your node will stop proposing
-		blocks until you upgrade to Algod version 3.21.0. As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
+	<p>A required upgrade has occurred on the Voi network. As a result, your node will no longer qualify for
+		rewards until you upgrade to Algod version 3.22.1. As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
 		for more specific help. Nodes installed using D13's guide should update automatically but may need to be restarted. Please see the link(s) below for additional resources:
 	</p>
 	<ul class="list-disc list-inside">
