@@ -94,10 +94,10 @@
 
 		// set default rewards based on epoch
 		endOfEpoch.setUTCHours(23, 59, 59, 999);
-		if (endOfEpoch >= new Date('2023-12-31T23:59:59.999Z')) {
+		if (endOfEpoch >= new Date('2024-03-01T23:59:59.999Z')) {
 			block_reward_pool = 25000000;
 			health_reward_pool = 20000000;
-		} else if (endOfEpoch >= new Date('2024-03-01T23:59:59.999Z')) {
+		} else if (endOfEpoch >= new Date('2023-12-31T23:59:59.999Z')) {
 			block_reward_pool = 35000000;
 			health_reward_pool = 10000000;
 		}
