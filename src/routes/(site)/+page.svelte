@@ -6,6 +6,7 @@
     import { algodClient } from '$lib/utils/algod';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
+	import { compareVersions } from 'compare-versions';
 
 	$: totalBlocks = 0;
 	$: totalWallets = 0;
@@ -20,6 +21,7 @@
 	$: selectedDate = '';
 	$: dataArrays = [];
 	$: dataIncomplete = false;
+	$: MIN_ALGOD_VERSION = '3.0.0';
 
 	let dates: any;
 	$: dates = [];
@@ -128,6 +130,7 @@
 				endOfDay.setUTCHours(23, 59, 59, 999);
 
 				dataIncomplete = endOfDay > new Date(data.max_timestamp) ? true : false;
+				MIN_ALGOD_VERSION = data.minimum_algod;
 
 				// Sort the data by block count
 				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
@@ -135,8 +138,24 @@
 
                 dataArrays.forEach((row: any) => {
                     totalWallets++;
-                    totalBlocks += row.block_count;
-                });
+
+					let nodeVer = '0';
+					if (row.nodes) {
+						for (let j = 0; j < row.nodes.length; j++) {
+							const node = row.nodes[j];
+							if (node.ver && compareVersions(node.ver,nodeVer) >= 0) {
+								nodeVer = node.ver;
+							}
+						}
+					}
+
+					if (nodeVer && compareVersions(nodeVer,MIN_ALGOD_VERSION) >= 0) {
+						totalBlocks += row.block_count;
+					}
+					else {
+						row.block_count = 0;
+					}
+				});
 
 				//calcRewards();
 				block_height = data.block_height;
@@ -220,6 +239,15 @@
 			</h5>
 			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
 				{totalBlocks == 0 ? '...Loading...' : totalBlocks.toLocaleString()}
+			</p>
+		</div>
+		<br/>
+		<div class="cardInner">
+			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+				Min Algod Version
+			</h5>
+			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+				{MIN_ALGOD_VERSION == '3.0.0' ? '...Loading...' : MIN_ALGOD_VERSION}
 			</p>
 		</div>
 	</Card>
