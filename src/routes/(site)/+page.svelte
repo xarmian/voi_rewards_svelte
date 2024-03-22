@@ -149,7 +149,7 @@
 						}
 					}
 
-					if (nodeVer && compareVersions(nodeVer,MIN_ALGOD_VERSION) >= 0) {
+					if (nodeVer && (compareVersions(nodeVer,MIN_ALGOD_VERSION) >= 0 || nodeVer === '0')) {
 						totalBlocks += row.block_count;
 					}
 					else {
