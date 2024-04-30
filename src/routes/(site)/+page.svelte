@@ -15,8 +15,8 @@
 	$: totalHealthyNodes = 0;
 	$: totalEmptyNodes = 0;
 	$: totalExtraNodes = 0;
-	$: block_reward_pool = 35000000;
-	$: health_reward_pool = 10000000;
+	$: block_reward_pool = 0;
+	$: health_reward_pool = 0;
 	$: minimumAlgod = '3.0.0';
 	$: selectedDate = '';
 	$: dataArrays = [];
@@ -191,16 +191,11 @@
 
 <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
 	<p class="font-bold">Notice:</p>
-	<p>A required upgrade has occurred on the Voi network. As a result, your node will no longer qualify for
-		rewards until you upgrade to Algod version 3.22.1. As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
-		for more specific help. Nodes installed using D13's guide should update automatically but may need to be restarted. Please see the link(s) below for additional resources:
+	<p>Phase 1 of the Voi Incentivized Testnet is ending and the final Node Participation Rewards have been distributed.
+		A snapshot of VOI and VIA balances is being taken May 1 at midnight UTC (April 30th 8pm EDT).
+		As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
+		for more specific help.
 	</p>
-	<ul class="list-disc list-inside">
-		<li>
-			<a href="https://github.com/AustP/austs-one-click-node/releases/tag/v1.4.2" target="_blank" class="underline text-yellow-700">Using Aust's One-click Node?</a> - Download latest version of Aust's One-click Node
-		</li>
-		<!-- Add more links as needed -->
-	</ul>
 </div>
 <div class="mt-6 font-bold text-2xl text-center">Epoch</div>
 <div class="mb-6 flex justify-center">
