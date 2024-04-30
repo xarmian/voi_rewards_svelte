@@ -199,6 +199,7 @@
 		As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
 		for more specific help.
 	</p>
+	<p>Keep an eye out here or on Discord for more information about Node Running Incentives for Testnet Phase 2.</p>
 </div>
 <div class="mt-6 font-bold text-2xl text-center">Epoch</div>
 <div class="mb-6 flex justify-center">
