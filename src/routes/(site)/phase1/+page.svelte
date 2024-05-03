@@ -236,7 +236,7 @@
                 </Card> 
             </div>
             <br/>
-            <div class="flex flex-col ">
+            <div class="flex-col hidden ">
                 <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
                     Block Rewards
                 </h1>
