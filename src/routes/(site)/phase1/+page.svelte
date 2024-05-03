@@ -37,7 +37,7 @@
 
 </script>
 <div>
-    <div class="flex flex-col">
+    <div class="flex flex-col mt-4">
         <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white place-self-center">
             Phase 1 Snapshot
         </h1>
@@ -45,7 +45,7 @@
         <br/>
         <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 w-3/4 place-self-center" role="alert">
             <p>This is an unofficial resource and is not affiliated with Voi Network or the Voi Foundation.
-                This data and calculator below attempt to be as accurate as possible based on available information,
+                The data and calculator below attempt to be as accurate as possible based on available information,
                 however it is not guaranteed to be accurate. Please verify with official sources before making any decisions.
             </p>
             <br/>
