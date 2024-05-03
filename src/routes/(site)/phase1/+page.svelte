@@ -176,8 +176,8 @@
                     Lockup Option
                 </h1>
                 <ul>
-                    <li>Airdrop may be locked for up to five years at a rate of 20% per year</li>
-                    <li>Full amount is allocated immediately for staking</li>
+                    <li>Airdrop may be locked for up to five years for a 20% componded bonus per year</li>
+                    <li>Bonus is earned immediately and may be used for node block rewards</li>
                 </ul>
                 <br/>
                 <p>Select a lockup period to calculate your stakable balance:</p>
