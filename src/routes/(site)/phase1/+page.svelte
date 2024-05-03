@@ -1,6 +1,8 @@
 <script lang="ts">
+  import InfoButton from '../../../lib/component/ui/InfoButton.svelte';
+
     import WalletSearch from "$lib/component/WalletSearch.svelte";
-    import { Card } from "flowbite-svelte";
+    import { Card, Popover } from "flowbite-svelte";
     import { goto } from '$app/navigation';
     import snapshotTSV from "./snapshot.txt?raw";
     //@ts-ignore
@@ -57,7 +59,8 @@
     </div> 
     <br/>
     <div class="dashboard justify-evenly flex flex-row">
-        <Card class="bg-gray-100 dark:bg-gray-700 h-42 w-64 m-2">
+        <Card class="bg-gray-100 dark:bg-gray-700 h-42 w-64 m-2 relative">
+            <InfoButton>This is the total eligible tokens distributed during TestNet Phase #1</InfoButton>
             <div class="cardInner">
                 <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                     TestNet Tokens
@@ -90,8 +93,11 @@
             </div>
         </Card>
 
-        <Card class="bg-gray-100 dark:bg-gray-700 h-42 w-64 m-2">
-            <div class="cardInner">
+        <Card class="bg-gray-100 dark:bg-gray-700 h-42 w-64 m-2 relative">
+            <InfoButton>
+                This is the total number of MainNet tokens that will be distributed to eligible wallets based on the snapshot for TestNet Phase #1.
+            </InfoButton>
+           <div class="cardInner">
                 <div class="cardInner">
                     <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                         Mainnet Allocation
@@ -123,54 +129,48 @@
                 <div class="flex flex-col place-items-center">
                     <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
                         <div class="cardInner">
-                            <div class="cardInner">
-                                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                    Phase 1 VOI
-                                </h5>
-                                <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                    {snapshot.find((s) => s.account === selectedWallet)?.voiBalance.toLocaleString()}
-                                </p>
-                            </div>
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Phase 1 VOI
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {snapshot.find((s) => s.account === selectedWallet)?.voiBalance.toLocaleString()}
+                            </p>
                         </div>
                     </Card>    
                     +
                     <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
                         <div class="cardInner">
-                            <div class="cardInner">
-                                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                    Phase 1 VIA
-                                </h5>
-                                <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                    {snapshot.find((s) => s.account === selectedWallet)?.viaBalance.toLocaleString()}
-                                </p>
-                            </div>
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Phase 1 VIA
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {snapshot.find((s) => s.account === selectedWallet)?.viaBalance.toLocaleString()}
+                            </p>
                         </div>
                     </Card>    
                 </div>
                 =
-                <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
+                <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2 relative">
                     <div class="cardInner">
-                        <div class="cardInner">
-                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Phase 1 Total
-                            </h5>
-                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {(snapshot.find((s) => s.account === selectedWallet)?.voiBalance + snapshot.find((s) => s.account === selectedWallet)?.viaBalance).toLocaleString()} VOI/VIA
-                            </p>
-                        </div>
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                            Phase 1 Total
+                        </h5>
+                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                            {(snapshot.find((s) => s.account === selectedWallet)?.voiBalance + snapshot.find((s) => s.account === selectedWallet)?.viaBalance).toLocaleString()} VOI/VIA
+                        </p>
                     </div>
+                    <InfoButton>This is the total combined VOI and VIA tokens in the wallet when the snapshot was taken. For the purposes of allocating tokens on Mainnet, 1 VOI = 1 VIA.</InfoButton>                    
                 </Card>
                 <i class="fas fa-arrow-right"></i>
-                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
+                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                    <InfoButton>The Mainnet Airdrop is calculated as a percentage of the total eligible VOI and VIA distributed in Phase 1, multiplied by the total Phase 1 allocation of 150 Million.</InfoButton>                    
                     <div class="cardInner">
-                        <div class="cardInner">
-                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Anticipated Mainnet Airdrop
-                            </h5>
-                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {airdrop?.toLocaleString()}
-                            </p>
-                        </div>
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                            Anticipated Mainnet Airdrop
+                        </h5>
+                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                            {airdrop?.toLocaleString()}
+                        </p>
                     </div>
                 </Card>    
 
@@ -180,9 +180,13 @@
                 <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
                     Lockup Option
                 </h1>
-                <ul>
-                    <li>Airdrop may be locked for up to five years for a 20% componded bonus per year</li>
+                <ul class="max-w-xl">
+                    <li>Airdrop may be locked for up to five years for an up-to 20% componded bonus per year</li>
                     <li>Bonus is earned immediately and may be used for node block rewards</li>
+                    <li>This is based on a current (unofficial) interpretation of the <a href="https://medium.com/@voifoundation/testnet-phases-announcement-338b929798bb" target="_blank" class="underline text-yellow-700">VOI Foundation announcement</a>. The calculator will
+                        be adjusted as new information becomes available.
+                    </li>
+                    <li>NOTE: 20% per year is being used for all years. Actual rate for shorter lockup periods may be less. This calculator will be updated to reflect varying rates once announced by the Foundation.</li>
                 </ul>
                 <br/>
                 <p>Select a lockup period to calculate your stakable balance:</p>
@@ -191,36 +195,43 @@
                 <RangeSlider values={[0]} min={0} max={5} pips={true} all="label" on:change={(e) => lockYears = e.detail.value} />
             </div>
             <div class="flex flex-row">
-                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
+                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                    <InfoButton>
+                        When tokens are locked, the full future bonus amount is allocated and made 
+                        available for staking on a participation node, to earn node rewards.
+                        This number reflects the total amount with the bonus applied, which may be used
+                        to earn node participation rewards.
+                    </InfoButton>
                     <div class="cardInner">
-                        <div class="cardInner">
-                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Stakable Balance
-                                <br/>
-                                <div class="text-sm">Balance with {lockYears} year lockup</div>
-                            </h5>
-                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {airdrop ? (airdrop * Math.pow(1.2, lockYears)).toLocaleString() : null}
-                            </p>
-                        </div>
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                            Stakable Balance
+                            <br/>
+                            <div class="text-sm">Balance with {lockYears} year lockup</div>
+                        </h5>
+                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                            {airdrop ? (airdrop * Math.pow(1.2, lockYears)).toLocaleString() : null}
+                        </p>
                     </div>
                 </Card> 
-                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
+                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                    <InfoButton>
+                        After the initial vesting period of 12 months, a user may begin to withdraw a portion of their
+                        tokens based on their selected Lock-up period. This number reflects the monthly
+                        withdrawable amount after the 12-month vesting period, based on the selected Lock-up period.
+                    </InfoButton>
                     <div class="cardInner">
-                        <div class="cardInner">
-                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Monthly Withdrawable
-                                <br/>
-                                <div class="text-sm">After 12-month vesting</div>
-                            </h5>
-                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {#if lockYears == 0}
-                                    Full balance
-                                {:else}
-                                    {airdrop ? (airdrop * Math.pow(1.2, lockYears) / (lockYears*12)).toLocaleString() : null}
-                                {/if}
-                            </p>
-                        </div>
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                            Monthly Withdrawable
+                            <br/>
+                            <div class="text-sm">After 12-month vesting</div>
+                        </h5>
+                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                            {#if lockYears == 0}
+                                Full balance
+                            {:else}
+                                {airdrop ? (airdrop * Math.pow(1.2, lockYears) / (lockYears*12)).toLocaleString() : null}
+                            {/if}
+                        </p>
                     </div>
                 </Card> 
             </div>
