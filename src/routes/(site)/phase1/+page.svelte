@@ -114,37 +114,40 @@
     {#if selectedWallet}
     <div class="inline-flex flex-col p-8 rounded-2xl bg-slate-100 dark:bg-slate-700 place-self-center place-items-center">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex flex-col place-items-center">
-                <div>{selectedWallet}</div>
+            <h1 class="text-2xl font-bold underline tracking-tight text-gray-900 dark:text-white flex flex-col place-items-center">
+                <div>{selectedWallet.substring(0,8)}...{selectedWallet.substring(selectedWallet.length-8,selectedWallet.length)}</div>
             </h1>
         </div>
         {#if selectedWallet && snapshot.find((s) => s.account == selectedWallet)}
-            <div class="flex flex-row">
-                <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
-                    <div class="cardInner">
+            <div class="flex flex-row place-items-center">
+                <div class="flex flex-col place-items-center">
+                    <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
                         <div class="cardInner">
-                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Phase 1 Voi
-                            </h5>
-                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {snapshot.find((s) => s.account === selectedWallet)?.voiBalance.toLocaleString()}
-                            </p>
+                            <div class="cardInner">
+                                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                    Phase 1 VOI
+                                </h5>
+                                <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                    {snapshot.find((s) => s.account === selectedWallet)?.voiBalance.toLocaleString()}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </Card>    
-                <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
-                    <div class="cardInner">
+                    </Card>    
+                    +
+                    <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
                         <div class="cardInner">
-                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Phase 1 Via
-                            </h5>
-                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {snapshot.find((s) => s.account === selectedWallet)?.viaBalance.toLocaleString()}
-                            </p>
+                            <div class="cardInner">
+                                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                    Phase 1 VIA
+                                </h5>
+                                <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                    {snapshot.find((s) => s.account === selectedWallet)?.viaBalance.toLocaleString()}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </Card>    
-                
+                    </Card>    
+                </div>
+                =
                 <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
                     <div class="cardInner">
                         <div class="cardInner">
@@ -152,11 +155,12 @@
                                 Phase 1 Total
                             </h5>
                             <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {(snapshot.find((s) => s.account === selectedWallet)?.voiBalance + snapshot.find((s) => s.account === selectedWallet)?.viaBalance).toLocaleString()}
+                                {(snapshot.find((s) => s.account === selectedWallet)?.voiBalance + snapshot.find((s) => s.account === selectedWallet)?.viaBalance).toLocaleString()} VOI/VIA
                             </p>
                         </div>
                     </div>
-                </Card>    
+                </Card>
+                <i class="fas fa-arrow-right"></i>
                 <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
                     <div class="cardInner">
                         <div class="cardInner">
