@@ -249,7 +249,7 @@
                     <li>Use the slider below to simulate potential block rewards based on total Online Stake
                         and potential block reward emission rate per year
                     </li>
-                    <li class="text-yellow-200 dark:text-yellow-300">This is a simulation for entertainment purposes only. It is only an estimation!</li>
+                    <li class="text-yellow-500 dark:text-yellow-300">This is a simulation for entertainment purposes only. It is only an estimation!</li>
                 </ul>
                 <br/>
                 <div class="flex flex-row space-x-2">
@@ -273,7 +273,7 @@
                                     This is the total amount of tokens staked on the network. The higher the total stake, the lower the individual rewards.
                                 </InfoButton>
                                 <i class="fas fa-arrow-right"></i>
-                                <div class="ml-2">
+                                <div class="ml-2 p-1 bg-blue-200 dark:bg-blue-700 rounded-md">
                                     {(totalStake[0] * 1000000).toLocaleString()} VOI
                                 </div>
                             </div>
@@ -286,7 +286,7 @@
                                     This is the total amount of tokens that will be distributed as block rewards over the course of a year. The higher the emission rate, the higher the rewards.
                                 </InfoButton>
                                 <i class="fas fa-arrow-right"></i>
-                                <div class="ml-2">
+                                <div class="ml-2 p-1 bg-blue-200 dark:bg-blue-700 rounded-md">
                                     {(emissionRate[0] * 1000000).toLocaleString()} VOI
                                 </div>
                             </div>
