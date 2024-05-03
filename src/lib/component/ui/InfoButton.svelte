@@ -1,9 +1,11 @@
 <script lang="ts">
     import { Popover } from "flowbite-svelte";
 
+    export let noAbsolute = false;
+
     let id = `info-${Math.random().toString(36).substring(2, 11)}`;
 </script>
-<div class="text-2xl font-bold text-gray-800 dark:text-gray-200 flex flex-col place-items-center m-2 absolute top-0 right-0">
+<div class="text-2xl font-bold text-gray-800 dark:text-gray-200 flex flex-col place-items-center {!noAbsolute ? 'm-2 absolute top-0 right-0' : 'ml-1 -mt-1 -mb-1'}">
     <button id={id}>
         <i class="fas fa-info-circle mr-2 text-blue-200"></i>
     </button>

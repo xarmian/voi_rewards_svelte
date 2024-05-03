@@ -20,7 +20,11 @@
     let airdrop: number | null = null;
     let totalBalance: number | null = null;
     let lockYears: number = 0;
-    let blockRewardPercent: number = 5;
+    let totalStake: number[] = [1000];
+    let emissionRate: number[] = [250];
+
+    $: myStake = airdrop ? (airdrop * Math.pow(1.2, lockYears)) : 0;
+    $: monthlyBlockReward = myStake / totalStake[0] * emissionRate[0] / 12;
 
     // snapshotTSV is a tab-separated value file with the following columns: account, userType, voiBalance, viaBalance. convert to JSON object
     const snapshot: Snapshot[] = snapshotTSV.split('\n').map((line: string) => {
@@ -209,7 +213,7 @@
                             <div class="text-sm">Balance with {lockYears} year lockup</div>
                         </h5>
                         <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                            {airdrop ? (airdrop * Math.pow(1.2, lockYears)).toLocaleString() : null}
+                            {myStake.toLocaleString()}
                         </p>
                     </div>
                 </Card> 
@@ -236,36 +240,60 @@
                 </Card> 
             </div>
             <br/>
-            <div class="flex-col hidden ">
+            <div class="flex flex-col">
                 <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
                     Block Rewards
                 </h1>
                 <ul class="max-w-xl">
                     <li>Locked tokens may earn block (node running) rewards on their full stakable balance</li>
-                    <li>Actual rate may vary, use the slider below to simulate potential block rewards</li>
+                    <li>Use the slider below to simulate potential block rewards based on total Online Stake
+                        and potential block reward emission rate per year
+                    </li>
+                    <li class="text-yellow-200 dark:text-yellow-300">This is a simulation for entertainment purposes only. It is only an estimation!</li>
                 </ul>
                 <br/>
-                <div class="flex flex-row">
-                    <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                <div class="flex flex-row space-x-2">
+                    <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative self-center">
                         <div class="cardInner">
                             <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                                 Block Rewards
                                 <br/>
-                                <div class="text-sm">per month</div>    
+                                <div class="text-sm">per month with above stake</div>    
                             </h5>
                             <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {#if lockYears == 0}
-                                    {(airdrop ? airdrop * blockRewardPercent / 100 / 12 : 0).toLocaleString()}
-                                {:else}
-                                    {(airdrop ? (airdrop * Math.pow(1.2, lockYears) / blockRewardPercent / 100 / 12) : 0).toLocaleString()}
-                                {/if}
+                                {monthlyBlockReward.toLocaleString()}
                             </p>
                         </div>
                     </Card>     
-                    <div class="w-96 self-center">
-                        <RangeSlider values={[5]} min={0} max={10} pips={true} suffix="%" all="label" on:change={(e) => blockRewardPercent = e.detail.value} />
+                    <div class="flex flex-col self-center space-y-1">
+                        <div class="w-96">
+                            <div class="flex flex-row items-center">
+                                Total Online Stake
+                                <InfoButton noAbsolute={true}>
+                                    This is the total amount of tokens staked on the network. The higher the total stake, the lower the individual rewards.
+                                </InfoButton>
+                                <i class="fas fa-arrow-right"></i>
+                                <div class="ml-2">
+                                    {(totalStake[0] * 1000000).toLocaleString()} VOI
+                                </div>
+                            </div>
+                            <RangeSlider bind:values={totalStake} min={100} max={2000} formatter={(v) => (v < 1000) ? v+'M' : (v/1000)+'B'} step={100} float={false} first="label" last="label" pips={true} />
+                        </div>
+                        <div class="w-96 self-center">
+                            <div class="flex flex-row items-center">
+                                Reward Emission per Year
+                                <InfoButton noAbsolute={true}>
+                                    This is the total amount of tokens that will be distributed as block rewards over the course of a year. The higher the emission rate, the higher the rewards.
+                                </InfoButton>
+                                <i class="fas fa-arrow-right"></i>
+                                <div class="ml-2">
+                                    {(emissionRate[0] * 1000000).toLocaleString()} VOI
+                                </div>
+                            </div>
+                            <RangeSlider bind:values={emissionRate} min={50} max={500} formatter={(v) => (v < 1000) ? v+'M' : (v/1000)+'B'} step={50} float={false} first="label" last="label" pips={true} />
+                            
+                        </div>
                     </div>
-        
                 </div>
             </div>
         {:else}
