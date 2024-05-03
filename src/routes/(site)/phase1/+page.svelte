@@ -3,6 +3,7 @@
     import { Card } from "flowbite-svelte";
     import { goto } from '$app/navigation';
     import snapshotTSV from "./snapshot.txt?raw";
+    //@ts-ignore
     import RangeSlider from "svelte-range-slider-pips";
 
     interface Snapshot {
@@ -50,7 +51,7 @@
             </p>
             <br/>
             <p>As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
-                for more specific help.
+                for more specific help, and find the <a href="https://medium.com/@voifoundation/testnet-phases-announcement-338b929798bb" target="_blank" class="underline text-yellow-700">official Phase 1 announcement here</a>.
             </p>
         </div>
     </div> 
