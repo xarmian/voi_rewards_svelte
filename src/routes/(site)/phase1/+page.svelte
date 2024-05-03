@@ -1,9 +1,8 @@
 <script lang="ts">
-  import InfoButton from '../../../lib/component/ui/InfoButton.svelte';
+    import InfoButton from '../../../lib/component/ui/InfoButton.svelte';
 
     import WalletSearch from "$lib/component/WalletSearch.svelte";
     import { Card, Popover } from "flowbite-svelte";
-    import { goto } from '$app/navigation';
     import snapshotTSV from "./snapshot.txt?raw";
     //@ts-ignore
     import RangeSlider from "svelte-range-slider-pips";
@@ -216,8 +215,8 @@
                 <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
                     <InfoButton>
                         After the initial vesting period of 12 months, a user may begin to withdraw a portion of their
-                        tokens based on their selected Lock-up period. This number reflects the monthly
-                        withdrawable amount after the 12-month vesting period, based on the selected Lock-up period.
+                        tokens based on their selected Lock-up period. This number reflects the amount a user may withdraw
+                        each month based on the selected Lock-up period.
                     </InfoButton>
                     <div class="cardInner">
                         <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
