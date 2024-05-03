@@ -20,6 +20,7 @@
     let airdrop: number | null = null;
     let totalBalance: number | null = null;
     let lockYears: number = 0;
+    let blockRewardPercent: number = 5;
 
     // snapshotTSV is a tab-separated value file with the following columns: account, userType, voiBalance, viaBalance. convert to JSON object
     const snapshot: Snapshot[] = snapshotTSV.split('\n').map((line: string) => {
@@ -233,6 +234,39 @@
                         </p>
                     </div>
                 </Card> 
+            </div>
+            <br/>
+            <div class="flex flex-col ">
+                <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
+                    Block Rewards
+                </h1>
+                <ul class="max-w-xl">
+                    <li>Locked tokens may earn block (node running) rewards on their full stakable balance</li>
+                    <li>Actual rate may vary, use the slider below to simulate potential block rewards</li>
+                </ul>
+                <br/>
+                <div class="flex flex-row">
+                    <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                        <div class="cardInner">
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Block Rewards
+                                <br/>
+                                <div class="text-sm">per month</div>    
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {#if lockYears == 0}
+                                    {(airdrop ? airdrop * blockRewardPercent / 100 / 12 : 0).toLocaleString()}
+                                {:else}
+                                    {(airdrop ? (airdrop * Math.pow(1.2, lockYears) / blockRewardPercent / 100 / 12) : 0).toLocaleString()}
+                                {/if}
+                            </p>
+                        </div>
+                    </Card>     
+                    <div class="w-96 self-center">
+                        <RangeSlider values={[5]} min={0} max={10} pips={true} suffix="%" all="label" on:change={(e) => blockRewardPercent = e.detail.value} />
+                    </div>
+        
+                </div>
             </div>
         {:else}
             <div class="flex flex-col p-8 rounded-2xl bg-slate-100 dark:bg-slate-700 place-items-center">
