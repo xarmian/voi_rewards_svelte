@@ -20,7 +20,7 @@
 		  <FooterLinkGroup ulClass="flex flex-wrap items-center mb-6 text-sm text-gray-500 sm:mb-0 dark:text-gray-400">
 			<FooterLink href="/what_is_voi">What is Voi?</FooterLink>
 			<FooterLink href="/how_to_node">How to Node?</FooterLink>
-			<FooterLink href="/phase1">Phase 1</FooterLink>
+			<!--<FooterLink href="/phase1">Phase 1</FooterLink>-->
 			<FooterLink href="/about">About</FooterLink>
 		  </FooterLinkGroup>
 		  <FooterLinkGroup ulClass="flex flex-wrap items-center mb-6 text-sm text-gray-500 sm:mb-0 dark:text-gray-400">
