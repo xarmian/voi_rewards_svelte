@@ -190,20 +190,40 @@
             <div class="w-80">
                 <RangeSlider values={[0]} min={0} max={5} pips={true} all="label" on:change={(e) => lockYears = e.detail.value} />
             </div>
-            <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
-                <div class="cardInner">
+            <div class="flex flex-row">
+                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
                     <div class="cardInner">
-                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                            Stakable Balance
-                            <br/>
-                            <div class="text-sm">Balance after {lockYears} year lockup</div>
-                        </h5>
-                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                            {airdrop ? (airdrop * Math.pow(1.2, lockYears)).toLocaleString() : null}
-                        </p>
+                        <div class="cardInner">
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Stakable Balance
+                                <br/>
+                                <div class="text-sm">Balance with {lockYears} year lockup</div>
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {airdrop ? (airdrop * Math.pow(1.2, lockYears)).toLocaleString() : null}
+                            </p>
+                        </div>
                     </div>
-                </div>
-            </Card>    
+                </Card> 
+                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2">
+                    <div class="cardInner">
+                        <div class="cardInner">
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Monthly Withdrawable
+                                <br/>
+                                <div class="text-sm">After 12-month vesting</div>
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {#if lockYears == 0}
+                                    Full balance
+                                {:else}
+                                    {airdrop ? (airdrop * Math.pow(1.2, lockYears) / (lockYears*12)).toLocaleString() : null}
+                                {/if}
+                            </p>
+                        </div>
+                    </div>
+                </Card> 
+            </div>
         {:else}
             <div class="flex flex-col p-8 rounded-2xl bg-slate-100 dark:bg-slate-700 place-items-center">
                 <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
