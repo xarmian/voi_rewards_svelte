@@ -267,27 +267,35 @@
                     </Card>     
                     <div class="flex flex-col self-center space-y-1">
                         <div class="w-96">
-                            <div class="flex flex-row items-center">
-                                Total Online Stake
-                                <InfoButton noAbsolute={true}>
-                                    This is the total amount of tokens staked on the network. The higher the total stake, the lower the individual rewards.
-                                </InfoButton>
+                            <div class="flex flex-row items-center justify-between">
+                                <div class="flex flex-row items-center">
+                                    Total Online Stake
+                                    <InfoButton noAbsolute={true}>
+                                        This is the total amount of tokens staked on the network. The higher the total stake, the lower the individual rewards.
+                                    </InfoButton>
+                                </div>
                                 <i class="fas fa-arrow-right"></i>
-                                <div class="ml-2 p-1 bg-blue-200 dark:bg-blue-700 rounded-md">
-                                    {(totalStake[0] * 1000000).toLocaleString()} VOI
+                                <div class="flex flex-row items-center">
+                                    <div class="ml-2 p-1 bg-blue-200 dark:bg-blue-700 rounded-md">
+                                        {(totalStake[0] * 1000000).toLocaleString()} VOI
+                                    </div>
                                 </div>
                             </div>
                             <RangeSlider bind:values={totalStake} min={100} max={2000} formatter={(v) => (v < 1000) ? v+'M' : (v/1000)+'B'} step={100} float={false} first="label" last="label" pips={true} />
                         </div>
                         <div class="w-96 self-center">
-                            <div class="flex flex-row items-center">
-                                Reward Emission per Year
-                                <InfoButton noAbsolute={true}>
-                                    This is the total amount of tokens that will be distributed as block rewards over the course of a year. The higher the emission rate, the higher the rewards.
-                                </InfoButton>
+                            <div class="flex flex-row items-center justify-between">
+                                <div class="flex flex-row items-center">
+                                    Reward Emission per Year
+                                    <InfoButton noAbsolute={true}>
+                                        This is the total amount of tokens that will be distributed as block rewards over the course of a year. The higher the emission rate, the higher the rewards.
+                                    </InfoButton>
+                                </div>
                                 <i class="fas fa-arrow-right"></i>
-                                <div class="ml-2 p-1 bg-blue-200 dark:bg-blue-700 rounded-md">
-                                    {(emissionRate[0] * 1000000).toLocaleString()} VOI
+                                <div class="flex flex-row items-center">
+                                    <div class="ml-2 p-1 bg-blue-200 dark:bg-blue-700 rounded-md">
+                                        {(emissionRate[0] * 1000000).toLocaleString()} VOI
+                                    </div>
                                 </div>
                             </div>
                             <RangeSlider bind:values={emissionRate} min={50} max={500} formatter={(v) => (v < 1000) ? v+'M' : (v/1000)+'B'} step={50} float={false} first="label" last="label" pips={true} />
