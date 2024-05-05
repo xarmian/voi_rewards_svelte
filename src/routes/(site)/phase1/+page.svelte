@@ -220,22 +220,17 @@
                 </Card> 
                 <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
                     <InfoButton>
-                        After the initial vesting period of 12 months, a user may begin to withdraw a portion of their
-                        tokens based on their selected Lock-up period. This number reflects the amount a user may withdraw
-                        each month based on the selected Lock-up period.
+                        After the selected lock-up period, tokens will vest at a rate of 1/12 per month for one year.
+                        This number reflects the amount a user may withdraw each month after the lock-up period.
                     </InfoButton>
                     <div class="cardInner">
                         <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                             Monthly Withdrawable
                             <br/>
-                            <div class="text-sm">After 12-month vesting</div>
+                            <div class="text-sm">After lock-up period</div>
                         </h5>
                         <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                            {#if lockYears == 0}
-                                Full balance
-                            {:else}
-                                {(myStake / (lockYears*12)).toLocaleString()}
-                            {/if}
+                            {(myStake / 12).toLocaleString()}
                         </p>
                     </div>
                 </Card> 
