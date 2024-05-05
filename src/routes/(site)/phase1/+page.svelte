@@ -224,12 +224,8 @@
                     Lockup Option
                 </h1>
                 <ul class="max-w-xl">
-                    <li>Airdrop may be locked for up to five years for an up-to 20% componded bonus per year</li>
+                    <li>Airdrop may be locked for one to five years for a 10%-20% componded bonus per year</li>
                     <li>Bonus is earned immediately and may be used for node block rewards</li>
-                    <li>This is based on a current (unofficial) interpretation of the <a href="https://medium.com/@voifoundation/testnet-phases-announcement-338b929798bb" target="_blank" class="underline text-yellow-700">VOI Foundation announcement</a>. The calculator will
-                        be adjusted as new information becomes available.
-                    </li>
-                    <li>NOTE: 20% per year is being used for all years. Actual rate for shorter lockup periods may be less. This calculator will be updated to reflect varying rates once announced by the Foundation.</li>
                 </ul>
                 <br/>
                 <p>Select a lockup period to calculate your stakable balance:</p>
