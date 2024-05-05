@@ -23,7 +23,8 @@
     let totalStake: number[] = [1000];
     let emissionRate: number[] = [250];
 
-    $: myStake = airdrop ? (airdrop * Math.pow(1.2, lockYears)) : 0;
+    const compoundRates = [0, 0.1, 0.12, 0.15, 0.18, 0.2];
+    $: myStake = airdrop ? (airdrop * Math.pow(1 + compoundRates[lockYears], lockYears)) : 0;
     $: monthlyBlockReward = myStake / totalStake[0] * emissionRate[0] / 12;
 
     // snapshotTSV is a tab-separated value file with the following columns: account, userType, voiBalance, viaBalance. convert to JSON object
@@ -233,7 +234,7 @@
                             {#if lockYears == 0}
                                 Full balance
                             {:else}
-                                {airdrop ? (airdrop * Math.pow(1.2, lockYears) / (lockYears*12)).toLocaleString() : null}
+                                {(myStake / (lockYears*12)).toLocaleString()}
                             {/if}
                         </p>
                     </div>
