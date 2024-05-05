@@ -41,6 +41,9 @@
         totalBalance = (snapshot.find((s) => s.account === selectedWallet)?.voiBalance??0) + (snapshot.find((s) => s.account === selectedWallet)?.viaBalance??0);
         airdrop = totalBalance / total_testnet_tokens * 150_000_000;
     }
+    else {
+        airdrop = ((totalBalance??0) / total_testnet_tokens * 150_000_000);
+    }
     
 
 </script>
@@ -122,63 +125,98 @@
         <WalletSearch onSubmit={(addr) => selectedWallet = addr} />
     </div>
     <br/>
-    {#if selectedWallet}
     <div class="inline-flex flex-col p-8 rounded-2xl bg-slate-100 dark:bg-slate-700 place-self-center place-items-center">
-        <div>
-            <h1 class="text-2xl font-bold underline tracking-tight text-gray-900 dark:text-white flex flex-col place-items-center">
-                <div>{selectedWallet.substring(0,8)}...{selectedWallet.substring(selectedWallet.length-8,selectedWallet.length)}</div>
-            </h1>
+        <div class="relative w-full">
+            {#if selectedWallet}
+                <button class="absolute top-0 right-0 border-gray-400 dark:border-gray-300 border hover:bg-gray-300 text-gray-400 dark:text-white w-8 h-8 rounded-full flex items-center justify-center" on:click={() => {selectedWallet = null; totalBalance = null}}>
+                    <i class="fas fa-times"></i>
+                </button>
+                <h1 class="text-2xl font-bold underline tracking-tight text-gray-900 dark:text-white flex flex-col place-items-center">
+                    <div>{selectedWallet.substring(0,8)}...{selectedWallet.substring(selectedWallet.length-8,selectedWallet.length)}</div>
+                </h1>
+                {#if !snapshot.find((s) => s.account == selectedWallet)}
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
+                            Wallet Not Found in Eligible Snapshot List. Input amount below to calculate Mainnet Allocation.
+                        </h1>
+                    </div>
+                {/if}
+            {/if}
         </div>
-        {#if selectedWallet && snapshot.find((s) => s.account == selectedWallet)}
             <div class="flex flex-row place-items-center">
-                <div class="flex flex-col place-items-center">
-                    <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
+                {#if selectedWallet && snapshot.find((s) => s.account == selectedWallet)}
+                    <div class="flex flex-col place-items-center">
+                        <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
+                            <div class="cardInner">
+                                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                    Phase 1 VOI
+                                </h5>
+                                <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                    {snapshot.find((s) => s.account === selectedWallet)?.voiBalance.toLocaleString()}
+                                </p>
+                            </div>
+                        </Card>    
+                        +
+                        <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
+                            <div class="cardInner">
+                                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                    Phase 1 VIA
+                                </h5>
+                                <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                    {snapshot.find((s) => s.account === selectedWallet)?.viaBalance.toLocaleString()}
+                                </p>
+                            </div>
+                        </Card>    
+                    </div>
+                    =
+                    <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2 relative">
                         <div class="cardInner">
                             <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Phase 1 VOI
+                                Phase 1 Total
                             </h5>
                             <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {snapshot.find((s) => s.account === selectedWallet)?.voiBalance.toLocaleString()}
+                                {(snapshot.find((s) => s.account === selectedWallet)?.voiBalance + snapshot.find((s) => s.account === selectedWallet)?.viaBalance).toLocaleString()} VOI/VIA
+                            </p>
+                        </div>
+                        <InfoButton>This is the total combined VOI and VIA tokens in the wallet when the snapshot was taken. For the purposes of allocating tokens on Mainnet, 1 VOI = 1 VIA.</InfoButton>                    
+                    </Card>
+                    <i class="fas fa-arrow-right"></i>
+                    <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                        <InfoButton>The Mainnet Airdrop is calculated as a percentage of the total eligible VOI and VIA distributed in Phase 1, multiplied by the total Phase 1 allocation of 150 Million.</InfoButton>                    
+                        <div class="cardInner">
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Anticipated Mainnet Airdrop
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {airdrop?.toLocaleString()}
                             </p>
                         </div>
                     </Card>    
-                    +
-                    <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2">
+                {:else}
+                    <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2 relative">
                         <div class="cardInner">
                             <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Phase 1 VIA
+                                Phase #1 Total
                             </h5>
                             <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                                {snapshot.find((s) => s.account === selectedWallet)?.viaBalance.toLocaleString()}
+                                <input type="number" class="w-40" bind:value={totalBalance} />
+                            </p>
+                        </div>
+                        <InfoButton>This is the total combined VOI and VIA tokens in the wallet when the snapshot was taken. For the purposes of allocating tokens on Mainnet, 1 VOI = 1 VIA.</InfoButton>                    
+                    </Card>
+                    <i class="fas fa-arrow-right"></i>
+                    <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                        <InfoButton>The Mainnet Airdrop is calculated as a percentage of the total eligible VOI and VIA distributed in Phase 1, multiplied by the total Phase 1 allocation of 150 Million.</InfoButton>                    
+                        <div class="cardInner">
+                            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Anticipated Mainnet Airdrop
+                            </h5>
+                            <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                {airdrop?.toLocaleString()}
                             </p>
                         </div>
                     </Card>    
-                </div>
-                =
-                <Card class="bg-green-100 dark:bg-green-700 h-42 w-60 m-2 relative">
-                    <div class="cardInner">
-                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                            Phase 1 Total
-                        </h5>
-                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                            {(snapshot.find((s) => s.account === selectedWallet)?.voiBalance + snapshot.find((s) => s.account === selectedWallet)?.viaBalance).toLocaleString()} VOI/VIA
-                        </p>
-                    </div>
-                    <InfoButton>This is the total combined VOI and VIA tokens in the wallet when the snapshot was taken. For the purposes of allocating tokens on Mainnet, 1 VOI = 1 VIA.</InfoButton>                    
-                </Card>
-                <i class="fas fa-arrow-right"></i>
-                <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
-                    <InfoButton>The Mainnet Airdrop is calculated as a percentage of the total eligible VOI and VIA distributed in Phase 1, multiplied by the total Phase 1 allocation of 150 Million.</InfoButton>                    
-                    <div class="cardInner">
-                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                            Anticipated Mainnet Airdrop
-                        </h5>
-                        <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-                            {airdrop?.toLocaleString()}
-                        </p>
-                    </div>
-                </Card>    
-
+                {/if}
             </div>
             <br/>
             <div class="flex flex-col ">
@@ -300,15 +338,7 @@
                     </div>
                 </div>
             </div>
-        {:else}
-            <div class="flex flex-col p-8 rounded-2xl bg-slate-100 dark:bg-slate-700 place-items-center">
-                <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
-                    Wallet Not Found in Eligible Snapshot List
-                </h1>
-            </div>
-        {/if}
     </div>
-    {/if}          
 </div>
 <style>
     li {
