@@ -91,29 +91,12 @@
     //if (typeof event !== 'undefined') event.stopPropagation(); // Stop event propagation
 
     // Get the table data
-    const rows = filterItems.filter((row: { total_rewards: number; }) => row.total_rewards > 0);
-    const data = rows.map((row: { proposer: any; block_rewards: any; health_rewards: any; total_rewards: any; }) => {
-      const address = row.proposer;
-      let tokenAmount;
-      let note;
-      if (type === 'block_rewards') {
-        tokenAmount = row.block_rewards;
-        note = JSON.stringify({blockRewards: tokenAmount});
-      } else if (type === 'health_rewards') {
-        tokenAmount = row.health_rewards;
-        note = JSON.stringify({healthRewards: tokenAmount});
-      } else {
-        tokenAmount = row.total_rewards;
-        note = JSON.stringify({blockRewards: row.block_rewards, healthRewards: row.health_rewards});
-      }
-      note = '"' + note.replace(/"/g, '""') + '"';
-      tokenAmount = Math.round(tokenAmount * Math.pow(10,6));
-
-      return [address, 'node', tokenAmount, note];
+    const data = filterItems.map((row: { proposer: any; points: any; }) => {
+      return [row.proposer, row.points];
     });
 
     // Create the CSV content
-    const headers = ['account', 'userType', 'tokenAmount', 'note'];
+    const headers = ['account', 'points'];
     const csvContent = headers.join(',') + '\n' + data.map((row: any[]) => row.join(',')).join('\n');
 
     // Download the CSV file
@@ -121,7 +104,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    const filename = type === 'block_rewards' ? 'block_rewards.csv' : type === 'health_rewards' ? 'health_rewards.csv' : 'all_rewards.csv';
+    const filename = 'phase2_health_points.csv';
     link.setAttribute('download', filename);
     link.style.display = 'none';
     document.body.appendChild(link);
@@ -248,7 +231,7 @@
                   <Tooltip defaultClass="py-2 px-3 text-sm font-medium w-64" triggeredBy="#tooltip_{i}" type="auto">{column.tooltip}</Tooltip>
                 {/if}
               </span>
-              {#if column.id === 'block_rewards' || column.id === 'health_score' || column.id === 'total_rewards'}
+              {#if column.id === 'block_rewards' || column.id === 'health_points' || column.id === 'total_rewards'}
                 <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)}></button>
               {/if}
           </RewardsTableHeader>
