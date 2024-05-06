@@ -15,103 +15,16 @@
 	$: totalHealthyNodes = 0;
 	$: totalEmptyNodes = 0;
 	$: totalExtraNodes = 0;
-	$: block_reward_pool = 0;
-	$: health_reward_pool = 0;
 	$: minimumAlgod = '3.0.0';
 	$: selectedDate = '';
 	$: dataArrays = [];
-	$: dataIncomplete = false;
 	$: MIN_ALGOD_VERSION = '3.0.0';
-
-	let dates: any;
-	$: dates = [];
 
 	let supply: any;
 	$: supply = {};
 
-	const populateDateDropdown = async () => {
-		const url = 'https://api.voirewards.com/proposers/index.php';
-		await fetch(url, { cache: 'no-store' })
-			.then((response) => response.json())
-			.then((data) => {
-				//const minTimestamp = new Date(data.min_timestamp);
-                const minTimestamp = new Date('2023-10-02T00:00:00Z');
-				const maxTimestamp = new Date(data.max_timestamp);
-
-				dates = [];
-
-				let currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
-				while (currentDate <= maxTimestamp) {
-					const startOfWeek = new Date(currentDate);
-					startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 1); // Monday
-					const endOfWeek = new Date(startOfWeek);
-					endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6); // Sunday
-					const dateStr = `${startOfWeek
-						.toISOString()
-						.substring(0, 10)
-						.replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
-					dates = [
-						...dates,
-						{
-							id: dateStr,
-							desc: dateStr.replace(
-								/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
-								'$1-$2-$3 to $4-$5-$6'
-							)
-						}
-					];
-					currentDate.setUTCDate(currentDate.getUTCDate() + 7); // Next week
-				}
-				selectedDate = dates[dates.length - 1].id;
-			})
-			.catch((error) => {
-				console.error(error);
-			});
-	};
-
-	const loadDashboardData = async (selectedDate: string) => {
-		// derive start and end dates from the selected date of format YYYYMMDD-YYYYMMDD
-		const startDate =
-			selectedDate.substring(0, 4) +
-			'-' +
-			selectedDate.substring(4, 6) +
-			'-' +
-			selectedDate.substring(6, 8);
-		const endDate =
-			selectedDate.substring(9, 13) +
-			'-' +
-			selectedDate.substring(13, 15) +
-			'-' +
-			selectedDate.substring(15, 17);
-		const url = `https://api.voirewards.com/proposers/index.php?start=${startDate}&end=${endDate}`;
-
-		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
-		const endOfEpoch = new Date(
-			Date.UTC(
-				parseInt(selectedDate.substring(9, 13)),
-				parseInt(selectedDate.substring(13, 15)) - 1,
-				parseInt(selectedDate.substring(15, 17))
-			)
-		);
-
-		// set default rewards based on epoch
-		endOfEpoch.setUTCHours(23, 59, 59, 999);
-		if (endOfEpoch >= new Date('2024-05-01T23:59:59.999Z')) {
-			block_reward_pool = 0;
-			health_reward_pool = 0;
-		} else if (endOfEpoch >= new Date('2024-03-01T23:59:59.999Z')) {
-			block_reward_pool = 35000000;
-			health_reward_pool = 10000000;
-		} else if (endOfEpoch >= new Date('2023-12-31T23:59:59.999Z')) {
-			block_reward_pool = 25000000;
-			health_reward_pool = 20000000;
-		}
-		else {
-			block_reward_pool = 12500000;
-			health_reward_pool = 10000000;
-		}
-		//block_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 25000000 : 12500000;
-		//health_reward_pool = endOfEpoch >= new Date('2023-12-31T23:59:59.999Z') ? 20000000 : 10000000;
+	const loadDashboardData = async () => {
+		const url = `https://api.voirewards.com/proposers/index_p2.php`;
 
 		// reinitialize totals
 		totalWallets = 0;
@@ -121,23 +34,13 @@
 		fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
 			.then(async (data) => {
-				// check if the end date selected in dropdown is more than maxTimestamp. If so, add notice below date selection that data is incomplete
-				const checkDate = new Date(
-					Date.UTC(
-						parseInt(selectedDate.substring(9, 13)),
-						parseInt(selectedDate.substring(13, 15)) - 1,
-						parseInt(selectedDate.substring(15, 17))
-					)
-				);
-				const endOfDay = new Date(checkDate);
-				endOfDay.setUTCHours(23, 59, 59, 999);
-
-				dataIncomplete = endOfDay > new Date(data.max_timestamp) ? true : false;
 				MIN_ALGOD_VERSION = data.minimum_algod;
 
 				// Sort the data by block count
 				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
 				dataArrays = data.data;
+
+				console.log(data.data);
 
                 dataArrays.forEach((row: any) => {
                     totalWallets++;
@@ -160,7 +63,6 @@
 					}
 				});
 
-				//calcRewards();
 				block_height = data.block_height;
 				block_height_timestamp = new Date(data.max_timestamp).toLocaleString('en-US', {
 					timeZone: 'UTC'
@@ -173,8 +75,7 @@
 	};
 
 	onMount(async () => {
-		await populateDateDropdown();
-		loadDashboardData(selectedDate);
+		loadDashboardData();
 
 		// get online stake
 		supply = await algodClient.supply().do();
@@ -182,8 +83,8 @@
 
 	$: {
 		rewardParams.set({
-			block_reward_pool: block_reward_pool,
-			health_reward_pool: health_reward_pool,
+			block_reward_pool: 0,
+			health_reward_pool: 0,
 			total_blocks: totalBlocks,
 			total_healthy_nodes: totalHealthyNodes - totalEmptyNodes,
 			total_extra_nodes: totalExtraNodes,
@@ -192,55 +93,18 @@
 	}
 </script>
 
-<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
+<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
 	<p class="font-bold">Notice:</p>
-	<p>Phase 1 of the Voi Incentivized Testnet is ending and the final Node Participation Rewards have been distributed.
-		A snapshot of VOI and VIA balances is being taken May 1 at midnight UTC (April 30th 8pm EDT).
-		As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
-		for more specific help.
+	<p>Phase 1 of the Voi Incentivized Testnet has ended. See our <a href="/phase1" class="underline text-yellow-700">Phase 1</a> page for details.</p>
+	<p>This page now shows cumulative points toward Phase 2 for running a Healthy node. Visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
+		for more information.
 	</p>
-	<p>Keep an eye out here or on Discord for more information about Node Running Incentives for Testnet Phase 2.</p>
 </div>
-<div class="mt-6 font-bold text-2xl text-center">Epoch</div>
-<div class="mb-6 flex justify-center">
-	<select
-		class="block w-60 dark:bg-gray-700 dark:text-white"
-		bind:value={selectedDate}
-		on:change={() => loadDashboardData(selectedDate)}
-	>
-		{#each dates as date}
-			<option value={date.id}>{date.desc}</option>
-		{/each}
-	</select>
-    <button class='m-6'
-        on:click={() => loadDashboardData(selectedDate)}>
-        <i class="fas fa-refresh fa-lg"></i>
-    </button>
-</div>
-{#if dataIncomplete}
-	<div class="mb6 flex justify-center">
-		<br />
-		<div class="block ml-4 text-red-500">
-			NOTICE: This Epoch is in progress. Data is incomplete.
-		</div>
-	</div>
-{/if}
 <div class="text-center">
 	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} />
 </div>
 <div class="dashboard justify-evenly">
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Rewarded Blocks
-				<br />
-				<span class="text-sm">(in epoch)</span>
-			</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{totalBlocks == 0 ? '...Loading...' : totalBlocks.toLocaleString()}
-			</p>
-		</div>
-		<br/>
 		<div class="cardInner">
 			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
 				Min Algod Version
@@ -297,41 +161,8 @@
 			</p>
 		</div>
 	</Card>
-	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Block Rewards</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-sm">
-				<input
-					type="text"
-					id="blockVoiPoolTotal"
-					class="w-36 text-right ml-2 bg-gray-50 dark:bg-gray-600"
-					bind:value={block_reward_pool}
-                    /><span class="text-sm"> / wk</span>
-                </p>
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Health Rewards</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-sm">
-				<input
-					type="text"
-					id="healthVoiPoolTotal"
-					class="w-36 text-right ml-2 bg-gray-50 dark:bg-gray-600"
-					bind:value={health_reward_pool}
-				/><span class="text-sm"> / wk</span>
-			</p>
-		</div>
-	</Card>
 </div>
 <div class="notices">
-	<div>
-		This website calculates the expected weekly Voi Testnet Token rewards for node operators, based
-		on the accepted block rewards proposal located <a
-			href="https://docs.google.com/document/d/1tgU9Ytd4YxHGOsnFBIuEV75sclpI92AeYPxVZcBxvE0/edit#heading=h.s8s7iwa3qzls"
-			>here</a
-		>.
-		<span style="font-weight:bold;"
-			>Please note that rewards are not official until they are distributed.</span
-		>
-	</div>
-	<br />
 	<div>
 		<span style="font-weight:bold;"
 			>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
@@ -346,6 +177,9 @@
 			</blockquote>
 			<cite>- Chris Swenor</cite>
 		</div>
+		<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center"
+			>Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.</div
+		>
 	</div>
 </div>
 {#if dataArrays.length > 0}
@@ -381,20 +215,6 @@
 		font-size: 1rem;
 		font-weight: bold;
 		text-align: right;
-	}
-	select {
-		width: 100%;
-		max-width: 260px;
-		font-size: 16px;
-		padding: 10px;
-		margin-bottom: 10px;
-	}
-	input[type='text'] {
-		width: 9em;
-		max-width: 200px;
-		font-size: 16px;
-		padding: 10px;
-		margin-right: 10px;
 	}
 	.cardInner {
 		display: flex;
