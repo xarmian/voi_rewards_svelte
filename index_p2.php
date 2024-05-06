@@ -253,6 +253,46 @@ switch($action) {
 
         $jarray = json_encode($proposals);
         break;
+    case 'walletPoints':
+        if (!isset($_REQUEST['wallet'])) break;
+        $wallet = $_REQUEST['wallet'];
+
+        // get weekly health data for every Monday starting from 2024-05-06 to today for the wallet, create array of dates formatted YYYY-MM-DD with points and health score
+        $points = array();
+        $date = '20240506';
+        while ($date <= date('Ymd', strtotime('+1 day', strtotime('now')))) {
+            $blacklist = fetchBlacklist();
+            $health = fetchWeeklyHealth($blacklist,$date);
+
+            $usedate = substr($date,0,4).'-'.substr($date,4,2).'-'.substr($date,6,2);
+            $startOfWeek = strtotime('last Monday', strtotime($usedate));
+            $endOfWeek = strtotime('last Sunday', strtotime($usedate));
+            $usedate = date('Y-m-d', $startOfWeek).' - '.date('Y-m-d', $endOfWeek);
+
+            if (isset($health['addresses'][$wallet])) {
+                if (!isset($points[$date])) {
+                    $points[$usedate] = array('points'=>0,'health'=>0);
+                }
+                
+                // sort nodes by health_divisor increasing
+                usort($health['addresses'][$wallet], function($a, $b) {
+                    return $a['health_divisor'] <=> $b['health_divisor'];
+                });
+
+                foreach($health['addresses'][$wallet] as $node) {
+                    if ($node['health_score'] > 5.0) {
+                        $points[$usedate]['points'] += 1.0/$node['health_divisor'];
+                        $points[$usedate]['health'] = $node['health_score'];
+                        break;
+                    }
+                }
+            }
+
+            $date = date('Ymd', strtotime('+1 week', strtotime($date)));
+        }
+
+        $jarray = json_encode($points);
+    break;
     case 'walletDetails':
         if (!isset($_REQUEST['wallet'])) break;
 
@@ -346,7 +386,7 @@ switch($action) {
 
         $startTimestamp = '2024-05-06T00:00:00Z';
         $endTimestamp = date('Y-m-d').'T23:59:59Z';
-        
+
         // Prepare the SQL query to select the addresses and block counts
         $sql = "SELECT proposer, COUNT(*) AS block_count FROM blocks WHERE timestamp >= :start AND timestamp <= :end GROUP BY proposer";
 
@@ -419,6 +459,15 @@ switch($action) {
                     'points' => $point['points'],
                 );
             }
+        }
+
+        if ($_REQUEST['format'] && strcasecmp($_REQUEST['format'],'csv') == 0) {
+            $csv = "account,points\n";
+            foreach($data as $d) {
+                $csv .= $d['proposer'].','.$d['points']."\n";
+            }
+            echo $csv;
+            exit();
         }
 
         /*// find $data['nodes'] with more than one node with a health_score >= 5.0

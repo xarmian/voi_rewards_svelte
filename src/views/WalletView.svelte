@@ -2,6 +2,7 @@
     import NodeComponent from '../lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
     import RewardsComponent from '$lib/component/RewardsComponent.svelte';
+    import PointsComponent from '$lib/component/PointsComponent.svelte';
 
 	import { onMount } from 'svelte';
     import { Card } from 'flowbite-svelte';
@@ -48,6 +49,7 @@
         {name: 'Node', component: NodeComponent},
         {name: 'Proposals', component: ProposalsComponent},
         {name: 'Rewards', component: RewardsComponent},
+        {name: 'Points', component: PointsComponent},
     ];
 
     $: selectedTab = (urlParams.has('tab')) ? urlParams.get('tab') : 'Node';

@@ -207,9 +207,9 @@
   if (!Device.isMobile) {
     columns.push({ id: 'status', desc: 'Consensus', tooltip: 'Consensus Voting Status' });
     columns.push({ id: 'algod', desc: 'Algod', tooltip: 'Algod Node Version' });
-    columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet during the Epoch' });
+    columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet during this Epoch' });
   }
-  columns.push({ id: 'health_points', desc: 'Node Points', tooltip: 'Phase 2 Node Health points are cumulative and accrued each week' });
+  columns.push({ id: 'health_points', desc: 'P2 Node Points', tooltip: 'Phase 2 Node Health points are cumulative and accrued each week. This is the total accrued so far.' });
 </script>
 
 <div class="overflow-auto {!Device.isMobile ? 'ml-6 mr-6' : ''}">
@@ -292,16 +292,6 @@
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
               <div>{item.points}</div>
-              {#if item.nodes && item.nodes.length > 0}
-                {#each item.nodes as node}
-                  <div class="whitespace-nowrap flex" title="Node Name: {node.node_name}{'\r'}Health Score: {node.health_score}{'\r'}Health Divisor: {node.health_divisor}">
-                    <div class="node_name truncate" on:click|stopPropagation><a href="https://voi-nodes.dev/node/{node.node_host}" target="_blank">{node.node_name}</a></div>
-                    <div class='node_health'> - {node.health_score}</div>
-                  </div>
-                {/each}
-              {:else}
-                <div style='font-size:10px'>(No Telemetry Data)</div>
-              {/if}
             </TableBodyCell>
           {:else}
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.points).toFixed(2)}</TableBodyCell>
@@ -383,7 +373,7 @@
           {items.reduce((sum, item) => sum + item.block_count, 0)}
         </TableBodyCell>
         <TableBodyCell class="p-2">
-          {Math.round(items.reduce((sum, item) => sum + item.health_rewards, 0))}
+          {Math.round(items.reduce((sum, item) => sum + item.points, 0))}
         </TableBodyCell>
       {/if}
     </TableBodyRow>
@@ -394,9 +384,6 @@
 <WalletView walletId={viewWalletId}></WalletView>
 </Modal>
 <style>
-.node_name {
-  max-width: 200px;
-}
 a {
   color: #007bff;
   text-decoration: none;
