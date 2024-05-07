@@ -266,6 +266,8 @@ switch($action) {
 
             $usedate = substr($date,0,4).'-'.substr($date,4,2).'-'.substr($date,6,2);
             $startOfWeek = strtotime('last Monday', strtotime($usedate));
+            // if startOfWeek is prior to 2024-05-01, set make it 2024-05-01
+            if ($startOfWeek < strtotime('2024-05-01')) $startOfWeek = strtotime('2024-05-01');
             $endOfWeek = strtotime('last Sunday', strtotime($usedate));
             $usedate = date('Y-m-d', $startOfWeek).' - '.date('Y-m-d', $endOfWeek);
 

@@ -48,8 +48,8 @@
     const tabs: any = [
         {name: 'Node', component: NodeComponent},
         {name: 'Proposals', component: ProposalsComponent},
-        {name: 'Rewards', component: RewardsComponent},
-        {name: 'Points', component: PointsComponent},
+        //{name: 'Rewards', component: RewardsComponent},
+        {name: 'Weekly Health', component: PointsComponent},
     ];
 
     $: selectedTab = (urlParams.has('tab')) ? urlParams.get('tab') : 'Node';

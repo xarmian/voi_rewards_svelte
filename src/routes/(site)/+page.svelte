@@ -163,7 +163,7 @@
 	</Card>
 </div>
 <div class="notices">
-	<div>
+	<div class="flex flex-col place-items-center">
 		<span style="font-weight:bold;"
 			>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
 			Chris said it best:</span
@@ -177,9 +177,10 @@
 			</blockquote>
 			<cite>- Chris Swenor</cite>
 		</div>
-		<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center"
-			>Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.</div
-		>
+		<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
+			Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
+		</div>
+		<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
 	</div>
 </div>
 {#if dataArrays.length > 0}

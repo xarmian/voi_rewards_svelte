@@ -209,7 +209,7 @@
     columns.push({ id: 'algod', desc: 'Algod', tooltip: 'Algod Node Version' });
     columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet during this Epoch' });
   }
-  columns.push({ id: 'health_points', desc: 'P2 Node Points', tooltip: 'Phase 2 Node Health points are cumulative and accrued each week. This is the total accrued so far.' });
+  columns.push({ id: 'health_points', desc: 'Weeks Healty (Phase 2)', tooltip: 'Phase 2 Node Health is cumulative and accrued each week. This is the total number of healthy weeks credited to the node.' });
 </script>
 
 <div class="overflow-auto {!Device.isMobile ? 'ml-6 mr-6' : ''}">
