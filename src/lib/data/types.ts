@@ -48,3 +48,24 @@ export interface Metadata {
     properties: object;
     royalties: string;
 }
+
+export type IProject = {
+    id: number;
+    title: string;
+    description: string;
+    quests: IQuest[];
+    status?: string; // 'active' or 'inactive'
+};
+
+export type IQuest = {
+    id: number;
+    name?: string;
+    title: string;
+    description: string;
+    status: null | "todo" | "in-progress" | "done";
+    reward: number;
+    earned?: number;
+    guide?: string;
+    frequency?: string; // daily, weekly, monthly, once -- once if undefined
+};
+

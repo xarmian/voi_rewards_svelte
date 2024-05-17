@@ -1,0 +1,203 @@
+const projects = [
+    {
+        id: 1,
+        title: "Node Running",
+        description: "Run a node on the Voi Network and earn points weekly",
+        status: 'active',
+        quests: [
+            {
+                id: 1,
+                title: "Run a node",
+                description: "Run a node on the Voi Network",
+                status: null,
+                reward: 1,
+                frequency: "Weekly",
+                guide: "https://docs.voi.network/node-runners/overview/"
+            },
+        ],
+    },
+    {
+        id: 2,
+        title: "Kibisis",
+        description: "Kibisis is a Voi Wallet. Complete tasks on Kibisis to earn points.",
+        quests: []
+    },
+    {
+        id: 3,
+        title: "Nautilus",
+        description: "Nautilus is an NFT token marketplace. Complete tasks on Nautilus to earn points.",
+        quests: [
+            {
+                id: 1,
+                title: "Connect a Wallet",
+                description: "Connect your Voi wallet to Nautilus",
+                status: null,
+                reward: 1
+            },
+        ],
+    },
+    {
+        id: 5,
+        title: "NFTNavigator",
+        description: "NFTNavigator is an Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
+        status: 'active',
+        quests: [
+            {
+                id: 1,
+                title: "Connect a Wallet",
+                name: 'connect_wallet',
+                description: 'Connect your Wallet to NFT Navigator',
+                guide: 'https://wind-bolt-806.notion.site/Quest-1-Connect-your-Wallet-to-NFTNavigator-dbe44f75bf1948d6a947920af97570df',
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 2,
+                title: "Authenticate your Wallet",
+                name: 'auth_wallet',
+                description: 'Authenticate your Wallet',
+                guide: 'https://wind-bolt-806.notion.site/Quest-2-Authenticate-your-Wallet-bd8a312141e0403688953625e14106df',
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 3,
+                title: "Set an Approved Spender",
+                name: 'token_approve',
+                description: 'Set an approved spender for a token in your wallet',
+                guide: 'https://wind-bolt-806.notion.site/Quest-3-Set-an-approved-spender-for-a-token-in-your-wallet-8beac53d87ab4492a5009cc5db8d69b5?pvs=25',
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 4,
+                tile: "Transfer a Token",
+                name: 'token_transfer',
+                description: 'Transfer a Token to someone else',
+                guide: 'https://wind-bolt-806.notion.site/Quest-4-Transfer-a-token-to-someone-else-23a00accea9b4dd299d43a52c6dadf76?pvs=25',
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 5,
+                title: "Create a Public Post in the NFT Lounge",
+                name: 'post_public',
+                description: 'Create a Public post in the NFT Lounge',
+                guide: 'https://wind-bolt-806.notion.site/Quest-5-Create-a-Public-post-in-the-NFT-Lounge-d242603d980e47bda36866d723fdfcad?pvs=25',
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 6,
+                title: "Create a Private Post in the NFT Lounge",
+                name: 'post_private',
+                description: 'Create a Private post in the NFT Lounge',
+                guide: 'https://wind-bolt-806.notion.site/Quest-6-Create-a-Private-post-in-the-NFT-Lounge-e6254158fb994c189a19308f74478f80?pvs=25',
+                status: null,
+                reward: 1,
+            }
+        ],
+    },
+    {
+        id: 4,
+        title: "Nomadex",
+        description: "Nomadex is a decentralized exchange. Complete tasks on Nomadex to earn points.",
+        status: 'active',
+        quests: [   
+            {
+                id: 1,
+                name: 'connect-wallet',
+                title: "Connect Wallet",
+                description: "Connect your Voi wallet to Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            },
+            {
+                id: 2,
+                name: 'swap',
+                title: "Swap",
+                description: "Swap tokens on Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            },
+            {
+                id: 3,
+                name: 'add-liquidity',
+                title: "Add Liquidity",
+                description: "Add liquidity to a pool on Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            },
+            {
+                id: 4,
+                name: 'remove-liquidity',
+                title: "Remove Liquidity",
+                description: "Remove liquidity from a pool on Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            },
+            {
+                id: 5,
+                name: 'create-arc200-token',
+                title: "Create ARC200 Token",
+                description: "Create an ARC200 token on Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            },
+            {
+                id: 6,
+                name: 'create-arc200-pool',
+                title: "Create ARC200 Pool",
+                description: "Create an ARC200 pool on Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            },
+            {
+                id: 7,
+                name: 'create-limit-order',
+                title: "Create Limit Order",
+                description: "Create a limit order on Nomadex",
+                status: null,
+                reward: 1,
+                guide: "https://actions-docs.nomadex.app/",
+            }
+        ]
+    },
+    {
+        id: 6,
+        title: "Humble",
+        description: "Humble is a decentralized exchange platform. Complete tasks on Humble to earn points.",
+        quests: [],
+    },
+    {
+        id: 7,
+        title: "Treehouse",
+        description: "Treehouse Toolbox provides a set of tools for performing various tasks on the Voi Network. Complete tasks on Treehouse to earn points.",
+        quests: [],
+    },
+    {
+        id: 8,
+        title: "Highforge",
+        description: "Highforge is an NFT minting platform. Complete tasks on Highforge to earn points.",
+        quests: [],
+    },
+    {
+        id: 9,
+        title: "Arcpay",
+        description: "Arcpay is a payment gateway. Complete tasks on Arcpay to earn points.",
+        quests: [],
+    },
+    {
+        id: 10,
+        title: "A-Wallet",
+        description: "A-Wallet is a wallet for the Voi Network. Complete tasks on A-Wallet to earn points.",
+        quests: [],
+    }
+];
+export default projects;
