@@ -132,6 +132,9 @@
 <h2 class="text-2xl font-bold mb-4">
     {project.title}
     <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
+    {#if !project.tracking}
+        <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
+    {/if}
 </h2>
 <table class="w-full whitespace-no-wrap">
     <thead>

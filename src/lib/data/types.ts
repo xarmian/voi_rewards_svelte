@@ -54,6 +54,7 @@ export type IProject = {
     title: string;
     description: string;
     quests: IQuest[];
+    tracking?: boolean;
     status?: string; // 'active' or 'inactive'
 };
 
