@@ -271,7 +271,23 @@ const projects = [
         id: 7,
         title: "Treehouse",
         description: "Treehouse Toolbox provides a set of tools for performing various tasks on the Voi Network. Complete tasks on Treehouse to earn points.",
-        quests: [],
+        status: "active",
+        quests: [
+            {
+                id: 1,
+                title: "Connect Wallet",
+                description: "Connect your wallet to Treehouse",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 2,
+                title: "Take a Snapshot",
+                description: "Take a snapshot of an NFT contract",
+                status: null,
+                reward: 1,
+            }
+        ],
     },
     {
         id: 8,
@@ -300,7 +316,17 @@ const projects = [
         id: 10,
         title: "A-Wallet",
         description: "A-Wallet is a wallet for the Voi Network. Complete tasks on A-Wallet to earn points.",
-        quests: [],
+        status: "active",
+        quests: [
+            {
+                id: 1,
+                title: "Create and use a Multi-Sig Wallet",
+                description: "Create and use a Multi-Sig Wallet",
+                status: null,
+                reward: 1,
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC44atzFGT",
+            }
+        ],
     }
 ];
 export default projects;
