@@ -305,9 +305,12 @@
                 <!-- address and nfd -->
                 <div>
                   <Label defaultClass="text-sm font-medium inline-block w-28">Wallet:</Label>
-                  <a on:click|stopPropagation href='https://voi.observer/explorer/account/{item.proposer}/transactions' target='_blank'>
+                  <button on:click|stopPropagation={() => {
+                      viewWallet = true;
+                      if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+                    }} class="text-blue-500 hover:text-blue-800 hover:underline">
                     {Device.isMobile ? item.proposer.substring(0,20) : item.proposer}...
-                  </a>
+                  </button>
                 </div>
                 {#if item.nfd}
                   <div>

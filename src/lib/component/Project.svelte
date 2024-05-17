@@ -43,6 +43,9 @@
                 if (row) {
                     quest.earned = 1;
                 }
+                else {
+                    quest.earned = 0;
+                }
             }
             
             loading = false;
@@ -68,6 +71,9 @@
                 const quest = project.quests[i];
                 if (completedActions.includes(quest.name)) {
                     quest.earned = 1;
+                }
+                else {
+                    quest.earned = 0;
                 }
             }
 
@@ -110,13 +116,13 @@
         }
     }
 
-	function parseCSV(csvData: string) {
-		const lines = csvData.split('\n');
-        const result = [];
+    function parseCSV(csvData: string): Array<Record<string, string>> {
+        const lines = csvData.split('\n');
+        const result: Array<Record<string, string>> = [];
         const headers = lines[0].split(',');
 
         for (let i = 1; i < lines.length; i++) {
-            const obj = {};
+            const obj: Record<string, string> = {};
             const currentline = lines[i].split(',');
 
             for (let j = 0; j < headers.length; j++) {
@@ -127,7 +133,7 @@
         }
 
         return result;
-	}
+    }
 </script>
 <h2 class="text-2xl font-bold mb-4">
     {project.title}

@@ -43,7 +43,7 @@
     {/if}
 </div>    
 <div class="hidden md:flex md:flex-wrap md:justify-center md:items-center">
-    <nav class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+    <nav class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {#each projects as project, i}
             <a 
                 class="m-1 cursor-pointer border-transparent rounded-xl w-full flex flex-col justify-center 
