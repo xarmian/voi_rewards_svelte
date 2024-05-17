@@ -4,7 +4,7 @@
 
     export let walletId: string | null;
     let isDropdownOpen: boolean = false;
-    $: selectedTab = 0;
+    export let selectedTab = 0;
 
     // sort projects with status='active' first then by id
     projects.sort((a, b) => {

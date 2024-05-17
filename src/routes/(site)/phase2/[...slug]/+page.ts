@@ -3,7 +3,7 @@ export const load = async ({ params }) => {
 
     const parts = slug.split('/');
 	const wallet = parts[0]??'';
-    const project = parts[1]??'';
+    const projectId = Number(parts[1]??0);
 
     const pageMetaTags = {
         title: 'Voi TestNet Phase 2 Quest Tracker',
@@ -12,7 +12,7 @@ export const load = async ({ params }) => {
     return {
         props: {
             wallet,
-            project,
+            projectId,
             pageMetaTags,
         },
     };

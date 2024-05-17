@@ -6,6 +6,7 @@
 
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | null;
+    $: projectId = data.props.projectId;
 </script>
 <div class="flex flex-col">
     <div class="flex flex-col mt-4">
@@ -40,5 +41,5 @@
         </div>
     {/if}
     <br/>
-    <QuestComponent walletId={selectedWallet} />
+    <QuestComponent walletId={selectedWallet} selectedTab={projectId} />
 </div>
