@@ -96,12 +96,13 @@
 <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
 	<p class="font-bold">Notice:</p>
 	<p>Phase 1 of the Voi Incentivized Testnet has ended. See our <a href="/phase1" class="underline text-yellow-700">Phase 1</a> page for details.</p>
+	<p>Visit our <a href="/phase2" class="underline text-yellow-700">Phase 2</a> page for details about Phase 2 Quests.</p>
 	<p>This page now shows cumulative points toward Phase 2 for running a Healthy node. Visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
 		for more information.
 	</p>
 </div>
 <div class="text-center">
-	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} />
+	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
 </div>
 <div class="dashboard justify-evenly">
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">

@@ -22,8 +22,6 @@
             // sum points[].points
             localProject.quests[0].earned = points.reduce((acc, cur) => acc + cur.points, 0);
             loading = false;
-            //localProject = localProject;
-            //console.log(localProject);
         } catch (error) {
             console.error('Failed to fetch points:', error);
         }
@@ -32,7 +30,7 @@
     async function getNomadexPoints() {
         try {
             const url = `https://api.nomadex.app/actions.csv?address=${wallet}`;
-            const response = await fetch(url);
+            const response = await fetch(url, { mode: 'no-cors' });
             const csvData = await response.text();
             const parsedData = parseCSV(csvData);
             console.log(parsedData);
@@ -78,19 +76,37 @@
             console.log(data);
             loading = false;
         }
+    }
 
+    async function getKibisisPoints() {
+        // set all quest.earned to -1
+        for (let i = 0; i < project.quests.length; i++) {
+            project.quests[i].earned = -1;
+        }
+        loading = false;
     }
 
     $: if (wallet) {
         loading = true;
-        if (project.title === 'Node Running') {
-            getNodePoints();
-        }
-        else if (project.title === 'Nomadex') {
-            getNomadexPoints();
-        }
-        else if (project.title === 'NFTNavigator') {
-            getNFTNavigatorPoints();
+        switch(project.title) {
+            case 'Node Running':
+                getNodePoints();
+                break;
+            case 'Nomadex':
+                getNomadexPoints();
+                break;
+            case 'NFTNavigator':
+                getNFTNavigatorPoints();
+                break;
+            case 'Kibisis':
+                getKibisisPoints();
+                break;
+            default:
+                for (let i = 0; i < project.quests.length; i++) {
+                    project.quests[i].earned = -1;
+                }
+                loading = false;
+                break;
         }
     }
 
@@ -148,9 +164,18 @@
                     {:else if loading}
                         <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
                     {:else if quest.earned}
-                        <i class="fas fa-check text-green-500 text-3xl"></i>
-                        {#if quest.frequency ?? 'Once' != 'Once'}
-                            <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
+                        {#if quest.earned == -1}
+                            <div class="text-xs text-red-500 flex flex-row">
+                                Unknown
+                                <InfoButton noAbsolute={true}>
+                                    <p class="text-sm">This quest is either unavailable, or we are unable to retrieve the completion status.</p>
+                                </InfoButton>
+                            </div>
+                        {:else}
+                            <i class="fas fa-check text-green-500 text-3xl"></i>
+                            {#if quest.frequency ?? 'Once' != 'Once'}
+                                <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
+                            {/if}
                         {/if}
                     {:else}
                         <i class="fas fa-times text-red-500 text-3xl"></i>

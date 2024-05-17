@@ -26,7 +26,7 @@
 
 <div class='flex flex-row flex-wrap justify-center'>
     <!-- table of transactions with columns for block, amount, transaction id -->
-    <div class='w-full flex flex-col place-items-center'>
+    <div class='w-full flex flex-col place-items-center mt-3'>
         <div class='w-full md:w-3/4 -mt-6 mb-6'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
         <table class='w-full border-collapse'>
             <thead>

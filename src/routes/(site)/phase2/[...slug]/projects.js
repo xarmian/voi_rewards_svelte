@@ -20,20 +20,54 @@ const projects = [
         id: 2,
         title: "Kibisis",
         description: "Kibisis is a Voi Wallet. Complete tasks on Kibisis to earn points.",
-        quests: []
+        status: 'active',
+        quests: [
+            {
+                id: 1,
+                title: "Send $VOI to a Friend",
+                description: "Send $VOI to another wallet using Kibisis",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 2,
+                title: "Send $VIA to a Friend",
+                description: "Send $VIA, a Smart Contract Asset, to another wallet using Kibisis",
+                status: null,
+                reward: 1,
+            },
+        ]
     },
     {
         id: 3,
         title: "Nautilus",
         description: "Nautilus is an NFT token marketplace. Complete tasks on Nautilus to earn points.",
+        status: "active",
         quests: [
             {
                 id: 1,
-                title: "Connect a Wallet",
-                description: "Connect your Voi wallet to Nautilus",
+                title: "Wallet Quest: Connect Wallet (Account Connection)",
+                description: "Wallet Quest: Connect Wallet (Account Connection)",
                 status: null,
-                reward: 1
+                reward: 1,
+                guide: 'https://confused-timbale-d13.notion.site/Wallet-Quest-Connect-Wallet-Account-Connection-31f5538d31da4969938a832693dcaf2d',
             },
+            {
+                id: 2,
+                title: "Sale Quest: List NFT for Sale",
+                description: "Sale Quest: List NFT for Sale",
+                status: null,
+                reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/Sale-Quest-List-NFT-for-Sale-c56a1df7859341b9ae4de3c0a09af95a",
+            },
+            {
+                id: 3,
+                title: "Sale Quest: Buy NFT for Sale",
+                description: "Sale Quest: Buy NFT for Sale",
+                status: null,
+                reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/Sale-Quest-Buy-NFT-for-Sale-f65e3255da1d49cb9f0f0f7224f7ec68",
+            }
         ],
     },
     {
@@ -71,7 +105,7 @@ const projects = [
             },
             {
                 id: 4,
-                tile: "Transfer a Token",
+                title: "Transfer a Token",
                 name: 'token_transfer',
                 description: 'Transfer a Token to someone else',
                 guide: 'https://wind-bolt-806.notion.site/Quest-4-Transfer-a-token-to-someone-else-23a00accea9b4dd299d43a52c6dadf76?pvs=25',
@@ -173,7 +207,65 @@ const projects = [
         id: 6,
         title: "Humble",
         description: "Humble is a decentralized exchange platform. Complete tasks on Humble to earn points.",
-        quests: [],
+        status: "active",
+        quests: [
+            {
+                id: 1,
+                title: "Connect your wallet to Humble",
+                description: "Connect your wallet to Humble",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-1-Connect-your-wallet-to-Humble-7b60b5bf60df4a64baba0564369365fd",
+            },
+            {
+                id: 2,
+                title: "Make your first Swap",
+                description: "Make your first Swap",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-2-Make-your-first-Swap-b1d2c71e200c4a77a56f46d04a4aeaee",
+            },
+            {
+                id: 3,
+                title: "Add Liquidity",
+                description: "Add Liquidity",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-3-Add-liquidity-f0db2253c4914b9f99905a4d43a058bb",
+            },
+            {
+                id: 4,
+                title: "Create a Token",
+                description: "Create a Token",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-4-Create-a-Token-8ee2077796fb48f68c08b742e8beaca9",
+            },
+            {
+                id: 5,
+                title: "Create a Farm",
+                description: "Create a Farm",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-5-Create-a-Farm-f9eb01f0450340ab9ac9904c1ed0239f",
+            },
+            {
+                id: 6,
+                title: "Joining a Farm & claiming rewards",
+                description: "Joining a Farm & claiming rewards",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-6-Joining-a-Farm-claiming-rewards-5bde5cdf15c0477fbde40c3e3ce57151",
+            },
+            {
+                id: 7,
+                title: "Connect with Humble Socials",
+                description: "Connect with Humble Socials",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-7-Connect-with-Humble-Socials-2305177c175c463bad8d61dfbfed480c",
+            },
+        ],
     },
     {
         id: 7,
@@ -185,7 +277,18 @@ const projects = [
         id: 8,
         title: "Highforge",
         description: "Highforge is an NFT minting platform. Complete tasks on Highforge to earn points.",
-        quests: [],
+        status: 'active',
+        quests: [
+            {
+                id: 1,
+                title: 'Mint the Quest 1 NFT',
+                description: 'Mint one Quest 1 NFT per day',
+                frequency: 'Daily',
+                status: null,
+                guide: 'https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d',
+                reward: 1,
+            }
+        ],
     },
     {
         id: 9,
