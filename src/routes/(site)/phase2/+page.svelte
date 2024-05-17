@@ -37,7 +37,7 @@
     <br/>
     <p class="text-center">Enter a wallet address to see your Voi TestNet Phase #2 Quest Progress</p>
     <div class="text-center">
-        <WalletSearch onSubmit={(addr) => selectedWallet = addr} />
+        <WalletSearch onSubmit={(addr) => selectedWallet = addr} loadPreviousValue={false} />
     </div>
     {#if selectedWallet}
         <br/>
