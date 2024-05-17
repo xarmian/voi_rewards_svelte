@@ -4,7 +4,6 @@ const projects = [
         title: "Node Running",
         description: "Run a node on the Voi Network and earn points weekly",
         status: 'active',
-        tracking: true,
         quests: [
             {
                 id: 1,
@@ -76,7 +75,6 @@ const projects = [
         title: "NFTNavigator",
         description: "NFTNavigator is an Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
         status: 'active',
-        tracking: true,
         quests: [
             {
                 id: 1,
@@ -139,7 +137,6 @@ const projects = [
         title: "Nomadex",
         description: "Nomadex is a decentralized exchange. Complete tasks on Nomadex to earn points.",
         status: 'active',
-        tracking: true,
         quests: [   
             {
                 id: 1,

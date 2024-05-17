@@ -33,7 +33,6 @@
             const response = await fetch(url, { mode: 'no-cors' });
             const csvData = await response.text();
             const parsedData = parseCSV(csvData);
-            console.log(parsedData);
             
             // filter parsedData for wallet (address)
             const data = parsedData.filter((row) => row.address === wallet);
@@ -62,7 +61,6 @@
             console.error('Failed to fetch quests', error);
         }
         else {
-            console.log('Fetched quests', data);
             let completedActions = [...new Set(data.map(item => item.action))];
 
             // for each quest, check if action is in completedActions
@@ -73,7 +71,6 @@
                 }
             }
 
-            console.log(data);
             loading = false;
         }
     }
@@ -88,6 +85,7 @@
 
     $: if (wallet) {
         loading = true;
+        project.tracking = true;
         switch(project.title) {
             case 'Node Running':
                 getNodePoints();
@@ -100,12 +98,14 @@
                 break;
             case 'Kibisis':
                 getKibisisPoints();
+                project.tracking = false;
                 break;
             default:
                 for (let i = 0; i < project.quests.length; i++) {
                     project.quests[i].earned = -1;
                 }
                 loading = false;
+                project.tracking = false;
                 break;
         }
     }
