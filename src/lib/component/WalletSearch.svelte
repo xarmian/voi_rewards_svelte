@@ -19,6 +19,7 @@
     import { SearchOutline } from 'flowbite-svelte-icons';
     //@ts-ignore
     import Device from 'svelte-device-info';
+	import { get } from 'svelte/store';
 
 	let searchText = '';
 	/**
@@ -61,7 +62,19 @@
 	// Function to handle text input changes
 	function handleInput() {
 		// Implement logic to search NFDomain and update addressList
-		if (searchText.includes('.algo')) {
+        const storedSearchText = localStorage.getItem('searchText');
+
+        if (searchText.length == 0 && storedSearchText) {
+            if (storedSearchText.includes('.algo')) {
+                getAddressesForNFD(storedSearchText).then((data) => {
+                    addressList = data;
+                });
+            }
+            else if (storedSearchText.length == 58) {
+                addressList = [storedSearchText];
+            }
+        }
+		else if (searchText.includes('.algo')) {
 			getAddressesForNFD(searchText).then((data) => {
 				addressList = data;
 			});
@@ -73,7 +86,11 @@
 
 	// Function to handle address selection or submit
 	function handleSubmit(addr?: string) {
-        if (loadPreviousValue) {
+        /*if (loadPreviousValue) {
+            localStorage.setItem('searchText', searchText);
+        }*/
+        
+        if (searchText && searchText.length > 0) {
             localStorage.setItem('searchText', searchText);
         }
 

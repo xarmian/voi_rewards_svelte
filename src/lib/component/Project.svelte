@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { IProject, IQuest} from "$lib/data/types";
     import { supabasePublicClient } from '$lib/supabase';
+	import InfoButton from "./ui/InfoButton.svelte";
 
     export let project: IProject;
     export let wallet: string | null;
@@ -143,7 +144,7 @@
                 <td class="px-4 py-3">{quest.frequency ?? 'Once'}</td>
                 <td class="px-4 py-3">
                     {#if !wallet}
-                        N/A
+                        <div class="text-xs text-red-500">Enter Wallet to View Status</div>
                     {:else if loading}
                         <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
                     {:else if quest.earned}
