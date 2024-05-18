@@ -122,7 +122,7 @@
     <br/>
     <p class="text-center">Enter a wallet address to see Snapshot balance, expected Mainnet Allocation, and lockup options</p>
     <div class="text-center">
-        <WalletSearch onSubmit={(addr) => selectedWallet = addr} />
+        <WalletSearch onSubmit={(addr) => selectedWallet = addr} loadPreviousValue={false} />
     </div>
     <br/>
     <div class="inline-flex flex-col p-8 rounded-2xl bg-slate-100 dark:bg-slate-700 place-self-center place-items-center">

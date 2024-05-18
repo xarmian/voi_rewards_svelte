@@ -8,7 +8,7 @@ const projects = [
             {
                 id: 1,
                 title: "Run a node",
-                description: "Run a node on the Voi Network",
+                description: "Run a participation node on the Voi Network",
                 status: null,
                 reward: 1,
                 frequency: "Weekly",
@@ -164,7 +164,7 @@ const projects = [
     {
         id: 5,
         title: "NFTNavigator",
-        description: "NFTNavigator is an Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
+        description: "NFTNavigator is a Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
         status: 'active',
         quests: [
             {
@@ -401,7 +401,17 @@ const projects = [
         id: 9,
         title: "Arcpay",
         description: "Arcpay is a payment gateway. Complete tasks on Arcpay to earn points.",
-        quests: [],
+        status: 'active',
+        quests: [
+            {
+                id: 1,
+                title: "Follow @WilderStubbs on Twitter",
+                description: "Follow @WilderStubbs on Twitter",
+                status: null,
+                reward: 1,
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCLkPtzkAF",
+            },
+        ],
     },
     {
         id: 10,
