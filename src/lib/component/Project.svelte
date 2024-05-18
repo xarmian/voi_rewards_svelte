@@ -30,7 +30,7 @@
     async function getNomadexPoints() {
         try {
             const url = `https://api.nomadex.app/actions.csv?address=${wallet}`;
-            const response = await fetch(url, { mode: 'no-cors' });
+            const response = await fetch(url);
             const csvData = await response.text();
             const parsedData = parseCSV(csvData);
             
