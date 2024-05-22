@@ -53,6 +53,10 @@ export type IProject = {
     id: number;
     title: string;
     description: string;
+    url?: string;
+    galxe?: string;
+    guide?: string;
+    twitter?: string;
     quests: IQuest[];
     tracking?: boolean;
     status?: string; // 'active' or 'inactive'

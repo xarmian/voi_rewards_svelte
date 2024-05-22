@@ -1,18 +1,40 @@
 const projects = [
     {
         id: 1,
-        title: "Node Running",
-        description: "Run a node on the Voi Network and earn points weekly",
+        title: "Voi Network",
+        description: "Social media, node running, and other quests from Voi Network",
+        url: 'https://voi.network',
+        guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a",
+        twitter: "https://x.com/Voi_Net",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8",
         status: 'active',
         quests: [
             {
                 id: 1,
-                title: "Run a node",
+                title: "Getting Started",
+                description: "Start here! Get to know the Voi Network Ecosystem",
+                status: null,
+                reward: 1,
+                frequency: "Once",
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8"
+            },
+            {
+                id: 2,
+                title: "Dive In Deeper",
+                description: "Find out more about the Voi Network Ecosystem",
+                status: null,
+                reward: 1,
+                frequency: "Weekly",
+                guide: " https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCekitzB4j"
+            },
+            {
+                id: 3,
+                title: "Network Infrastructure",
                 description: "Run a participation node on the Voi Network",
                 status: null,
                 reward: 1,
                 frequency: "Weekly",
-                guide: "https://docs.voi.network/node-runners/overview/"
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCGUPtzt9a"
             },
         ],
     },
@@ -20,21 +42,37 @@ const projects = [
         id: 2,
         title: "Kibisis",
         description: "Kibisis is a Voi Wallet. Complete tasks on Kibisis to earn points.",
+        url: "https://kibis.is",
+        guide: "https://kibis.is/blog/the-voiage-to-mainnet",
+        twitter: "https://x.com/kibisis_wallet",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1btzeG8",
         status: 'active',
         quests: [
             {
                 id: 1,
+                title: "Social Media Quest",
+                description: "Follow, like, and/or share Kibisis on social media",
+                status: null,
+                reward: 1,
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC9Nbtzpzz",
+            },
+            {
+                id: 2,
                 title: "Send $VOI to a Friend",
                 description: "Send $VOI to another wallet using Kibisis",
                 status: null,
                 reward: 1,
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCAnctzNGv",
+                frequency: "Daily",
             },
             {
-                id: 2,
+                id: 3,
                 title: "Send $VIA to a Friend",
                 description: "Send $VIA, a Smart Contract Asset, to another wallet using Kibisis",
                 status: null,
                 reward: 1,
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCHmctzaUF",
+                frequency: "Daily",
             },
         ]
     },
@@ -42,6 +80,10 @@ const projects = [
         id: 3,
         title: "Nautilus",
         description: "Nautilus is an NFT token marketplace. Complete tasks on Nautilus to earn points.",
+        url: "https://nautilus.sh",
+        guide: "https://confused-timbale-d13.notion.site/Nautilus-Voiage-to-MainNet-Quests-0147e70e5fc24467ac0bdab6761c08e3",
+        twitter: "https://x.com/NautilusNFTs",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCcBPtzd7E",
         status: "active",
         quests: [
             {
@@ -165,6 +207,10 @@ const projects = [
         id: 5,
         title: "NFTNavigator",
         description: "NFTNavigator is a Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
+        url: "https://nftnavigator.xyz",
+        guide: "https://wind-bolt-806.notion.site/NFTNavigator-Voiage-to-MainNet-Quests-696da0ba04784f9e827354adc8ec84d1",
+        twitter: "https://x.com/voinftnavigator",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1sHtz1VC",
         status: 'active',
         quests: [
             {
@@ -227,6 +273,7 @@ const projects = [
         id: 4,
         title: "Nomadex",
         description: "Nomadex is a decentralized exchange. Complete tasks on Nomadex to earn points.",
+        url: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
         status: 'active',
         quests: [   
             {
@@ -298,6 +345,10 @@ const projects = [
         id: 6,
         title: "Humble",
         description: "Humble is a decentralized exchange platform. Complete tasks on Humble to earn points.",
+        url: "https://voi.nomadex.app/swap/VOI-VIA/",
+        guide: "https://actions-docs.nomadex.app/",
+        twitter: "https://x.com/nomadex_app",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCezbtz9PD",
         status: "active",
         quests: [
             {
@@ -362,6 +413,9 @@ const projects = [
         id: 7,
         title: "Treehouse",
         description: "Treehouse Toolbox provides a set of tools for performing various tasks on the Voi Network. Complete tasks on Treehouse to earn points.",
+        url: "https://treehouse-tools.boeieruurd.com/",
+        guide: "https://medium.com/@RachKoch/voiage-to-main-net-phase-2-1f8199c1de0e",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCE4atz4He",
         status: "active",
         quests: [
             {
@@ -384,6 +438,10 @@ const projects = [
         id: 8,
         title: "Highforge",
         description: "Highforge is an NFT minting platform. Complete tasks on Highforge to earn points.",
+        url: "https://highforge.io/",
+        guide: "https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d",
+        twitter: "https://x.com/highforgeio",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCAZPtzxsy",
         status: 'active',
         quests: [
             {
@@ -401,6 +459,7 @@ const projects = [
         id: 9,
         title: "Arcpay",
         description: "Arcpay is a payment gateway. Complete tasks on Arcpay to earn points.",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCLkPtzkAF",
         status: 'active',
         quests: [
             {
@@ -417,6 +476,10 @@ const projects = [
         id: 10,
         title: "A-Wallet",
         description: "A-Wallet is a wallet for the Voi Network. Complete tasks on A-Wallet to earn points.",
+        url: "https://www.a-wallet.net/",
+        guide: "https://rightful-wool-283.notion.site/AWallet-VOI-tasks-f4eb24d261f94072b89bdebbd04507d5",
+        twitter: "https://x.com/EAlgonaut",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCdratzuWv",
         status: "active",
         quests: [
             {
@@ -428,6 +491,55 @@ const projects = [
                 guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC44atzFGT",
             }
         ],
+    },
+    {
+        id: 11,
+        title: "Womp Crew",
+        description: "Engage with the Womp Crew Poker Party and Spread the word",
+        url: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1Vntz2sh",
+        status: "active",
+        quests: [
+            {
+                id: 1,
+                title: "Social Media",
+                description: "Like and share the Womp Crew Poker Party",
+                status: null,
+                reward: 1,
+                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1Vntz2sh",
+            },
+        ],
+    },
+    {
+        id: 12,
+        title: "Aramid",
+        description: "Aramid Finance Token Bridge",
+        url: "https://www.aramid.finance/",
+        guide: "https://rightful-wool-283.notion.site/Aramid-Finance-VOI-Tasks-4ddb5d02ec304936a111fba47d27f155",
+        twitter: "https://x.com/AramidFinance",
+        status: "active",
+        quests: [
+            {
+                id: 1,
+                title: "Discord",
+                description: "Join Aramid Discord",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 2,
+                title: "X / Twitter",
+                description: "Follow Aramid on X",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 3,
+                title: "Transfer Assets",
+                description: "Transfer asset between chains using Aramid Bridge",
+                status: null,
+                reward: 1,
+            },
+        ]
     }
 ];
 export default projects;

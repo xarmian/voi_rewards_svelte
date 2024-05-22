@@ -2,6 +2,7 @@
     import type { IProject, IQuest} from "$lib/data/types";
     import { supabasePublicClient } from '$lib/supabase';
 	import InfoButton from "./ui/InfoButton.svelte";
+    import GalaxeIconImage from "$lib/assets/galxe_icon.jpeg";
 
     export let project: IProject;
     export let wallet: string | null;
@@ -135,13 +136,47 @@
         return result;
     }
 </script>
-<h2 class="text-2xl font-bold mb-4">
-    {project.title}
-    <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
-    {#if !project.tracking}
-        <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
-    {/if}
-</h2>
+<div class="flex flex-col md:flex-row md:justify-between">
+    <h2 class="text-2xl font-bold mb-4 mt-4 flex flex-col">
+        {#if project.url}
+            <a class="text-blue-500 hover:text-blue-400 underline cursor-pointer" target="_blank" href={project.url}>
+                {project.title}
+            </a>
+        {:else}
+            {project.title}
+        {/if}
+        <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
+        {#if !project.tracking}
+            <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
+        {/if}
+    </h2>
+    <div class="flex flex-row md:self-end md:place-items-end mb-2 space-x-4">
+        {#if project.guide}
+            <a class="flex items-center space-x-1 text-blue-500 hover:text-blue-400 cursor-pointer" target="_blank" href={project.guide}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span class="text-base text-gray-500">Project Quest Guide</span>
+            </a>
+        {/if}
+        {#if project.galxe}
+            <a class="flex items-center space-x-1 text-blue-500 hover:text-blue-400 cursor-pointer" target="_blank" href={project.galxe}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span class="text-base text-gray-500">Galxe Guide</span>
+            </a>
+        {/if}
+        {#if project.twitter}
+            <a class="flex items-center space-x-1 text-blue-500 hover:text-blue-400 cursor-pointer" target="_blank" href={project.twitter}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span class="text-base text-gray-500">Project Twitter</span>
+            </a>
+        {/if}
+    </div>
+</div>
 <table class="w-full whitespace-no-wrap">
     <thead>
         <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 dark:text-gray-100 uppercase border-b bg-gray-50 dark:bg-gray-700">
@@ -156,7 +191,10 @@
         {#each localProject.quests as quest, i}
             <tr class="text-gray-700 dark:text-gray-100">
                 <td class="px-4 py-3">#{quest.id}</td>
-                <td class="px-4 py-3">{quest.description}</td>
+                <td class="px-4 py-3">
+                    <div class="font-semibold">{quest.title}</div>
+                    <div class="text-xs">{quest.description}</div>
+                </td>
                 <td class="px-4 py-3">
                     {#if !quest.guide}
                         N/A
@@ -175,9 +213,9 @@
                     {:else if quest.earned}
                         {#if quest.earned == -1}
                             <div class="text-xs text-red-500 flex flex-row">
-                                Unknown
+                                Unavailable
                                 <InfoButton noAbsolute={true}>
-                                    <p class="text-sm">This quest is either unavailable, or we are unable to retrieve the completion status.</p>
+                                    <p class="text-sm">We are currently unable to track the completion status for this quest.</p>
                                 </InfoButton>
                             </div>
                         {:else}
