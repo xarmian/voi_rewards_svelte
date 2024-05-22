@@ -586,6 +586,72 @@ const projects = [
                 guide: "https://rightful-wool-283.notion.site/Task-4-Become-executor-0ca7c84247f94187b366e1d00366cbaa",
             }
         ],        
+    },
+    {
+        id: 14,
+        title: "AlgoLeagues",
+        description: "AlgoLeagues Discord Bot facilitates transferring, withdrawing, and tipping Voi assets in Discord servers.",
+        guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/944ddd5dc496d47d7163a3399e4d64ebff32f003/README.md",
+        twitter: "https://x.com/algoleagues",
+        status: "active",
+        "quests": [
+            {
+                id: 1,
+                title: "Register a VOI address in Discord",
+                description: "Get started with Algo Leagues Discord Bot by registering your VOI address.",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-1-register-a-voi-address-in-discord",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 2,
+                title: "Confirm your address for Algo Leagues",
+                description: "Send a message to the Algo Leagues Discord Bot to confirm your address.",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-2-confirm-your-address-for-algo-leagues",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 3,
+                title: "Deposit VOI or a Standard Asset to your Algo Leagues account",
+                description: "Learn how Standard Assets are deposited for spending in Algo Leagues.",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-3-deposit-voi-or-a-standard-asset-to-your-algo-leagues-account",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 4,
+                title: "Withdraw VOI or a Standard Asset from your Algo Leagues account",
+                description: "Use the Withdraw System to take your assets back to your wallet.",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-4-withdraw-voi-or-a-standard-asset-from-your-algo-leagues-account",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 5,
+                title: "Approve Algo Leagues to spend a Smart Asset on your behalf",
+                description: "Use ARC-200 approvals to maintain custody of your smart assets while allowing Algo Leagues to spend them.",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-5-approve-algo-leagues-to-spend-a-smart-asset-on-your-behalf",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 6,
+                title: "Send a Smart Asset to another Discord user",
+                description: "Spend an approved balance directly on chain to a single user within Discord",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-6-send-a-smart-asset-to-another-discord-user",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 7,
+                title: "Rain a Smart Asset to active users in a Discord channel",
+                description: "Spend an approved balance directly on chain to multiple users within Discord",
+                guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-7-rain-a-smart-asset-to-active-users-in-a-discord-channel",
+                status: null,
+                reward: 1,
+            },
+        ]
     }
 ];
 export default projects;

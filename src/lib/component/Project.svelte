@@ -6,6 +6,7 @@
 
     export let project: IProject;
     export let wallet: string | null;
+    let realtime = [ 'Voi Network', 'Nomadex', 'NFTNavigator', 'AlgoLeagues-placeholder' ];
 
     $: localProject = project;
     $: loading = true;
@@ -91,6 +92,29 @@
         }
     }
 
+    async function getAlgoLeaguesPoints() {
+        try {
+            const url = `https://4wjjj4w7u5.execute-api.us-east-1.amazonaws.com/default/addr/${wallet}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            // for each quest, check if action is in completedActions
+            for (let i = 0; i < project.quests.length; i++) {
+                const quest = project.quests[i];
+                if (data.quests[`algo-leagues-${quest.id}`]?.completed) {
+                    quest.earned = 1;
+                }
+                else {
+                    quest.earned = 0;
+                }
+            }
+
+            loading = false;
+        } catch (error) {
+            console.error('Failed to fetch points:', error);
+        }
+    }
+
     async function getKibisisPoints() {
         // set all quest.earned to -1
         for (let i = 0; i < project.quests.length; i++) {
@@ -101,7 +125,6 @@
 
     $: if (wallet) {
         loading = true;
-        project.tracking = true;
         switch(project.title) {
             case 'Voi Network':
                 getNodePoints();
@@ -114,14 +137,15 @@
                 break;
             case 'Kibisis':
                 getKibisisPoints();
-                project.tracking = false;
+                break;
+            case 'AlgoLeagues-placeholder':
+                getAlgoLeaguesPoints();
                 break;
             default:
                 for (let i = 0; i < project.quests.length; i++) {
                     project.quests[i].earned = -1;
                 }
                 loading = false;
-                project.tracking = false;
                 break;
         }
     }
@@ -155,7 +179,7 @@
             {project.title}
         {/if}
         <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
-        {#if !project.tracking}
+        {#if !realtime.includes(project.title)}
             <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
         {/if}
     </h2>
