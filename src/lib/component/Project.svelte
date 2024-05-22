@@ -21,7 +21,7 @@
             });
             
             // sum points[].points
-            localProject.quests[0].earned = points.reduce((acc, cur) => acc + cur.points, 0);
+            localProject.quests[2].earned = points.reduce((acc, cur) => acc + cur.points, 0);
             loading = false;
         } catch (error) {
             console.error('Failed to fetch points:', error);
@@ -94,7 +94,7 @@
         loading = true;
         project.tracking = true;
         switch(project.title) {
-            case 'Node Running':
+            case 'Voi Network':
                 getNodePoints();
                 break;
             case 'Nomadex':
