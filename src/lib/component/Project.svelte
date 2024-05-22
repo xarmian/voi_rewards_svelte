@@ -160,7 +160,7 @@
         </a>
         {/if}
         {#if project.galxe}
-        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.guide}>
+        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.galxe}>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
@@ -168,7 +168,7 @@
             </a>
         {/if}
         {#if project.twitter}
-        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.guide}>
+        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.twitter}>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>

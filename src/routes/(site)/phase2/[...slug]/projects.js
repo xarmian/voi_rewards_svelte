@@ -273,7 +273,10 @@ const projects = [
         id: 4,
         title: "Nomadex",
         description: "Nomadex is a decentralized exchange. Complete tasks on Nomadex to earn points.",
-        url: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
+        url: "https://voi.nomadex.app/swap/VOI-VIA/",
+        guide: "https://actions-docs.nomadex.app/",
+        twitter: "https://x.com/nomadex_app",
+        galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
         status: 'active',
         quests: [   
             {
@@ -540,6 +543,49 @@ const projects = [
                 reward: 1,
             },
         ]
+    },
+    {
+        id: 13,
+        title: "Biatec Scheduler",
+        description: "Biatec Scheduler is a decentralized scheduling platform. Complete tasks on Biatec Scheduler to earn points.",
+        url: "https://www.biatec.io/",
+        guide: "https://rightful-wool-283.notion.site/Biatec-Scheduler-VOI-Tasks-36685c4e1061455297429e38b9a84ebb",
+        twitter: "https://x.com/EAlgonaut",
+        status: "active",
+        quests: [
+            {
+                id: 1,
+                title: "Join Discord",
+                description: "Join Biatec Scheduler Discord",
+                status: null,
+                reward: 1,
+                guide: "https://rightful-wool-283.notion.site/Task-1-Join-discrod-664e44f849884c23b1f7f9d04aa4c226",
+            },
+            {
+                id: 2,
+                title: "Follow X Account",
+                description: "Follow Biatec Scheduler on X",
+                status: null,
+                reward: 1,
+                guide: "https://rightful-wool-283.notion.site/Task-2-Follow-X-account-ace0b5a833f840d8ae78849a7fc08555",
+            },
+            {
+                id: 3,
+                title: "Do a daily scheduled payment",
+                description: "Create a scheduled payment on Biatec Scheduler",
+                status: null,
+                reward: 1,
+                guide: "https://rightful-wool-283.notion.site/Task-3-Do-a-daily-scheduled-payment-e62c091cd4a34d8f9523046ecb6514a5",
+            },
+            {
+                id: 4,
+                title: "Become executor",
+                description: "Become an executor on Biatec Scheduler",
+                status: null,
+                reward: 1,
+                guide: "https://rightful-wool-283.notion.site/Task-4-Become-executor-0ca7c84247f94187b366e1d00366cbaa",
+            }
+        ],        
     }
 ];
 export default projects;
