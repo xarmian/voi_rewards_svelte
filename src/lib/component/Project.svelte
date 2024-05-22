@@ -152,27 +152,27 @@
     </h2>
     <div class="flex flex-row md:self-end md:place-items-end mb-2 space-x-4">
         {#if project.guide}
-            <a class="flex items-center space-x-1 text-blue-500 hover:text-blue-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent" target="_blank" href={project.guide}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                </svg>
-                <span class="text-base text-gray-500">Project Quest Guide</span>
-            </a>
+        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.guide}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            <span class="text-lg text-blue-500 hover:text-blue-400 underline">Project Quest Guide</span>
+        </a>
         {/if}
         {#if project.galxe}
-            <a class="flex items-center space-x-1 text-blue-500 hover:text-blue-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent" target="_blank" href={project.galxe}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.guide}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                <span class="text-base text-gray-500">Galxe Guide</span>
+                <span class="text-lg text-blue-500 hover:text-blue-400 underline">Galxe Guide</span>
             </a>
         {/if}
         {#if project.twitter}
-            <a class="flex items-center space-x-1 text-blue-500 hover:text-blue-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent" target="_blank" href={project.twitter}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.guide}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                <span class="text-base text-gray-500">Project Twitter</span>
+                <span class="text-lg text-blue-500 hover:text-blue-400 underline">Project Twitter</span>
             </a>
         {/if}
     </div>
