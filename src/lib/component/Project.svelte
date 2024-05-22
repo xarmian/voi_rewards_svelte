@@ -20,8 +20,17 @@
                 return { date: key, health: data[key].health, points: data[key].points };
             });
             
-            // sum points[].points
-            localProject.quests[2].earned = points.reduce((acc, cur) => acc + cur.points, 0);
+            // find the quest with title "Network Infrastructure" and add health points
+            let ni = localProject.quests.find((quest) => quest.title === 'Network Infrastructure');
+            if (ni) ni.earned = points.reduce((acc, cur) => acc + cur.points, 0);
+
+            // set all other quest earned to -1
+            for (let i = 0; i < localProject.quests.length; i++) {
+                if (localProject.quests[i].earned === undefined) {
+                    localProject.quests[i].earned = -1;
+                }
+            }
+
             loading = false;
         } catch (error) {
             console.error('Failed to fetch points:', error);
