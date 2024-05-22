@@ -72,5 +72,6 @@ export type IQuest = {
     earned?: number;
     guide?: string;
     frequency?: string; // daily, weekly, monthly, once -- once if undefined
+    isOpen?: boolean;
 };
 
