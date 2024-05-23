@@ -8,6 +8,7 @@ const projects = [
         twitter: "https://x.com/Voi_Net",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8",
         status: 'active',
+        realtime: true,
         quests: [
             {
                 id: 1,
@@ -212,6 +213,7 @@ const projects = [
         twitter: "https://x.com/voinftnavigator",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1sHtz1VC",
         status: 'active',
+        realtime: true,
         quests: [
             {
                 id: 1,
@@ -278,6 +280,7 @@ const projects = [
         twitter: "https://x.com/nomadex_app",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
         status: 'active',
+        realtime: true,
         quests: [   
             {
                 id: 1,
@@ -295,6 +298,7 @@ const projects = [
                 description: "Swap tokens on Nomadex",
                 status: null,
                 reward: 1,
+                frequency: "Daily",
                 guide: "https://actions-docs.nomadex.app/",
             },
             {
@@ -594,6 +598,7 @@ const projects = [
         guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/944ddd5dc496d47d7163a3399e4d64ebff32f003/README.md",
         twitter: "https://x.com/algoleagues",
         status: "active",
+        realtime: true,
         "quests": [
             {
                 id: 1,

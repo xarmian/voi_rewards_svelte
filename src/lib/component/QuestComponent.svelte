@@ -6,8 +6,6 @@
     let isDropdownOpen: boolean = false;
     export let selectedTab = 0;
 
-    let realtime = [ 'Voi Network', 'Nomadex', 'NFTNavigator', 'AlgoLeagues-placeholder' ];
-
     // sort projects with status='active' first then by id
     projects.sort((a, b) => {
         if (a.status === 'active' && b.status !== 'active') return -1;
@@ -37,7 +35,7 @@
                         {project.title}
                         {#if (project.status??'inactive') !== 'active'}
                             <span class="text-xs text-red-500">Coming soon!</span>
-                        {:else if realtime.includes(project.title)}
+                        {:else if project.realtime??false}
                             <span class="text-xs text-green-500">Realtime</span>
                         {/if}
                     </a>
@@ -60,7 +58,7 @@
                 <div>{project.title}</div>
                 {#if (project.status??'inactive') !== 'active'}
                     <div class="text-xs text-red-500 dark:text-red-300">Coming soon!</div>
-                {:else if realtime.includes(project.title)}
+                {:else if project.realtime??false}
                     <div class="text-xs text-green-500 dark:text-green-300">Realtime Data ⚡</div>
                 {/if}
             </a>

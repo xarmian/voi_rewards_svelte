@@ -40,7 +40,7 @@
 				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
 				dataArrays = data.data;
 
-				console.log(data.data);
+				//console.log(data.data);
 
                 dataArrays.forEach((row: any) => {
                     totalWallets++;

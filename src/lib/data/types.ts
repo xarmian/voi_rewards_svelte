@@ -59,6 +59,7 @@ export type IProject = {
     twitter?: string;
     quests: IQuest[];
     tracking?: boolean;
+    realtime?: boolean;
     status?: string; // 'active' or 'inactive'
 };
 

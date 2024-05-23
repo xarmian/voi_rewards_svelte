@@ -6,7 +6,6 @@
 
     export let project: IProject;
     export let wallet: string | null;
-    let realtime = [ 'Voi Network', 'Nomadex', 'NFTNavigator', 'AlgoLeagues-placeholder' ];
 
     $: localProject = project;
     $: loading = true;
@@ -50,9 +49,20 @@
             
             for (let i = 0; i < project.quests.length; i++) {
                 const quest = project.quests[i];
-                const row = data.find((row) => row.action === quest.name);
-                if (row) {
-                    quest.earned = 1;
+                const row = data.filter((row) => row.action === quest.name);
+
+                if (row.length > 0) {
+                    if (quest.name == 'swap') {
+                        let uniqueDates = new Set();
+                        row.forEach(entry => {
+                            let date = new Date(Number(entry.timestamp) * 1000).toISOString().split('T')[0];
+                            uniqueDates.add(date);
+                        });
+                        quest.earned = uniqueDates.size;
+                    }
+                    else {
+                        quest.earned = 1;
+                    }
                 }
                 else {
                     quest.earned = 0;
@@ -94,7 +104,7 @@
 
     async function getAlgoLeaguesPoints() {
         try {
-            const url = `https://4wjjj4w7u5.execute-api.us-east-1.amazonaws.com/default/addr/${wallet}`;
+            const url = `/api/quests/?project=Algoleagues&wallet=${wallet}`;
             const response = await fetch(url);
             const data = await response.json();
 
@@ -138,7 +148,7 @@
             case 'Kibisis':
                 getKibisisPoints();
                 break;
-            case 'AlgoLeagues-placeholder':
+            case 'AlgoLeagues':
                 getAlgoLeaguesPoints();
                 break;
             default:
@@ -179,7 +189,7 @@
             {project.title}
         {/if}
         <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
-        {#if !realtime.includes(project.title)}
+        {#if project.realtime??false}
             <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
         {/if}
     </h2>
