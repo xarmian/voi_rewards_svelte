@@ -352,9 +352,9 @@ const projects = [
         id: 6,
         title: "Humble",
         description: "Humble is a decentralized exchange platform. Complete tasks on Humble to earn points.",
-        url: "https://voi.nomadex.app/swap/VOI-VIA/",
-        guide: "https://actions-docs.nomadex.app/",
-        twitter: "https://x.com/nomadex_app",
+        url: "https://voi.humble.sh/",
+        guide: "https://sandy-griffin-b91.notion.site/Humble-Voi-Testnet-to-Mainnet-Quests-5e2b7a38af1143a88380ff002d7d0eac",
+        twitter: "https://x.com/HumbleDefi",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCezbtz9PD",
         status: "active",
         quests: [
