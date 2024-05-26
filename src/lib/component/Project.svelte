@@ -240,23 +240,21 @@
                     </div>
                     <div><strong>Frequency:</strong> {quest.frequency ?? 'Once'}</div>
                     <div><strong>Completed?</strong> 
-                        {#if !wallet}
+                        {#if !project.realtime || quest.earned == -1}
+                            <div class="text-xs text-red-500 flex flex-row">
+                                Real-time tracking unavailable
+                                <InfoButton noAbsolute={true}>
+                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
+                                </InfoButton>
+                            </div>
+                        {:else if !wallet}
                             <div class="text-xs text-red-500">Enter Wallet to View Status</div>
                         {:else if loading}
                             <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
                         {:else if quest.earned}
-                            {#if quest.earned == -1}
-                                <div class="text-xs text-red-500 flex flex-row">
-                                    Unavailable
-                                    <InfoButton noAbsolute={true}>
-                                        <p class="text-sm">We are currently unable to track the completion status for this quest.</p>
-                                    </InfoButton>
-                                </div>
-                            {:else}
-                                <i class="fas fa-check text-green-500 text-3xl"></i>
-                                {#if quest.frequency ?? 'Once' != 'Once'}
-                                    <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
-                                {/if}
+                            <i class="fas fa-check text-green-500 text-3xl"></i>
+                            {#if quest.frequency ?? 'Once' != 'Once'}
+                                <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
                             {/if}
                         {:else}
                             <i class="fas fa-times text-red-500 text-3xl"></i>
@@ -297,23 +295,21 @@
                     </td>
                     <td class="px-4 py-3">{quest.frequency ?? 'Once'}</td>
                     <td class="px-4 py-3">
-                        {#if !wallet}
+                        {#if !project.realtime || quest.earned == -1}
+                            <div class="text-xs text-red-500 flex flex-row">
+                                Real-time tracking unavailable
+                                <InfoButton noAbsolute={true}>
+                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
+                                </InfoButton>
+                            </div>
+                        {:else if !wallet}
                             <div class="text-xs text-red-500">Enter Wallet to View Status</div>
                         {:else if loading}
                             <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
                         {:else if quest.earned}
-                            {#if quest.earned == -1}
-                                <div class="text-xs text-red-500 flex flex-row">
-                                    Unavailable
-                                    <InfoButton noAbsolute={true}>
-                                        <p class="text-sm">We are currently unable to track the completion status for this quest.</p>
-                                    </InfoButton>
-                                </div>
-                            {:else}
-                                <i class="fas fa-check text-green-500 text-3xl"></i>
-                                {#if quest.frequency ?? 'Once' != 'Once'}
-                                    <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
-                                {/if}
+                            <i class="fas fa-check text-green-500 text-3xl"></i>
+                            {#if quest.frequency ?? 'Once' != 'Once'}
+                                <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
                             {/if}
                         {:else}
                             <i class="fas fa-times text-red-500 text-3xl"></i>
