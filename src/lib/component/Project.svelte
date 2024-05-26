@@ -189,7 +189,7 @@
             {project.title}
         {/if}
         <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
-        {#if project.realtime??false}
+        {#if !project.realtime}
             <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
         {/if}
     </h2>
