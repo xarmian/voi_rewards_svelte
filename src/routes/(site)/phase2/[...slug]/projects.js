@@ -206,7 +206,7 @@ const projects = [
     },
     {
         id: 5,
-        title: "NFTNavigator",
+        title: "NFT Navigator",
         description: "NFTNavigator is a Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
         url: "https://nftnavigator.xyz",
         guide: "https://wind-bolt-806.notion.site/NFTNavigator-Voiage-to-MainNet-Quests-696da0ba04784f9e827354adc8ec84d1",
@@ -268,7 +268,16 @@ const projects = [
                 guide: 'https://wind-bolt-806.notion.site/Quest-6-Create-a-Private-post-in-the-NFT-Lounge-e6254158fb994c189a19308f74478f80?pvs=25',
                 status: null,
                 reward: 1,
-            }
+            },
+            {
+                id: 7,
+                title: "Vote in a Poll in the NFT Lounge",
+                name: 'post_poll_vote',
+                description: 'Vote in a Poll in the NFT Lounge',
+                guide: 'https://wind-bolt-806.notion.site/Quest-7-Vote-in-a-Poll-in-the-NFT-Lounge-355b4f18a068470fb4f4c4cc3d981a2d',
+                status: null,
+                reward: 1,
+            },
         ],
     },
     {
