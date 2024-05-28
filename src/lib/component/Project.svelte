@@ -142,7 +142,7 @@
             case 'Nomadex':
                 getNomadexPoints();
                 break;
-            case 'NFTNavigator':
+            case 'NFT Navigator':
                 getNFTNavigatorPoints();
                 break;
             case 'Kibisis':
