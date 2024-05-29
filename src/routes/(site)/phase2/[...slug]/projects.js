@@ -468,7 +468,16 @@ const projects = [
                 status: null,
                 guide: 'https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d',
                 reward: 1,
-            }
+            },
+            {
+                id: 2,
+                title: 'Mint and List',
+                description: 'Get ready for the next challenge! Mint NFTs and list them on one of the available marketplaces.',
+                frequency: 'Once',
+                status: null,
+                guide: 'https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d',
+                reward: 1,
+            },
         ],
     },
     {
