@@ -53,6 +53,7 @@ export type IProject = {
     id: number;
     title: string;
     description: string;
+    type: string;
     url?: string;
     galxe?: string;
     guide?: string;
