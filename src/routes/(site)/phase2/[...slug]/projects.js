@@ -509,7 +509,7 @@ const projects = [
         id: 9,
         title: "Arcpay",
         type: "Payments",
-        category: "Tools",
+        category: "Other",
         description: "Arcpay is a payment gateway. Complete tasks on Arcpay to earn points.",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCLkPtzkAF",
         status: 'active',
