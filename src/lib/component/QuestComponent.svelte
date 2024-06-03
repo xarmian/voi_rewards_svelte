@@ -6,14 +6,15 @@
     let isDropdownOpen: boolean = false;
     export let selectedTab = 0;
 
-    // sort projects with status='active' first then by id
+    // sort projects with status='active' and realtime=true first, then by id
     projects.sort((a, b) => {
         if (a.status === 'active' && b.status !== 'active') return -1;
         if (a.status !== 'active' && b.status === 'active') return 1;
+        if (a.realtime && !b.realtime) return -1;
+        if (!a.realtime && b.realtime) return 1;
         return a.id - b.id;
     });
 </script>
-
 <div class="md:hidden place-self-center flex flex-row">
     <div class="self-center mr-2">
         Project:
@@ -48,19 +49,24 @@
     <nav class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {#each projects as project, i}
             <a 
-                class="m-1 cursor-pointer border-transparent rounded-xl w-full flex flex-col justify-center 
-                whitespace-nowrap py-6 px-3 border-b-4 font-semibold text-lg 
+                class="m-1 cursor-pointer border-transparent rounded-xl w-full flex flex-col justify-between
+                whitespace-nowrap py-2 h-24 px-3 border-b-4 font-semibold text-lg 
                 hover:text-gray-700 dark:hover:text-gray-100 hover:border-gray-300 dark:hover:border-gray-300 
                 bg-blue-200 dark:bg-blue-900 hover:bg-blue-300 dark:hover:bg-blue-700
                 {selectedTab === i ? 'text-white !bg-blue-500 dark:!bg-blue-500' : 'text-gray-500 dark:text-gray-200'}" 
                 class:disabled={(project.status??'inactive') !== 'active'}
                 on:click={() => selectedTab = i}>
-                <div>{project.title}</div>
-                {#if (project.status??'inactive') !== 'active'}
-                    <div class="text-xs text-red-500 dark:text-red-300">Coming soon!</div>
-                {:else if project.realtime??false}
-                    <div class="text-xs text-green-500 dark:text-green-300">Realtime Data ⚡</div>
-                {/if}
+                <div>
+                    <div>{project.title}</div>
+                    <div class='text-xs'>{project.type}</div>
+                </div>
+                <div>
+                    {#if (project.status??'inactive') !== 'active'}
+                        <div class="text-xs text-red-500 dark:text-red-300">Coming soon!</div>
+                    {:else if project.realtime??false}
+                        <div class="text-xs text-green-500 dark:text-green-300">Realtime Data ⚡</div>
+                    {/if}
+                </div>
             </a>
         {/each}
     </nav>

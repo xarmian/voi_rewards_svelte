@@ -2,6 +2,7 @@ const projects = [
     {
         id: 1,
         title: "Voi Network",
+        type: "Network",
         description: "Social media, node running, and other quests from Voi Network",
         url: 'https://voi.network',
         guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a",
@@ -42,6 +43,7 @@ const projects = [
     {
         id: 2,
         title: "Kibisis",
+        type: "Wallet",
         description: "Kibisis is a Voi Wallet. Complete tasks on Kibisis to earn points.",
         url: "https://kibis.is",
         guide: "https://kibis.is/blog/the-voiage-to-mainnet",
@@ -80,15 +82,18 @@ const projects = [
     {
         id: 3,
         title: "Nautilus",
+        type: "NFT Marketplace",
         description: "Nautilus is an NFT token marketplace. Complete tasks on Nautilus to earn points.",
         url: "https://nautilus.sh",
         guide: "https://confused-timbale-d13.notion.site/Nautilus-Voiage-to-MainNet-Quests-0147e70e5fc24467ac0bdab6761c08e3",
         twitter: "https://x.com/NautilusNFTs",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCcBPtzd7E",
         status: "active",
+        realtime: true,
         quests: [
             {
                 id: 1,
+                name: "connect_wallet",
                 title: "Wallet Quest: Connect Wallet (Account Connection)",
                 description: "Wallet Quest: Connect Wallet (Account Connection)",
                 status: null,
@@ -97,6 +102,7 @@ const projects = [
             },
             {
                 id: 2,
+                name: "sale_list_once",
                 title: "Sale Quest: List NFT for Sale",
                 description: "Sale Quest: List NFT for Sale",
                 status: null,
@@ -105,6 +111,7 @@ const projects = [
             },
             {
                 id: 3,
+                name: "sale_buy_once",
                 title: "Sale Quest: Buy NFT for Sale",
                 description: "Sale Quest: Buy NFT for Sale",
                 status: null,
@@ -113,6 +120,7 @@ const projects = [
             },
             {
                 id: 4,
+                name: "swap_list_once",
                 title: "M-Swap Quest: List MechaSwap (NFT Swap)",
                 description: "M-Swap Quest: List MechaSwap (NFT Swap)",
                 status: null,
@@ -120,6 +128,7 @@ const projects = [
             },
             {
                 id: 5,
+                name: "swap_execute_once",
                 title: "M-Swap Quest: Execute MechaSwap (NFT Swap)",
                 description: "M-Swap Quest: Execute MechaSwap (NFT Swap)",
                 status: null,
@@ -127,26 +136,29 @@ const projects = [
             },
             {
                 id: 6,
-                title: "Time Quest: List NFT 1 minute after mint on High Forge",
-                description: "Time Quest: List NFT 1 minute after mint on High Forge",
+                name: "timed_sale_list_1minute",
+                title: "Timed Quest: List NFT 1 minute after mint on High Forge",
+                description: "Timed Quest: List NFT 1 minute after mint on High Forge",
                 status: null,
                 reward: 1,
             },
             {
                 id: 7,
-                title: "Time Quest: Buy NFT 15 minutes after listing on High Forge",
-                description: "Time Quest: Buy NFT 15 minutes after listing on High Forge",
+                name: "timed_sale_list_15minutes",
+                title: "Timed Quest: List NFT 15 minutes after listing on High Forge",
+                description: "Timed Quest: List NFT 15 minutes after listing on High Forge",
                 status: null,
                 reward: 1,
             },
             {
                 id: 8,
-                title: "Time Quest: List NFT 1 hour after mint on High Forge",
-                description: "Time Quest: List NFT 1 hour after mint on High Forge",
+                name: "timed_sale_list_1hour",
+                title: "Timed Quest: List NFT 1 hour after mint on High Forge",
+                description: "Timed Quest: List NFT 1 hour after mint on High Forge",
                 status: null,
                 reward: 1,
             },
-            {
+            /*{
                 id: 9,
                 title: "Common Quest: Trade NFTs with more than 5 different wallets",
                 description: "Common Quest: Trade NFTs with more than 5 different wallets",
@@ -201,12 +213,13 @@ const projects = [
                 description: "Legendary Quest: Collect an NFT from each collection",
                 status: null,
                 reward: 1,
-            }
+            }*/
         ],
     },
     {
         id: 5,
         title: "NFT Navigator",
+        type: "NFT Discovery",
         description: "NFTNavigator is a Discovery and Analytics tool for NFTs. Complete tasks on NFTNavigator to earn points.",
         url: "https://nftnavigator.xyz",
         guide: "https://wind-bolt-806.notion.site/NFTNavigator-Voiage-to-MainNet-Quests-696da0ba04784f9e827354adc8ec84d1",
@@ -283,6 +296,7 @@ const projects = [
     {
         id: 4,
         title: "Nomadex",
+        type: "DEX",
         description: "Nomadex is a decentralized exchange. Complete tasks on Nomadex to earn points.",
         url: "https://voi.nomadex.app/swap/VOI-VIA/",
         guide: "https://actions-docs.nomadex.app/",
@@ -360,6 +374,7 @@ const projects = [
     {
         id: 6,
         title: "Humble",
+        type: "DEX",
         description: "Humble is a decentralized exchange platform. Complete tasks on Humble to earn points.",
         url: "https://voi.humble.sh/",
         guide: "https://sandy-griffin-b91.notion.site/Humble-Voi-Testnet-to-Mainnet-Quests-5e2b7a38af1143a88380ff002d7d0eac",
@@ -428,6 +443,7 @@ const projects = [
     {
         id: 7,
         title: "Treehouse",
+        type: "Tools",
         description: "Treehouse Toolbox provides a set of tools for performing various tasks on the Voi Network. Complete tasks on Treehouse to earn points.",
         url: "https://treehouse-tools.boeieruurd.com/",
         guide: "https://medium.com/@RachKoch/voiage-to-main-net-phase-2-1f8199c1de0e",
@@ -453,6 +469,7 @@ const projects = [
     {
         id: 8,
         title: "Highforge",
+        type: "NFT Minting Platform",
         description: "Highforge is an NFT minting platform. Complete tasks on Highforge to earn points.",
         url: "https://highforge.io/",
         guide: "https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d",
@@ -483,6 +500,7 @@ const projects = [
     {
         id: 9,
         title: "Arcpay",
+        type: "Payments",
         description: "Arcpay is a payment gateway. Complete tasks on Arcpay to earn points.",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCLkPtzkAF",
         status: 'active',
@@ -500,6 +518,7 @@ const projects = [
     {
         id: 10,
         title: "A-Wallet",
+        type: "Wallet",
         description: "A-Wallet is a wallet for the Voi Network. Complete tasks on A-Wallet to earn points.",
         url: "https://www.a-wallet.net/",
         guide: "https://rightful-wool-283.notion.site/AWallet-VOI-tasks-f4eb24d261f94072b89bdebbd04507d5",
@@ -520,6 +539,7 @@ const projects = [
     {
         id: 11,
         title: "Womp Crew",
+        type: "Social",
         description: "Engage with the Womp Crew Poker Party and Spread the word",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1Vntz2sh",
         status: "active",
@@ -537,6 +557,7 @@ const projects = [
     {
         id: 12,
         title: "Aramid",
+        type: "Bridge",
         description: "Aramid Finance Token Bridge",
         url: "https://www.aramid.finance/",
         guide: "https://rightful-wool-283.notion.site/Aramid-Finance-VOI-Tasks-4ddb5d02ec304936a111fba47d27f155",
@@ -569,6 +590,7 @@ const projects = [
     {
         id: 13,
         title: "Biatec Scheduler",
+        type: "Tools",
         description: "Biatec Scheduler is a decentralized scheduling platform. Complete tasks on Biatec Scheduler to earn points.",
         url: "https://www.biatec.io/",
         guide: "https://rightful-wool-283.notion.site/Biatec-Scheduler-VOI-Tasks-36685c4e1061455297429e38b9a84ebb",
@@ -612,6 +634,7 @@ const projects = [
     {
         id: 14,
         title: "AlgoLeagues",
+        type: "Discord Bot",
         description: "AlgoLeagues Discord Bot facilitates transferring, withdrawing, and tipping Voi assets in Discord servers.",
         guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/944ddd5dc496d47d7163a3399e4d64ebff32f003/README.md",
         twitter: "https://x.com/algoleagues",

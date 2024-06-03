@@ -125,6 +125,33 @@
         }
     }
 
+    async function getNautilusPoints() {
+        try {
+            const url = `https://quest.nautilus.sh/quest?key=${wallet}`;
+            const data = await fetch(url).then((response) => response.json());
+
+            if (data.message !== 'ok') {
+                console.error('Failed to fetch Nautilus points:', data.message);
+                return;
+            }
+
+            // for each quest, check if action is in completedActions
+            for (let i = 0; i < project.quests.length; i++) {
+                const quest = project.quests[i];
+                if (data.results.find((result: { key: string, value: string }) => result.key === quest.name+':'+wallet)) {
+                    quest.earned = 1;
+                }
+                else {
+                    quest.earned = 0;
+                }
+            }
+
+            loading = false;
+        } catch (error) {
+            console.error('Failed to fetch points:', error);
+        }
+    }
+
     async function getKibisisPoints() {
         // set all quest.earned to -1
         for (let i = 0; i < project.quests.length; i++) {
@@ -150,6 +177,9 @@
                 break;
             case 'AlgoLeagues':
                 getAlgoLeaguesPoints();
+                break;
+            case 'Nautilus':
+                getNautilusPoints();
                 break;
             default:
                 for (let i = 0; i < project.quests.length; i++) {
