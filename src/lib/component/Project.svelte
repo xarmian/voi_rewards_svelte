@@ -253,9 +253,22 @@
 <div class="md:hidden">
     {#each localProject.quests as quest, i}
         <div class="border-b border-gray-300 dark:border-gray-900">
-            <button class="w-full text-left p-4 bg-gray-100 dark:bg-gray-700" on:click={() => quest.isOpen = !quest.isOpen}>
-                <div class="font-semibold">{quest.title}</div>
-                <div class="text-xs">{quest.description}</div>
+            <button class="flex flex-row w-full text-left p-4 justify-between bg-gray-100 dark:bg-gray-700" on:click={() => quest.isOpen = !quest.isOpen}>
+                <div>
+                    <div class="font-semibold">{quest.title}</div>
+                    <div class="text-xs">{quest.description}</div>
+                </div>
+                <div>
+                    {#if quest.isOpen}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    {:else}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    {/if}
+                </div>
             </button>
             {#if quest.isOpen}
                 <div class="p-4 bg-white dark:bg-gray-800">
