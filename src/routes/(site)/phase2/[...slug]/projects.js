@@ -539,7 +539,7 @@ const projects = [
     {
         id: 11,
         title: "Womp Crew",
-        type: "Social",
+        type: "Gaming",
         description: "Engage with the Womp Crew Poker Party and Spread the word",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1Vntz2sh",
         status: "active",
