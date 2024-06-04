@@ -41,5 +41,17 @@
         </div>
     {/if}
     <br/>
+    <div class="flex justify-center space-x-4">
+        <div class="self-center">Need Testnet VOI?</div>
+        <a href="https://voiager.org/get-started" target="_blank" class="flex flex-col items-center py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
+            <i class="fas fa-faucet text-3xl"></i>
+            <div>$VOI Faucet</div>
+        </a>
+        <a href="https://faucet.nautilus.sh/?account={selectedWallet??''}" target="_blank" class="flex flex-col items-center py-2 px-4 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
+            <i class="fas fa-faucet text-3xl"></i>
+            <div>$VIA Faucet</div>
+        </a>
+    </div>
+    <br/>
     <QuestComponent walletId={selectedWallet} selectedTab={projectId} />
 </div>

@@ -1,6 +1,5 @@
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
-    console.log(url);
     const urlParams = url.searchParams;
 
     const project = urlParams.get('project');
