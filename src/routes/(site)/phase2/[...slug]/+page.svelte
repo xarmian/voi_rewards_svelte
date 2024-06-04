@@ -47,7 +47,7 @@
             <i class="fas fa-faucet text-3xl"></i>
             <div>$VOI Faucet</div>
         </a>
-        <a href="https://faucet.nautilus.sh/?account={selectedWallet??''}" target="_blank" class="flex flex-col items-center py-2 px-4 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
+        <a href="https://faucet.nautilus.sh{selectedWallet ? '?account='+selectedWallet : ''}" target="_blank" class="flex flex-col items-center py-2 px-4 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
             <i class="fas fa-faucet text-3xl"></i>
             <div>$VIA Faucet</div>
         </a>
