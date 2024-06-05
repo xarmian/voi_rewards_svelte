@@ -4,6 +4,7 @@
     import projects from '../phase2/[...slug]/projects';
     import { browser } from '$app/environment';
 	import { MetaTags } from 'svelte-meta-tags';
+    import type { MetaTagsProps } from 'svelte-meta-tags';
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
     const keep = ['Kibisis', 'Nomadex', 'Humble', 'Nautilus', 'NFT Navigator', 'High Forge'];
@@ -34,9 +35,41 @@
             });
         }
     });
+
 </script>
 
-<MetaTags title="Voi Testnet Quests" description="Start Questing on the Voi Testnet Network" />
+<MetaTags
+  title="Voi Testnet Quests"
+  titleTemplate="%s | Voi Rewards Auditor"
+  description="Get Your Quest On, with the Voi Testnet Network"
+  openGraph={{
+    url: 'Get Your Quest On, with the Voi Testnet Network',
+    title: 'Voi Testnet Quests',
+    description: 'Get Your Quest On, with the Voi Testnet Network',
+    images: [
+      {
+        url: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
+        width: 192,
+        height: 192,
+        alt: 'Voi Logo'
+      },
+      {
+        url: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
+        width: 512,
+        height: 512,
+        alt: 'Voi Logo'
+      },
+    ],
+    siteName: 'VoiTestnetQuests'
+  }}
+  twitter={{
+    cardType: 'summary_large_image',
+    title: 'Voi Testnet Quests',
+    description: 'Get Your Quest On, with the Voi Testnet Network',
+    image: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
+    imageAlt: 'Voi Logo'
+  }}
+/>
 <div class="h-screen flex flex-col justify-center items-center text-white" style="background-color: rgb(111,42,226)">
     <img src={VoiLogo} alt="Voi Logo" class="-mt-72 h-96 animate-pulse">
     <h1 class="text-6xl font-bold mb-8 -mt-36 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
