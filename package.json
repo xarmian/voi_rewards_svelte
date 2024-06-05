@@ -2,6 +2,9 @@
 	"name": "voi_rewards_auditor",
 	"version": "0.0.1",
 	"private": true,
+	"main": "dist/index.js",
+	"module": "dist/index.js",
+	"svelte": "dist/index.js",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -25,6 +28,7 @@
 		"postcss": "^8.4.30",
 		"prettier": "^2.8.0",
 		"prettier-plugin-svelte": "^2.10.1",
+		"saos": "^1.3.1",
 		"svelte": "^4.0.5",
 		"svelte-check": "^3.4.3",
 		"svelte-copy": "^1.4.1",

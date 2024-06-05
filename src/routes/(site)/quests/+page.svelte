@@ -3,8 +3,7 @@
     import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
     import projects from '../phase2/[...slug]/projects';
     import { browser } from '$app/environment';
-	import { MetaTags } from 'svelte-meta-tags';
-    import type { MetaTagsProps } from 'svelte-meta-tags';
+    import Saos from "saos";
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
     const keep = ['Kibisis', 'Nomadex', 'Humble', 'Nautilus', 'NFT Navigator', 'High Forge'];
@@ -38,38 +37,6 @@
 
 </script>
 
-<MetaTags
-  title="Voi Testnet Quests"
-  titleTemplate="%s | Voi Rewards Auditor"
-  description="Get Your Quest On, with the Voi Testnet Network"
-  openGraph={{
-    url: 'Get Your Quest On, with the Voi Testnet Network',
-    title: 'Voi Testnet Quests',
-    description: 'Get Your Quest On, with the Voi Testnet Network',
-    images: [
-      {
-        url: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
-        width: 192,
-        height: 192,
-        alt: 'Voi Logo'
-      },
-      {
-        url: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
-        width: 512,
-        height: 512,
-        alt: 'Voi Logo'
-      },
-    ],
-    siteName: 'VoiTestnetQuests'
-  }}
-  twitter={{
-    cardType: 'summary',
-    title: 'Voi Testnet Quests',
-    description: 'Get Your Quest On, with the Voi Testnet Network',
-    image: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
-    imageAlt: 'Voi Logo'
-  }}
-/>
 <div class="h-screen flex flex-col justify-center items-center text-white" style="background-color: rgb(111,42,226)">
     <img src={VoiLogo} alt="Voi Logo" class="-mt-72 h-96 animate-pulse">
     <h1 class="text-6xl font-bold mb-8 -mt-36 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
@@ -96,28 +63,32 @@
 
 {#each filteredProjects as project, i}
     <div class={`p-4 sm:p-20 text-white flex flex-row justify-between ${i % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500 flex-row-reverse'}`}>
-        <div class='flex flex-col max-w-screen-sm'>
-            <img src={project.logo} alt={project.title} class="w-52" />
-            <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
-            <p class="text-xl mb-8">{project.description}</p>
-        </div>
-        <div class={`flex flex-col justify-center space-y-4 ${i % 2 === 0 ? '' : 'mr-2'}`}>
-            {#if project.url}
-                <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
-            {/if}
-            {#if project.guide}
-                <a href={project.guide} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Project Quests</a>
-            {/if}
-            {#if project.galxe}
-                <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
-            {/if}
-            {#if project.twitter}
-                <a href={project.twitter} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">
-                    <i class="fab fa-twitter"></i>
-                    Twitter
-                </a>
-            {/if}
-        </div>
+        <Saos once={true} animation={`${i % 2 ? 'from-right' : 'from-left'} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+            <div class='flex flex-col max-w-screen-sm'>
+                <img src={project.logo} alt={project.title} class="w-52" />
+                <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
+                <p class="text-xl mb-8">{project.description}</p>
+            </div>
+        </Saos>
+        <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+            <div class={`flex flex-col justify-center space-y-4 ${i % 2 === 0 ? '' : 'mr-2'}`}>
+                {#if project.url}
+                    <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
+                {/if}
+                {#if project.guide}
+                    <a href={project.guide} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Project Quests</a>
+                {/if}
+                {#if project.galxe}
+                    <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
+                {/if}
+                {#if project.twitter}
+                    <a href={project.twitter} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">
+                        <i class="fab fa-twitter"></i>
+                        Twitter
+                    </a>
+                {/if}
+            </div>
+        </Saos>
     </div>
 {/each}
 <div class="p-4 sm:p-20 text-white flex flex-col justify-center items-center {filteredProjects.length % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500'}">
@@ -125,3 +96,34 @@
     <p class="text-xl mb-8">Check out the Phase 2 Quests page for more Projects, Quests, and Real-time Status Tracking.</p>
     <a href="/phase2" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Go to Phase 2 Quest Tracker</a>
 </div>
+
+<style>
+@keyframes -global-from-left {
+  0% {
+    transform: rotateX(50deg) translateX(-200vw) skewX(-50deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateX(0deg) translateX(0) skewX(0deg);
+    opacity: 1;
+  }
+}
+@keyframes -global-from-right {
+  0% {
+    transform: rotateX(50deg) translateX(200vw) skewX(50deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateX(0deg) translateX(0) skewX(0deg);
+    opacity: 1;
+  }
+}
+@keyframes -global-fadein {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+</style>
