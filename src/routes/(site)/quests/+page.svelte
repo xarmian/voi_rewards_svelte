@@ -63,7 +63,7 @@
     siteName: 'VoiTestnetQuests'
   }}
   twitter={{
-    cardType: 'summary_large_image',
+    cardType: 'summary',
     title: 'Voi Testnet Quests',
     description: 'Get Your Quest On, with the Voi Testnet Network',
     image: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
