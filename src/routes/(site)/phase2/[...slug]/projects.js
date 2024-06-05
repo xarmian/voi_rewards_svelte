@@ -46,12 +46,13 @@ const projects = [
         title: "Kibisis",
         type: "Wallet",
         category: "Wallets",
-        description: "Kibisis is a Voi Wallet. Complete tasks on Kibisis to earn points.",
+        description: "Get started with the Kibisis Browser Extension Wallet. Complete tasks on Kibisis to quest earn points.",
         url: "https://kibis.is",
         guide: "https://kibis.is/blog/the-voiage-to-mainnet",
         twitter: "https://x.com/kibisis_wallet",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1btzeG8",
         status: 'active',
+        logo: '/logos/kibisis.png',
         quests: [
             {
                 id: 1,
@@ -86,13 +87,14 @@ const projects = [
         title: "Nautilus",
         type: "NFT Marketplace",
         category: "NFTs",
-        description: "Nautilus is an NFT token marketplace. Complete tasks on Nautilus to earn points.",
+        description: "Complete tasks in the Nautilus NFT Marketplace to earn quest points.",
         url: "https://nautilus.sh",
         guide: "https://confused-timbale-d13.notion.site/Nautilus-Voiage-to-MainNet-Quests-0147e70e5fc24467ac0bdab6761c08e3",
         twitter: "https://x.com/NautilusNFTs",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCcBPtzd7E",
         status: "active",
         realtime: true,
+        logo: '/logos/nautilus.png',
         quests: [
             {
                 id: 1,
@@ -224,6 +226,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1sHtz1VC",
         status: 'active',
         realtime: true,
+        logo: 'logos/nftnavigator.png',
         quests: [
             {
                 id: 1,
@@ -295,13 +298,14 @@ const projects = [
         title: "Nomadex",
         type: "DEX",
         category: "DEXes",
-        description: "Nomadex is a decentralized exchange. Complete tasks on Nomadex to earn points.",
+        description: "Nomadex is a decentralized exchange on Voi. Complete tasks on Nomadex to earn quest points.",
         url: "https://voi.nomadex.app/swap/VOI-VIA/",
         guide: "https://actions-docs.nomadex.app/",
         twitter: "https://x.com/nomadex_app",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
         status: 'active',
         realtime: true,
+        logo: 'logos/nomadex.png',
         quests: [   
             {
                 id: 1,
@@ -381,6 +385,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCezbtz9PD",
         status: "active",
         realtime: true,
+        logo: 'logos/humble.svg',
         quests: [
             {
                 id: 1,
@@ -491,7 +496,7 @@ const projects = [
     },
     {
         id: 8,
-        title: "Highforge",
+        title: "High Forge",
         type: "NFT Minting",
         category: "NFTs",
         description: "Highforge is an NFT minting platform. Complete tasks on Highforge to earn points.",
@@ -500,6 +505,7 @@ const projects = [
         twitter: "https://x.com/highforgeio",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCAZPtzxsy",
         status: 'active',
+        logo: 'logos/highforge.png',
         quests: [
             {
                 id: 1,

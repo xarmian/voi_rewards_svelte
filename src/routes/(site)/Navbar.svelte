@@ -16,7 +16,7 @@
   <NavUl>
     <NavLi class="text-xl" href="/"><div class:selected={activeLink === '/'} on:click={() => activeLink = '/'} transition:fly={{y: 50, duration: 400}}>Home</div></NavLi>
     <NavLi class="text-xl" href="/what_is_voi"><div class:selected={activeLink === '/what_is_voi'} on:click={() => activeLink = '/what_is_voi'} transition:fly={{ y: 50, duration: 400 }}>What is Voi?</div></NavLi>
-    <NavLi class="text-xl" href="/how_to_node"><div class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'} transition:fly={{ y: 50, duration: 400 }}>How to Node?</div></NavLi>
+    <NavLi class="text-xl" href="/how_to_node"><div class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'} transition:fly={{ y: 50, duration: 400 }}>Run a Node</div></NavLi>
     <NavLi class="text-xl" href="/phase1"><div class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'} transition:fly={{ y: 50, duration: 400 }}>Phase 1</div></NavLi>
     <NavLi class="text-xl" href="/phase2"><div class:selected={activeLink === '/phase2'} on:click={() => activeLink = '/phase2'} transition:fly={{ y: 50, duration: 400 }}>Phase 2</div></NavLi>
     <NavLi class="text-xl" href="/about"><div class:selected={activeLink === '/about'} on:click={() => activeLink = '/about'} transition:fly={{ y: 50, duration: 400 }}>About</div></NavLi>
