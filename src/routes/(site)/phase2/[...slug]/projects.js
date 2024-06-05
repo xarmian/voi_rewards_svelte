@@ -123,22 +123,6 @@ const projects = [
             },
             {
                 id: 4,
-                name: "swap_list_once",
-                title: "M-Swap Quest: List MechaSwap (NFT Swap)",
-                description: "M-Swap Quest: List MechaSwap (NFT Swap)",
-                status: null,
-                reward: 1,
-            },
-            {
-                id: 5,
-                name: "swap_execute_once",
-                title: "M-Swap Quest: Execute MechaSwap (NFT Swap)",
-                description: "M-Swap Quest: Execute MechaSwap (NFT Swap)",
-                status: null,
-                reward: 1,
-            },
-            {
-                id: 6,
                 name: "timed_sale_list_1minute",
                 title: "Timed Quest: List NFT 1 minute after mint on High Forge",
                 description: "Timed Quest: List NFT 1 minute after mint on High Forge",
@@ -146,7 +130,7 @@ const projects = [
                 reward: 1,
             },
             {
-                id: 7,
+                id: 5,
                 name: "timed_sale_list_15minutes",
                 title: "Timed Quest: List NFT 15 minutes after listing on High Forge",
                 description: "Timed Quest: List NFT 15 minutes after listing on High Forge",
@@ -154,12 +138,21 @@ const projects = [
                 reward: 1,
             },
             {
-                id: 8,
+                id: 6,
                 name: "timed_sale_list_1hour",
                 title: "Timed Quest: List NFT 1 hour after mint on High Forge",
                 description: "Timed Quest: List NFT 1 hour after mint on High Forge",
                 status: null,
                 reward: 1,
+            },
+            {
+                id: 7,
+                name: "faucet_drip_once",
+                title: "Faucet Quest: Drip Faucet",
+                description: "Collect 1000 VIA from the Nautilus Faucet",
+                status: null,
+                reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/Faucet-Quest-Faucet-Quest-Drip-1000-VIA-from-faucet-9f479e6a507a49b48f0d25487e3f3540",
             },
             /*{
                 id: 9,
@@ -387,9 +380,11 @@ const projects = [
         twitter: "https://x.com/HumbleDefi",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCezbtz9PD",
         status: "active",
+        realtime: true,
         quests: [
             {
                 id: 1,
+                name: 'connect_wallet',
                 title: "Connect your wallet to Humble",
                 description: "Connect your wallet to Humble",
                 status: null,
@@ -398,6 +393,7 @@ const projects = [
             },
             {
                 id: 2,
+                name: "hmbl_pool_swap",
                 title: "Make your first Swap",
                 description: "Make your first Swap",
                 status: null,
@@ -406,6 +402,7 @@ const projects = [
             },
             {
                 id: 3,
+                name: "hmbl_pool_add",
                 title: "Add Liquidity",
                 description: "Add Liquidity",
                 status: null,
@@ -414,6 +411,7 @@ const projects = [
             },
             {
                 id: 4,
+                name: "hmbl_token_create",
                 title: "Create a Token",
                 description: "Create a Token",
                 status: null,
@@ -422,6 +420,32 @@ const projects = [
             },
             {
                 id: 5,
+                name: "hmbl_pool_create",
+                title: "Create a Pool",
+                description: "Create a Liquidity Pool on Humble Swap",
+                status: null,
+                reward: 1,            },
+            {
+                id: 6,
+                title: "Stake in a Farm",
+                name: "hmbl_farm_stake",
+                description: "Stake tokens in a Humble Farm",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-6-Joining-a-Farm-claiming-rewards-5bde5cdf15c0477fbde40c3e3ce57151",
+            },
+            {
+                id: 7,
+                name: "hmbl_farm_claim",
+                title: "Claim farm rewards",
+                description: "Claim rewards from a Humble Farm",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-6-Joining-a-Farm-claiming-rewards-5bde5cdf15c0477fbde40c3e3ce57151",
+            },
+            {
+                id: 8,
+                name: "hmbl_farm_create",
                 title: "Create a Farm",
                 description: "Create a Farm",
                 status: null,
@@ -429,15 +453,7 @@ const projects = [
                 guide: "https://sandy-griffin-b91.notion.site/Quest-5-Create-a-Farm-f9eb01f0450340ab9ac9904c1ed0239f",
             },
             {
-                id: 6,
-                title: "Joining a Farm & claiming rewards",
-                description: "Joining a Farm & claiming rewards",
-                status: null,
-                reward: 1,
-                guide: "https://sandy-griffin-b91.notion.site/Quest-6-Joining-a-Farm-claiming-rewards-5bde5cdf15c0477fbde40c3e3ce57151",
-            },
-            {
-                id: 7,
+                id: 9,
                 title: "Connect with Humble Socials",
                 description: "Connect with Humble Socials",
                 status: null,
@@ -712,6 +728,34 @@ const projects = [
                 reward: 1,
             },
         ]
-    }
+    },
+    {
+        id: 15,
+        title: "MechaSwap",
+        type: "Tools",
+        category: "Tools",
+        description: "MechaSwap is a trustless NFT swap platform. Complete tasks on MechaSwap to earn points.",
+        url: "https://mechaswap.nautilus.sh",
+        status: "active",
+        realtime: true,
+        quests: [
+            {
+                id: 4,
+                name: "swap_list_once",
+                title: "M-Swap Quest: List MechaSwap (NFT Swap)",
+                description: "M-Swap Quest: List MechaSwap (NFT Swap)",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 5,
+                name: "swap_execute_once",
+                title: "M-Swap Quest: Execute MechaSwap (NFT Swap)",
+                description: "M-Swap Quest: Execute MechaSwap (NFT Swap)",
+                status: null,
+                reward: 1,
+            },
+        ]
+    },
 ];
 export default projects;
