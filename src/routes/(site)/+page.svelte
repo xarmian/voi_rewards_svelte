@@ -8,7 +8,7 @@
     onMount(async () => {
         const url = window.location.href;
 
-        if (url.includes('quests')) {
+        if (url.includes('quests.voirewards.com')) {
             page = 'quests';
         }
         else {
