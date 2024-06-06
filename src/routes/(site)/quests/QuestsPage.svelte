@@ -6,8 +6,21 @@
     import Saos from "saos";
     //@ts-ignore
     import Device from 'svelte-device-info';
+	import ProjectModal from './ProjectModal.svelte';
 
     let isMobile = false;
+    let selectedProjectId: number | null = null;
+
+    $: if (selectedProjectId || selectedProjectId == null) {
+        if (document) {
+            if (selectedProjectId) {
+                document.body.style.overflow = 'hidden';
+            }
+            else {
+                document.body.style.overflow = 'auto';
+            }
+        }
+    }
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
     const keep = ['Kibisis', 'Nomadex', 'Humble', 'Nautilus', 'NFT Navigator', 'High Forge'];
@@ -87,7 +100,7 @@
                 {#if project.url}
                     <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
                 {/if}
-                <a href={`/quests/${project.id}`} class="bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
+                <a on:click|stopPropagation={() => selectedProjectId = project.id} class="cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                 {#if project.galxe}
                     <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
                 {/if}
@@ -106,6 +119,15 @@
     <p class="text-xl mb-8">Check out our Phase 2 Quest Tracker for more Projects, Quests, and Real-time Status Tracking.</p>
     <a href="/phase2" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Go to Phase 2 Quest Tracker</a>
 </div>
+
+{#if selectedProjectId}
+  <div class="h-screen modal" on:click={() => selectedProjectId = null} on:click|stopPropagation>
+    <div class="relative h-screen max-w-4xl overflow-auto bg-white dark:bg-gray-800 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
+    <ProjectModal projectId={selectedProjectId} />
+        <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => selectedProjectId = null}>X</button>
+    </div>
+  </div>
+{/if}
 
 <style>
 @keyframes -global-from-left {
@@ -136,4 +158,22 @@
     opacity: 1;
   }
 }
+.modal {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .modal-content {
+    height: 100%;
+    transform: translateX(100%);
+    transition: transform 2s ease-in-out;
+  }
+
+  .modal-content.show {
+    transform: translateX(0);
+  }
 </style>
