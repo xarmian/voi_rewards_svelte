@@ -46,7 +46,7 @@ const projects = [
         title: "Kibisis",
         type: "Wallet",
         category: "Wallets",
-        description: "Get started with the Kibisis Browser Extension Wallet. Complete tasks on Kibisis to quest earn points.",
+        description: "Get started with the Kibisis Browser Extension Wallet. Complete tasks on Kibisis to earn quest points.",
         url: "https://kibis.is",
         guide: "https://kibis.is/blog/the-voiage-to-mainnet",
         twitter: "https://x.com/kibisis_wallet",
