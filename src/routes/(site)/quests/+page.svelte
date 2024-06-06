@@ -1,4 +1,4 @@
 <script lang="ts">
-    import Quests from "./Quests.svelte";
+    import Quests from "./QuestsPage.svelte";
 </script>
 <Quests />

@@ -1,6 +1,6 @@
 <script lang="ts">
     import Dashboard from './Dashboard.svelte';
-    import Quests from './quests/Quests.svelte';
+    import Quests from './quests/QuestsPage.svelte';
     import { onMount } from 'svelte';
 
     let page: null | string = null;
