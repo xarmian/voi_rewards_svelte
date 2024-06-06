@@ -124,7 +124,7 @@
 
 {#if selectedProjectId}
   <div class="h-screen modal" on:click={() => selectedProjectId = null} on:click|stopPropagation transition:fly={{ delay: 0, duration: 300, x: '100%', y: 0, opacity: 0.5, easing: quintOut }}>
-    <div class="relative h-screen max-w-4xl overflow-auto bg-purple-200 dark:bg-purple-900 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
+    <div class="relative h-screen max-w-4xl overflow-auto bg-purple-200 dark:bg-purple-950 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
     <ProjectModal projectId={selectedProjectId} />
         <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => selectedProjectId = null}>X</button>
     </div>
