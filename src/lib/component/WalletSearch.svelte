@@ -108,7 +108,7 @@
             }
             return;
         }
-        else if (storeAddress) {
+        else if (storeAddress && addr) {
             localStorage.setItem('searchText', addr);
         }
 
