@@ -21,7 +21,7 @@
     import Device from 'svelte-device-info';
 	import { get } from 'svelte/store';
 
-	let searchText = '';
+	export let searchText = '';
 	/**
 	 * @type {string | any[]}
 	 */

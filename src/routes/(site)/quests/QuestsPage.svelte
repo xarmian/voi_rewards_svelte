@@ -87,9 +87,7 @@
                 {#if project.url}
                     <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
                 {/if}
-                {#if project.guide}
-                    <a href={project.guide} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Project Quests</a>
-                {/if}
+                <a href={`/quests/${project.id}`} class="bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                 {#if project.galxe}
                     <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
                 {/if}
