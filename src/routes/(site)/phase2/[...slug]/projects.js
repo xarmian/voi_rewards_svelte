@@ -157,7 +157,7 @@ const projects = [
                 guide: "https://confused-timbale-d13.notion.site/Faucet-Quest-Faucet-Quest-Drip-1000-VIA-from-faucet-9f479e6a507a49b48f0d25487e3f3540",
             },
             {
-                id: 7,
+                id: 8,
                 name: "connect_socials",
                 title: "Social Quest: Connect with Nautilus Socials",
                 description: "Connect with Nautilus Socials",
