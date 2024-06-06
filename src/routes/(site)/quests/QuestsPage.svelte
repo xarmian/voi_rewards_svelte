@@ -99,10 +99,10 @@
         </div>
         <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
             <div class={`flex flex-col justify-center space-y-4 ${i % 2 === 0 ? '' : 'mr-2'}`}>
+                <a on:click|stopPropagation={() => selectedProjectId = project.id} class="cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                 {#if project.url}
                     <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
                 {/if}
-                <a on:click|stopPropagation={() => selectedProjectId = project.id} class="cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                 {#if project.galxe}
                     <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
                 {/if}
@@ -124,7 +124,7 @@
 
 {#if selectedProjectId}
   <div class="h-screen modal" on:click={() => selectedProjectId = null} on:click|stopPropagation transition:fly={{ delay: 0, duration: 300, x: '100%', y: 0, opacity: 0.5, easing: quintOut }}>
-    <div class="relative h-screen max-w-4xl overflow-auto bg-white dark:bg-gray-800 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
+    <div class="relative h-screen max-w-4xl overflow-auto bg-purple-200 dark:bg-purple-900 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
     <ProjectModal projectId={selectedProjectId} />
         <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => selectedProjectId = null}>X</button>
     </div>
