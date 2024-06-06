@@ -31,6 +31,7 @@
     let componentElement: any;
     export let onSubmit: (addr: string) => void;
     export let loadPreviousValue: boolean = true;
+    export let storeAddress: boolean = false;
     $: isMobile = false;
 
 
@@ -106,6 +107,9 @@
                 toast.push('Please select an address');
             }
             return;
+        }
+        else if (storeAddress) {
+            localStorage.setItem('searchText', addr);
         }
 
         onSubmit(addr??searchText);
