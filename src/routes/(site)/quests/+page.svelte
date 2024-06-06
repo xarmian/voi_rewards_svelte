@@ -63,14 +63,14 @@
 
 {#each filteredProjects as project, i}
     <div class={`p-4 sm:p-20 text-white flex flex-row justify-between ${i % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500 flex-row-reverse'}`}>
-        <Saos once={true} animation={`${i % 2 ? 'from-right' : 'from-left'} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+        <Saos once={true} animation={`${i % 2 ? 'sm:from-right' : 'sm:from-left'} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
             <div class='flex flex-col max-w-screen-sm'>
                 <img src={project.logo} alt={project.title} class="w-52" />
                 <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
                 <p class="text-xl mb-8">{project.description}</p>
             </div>
         </Saos>
-        <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+        <Saos once={true} animation={`sm:fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
             <div class={`flex flex-col justify-center space-y-4 ${i % 2 === 0 ? '' : 'mr-2'}`}>
                 {#if project.url}
                     <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
