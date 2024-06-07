@@ -62,6 +62,15 @@
 
 	// Function to handle text input changes
 	function handleInput() {
+        // if searchText is empty, clear addressList and localStorage
+        if (searchText.length == 0) {
+            addressList = [];
+            localStorage.removeItem('searchText');
+            selectedAddressIndex = -1;
+            onSubmit('');
+            return;
+        }
+
 		// Implement logic to search NFDomain and update addressList
         const storedSearchText = localStorage.getItem('searchText');
 
@@ -108,8 +117,8 @@
             }
             return;
         }
-        else if (storeAddress && addr) {
-            localStorage.setItem('searchText', addr);
+        else if (storeAddress) {
+            localStorage.setItem('searchText', addr ?? '');
         }
 
         onSubmit(addr??searchText);
@@ -169,7 +178,7 @@
         </button>
     </div>
 
-    {#if addressList.length > 0}
+    {#if addressList.length > 0 && searchText.length > 0}
     <div class="absolute z-50 mt-2 w-full">
         <div class="bg-white dark:bg-gray-800 overflow-hidden max-h-64 rounded-lg shadow-lg">
             <ul class="inline-block text-left">
