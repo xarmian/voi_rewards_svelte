@@ -307,53 +307,63 @@
         </div>
     </div>
 </div>
-<div class="flex flex-wrap justify-around bg-purple-950 p-4">
-    {#each localProject.quests as quest, i}
-        <div class="w-full sm:w-1/2 md:w-1/3 bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg m-4 flex flex-col justify-between">
-            <div class="px-6 py-4">
-                <div class="font-bold text-xl mb-2">{quest.title}</div>
-                {#if quest.title !== quest.description}
-                    <p class="text-gray-700 dark:text-gray-100 text-base">{quest.description}</p>
-                {/if}
-            </div>
-            <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
-                <div>
-                    <span class="text-gray-600 dark:text-gray-200 text-sm">Frequency:</span>
-                    <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
-                </div>
-                {#if quest.guide}
-                    <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
-                        View Guide
-                    </a>
-                {/if}
-            </div>
-            <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
-                {#if !project.realtime || quest.earned == -1}
-                    <div class="text-xs text-red-500 flex flex-row">
-                        Status unavailable
-                        <InfoButton noAbsolute={true}>
-                            <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
-                        </InfoButton>
-                    </div>
-                {:else if !wallet}
-                    <div class="text-xs text-red-500">Enter Wallet to View Status</div>
-                {:else if loading}
-                    <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
-                {:else if quest.earned}
-                    <div class="flex items-center space-x-2">
-                        <i class="fas fa-check text-green-500 text-3xl"></i>
-                        <span>Completed</span>
-                    </div>
-                    {#if quest.frequency ?? 'Once' != 'Once'}
-                        <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
-                    {/if}
-                {:else}
-                    <div class="flex items-center space-x-2">
-                        <i class="fas fa-times text-red-500 text-3xl"></i>
-                        <span>Incomplete</span>
-                    </div>
-                {/if}
-            </div>
+<div class="flex flex-col justify-center">
+    <a href={project.url} target="_blank" class="place-self-center h-24 flex flex-col justify-center content-center place-items-centerinline-block bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg mt-4 hover:bg-purple-700">
+        <span class="mr-2 self-center">
+            <i class="fas fa-external-link-alt"></i>
+        </span>
+        <div>
+            Go to {project.title}
         </div>
-    {/each}
+    </a>
+    <div class="flex flex-wrap justify-around bg-purple-950 p-4">
+        {#each localProject.quests as quest, i}
+            <div class="w-full sm:w-1/2 md:w-1/3 bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg m-4 flex flex-col justify-between">
+                <div class="px-6 py-4">
+                    <div class="font-bold text-xl mb-2">{quest.title}</div>
+                    {#if quest.title !== quest.description}
+                        <p class="text-gray-700 dark:text-gray-100 text-base">{quest.description}</p>
+                    {/if}
+                </div>
+                <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
+                    <div>
+                        <span class="text-gray-600 dark:text-gray-200 text-sm">Frequency:</span>
+                        <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
+                    </div>
+                    {#if quest.guide}
+                        <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
+                            View Guide
+                        </a>
+                    {/if}
+                </div>
+                <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
+                    {#if !project.realtime || quest.earned == -1}
+                        <div class="text-xs text-red-500 flex flex-row">
+                            Status unavailable
+                            <InfoButton noAbsolute={true}>
+                                <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
+                            </InfoButton>
+                        </div>
+                    {:else if !wallet}
+                        <div class="text-xs text-red-500">Enter Wallet to View Status</div>
+                    {:else if loading}
+                        <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
+                    {:else if quest.earned}
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-check text-green-500 text-3xl"></i>
+                            <span>Completed</span>
+                        </div>
+                        {#if quest.frequency ?? 'Once' != 'Once'}
+                            <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
+                        {/if}
+                    {:else}
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-times text-red-500 text-3xl"></i>
+                            <span>Incomplete</span>
+                        </div>
+                    {/if}
+                </div>
+            </div>
+        {/each}
+    </div>
 </div>
