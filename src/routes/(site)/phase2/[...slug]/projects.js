@@ -32,6 +32,7 @@ const projects = [
             },
             {
                 id: 3,
+                name: "run_a_node",
                 title: "Network Infrastructure",
                 description: "Run a participation node on the Voi Network",
                 status: null,
@@ -53,6 +54,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1btzeG8",
         status: 'active',
         logo: '/logos/kibisis.png',
+        realtime: true,
         quests: [
             {
                 id: 1,
@@ -64,6 +66,7 @@ const projects = [
             },
             {
                 id: 2,
+                name: "send-native-currency-action",
                 title: "Send $VOI to a Friend",
                 description: "Send $VOI to another wallet using Kibisis",
                 status: null,
@@ -73,8 +76,9 @@ const projects = [
             },
             {
                 id: 3,
+                name: "send-arc0200-asset-action",
                 title: "Send $VIA to a Friend",
-                description: "Send $VIA, a Smart Contract Asset, to another wallet using Kibisis",
+                description: "Send $VIA, a Smart Contract Asset, to another address using Kibisis",
                 status: null,
                 reward: 1,
                 guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCHmctzaUF",
@@ -158,7 +162,6 @@ const projects = [
             },
             {
                 id: 8,
-                name: "connect_socials",
                 title: "Social Quest: Connect with Nautilus Socials",
                 description: "Connect with Nautilus Socials",
                 status: null,

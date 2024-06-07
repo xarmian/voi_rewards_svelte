@@ -209,11 +209,30 @@
     }
 
     async function getKibisisPoints() {
-        // set all quest.earned to -1
-        for (let i = 0; i < project.quests.length; i++) {
-            project.quests[i].earned = -1;
+        try {
+            const url = `https://api.kibis.is/quests/daily?account=${wallet}`;
+            const data = await fetch(url).then((response) => response.json());
+
+            if (data.account !== wallet) {
+                console.error('Failed to fetch Kibisis points:', data);
+                return;
+            }
+
+            // for each quest, check if action is in completedActions
+            for (let i = 0; i < project.quests.length; i++) {
+                const quest = project.quests[i];
+                if (data.quests.find((result: { id: string, completed: number }) => result.id === quest.name && result.completed === 1)) {
+                    quest.earned = 1;
+                }
+                else {
+                    quest.earned = 0;
+                }
+            }
+
+            loading = false;
+        } catch (error) {
+            console.error('Failed to fetch points:', error);
         }
-        loading = false;
     }
 
     $: if (wallet) {
@@ -337,7 +356,7 @@
                     {/if}
                 </div>
                 <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
-                    {#if !project.realtime || quest.earned == -1}
+                    {#if !project.realtime || quest.earned == -1 || !quest.name}
                         <div class="text-xs text-red-500 flex flex-row">
                             Status unavailable
                             <InfoButton noAbsolute={true}>

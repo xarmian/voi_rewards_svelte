@@ -32,6 +32,7 @@
     export let onSubmit: (addr: string) => void;
     export let loadPreviousValue: boolean = true;
     export let storeAddress: boolean = false;
+    export let clearOnSubmit: boolean = false;
     $: isMobile = false;
 
 
@@ -62,15 +63,6 @@
 
 	// Function to handle text input changes
 	function handleInput() {
-        // if searchText is empty, clear addressList and localStorage
-        if (searchText.length == 0) {
-            addressList = [];
-            localStorage.removeItem('searchText');
-            selectedAddressIndex = -1;
-            onSubmit('');
-            return;
-        }
-
 		// Implement logic to search NFDomain and update addressList
         const storedSearchText = localStorage.getItem('searchText');
 
@@ -100,6 +92,7 @@
             localStorage.setItem('searchText', searchText);
         }*/
         
+        console.log(searchText);
         if (searchText && searchText.length > 0) {
             localStorage.setItem('searchText', searchText);
         }
@@ -117,12 +110,15 @@
             }
             return;
         }
-        else if (storeAddress) {
-            localStorage.setItem('searchText', addr ?? '');
+        else if (storeAddress && addr) {
+            localStorage.setItem('searchText', addr);
         }
 
         onSubmit(addr??searchText);
         addressList = [];
+        if (clearOnSubmit) {
+            searchText = '';
+        }
 	}
 
     function handleClickOutside(event: MouseEvent) {
@@ -157,18 +153,37 @@
     function init(el: any) {
         el.focus();
     }
+
+    function clearSearchText() {
+        searchText = '';
+        addressList = [];
+        localStorage.removeItem('searchText');
+        selectedAddressIndex = -1;
+        onSubmit('');
+        return;
+    }
 </script>
 
 <div class="mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl relative" bind:this={componentElement}>
-    <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg shadow">
+    <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg shadow relative">
         <input
             type="text"
             use:init
             bind:value={searchText}
             on:input={(event) => handleInput()}
-            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2"
+            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2 pr-8"
             placeholder="Select wallet by Address or NFD"
         />
+        {#if searchText}
+            <button
+                class="absolute inset-y-0 right-14 pl-2 pr-4 flex items-center cursor-pointer"
+                on:click={clearSearchText}
+            >
+                <svg class="h-6 w-6 text-gray-500 dark:text-gray-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        {/if}
         <button on:click={() => handleSubmit(undefined)} class="dark:bg-blue-500 bg-blue-300 p-2 rounded-r-lg">
         {#if !isMobile}
             Submit

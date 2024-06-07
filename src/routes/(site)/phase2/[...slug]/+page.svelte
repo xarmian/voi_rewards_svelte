@@ -27,7 +27,7 @@
     <br/>
     <p class="text-center">Enter a wallet address to see your Voi TestNet Phase #2 Quest Progress</p>
     <div class="text-center">
-        <WalletSearch onSubmit={(addr) => goto(`/phase2/${addr}`)} loadPreviousValue={false} />
+        <WalletSearch onSubmit={(addr) => goto(`/phase2/${addr}`)} loadPreviousValue={false} clearOnSubmit={true} />
     </div>
     {#if selectedWallet}
         <br/>
