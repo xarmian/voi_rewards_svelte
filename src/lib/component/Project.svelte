@@ -271,158 +271,89 @@
         return result;
     }
 </script>
-<div class="flex flex-col md:flex-row md:justify-between p-2 md:p-0">
-    <h2 class="text-2xl font-bold mb-4 mt-4 flex flex-col">
-        {#if project.url}
-            <a class="text-blue-500 hover:text-blue-400 underline cursor-pointer" target="_blank" href={project.url}>
-                {project.title}
-            </a>
-        {:else}
-            {project.title}
-        {/if}
-        <p class="text-gray-600 dark:text-gray-200 text-sm">{project.description}</p>
-        {#if !project.realtime}
-            <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
-        {/if}
-    </h2>
-    <div class="flex flex-row md:self-end md:place-items-end mb-2 space-x-4">
-        {#if project.guide}
-        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.guide}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            <span class="text-lg text-blue-500 hover:text-blue-400 underline">Project Quest Guide</span>
-        </a>
-        {/if}
-        {#if project.galxe}
-        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.galxe}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                </svg>
-                <span class="text-lg text-blue-500 hover:text-blue-400 underline">Galxe Guide</span>
-            </a>
-        {/if}
-        {#if project.twitter}
-        <a class="flex items-center space-x-1 text-green-500 hover:text-green-400 cursor-pointer shadow-md rounded-lg bg-gray-100 dark:bg-transparent md:shadow-none md:bg-transparent transform transition duration-500 ease-in-out hover:scale-105" target="_blank" href={project.twitter}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                </svg>
-                <span class="text-lg text-blue-500 hover:text-blue-400 underline">Project Twitter</span>
-            </a>
-        {/if}
+<div class="bg-purple-950 text-white p-4 rounded-lg shadow-lg">
+    <div class="flex flex-col md:flex-row md:items-center justify-between">
+        <div class="mb-4 md:mb-0">
+            <h2 class="text-3xl font-bold">
+                {#if project.url}
+                    <a class="text-blue-300 hover:text-blue-200 underline cursor-pointer" target="_blank" href={project.url}>
+                        {project.title}
+                    </a>
+                {:else}
+                    {project.title}
+                {/if}
+            </h2>
+            <p class="text-gray-300 text-sm">{project.description}</p>
+            {#if !project.realtime}
+                <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
+            {/if}
+        </div>
+        <div class="flex flex-row space-x-4">
+            {#if project.guide}
+                <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.guide}>
+                    <span class="text-lg underline">Project Quest Guide</span>
+                </a>
+            {/if}
+            {#if project.galxe}
+                <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.galxe}>
+                    <span class="text-lg underline">Galxe Guide</span>
+                </a>
+            {/if}
+            {#if project.twitter}
+                <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.twitter}>
+                    <span class="text-lg underline">Project Twitter</span>
+                </a>
+            {/if}
+        </div>
     </div>
 </div>
-<div class="md:hidden">
+<div class="flex flex-wrap justify-around bg-purple-950 p-4">
     {#each localProject.quests as quest, i}
-        <div class="border-b border-gray-300 dark:border-gray-900">
-            <button class="flex flex-row w-full text-left p-4 justify-between bg-gray-100 dark:bg-gray-700" on:click={() => quest.isOpen = !quest.isOpen}>
+        <div class="w-full sm:w-1/2 md:w-1/3 bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg m-4 flex flex-col justify-between">
+            <div class="px-6 py-4">
+                <div class="font-bold text-xl mb-2">{quest.title}</div>
+                {#if quest.title !== quest.description}
+                    <p class="text-gray-700 dark:text-gray-100 text-base">{quest.description}</p>
+                {/if}
+            </div>
+            <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
                 <div>
-                    <div class="font-semibold">{quest.title}</div>
-                    <div class="text-xs">{quest.description}</div>
+                    <span class="text-gray-600 dark:text-gray-200 text-sm">Frequency:</span>
+                    <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
                 </div>
-                <div>
-                    {#if quest.isOpen}
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    {:else}
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
+                {#if quest.guide}
+                    <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
+                        View Guide
+                    </a>
+                {/if}
+            </div>
+            <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
+                {#if !project.realtime || quest.earned == -1}
+                    <div class="text-xs text-red-500 flex flex-row">
+                        Status unavailable
+                        <InfoButton noAbsolute={true}>
+                            <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
+                        </InfoButton>
+                    </div>
+                {:else if !wallet}
+                    <div class="text-xs text-red-500">Enter Wallet to View Status</div>
+                {:else if loading}
+                    <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
+                {:else if quest.earned}
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-check text-green-500 text-3xl"></i>
+                        <span>Completed</span>
+                    </div>
+                    {#if quest.frequency ?? 'Once' != 'Once'}
+                        <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
                     {/if}
-                </div>
-            </button>
-            {#if quest.isOpen}
-                <div class="p-4 bg-white dark:bg-gray-800">
-                    <div><strong>Guide:</strong> 
-                        {#if !quest.guide}
-                            N/A
-                        {:else}
-                            <a class="text-blue-500 hover:text-blue-400 cursor-pointer" target="_blank" href={quest.guide}>
-                                View Guide
-                            </a>
-                        {/if}
+                {:else}
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-times text-red-500 text-3xl"></i>
+                        <span>Incomplete</span>
                     </div>
-                    <div><strong>Frequency:</strong> {quest.frequency ?? 'Once'}</div>
-                    <div><strong>Completed?</strong> 
-                        {#if !project.realtime || quest.earned == -1}
-                            <div class="text-xs text-red-500 flex flex-row">
-                                Real-time tracking unavailable
-                                <InfoButton noAbsolute={true}>
-                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
-                                </InfoButton>
-                            </div>
-                        {:else if !wallet}
-                            <div class="text-xs text-red-500">Enter Wallet to View Status</div>
-                        {:else if loading}
-                            <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
-                        {:else if quest.earned}
-                            <i class="fas fa-check text-green-500 text-3xl"></i>
-                            {#if quest.frequency ?? 'Once' != 'Once'}
-                                <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
-                            {/if}
-                        {:else}
-                            <i class="fas fa-times text-red-500 text-3xl"></i>
-                        {/if}
-                    </div>
-                </div>
-            {/if}
+                {/if}
+            </div>
         </div>
     {/each}
 </div>
-<div class="hidden md:block">
-    <table class="w-full whitespace-no-wrap">
-        <thead>
-            <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 dark:text-gray-100 uppercase border-b bg-gray-50 dark:bg-gray-700">
-                <th class="px-4 py-3 align-top">Quest</th>
-                <th class="px-4 py-3 align-top">Description</th>
-                <th class="px-4 py-3 align-top">Guide</th>
-                <th class="px-4 py-3 align-top">Frequency</th>
-                <th class="px-4 py-3 align-top">Completed?</th>
-            </tr>
-        </thead>
-        <tbody class="bg-white dark:bg-gray-700 divide-y text-left">
-            {#each localProject.quests as quest, i}
-                <tr class="text-gray-700 dark:text-gray-100">
-                    <td class="px-4 py-3">#{quest.id}</td>
-                    <td class="px-4 py-3">
-                        <div class="font-semibold">{quest.title}</div>
-                        <div class="text-xs">{quest.description}</div>
-                    </td>
-                    <td class="px-4 py-3">
-                        {#if !quest.guide}
-                            N/A
-                        {:else}
-                            <a class="text-blue-500 hover:text-blue-400 cursor-pointer" target="_blank" href={quest.guide}>
-                                View Guide
-                            </a>
-                        {/if}
-                    </td>
-                    <td class="px-4 py-3">{quest.frequency ?? 'Once'}</td>
-                    <td class="px-4 py-3">
-                        {#if !project.realtime || quest.earned == -1}
-                            <div class="text-xs text-red-500 flex flex-row">
-                                Real-time tracking unavailable
-                                <InfoButton noAbsolute={true}>
-                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
-                                </InfoButton>
-                            </div>
-                        {:else if !wallet}
-                            <div class="text-xs text-red-500">Enter Wallet to View Status</div>
-                        {:else if loading}
-                            <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
-                        {:else if quest.earned}
-                            <i class="fas fa-check text-green-500 text-3xl"></i>
-                            {#if quest.frequency ?? 'Once' != 'Once'}
-                                <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
-                            {/if}
-                        {:else}
-                            <i class="fas fa-times text-red-500 text-3xl"></i>
-                        {/if}
-                    </td>
-                </tr>
-            {/each}
-        </tbody>
-    </table>
-</div>
-<br/>

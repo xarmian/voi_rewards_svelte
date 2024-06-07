@@ -27,3 +27,6 @@
         </div>
     {/if}
 </div>
+<div class="mb-8 text-center">
+    <p class="text-gray-500">Reached the end? Check out the <a href="/phase2" class="text-blue-500 hover:text-blue-700">full list of projects</a> to find more quests, and check back regularly for new quests and updates.</p>
+</div>

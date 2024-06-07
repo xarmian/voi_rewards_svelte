@@ -14,7 +14,7 @@
     let selectedProjectId: number | null = null;
 
     $: if (selectedProjectId || selectedProjectId == null) {
-        if (document) {
+        if (browser && document) {
             if (selectedProjectId) {
                 document.body.style.overflow = 'hidden';
             }

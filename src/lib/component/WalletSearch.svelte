@@ -151,18 +151,16 @@
 </script>
 
 <div class="mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl relative" bind:this={componentElement}>
-    <div
-        class="dark:bg-gray-800 bg-white flex"
-    >
+    <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg shadow">
         <input
             type="text"
             use:init
             bind:value={searchText}
             on:input={(event) => handleInput()}
-            class="dark:bg-gray-700 bg-gray-100 flex-grow"
+            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2"
             placeholder="Select wallet by Address or NFD"
         />
-        <button on:click={() => handleSubmit(undefined)} class="dark:bg-blue-500 bg-blue-300 p-2">
+        <button on:click={() => handleSubmit(undefined)} class="dark:bg-blue-500 bg-blue-300 p-2 rounded-r-lg">
         {#if !isMobile}
             Submit
         {:else}
@@ -172,12 +170,12 @@
     </div>
 
     {#if addressList.length > 0}
-    <div class="absolute z-50">
-        <div class="bg-white dark:bg-gray-800 overflow-hidden max-h-64">
+    <div class="absolute z-50 mt-2 w-full">
+        <div class="bg-white dark:bg-gray-800 overflow-hidden max-h-64 rounded-lg shadow-lg">
             <ul class="inline-block text-left">
                 {#each addressList as address, index}
                     <li>
-                        <button class="p-1 border border-solid text-left w-screen md:w-full lg:w-full text-lg"
+                        <button class="p-1 border border-solid text-left w-full text-lg rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => {
                                 handleSubmit(address);
@@ -191,20 +189,20 @@
     {/if}
 </div>
 <style lang="postcss">
-	ul {
-		@apply bg-white dark:bg-gray-800;
+    ul {
+        @apply bg-white dark:bg-gray-800;
         z-index:1;
-	}
+    }
 
-	li {
-		@apply border-b border-gray-200 dark:border-gray-700;
-	}
+    li {
+        @apply border-b border-gray-200 dark:border-gray-700;
+    }
 
-	button {
-		@apply text-gray-900 dark:text-white;
-	}
+    button {
+        @apply text-gray-900 dark:text-white;
+    }
 
-	.selected {
-		@apply bg-gray-300 dark:bg-gray-700;
-	}
+    .selected {
+        @apply bg-gray-300 dark:bg-gray-700;
+    }
 </style>
