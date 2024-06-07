@@ -116,6 +116,12 @@
         </Saos>
     </div>
 {/each}
+
+<div class="p-4 sm:p-12 text-white flex flex-col justify-center items-center" style="background-color: rgb(111,42,226)">
+    <h2 class="text-4xl font-bold mb-8">Complete quests to earn rewards and help test the Voi Network.</h2>
+    <p class="text-xl mb-8">Quests are designed to test the network and introduce you to the budding Voi ecosystem. They are fun, educational, and a great way to learn about Voi while earning rewards.</p>
+</div>
+
 <div class="p-4 sm:p-20 text-white flex flex-col justify-center items-center {filteredProjects.length % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500'}">
     <h1 class="text-6xl font-bold mb-8">Hungry for more Quests?</h1>
     <p class="text-xl mb-8">Check out our Phase 2 Quest Tracker for more Projects, Quests, and Real-time Status Tracking.</p>
