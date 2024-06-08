@@ -25,7 +25,7 @@
     }
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
-    const keep = ['Kibisis', 'Nomadex', 'Humble', 'Nautilus', 'NFT Navigator', 'High Forge'];
+    const keep = ['Kibisis', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator'];
     const filteredProjects = projects.filter(project => keep.includes(project.title)).sort((a, b) => keep.indexOf(a.title) - keep.indexOf(b.title));
 
     onMount(() => {
