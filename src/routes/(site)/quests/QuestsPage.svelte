@@ -87,32 +87,32 @@
 </div>
 
 {#each filteredProjects as project, i}
-    <div class={`p-4 sm:p-20 text-white flex flex-row justify-between ${i % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500 flex-row-reverse'}`}>
-        <div class="self-center">
-            <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
-                <div class='flex flex-col max-w-screen-sm h-full'>
-                    <img src={project.logo} alt={project.title} class="w-52" />
-                    <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
-                    <p class="text-xl mb-8">{project.description}</p>
+    <div class={`p-4 md:p-20 text-white flex flex-row justify-between min-h-72 md:h-64 relative ${i % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500 flex-row-reverse'}`}>
+        <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+                <div class="flex flex-row justify-between md:absolute shadow-2xl shadow-black -top-28 {i % 2 === 0 ? 'left-0' : 'right-0'} bg-purple-400 border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2">
+                    <div class='flex flex-col max-w-screen-sm h-full'>
+                        <img src={project.logo} alt={project.title} class="w-52" />
+                        <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
+                        <p class="text-xl mb-8">{project.description}</p>
+                    </div>
+                    <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+                        <div class={`flex flex-col justify-center space-y-4`}>
+                            <a on:click|stopPropagation={() => selectedProjectId = project.id} class="whitespace-nowrap cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
+                            {#if project.url}
+                                <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
+                            {/if}
+                            {#if project.galxe}
+                                <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
+                            {/if}
+                            {#if project.twitter}
+                                <a href={project.twitter} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">
+                                    <i class="fab fa-twitter"></i>
+                                    Twitter
+                                </a>
+                            {/if}
+                        </div>
+                    </Saos>
                 </div>
-            </Saos>
-        </div>
-        <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
-            <div class={`flex flex-col justify-center space-y-4 ${i % 2 === 0 ? '' : 'mr-2'}`}>
-                <a on:click|stopPropagation={() => selectedProjectId = project.id} class="cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
-                {#if project.url}
-                    <a href={project.url} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">{project.title} Website</a>
-                {/if}
-                {#if project.galxe}
-                    <a href={project.galxe} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Social Quests</a>
-                {/if}
-                {#if project.twitter}
-                    <a href={project.twitter} target="_blank" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">
-                        <i class="fab fa-twitter"></i>
-                        Twitter
-                    </a>
-                {/if}
-            </div>
         </Saos>
     </div>
 {/each}
@@ -132,7 +132,11 @@
   <div class="h-screen modal" on:click={() => selectedProjectId = null} on:click|stopPropagation transition:fly={{ delay: 0, duration: 300, x: '100%', y: 0, opacity: 0.5, easing: quintOut }}>
     <div class="relative h-screen max-w-4xl overflow-auto bg-purple-200 dark:bg-purple-950 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
     <ProjectModal projectId={selectedProjectId} />
-        <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => selectedProjectId = null}>X</button>
+    <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => selectedProjectId = null}>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+    </button>
     </div>
   </div>
 {/if}
