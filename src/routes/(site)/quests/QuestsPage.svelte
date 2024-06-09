@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ProjectSlideout from './ProjectSlideout.svelte';
+
     import { onMount, onDestroy } from 'svelte';
     import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
     import projects from '../phase2/[...slug]/projects';
@@ -72,9 +74,9 @@
     </div>
 </div>
 
-<div class="p-4 sm:p-12 text-white flex flex-col justify-center items-center bg-blue-500">
+<div class="p-4 sm:p-12 text-white flex flex-col justify-center items-center bg-blue-300">
+    <div class="self-center text-purple-900">Need Testnet VOI?</div>
     <div class="flex justify-center space-x-4">
-        <div class="self-center">Need Testnet VOI?</div>
         <a href="https://voiager.org/get-started" target="_blank" class="flex flex-col items-center py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
             <i class="fas fa-faucet text-3xl"></i>
             <div>$VOI Faucet</div>
@@ -86,8 +88,16 @@
     </div>
 </div>
 
+<div class="p-4 sm:p-12 text-white flex flex-col justify-center items-center" style="background-color: rgb(111,42,226)">
+    <div class="flex flex-col justify-center items-center space-y-4 sm:w-1/2">
+        <h1 class="text-6xl font-bold mb-8">Quests</h1>
+        <p class="text-xl mb-8">Complete quests to earn rewards and help test the Voi Network.</p>
+        <p class="text-xl mb-8">Quests are designed to test the network and introduce you to the budding Voi ecosystem. They are fun, educational, and a great way to learn about Voi while earning rewards.</p>
+    </div>
+</div>
+
 {#each filteredProjects as project, i}
-    <div class={`p-4 md:p-20 text-white flex flex-row justify-between min-h-72 md:h-64 relative ${i % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500 flex-row-reverse'}`}>
+    <div class={`p-4 md:p-20 text-white flex flex-row justify-between min-h-72 md:h-64 relative ${i % 2 === 0 ? 'bg-blue-500' : 'bg-blue-300 flex-row-reverse'}`}>
         <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
                 <div class="flex flex-row justify-between md:absolute shadow-2xl shadow-black -top-28 {i % 2 === 0 ? 'left-0' : 'right-0'} bg-purple-400 border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2">
                     <div class='flex flex-col max-w-screen-sm h-full'>
@@ -117,28 +127,14 @@
     </div>
 {/each}
 
-<div class="p-4 sm:p-12 text-white flex flex-col justify-center items-center" style="background-color: rgb(111,42,226)">
-    <h2 class="text-4xl font-bold mb-8">Complete quests to earn rewards and help test the Voi Network.</h2>
-    <p class="text-xl mb-8">Quests are designed to test the network and introduce you to the budding Voi ecosystem. They are fun, educational, and a great way to learn about Voi while earning rewards.</p>
-</div>
-
-<div class="p-4 sm:p-20 text-white flex flex-col justify-center items-center {filteredProjects.length % 2 === 0 ? 'bg-blue-300' : 'bg-blue-500'}">
+<div class="p-4 sm:p-20 text-white flex flex-col justify-center items-center {filteredProjects.length % 2 === 0 ? 'bg-blue-500' : 'bg-blue-300'}">
     <h1 class="text-6xl font-bold mb-8">Hungry for more Quests?</h1>
     <p class="text-xl mb-8">Check out our Phase 2 Quest Tracker for more Projects, Quests, and Real-time Status Tracking.</p>
     <a href="/phase2" class="bg-white text-blue-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-500 hover:text-white">Go to Phase 2 Quest Tracker</a>
 </div>
 
 {#if selectedProjectId}
-  <div class="h-screen modal" on:click={() => selectedProjectId = null} on:click|stopPropagation transition:fly={{ delay: 0, duration: 300, x: '100%', y: 0, opacity: 0.5, easing: quintOut }}>
-    <div class="relative h-screen max-w-4xl overflow-auto bg-purple-200 dark:bg-purple-950 modal-content {selectedProjectId ? 'show' : ''}" on:click|stopPropagation>
-    <ProjectModal projectId={selectedProjectId} />
-    <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => selectedProjectId = null}>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
-    </button>
-    </div>
-  </div>
+    <ProjectSlideout bind:projectid={selectedProjectId}></ProjectSlideout>
 {/if}
 
 <style>

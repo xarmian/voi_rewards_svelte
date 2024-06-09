@@ -290,19 +290,19 @@
         return result;
     }
 </script>
-<div class="bg-purple-700 dark:bg-purple-800 dark:text-white p-4 rounded-lg shadow-lg mt-4">
+<div class="bg-purple-300 dark:bg-purple-800 dark:text-white p-4 rounded-lg shadow-lg mt-4">
     <div class="flex flex-col md:flex-row md:items-center justify-between">
         <div class="mb-4 md:mb-0">
             <h2 class="text-3xl font-bold">
                 {#if project.url}
-                    <a class="text-blue-300 hover:text-blue-200 underline cursor-pointer" target="_blank" href={project.url}>
+                    <a class="text-blue-900 dark:text-blue-300 hover:text-blue-700 hover:dark:text-blue-100 underline cursor-pointer" target="_blank" href={project.url}>
                         {project.title}
                     </a>
                 {:else}
                     {project.title}
                 {/if}
             </h2>
-            <p class="text-gray-300 text-sm">{project.description}</p>
+            <p class="text-gray-800 dark:text-gray-200 text-sm">{project.description}</p>
             {#if !project.realtime}
                 <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
             {/if}
@@ -337,7 +337,7 @@
     </a>
     <div class="flex flex-wrap justify-around p-4">
         {#each localProject.quests as quest, i}
-            <div class="w-full sm:w-1/2 md:w-1/3 bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg m-4 flex flex-col justify-between">
+            <div class="w-full sm:w-1/2 md:w-1/3 bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
                 <div class="px-6 py-4">
                     <div class="font-bold text-xl mb-2">{quest.title}</div>
                     {#if quest.title !== quest.description}
