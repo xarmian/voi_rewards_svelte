@@ -3,17 +3,17 @@
 
     import { onMount, onDestroy } from 'svelte';
     import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
+    import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
     import projects from '../phase2/[...slug]/projects';
     import { browser } from '$app/environment';
     import Saos from "saos";
     //@ts-ignore
     import Device from 'svelte-device-info';
-	import ProjectModal from './ProjectModal.svelte';
-    import { fly } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
 
     let isMobile = false;
     let selectedProjectId: number | null = null;
+    let logoElement: HTMLImageElement;
+    let arrowElement: HTMLOrSVGElement;
 
     $: if (selectedProjectId || selectedProjectId == null) {
         if (browser && document) {
@@ -40,6 +40,13 @@
                     behavior: 'smooth'
                 });
             });
+
+            if (logoElement && arrowElement) {
+                setTimeout(() => {
+                    logoElement.src = VoiLogoStatic;
+                    arrowElement.classList.remove('animate-bounce');
+                }, 30000)
+            }
         }
 
         isMobile = Device.isMobile;
@@ -61,10 +68,10 @@
 </script>
 
 <div class="h-screen flex flex-col justify-center items-center text-white relative" style="background-color: rgb(111,42,226)">
-    <img src={VoiLogo} alt="Voi Logo" class="-mt-72 h-96 animate-pulse">
+    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-72 h-96">
     <h1 class="text-6xl font-bold mb-8 -mt-36 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
     <div class="arrow cursor-pointer mb-8">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
+        <svg bind:this={arrowElement} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
         </svg>
     </div>
@@ -92,7 +99,7 @@
     <div class="flex flex-col justify-center items-center space-y-4 sm:w-1/2">
         <h1 class="text-6xl font-bold mb-8">Quests</h1>
         <p class="text-xl mb-8">Complete quests to earn rewards and help test the Voi Network.</p>
-        <p class="text-xl mb-8">Quests are designed to test the network and introduce you to the budding Voi ecosystem. They are fun, educational, and a great way to learn about Voi while earning rewards.</p>
+        <p class="text-lg mb-8">Quests help test the network and introduce you to the budding Voi ecosystem. They are fun, educational, and a great way to learn about Voi while earning rewards. Points earned from quests will correlate to an airdrop following Voi's move to Mainnet, anticipated for later this year.</p>
     </div>
 </div>
 
