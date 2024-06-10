@@ -13,7 +13,7 @@
     let isMobile = false;
     let selectedProjectId: number | null = null;
     let logoElement: HTMLImageElement;
-    let arrowElement: HTMLOrSVGElement;
+    let arrowElement: SVGSVGElement;
 
     $: if (selectedProjectId || selectedProjectId == null) {
         if (browser && document) {
