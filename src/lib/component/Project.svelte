@@ -210,7 +210,7 @@
 
     async function getKibisisPoints() {
         try {
-            const url = `https://api.kibis.is/quests/daily?account=${wallet}`;
+            const url = `https://api.kibis.is/v1/quests?account=${wallet}`;
             const data = await fetch(url).then((response) => response.json());
 
             if (data.account !== wallet) {
