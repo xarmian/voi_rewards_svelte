@@ -81,10 +81,10 @@
     <div class="hero-section">
         <h1>Getting Started</h1>
         <p>Get yourself started with a wallet, TestNet tokens from the Faucet, and become familiar with the Voi ecosystem</p>
-        <div class="cta-buttons flex-col md:flex-row flex-wrap justify-center">
+        <div class="cta-buttons flex-row flex-wrap justify-center">
           <a href='https://kibis.is/' target="_blank" class="cta-button">Wallet</a>
-          <a href='https://voiager.org/get-started' target="_blank" class="cta-button">$VOI Faucet</a>
-          <a href='https://faucet.nautilus.sh/' target="_blank" class="cta-button">$VIA Faucet</a>
+          <a href='https://voiager.org/get-started' target="_blank" class="cta-button">$VOI<br/>Faucet</a>
+          <a href='https://faucet.nautilus.sh/' target="_blank" class="cta-button">$VIA<br/>Faucet</a>
           <a href='https://airtable.com/apphFYuejZFJJG0i6/shru2v6BXxUaAEU7O' target="_blank" class="cta-button">Ecosystem Directory</a>
           <a href='https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a' target="_blank" class="cta-button">Node Running</a>
         </div>
@@ -245,7 +245,7 @@
     font-weight: bold;
     transition: background-color 0.3s ease;
     align-content: center;
-    width: 14rem;
+    width: 11rem;
     height: 5rem;
   }
 
