@@ -67,17 +67,13 @@
 
 </script>
 
-<div class="h-screen flex flex-col justify-center items-center text-white relative" style="background-color: rgb(111,42,226)">
-    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-64 h-72">
-    <h1 class="text-6xl font-bold mb-16 -mt-24 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
-    <div class="arrow cursor-pointer mb-6">
+<div class="h-screen flex flex-col justify-center items-center text-white" style="background-color: rgb(111,42,226)">
+    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-48 h-72">
+    <h1 class="text-6xl font-bold mb-24 -mt-8 text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
+    <div class="arrow cursor-pointer">
         <svg bind:this={arrowElement} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
         </svg>
-    </div>
-    <div class="absolute bottom-6 space-y-0 flex-row space-x-6 hidden">
-        <a href='https://medium.com/@voifoundation/phase-2-of-the-incentivised-testnet-bf32d880e8f4' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Phase 2 Announcement</a>
-        <a href='https://dashboard.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1MtdQcK' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Social Quests on Galxe</a>
     </div>
 </div>
 
@@ -85,9 +81,10 @@
     <div class="hero-section">
         <h1>Getting Started?</h1>
         <p>Get yourself started with a wallet, TestNet tokens from the Faucet, and become familiar with the Voi ecosystem</p>
-        <div class="cta-buttons flex-col sm:flex-row">
+        <div class="cta-buttons flex-col md:flex-row flex-wrap justify-center">
           <a href='https://kibis.is/' target="_blank" class="cta-button">Wallet</a>
-          <a href='https://voiager.org/get-started' target="_blank" class="cta-button">Faucet</a>
+          <a href='https://voiager.org/get-started' target="_blank" class="cta-button">$VOI Faucet</a>
+          <a href='https://faucet.nautilus.sh/' target="_blank" class="cta-button">$VIA Faucet</a>
           <a href='https://airtable.com/apphFYuejZFJJG0i6/shru2v6BXxUaAEU7O' target="_blank" class="cta-button">Ecosystem Directory</a>
           <a href='https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a' target="_blank" class="cta-button">Node Running</a>
         </div>
@@ -248,6 +245,8 @@
     font-weight: bold;
     transition: background-color 0.3s ease;
     align-content: center;
+    width: 14rem;
+    height: 5rem;
   }
 
   .hero-section .cta-button:hover {
