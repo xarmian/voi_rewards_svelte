@@ -77,7 +77,7 @@
     </div>
     <div class="absolute bottom-6 space-y-0 flex-row space-x-6 hidden">
         <a href='https://medium.com/@voifoundation/phase-2-of-the-incentivised-testnet-bf32d880e8f4' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Phase 2 Announcement</a>
-        <a href='https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Social Quests on Galxe</a>
+        <a href='https://dashboard.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1MtdQcK' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Social Quests on Galxe</a>
     </div>
 </div>
 
@@ -151,9 +151,6 @@
                                 <a on:click|stopPropagation={() => selectedProjectId = project.id} class="whitespace-nowrap cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                                 {#if project.url}
                                     <a href={project.url} target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">{project.title} Website</a>
-                                {/if}
-                                {#if project.galxe}
-                                    <a href={project.galxe} target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Social Quests</a>
                                 {/if}
                                 {#if project.twitter}
                                     <a href={project.twitter} target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">

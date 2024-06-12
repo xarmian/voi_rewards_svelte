@@ -330,16 +330,16 @@
     </a>
     <div class="flex flex-wrap justify-around p-4">
         {#each localProject.quests as quest, i}
-            <div class="w-full sm:w-1/2 md:w-1/3 bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
+            <div class="w-full sm:w-1/2 md:w-1/3 text-black bg-[#65DBAB] rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
                 <div class="px-6 py-4">
                     <div class="font-bold text-xl mb-2">{quest.title}</div>
                     {#if quest.title !== quest.description}
-                        <p class="text-gray-700 dark:text-gray-100 text-base">{quest.description}</p>
+                        <p class="text-gray-700 text-base">{quest.description}</p>
                     {/if}
                 </div>
                 <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
                     <div>
-                        <span class="text-gray-600 dark:text-gray-200 text-sm">Frequency:</span>
+                        <span class="text-gray-800 text-sm">Frequency:</span>
                         <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
                     </div>
                     {#if quest.guide}
@@ -366,7 +366,7 @@
                             <span>Completed</span>
                         </div>
                         {#if quest.frequency ?? 'Once' != 'Once'}
-                            <p class="text-xs text-green-500">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
+                            <p class="text-xs text-green-800">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
                         {/if}
                     {:else}
                         <div class="flex items-center space-x-2">
