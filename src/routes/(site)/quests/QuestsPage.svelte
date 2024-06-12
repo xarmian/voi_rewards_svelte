@@ -68,9 +68,9 @@
 </script>
 
 <div class="h-screen flex flex-col justify-center items-center text-white relative" style="background-color: rgb(111,42,226)">
-    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-72 h-96">
-    <h1 class="text-6xl font-bold mb-8 -mt-36 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
-    <div class="arrow cursor-pointer mb-8">
+    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-64 h-96">
+    <h1 class="text-6xl font-bold mb-16 -mt-24 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
+    <div class="arrow cursor-pointer mb-6">
         <svg bind:this={arrowElement} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
         </svg>
