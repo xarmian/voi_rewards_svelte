@@ -41,12 +41,12 @@
                 });
             });
 
-            if (logoElement && arrowElement) {
-                setTimeout(() => {
+            setTimeout(() => {
+                if (logoElement && arrowElement) {
                     logoElement.src = VoiLogoStatic;
                     arrowElement.classList.remove('animate-bounce');
-                }, 30000)
-            }
+                }
+            }, 30000)
         }
 
         isMobile = Device.isMobile;
@@ -79,7 +79,7 @@
 
 <div class="restofpage">
     <div class="hero-section">
-        <h1>Getting Started?</h1>
+        <h1>Getting Started</h1>
         <p>Get yourself started with a wallet, TestNet tokens from the Faucet, and become familiar with the Voi ecosystem</p>
         <div class="cta-buttons flex-col md:flex-row flex-wrap justify-center">
           <a href='https://kibis.is/' target="_blank" class="cta-button">Wallet</a>
