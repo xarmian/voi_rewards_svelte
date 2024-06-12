@@ -27,7 +27,7 @@
     }
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
-    const keep = ['Kibisis', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator'];
+    const keep = ['Kibisis', 'Voi Network', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator'];
     const filteredProjects = projects.filter(project => keep.includes(project.title)).sort((a, b) => keep.indexOf(a.title) - keep.indexOf(b.title));
 
     onMount(() => {
@@ -104,7 +104,7 @@
 </div>
 
 {#each filteredProjects as project, i}
-    <div class={`p-4 md:p-20 text-white flex flex-row justify-between min-h-72 md:h-64 relative ${i % 2 === 0 ? 'bg-blue-500' : 'bg-blue-300 flex-row-reverse'}`}>
+    <div class={`p-4 md:p-20 text-white flex flex-row justify-between min-h-72 md:h-72 relative ${i % 2 === 0 ? 'bg-blue-500' : 'bg-blue-300 flex-row-reverse'}`}>
         <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
                 <div class="flex flex-row justify-between md:absolute shadow-2xl shadow-black -top-28 {i % 2 === 0 ? 'left-0' : 'right-0'} bg-purple-400 border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2">
                     <div class='flex flex-col max-w-screen-sm h-full'>

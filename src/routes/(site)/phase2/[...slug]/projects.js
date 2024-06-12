@@ -4,11 +4,12 @@ const projects = [
         title: "Voi Network",
         type: "Network",
         category: "Core",
-        description: "Social media, node running, and other quests from Voi Network",
+        description: "Run a participation node and help maintain the security and integrity of the Voi Network while earning Quest Points.",
         url: 'https://voi.network',
         guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a",
         twitter: "https://x.com/Voi_Net",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8",
+        logo: '/logos/voi_logo.png',
         status: 'active',
         realtime: true,
         quests: [
