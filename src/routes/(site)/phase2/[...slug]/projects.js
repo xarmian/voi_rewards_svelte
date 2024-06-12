@@ -2,7 +2,7 @@ const projects = [
     {
         id: 1,
         title: "Voi Network",
-        type: "Network",
+        type: "Node Running",
         category: "Core",
         description: "Run a participation node and help maintain the security and integrity of the Voi Network while earning Quest Points.",
         url: 'https://voi.network',
@@ -14,27 +14,9 @@ const projects = [
         realtime: true,
         quests: [
             {
-                id: 1,
-                title: "Getting Started",
-                description: "Start here! Get to know the Voi Network Ecosystem",
-                status: null,
-                reward: 1,
-                frequency: "Once",
-                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8"
-            },
-            {
-                id: 2,
-                title: "Dive In Deeper",
-                description: "Find out more about the Voi Network Ecosystem",
-                status: null,
-                reward: 1,
-                frequency: "Weekly",
-                guide: " https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCekitzB4j"
-            },
-            {
                 id: 3,
                 name: "run_a_node",
-                title: "Network Infrastructure",
+                title: "Run a Node",
                 description: "Run a participation node on the Voi Network",
                 status: null,
                 reward: 1,

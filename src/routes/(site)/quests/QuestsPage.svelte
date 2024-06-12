@@ -104,15 +104,16 @@
 </div>
 
 {#each filteredProjects as project, i}
-    <div class={`p-4 md:p-20 text-white flex flex-row justify-between min-h-72 md:h-72 relative ${i % 2 === 0 ? 'bg-blue-500' : 'bg-blue-300 flex-row-reverse'}`}>
+    <div class={`p-4 md:p-20 text-white flex flex-row justify-between items-center min-h-72 md:h-72 ${i % 2 === 0 ? 'bg-blue-500' : 'bg-blue-300 flex-row-reverse'}`}>
         <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
-                <div class="flex flex-row justify-between md:absolute shadow-2xl shadow-black -top-28 {i % 2 === 0 ? 'left-0' : 'right-0'} bg-purple-400 border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2">
-                    <div class='flex flex-col max-w-screen-sm h-full'>
+            <div class="flex flex-row justify-between shadow-2xl shadow-black bg-purple-400 border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10">
+                <div class='flex flex-col max-w-screen-sm h-full'>
+                        <h1 class="text-3xl font-bold mb-2">{project.type}</h1>
                         <img src={project.logo} alt={project.title} class="w-52" />
                         <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
                         <p class="text-xl mb-8">{project.description}</p>
                     </div>
-                    <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
+                    <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both; height: 100%; align-content: center;`}>
                         <div class={`flex flex-col justify-center space-y-4`}>
                             <a on:click|stopPropagation={() => selectedProjectId = project.id} class="whitespace-nowrap cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                             {#if project.url}
