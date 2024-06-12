@@ -68,7 +68,7 @@
 </script>
 
 <div class="h-screen flex flex-col justify-center items-center text-white relative" style="background-color: rgb(111,42,226)">
-    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-64 h-96">
+    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-64 h-72">
     <h1 class="text-6xl font-bold mb-16 -mt-24 z-10">Get Your<br class="sm:hidden"/> Quest On</h1>
     <div class="arrow cursor-pointer mb-6">
         <svg bind:this={arrowElement} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
@@ -82,34 +82,16 @@
 </div>
 
 <div class="restofpage">
-    <div class="p-4 sm:px-12 text-black flex-col flex sm:flex-row justify-evenly items-center">
-        <div class="project flex flex-row justify-between shadow-md shadow-black bg-[#65DBAB] border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10 mb-6 sm:mb-0">
-            <div class='flex flex-col max-w-screen-sm h-full'>
-                <h1 class="text-3xl font-bold mb-2">Getting Started?</h1>
-                <p class="text-xl mb-8">Get yourself started with a wallet, TestNet tokens from the Faucet, and become familiar with the Voi ecosystem using these links</p>
-            </div>
-            <div class={`flex flex-col justify-center space-y-4`}>
-                <a href='https://kibis.is/' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Wallet</a>
-                <a href='https://voiager.org/get-started' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Faucet</a>
-                <a href='https://airtable.com/apphFYuejZFJJG0i6/shru2v6BXxUaAEU7O' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Ecosystem Directory</a>
-                <a href='https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Node Running</a>
-            </div>
+    <div class="hero-section">
+        <h1>Getting Started?</h1>
+        <p>Get yourself started with a wallet, TestNet tokens from the Faucet, and become familiar with the Voi ecosystem</p>
+        <div class="cta-buttons flex-col sm:flex-row">
+          <a href='https://kibis.is/' target="_blank" class="cta-button">Wallet</a>
+          <a href='https://voiager.org/get-started' target="_blank" class="cta-button">Faucet</a>
+          <a href='https://airtable.com/apphFYuejZFJJG0i6/shru2v6BXxUaAEU7O' target="_blank" class="cta-button">Ecosystem Directory</a>
+          <a href='https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a' target="_blank" class="cta-button">Node Running</a>
         </div>
-        <div class="flex flex-col">
-            <div class="self-center text-white">Need Testnet VOI?</div>
-            <div class="flex justify-center space-x-4">
-                <a href="https://voiager.org/get-started" target="_blank" class="flex flex-col items-center py-2 px-4 bg-[#2C037A] text-white font-semibold rounded-lg shadow-md hover:bg-purple-900">
-                    <i class="fas fa-faucet text-3xl"></i>
-                    <div>$VOI Faucet</div>
-                </a>
-                <a href="https://faucet.nautilus.sh" target="_blank" class="flex flex-col items-center py-2 px-4 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
-                    <i class="fas fa-faucet text-3xl"></i>
-                    <div>$VIA Faucet</div>
-                </a>
-            </div>
-        </div>
-    </div>
-    
+      </div>    
     
     <div class="p-4 sm:p-12 text-white flex flex-col justify-center items-center">
         <div class="flex flex-col justify-center items-center space-y-4 sm:w-1/2">
@@ -229,5 +211,47 @@
   .project {
     transform: scale(1.00);
     transition: transform 0.5s;
+  }
+
+  .hero-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background-color: #2C037A;
+    color: white;
+    text-align: center;
+  }
+
+  .hero-section h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .hero-section p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+  }
+
+  .hero-section .cta-buttons {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .hero-section .cta-button {
+    background-color: #65DBAB;
+    color: #672ed9;
+    padding: 1rem 2rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+    align-content: center;
+  }
+
+  .hero-section .cta-button:hover {
+    background-color: #672ed9;
+    color: white;
   }
 </style>
