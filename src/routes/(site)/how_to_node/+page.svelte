@@ -11,6 +11,14 @@
                 url: 'https://docs.voi.network/',
             },
             {
+                text: 'Guide to running a node with *Voi Swarm* (Linux)',
+                url: 'https://voinetwork.github.io/voi-swarm',
+            },
+            {
+                text: 'Video Guide to installing and managing a node with *PixelNode*',
+                url: 'https://www.youtube.com/watch?v=BbuViDosZbE',
+            },
+            {
                 text: 'Guide to Setting up a *Participation Node* on Ubuntu by D13',
                 url: 'https://d13.co/posts/set-up-voi-participation-node/',
             },
