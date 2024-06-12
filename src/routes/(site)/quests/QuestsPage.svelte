@@ -137,7 +137,7 @@
     </div>
 
     {#each filteredProjects as project, i}
-        <div class={`p-4 md:px-20 text-black flex flex-row justify-between items-center min-h-72 md:h-96 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
+        <div class={`p-4 md:px-20 text-black flex flex-row justify-between items-center min-h-72 md:h-72 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
             <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
                 <div class="project flex flex-row justify-between shadow-md shadow-black bg-[#65DBAB] border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10">
                     <div class='flex flex-col max-w-screen-sm h-full'>
