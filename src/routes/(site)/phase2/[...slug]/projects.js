@@ -675,6 +675,7 @@ const projects = [
         "quests": [
             {
                 id: 1,
+                name: 'algo-leagues-1',
                 title: "Register a VOI address in Discord",
                 description: "Get started with Algo Leagues Discord Bot by registering your VOI address.",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-1-register-a-voi-address-in-discord",
@@ -683,6 +684,7 @@ const projects = [
             },
             {
                 id: 2,
+                name: 'algo-leagues-2',
                 title: "Confirm your address for Algo Leagues",
                 description: "Send a message to the Algo Leagues Discord Bot to confirm your address.",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-2-confirm-your-address-for-algo-leagues",
@@ -691,6 +693,7 @@ const projects = [
             },
             {
                 id: 3,
+                name: 'algo-leagues-3',
                 title: "Deposit VOI or a Standard Asset to your Algo Leagues account",
                 description: "Learn how Standard Assets are deposited for spending in Algo Leagues.",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-3-deposit-voi-or-a-standard-asset-to-your-algo-leagues-account",
@@ -699,6 +702,7 @@ const projects = [
             },
             {
                 id: 4,
+                name: 'algo-leagues-4',
                 title: "Withdraw VOI or a Standard Asset from your Algo Leagues account",
                 description: "Use the Withdraw System to take your assets back to your wallet.",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-4-withdraw-voi-or-a-standard-asset-from-your-algo-leagues-account",
@@ -707,6 +711,7 @@ const projects = [
             },
             {
                 id: 5,
+                name: 'algo-leagues-5',
                 title: "Approve Algo Leagues to spend a Smart Asset on your behalf",
                 description: "Use ARC-200 approvals to maintain custody of your smart assets while allowing Algo Leagues to spend them.",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-5-approve-algo-leagues-to-spend-a-smart-asset-on-your-behalf",
@@ -715,6 +720,7 @@ const projects = [
             },
             {
                 id: 6,
+                name: 'algo-leagues-6',
                 title: "Send a Smart Asset to another Discord user",
                 description: "Spend an approved balance directly on chain to a single user within Discord",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-6-send-a-smart-asset-to-another-discord-user",
@@ -723,6 +729,7 @@ const projects = [
             },
             {
                 id: 7,
+                name: 'algo-leagues-7',
                 title: "Rain a Smart Asset to active users in a Discord channel",
                 description: "Spend an approved balance directly on chain to multiple users within Discord",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-7-rain-a-smart-asset-to-active-users-in-a-discord-channel",
