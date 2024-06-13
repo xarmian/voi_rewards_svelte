@@ -48,7 +48,7 @@
                     if (quest.name == 'swap') {
                         let uniqueDates = new Set();
                         row.forEach(entry => {
-                            let date = new Date(Number(entry.timestamp) * 1000).toISOString().split('T')[0];
+                            let date = new Date(Number(entry.timestamp)).toISOString().split('T')[0];
                             uniqueDates.add(date);
                         });
                         quest.earned = uniqueDates.size;
