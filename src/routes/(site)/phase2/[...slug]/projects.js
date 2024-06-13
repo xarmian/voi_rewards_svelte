@@ -725,6 +725,7 @@ const projects = [
                 description: "Spend an approved balance directly on chain to a single user within Discord",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-6-send-a-smart-asset-to-another-discord-user",
                 status: null,
+                frequency: 'Weekly',
                 reward: 1,
             },
             {
@@ -734,6 +735,7 @@ const projects = [
                 description: "Spend an approved balance directly on chain to multiple users within Discord",
                 guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/main/README.md#quest-7-rain-a-smart-asset-to-active-users-in-a-discord-channel",
                 status: null,
+                frequency: 'Weekly',
                 reward: 1,
             },
         ]
