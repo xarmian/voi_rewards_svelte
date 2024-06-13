@@ -306,11 +306,6 @@
                     <span class="text-lg underline">Project Quest Guide</span>
                 </a>
             {/if}
-            {#if project.galxe}
-                <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.galxe}>
-                    <span class="text-lg underline">Galxe Guide</span>
-                </a>
-            {/if}
             {#if project.twitter}
                 <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.twitter}>
                     <span class="text-lg underline">Project Twitter</span>

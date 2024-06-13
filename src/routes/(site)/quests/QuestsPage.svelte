@@ -27,7 +27,7 @@
     }
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
-    const keep = ['Kibisis', 'Voi Network', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator'];
+    const keep = ['Kibisis', 'Voi Network', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator', 'AlgoLeagues'];
     const filteredProjects = projects.filter(project => keep.includes(project.title)).sort((a, b) => keep.indexOf(a.title) - keep.indexOf(b.title));
 
     onMount(() => {
@@ -108,7 +108,7 @@
                     </div>
                     <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both; height: 100%; align-content: center;`}>
                         <div class={`flex flex-col justify-center space-y-4`}>
-                            <a href='https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8' target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Social Quests</a>
+                            <a href='https://dashboard.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1MtdQcK' target="_blank" class="h-16 text-center content-center w-36 bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Social Quests</a>
                         </div>
                     </Saos>
                 </div>
@@ -118,21 +118,22 @@
     {#each filteredProjects as project, i}
         <div class={`p-4 md:px-20 text-black flex flex-row justify-between items-center min-h-72 md:h-72 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
             <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
-                <div class="project flex flex-row justify-between shadow-md shadow-black bg-[#65DBAB] border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10">
+                <div class="project flex flex-col shadow-md shadow-black bg-[#65DBAB] border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10">
+                  <h1 class="text-3xl font-bold mb-2">{project.type}</h1>
+                  <div class="flex flex-row justify-between">
                     <div class='flex flex-col max-w-screen-sm h-full'>
-                            <h1 class="text-3xl font-bold mb-2">{project.type}</h1>
                             <img src={project.logo} alt={project.title} class="w-52" />
                             <h1 class="hidden text-6xl font-bold mb-8">{project.title}</h1>
                             <p class="text-xl mb-8">{project.description}</p>
                         </div>
                         <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both; height: 100%; align-content: center;`}>
-                            <div class={`flex flex-col justify-center space-y-4`}>
-                                <a on:click|stopPropagation={() => selectedProjectId = project.id} class="whitespace-nowrap cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
+                            <div class={`flex flex-col justify-center space-y-4 align-top`}>
+                                <a on:click|stopPropagation={() => selectedProjectId = project.id} class="h-16 text-center content-center whitespace-nowrap cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                                 {#if project.url}
-                                    <a href={project.url} target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">{project.title} Website</a>
+                                    <a href={project.url} target="_blank" class="h-16 text-center content-center bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">{project.title} Website</a>
                                 {/if}
                                 {#if project.twitter}
-                                    <a href={project.twitter} target="_blank" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">
+                                    <a href={project.twitter} target="_blank" class="h-16 text-center content-center bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">
                                         <i class="fab fa-twitter"></i>
                                         Twitter
                                     </a>
@@ -140,6 +141,7 @@
                             </div>
                         </Saos>
                     </div>
+                  </div>
             </Saos>
         </div>
     {/each}

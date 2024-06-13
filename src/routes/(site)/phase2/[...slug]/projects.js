@@ -21,7 +21,7 @@ const projects = [
                 status: null,
                 reward: 1,
                 frequency: "Weekly",
-                guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCGUPtzt9a"
+                guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a"
             },
         ],
     },
@@ -300,7 +300,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
         status: 'active',
         realtime: true,
-        logo: 'logos/nomadex.png',
+        logo: 'logos/NomadexLogoFull.webp',
         quests: [   
             {
                 id: 1,
@@ -664,11 +664,12 @@ const projects = [
     {
         id: 14,
         title: "AlgoLeagues",
-        type: "Discord Bot",
+        type: "AlgoLeagues Discord Bot",
         category: "Other",
         description: "AlgoLeagues Discord Bot facilitates transferring, withdrawing, and tipping Voi assets in Discord servers.",
         guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/944ddd5dc496d47d7163a3399e4d64ebff32f003/README.md",
         twitter: "https://x.com/algoleagues",
+        logo: "/logos/voi_logo2.png",
         status: "active",
         realtime: true,
         "quests": [

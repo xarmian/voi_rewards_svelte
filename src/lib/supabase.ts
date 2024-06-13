@@ -6,3 +6,17 @@ const supabaseUrl = PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = PUBLIC_SUPABASE_ANON_KEY;
 
 export const supabasePublicClient = createClient(supabaseUrl!, supabaseAnonKey!);
+
+export interface PLeaderboard {
+    wallet: string;
+    last_modified: Date;
+    total: number;
+    network: number;
+    nftnavigator: number;
+    nautilus: number;
+    humble: number;
+    kibisis: number;
+    nomadex: number;
+    highforge: number;
+    algoleagues: number;
+}
