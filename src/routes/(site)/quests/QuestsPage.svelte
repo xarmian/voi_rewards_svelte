@@ -150,7 +150,7 @@
       {/each}
   </div>
 
-  <div class="p-4 sm:p-20 text-white flex flex-col justify-center items-center {filteredProjects.length % 2 === 0 ? 'bg-[#672ed9]' : 'bg-[#2C037A]'}">
+  <div class="p-4 sm:p-20 text-white flex flex-col justify-center items-center w-full {filteredProjects.length % 2 === 0 ? 'bg-[#672ed9]' : 'bg-[#2C037A]'}">
       <h1 class="text-6xl font-bold mb-8">Hungry for more Quests?</h1>
       <p class="text-xl mb-8">Check out our Phase 2 Quest Tracker for more Projects, Quests, and Real-time Status Tracking.</p>
       <a href="/phase2" class="bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">Go to Phase 2 Quest Tracker</a>
