@@ -93,17 +93,19 @@
 	}
 </script>
 
-<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
+<!--<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
 	<p class="font-bold">Notice:</p>
-	<p>Phase 1 of the Voi Incentivized Testnet has ended. See our <a href="/phase1" class="underline text-yellow-700">Phase 1</a> page for details.</p>
-	<p>Visit our <a href="/phase2" class="underline text-yellow-700">Phase 2</a> page for details about Phase 2 Quests.</p>
+	<p>Visit our <a href="/quests" class="underline text-yellow-700">Quest</a> page for details about Phase 2 Quests.</p>
 	<p>This page now shows cumulative points toward Phase 2 for running a Healthy node. Visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
 		for more information.
 	</p>
+</div>-->
+<br/>
+<div class="bg-[rgb(111,42,226)] text-white text-center py-4 mb-4">
+	<h2 class="text-2xl font-bold">Looking for Voi TestNet Quests?</h2>
+	<p>Visit our <a href="/quests" class="underline">Questing Page Here!</a></p>
 </div>
-<div class="text-center">
-	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
-</div>
+
 <div class="dashboard justify-evenly">
 	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 		<div class="cardInner">
@@ -163,9 +165,12 @@
 		</div>
 	</Card>
 </div>
+<div class="text-center">
+	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
+</div>
 <div class="notices">
 	<div class="flex flex-col place-items-center">
-		<span style="font-weight:bold;"
+		<!--<span style="font-weight:bold;"
 			>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
 			Chris said it best:</span
 		>
@@ -177,7 +182,7 @@
 				and against the mission of Voi."
 			</blockquote>
 			<cite>- Chris Swenor</cite>
-		</div>
+		</div>-->
 		<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
 			Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
 		</div>

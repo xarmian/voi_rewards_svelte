@@ -35,6 +35,9 @@
   let viewWallet = false;
   let viewWalletId = '';
 
+  let currentPage = 1;
+  let itemsPerPage = 100;
+
   const toggleRow = (row: number) => {
     if (expandedRow === row) {
       expandedRow = null;
@@ -215,6 +218,7 @@
 <div class="overflow-auto {!Device.isMobile ? 'ml-6 mr-6' : ''}">
 <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm}>
 </TableSearch>
+
 <Table>
   <TableHead>
       {#each columns as column, i}
@@ -238,7 +242,7 @@
       {/each}
   </TableHead>
   <TableBody tableBodyClass="divide-y">
-      {#each filterItems as item, i}
+      {#each filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) as item, i}
       <TableBodyRow on:click={() => toggleRow(i)}>
           <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
             {item.rank}
@@ -366,6 +370,7 @@
         </TableBodyRow>
       {/if}
     {/each}
+ 
     <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
       <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
       <TableBodyCell colspan="{!Device.isMobile ? 4 : 2}" class="p-2">
@@ -382,6 +387,23 @@
     </TableBodyRow>
   </TableBody>
 </Table>
+<div class="flex justify-between">
+  <button
+    class="px-4 py-2 bg-blue-500 text-white"
+    on:click={() => currentPage = Math.max(1, currentPage - 1)}
+    disabled={currentPage === 1}
+  >
+    Previous
+  </button>
+  <div>Page {currentPage} of {Math.ceil(filterItems.length / itemsPerPage)}</div>
+  <button
+    class="px-4 py-2 bg-blue-500 text-white"
+    on:click={() => currentPage = Math.min(Math.ceil(filterItems.length / itemsPerPage), currentPage + 1)}
+    disabled={currentPage * itemsPerPage >= filterItems.length}
+  >
+    Next
+  </button>
+</div>
 </div>
 <Modal bind:open={viewWallet} autoclose size='lg' outsideclose>
 <WalletView walletId={viewWalletId}></WalletView>
