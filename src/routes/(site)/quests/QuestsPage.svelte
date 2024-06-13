@@ -83,7 +83,7 @@
   <div class="restofpage">
       <div class="hero-section">
           <h1>Getting Started</h1>
-          <p>Get yourself started with a wallet, TestNet tokens from the Faucet, and become familiar with the Voi ecosystem</p>
+          <p>Get started by downloading a wallet, securing Testnet tokens, and familiarizing yourself with the Voi ecosystem.</p>
           <div class="cta-buttons flex-row flex-wrap justify-center">
             <a href='https://kibis.is/' target="_blank" class="cta-button">Wallet</a>
             <a href='https://voiager.org/get-started' target="_blank" class="cta-button">$VOI<br/>Faucet</a>
