@@ -15,7 +15,7 @@
         }
     });
 </script>
-<div class="flex flex-col mt-4 relative">
+<div class="flex flex-col pt-4 relative border-l-4 border-l-teal-400">
     <div class="sm:hidden h-10">&nbsp;</div>
     <p class="text-center">Enter a wallet address to see your Voi TestNet Phase #2 Quest Progress</p>
     <div class="text-center">
@@ -27,6 +27,6 @@
         </div>
     {/if}
 </div>
-<div class="mb-8 text-center">
+<div class="pb-8 text-center border-l-4 border-l-teal-400">
     <p class="text-gray-500">Reached the end? Check out the <a href="/phase2" class="text-blue-500 hover:text-blue-700">full list of projects</a> to find more quests, and check back regularly for new quests and updates.</p>
 </div>

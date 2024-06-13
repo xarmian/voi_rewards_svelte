@@ -86,7 +86,7 @@
         </div>
     {/if}
 </div>    
-<div class="flex flex-wrap sm:justify-center mx-auto">
+<div class="flex flex-wrap sm:justify-center mx-auto {selectedTab ? 'blur-sm' : ''}">
     <div class="flex flex-col sm:w-full lg:w-3/4 ml-2">
     {#each Object.entries(groupedProjects) as [category, projects]}
         <div class="flex flex-col">
