@@ -46,7 +46,7 @@
                     logoElement.src = VoiLogoStatic;
                     arrowElement.classList.remove('animate-bounce');
                 }
-            }, 30000)
+            }, 4500)
         }
 
         isMobile = Device.isMobile;
@@ -67,16 +67,18 @@
 
 </script>
 
-<div class={selectedProjectId ? 'blur-sm' : ''}>
-  <div class="h-screen flex flex-col justify-center items-center text-white" style="background-color: rgb(111,42,226)">
-      <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-mt-48 h-72">
-      <h1 class="text-6xl font-bold mb-24 -mt-8 text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
-      <div class="arrow cursor-pointer">
-          <svg bind:this={arrowElement} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-          </svg>
-      </div>
+<div class={`${selectedProjectId ? 'blur-sm' : ''} flex flex-col items-center`} style="background-color: rgb(111,42,226)">
+  <div class="h-[70vh] flex flex-col justify-evenly items-center my-24">
+    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-my-48 h-[32rem] z-0 self-center object-cover object-center" style="clip-path: inset(150px 0 0 0)">
+    <div class="h-screen flex flex-col justify-center items-center text-white z-10">
+        <h1 class="text-6xl font-bold text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
+    </div>
+    <div class="arrow cursor-pointer">
+      <svg bind:this={arrowElement} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-12 w-12 animate-bounce">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+      </svg>
   </div>
+</div>
 
   <div class="restofpage">
       <div class="hero-section">
@@ -128,7 +130,7 @@
                               <p class="text-xl mb-8">{project.description}</p>
                           </div>
                           <Saos once={true} animation={`fadein 2s cubic-bezier(0.35, 0.5, 0.65, 0.95) both; height: 100%; align-content: center;`}>
-                              <div class={`flex flex-col justify-center space-y-4 align-top`}>
+                              <div class={`flex flex-col justify-center space-y-4 align-top w-36`}>
                                   <a on:click|stopPropagation={() => selectedProjectId = project.id} class="h-16 text-center content-center whitespace-nowrap cursor-pointer bg-white text-green-500 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-500 hover:text-white">Project Quests</a>
                                   {#if project.url}
                                       <a href={project.url} target="_blank" class="h-16 text-center content-center bg-white text-[#672ed9] font-bold py-2 px-4 rounded-lg shadow-md hover:bg-[#672ed9] hover:text-white">{project.title} Website</a>

@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face{
+    font-family: 'N27';
+    src: url('/fonts/N27-Regular.woff') format('woff');
+  }
+.n27 {
+    font-family: 'N27', sans-serif;
+}
+body {
+  font-family: 'N27', sans-serif;
+}
+  
