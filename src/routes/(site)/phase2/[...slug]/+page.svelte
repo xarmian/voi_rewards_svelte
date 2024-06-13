@@ -9,7 +9,7 @@
     let projectId = data.props.projectId;
 </script>
 <div class="flex flex-col dark:bg-purple-950">
-    <div class="flex flex-col {projectId ? 'blur' : ''}">
+    <div class="flex flex-col {projectId ? 'blur-sm' : ''}">
         <div class="flex flex-col mt-4">
             <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white place-self-center">
                 Phase 2 Quest Tracking
