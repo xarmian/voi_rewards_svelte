@@ -2,7 +2,7 @@
   import ProjectSlideout from './ProjectSlideout.svelte';
 
     import { onMount, onDestroy } from 'svelte';
-    import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
+    //import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
     import projects from '../phase2/[...slug]/projects';
     import { browser } from '$app/environment';
@@ -43,7 +43,7 @@
 
             setTimeout(() => {
                 if (logoElement && arrowElement) {
-                    logoElement.src = VoiLogoStatic;
+                    //logoElement.src = VoiLogoStatic;
                     arrowElement.classList.remove('animate-bounce');
                 }
             }, 4500)
@@ -69,7 +69,7 @@
 
 <div class={`${selectedProjectId ? 'blur-sm' : ''} flex flex-col items-center`} style="background-color: rgb(111,42,226)">
   <div class="h-[70vh] flex flex-col justify-evenly items-center my-24">
-    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-my-48 h-[32rem] z-0 self-center object-cover object-center" style="clip-path: inset(150px 0 150px 0)">
+    <img bind:this={logoElement} src={VoiLogoStatic} alt="Voi Logo" class="-my-48 h-[32rem] z-0 self-center object-cover object-center" style="clip-path: inset(150px 0 150px 0)">
     <div class="h-screen flex flex-col justify-center items-center text-white z-10">
         <h1 class="text-6xl font-bold text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
     </div>
