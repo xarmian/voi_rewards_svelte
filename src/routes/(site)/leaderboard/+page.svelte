@@ -1,10 +1,30 @@
 <script lang="ts">
 	import Leaderboard from "./Leaderboard.svelte";
+    import { supabasePublicClient } from "$lib/supabase";
 
     import type { PageData } from './$types';
 	import InfoButton from "$lib/component/ui/InfoButton.svelte";
     
     export let data: PageData;
+    let searchTerm = '';
+    let ranks = data.ranks;
+
+    $: {
+        if (searchTerm.length > 0) {
+            supabasePublicClient.from('leaderboard')
+                .select('*')
+                .like('wallet', `%${searchTerm.toUpperCase()}%`)
+                .order('total', { ascending: false }).limit(100)
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error(error);
+                    } else {
+                        ranks = data;
+                    }
+                });
+        }
+    }
+
 </script>
 
 <div class="container mx-auto mt-6">
@@ -50,10 +70,20 @@
 <div class="container mx-auto my-6">
     <div class="p-2 sm:p-8 rounded-2xl bg-white dark:bg-gray-900 shadow-md">
         <div class="flex flex-col sm:flex-row sm:justify-between">
-            <h1 class="text-2xl font-semibold text-gray-800 dark:text-white">
-                <img src="/logos/voi_logo.png" alt="Voi" class="h-14 pb-2 inline-block" />
-                Project Quest Leaderboard
-            </h1>
+            <div>
+                <h1 class="text-2xl font-semibold text-gray-800 dark:text-white">
+                    <img src="/logos/voi_logo.png" alt="Voi" class="h-14 pb-2 inline-block" />
+                    Project Quest Leaderboard
+                </h1>
+                <div class="mt-4 mb-1">
+                    <input
+                        type="text" size="40"
+                        placeholder="Search by account address..."
+                        class="p-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                        bind:value={searchTerm}
+                    />
+                </div>
+            </div>
             <div class="text-xs sm:place-self-end">
                 <div>
                     Leaderboard data is delayed and updated periodically throughout the day.
@@ -63,6 +93,6 @@
                 </div>
             </div>
         </div>
-        <Leaderboard data={data.ranks} />
+        <Leaderboard data={ranks} />
     </div>
 </div>

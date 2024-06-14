@@ -743,11 +743,12 @@ const projects = [
     {
         id: 15,
         title: "MechaSwap",
-        type: "Tool",
+        type: "NFT Swap Tool",
         category: "NFTs",
         description: "MechaSwap is a trustless NFT swap platform. Complete tasks on MechaSwap to earn points.",
         url: "https://mechaswap.nautilus.sh",
         status: "active",
+        logo: 'logos/mecha-swap.webp',
         realtime: true,
         quests: [
             {
