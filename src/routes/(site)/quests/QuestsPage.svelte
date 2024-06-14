@@ -69,7 +69,7 @@
 
 <div class={`${selectedProjectId ? 'blur-sm' : ''} flex flex-col items-center`} style="background-color: rgb(111,42,226)">
   <div class="h-[70vh] flex flex-col justify-evenly items-center my-24">
-    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-my-48 h-[32rem] z-0 self-center object-cover object-center" style="clip-path: inset(150px 0 0 0)">
+    <img bind:this={logoElement} src={VoiLogo} alt="Voi Logo" class="-my-48 h-[32rem] z-0 self-center object-cover object-center" style="clip-path: inset(150px 0 150px 0)">
     <div class="h-screen flex flex-col justify-center items-center text-white z-10">
         <h1 class="text-6xl font-bold text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
     </div>
