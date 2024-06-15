@@ -370,6 +370,9 @@
                         </div>
                     {/if}
                 </div>
+                {#if quest.name == 'run_a_node'}
+                    <div class='p-3 text-xs font-bold text-red-900'>Points are earned for each heathly week of node running. Quest status currently does not update until then. This should be improved within the next few days.</div>
+                {/if}
             </div>
         {/each}
     </div>
