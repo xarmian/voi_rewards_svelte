@@ -99,6 +99,11 @@
                         <span class="label">Wallets on Node:</span>
                         <span>{nodeData.health_divisor??'Loading...'}</span>
                     </p>
+                    {#if nodeData.health_hours && nodeData.health_hours < 168}
+                        <p class="mt-2">
+                            NOTE: New nodes may take up to 7 days to reach full health.
+                        </p>
+                    {/if}
                 </div>
             {/if}
         </Card>

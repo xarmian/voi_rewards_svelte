@@ -76,7 +76,7 @@
                     }
                     else {
                         if (points[points.length-1].hours < 168) {
-                            steps[2].additionalInfo2 = 'Health score is an average and should continue to climb until the node has been online for a full week.';
+                            steps[2].additionalInfo2 = 'Health score is an average and may take up to a week to reach its full value.';
                         }
                         else {
                             steps[2].additionalInfo2 = 'Health score must be above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).';
