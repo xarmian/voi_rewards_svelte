@@ -21,7 +21,8 @@
         {
             name: 'Health Score >= 5.0',
             detected: false,
-            additionalInfo: ''
+            additionalInfo: '',
+            additionalInfo2: ''
         }
     ];
 
@@ -40,7 +41,7 @@
 
                 // data is an object of objects with key: date, { health, points }
                 let points = Object.keys(data).map((key) => {
-                    return { date: key, health: data[key].health, points: data[key].points, hours: data[key].hours };
+                    return { date: key, health: data[key].health, points: data[key].points, hours: data[key].hours, name: data[key].name };
                 });
                 
                 // find the quest with name "run_a_node"
@@ -65,19 +66,20 @@
                     if (points[points.length-1] && points[points.length-1].hours > 0) {
                         steps[1].detected = true;
                         steps[1].name = 'Telemetry Detected';
-                        steps[1].additionalInfo = `Current Weekly Health Score: ${points[points.length-1].health}`;
+                        steps[1].additionalInfo = points[points.length-1].name;
+                        steps[2].additionalInfo = `Current Weekly Health Score: ${points[points.length-1].health}`;
                     }
 
                     if (points[points.length-1].health >= 5.0) {
                         steps[2].detected = true;
-                        steps[2].additionalInfo = 'Maintain health score above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).'
+                        steps[2].additionalInfo2 = 'Maintain health score above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).'
                     }
                     else {
                         if (points[points.length-1].hours < 168) {
-                            steps[2].additionalInfo = 'Health score is an average and should continue to climb until the node has been online for a full week.';
+                            steps[2].additionalInfo2 = 'Health score is an average and should continue to climb until the node has been online for a full week.';
                         }
                         else {
-                            steps[2].additionalInfo = 'Health score must be above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).';
+                            steps[2].additionalInfo2 = 'Health score must be above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).';
                         }
                     }
                 }
@@ -441,7 +443,7 @@
                     {#if !loading}
                         <div class="flex flex-col items-center m-2 mt-4">
                             <ul>
-                            {#each steps as {name, detected, additionalInfo}}
+                            {#each steps as {name, detected, additionalInfo, additionalInfo2}}
                                 <li class="flex items-start mb-4">
                                 {#if detected}
                                     <span class="text-green-500 mb-2 mr-2">&#10003;</span>
@@ -451,6 +453,9 @@
                                 <div class="flex flex-col">
                                     <div>{name}</div>
                                     <div class="text-sm">{additionalInfo}</div>
+                                    {#if additionalInfo2}
+                                        <div class="text-sm">{additionalInfo2}</div>
+                                    {/if}
                                 </div>
                                 </li>
                             {/each}
