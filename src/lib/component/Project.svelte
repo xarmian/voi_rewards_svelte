@@ -1,33 +1,89 @@
 <script lang="ts">
     import type { IProject, IQuest} from "$lib/data/types";
     import { supabasePublicClient } from '$lib/supabase';
+	import { algodClient } from "$lib/utils/algod";
 	import InfoButton from "./ui/InfoButton.svelte";
-    import GalaxeIconImage from "$lib/assets/galxe_icon.jpeg";
 
     export let project: IProject;
     export let wallet: string | null;
 
+    let steps = [
+        {
+            name: 'Wallet Offline',
+            detected: false,
+            additionalInfo: ''
+        },
+        {
+            name: 'Telemetry Not Detected',
+            detected: false,
+            additionalInfo: ''
+        },
+        {
+            name: 'Health Score >= 5.0',
+            detected: false,
+            additionalInfo: ''
+        }
+    ];
+
     $: localProject = project;
     $: loading = true;
 
+    const displayBalance = (amt: number) => {
+        return (amt / Math.pow(10,6)).toLocaleString();
+    }
+
     async function getNodePoints() {
         try {
-            const url = `https://api.voirewards.com/proposers/index_p2.php?action=walletPoints&wallet=${wallet}`;
-            const data = await fetch(url).then((response) => response.json());
+            if (wallet) {
+                const url = `https://api.voirewards.com/proposers/index_p2.php?action=walletPoints&wallet=${wallet}`;
+                const data = await fetch(url).then((response) => response.json());
 
-            // data is an object of objects with key: date, { health, points }
-            let points = Object.keys(data).map((key) => {
-                return { date: key, health: data[key].health, points: data[key].points };
-            });
-            
-            // find the quest with name "run_a_node"
-            let ni = localProject.quests.find((quest) => quest.name === 'run_a_node');
-            if (ni) ni.earned = points.reduce((acc, cur) => acc + cur.points, 0);
+                // data is an object of objects with key: date, { health, points }
+                let points = Object.keys(data).map((key) => {
+                    return { date: key, health: data[key].health, points: data[key].points, hours: data[key].hours };
+                });
+                
+                // find the quest with name "run_a_node"
+                let ni = localProject.quests.find((quest) => quest.name === 'run_a_node');
+                if (ni) {
+                    const filteredPoints = points.slice(0, -1); // Exclude the last record
+                    ni.earned = filteredPoints.reduce((acc, cur) => acc + cur.points, 0);
+                }
 
-            loading = false;
+                const accountInfo = await algodClient.accountInformation(wallet).do();
+                if (accountInfo.status === 'Offline') {
+                    steps[0].detected = false;
+                    steps[0].name = 'Wallet Offline';
+                }
+                else if (accountInfo.status === 'Online') {
+                    steps[0].detected = true;
+                    steps[0].name = 'Wallet Online';
+                    steps[0].additionalInfo = `Online Balance: ${displayBalance(accountInfo.amount)} VOI`;
+                }
+                
+                if (points[points.length-1].hours > 0) {
+                    steps[1].detected = true;
+                    steps[1].name = 'Telemetry Detected';
+                    steps[1].additionalInfo = `Current Weekly Health Score: ${points[points.length-1].health}`;
+                }
+
+                if (points[points.length-1].health >= 5.0) {
+                    steps[2].detected = true;
+                    steps[2].additionalInfo = 'Maintain health score above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).'
+                }
+                else {
+                    if (points[points.length-1].hours < 168) {
+                        steps[2].additionalInfo = 'Health score should continue to climb until it has been online for a full week.';
+                    }
+                    else {
+                        steps[2].additionalInfo = 'Health score must be above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).';
+                    }
+                }
+            }
         } catch (error) {
             console.error('Failed to fetch points:', error);
         }
+        //loading = false;
     }
 
     async function getNomadexPoints() {
@@ -282,6 +338,7 @@
 
         return result;
     }
+
 </script>
 <div class="bg-purple-300 dark:bg-purple-800 dark:text-white p-4 rounded-lg shadow-lg mt-4">
     <div class="flex flex-col md:flex-row md:items-center justify-between">
@@ -325,53 +382,101 @@
     </a>
     <div class="flex flex-wrap justify-around p-4">
         {#each localProject.quests as quest, i}
-            <div class="w-full sm:w-1/2 md:w-1/3 text-black bg-[#65DBAB] rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
+            <div class="{quest.name != 'run_a_node' ? 'w-full sm:w-1/2 md:w-1/3' : ''} text-black bg-[#65DBAB] rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
                 <div class="px-6 py-4">
                     <div class="font-bold text-xl mb-2">{quest.title}</div>
                     {#if quest.title !== quest.description}
                         <p class="text-gray-700 text-base">{quest.description}</p>
                     {/if}
                 </div>
-                <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
-                    <div>
-                        <span class="text-gray-800 text-sm">Frequency:</span>
-                        <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
-                    </div>
-                    {#if quest.guide}
-                        <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
-                            View Guide
-                        </a>
-                    {/if}
-                </div>
-                <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
-                    {#if !project.realtime || quest.earned == -1 || !quest.name}
-                        <div class="text-xs text-red-500 flex flex-row">
-                            Status unavailable
-                            <InfoButton noAbsolute={true}>
-                                <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
-                            </InfoButton>
+                {#if quest.name != 'run_a_node'}
+                    <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
+                        <div>
+                            <span class="text-gray-800 text-sm">Frequency:</span>
+                            <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
                         </div>
-                    {:else if !wallet}
-                        <div class="text-xs text-red-500">Enter Wallet to View Status</div>
-                    {:else if loading}
-                        <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
-                    {:else if quest.earned}
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-check text-green-500 text-3xl"></i>
-                            <span>Completed</span>
-                        </div>
-                        {#if quest.frequency ?? 'Once' != 'Once'}
-                            <p class="text-xs text-green-800">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
+                        {#if quest.guide}
+                            <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
+                                View Guide
+                            </a>
                         {/if}
-                    {:else}
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-times text-red-500 text-3xl"></i>
-                            <span>Incomplete</span>
+                    </div>
+                    <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
+                        {#if !project.realtime || quest.earned == -1 || !quest.name}
+                            <div class="text-xs text-red-500 flex flex-row">
+                                Status unavailable
+                                <InfoButton noAbsolute={true}>
+                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
+                                </InfoButton>
+                            </div>
+                        {:else if !wallet}
+                            <div class="text-xs text-red-500">Enter Wallet to View Status</div>
+                        {:else if loading}
+                            <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
+                        {:else if quest.earned}
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-check text-green-500 text-3xl"></i>
+                                <span>Completed</span>
+                            </div>
+                            {#if quest.frequency ?? 'Once' != 'Once'}
+                                <p class="text-xs text-green-800">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
+                            {/if}
+                        {:else}
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-times text-red-500 text-3xl"></i>
+                                <span>Incomplete</span>
+                            </div>
+                        {/if}
+                    </div>
+                {:else}
+                    <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
+                        {#if quest.guide}
+                            <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
+                                View Guide
+                            </a>
+                        {/if}
+                    </div>
+                    {#if !loading}
+                        <div class="flex flex-col items-center m-2 mt-4">
+                            <ul>
+                            {#each steps as {name, detected, additionalInfo}}
+                                <li class="flex items-start mb-4">
+                                {#if detected}
+                                    <span class="text-green-500 mb-2 mr-2">&#10003;</span>
+                                {:else}
+                                    <span class="text-red-500 mb-2 mr-2">&#10007;</span>
+                                {/if}
+                                <div class="flex flex-col">
+                                    <div>{name}</div>
+                                    <div class="text-sm">{additionalInfo}</div>
+                                </div>
+                                </li>
+                            {/each}
+                            </ul>
                         </div>
                     {/if}
-                </div>
-                {#if quest.name == 'run_a_node'}
-                    <div class='p-3 text-xs font-bold text-red-900'>Points are earned for each heathly week of node running. Quest status currently does not update until then. This should be improved within the next few days.</div>
+                    <div class="px-6 pt-1 pb-2 flex flex-row items-center justify-center space-x-4">
+                        {#if !project.realtime || quest.earned == -1 || !quest.name}
+                            <div class="text-xs text-red-500 flex flex-row">
+                                Status unavailable
+                                <InfoButton noAbsolute={true}>
+                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
+                                </InfoButton>
+                            </div>
+                        {:else if !wallet}
+                            <div class="text-xs text-red-500">Enter Wallet to View Status</div>
+                        {:else if loading}
+                            <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
+                        {:else if quest.earned}
+                            <div class="text-sm text-green-800">
+                                <div>Weeks earned so far: {quest.earned}</div>
+                                <div class="text-xs">(Not including current week)</div>
+                            </div>
+                        {/if}
+                    </div>
+                    <div class="p-4">
+                        NOTICE: If multiple wallets are staked to the same node, the points will be divided among the wallets.
+                    </div>
                 {/if}
             </div>
         {/each}
