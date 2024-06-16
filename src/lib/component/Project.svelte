@@ -83,7 +83,7 @@
         } catch (error) {
             console.error('Failed to fetch points:', error);
         }
-        //loading = false;
+        loading = false;
     }
 
     async function getNomadexPoints() {
