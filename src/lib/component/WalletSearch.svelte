@@ -43,7 +43,7 @@
             document.addEventListener('click', handleClickOutside);
 
             // Read searchText from local storage
-            if (loadPreviousValue) {
+            if (loadPreviousValue && searchText == '') {
                 const storedSearchText = localStorage.getItem('searchText');
                 if (storedSearchText) {
                     searchText = storedSearchText;
@@ -92,11 +92,6 @@
             localStorage.setItem('searchText', searchText);
         }*/
         
-        console.log(searchText);
-        if (searchText && searchText.length > 0) {
-            localStorage.setItem('searchText', searchText);
-        }
-
         if (selectedAddressIndex >= 0) {
             addr = addressList[selectedAddressIndex];
         }
@@ -110,8 +105,13 @@
             }
             return;
         }
-        else if (storeAddress && addr) {
-            localStorage.setItem('searchText', addr);
+        else if (storeAddress) {
+            if (addr) {
+                localStorage.setItem('searchText', addr);
+            }
+            else if (searchText && searchText.length > 0) {
+                localStorage.setItem('searchText', searchText);
+            }
         }
 
         onSubmit(addr??searchText);

@@ -61,22 +61,24 @@
                     steps[0].additionalInfo = `Online Balance: ${displayBalance(accountInfo.amount)} VOI`;
                 }
                 
-                if (points[points.length-1].hours > 0) {
-                    steps[1].detected = true;
-                    steps[1].name = 'Telemetry Detected';
-                    steps[1].additionalInfo = `Current Weekly Health Score: ${points[points.length-1].health}`;
-                }
+                if (points && points.length > 0) {
+                    if (points[points.length-1] && points[points.length-1].hours > 0) {
+                        steps[1].detected = true;
+                        steps[1].name = 'Telemetry Detected';
+                        steps[1].additionalInfo = `Current Weekly Health Score: ${points[points.length-1].health}`;
+                    }
 
-                if (points[points.length-1].health >= 5.0) {
-                    steps[2].detected = true;
-                    steps[2].additionalInfo = 'Maintain health score above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).'
-                }
-                else {
-                    if (points[points.length-1].hours < 168) {
-                        steps[2].additionalInfo = 'Health score should continue to climb until it has been online for a full week.';
+                    if (points[points.length-1].health >= 5.0) {
+                        steps[2].detected = true;
+                        steps[2].additionalInfo = 'Maintain health score above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).'
                     }
                     else {
-                        steps[2].additionalInfo = 'Health score must be above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).';
+                        if (points[points.length-1].hours < 168) {
+                            steps[2].additionalInfo = 'Health score should continue to climb until it has been online for a full week.';
+                        }
+                        else {
+                            steps[2].additionalInfo = 'Health score must be above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).';
+                        }
                     }
                 }
             }

@@ -3,10 +3,21 @@
 	import { goto } from "$app/navigation";
     import type { PageData } from './$types';
 	import QuestComponent from "$lib/component/QuestComponent.svelte";
+	import { onMount } from "svelte";
 
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | null;
+    let searchText: string | undefined;
     let projectId = data.props.projectId;
+
+    onMount(() => {
+        if (selectedWallet) {
+            searchText = selectedWallet;
+        }
+        else if (searchText) {
+            selectedWallet = searchText;
+        }
+    });
 </script>
 <div class="flex flex-col dark:bg-purple-950">
     <div class="flex flex-col {projectId ? 'blur-sm' : ''}">
@@ -28,7 +39,7 @@
         <br/>
         <p class="text-center">Enter a wallet address to see your Voi TestNet Phase #2 Quest Progress</p>
         <div class="text-center">
-            <WalletSearch onSubmit={(addr) => goto(`/phase2/${addr}`)} loadPreviousValue={false} clearOnSubmit={true} />
+            <WalletSearch onSubmit={(addr) => goto(`/phase2/${addr}`)} loadPreviousValue={true} clearOnSubmit={true} storeAddress={true} bind:searchText={searchText} />
         </div>
         {#if selectedWallet}
             <br/>

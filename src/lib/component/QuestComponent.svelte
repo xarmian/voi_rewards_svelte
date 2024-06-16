@@ -1,10 +1,10 @@
 <script lang="ts">
-    import Project from "$lib/component/Project.svelte";
     import type { IProject } from "$lib/data/types.js";
     import projects from "../../routes/(site)/phase2/[...slug]/projects.js";
 	import ProjectSlideout from "../../routes/(site)/quests/ProjectSlideout.svelte";
 
-    export let walletId: string | null;
+    export let walletId: string | undefined;
+    console.log(walletId);
     let isDropdownOpen: boolean = false;
     export let selectedTab = 0;
 
@@ -128,7 +128,7 @@
     {/if}
 </div>-->
 {#if selectedTab}
-    <ProjectSlideout bind:projectid={selectedTab}></ProjectSlideout>
+    <ProjectSlideout bind:projectid={selectedTab} bind:walletId={walletId}></ProjectSlideout>
 {/if}
 
 <style>

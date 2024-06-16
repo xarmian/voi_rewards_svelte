@@ -5,7 +5,7 @@
 	import { onMount } from "svelte";
 
     let selectedWallet: string | undefined;
-    let searchWallet: string | undefined;
+    export let searchWallet: string | undefined = selectedWallet;
     export let projectId;
     $: project = projects.find((p) => p.id == projectId);
 
