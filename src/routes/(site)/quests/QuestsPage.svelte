@@ -101,7 +101,7 @@
           </div>
       </div>
 
-      <div class={`p-4 md:p-20 text-black flex justify-between items-center min-h-72 md:h-72 flex-row-reverse`}>
+      <div class={`p-4 from-right-third text-black flex items-center min-h-72 md:h-72 flex-row-reverse`}>
           <Saos once={true} animation={`${!isMobile ? 'from-right' : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
               <div class="project flex flex-row justify-between shadow-md shadow-black bg-[#65DBAB] border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10">
                   <div class='flex flex-col max-w-screen-sm h-full'>
@@ -119,7 +119,7 @@
       </div>
 
       {#each filteredProjects as project, i}
-          <div class={`p-4 md:px-20 text-black flex flex-row justify-between items-center min-h-72 md:h-72 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
+        <div class={`p-4 text-black flex flex-row items-center min-h-72 md:h-72 ${i % 2 === 0 ? 'from-left-third' : 'flex-row-reverse from-right-third'}`}>
               <Saos once={true} animation={`${!isMobile ? (i % 2 ? 'from-right' : 'from-left') : ''} 0.5s cubic-bezier(0.35, 0.5, 0.65, 0.95) both`}>
                   <div class="project flex flex-col shadow-md shadow-black bg-[#65DBAB] border border-black p-6 sm:w-[30rem] rounded-2xl space-x-2 z-10">
                     <h1 class="text-3xl font-bold mb-2">{project.type}</h1>
@@ -257,5 +257,13 @@
   .hero-section .cta-button:hover {
     background-color: #672ed9;
     color: white;
+  }
+  .from-left-third {
+    margin-left: calc(33.33% - 22rem);
+    margin-right: auto;
+  }
+  .from-right-third {
+    margin-right: calc(33.33% - 22rem);
+    margin-left: auto;
   }
 </style>
