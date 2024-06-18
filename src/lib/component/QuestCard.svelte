@@ -29,7 +29,7 @@
                 <div class="text-xs text-red-500 flex items-center space-x-2">
                     <i class="fas fa-exclamation-circle"></i>
                     <span>Status unavailable</span>
-                    <InfoButton noAbsolute={true}>
+                    <InfoButton noAbsolute={true} buttonColor="text-blue-700">
                         <p class="text-xs">Completion status is not currently available for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
                     </InfoButton>
                 </div>
