@@ -63,7 +63,7 @@
             },
             {
                 text: 'VOI Discord',
-                url: 'htps://discord.gg/voinetwork',
+                url: 'https://discord.gg/voi-network',
             },
             {
                 text: '@Voi_Net Twitter',
@@ -103,7 +103,7 @@
             4. Wait a few hours for your node to appear on the <A href="https://voi-nodes.dev/">Voi-Node Metrics Dashboard</A>, then periodically monitor your node's health. On the Monday following a Healthy <b>weekly</b> score of 5.0 or higher, you will be awarded quest points, which can be seen in the <A href="/phase2">Voi Rewards Quest Tracker</A>.
         </li>
         <li class='ml-10 m-2'>
-            <b>NEED HELP?</b> If you have any questions or need help, visit the <A href="htps://discord.gg/voinetwork" target="_blank">Voi Discord</A> for assistance.
+            <b>NEED HELP?</b> If you have any questions or need help, visit the <A href="https://discord.gg/voi-network" target="_blank">Voi Discord</A> for assistance.
         </li>
     </ul>
     {#each categories as category}

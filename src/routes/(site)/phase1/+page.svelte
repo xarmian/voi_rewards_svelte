@@ -60,7 +60,7 @@
                 however it is not guaranteed to be accurate. Please verify with official sources before making any decisions.
             </p>
             <br/>
-            <p>As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
+            <p>As always please visit the <a href="https://discord.gg/voi-network" target="_blank" class="underline text-yellow-700">Voi Discord</a>
                 for more specific help, and find the <a href="https://medium.com/@voifoundation/testnet-phases-announcement-338b929798bb" target="_blank" class="underline text-yellow-700">official Phase 1 announcement here</a>.
             </p>
         </div>

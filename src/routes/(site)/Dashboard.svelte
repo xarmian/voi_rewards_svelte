@@ -96,7 +96,7 @@
 <!--<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
 	<p class="font-bold">Notice:</p>
 	<p>Visit our <a href="/quests" class="underline text-yellow-700">Quest</a> page for details about Phase 2 Quests.</p>
-	<p>This page now shows cumulative points toward Phase 2 for running a Healthy node. Visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700">Voi Discord</a>
+	<p>This page now shows cumulative points toward Phase 2 for running a Healthy node. Visit the <a href="https://discord.gg/voi-network" target="_blank" class="underline text-yellow-700">Voi Discord</a>
 		for more information.
 	</p>
 </div>-->

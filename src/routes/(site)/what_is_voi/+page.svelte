@@ -27,7 +27,7 @@
             </A>
 		</li>
 		<li>
-            <A href="https://t.co/mXYdYkWE6i" target="_blank"><DiscordSolid class="inline" />
+            <A href="https://discord.gg/voi-network" target="_blank"><DiscordSolid class="inline" />
                 <span class="m-2">VOI Discord</span>
             </A>
         </li>

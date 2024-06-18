@@ -31,7 +31,7 @@
                     This page is intended to help the community track their TestNet Phase 2 Quest progress.
                 </p>
                 <br/>
-                <p>As always please visit the <a href="https://discord.gg/vnFbrJrHeW" target="_blank" class="underline text-yellow-700 dark:text-yellow-300">Voi Discord</a>
+                <p>As always please visit the <a href="https://discord.gg/voi-network" target="_blank" class="underline text-yellow-700 dark:text-yellow-300">Voi Discord</a>
                     for more specific help, and find the <a href="https://medium.com/@voifoundation/phase-2-of-the-incentivised-testnet-bf32d880e8f4" target="_blank" class="underline text-yellow-700 dark:text-yellow-300">Official Phase 2 announcement here</a>.
                 </p>
             </div>
