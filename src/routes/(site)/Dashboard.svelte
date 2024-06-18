@@ -208,7 +208,7 @@
 		flex-wrap: wrap;
 		justify-content: center;
 	}
-	.quote {
+	/*.quote {
 		margin: 1rem 0;
 		padding: 1rem;
 		border-left: 5px solid #007bff;
@@ -225,7 +225,7 @@
 		font-size: 1rem;
 		font-weight: bold;
 		text-align: right;
-	}
+	}*/
 	.cardInner {
 		display: flex;
 		flex-direction: column;

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import QuestCard from './QuestCard.svelte';
+
     import type { IProject, IQuest} from "$lib/data/types";
     import { supabasePublicClient } from '$lib/supabase';
 	import { algodClient } from "$lib/utils/algod";
@@ -344,46 +346,42 @@
     }
 
 </script>
-<div class="bg-purple-300 dark:bg-purple-800 dark:text-white p-4 rounded-lg shadow-lg mt-4">
-    <div class="flex flex-col md:flex-row md:items-center justify-between">
-        <div class="mb-4 md:mb-0">
+<div class="dark:bg-purple-400 dark:text-white p-4 rounded-lg shadow-lg mt-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between space-x-4">
+        <div class="mb-4 md:mb-0 flex-grow self-start">
             <h2 class="text-3xl font-bold">
-                {#if project.url}
-                    <a class="text-blue-900 dark:text-blue-300 hover:text-blue-700 hover:dark:text-blue-100 underline cursor-pointer" target="_blank" href={project.url}>
+                {#if project.logo && project.url}
+                    <a target="_blank" href={project.url}>
+                        <img class="h-24 rounded-lg" src={project.logo} alt={project.title} />
+                    </a>
+                {:else if project.url}
+                    <a class="text-blue-900 hover:text-blue-700 underline cursor-pointer" target="_blank" href={project.url}>
                         {project.title}
                     </a>
                 {:else}
                     {project.title}
                 {/if}
             </h2>
-            <p class="text-gray-800 dark:text-gray-200 text-sm">{project.description}</p>
+            <p class="text-gray-800 text-sm">{project.description}</p>
             {#if !project.realtime}
-                <div class="text-xs text-red-500">Live quest tracking is not yet available for this project.</div>
+                <div class="text-xs text-red-800">Live quest tracking is not yet available for this project.</div>
             {/if}
         </div>
-        <div class="flex flex-row space-x-4">
+        <div class="flex flex-col space-y-4">
             {#if project.guide}
-                <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.guide}>
-                    <span class="text-lg underline">Project Quest Guide</span>
-                </a>
+                <button class="flex items-center space-x-2 bg-white rounded-full text-blue-800 hover:text-blue-700 hover:bg-gray-100 outline-gray-800 hover:outline cursor-pointer" on:click={() => window.open(project.guide)}>
+                    <span class="text-lg p-4">{project.title} Quest Guide</span>
+                </button>
             {/if}
             {#if project.twitter}
-                <a class="flex items-center space-x-2 text-blue-300 hover:text-blue-200 cursor-pointer" target="_blank" href={project.twitter}>
-                    <span class="text-lg underline">Project Twitter</span>
-                </a>
+                <button class="flex items-center space-x-2 bg-white rounded-full text-blue-800 hover:text-blue-700 hover:bg-gray-100 outline-gray-800 hover:outline cursor-pointer" on:click={() => window.open(project.twitter)}>
+                    <span class="text-lg p-4">{project.title} Twitter/X</span>
+                </button>
             {/if}
         </div>
     </div>
 </div>
 <div class="flex flex-col justify-center">
-    <a href={project.url} target="_blank" class="place-self-center h-24 flex flex-col justify-center content-center place-items-centerinline-block bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg mt-4 hover:bg-purple-700">
-        <span class="mr-2 self-center">
-            <i class="fas fa-external-link-alt"></i>
-        </span>
-        <div>
-            Go to {project.title}
-        </div>
-    </a>
     <div class="flex flex-wrap justify-around p-4">
         {#each localProject.quests as quest, i}
             <div class="{quest.name != 'run_a_node' ? 'w-full sm:w-1/2 md:w-1/3' : ''} text-black bg-[#65DBAB] rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
@@ -394,44 +392,7 @@
                     {/if}
                 </div>
                 {#if quest.name != 'run_a_node'}
-                    <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
-                        <div>
-                            <span class="text-gray-800 text-sm">Frequency:</span>
-                            <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">{quest.frequency ?? 'Once'}</span>
-                        </div>
-                        {#if quest.guide}
-                            <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
-                                View Guide
-                            </a>
-                        {/if}
-                    </div>
-                    <div class="px-6 pt-4 pb-2 flex flex-row items-center justify-center space-x-4">
-                        {#if !project.realtime || quest.earned == -1 || !quest.name}
-                            <div class="text-xs text-red-500 flex flex-row">
-                                Status unavailable
-                                <InfoButton noAbsolute={true}>
-                                    <p class="text-xs">We are currently unable to track the completion status for this quest. Quests or actions listed should still be tracked if done properly, and may be visible on other platforms such as Galxe, on the Project's own page, or not available yet. A link to the project's Galaxe page is available above this quest table.</p>
-                                </InfoButton>
-                            </div>
-                        {:else if !wallet}
-                            <div class="text-xs text-red-500">Enter Wallet to View Status</div>
-                        {:else if loading}
-                            <i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i>
-                        {:else if quest.earned}
-                            <div class="flex items-center space-x-2">
-                                <i class="fas fa-check text-green-500 text-3xl"></i>
-                                <span>Completed</span>
-                            </div>
-                            {#if quest.frequency ?? 'Once' != 'Once'}
-                                <p class="text-xs text-green-800">+{quest.earned} point{quest.earned > 1 ? 's' : ''}</p>
-                            {/if}
-                        {:else}
-                            <div class="flex items-center space-x-2">
-                                <i class="fas fa-times text-red-500 text-3xl"></i>
-                                <span>Incomplete</span>
-                            </div>
-                        {/if}
-                    </div>
+                    <QuestCard {project} {quest} {wallet} {loading}></QuestCard>                
                 {:else}
                     <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
                         {#if quest.guide}

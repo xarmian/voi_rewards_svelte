@@ -62,6 +62,7 @@ export type IProject = {
     tracking?: boolean;
     realtime?: boolean;
     status?: string; // 'active' or 'inactive'
+    logo?: string;
 };
 
 export type IQuest = {
