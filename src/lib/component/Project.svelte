@@ -346,7 +346,7 @@
     }
 
 </script>
-<div class="dark:bg-purple-400 dark:text-white p-4 rounded-lg shadow-lg mt-4">
+<div class="dark:bg-purple-400 dark:text-white p-4 sm:rounded-lg shadow-lg mt-4">
     <div class="flex flex-col md:flex-row md:items-center justify-between space-x-4">
         <div class="mb-4 md:mb-0 flex-grow self-start">
             <h2 class="text-3xl font-bold">
