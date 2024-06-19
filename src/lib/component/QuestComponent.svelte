@@ -73,7 +73,7 @@
                             {#if project.logo}
                                 <img src={project.logo} alt={project.title} class="h-12" />
                             {:else}
-                                <div>{project.title}</div>
+                                <div class="text-2xl">{project.title}</div>
                             {/if}
                             <div class='text-sm'>{project.type}</div>
                         </div>
