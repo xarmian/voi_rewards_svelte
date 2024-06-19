@@ -54,18 +54,19 @@
 
 </script>
 <div class="flex flex-wrap sm:justify-center mx-auto {selectedTab ? 'blur-sm' : ''}">
-    <div class="flex flex-col sm:w-full lg:w-3/4 m-2">
+    <div class="flex flex-col sm:w-full lg:w-full m-2">
     {#each Object.entries(groupedProjects) as [category, projects]}
-        <div class="flex flex-col">
-            <h2 class="text-lg ml-3">{category}</h2>
-            <div class="flex flex-row flex-wrap">
+        <div class="flex flex-col mt-4">
+            <h2 class="text-xl font-semibold py-2 px-4 bg-purple-900 text-white rounded-lg shadow-md">
+                {category}
+            </h2>            <div class="flex flex-row flex-wrap">
                 {#each projects as project, i}
                     <a 
-                        class="cursor-pointer border rounded-xl w-full sm:w-2/6 h-52 flex flex-col justify-between
+                        class="cursor-pointer border rounded-xl w-full sm:w-1/3 h-52 flex flex-col justify-between
                         py-2 px-3 font-semibold m-2 my-2 shadow-xl
-                    dark:hover:text-gray-100 hover:border-gray-300 dark:hover:border-gray-300 
-                        bg-blue-100 border-blue-50 dark:border-blue-700 dark:bg-slate-900 hover:bg-blue-300 dark:hover:bg-slate-800
-                        {selectedTab === project.id ? 'text-white !bg-blue-500 dark:!bg-blue-500' : 'text-black dark:text-gray-200'}" 
+                    text-black hover:border-gray-800 dark:hover:border-white
+                        bg-blue-100 border-blue-50 dark:border-blue-700 dark:bg-[#65DBAB]
+                        " 
                         class:disabled={(project.status??'inactive') !== 'active'}
                         on:click={() => selectedTab = project.id}>
                         <div class="flex-col justify-between">
@@ -74,14 +75,14 @@
                             {:else}
                                 <div>{project.title}</div>
                             {/if}
-                            <div class='text-xs'>{project.type}</div>
+                            <div class='text-sm'>{project.type}</div>
                         </div>
-                        <div class="text-sm">{project.quests.length} quest{project.quests.length > 1 ? 's' : ''}</div>
+                        <div class="">{project.quests.length} quest{project.quests.length > 1 ? 's' : ''}</div>
                         <div class="flex justify-end">
                             {#if (project.status??'inactive') !== 'active'}
-                                <div class="text-xs text-red-500 dark:text-red-300">Coming soon!</div>
+                                <div class="text-sm text-red-500 dark:text-red-300">Coming soon!</div>
                             {:else if project.realtime??false}
-                                <div class="text-xs text-green-800 dark:text-green-300">Realtime Data ⚡</div>
+                                <div class="text-sm text-green-900">Realtime Data ⚡</div>
                             {:else}
                                 <div>&nbsp;</div>
                             {/if}

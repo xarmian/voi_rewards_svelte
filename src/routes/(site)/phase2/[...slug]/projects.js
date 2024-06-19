@@ -221,7 +221,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC1sHtz1VC",
         status: 'active',
         realtime: true,
-        logo: 'logos/nftnavigator.png',
+        logo: '/logos/nftnavigator.png',
         quests: [
             {
                 id: 1,
@@ -300,7 +300,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCQebtzCd3",
         status: 'active',
         realtime: true,
-        logo: 'logos/NomadexLogoFull.webp',
+        logo: '/logos/NomadexLogoFull.webp',
         quests: [   
             {
                 id: 1,
@@ -380,7 +380,7 @@ const projects = [
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCezbtz9PD",
         status: "active",
         realtime: true,
-        logo: 'logos/humble.svg',
+        logo: '/logos/humble.svg',
         quests: [
             {
                 id: 1,
@@ -500,7 +500,7 @@ const projects = [
         twitter: "https://x.com/highforgeio",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCAZPtzxsy",
         status: 'active',
-        logo: 'logos/highforge.png',
+        logo: '/logos/highforge.png',
         quests: [
             {
                 id: 1,
@@ -748,7 +748,7 @@ const projects = [
         description: "MechaSwap is a trustless NFT swap platform. Complete tasks on MechaSwap to earn points.",
         url: "https://mechaswap.nautilus.sh",
         status: "active",
-        logo: 'logos/mecha-swap.webp',
+        logo: '/logos/mecha-swap.webp',
         realtime: true,
         quests: [
             {
