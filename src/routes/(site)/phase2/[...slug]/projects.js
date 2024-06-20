@@ -813,6 +813,7 @@ const projects = [
                 description: "Send a Chub v2 to a friend",
                 status: null,
                 reward: 1,
+                frequency: 'Weekly',
             },
             {
                 id: 3,
@@ -821,6 +822,7 @@ const projects = [
                 description: "Hold onto a Chub v2 and keep it in your wallet",
                 status: null,
                 reward: 1,
+                frequency: 'Weekly',
             },
         ]
     }
