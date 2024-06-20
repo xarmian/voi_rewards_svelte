@@ -18,7 +18,8 @@
         {
             name: 'Telemetry Not Detected',
             detected: false,
-            additionalInfo: ''
+            additionalInfo: 'Ensure your node has at least 2000 VOI, telemetry is enabled',
+            additionalInfo2: 'It may take a few hours for telemetry to be detected after starting your node.'
         },
         {
             name: 'Health Score >= 5.0',
@@ -290,6 +291,49 @@
         }
     }
 
+    async function getChubsPoints() {
+        let url;
+        let quest;
+
+        try {
+            // grab_chub
+            quest = project.quests[0];
+            url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&to=${wallet}&limit=1`;
+            let data = await fetch(url).then((response) => response.json());
+            if (data.transfers.length > 0) {
+                quest.earned = 1;
+            }
+            else {
+                url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/mp/sales?collectionId=48716545&buyer=${wallet}&limit=1`;
+                data = await fetch(url).then((response) => response.json());
+                if (data.sales.length > 0) {
+                    quest.earned = 1;
+                }
+            }
+
+            // share_chub
+            quest = project.quests[1];
+            url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&from=${wallet}&limit=1`;
+            data = await fetch(url).then((response) => response.json());
+            if (data.transfers.length > 0) {
+                quest.earned = 1;
+            }
+
+            // hold_chub
+            quest = project.quests[2];
+            url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/tokens?contractId=48716545&owner=${wallet}&limit=1`;
+            data = await fetch(url).then((response) => response.json());
+            if (data.tokens.length > 0) {
+                quest.earned = 1;
+            }
+
+           loading = false;
+        }
+        catch (error) {
+            console.error('Failed to fetch Chubs points:', error);
+        }
+    }
+
     $: if (wallet) {
         loading = true;
         switch(project.title) {
@@ -316,6 +360,9 @@
                 break;
             case 'Humble':
                 getHumblePoints();
+                break;
+            case 'Chubs':
+                getChubsPoints();
                 break;
             default:
                 for (let i = 0; i < project.quests.length; i++) {

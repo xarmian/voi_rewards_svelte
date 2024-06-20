@@ -520,6 +520,15 @@ const projects = [
                 guide: 'https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d',
                 reward: 1,
             },
+            {
+                id: 3,
+                title: 'Quest 3: Mint w/ Arc200',
+                description: 'The excitement continues! Acquire a specific Arc200 coin from other DeFi platforms, or other users, then mint your NFT to complete the quest. Stay tuned for the link and step-by-step instructions!',
+                frequency: 'Once',
+                status: null,
+                guide: 'https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d',
+                reward: 1,
+            },
         ],
     },
     {
@@ -777,5 +786,43 @@ const projects = [
             },
         ]
     },
+    {
+        id: 16,
+        title: "Chubs",
+        type: "Chubs v2 NFT Collection",
+        category: "NFTs",
+        description: "Chubs v2 is a collection of NFTs on Voi. Use your Chub to complete tasks and earn points.",
+        url: "https://nftnavigator.xyz/collection/48716545",
+        status: "active",
+        realtime: true,
+        logo: '/logos/chubs.png',
+        reward: 1,
+        quests: [
+            {
+                id: 1,
+                name: "grab_chub",
+                title: "Grab a Chub",
+                description: "Grab a Chub from the Chubs v2 collection by minting, buying, or receiving one",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 2,
+                name: "share_chub",
+                title: "Share your Chub",
+                description: "Send a Chub v2 to a friend",
+                status: null,
+                reward: 1,
+            },
+            {
+                id: 3,
+                name: "hold_chub",
+                title: "Hold your Chub",
+                description: "Hold onto a Chub v2 and keep it in your wallet",
+                status: null,
+                reward: 1,
+            },
+        ]
+    }
 ];
 export default projects;
