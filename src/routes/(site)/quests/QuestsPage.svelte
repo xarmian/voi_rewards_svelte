@@ -1,29 +1,25 @@
 <script lang="ts">
   import ProjectSlideout from './ProjectSlideout.svelte';
-
-    import { onMount, onDestroy } from 'svelte';
     //import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
     import projects from '../phase2/[...slug]/projects';
     import { browser } from '$app/environment';
-    import Saos from "saos";
-    //@ts-ignore
-    import Device from 'svelte-device-info';
+	import { goto } from '$app/navigation';
+  
 
-    let isMobile = false;
-    let selectedProjectId: number | null = null;
-    let logoElement: HTMLImageElement;
-    let arrowElement: SVGSVGElement;
+    export let selectedProjectId: number | null = null;
 
     $: if (selectedProjectId || selectedProjectId == null) {
-        if (browser && document) {
-            if (selectedProjectId) {
-                document.body.style.overflow = 'hidden';
-            }
-            else {
-                document.body.style.overflow = 'auto';
-            }
-        }
+      if (browser && document) {
+          if (selectedProjectId) {
+              document.body.style.overflow = 'hidden';
+          }
+          else {
+              document.body.style.overflow = 'auto';
+          }
+          const p = projects.find(p => p.id === selectedProjectId);
+          goto('/quests/' + encodeURIComponent(p?.title ?? ''));
+      }
     }
 
     // filter projects list by title, keep only the titles in the keep array and sort by keep array
@@ -32,46 +28,11 @@
     const otherProjects = projects.filter(project => !keep.includes(project.title));
     const filteredProjects = keptProjects.concat(otherProjects);
 
-    onMount(() => {
-        if (browser) {
-            const arrow = document.querySelector('.arrow');
-
-            arrow?.addEventListener('click', () => {
-                window.scroll({
-                    top: window.innerHeight,
-                    behavior: 'smooth'
-                });
-            });
-
-            setTimeout(() => {
-                if (logoElement && arrowElement) {
-                    //logoElement.src = VoiLogoStatic;
-                    arrowElement.classList.remove('animate-bounce');
-                }
-            }, 4500)
-        }
-
-        isMobile = Device.isMobile;
-    });
-
-    onDestroy(() => {
-        if (browser) {
-            const arrow = document.querySelector('.arrow');
-
-            arrow?.removeEventListener('click', () => {
-                window.scroll({
-                    top: window.innerHeight,
-                    behavior: 'smooth'
-                });
-            });
-        }
-    });
-
 </script>
 
 <div class={`${selectedProjectId ? 'blur-sm' : ''} flex flex-col items-center`} style="background-color: rgb(111,42,226)">
   <div class="flex flex-col h-1/2">
-    <img bind:this={logoElement} src={VoiLogoStatic} alt="Voi Logo" class="-my-36 h-[40rem] z-0 self-center object-cover object-center" style="clip-path: inset(180px 0 180px 0)">
+    <img src={VoiLogoStatic} alt="Voi Logo" class="-my-36 h-[40rem] z-0 self-center object-cover object-center" style="clip-path: inset(180px 0 180px 0)">
     <div class="flex flex-col justify-center items-center text-white z-10 -my-16 mb-20">
         <h1 class="text-5xl font-bold text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
     </div>
