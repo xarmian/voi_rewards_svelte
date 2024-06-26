@@ -18,7 +18,9 @@
               document.body.style.overflow = 'auto';
           }
           const p = projects.find(p => p.id === selectedProjectId);
-          goto('/quests/' + encodeURIComponent(p?.title ?? ''));
+
+          const newUrl = '/quests/' + encodeURIComponent(p?.title ?? '');
+          history.pushState({ path: newUrl }, '', newUrl);
       }
     }
 
