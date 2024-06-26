@@ -17,7 +17,7 @@ export const load = async ({ params }) => {
     const pageMetaTags = {
         title: 'Voi Testnet Quests' + (project?.title ? ` | ${project.title}` : ''),
         description: project?.description || 'Get Your Quest On, with the Voi Testnet Network',
-        imageUrl: project?.logo ? ('https://voirewards.com' + project?.logo) : 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
+        imageUrl: project?.logo ? ('https://voirewards.com' + project?.logo.replace(/\.(svg|webp)$/, '.png')) : 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png',
     };
 
     return {
