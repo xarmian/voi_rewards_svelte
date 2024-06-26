@@ -81,12 +81,14 @@
       <div class="hero-section py-16">
           <div class="mt-12 text-3xl">Getting Started</div>
           <div class="text-2xl my-6 w-full sm:w-1/2">Get started by downloading a wallet, securing Testnet tokens, and familiarizing yourself with the Voi ecosystem.</div>
-          <div class="cta-buttons flex-row flex-wrap justify-center my-10">
+          <div class="cta-buttons flex-row flex-wrap justify-center mt-10 mb-10 max-w-[60rem]">
             <a href='https://kibis.is/' target="_blank" class="cta-button">Wallet</a>
             <a href='https://voiager.org/get-started' target="_blank" class="cta-button">$VOI<br/>Faucet</a>
             <a href='https://faucet.nautilus.sh/' target="_blank" class="cta-button">$VIA<br/>Faucet</a>
             <a href='https://airtable.com/apphFYuejZFJJG0i6/shru2v6BXxUaAEU7O' target="_blank" class="cta-button">Ecosystem Directory</a>
-            <a href='https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a' target="_blank" class="cta-button">Node Running</a>
+            <a href='https://voinetwork.github.io/voi-swarm/getting-started/introduction/' target="_blank" class="cta-button">Node Running</a>
+            <a href='https://x.com/Voi_Net' target="_blank" class="cta-button">Voi Twitter/<i class="fa-brands fa-x-twitter"></i></a>
+            <a href='https://discord.gg/vnFbrJrHeW' target="_blank" class="cta-button">Voi Discord <i class="fa-brands fa-discord"></i></a>
           </div>
         </div>    
       

@@ -18,7 +18,7 @@ const projects = [
         category: "Core",
         description: "Run a participation node and help maintain the security and integrity of the Voi Network while earning Voi Points.",
         url: 'https://voi.network',
-        guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a",
+        guide: "https://voinetwork.github.io/voi-swarm/getting-started/introduction/",
         twitter: "https://x.com/Voi_Net",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8",
         logo: '/logos/voi_logo.png',
@@ -33,7 +33,7 @@ const projects = [
                 status: null,
                 reward: 1,
                 frequency: "Weekly",
-                guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a"
+                guide: "https://voinetwork.github.io/voi-swarm/getting-started/introduction/"
             },
         ],
     },

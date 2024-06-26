@@ -189,7 +189,7 @@
 			</div>
 			<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
 			<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
-				<a href="https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a" target="_blank">Learn to Run a Node</a>
+				<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank">Learn to Run a Node</a>
 			</button>
 		</div>
 	</div>
