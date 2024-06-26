@@ -20,6 +20,7 @@
     let groupedProjects: { [key: string]: IProject[] } = {};
 
     projects.forEach(project => {
+        if (project.title == 'Social Quests') return;
         if (!groupedProjects[project.category]) {
             groupedProjects[project.category] = [];
         }
@@ -53,18 +54,19 @@
     }
 
 </script>
-<div class="flex flex-wrap sm:justify-center mx-auto {selectedTab ? 'blur-sm' : ''}">
+<div class="flex flex-wrap sm:justify-center mx-auto sm:w-3/4 {selectedTab ? 'blur-sm' : ''}">
     <div class="flex flex-col sm:w-full lg:w-full m-2">
     {#each Object.entries(groupedProjects) as [category, projects]}
         <div class="flex flex-col mt-4">
             <h2 class="text-xl font-semibold py-2 px-4 bg-purple-900 text-white rounded-lg shadow-md">
                 {category}
-            </h2>            <div class="flex flex-row flex-wrap">
+            </h2>
+            <div class="flex flex-row flex-wrap">
                 {#each projects as project, i}
                     <a 
                         class="cursor-pointer border rounded-xl w-full sm:w-1/3 h-52 flex flex-col justify-between
-                        py-2 px-3 font-semibold m-2 my-2 shadow-xl
-                    text-black hover:border-gray-800 dark:hover:border-white
+                        py-2 px-3 font-semibold m-2 my-2
+                        text-black hover:border-gray-800 dark:hover:border-white
                         bg-blue-100 border-blue-50 dark:border-blue-700 dark:bg-[#65DBAB]
                         " 
                         class:disabled={(project.status??'inactive') !== 'active'}
@@ -94,11 +96,6 @@
     {/each}
     </div>
 </div>
-<!--<div class="m-0 md:mx-8 mt-4">
-    {#if selectedProject}
-        <Project project={selectedProject} wallet={walletId} />
-    {/if}
-</div>-->
 {#if selectedTab}
     <ProjectSlideout bind:projectid={selectedTab} bind:walletId={walletId}></ProjectSlideout>
 {/if}

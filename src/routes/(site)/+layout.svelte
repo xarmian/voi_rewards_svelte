@@ -8,14 +8,14 @@
 	//import { Footer, FooterCopyright, FooterLinkGroup, FooterBrand, FooterLink } from 'flowbite-svelte';
 </script>
 
-<div class="app dark:text-white">
+<div class="dark:text-white bg-[#662ed9]">
 	<Navbar />
 
 	<main>
 		<slot />
 	</main>
 	<SvelteToast {options} />
-	<Footer footerType="logo">
+	<Footer footerType="socialmedia">
 		<div class="sm:flex sm:items-center sm:justify-between">
 		  <FooterLinkGroup ulClass="flex flex-wrap items-center mb-6 text-sm text-gray-500 sm:mb-0 dark:text-gray-400">
 			<FooterLink href="/what_is_voi">What is Voi?</FooterLink>

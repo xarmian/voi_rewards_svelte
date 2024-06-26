@@ -1,5 +1,17 @@
 const projects = [
     {
+        id: 0,
+        title: "Social Quests",
+        type: "Social Quests",
+        category: "Social Quests",
+        description: "Complete Social Quests on Galxe. Register your social media account(s) and perform qualifying activities to earn Quest Points",
+        guide: "https://dashboard.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1MtdQcK",
+        logo: "/logos/galxe.png",
+        status: "active",
+        realtime: true,
+        quests: [ ]
+    },
+    {
         id: 1,
         title: "Voi Network",
         type: "Node Running",
@@ -9,7 +21,7 @@ const projects = [
         guide: "https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a",
         twitter: "https://x.com/Voi_Net",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCB1StzTo8",
-        logo: '/logos/voi_logo2.png',
+        logo: '/logos/voi_logo.png',
         status: 'active',
         realtime: true,
         quests: [
@@ -454,6 +466,16 @@ const projects = [
             },
             {
                 id: 9,
+                name: "hmbl_pool_swap_daily",
+                title: "Make a Daily Swap",
+                description: "Make a Daily Swap",
+                frequency: "Daily",
+                status: null,
+                reward: 1,
+                guide: "https://sandy-griffin-b91.notion.site/Quest-2-Make-your-first-Swap-b1d2c71e200c4a77a56f46d04a4aeaee",
+            },
+            {
+                id: 10,
                 title: "Connect with Humble Socials",
                 description: "Connect with Humble Socials",
                 status: null,
@@ -678,7 +700,6 @@ const projects = [
         description: "AlgoLeagues Discord Bot facilitates transferring, withdrawing, and tipping Voi assets in Discord servers. Use the bot in the Voi Discord to earn points.",
         guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/944ddd5dc496d47d7163a3399e4d64ebff32f003/README.md",
         twitter: "https://x.com/algoleagues",
-        logo: "/logos/voi_logo2.png",
         status: "active",
         realtime: true,
         "quests": [

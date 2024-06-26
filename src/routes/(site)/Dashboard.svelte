@@ -100,101 +100,103 @@
 		for more information.
 	</p>
 </div>-->
-<br/>
-<div class="bg-[rgb(111,42,226)] text-white text-center py-4 mb-4">
-	<h2 class="text-2xl font-bold">Looking for Voi TestNet Quests?</h2>
-	<p>Visit our <a href="/quests" class="underline">Questing Page Here!</a></p>
-</div>
 
-<div class="dashboard justify-evenly">
-	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Min Algod Version
-			</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{MIN_ALGOD_VERSION == '3.0.0' ? '...Loading...' : MIN_ALGOD_VERSION}
-			</p>
-		</div>
-	</Card>
-	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Last Block
-			</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{#if block_height == 0}
-					...Loading...
-				{:else}
-					{block_height.toLocaleString()}
-					<br />
-					<div class="text-sm my-1">
-						{block_height_timestamp} UTC
-					</div>
-				{/if}
-			</p>
-		</div>
-	</Card>
-	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Participating Wallets
-			</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{totalWallets == 0 ? '...Loading...' : totalWallets}
-			</p>
-		</div>
-		<br/>
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Online Stake
-			</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{(supply['online-money']??0) == 0 ? '...Loading...' : Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString()+' VOI'}
-			</p>
-		</div>
-	</Card>
-	<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-		<div class="cardInner">
-			<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-				Total Healthy Nodes
-			</h5>
-			<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-				{totalHealthyNodes == 0 ? '...Loading...' : totalHealthyNodes}
-			</p>
-		</div>
-	</Card>
-</div>
-<div class="text-center">
-	<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
-</div>
-<div class="notices">
-	<div class="flex flex-col place-items-center">
-		<!--<span style="font-weight:bold;"
-			>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
-			Chris said it best:</span
-		>
-		<div class="quote bg-gray-200 dark:bg-gray-600">
-			<blockquote>
-				"After testnet is over the game will also be over and the points will be tallied. A new
-				entity that follows proper roles and regulations will decide the rewards of the game. There
-				is a chance they might decide zero, but I believe that would be against their best interest
-				and against the mission of Voi."
-			</blockquote>
-			<cite>- Chris Swenor</cite>
-		</div>-->
-		<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
-			Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
-		</div>
-		<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
-		<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
-			<a href="https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a" target="_blank">Learn to Run a Node</a>
-		</button>
+<div class="bg-white dark:bg-gray-800 pt-8 flex flex-col">
+	<div class="bg-[rgb(111,42,226)] text-white text-center py-4 mb-4 w-1/2 rounded-full place-self-center">
+		<h2 class="text-2xl font-bold">Looking for Voi TestNet Quests?</h2>
+		<p>Visit our <a href="/quests" class="underline">Questing Page Here!</a></p>
 	</div>
+
+	<div class="dashboard justify-evenly">
+		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
+			<div class="cardInner">
+				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+					Min Algod Version
+				</h5>
+				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+					{MIN_ALGOD_VERSION == '3.0.0' ? '...Loading...' : MIN_ALGOD_VERSION}
+				</p>
+			</div>
+		</Card>
+		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
+			<div class="cardInner">
+				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+					Last Block
+				</h5>
+				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+					{#if block_height == 0}
+						...Loading...
+					{:else}
+						{block_height.toLocaleString()}
+						<br />
+						<div class="text-sm my-1">
+							{block_height_timestamp} UTC
+						</div>
+					{/if}
+				</p>
+			</div>
+		</Card>
+		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
+			<div class="cardInner">
+				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+					Participating Wallets
+				</h5>
+				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+					{totalWallets == 0 ? '...Loading...' : totalWallets}
+				</p>
+			</div>
+			<br/>
+			<div class="cardInner">
+				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+					Online Stake
+				</h5>
+				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+					{(supply['online-money']??0) == 0 ? '...Loading...' : Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString()+' VOI'}
+				</p>
+			</div>
+		</Card>
+		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
+			<div class="cardInner">
+				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+					Total Healthy Nodes
+				</h5>
+				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+					{totalHealthyNodes == 0 ? '...Loading...' : totalHealthyNodes}
+				</p>
+			</div>
+		</Card>
+	</div>
+	<div class="text-center">
+		<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
+	</div>
+	<div class="notices">
+		<div class="flex flex-col place-items-center">
+			<!--<span style="font-weight:bold;"
+				>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
+				Chris said it best:</span
+			>
+			<div class="quote bg-gray-200 dark:bg-gray-600">
+				<blockquote>
+					"After testnet is over the game will also be over and the points will be tallied. A new
+					entity that follows proper roles and regulations will decide the rewards of the game. There
+					is a chance they might decide zero, but I believe that would be against their best interest
+					and against the mission of Voi."
+				</blockquote>
+				<cite>- Chris Swenor</cite>
+			</div>-->
+			<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
+				Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
+			</div>
+			<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
+			<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
+				<a href="https://medium.com/@rob.sanders1/a-voiagers-guide-to-node-running-a0251194a64a" target="_blank">Learn to Run a Node</a>
+			</button>
+		</div>
+	</div>
+	{#if dataArrays.length > 0}
+		<RewardsTable items={dataArrays} />
+	{/if}
 </div>
-{#if dataArrays.length > 0}
-	<RewardsTable items={dataArrays} />
-{/if}
 
 <style>
 	.notices {

@@ -2,7 +2,8 @@
     import WalletSearch from "$lib/component/WalletSearch.svelte";
 	import Project from "$lib/component/Project.svelte";
     import projects from "../phase2/[...slug]/projects.js";
-	import { onMount } from "svelte";
+	import { onDestroy, onMount } from "svelte";
+    import { browser } from '$app/environment';
 
     let selectedWallet: string | undefined;
     export let searchWallet: string | undefined = selectedWallet;
@@ -14,17 +15,19 @@
             selectedWallet = searchWallet;
         }
     });
+
+    onDestroy(() => {
+        if (browser && document) {
+            document.body.style.overflow = 'auto';
+        }
+    });
+
 </script>
-<div class="min-h-full sm:border-l-4 sm:border-l-teal-400">
+<div class="min-h-full">
     <div class="n27 flex flex-col pt-4 relative">
-        <div class="sm:hidden h-10">&nbsp;</div>
-        <p class="text-center">Enter a wallet address to see your Voi TestNet Phase #2 Quest Progress</p>
-        <div class="text-center">
-            <WalletSearch bind:searchText={searchWallet} storeAddress={true} onSubmit={(addr) => { selectedWallet = addr; searchWallet = addr; } } loadPreviousValue={true} />
-        </div>
         {#if project}
             <div class="sm:mx-4">
-                <Project {project} wallet={selectedWallet ?? null} />
+                <Project project={project} bind:searchWallet={searchWallet} wallet={selectedWallet ?? null} />
             </div>
         {/if}
     </div>

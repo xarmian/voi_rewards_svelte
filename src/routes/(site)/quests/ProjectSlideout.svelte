@@ -1,7 +1,7 @@
 <script lang="ts">
     import { browser } from '$app/environment';
 	import ProjectModal from './ProjectModal.svelte';
-    import { fly } from 'svelte/transition';
+    //import { fly } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 
     export let projectid: number | null = null;
@@ -19,13 +19,11 @@
     }
 </script>
 
-  <div class="n27 h-screen modal" on:click={() => projectid = null} on:click|stopPropagation transition:fly={{ delay: 0, duration: 300, x: '100%', y: 0, opacity: 0.5, easing: quintOut }}>
-    <div class="relative h-screen max-w-4xl overflow-auto bg-purple-200 dark:bg-purple-950 modal-content {projectid ? 'show' : ''}" on:click|stopPropagation>
-    <ProjectModal projectId={projectid} bind:searchWallet={walletId} />
-    <button class="absolute top-4 left-4 text-white bg-gray-500 cursor-pointer rounded-full h-12 w-12 p-2" on:click={() => projectid = null}>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
+  <div class="n27 h-3/4 modal border-lg shadow relative z-10" on:click={() => projectid = null} on:click|stopPropagation>
+    <div class="relative h-screen max-w-4xl overflow-auto bg-gray-100 dark:bg-purple-950 rounded-2xl modal-content {projectid ? 'show' : ''}" on:click|stopPropagation>
+    <ProjectModal bind:projectId={projectid} bind:searchWallet={walletId} />
+    <button class="absolute top-4 right-4 text-gray-400 dark:text-white border-2 border-gray-400 cursor-pointer rounded-lg h-7 w-7" on:click={() => projectid = null}>
+        <i class="fas fa-times"></i>
     </button>
     </div>
   </div>
@@ -33,15 +31,20 @@
 <style>
 .modal {
     position: fixed;
-    top: 0;
-    right: 0;
-    width: 100%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
-    justify-content: flex-end;
-  }
-
-  .modal-content {
+    justify-content: center;
+    align-items: center;
+    width: 100%;
     height: 100%;
-  }
+}
+
+.modal-content {
+    max-width: 90%;
+    max-height: 90%;
+    overflow: auto;
+}
 </style>
 

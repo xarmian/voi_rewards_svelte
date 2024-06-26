@@ -29,7 +29,7 @@
     </div>
     {#if project}
         <div class="sm:mx-4">
-            <Project {project} wallet={selectedWallet ?? null} />
+            <Project {project} bind:searchWallet={searchWallet} wallet={selectedWallet ?? null} />
         </div>
     {/if}
     <div class="flex justify-center space-x-4">

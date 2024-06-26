@@ -165,18 +165,18 @@
 </script>
 
 <div class="mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl relative" bind:this={componentElement}>
-    <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg shadow relative">
+    <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg relative">
         <input
             type="text"
             use:init
             bind:value={searchText}
             on:input={(event) => handleInput()}
-            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2 pr-8"
+            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2 pr-8 text-black dark:text-white"
             placeholder="Select wallet by Address or NFD"
         />
         {#if searchText}
             <button
-                class="absolute inset-y-0 right-14 pl-2 pr-4 flex items-center cursor-pointer"
+                class="absolute inset-y-0 right-16 pl-2 pr-4 flex items-center cursor-pointer"
                 on:click={clearSearchText}
             >
                 <svg class="h-6 w-6 text-gray-500 dark:text-gray-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,7 +184,7 @@
                 </svg>
             </button>
         {/if}
-        <button on:click={() => handleSubmit(undefined)} class="dark:bg-blue-500 bg-blue-300 p-2 rounded-r-lg">
+        <button on:click={() => handleSubmit(undefined)} class="bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg">
         {#if !isMobile}
             Submit
         {:else}
@@ -199,7 +199,7 @@
             <ul class="inline-block text-left">
                 {#each addressList as address, index}
                     <li>
-                        <button class="p-1 border border-solid text-left w-full text-lg rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+                        <button class="p-1 border border-solid text-left w-full text-lg hover:bg-gray-200 dark:hover:bg-gray-700"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => {
                                 handleSubmit(address);

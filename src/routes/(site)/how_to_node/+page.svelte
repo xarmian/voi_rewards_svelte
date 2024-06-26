@@ -78,16 +78,16 @@
     
 </script>
 
-<div class="about">
-    <header class="bg-gray-100 dark:bg-gray-800 py-4 px-8">
+<div class="about bg-white dark:bg-gray-800 pt-4">
+    <header class="bg-purple-200 dark:bg-purple-800 my-4 mx-8 p-4 rounded-xl">
         <h1 class="text-2xl font-bold">Node Running Resources</h1>
-        <h2 class="text-lg font-medium text-gray-600">Interested in Running a Node? Check out the resources and links below:</h2>
-    </header>
-    <div class="ml-10">
-        In Phase 2 of TestNet, Node Runners earn quest points for each week their node remains healthy.
-    </div>
+        <h2 class="text-lg font-medium text-gray-600 dark:text-gray-200">Interested in Running a Node? Check out the resources and links below</h2>
+        <div class="mt-2 text-sm">
+            In Phase 2 of TestNet, Node Runners earn quest points for each week their node remains healthy.
+        </div>
+        </header>
     <ul class="m-10">
-        <header class="bg-gray-50 dark:bg-gray-700 py-4 px-8">
+        <header class="bg-gray-100 dark:bg-gray-700 py-4 px-8">
             <h1 class="text-xl font-bold">Quick Start Guide</h1>
         </header>
         <li class='ml-10 m-2'>
@@ -107,11 +107,11 @@
         </li>
     </ul>
     {#each categories as category}
-        <ul class="m-10">
-            <header class="bg-gray-50 dark:bg-gray-700 py-4 px-8">
+        <ul class="p-10">
+            <header class="bg-gray-100 dark:bg-gray-700 py-4 px-8">
                 <h1 class="text-xl font-bold">{category.heading}</h1>
                 {#if category.subheading}
-                    <h2 class="text-lg font-medium text-gray-600">{category.subheading}</h2>
+                    <h2 class="text-lg font-medium text-gray-600 dark:text-gray-300">{category.subheading}</h2>
                 {/if}
             </header>
             {#each category.links as link}

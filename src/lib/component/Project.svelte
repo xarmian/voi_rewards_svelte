@@ -5,9 +5,11 @@
     import { supabasePublicClient } from '$lib/supabase';
 	import { algodClient } from "$lib/utils/algod";
 	import InfoButton from "./ui/InfoButton.svelte";
+	import WalletSearch from './WalletSearch.svelte';
 
     export let project: IProject;
     export let wallet: string | null;
+    export let searchWallet: string | undefined;
 
     let steps = [
         {
@@ -248,14 +250,23 @@
             // for each quest, check if action is in completedActions
             for (let i = 0; i < project.quests.length; i++) {
                 const quest = project.quests[i];
-                if (data.results.find((result: { key: string, value: string }) => result.key === quest.name+':'+wallet)) {
-                    quest.earned = 1;
+                if (quest.name === undefined) {
+                    quest.earned = -1;
                 }
                 else {
-                    quest.earned = 0;
+                    const rec = data.results.find((result: { key: string, value: string }) => result.key === quest.name+':'+wallet);
+                    if (rec) {
+                        if (rec.value > 1700000000000) {
+                            quest.earned = 1;
+                        }
+                        else {
+                            quest.earned = rec.value;
+                        }
+                    }
+                    else {
+                        quest.earned = 0;
+                    }
                 }
-
-                if (quest.id === 9) quest.earned = -1;
             }
 
             loading = false;
@@ -393,58 +404,73 @@
     }
 
 </script>
-<div class="dark:bg-purple-400 dark:text-white p-4 sm:rounded-lg shadow-lg mt-4">
-    <div class="flex flex-col md:flex-row md:items-center justify-between space-x-4">
-        <div class="mb-4 md:mb-0 flex-grow self-start">
-            <h2 class="text-3xl font-bold">
-                {#if project.logo && project.url}
-                    <a target="_blank" href={project.url}>
-                        <img class="h-24 rounded-lg" src={project.logo} alt={project.title} />
-                    </a>
-                {:else if project.url}
-                    <a class="text-blue-900 hover:text-blue-700 underline cursor-pointer" target="_blank" href={project.url}>
-                        {project.title}
-                    </a>
-                {:else}
-                    {project.title}
-                {/if}
-            </h2>
-            <p class="text-gray-800 text-sm">{project.description}</p>
+<div class="dark:text-white p-8 sm:rounded-lg my-4">
+    <h2 class="text-3xl font-bold">
+        {#if project.logo && project.url}
+            <a target="_blank" href={project.url}>
+                <img class="h-24 rounded-lg" src={project.logo} alt={project.title} />
+            </a>
+        {:else if project.url}
+            <a class="text-blue-900 hover:text-blue-700 underline cursor-pointer" target="_blank" href={project.url}>
+                {project.title}
+            </a>
+        {:else}
+            {project.title}
+        {/if}
+    </h2>
+    <div class="flex flex-col md:flex-row md:items-center space-x-4">
+        <div class="mb-4 md:mb-0 w-2/5 self-start">
+            <p class="text-gray-800 dark:text-gray-200 text-lg">{project.description}</p>
             {#if !project.realtime}
                 <div class="text-xs text-red-800">Live quest tracking is not yet available for this project.</div>
             {/if}
         </div>
-        <div class="flex flex-col space-y-4">
+        <div class="flex flex-col space-y-2 w-full self-end">
             {#if project.guide}
-                <button class="flex items-center space-x-2 bg-white rounded-full text-blue-800 hover:text-blue-700 hover:bg-gray-100 outline-gray-800 hover:outline cursor-pointer" on:click={() => window.open(project.guide)}>
-                    <span class="text-lg p-4">{project.title} Quest Guide</span>
-                </button>
+                <a href={project.guide} target="_blank" class="flex h-14 w-full bg-white text-[#41137E] dark:bg-gray-700 dark:text-[#D4BFF6] rounded-md font-bold px-4 py-2 items-center space-x-2 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-500">
+                <div class="rounded-full bg-[#D4BFF6] h-6 w-6 flex items-center justify-center">
+                    <i class="fa-regular fa-comment text-[#41137E] text-xs"></i>
+                </div>
+                  <div>{project.title} Quest Guide</div>
+                  <i class="fas fa-arrow-right flex-grow text-end"></i>
+               </a>
             {/if}
             {#if project.twitter}
-                <button class="flex items-center space-x-2 bg-white rounded-full text-blue-800 hover:text-blue-700 hover:bg-gray-100 outline-gray-800 hover:outline cursor-pointer" on:click={() => window.open(project.twitter)}>
-                    <span class="text-lg p-4">{project.title} Twitter/X</span>
-                </button>
+                <a href={project.twitter} target="_blank" class="flex h-14 w-full bg-white text-[#41137E] dark:bg-gray-700 dark:text-[#D4BFF6] rounded-md font-bold px-4 py-2 items-center space-x-2 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-500">
+                <div class="rounded-full bg-[#D4BFF6] h-6 w-6 flex items-center justify-center">
+                    <i class="fa-brands fa-x-twitter text-[#41137E] text-xs"></i>
+                </div> 
+                <div>{project.title} Twitter/X</div>
+                <i class="fas fa-arrow-right flex-grow text-end"></i>
+                </a>
             {/if}
         </div>
     </div>
 </div>
-<div class="flex flex-col justify-center">
+<div class="rounded-lg bg-white dark:bg-opacity-70 text-[#41137E] font-extrabold text-lg flex flex-col sm:flex-row justify-center mx-8 p-4 space-x-4 items-center">
+    <p class="text-center">Enter a wallet address to see your Voi TestNet Phase #2 Quest Progress</p>
+    <div class="text-center sm:w-1/2 text-gray-200">
+        <WalletSearch bind:searchText={searchWallet} storeAddress={true} onSubmit={(addr) => { wallet = addr; } } loadPreviousValue={true} />
+    </div>
+</div>
+<div class="flex flex-col justify-center text-[#41137E]">
     <div class="flex flex-wrap justify-around p-4">
         {#each localProject.quests as quest, i}
-            <div class="{quest.name != 'run_a_node' ? 'w-full sm:w-1/2 md:w-1/3' : ''} text-black bg-[#65DBAB] rounded-lg overflow-hidden shadow-xl border-gray-200 dark:border-gray-800 border m-4 flex flex-col justify-between">
-                <div class="px-6 py-4">
-                    <div class="font-bold text-xl mb-2">{quest.title}</div>
+            <div class="{quest.name != 'run_a_node' ? 'w-full sm:w-1/2 md:w-1/3' : ''} bg-[#F2EAFF] dark:bg-opacity-80 rounded-lg overflow-hidden m-2 p-8 flex flex-col justify-between">
+                <div class="">
+                    <div class="font-extrabold text-2xl mb-2">{quest.title}</div>
                     {#if quest.title !== quest.description}
-                        <p class="text-gray-700 text-base">{quest.description}</p>
+                        <p class="text-base">{quest.description}</p>
                     {/if}
                 </div>
                 {#if quest.name != 'run_a_node'}
                     <QuestCard {project} {quest} {wallet} {loading}></QuestCard>                
                 {:else}
-                    <div class="px-6 pt-4 pb-2 flex flex-col items-center space-y-4">
+                    <div class="m-8 w-1/2 place-self-center">
                         {#if quest.guide}
-                            <a class="inline-block bg-blue-500 hover:bg-blue-400 text-white py-1 px-2 rounded cursor-pointer" target="_blank" href={quest.guide}>
-                                View Guide
+                            <a class="flex justify-between rounded-lg text-white px-4 py-3 bg-[#6F2AE2] text-xl place-items-center" target="_blank" href={quest.guide}>
+                                <div>View Guide</div>
+                                <i class="fas fa-arrow-right"></i>
                             </a>
                         {/if}
                     </div>
