@@ -23,7 +23,7 @@
     <DarkMode />
   </NavUl>
   <div class="hidden sm:flex flex-row p-4 mt-0 text-sm font-medium place-items-center space-x-2">
-    <a class="text-xl navButton" href="https://voirewards.com"><div class:selected={activeLink === '/'} on:click={() => activeLink = '/'}>Home</a>
+    <a class="text-xl navButton" href="https://voirewards.com" class:selected={activeLink === '/'} on:click={() => activeLink = '/'}>Home</a>
     <a class="text-xl navButton" href="/what_is_voi" class:selected={activeLink === '/what_is_voi'} on:click={() => activeLink = '/what_is_voi'}>What is Voi?</a>
     <a class="text-xl navButton" href="/how_to_node" class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'}>Run a Node</a>
     <a class="text-xl navButton" href="/phase1" class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'}>Phase 1</a>
