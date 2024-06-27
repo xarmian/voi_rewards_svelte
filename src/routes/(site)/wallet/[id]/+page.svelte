@@ -7,8 +7,10 @@
     let walletId = data.walletId;
 </script>
 
-<div class="float-left text-xl pl-6 cursor-pointer">
-    <a on:click={() => goto('/')} class="text-blue-500 hover:text-blue-800">&#8592; Home</a>
-</div>
+<div class="bg-white dark:bg-black pt-4">
+    <div class="float-left text-xl pl-6 cursor-pointer">
+        <a on:click={() => goto('/')} class="text-blue-500 hover:text-blue-800">&#8592; Home</a>
+    </div>
 
-<WalletView isModal={false} walletId={walletId}></WalletView>
+    <WalletView isModal={false} walletId={walletId}></WalletView>
+</div>
