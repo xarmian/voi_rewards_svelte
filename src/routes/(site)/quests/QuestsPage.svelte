@@ -62,7 +62,11 @@
             <p class="text-lg text-gray-400">Quests help test the network and introduce you to the budding Voi ecosystem. They are fun, educational, and a great way to learn about Voi while earning rewards. Points earned from quests will correlate to an airdrop following Voi's move to Mainnet, anticipated for later this year.</p>
         </div>
 
-        <div class="flex flex-wrap place-content-center">
+        <div class="flex flex-col justify-center items-center sm:w-3/4">
+          <button class="py-4 px-8 text-xl bg-blue-500 text-white rounded-lg" on:click={() => goto('/leaderboard')}>View Leaderboard</button>
+        </div>
+
+        <div class="flex flex-wrap place-content-center pt-8">
 
           {#each filteredProjects as project, i}
             <div class="project flex p-2 flex-col bg-gray-100 dark:bg-gray-800 sm:w-[20rem] rounded-lg w-[343px] h-[540px] m-1 sm:m-4">

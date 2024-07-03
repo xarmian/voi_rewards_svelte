@@ -19,4 +19,6 @@ export interface PLeaderboard {
     nomadex: number;
     highforge: number;
     algoleagues: number;
+    mechaswap: number;
+    originalPosition?: number;
 }

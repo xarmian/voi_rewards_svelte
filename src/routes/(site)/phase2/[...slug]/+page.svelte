@@ -20,7 +20,7 @@
         }
     });
 </script>
-<div class="flex flex-col dark:bg-[#2C037A]" style="background-color: rgb(111,42,226)">
+<div class="flex flex-col bg-[rgb(111,42,226)]">
     <div class="flex flex-col">
         <img src={VoiLogoStatic} alt="Voi Logo" class="-my-32 h-[30rem] z-0 self-center object-cover object-center" style="clip-path: inset(180px 0 180px 0)">
         <div class="flex flex-col justify-center items-center text-white z-10 -my-14 mb-10">
@@ -35,7 +35,31 @@
             <i class="fas fa-faucet mr-2"></i> $VIA Faucet
         </a>
     </div>
-    <div class="w-full bg-white">
+    <div class="flex flex-col w-full bg-white dark:bg-gray-800 place-items-center">
+        <div class="px-2 m-4 w-full sm:w-1/2">
+            <WalletSearch onSubmit={(v) => {goto(`/phase2/${v}`)}} />
+        </div>
+        {#if data.props.wallet && data.props.leaderboardData}
+            <div class="flex flex-col place-items-center pt-4">
+                <div class="flex flex-wrap place-self-center">
+                    <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
+                        <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                            <div class="text-2xl font-semibold text-gray-800 dark:text-white">{data.props.leaderboardData.network??0}</div>
+                            <div class="text-gray-500 dark:text-gray-300">Node Points</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
+                        <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                            <div class="text-2xl font-semibold text-gray-800 dark:text-white">{(data.props.leaderboardData.total??0) - (data.props.leaderboardData.network??0)}</div>
+                            <div class="text-gray-500 dark:text-gray-300">Ecosystem Actions</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
+                    NOTICE: Data above is delayed
+                </div>
+            </div>
+        {/if}
         <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} />
     </div>
 </div>

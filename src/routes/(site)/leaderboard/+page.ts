@@ -5,7 +5,7 @@ export const load = async () => {
     const { data, error } = await supabasePublicClient
         .from('leaderboard')
         .select('*')
-        .order('total', { ascending: false }).limit(100);
+        .order('total', { ascending: false }); //.limit(100);
 
     // get count of number of rows in leaderboard table
     const { count, error: countError } = await supabasePublicClient
