@@ -54,6 +54,12 @@
                             <div class="text-gray-500 dark:text-gray-300">Ecosystem Actions</div>
                         </div>
                     </div>
+                    <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
+                        <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                            <div class="text-2xl font-semibold text-gray-800 dark:text-white">{data.props.leaderboardData.row_number??0}</div>
+                            <div class="text-gray-500 dark:text-gray-300">Leaderboard Position</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
                     NOTICE: Data above is delayed

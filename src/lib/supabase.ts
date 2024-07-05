@@ -20,5 +20,6 @@ export interface PLeaderboard {
     highforge: number;
     algoleagues: number;
     mechaswap: number;
-    originalPosition?: number;
+    row_number?: number;
+    points? : number;
 }

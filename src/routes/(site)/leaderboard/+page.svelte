@@ -8,14 +8,23 @@
     
     export let data: PageData;
     let searchTerm = '';
-    let ranks: PLeaderboard[] | undefined = data.ranks?.map((rank, index) => ({ ...rank, originalPosition: index + 1 }));
+    let ranks: PLeaderboard[] | undefined = data.ranks;
     let filterRanks: PLeaderboard[] | undefined = ranks;
 
     $: {
         if (searchTerm.length > 0) {
-            filterRanks = ranks?.filter((rank) => {
-                return rank.wallet.toLowerCase().includes(searchTerm.toLowerCase());
-            }).slice(0, 100);
+            supabasePublicClient
+                .from('leaderboard')
+                .select('*')
+                .ilike('wallet', `%${searchTerm}%`)
+                .order('row_number', { ascending: true }).limit(100)
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error(error);
+                    } else {
+                        filterRanks = data;
+                    }
+                });
         } else {
             filterRanks = ranks?.slice(0, 100);
         }
@@ -73,7 +82,9 @@
                     </h1>
                     <div class="text-gray-500 dark:text-gray-300">
                         Points are awarded for participating in Voi Network projects. The leaderboard is updated periodically throughout the day.
-                        Not all projects are tracked in the leaderboard, but more are being added as the data becomes available.
+                    </div>
+                    <div class="text-red-800 dark:text-red-500 font-bold text-lg">
+                        NOTICE: Not all projects are tracked in the leaderboard. More will be added as the data becomes available.
                     </div>
                     <div class="mt-4 mb-1">
                         <input
