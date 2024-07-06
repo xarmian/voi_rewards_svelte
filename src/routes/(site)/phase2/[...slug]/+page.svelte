@@ -5,6 +5,7 @@
 	import QuestComponent from "$lib/component/QuestComponent.svelte";
 	import { onMount } from "svelte";
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
+    import Time from 'svelte-time';
 
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | undefined;
@@ -37,35 +38,36 @@
     </div>
     <div class="flex flex-col w-full bg-white dark:bg-gray-800 place-items-center">
         <div class="px-2 m-4 w-full sm:w-1/2">
-            <WalletSearch onSubmit={(v) => {goto(`/phase2/${v}`)}} />
+            <WalletSearch onSubmit={(v) => {goto(`/phase2/${v}`)}} {searchText} />
         </div>
         {#if data.props.wallet && data.props.leaderboardData}
             <div class="flex flex-col place-items-center pt-4">
                 <div class="flex flex-wrap place-self-center">
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
-                        <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
                             <div class="text-2xl font-semibold text-gray-800 dark:text-white">{data.props.leaderboardData.network??0}</div>
                             <div class="text-gray-500 dark:text-gray-300">Node Points</div>
                         </div>
                     </div>
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
-                        <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
                             <div class="text-2xl font-semibold text-gray-800 dark:text-white">{(data.props.leaderboardData.total??0) - (data.props.leaderboardData.network??0)}</div>
                             <div class="text-gray-500 dark:text-gray-300">Ecosystem Actions</div>
                         </div>
                     </div>
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
-                        <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
                             <div class="text-2xl font-semibold text-gray-800 dark:text-white">{data.props.leaderboardData.row_number??0}</div>
                             <div class="text-gray-500 dark:text-gray-300">Leaderboard Position</div>
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
-                    NOTICE: Data above is delayed
+                <div class="items-center sm:items-start sm:ml-4 m-1">
+                    NOTICE: Data above is delayed. Last Updated
+                    <Time timestamp={data.props.leaderboardData.last_modified} format="MMM D, YYYY h:mm A" relative />
                 </div>
             </div>
         {/if}
-        <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} />
+        <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} leaderboardData={data.props.leaderboardData} />
     </div>
 </div>

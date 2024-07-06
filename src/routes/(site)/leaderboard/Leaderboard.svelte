@@ -21,8 +21,8 @@
 			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Rank</th>
 			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">User Account</th>
             <th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider hidden">$POINTS</th>
-			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Node Health</th>
-			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Ecosystem Projects</th>
+			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Node Health Points</th>
+			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Ecosystem Project Points</th>
 			<th class="px-1 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Total Actions</th>
 		</tr>
 	</thead>

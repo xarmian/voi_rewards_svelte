@@ -1,12 +1,15 @@
 <script lang="ts">
+  import ProjectBox from './ProjectBox.svelte';
+
     import type { IProject } from "$lib/data/types.js";
+	import type { PLeaderboard } from "$lib/supabase.js";
     import projects from "../../routes/(site)/phase2/[...slug]/projects.js";
 	import ProjectSlideout from "../../routes/(site)/quests/ProjectSlideout.svelte";
 
     export let walletId: string | undefined;
-    console.log(walletId);
     let isDropdownOpen: boolean = false;
     export let selectedTab = 0;
+    export let leaderboardData: PLeaderboard | undefined = undefined;
 
     // sort projects with status='active' and realtime=true first, then by id
     projects.sort((a, b) => {
@@ -53,6 +56,7 @@
         selectedProject = projects.find((project) => project.id == selectedTab);
     }
 
+console.log(leaderboardData);
 </script>
 <div class="flex flex-wrap sm:justify-center mx-auto sm:w-3/4 {selectedTab ? 'blur-sm' : ''}">
     <div class="flex flex-col sm:w-full lg:w-full m-2">
@@ -63,33 +67,7 @@
             </h2>
             <div class="flex flex-row flex-wrap">
                 {#each projects as project, i}
-                    <a 
-                        class="cursor-pointer border rounded-xl w-full sm:w-1/3 h-52 flex flex-col justify-between
-                        py-2 px-3 font-semibold m-2 my-2
-                        text-black hover:border-gray-800 dark:hover:border-white
-                        bg-blue-100 border-blue-50 dark:border-blue-700 dark:bg-[#65DBAB]
-                        " 
-                        class:disabled={(project.status??'inactive') !== 'active'}
-                        on:click={() => selectedTab = project.id}>
-                        <div class="flex-col justify-between">
-                            {#if project.logo}
-                                <img src={project.logo} alt={project.title} class="h-12" />
-                            {:else}
-                                <div class="text-2xl">{project.title}</div>
-                            {/if}
-                            <div class='text-sm'>{project.type}</div>
-                        </div>
-                        <div class="">{project.quests.length} quest{project.quests.length > 1 ? 's' : ''}</div>
-                        <div class="flex justify-end">
-                            {#if (project.status??'inactive') !== 'active'}
-                                <div class="text-sm text-red-500 dark:text-red-300">Coming soon!</div>
-                            {:else if project.realtime??false}
-                                <div class="text-sm text-green-900">Realtime Data ⚡</div>
-                            {:else}
-                                <div>&nbsp;</div>
-                            {/if}
-                        </div>
-                    </a>
+                    <ProjectBox bind:selectedTab {leaderboardData} {project} ></ProjectBox>
                 {/each}
             </div>
         </div>
@@ -99,12 +77,3 @@
 {#if selectedTab}
     <ProjectSlideout bind:projectid={selectedTab} bind:walletId={walletId}></ProjectSlideout>
 {/if}
-
-<style>
-    .disabled {
-        cursor: not-allowed;
-        pointer-events: none;
-        background-color: gray;
-    }
-</style>
-

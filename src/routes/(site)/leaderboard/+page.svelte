@@ -5,6 +5,7 @@
 
     import type { PageData } from './$types';
 	import InfoButton from "$lib/component/ui/InfoButton.svelte";
+	import Time from "svelte-time/Time.svelte";
     
     export let data: PageData;
     let searchTerm = '';
@@ -75,7 +76,7 @@
     <div class="container mx-auto my-6">
         <div class="p-2 sm:p-8 rounded-2xl bg-white dark:bg-gray-900 shadow-md">
             <div class="flex flex-col sm:flex-row sm:justify-between">
-                <div>
+                <div class="w-full">
                     <h1 class="text-2xl font-semibold text-gray-800 dark:text-white">
                         <img src="/logos/voi_logo.png" alt="Voi" class="h-14 pb-2 inline-block" />
                         Project Quest Leaderboard
@@ -86,13 +87,18 @@
                     <div class="text-red-800 dark:text-red-500 font-bold text-lg">
                         NOTICE: Not all projects are tracked in the leaderboard. More will be added as the data becomes available.
                     </div>
-                    <div class="mt-4 mb-1">
+                    <div class="mt-4 mb-1 flex justify-between w-full">
                         <input
                             type="text" size="40"
                             placeholder="Search by account address..."
                             class="p-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                             bind:value={searchTerm}
                         />
+                        {#if ranks}
+                            <div class="place-self-end">
+                                Last updated: <Time timestamp={ranks[0].last_modified} format="MMM D, YYYY h:mm A" />
+                            </div>
+                        {/if}
                     </div>
                 </div>
             </div>
