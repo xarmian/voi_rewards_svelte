@@ -307,7 +307,7 @@ const projects = [
                 title: "React to a Post in the NFT Lounge",
                 name: "post_reaction",
                 description: "React to a Post in the NFT Lounge",
-                guide: "https://wind-bolt-806.notion.site/Quest-8-React-to-a-Post-in-the-NFT-Lounge-5b1d0f7f7e1f4f2c9e0e3f8c6b1f9b3e",
+                guide: "https://wind-bolt-806.notion.site/Quest-8-React-to-a-Post-in-the-NFT-Lounge-3294d8ab1fe04ec48565047e1f352d47",
             }
         ],
     },
