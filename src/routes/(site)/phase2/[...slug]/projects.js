@@ -132,6 +132,7 @@ const projects = [
                 description: "Timed Quest: List NFT 1 minute after mint on High Forge",
                 status: null,
                 reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/Time-Quest-List-NFT-1-minute-after-mint-on-High-Forge-2fdf74a46051410e9aa87524a98c5501"
             },
             {
                 id: 5,
@@ -140,6 +141,7 @@ const projects = [
                 description: "Timed Quest: List NFT 15 minutes after listing on High Forge",
                 status: null,
                 reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/Time-Quest-List-NFT-1-minute-after-mint-on-High-Forge-2fdf74a46051410e9aa87524a98c5501"
             },
             {
                 id: 6,
@@ -148,6 +150,7 @@ const projects = [
                 description: "Timed Quest: List NFT 1 hour after mint on High Forge",
                 status: null,
                 reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/Time-Quest-List-NFT-1-minute-after-mint-on-High-Forge-2fdf74a46051410e9aa87524a98c5501"
             },
             {
                 id: 7,
@@ -166,6 +169,14 @@ const projects = [
                 reward: 1,
                 guide: "https://confused-timbale-d13.notion.site/Social-Quest-Connect-with-Nautilus-Socials-e6b4c1b76e8c40dfba3969e7e5c3c6da",
             },
+            {
+                id: 9,
+                title: "NFT Quest: Transfer NFT",
+                description: "Transfer NFT to another user on Nautilus",
+                status: null,
+                reward: 1,
+                guide: "https://confused-timbale-d13.notion.site/NFT-Quest-Transfer-NFT-28208d3186a941ad9bc94faf8b7ffd8b",
+            }, 
             /*{
                 id: 9,
                 title: "Common Quest: Trade NFTs with more than 5 different wallets",
