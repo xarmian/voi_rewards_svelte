@@ -826,6 +826,7 @@ const projects = [
         title: "Chubs",
         type: "Chubs v2 NFT Collection",
         category: "NFTs",
+        column: "chubs",
         description: "Chubs v2 is a collection of NFTs on Voi. Use your Chub to complete tasks and earn points.",
         url: "https://nftnavigator.xyz/collection/48716545",
         status: "active",

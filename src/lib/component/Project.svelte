@@ -372,7 +372,7 @@
         return result.find((walletPoints) => walletPoints.wallet === wallet);
     }
 
-    function calculateShareChubsPoints(transferData: TransferData): WalletPoints[] {
+    function calculateChubsSharePoints(transferData: TransferData): WalletPoints[] {
         const walletWeeklyTransfers: Map<string, boolean> = new Map();
 
         // Helper function to get the week number
@@ -433,7 +433,7 @@
                 quest.earned = 0;
                 url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&from=${wallet}`;
                 data = await fetch(url).then((response) => response.json())
-                const spts = calculateShareChubsPoints(data);
+                const spts = calculateChubsSharePoints(data);
                 if (spts.length > 0) {
                     quest.earned = spts[0].points;
                 }
