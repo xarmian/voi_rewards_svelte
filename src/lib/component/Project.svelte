@@ -7,6 +7,25 @@
 	import InfoButton from "./ui/InfoButton.svelte";
 	import WalletSearch from './WalletSearch.svelte';
 
+    interface Transfer {
+        transactionId: string;
+        contractId: number;
+        tokenId: number;
+        round: number;
+        fromAddr: string;
+        toAddr: string;
+        timestamp: number;
+    }
+
+    interface TransferData {
+        transfers: Transfer[];
+    }
+
+    interface WalletPoints {
+        wallet: string;
+        points: number;
+    }
+
     export let project: IProject;
     export let wallet: string | null;
     export let searchWallet: string | undefined;
@@ -302,40 +321,132 @@
         }
     }
 
+    function calculateChubsHoldPoints(transferData: TransferData, wallet: string): WalletPoints | undefined {
+        const walletHoldings: Map<string, Map<number, number>> = new Map();
+        const walletEpochs: Map<string, Set<number>> = new Map();
+
+        // Helper function to get the epoch number
+        const getEpochNumber = (timestamp: number): number => {
+            const date = new Date(timestamp * 1000);
+            date.setUTCHours(0, 0, 0, 0);
+            return Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
+        };
+
+        // last epoch is today
+        const lastEpoch = getEpochNumber(Date.now() / 1000);
+
+        // Process transfers
+        transferData.transfers.forEach((transfer) => {
+            const epochNumber = getEpochNumber(transfer.timestamp);
+
+            // Remove token from sender's holdings
+            if (transfer.fromAddr !== "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ") {
+                const senderHoldings = walletHoldings.get(transfer.fromAddr) || new Map();
+                senderHoldings.delete(transfer.tokenId);
+                walletHoldings.set(transfer.fromAddr, senderHoldings);
+            }
+
+            // Add token to receiver's holdings
+            const receiverHoldings = walletHoldings.get(transfer.toAddr) || new Map();
+            receiverHoldings.set(transfer.tokenId, epochNumber);
+            walletHoldings.set(transfer.toAddr, receiverHoldings);
+        });
+
+        // Calculate points for each wallet
+        walletHoldings.forEach((holdings, wallet) => {
+            const epochs = new Set<number>();
+            holdings.forEach((acquiredEpoch, tokenId) => {
+                for (let epoch = acquiredEpoch; epoch <= lastEpoch; epoch++) {
+                    epochs.add(epoch);
+                }
+            });
+            walletEpochs.set(wallet, epochs);
+        });
+
+        // Convert to result format
+        const result: WalletPoints[] = Array.from(walletEpochs.entries()).map(([wallet, epochs]) => ({
+            wallet,
+            points: Math.max(epochs.size-2,0)
+        }));
+
+        return result.find((walletPoints) => walletPoints.wallet === wallet);
+    }
+
+    function calculateShareChubsPoints(transferData: TransferData): WalletPoints[] {
+        const walletWeeklyTransfers: Map<string, boolean> = new Map();
+
+        // Helper function to get the week number
+        const getWeekNumber = (timestamp: number): number => {
+            const date = new Date(timestamp * 1000);
+            date.setUTCHours(0, 0, 0, 0);
+            date.setUTCDate(date.getUTCDate() - date.getUTCDay() + 1);
+            return Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
+        };
+
+        // Process transfers
+        transferData.transfers.forEach((transfer) => {
+            const weekNumber = getWeekNumber(transfer.timestamp);
+
+            // Only consider outgoing transfers (ignore minting address)
+            if (transfer.fromAddr !== "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ") {
+                const key = `${transfer.fromAddr}-${weekNumber}`;
+                walletWeeklyTransfers.set(key, true);
+            }
+        });
+
+        // Calculate points
+        const walletPoints: Map<string, number> = new Map();
+        walletWeeklyTransfers.forEach((v, key) => {
+            const [wallet, _] = key.split('-');
+            walletPoints.set(wallet, (walletPoints.get(wallet) || 0) + 1);
+        });
+
+        // Convert to array of objects
+        const result: WalletPoints[] = Array.from(walletPoints, ([wallet, points]) => ({ wallet, points }));
+        return result;
+    }
+
     async function getChubsPoints() {
         let url;
         let quest;
 
         try {
-            // grab_chub
-            quest = project.quests[0];
-            url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&to=${wallet}&limit=1`;
-            let data = await fetch(url).then((response) => response.json());
-            if (data.transfers.length > 0) {
-                quest.earned = 1;
-            }
-            else {
-                url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/mp/sales?collectionId=48716545&buyer=${wallet}&limit=1`;
-                data = await fetch(url).then((response) => response.json());
-                if (data.sales.length > 0) {
+            if (wallet) {
+                // grab_chub
+                quest = project.quests[0];
+                quest.earned = 0;
+                url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&to=${wallet}&limit=1`;
+                let data = await fetch(url).then((response) => response.json());
+                if (data.transfers.length > 0) {
                     quest.earned = 1;
                 }
-            }
+                else {
+                    url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/mp/sales?collectionId=48716545&buyer=${wallet}&limit=1`;
+                    data = await fetch(url).then((response) => response.json());
+                    if (data.sales.length > 0) {
+                        quest.earned = 1;
+                    }
+                }
 
-            // share_chub
-            quest = project.quests[1];
-            url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&from=${wallet}&limit=1`;
-            data = await fetch(url).then((response) => response.json());
-            if (data.transfers.length > 0) {
-                quest.earned = 1;
-            }
+                // share_chub
+                quest = project.quests[1];
+                quest.earned = 0;
+                url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&from=${wallet}`;
+                data = await fetch(url).then((response) => response.json())
+                const spts = calculateShareChubsPoints(data);
+                if (spts.length > 0) {
+                    quest.earned = spts[0].points;
+                }
 
-            // hold_chub
-            quest = project.quests[2];
-            url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/tokens?contractId=48716545&owner=${wallet}&limit=1`;
-            data = await fetch(url).then((response) => response.json());
-            if (data.tokens.length > 0) {
-                quest.earned = 1;
+                // hold_chub
+                quest = project.quests[2];
+                quest.earned = 0;
+                url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&user=${wallet}`;
+                data = await fetch(url).then((response) => response.json());
+                const r = calculateChubsHoldPoints(data, wallet);
+                if (r) {
+                    quest.earned = r.points;
+                }
             }
 
            loading = false;

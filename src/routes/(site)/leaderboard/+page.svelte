@@ -46,7 +46,7 @@
         <div class="flex flex-col items-center sm:items-start sm:mx-4">
             <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
                 <div class="text-2xl font-semibold text-gray-800 dark:text-white flex align-middle space-x-2">
-                    <div>6</div>
+                    <div>7</div>
                     <div class="self-center">
                         <InfoButton noAbsolute={true}>
                             <div class="text-xs">
@@ -58,6 +58,7 @@
                                     <li>Humble</li>
                                     <li>NFTNavigator</li>
                                     <li>Mechaswap</li>
+                                    <li>Chubs v2</li>
                                 </ul>
                             </div>
                         </InfoButton>
