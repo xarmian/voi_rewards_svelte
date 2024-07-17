@@ -37,11 +37,15 @@
                 </tr>
             </thead>
             <tbody>
-                {#each points as rec}
+                {#each points as rec, i}
                     <tr class='dark:border-gray-500'>
                         <td class='dark:border-gray-500'>{rec.date}</td>
                         <td class='dark:border-gray-500'>{rec.health}</td>
-                        <td class='dark:border-gray-500'>{rec.points}</td>
+                        <td class='dark:border-gray-500'>{rec.points}
+                            {#if rec.points > 0 && i == points.length - 1}
+                            <span class="text-green-500"> (pending)</span>
+                            {/if}
+                        </td>
                     </tr>
                 {/each}
             </tbody>

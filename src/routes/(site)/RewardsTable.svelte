@@ -295,7 +295,12 @@
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{item.block_count}</TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
-              <div>{item.points}</div>
+              <div>
+                {item.points}
+                {#if item.nodes[0].health_score >= 5.0}
+                  <span class="text-green-500 text-xs"> (+1 pending)</span>
+                {/if}
+              </div>
             </TableBodyCell>
           {:else}
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.points).toFixed(2)}</TableBodyCell>

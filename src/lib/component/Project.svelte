@@ -52,12 +52,14 @@
 
     $: localProject = project;
     $: loading = true;
+    $: currentWeekHealthy = false;
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
     }
 
     async function getNodePoints() {
+        currentWeekHealthy = false;
         try {
             if (wallet) {
                 const url = `https://api.voirewards.com/proposers/index_p2.php?action=walletPoints&wallet=${wallet}`;
@@ -97,6 +99,7 @@
                     if (points[points.length-1].health >= 5.0) {
                         steps[2].detected = true;
                         steps[2].additionalInfo2 = 'Maintain health score above 5.0 to earn points at end of epoch (Sunday 23:59 UTC).'
+                        currentWeekHealthy = true;
                     }
                     else {
                         if (points[points.length-1].hours < 168) {
@@ -622,7 +625,9 @@
                         {:else if quest.earned}
                             <div class="text-sm text-green-800">
                                 <div>Weeks earned so far: {quest.earned}</div>
-                                <div class="text-xs">(Not including current week)</div>
+                                {#if currentWeekHealthy}
+                                    <div class="text-xs">(+1 Point for current week is pending)</div>
+                                {/if}
                             </div>
                         {/if}
                     </div>
