@@ -56,7 +56,7 @@
         selectedProject = projects.find((project) => project.id == selectedTab);
     }
 
-console.log(leaderboardData);
+// console.log(leaderboardData);
 </script>
 <div class="flex flex-wrap sm:justify-center mx-auto sm:w-3/4 {selectedTab ? 'blur-sm' : ''}">
     <div class="flex flex-col sm:w-full lg:w-full m-2">

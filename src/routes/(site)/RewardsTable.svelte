@@ -297,7 +297,7 @@
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
               <div>
                 {item.points}
-                {#if item.nodes[0].health_score >= 5.0}
+                {#if item.nodes[0]?.health_score??0 >= 5.0}
                   <span class="text-green-500 text-xs"> (+1 pending)</span>
                 {/if}
               </div>
