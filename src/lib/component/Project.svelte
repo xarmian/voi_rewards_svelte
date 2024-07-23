@@ -300,6 +300,7 @@
     async function getKibisisPoints() {
         try {
             const url = `https://api.kibis.is/v1/quests?account=${wallet}`;
+            //const url = `https://faas-ams3-2a2df116.doserverless.co/api/v1/web/fn-37f71b69-b023-46bb-b07e-846ebe0977bc/v1/quests/daily?account=${wallet}`;
             const data = await fetch(url).then((response) => response.json());
 
             if (data.account !== wallet) {
@@ -310,10 +311,15 @@
             // for each quest, check if action is in completedActions
             for (let i = 0; i < project.quests.length; i++) {
                 const quest = project.quests[i];
-                if (data.quests.find((result: { id: string, completed: number }) => result.id === quest.name && result.completed === 1)) {
-                    quest.earned = 1;
-                }
-                else {
+
+                if (data.quests.find((result: { id: string, total: number, completed: boolean }) => {
+                    if (result.id === quest.name) {
+                        quest.earned = result.total;
+                        quest.complete_epoch = result.completed;
+                        return true;
+                    }
+                    return false;
+                }) === undefined) {
                     quest.earned = 0;
                 }
             }

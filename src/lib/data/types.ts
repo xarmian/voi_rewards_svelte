@@ -73,6 +73,7 @@ export type IQuest = {
     status: null | "todo" | "in-progress" | "done";
     reward: number;
     earned?: number;
+    complete_epoch?: boolean;
     guide?: string;
     frequency?: string; // daily, weekly, monthly, once -- once if undefined
     isOpen?: boolean;
