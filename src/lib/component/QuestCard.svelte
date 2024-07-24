@@ -50,13 +50,25 @@
                 </div>
             </div>
         {:else}
-            <div class="flex items-center space-x-2 text-red-500">
-                <i class="fas fa-times text-xl"></i>
-                <span>Incomplete</span>
-                {#if quest.complete_epoch === false}
-                    <span class="text-sm">(for current epoch)</span>
-                {/if}
-            </div>
+            {#if quest.status === 'done'}
+                <div class="flex items-start space-x-2 text-gray-500">
+                    <i class="fas fa-times text-xl"></i>
+                    <span class="flex space-x-2">
+                        <span>This Quest has Expired</span>
+                        <InfoButton noAbsolute={true} buttonColor="text-[#0A77FF]">
+                            <p class="text-sm">This quest has expired and is no longer available to complete. Please check the project's page for more information. Expired quests may be re-instated in the future.</p>
+                        </InfoButton>
+                    </span>
+                </div>
+            {:else}
+                <div class="flex items-center space-x-2 text-red-500">
+                    <i class="fas fa-times text-xl"></i>
+                    <span>Incomplete</span>
+                    {#if quest.complete_epoch === false}
+                        <span class="text-sm">(for current epoch)</span>
+                    {/if}
+                </div>
+            {/if}
         {/if}
         {#if quest.earned && quest.earned > 0}
             <div class="text-sm text-green-800">+{quest.earned} point{(quest.earned??0) > 1 ? 's' : ''}</div>

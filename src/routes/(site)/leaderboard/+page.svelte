@@ -83,7 +83,7 @@
                         Project Quest Leaderboard
                     </h1>
                     <div class="text-gray-500 dark:text-gray-300">
-                        Points are awarded for participating in Voi Network projects. The leaderboard is updated periodically throughout the day.
+                        Points are awarded for participating in Voi Network projects. The leaderboard is currently updated daily at 04:30 UTC.
                     </div>
                     <div class="text-red-800 dark:text-red-500 font-bold text-lg">
                         NOTICE: Not all projects are tracked in the leaderboard. More will be added as the data becomes available.

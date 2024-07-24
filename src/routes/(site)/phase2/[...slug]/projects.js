@@ -543,6 +543,7 @@ const projects = [
         category: "NFTs",
         description: "High Forge is an NFT minting platform. Mint your first NFT on High Forge, earn points, and use it complete more quests.",
         url: "https://highforge.io/",
+        realtime: true,
         guide: "https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d",
         twitter: "https://x.com/highforgeio",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCAZPtzxsy",
@@ -551,15 +552,17 @@ const projects = [
         quests: [
             {
                 id: 1,
-                title: 'Mint the Quest 1 NFT',
-                description: 'Mint one Quest 1 NFT per day',
+                name: 'HF_quest_1',
+                title: 'Mint a High Forge Quest NFT',
+                description: 'Mint one High Forge Quest NFT per day',
                 frequency: 'Daily',
-                status: null,
+                status: 'done',
                 guide: 'https://tiny-sodium-7ff.notion.site/High-Forge-Phase-2-Quests-7325ead6581747bca1d1333a9416ab4d',
                 reward: 1,
             },
             {
                 id: 2,
+                name: 'HF_quest_2',
                 title: 'Mint and List',
                 description: 'Get ready for the next challenge! Mint NFTs and list them on one of the available marketplaces.',
                 frequency: 'Once',
@@ -569,6 +572,7 @@ const projects = [
             },
             {
                 id: 3,
+                name: 'HF_quest_3',
                 title: 'Quest 3: Mint w/ Arc200',
                 description: 'The excitement continues! Acquire a specific Arc200 coin from other DeFi platforms, or other users, then mint your NFT to complete the quest. Stay tuned for the link and step-by-step instructions!',
                 frequency: 'Once',

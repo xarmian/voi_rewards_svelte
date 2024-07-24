@@ -330,6 +330,33 @@
         }
     }
 
+    async function getHighforgePoints() {
+        try {
+            const url = `https://test-voi.api.highforge.io/quests/${wallet}`;
+            const data = await fetch(url).then((response) => response.json());
+
+            // for each quest, check if action is in completedActions
+            for (let i = 0; i < project.quests.length; i++) {
+                const quest = project.quests[i];
+
+                if (data.find((result: { quest: string, points: number, completed?: boolean }) => {
+                    if (result.quest === quest.name) {
+                        quest.earned = result.points;
+                        quest.complete_epoch = result.completed;
+                        return true;
+                    }
+                    return false;
+                }) === undefined) {
+                    quest.earned = 0;
+                }
+            }
+
+            loading = false;
+        } catch (error) {
+            console.error('Failed to fetch points:', error);
+        }
+    }
+
     function calculateChubsHoldPoints(transferData: TransferData, wallet: string): WalletPoints | undefined {
         const walletHoldings: Map<string, Map<number, number>> = new Map();
         const walletEpochs: Map<string, Set<number>> = new Map();
@@ -494,6 +521,9 @@
                 break;
             case 'Chubs':
                 getChubsPoints();
+                break;
+            case 'High Forge':
+                getHighforgePoints();
                 break;
             default:
                 for (let i = 0; i < project.quests.length; i++) {
