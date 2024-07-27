@@ -46,13 +46,14 @@
         <div class="flex flex-col items-center sm:items-start sm:mx-4">
             <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
                 <div class="text-2xl font-semibold text-gray-800 dark:text-white flex align-middle space-x-2">
-                    <div>7</div>
-                    <div class="self-center">
+                    <div>8</div>
+                    <div class="align-cente">
                         <InfoButton noAbsolute={true}>
                             <div class="text-xs">
                                 Current Projects Tracked in Leaderboard:
                                 <ul class="list-disc list-inside">
                                     <li>Node Running</li>
+                                    <li>Kibisis</li>
                                     <li>Nautilus</li>
                                     <li>Nomadex</li>
                                     <li>Humble</li>

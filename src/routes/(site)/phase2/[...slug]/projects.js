@@ -603,14 +603,15 @@ const projects = [
     },
     {
         id: 10,
-        title: "A-Wallet",
+        title: "Biatec Wallet (A-Wallet)",
         type: "Wallet",
         category: "Wallets",
-        description: "A-Wallet is a wallet for the Voi Network. Complete tasks on A-Wallet to earn points.",
+        description: "Biatec Wallet (formerly A-Wallet) is a wallet for the Voi Network. Complete tasks with Biatec Wallet to earn points.",
         url: "https://www.a-wallet.net/",
         guide: "https://rightful-wool-283.notion.site/AWallet-VOI-tasks-f4eb24d261f94072b89bdebbd04507d5",
         twitter: "https://x.com/EAlgonaut",
         galxe: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCdratzuWv",
+        logo: '/logos/biatec-wallet.svg',
         status: "active",
         quests: [
             {

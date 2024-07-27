@@ -6,6 +6,7 @@
 	import { onMount } from "svelte";
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
     import Time from 'svelte-time';
+	import InfoButton from "$lib/component/ui/InfoButton.svelte";
 
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | undefined;
@@ -51,7 +52,26 @@
                     </div>
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
                         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
-                            <div class="text-2xl font-semibold text-gray-800 dark:text-white">{(data.props.leaderboardData.total??0) - (data.props.leaderboardData.network??0)}</div>
+                            <div class="flex space-x-1">
+                                <div class="text-2xl font-semibold text-gray-800 dark:text-white">{(data.props.leaderboardData.total??0) - (data.props.leaderboardData.network??0)}</div>
+                                <div class="self-center">
+                                    <InfoButton noAbsolute={true}>
+                                        <div class="text-sm">
+                                            Ecosystem Actions count includes the following projects:
+                                            <ul class="list-disc list-inside text-xs">
+                                                <li>Node Running</li>
+                                                <li>Kibisis</li>
+                                                <li>Nautilus</li>
+                                                <li>Nomadex</li>
+                                                <li>Humble</li>
+                                                <li>NFTNavigator</li>
+                                                <li>Mechaswap</li>
+                                                <li>Chubs v2</li>
+                                            </ul>
+                                        </div>
+                                    </InfoButton>
+                                </div>
+                            </div>
                             <div class="text-gray-500 dark:text-gray-300">Ecosystem Actions</div>
                         </div>
                     </div>
