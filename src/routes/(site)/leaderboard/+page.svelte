@@ -47,7 +47,7 @@
             <div class="p-4 rounded-lg bg-white dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
                 <div class="text-2xl font-semibold text-gray-800 dark:text-white flex align-middle space-x-2">
                     <div>8</div>
-                    <div class="align-cente">
+                    <div class="align-center">
                         <InfoButton noAbsolute={true}>
                             <div class="text-xs">
                                 Current Projects Tracked in Leaderboard:

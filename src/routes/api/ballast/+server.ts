@@ -23,6 +23,7 @@ const fetchBallast = async() => {
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
     const urlParams = url.searchParams;
+    console.log(process.version);
 
     const lookback_param = (urlParams.has('lookback')) ? urlParams.get('lookback') : null;
     const lookback_blocks = (lookback_param) ? parseInt(lookback_param) : 5;
