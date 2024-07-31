@@ -66,6 +66,7 @@
                                                 <li>Humble</li>
                                                 <li>NFTNavigator</li>
                                                 <li>Mechaswap</li>
+                                                <li>AlgoLeagues</li>
                                                 <li>Chubs v2</li>
                                             </ul>
                                         </div>
