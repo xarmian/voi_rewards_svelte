@@ -727,6 +727,7 @@ const projects = [
         title: "AlgoLeagues",
         type: "AlgoLeagues Discord Bot",
         category: "Other",
+        column: "algoleagues",
         description: "AlgoLeagues Discord Bot facilitates transferring, withdrawing, and tipping Voi assets in Discord servers. Use the bot in the Voi Discord to earn points.",
         guide: "https://github.com/EasyTiger909/algo-leagues-quest-guide/blob/944ddd5dc496d47d7163a3399e4d64ebff32f003/README.md",
         twitter: "https://x.com/algoleagues",
