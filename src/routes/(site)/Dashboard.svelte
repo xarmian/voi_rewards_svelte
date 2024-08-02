@@ -188,6 +188,11 @@
 				Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
 			</div>
 			<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
+
+			<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center mt-4">
+				NOTICE: New nodes that join the network after July 31st will not be eligible for TestNet Phase 2 points.
+			</div>
+	
 			<div class="flex flex-row place-items-center space-x-4">
 				<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
 					<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank">Learn to Run a Node</a>
