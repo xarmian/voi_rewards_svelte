@@ -30,7 +30,7 @@ const projects = [
                 id: 3,
                 name: "run_a_node",
                 title: "Run a Node",
-                description: "Run a participation node on the Voi Network and earn points for each week the node remains online with a health score >= 5.0",
+                description: "Run a participation node on the Voi Network and earn points for each week the node remains online with a health score >= 5.0. NOTE: Nodes that join the network after July 31st will not be eligible for TestNet Phase 2 reward points.",
                 status: null,
                 reward: 1,
                 frequency: "Weekly",
