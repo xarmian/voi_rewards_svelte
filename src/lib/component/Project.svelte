@@ -357,56 +357,140 @@
         }
     }
 
-    function calculateChubsHoldPoints(transferData: TransferData, wallet: string): WalletPoints | undefined {
-        const walletHoldings: Map<string, Map<number, number>> = new Map();
-        const walletEpochs: Map<string, Set<number>> = new Map();
+    function calculateChubsHoldPoints(data) {
+      const balances = {};
+      const weeklyMinBalances = {};
+    
+      // Helper function to get the Monday of the week for a given date
+      const getMonday = (d) => {
+        const inputDate = new Date(d); // Convert input to Date object if not already
+        inputDate.setUTCHours(0, 0, 0, 0); // Set to 0:00 UTC
+        const dayOfWeek = inputDate.getDay(); // Get the day of the week (0-6)
+        const diff = dayOfWeek === 0 ? 6 : dayOfWeek; // Calculate difference to previous Monday
+        let previousMonday = new Date(inputDate);
+    
+        if (dayOfWeek !== 0) { // If it's not Monday
+            previousMonday.setUTCDate(inputDate.getUTCDate() - diff); // Subtract difference to get to Monday
+        }
 
-        // Helper function to get the epoch number
-        const getEpochNumber = (timestamp: number): number => {
-            const date = new Date(timestamp * 1000);
-            date.setUTCHours(0, 0, 0, 0);
-            return Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
-        };
+        return previousMonday;
+    };
+    
+      // Helper function to format date as YYYY-MM-DD
+      const formatDate = (date) => date.toISOString().split('T')[0];
+    
+      // Find the earliest and latest dates 0:00 UTC
+      let earliestDate = new Date(data.transfers[0].timestamp * 1000);
+      earliestDate.setUTCHours(0, 0, 0, 0);
+      
+      //let latestDate = new Date(data.transfers[0].timestamp * 1000);
+      let latestDate = new Date();
+      latestDate.setUTCHours(0, 0, 0, 0);
+      const addresses = new Set();
+    
+      data.transfers.forEach(transfer => {
+        const date = new Date(transfer.timestamp * 1000);
+        if (date < earliestDate) earliestDate = date;
+        if (date > latestDate) latestDate = date;
+        addresses.add(transfer.fromAddr);
+        addresses.add(transfer.toAddr);
+      });
 
-        // last epoch is today
-        const lastEpoch = getEpochNumber(Date.now() / 1000);
+      // Adjust to full weeks
+      earliestDate = getMonday(earliestDate);
+      latestDate = getMonday(new Date(latestDate.getTime() + 7 * 24 * 60 * 60 * 1000)); // Next Monday
 
-        // Process transfers
-        transferData.transfers.forEach((transfer) => {
-            const epochNumber = getEpochNumber(transfer.timestamp);
+      // Initialize balances and weeklyMinBalances
+      for (let d = earliestDate; d < latestDate; d.setDate(d.getDate() + 7)) {
+        const weekStart = formatDate(d);
+        weeklyMinBalances[weekStart] = {};
+        addresses.forEach(addr => {
+          if (!balances[addr]) balances[addr] = 0;
+          weeklyMinBalances[weekStart][addr] = { balance: balances[addr], wasZero: false };
+        });
+      }
 
-            // Remove token from sender's holdings
-            if (transfer.fromAddr !== "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ") {
-                const senderHoldings = walletHoldings.get(transfer.fromAddr) || new Map();
-                senderHoldings.delete(transfer.tokenId);
-                walletHoldings.set(transfer.fromAddr, senderHoldings);
-            }
-
-            // Add token to receiver's holdings
-            const receiverHoldings = walletHoldings.get(transfer.toAddr) || new Map();
-            receiverHoldings.set(transfer.tokenId, epochNumber);
-            walletHoldings.set(transfer.toAddr, receiverHoldings);
+      // for each address in the first week of weeklyBalances, set wasZero to true
+        const firstWeek = Object.keys(weeklyMinBalances)[0];
+        addresses.forEach(addr => {
+            weeklyMinBalances[firstWeek][addr].wasZero = true;
         });
 
-        // Calculate points for each wallet
-        walletHoldings.forEach((holdings, wallet) => {
-            const epochs = new Set<number>();
-            holdings.forEach((acquiredEpoch, tokenId) => {
-                for (let epoch = acquiredEpoch; epoch <= lastEpoch; epoch++) {
-                    epochs.add(epoch);
+      // Process transfers
+      data.transfers.forEach(transfer => {
+        const { fromAddr, toAddr, timestamp } = transfer;
+        const date = new Date(timestamp * 1000);
+        date.setUTCHours(0, 0, 0, 0);
+        const weekStart = formatDate(getMonday(date));
+    
+        // Update balances
+        balances[fromAddr]--;
+        balances[toAddr]++;
+    
+        // Update weekly minimum balances
+        if (fromAddr != 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ') {
+            try {
+                weeklyMinBalances[weekStart][fromAddr].balance = balances[fromAddr];
+            }
+            catch(err) {
+                console.log(err, weekStart);
+            }
+        }
+
+        if (toAddr != 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ') {
+            try {
+                weeklyMinBalances[weekStart][toAddr].balance = balances[toAddr];
+            }
+            catch(err) {
+                console.log(err, weekStart);
+            }
+        }
+
+        // Check if balance became zero
+        if (balances[fromAddr] <= 0) weeklyMinBalances[weekStart][fromAddr].wasZero = true;
+        if (balances[toAddr] <= 0) weeklyMinBalances[weekStart][toAddr].wasZero = true;
+      });
+
+      // for each week for each wallet, if the balance is zero and wasZero is false, set the balance to the balance of the previous week
+        const weeks = Object.keys(weeklyMinBalances);
+        weeks.forEach((week, index) => {
+            if (index === 0) return;
+            const previousWeek = weeks[index - 1];
+            addresses.forEach(addr => {
+                if (weeklyMinBalances[week][addr].balance === 0 && !weeklyMinBalances[week][addr].wasZero) {
+                    weeklyMinBalances[week][addr].balance = weeklyMinBalances[previousWeek][addr].balance;
+                }
+                if (weeklyMinBalances[previousWeek][addr].balance === 0) {
+                    weeklyMinBalances[week][addr].wasZero = true;
                 }
             });
-            walletEpochs.set(wallet, epochs);
         });
 
-        // Convert to result format
-        const result: WalletPoints[] = Array.from(walletEpochs.entries()).map(([wallet, epochs]) => ({
-            wallet,
-            points: Math.max(epochs.size-2,0)
-        }));
+      // Convert weeklyMinBalances to the required array format
+      const result = Object.entries(weeklyMinBalances).map(([weekStart, accounts]) => ({
+        weekStart,
+        weekEnd: formatDate(new Date(new Date(weekStart).getTime() + 6 * 24 * 60 * 60 * 1000)),
+        accounts: Object.entries(accounts).map(([address, { balance, wasZero }]) => ({
+          address,
+          balance: wasZero ? 0 : balance
+        }))
+      }));
 
-        return result.find((walletPoints) => walletPoints.wallet === wallet);
-    }
+    // for each wallet, calculate the number of weeks where the balance did not drop to zero
+    const walletPoints = new Map();
+    result.slice(0, -1).forEach(({ accounts }, index) => {
+        accounts.forEach(({ address, balance, wasZero }) => {
+            if (balance > 0 && !wasZero) {
+                walletPoints.set(address, (walletPoints.get(address) || 0) + 1);
+            }
+        });
+    });
+
+    // Convert to array of objects
+    const points = Array.from(walletPoints, ([wallet, points]) => ({ wallet, points }));
+
+    return points;
+}
 
     function calculateChubsSharePoints(transferData: TransferData): WalletPoints[] {
         const walletWeeklyTransfers: Map<string, boolean> = new Map();
@@ -479,9 +563,12 @@
                 quest.earned = 0;
                 url = `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/transfers?contractId=48716545&user=${wallet}`;
                 data = await fetch(url).then((response) => response.json());
-                const r = calculateChubsHoldPoints(data, wallet);
-                if (r) {
-                    quest.earned = r.points;
+                const r = calculateChubsHoldPoints(data);
+                if (r && r.length > 0) {
+                    quest.earned = r[0].points;
+                }
+                else {
+                    quest.earned = 0;
                 }
             }
 
