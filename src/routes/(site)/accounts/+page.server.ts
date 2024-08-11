@@ -10,18 +10,17 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
 
     // get all addresses connected to user's discord id
     if (user && user.user_metadata && user.user_metadata.provider_id) {
-        // select * from users using supabase api
         const { data, error: supaError } = await supabasePrivateClient
             .from('addresses')
             .select(`
                 address,
                 is_primary,
-                users (
+                users!inner (
                     discord_id
                 )
             `)
             .eq('users.discord_id', user.user_metadata.provider_id);
-
+            
         if (supaError) {
             console.error('Error fetching user and addresses:', error);
         } else if (data) {
