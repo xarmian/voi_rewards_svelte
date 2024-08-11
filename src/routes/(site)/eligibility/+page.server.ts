@@ -1,16 +1,17 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { supabasePrivateClient as supabase } from '$lib/supabase-server';
+import { supabasePrivateClient as supabasePrivateClient } from '$lib/supabase-server';
 import { verifyToken } from 'avm-wallet-svelte';
 
 export const load: PageServerLoad = async ({ params, cookies, url, locals }) => {
-    const user = locals.user;
+    const user = (await locals.getSession())?.user;
+    
     const wallets = [];
 
     // get all addresses connected to user's discord id
     if (user && user.user_metadata && user.user_metadata.provider_id) {
         // select * from users using supabase api
-        const { data, error: supaError } = await supabase
+        const { data, error: supaError } = await supabasePrivateClient
             .from('addresses')
             .select(`
                 address,
@@ -50,11 +51,15 @@ export const actions = {
         }
 
         // get user's discord ID
-        const authUser = await locals.getUser();
+        const authUser = (await locals.getSession())?.user;
         const discordId = authUser?.user_metadata?.provider_id;
 
+        if (!authUser || !discordId) {
+            error(401, 'User not authenticated');
+        }
+
         // get user's uuid from users table using discord_id
-        const { data: user, error: supaError } = await supabase
+        const { data: user, error: supaError } = await supabasePrivateClient
             .from('users')
             .select('id')
             .eq('discord_id', discordId)
@@ -69,7 +74,7 @@ export const actions = {
         }
 
         // set all addresses as not primary
-        const { error: unsetError } = await supabase
+        const { error: unsetError } = await supabasePrivateClient
             .from('addresses')
             .update({ is_primary: false })
             .eq('user_id', user.id);
@@ -79,7 +84,7 @@ export const actions = {
         }
 
         // set the selected address as primary
-        const { error: setPrimaryError } = await supabase
+        const { error: setPrimaryError } = await supabasePrivateClient
             .from('addresses')
             .update({ is_primary: true })
             .eq('user_id', user.id)

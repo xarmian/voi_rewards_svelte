@@ -1,29 +1,47 @@
-// src/hooks.server.ts
-import type { Handle } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '@supabase/auth-helpers-sveltekit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
-import type { Database } from './lib/database.types';
+import { createServerClient } from '@supabase/ssr';
+import type { Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
-  event.locals.supabase = createSupabaseServerClient<Database>({
-    supabaseUrl: PUBLIC_SUPABASE_URL,
-    supabaseKey: PUBLIC_SUPABASE_ANON_KEY,
-    event,
-  });
+    event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+        cookies: {
+            get: (key) => event.cookies.get(key),
+            /**
+             * Note: You have to add the `path` variable to the
+             * set and remove method due to sveltekit's cookie API
+             * requiring this to be set, setting the path to an empty string
+             * will replicate previous/standard behaviour (https://kit.svelte.dev/docs/types#public-types-cookies)
+             */
+            set: (key, value, options) => {
+                event.cookies.set(key, value, { ...options, path: '/' });
+            },
+            remove: (key, options) => {
+                event.cookies.delete(key, { ...options, path: '/' });
+            }
+        }
+    });
 
-  event.locals.getUser = async () => {
-    const {
-        data: { user },
-    } = await event.locals.supabase.auth.getUser();
-    return user;
-  };
+    /**
+     * a little helper that is written for convenience so that instead
+     * of calling `const { data: { session } } = await supabase.auth.getSession()`
+     * you just call this `await getSession()`
+     */
+    let sessionRetrieved = false;
+    event.locals.getSession = async () => {
+        sessionRetrieved = true;
+        const {
+            data: { session }
+        } = await event.locals.supabase.auth.getSession();
+        return session;
+    };
 
-  const user = await event.locals.getUser();
-    
-    if (user) {
-        event.locals.user = user;
+    if (!sessionRetrieved) {
+        await event.locals.supabase.auth.getSession();
     }
 
-  const response = await resolve(event);
-  return response;
+    return resolve(event, {
+        filterSerializedResponseHeaders(name) {
+            return name === 'content-range';
+        }
+    });
 };

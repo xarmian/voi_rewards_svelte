@@ -1,5 +1,5 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { supabasePrivateClient as supabase } from '$lib/supabase-server';
+import { supabasePrivateClient as supabasePrivateClient } from '$lib/supabase-server';
 import { verifyToken } from 'avm-wallet-svelte';
 
 export const POST: RequestHandler = async ({ request, cookies, locals }) => {
@@ -11,17 +11,17 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
     const isValid = (walletId && token) ? await verifyToken(walletId,token) : false;
 
     if (!isValid) {
-        return new Response(JSON.stringify({ error: 'Invalid wallet token' }), {
+        return new Response(JSON.stringify({ error: 'Invalid wallet token. Please re-authenticate your Voi Account and try again.' }), {
             status: 401,
         });
     }
 
     // get user's discord ID
-    const authUser = await locals.getUser();
+    const authUser = (await locals.getSession())?.user;
     const discordId = authUser?.user_metadata?.provider_id;
 
     // get user's uuid from users table using discord_id
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabasePrivateClient
         .from('users')
         .select('id')
         .eq('discord_id', discordId)
@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
     }
 
     // check if user already has a wallet, if not then this will be their primary wallet
-    const { data: existingWallets, error: existingWalletsError } = await supabase
+    const { data: existingWallets, error: existingWalletsError } = await supabasePrivateClient
         .from('addresses')
         .select('id')
         .eq('user_id', user.id);
@@ -52,7 +52,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
     }
 
     // Log wallet information to your database
-    const { error: walletError } = await supabase
+    const { error: walletError } = await supabasePrivateClient
         .from('addresses')
         .upsert({
             user_id: user.id,

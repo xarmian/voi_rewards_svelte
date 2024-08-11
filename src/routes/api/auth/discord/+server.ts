@@ -4,6 +4,7 @@ import { supabasePrivateClient as supabase } from '$lib/supabase-server';
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const { access_token } = await request.json();
+    console.log('access_token:', access_token);
 
     // Fetch Discord user information
     const discordResponse = await fetch('https://discord.com/api/users/@me', {
@@ -12,6 +13,8 @@ export const POST: RequestHandler = async ({ request }) => {
       },
     });
 
+    console.log(discordResponse);
+
     if (!discordResponse.ok) {
       return new Response(JSON.stringify({ error: 'Failed to fetch Discord information' }), {
         status: 400,
@@ -19,9 +22,10 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const discordUser = await discordResponse.json();
+    console.log('discordUser:', discordUser);
 
     // Log Discord information to your database
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('users')
       .upsert({
         discord_id: discordUser.id,

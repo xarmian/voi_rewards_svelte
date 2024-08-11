@@ -1,19 +1,23 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { supabasePublicClient as supabase } from '$lib/supabase';
+    // import { supabasePublicClient as supabase } from '$lib/supabase-server';
     import { goto } from '$app/navigation';
+    import type { PageData } from '../$types';
   
+    export let data: PageData;
     let error: string | null = null;
   
     onMount(async () => {
-      const { data, error: authError } = await supabase.auth.getSession();
+      const { data: { session }, error: authError } = await data.supabase.auth.getSession();
+
+      console.log('getSession data', session);
   
       if (authError) {
         error = 'Authentication failed. Please try again.';
         return;
       }
   
-      if (data.session) {
+      if (session) {
         try {
           const response = await fetch('/api/auth/discord', {
             method: 'POST',
@@ -21,8 +25,9 @@
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              access_token: data.session.provider_token,
-              user_id: data.session.user.id,
+              access_token: session.provider_token,
+              user_id: session.user.id,
+              session: session,
             }),
           });
   
@@ -40,11 +45,11 @@
     });
   </script>
   
-  <main>
+  <div class="flex flex-col place-items-center py-10 text-2xl bg-white dark:bg-black">
     {#if error}
       <p>{error}</p>
-      <a href="/eligibility">Return to Eligibility Page</a>
+      <a href="/eligibility">Return to Account Management Page</a>
     {:else}
       <p>Processing your login, please wait...</p>
     {/if}
-  </main>
+  </div>
