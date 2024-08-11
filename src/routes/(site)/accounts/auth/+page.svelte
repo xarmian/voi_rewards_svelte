@@ -32,7 +32,7 @@
           });
   
           if (response.ok) {
-            goto('/eligibility');
+            goto('/accounts');
           } else {
             error = 'Failed to log Discord information. Please try again.';
           }
@@ -48,7 +48,7 @@
   <div class="flex flex-col place-items-center py-10 text-2xl bg-white dark:bg-black">
     {#if error}
       <p>{error}</p>
-      <a href="/eligibility">Return to Account Management Page</a>
+      <a href="/accounts">Return to Account Management Page</a>
     {:else}
       <p>Processing your login, please wait...</p>
     {/if}

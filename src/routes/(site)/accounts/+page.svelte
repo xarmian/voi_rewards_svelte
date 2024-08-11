@@ -59,7 +59,7 @@
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'discord',
             options: {
-                redirectTo: `${window.location.origin}/eligibility/auth`
+                redirectTo: `${window.location.origin}/accounts/auth`
             }
         });
         if (error) console.error('Error signing in with Discord:', error);
