@@ -18,6 +18,8 @@
     }
 
     export let data: PageData;
+    let showPrivacyModal = false;
+
     $: discordAccounts = [] as DiscordAccount[];
     $: voiWallets = [] as VoiWallet[];
     let user: User | null = data.server_data.user;
@@ -149,9 +151,15 @@
 <div class="bg-gray-100 dark:bg-black">
     <div class="container mx-auto p-4 max-w-3xl">
         <h1 class="text-3xl font-bold mb-6 text-black dark:text-white">Account Management</h1>
-
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
+            Use of this site requires connecting a Discord account and a Voi wallet. The Discord account is used to verify your identity and the Voi wallet is used to receive rewards.
+            View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
+        </div>
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
             <h2 class="text-2xl font-semibold mb-4">Discord Account</h2>
+            <div class="text-gray-600 dark:text-gray-400 mb-4">
+                Connect one Discord Account. All Voi addresses will be linked under this account.
+            </div>
             {#if discordAccounts.length > 0}
                 <ul class="space-y-2">
                     {#each discordAccounts as account (account.id)}
@@ -161,7 +169,7 @@
                         on:click={() => disconnectDiscord(account.id)}
                         class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
                         >
-                        Disconnect
+                        Logout
                         </button>
                     </li>
                     {/each}
@@ -179,6 +187,9 @@
 
         <div class="bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 {discordAccounts.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
             <h2 class="text-2xl font-semibold mb-4">Voi Accounts</h2>
+            <div class="text-gray-600 dark:text-gray-400 mb-4">
+                Connect your Voi addresses here. Your accounts will be aggregated, and any rewards will be sent to the wallet designated as Primary.
+            </div>
             {#if voiWallets.length > 0}
                 <ul class="space-y-2">
                     {#each voiWallets as wallet (wallet.address)}
@@ -189,7 +200,7 @@
                                     <div class="text-green-500">Primary</div>
                                     <InfoButton noAbsolute={true}>
                                         <div class="text-xs">
-                                            Setting a wallet as primary will make it the wallet to be used for airdrops
+                                            This wallet is set as your primary wallet. You can only have one primary wallet at a time. Your primary wallet will be used to receive rewards.
                                         </div>
                                     </InfoButton>
                                 </span>
@@ -222,6 +233,69 @@
         </div>
     </div>
 </div>
+{#if showPrivacyModal}
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 max-w-3xl">
+            <h2 class="text-2xl font-semibold mb-4">Privacy Policy</h2>
+            <div class="overflow-auto" style="height: 75vh;">
+                <p class="text-gray-600 dark:text-gray-400">
+                    <div class="privacy-policy p-6 rounded-lg shadow-md">
+                        <h1 class="text-2xl font-bold mb-4">Privacy Policy</h1>
+                        <p class="text-sm text-gray-600 mb-6">Last updated: 2024-08-11</p>
+                        
+                        <h2 class="text-xl font-semibold mb-2">1. Introduction</h2>
+                        <p class="mb-4">Welcome to Voirewards.com ("we," "our," or "us"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services, particularly in relation to connecting your Discord account and Voi wallet for participation in rewards distributions conducted by the Voi Foundation.</p>
+                        <p class="mb-4">While Voirewards.com is not directly affiliated with the Voi Foundation, data submitted to this website may be collected and shared with the Voi Foundation for these stated purposes.</p>
+                        <h2 class="text-xl font-semibold mb-2">2. Information We Collect</h2>
+                        <p class="mb-2">We collect information that you provide directly to us when you use our website:</p>
+                        <ul class="list-disc list-inside mb-4">
+                            <li>Discord account information</li>
+                            <li>Voi wallet information</li>
+                            <li>Any other information you choose to provide</li>
+                        </ul>
+                        
+                        <h2 class="text-xl font-semibold mb-2">3. How We Use Your Information</h2>
+                        <p class="mb-2">We use the information we collect to:</p>
+                        <ul class="list-disc list-inside mb-4">
+                            <li>Facilitate your participation in Voi Foundation rewards distribution</li>
+                            <li>Determine eligibility for rewards</li>
+                            <li>Communicate with you about the rewards and our services</li>
+                            <li>Improve and optimize our website and services</li>
+                        </ul>
+                        
+                        <h2 class="text-xl font-semibold mb-2">4. Sharing of Your Information</h2>
+                        <p class="mb-2">We may share your information with:</p>
+                        <ul class="list-disc list-inside mb-4">
+                            <li>Voi Foundation: To facilitate rewards distribution and determine eligibility</li>
+                            <li>Service Providers: Third-party vendors who help us operate our website and provide our services</li>
+                            <li>Legal Requirements: When required by law or to protect our rights</li>
+                        </ul>
+                        
+                        <h2 class="text-xl font-semibold mb-2">5. Data Storage and Security</h2>
+                        <p class="mb-4">We use industry-standard security measures to protect your information.</p>
+                        
+                        <h2 class="text-xl font-semibold mb-2">6. Your Rights and Choices</h2>
+                        <p class="mb-2">You have the right to:</p>
+                        <ul class="list-disc list-inside mb-4">
+                            <li>Access, correct, or delete your personal information</li>
+                            <li>Opt-out of certain data collection or use</li>
+                            <li>Withdraw consent for processing your data (where applicable)</li>
+                        </ul>
+                        <p class="mb-4">To exercise these rights, please contact us using the information provided in the "Contact Us" section.</p>
+                        
+                        <h2 class="text-xl font-semibold mb-2">7. Changes to This Privacy Policy</h2>
+                        <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.</p>
+                    </div>
+            </div>
+            <button
+            on:click={() => showPrivacyModal = false}
+            class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
+        >
+            Close
+        </button>
+</div>
+    </div>
+{/if}
 <style lang="postcss">
     :global(body) {
         @apply bg-gray-100;
