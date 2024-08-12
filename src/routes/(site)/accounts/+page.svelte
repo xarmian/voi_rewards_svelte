@@ -5,6 +5,7 @@
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import type { PageData } from '../$types';
 	import InfoButton from '$lib/component/ui/InfoButton.svelte';
+	import { onMount } from 'svelte';
 
     interface DiscordAccount {
       id: string;
@@ -17,16 +18,19 @@
     }
 
     export let data: PageData;
-    let discordAccounts: DiscordAccount[] = [];
+    $: discordAccounts = [] as DiscordAccount[];
     $: voiWallets = [] as VoiWallet[];
     let user: User | null = data.server_data.user;
     const supabase = data.supabase;
 
-    $: if (user) {
-        discordAccounts.push({
-            id: user.id,
-            username: user.email??''
-        });
+    onMount(() => {
+        if (user) {
+            discordAccounts.push({
+                id: user.id,
+                username: user.email??''
+            });
+            discordAccounts = discordAccounts;
+        }
 
         voiWallets = data.server_data.wallets.map((wallet) => {
             return {
@@ -34,25 +38,14 @@
                 is_primary: wallet.is_primary
             };
         });
-    }
-  
+    });
+
     function disconnectDiscord(accountId: string) {
-      // Implement Discord account disconnection logic
       console.log(`Disconnecting Discord account ${accountId}...`);
       discordAccounts = discordAccounts.filter(account => account.id !== accountId);
-    }
-  
-    function disconnectVoi(walletAddress: string) {
-      // Implement Voi wallet disconnection logic
-      console.log(`Disconnecting Voi wallet ${walletAddress}...`);
-      voiWallets = voiWallets.filter(wallet => wallet.address !== walletAddress);
+      voiWallets = [];
 
-      // TODO: Send wallet disconnection request to backend?
-
-      // remove wallet from connectedWallets
-      connectedWallets.update((wallets) => {
-        return wallets.filter((wallet) => wallet.address !== walletAddress);
-      });
+      data.supabase.auth.signOut();
     }
   
     async function connectDiscord() {
@@ -123,6 +116,34 @@
             return true;
         }
     }
+
+    async function disconnectVoi(walletAddress: string) {
+        console.log(`Disconnecting Voi wallet ${walletAddress}...`);
+        voiWallets = voiWallets.filter(wallet => wallet.address !== walletAddress);
+
+        // TODO: Send wallet disconnection request to backend?
+        const formData = new FormData();
+        formData.append('wallet', walletAddress);
+
+        const response = await fetch('?/disconnectWallet', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            alert(data.error.message);
+            return false;
+        }
+        else {
+            // remove wallet from connectedWallets
+            connectedWallets.update((wallets) => {
+                return wallets.filter((wallet) => wallet.address !== walletAddress);
+            });
+
+            return true;
+        }
+    }
 </script>  
 
 <div class="bg-gray-100 dark:bg-black">
@@ -132,19 +153,19 @@
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
             <h2 class="text-2xl font-semibold mb-4">Discord Account</h2>
             {#if discordAccounts.length > 0}
-            <ul class="space-y-2">
-                {#each discordAccounts as account (account.id)}
-                <li class="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                    <span>{account.username}</span>
-                    <button
-                    on:click={() => disconnectDiscord(account.id)}
-                    class="bg-gray-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors pointer-events-none"
-                    >
-                    Disconnect
-                    </button>
-                </li>
-                {/each}
-            </ul>
+                <ul class="space-y-2">
+                    {#each discordAccounts as account (account.id)}
+                    <li class="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded">
+                        <span>{account.username}</span>
+                        <button
+                        on:click={() => disconnectDiscord(account.id)}
+                        class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
+                        >
+                        Disconnect
+                        </button>
+                    </li>
+                    {/each}
+                </ul>
             {:else}
                 <p class="text-gray-600 dark:text-gray-400">No Discord accounts connected.</p>
                 <button
@@ -179,7 +200,7 @@
                             {/if}
                             <button
                             on:click={() => disconnectVoi(wallet.address)}
-                            class="bg-gray-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors pointer-events-none"
+                            class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
                             >
                                 Disconnect
                             </button>

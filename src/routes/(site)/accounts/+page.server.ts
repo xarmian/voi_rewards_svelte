@@ -19,7 +19,8 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
                     discord_id
                 )
             `)
-            .eq('users.discord_id', user.user_metadata.provider_id);
+            .eq('users.discord_id', user.user_metadata.provider_id)
+            .eq('disconnected', false);
             
         if (supaError) {
             console.error('Error fetching user and addresses:', error);
@@ -98,4 +99,55 @@ export const actions = {
             body: { success: true },
         };
     },
+    disconnectWallet: async ({ request, params, cookies, locals }) => {
+        const formData = await request.formData();
+        const wallet = formData.get('wallet')?.toString();
+
+        // verify the token
+        const token = cookies.get(`avm-wallet-token-${wallet}`);
+        const isValid = (wallet && token) ? await verifyToken(wallet, token) : false;
+
+        if (!isValid) {
+            error(401, 'Invalid wallet token');
+        }
+
+        // get user's discord ID
+        const authUser = (await locals.getSession())?.user;
+        const discordId = authUser?.user_metadata?.provider_id;
+
+        if (!authUser || !discordId) {
+            error(401, 'User not authenticated');
+        }
+
+        // get user's uuid from users table using discord_id
+        const { data: user, error: supaError } = await supabasePrivateClient
+            .from('users')
+            .select('id')
+            .eq('discord_id', discordId)
+            .single();
+
+        if (supaError) {
+            error(500, 'Failed to fetch user information');
+        }
+
+        if (!user) {
+            error(404, 'User not found');
+        }
+
+        // disconnect the wallet by updating column `disconnected` to true
+        const { error: disconnectError } = await supabasePrivateClient
+            .from('addresses')
+            .update({ disconnected: true })
+            .eq('user_id', user.id)
+            .eq('address', wallet);
+            
+        if (disconnectError) {
+            error(500, 'Failed to disconnect wallet');
+        }
+
+        return {
+            status: 200,
+            body: { success: true },
+        };
+    }
 }
