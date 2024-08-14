@@ -149,5 +149,32 @@ export const actions = {
             status: 200,
             body: { success: true },
         };
+    },
+    optin: async ({ request, params, cookies, locals }) => {
+        const formData = await request.formData();
+        const optin = formData.get('optin')?.toString();
+
+        // get user's discord ID
+        const authUser = (await locals.getSession())?.user;
+        const discordId = authUser?.user_metadata?.provider_id;
+
+        if (!authUser || !discordId) {
+            error(401, 'User not authenticated');
+        }
+
+        // update user's record to opt-in
+        const { error: optinError } = await supabasePrivateClient
+            .from('users')
+            .update({ email_consent: optin === 'optin' })
+            .eq('discord_id', discordId);
+
+        if (optinError) {
+            error(500, 'Failed to opt-in user');
+        }
+
+        return {
+            status: 200,
+            body: { success: true },
+        };
     }
 }

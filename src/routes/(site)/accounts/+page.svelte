@@ -6,6 +6,7 @@
 	import type { PageData } from '../$types';
 	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 	import { onMount } from 'svelte';
+    import { RadioButton, ButtonGroup } from 'flowbite-svelte';
 
     interface DiscordAccount {
       id: string;
@@ -23,6 +24,7 @@
     $: discordAccounts = [] as DiscordAccount[];
     $: voiWallets = [] as VoiWallet[];
     let user: User | null = data.server_data.user;
+    let optinGroup = 'optout';
     const supabase = data.supabase;
 
     onMount(() => {
@@ -146,13 +148,33 @@
             return true;
         }
     }
+
+    async function handleOptInOut(value) {
+        console.log('Opt in/out value:', value);
+        const formData = new FormData();
+        formData.append('optin', value);
+
+        const response = await fetch('?/optin', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            alert(data.error.message);
+            return false;
+        }
+        else {
+            return true;
+        }
+    }
 </script>  
 
 <div class="bg-gray-100 dark:bg-black">
     <div class="container mx-auto p-4 max-w-3xl">
         <h1 class="text-3xl font-bold mb-6 text-black dark:text-white">Account Management</h1>
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
-            Use of this site requires connecting a Discord account and a Voi wallet. The Discord account is used to verify your identity and the Voi wallet is used to receive rewards.
+            Use of this site requires connecting a Discord account and one or more Voi wallets. The Discord account is used to verify your identity and Voi wallets are used to calculate and receive rewards.
             View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
         </div>
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
@@ -182,6 +204,17 @@
                 >
                 Connect Discord Account
             </button>
+            {/if}
+            {#if discordAccounts.length > 0}
+                <div class="m-4 flex justify-center">
+                    <ButtonGroup>
+                        <RadioButton on:change={() => handleOptInOut(optinGroup)} value="optin" bind:group={optinGroup}><div class='w-28'>Opt in to receive Voi Notification E-mails</div></RadioButton>
+                        <RadioButton on:change={() => handleOptInOut(optinGroup)} value="optout" bind:group={optinGroup}><div class='w-28'>Do not send me Voi Notification E-Mails</div></RadioButton>
+                    </ButtonGroup>
+                </div>
+                {#if optinGroup === 'optout'}
+                    <div class="text-red-500 text-center">You are opted out of receiving Notification E-Mails.</div>
+                {/if}
             {/if}
         </div>
 
