@@ -7,6 +7,7 @@
 	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 	import { onMount } from 'svelte';
     import { RadioButton, ButtonGroup } from 'flowbite-svelte';
+    import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 
     interface DiscordAccount {
       id: string;
@@ -255,7 +256,7 @@
                 <p class="text-gray-600 dark:text-gray-400">No Voi accounts connected.</p>
             {/if}
             <div class="mt-4">
-                <Web3Wallet availableWallets={['DeflyWallet','Kibisis','LuteWallet']} showAuthButtons={true} algodClient={algodClient} indexerClient={algodIndexer} walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"/>
+                <Web3Wallet availableWallets={['WalletConnect','Kibisis','LuteWallet']} connectButtonType="static" modalType="modal" showAuthButtons={true} algodClient={algodClient} indexerClient={algodIndexer} {wcProjectId} walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"/>
             </div>
             <!--<button
                 on:click={connectVoi}
