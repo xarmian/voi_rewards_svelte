@@ -46,6 +46,7 @@ export const actions = {
         const formData = await request.formData();
         const wallet = formData.get('wallet')?.toString();
 
+        /*
         // verify the token
         const token = cookies.get(`avm-wallet-token-${wallet}`);
         const isValid = (wallet && token) ? await verifyToken(wallet, token) : false;
@@ -53,6 +54,7 @@ export const actions = {
         if (!isValid) {
             error(401, 'Invalid wallet token');
         }
+        */
 
         // get user's discord ID
         const authUser = (await locals.getUser());
@@ -107,6 +109,7 @@ export const actions = {
         const formData = await request.formData();
         const wallet = formData.get('wallet')?.toString();
 
+        /* -- don't need token to be valid since the user is authenticated already
         // verify the token
         const token = cookies.get(`avm-wallet-token-${wallet}`);
         const isValid = (wallet && token) ? await verifyToken(wallet, token) : false;
@@ -114,6 +117,7 @@ export const actions = {
         if (!isValid) {
             error(401, 'Invalid wallet token');
         }
+        */
 
         // get user's discord ID
         const authUser = (await locals.getUser());

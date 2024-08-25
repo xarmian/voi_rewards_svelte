@@ -51,7 +51,6 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
         });
     }
 
-    // Log wallet information to your database
     const { error: walletError } = await supabasePrivateClient
         .from('addresses')
         .upsert({
@@ -59,6 +58,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
             address: walletId,
             chain: 'VOI',
             is_primary: !existingWallets || existingWallets.length === 0,
+            disconnected: false,
         }, {
             onConflict: 'user_id,address,chain',
         });
