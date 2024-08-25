@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
     }
 
     // get user's discord ID
-    const authUser = (await locals.getSession())?.user;
+    const authUser = (await locals.getUser());
     const discordId = authUser?.user_metadata?.provider_id;
 
     // get user's uuid from users table using discord_id

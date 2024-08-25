@@ -2,6 +2,12 @@
 	import { Footer, FooterBrand, FooterLinkGroup, FooterLink } from 'flowbite-svelte';
 	import Navbar from './Navbar.svelte';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
+	import { goto } from '$app/navigation';
+
+	export let data;
+
+	let showNotice = true;
+	if (data.session?.user) showNotice = false;
 
 	const options = {
   	}
@@ -10,7 +16,24 @@
 
 <div class="dark:text-white bg-[#662ed9]">
 	<Navbar />
-
+	{#if showNotice}
+		<div class="flex flex-row bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 w-full justify-between" role="alert">
+			<div class="flex flex-row">
+				<div class="flex flex-col">
+					<p class="font-bold">Notice!</p>
+					<p>
+						Get ready for Voi MainNet! Register your Discord account and wallet addresses now! Deadline: September 16, 2024
+						<a href="https://medium.com/@voifoundation/mainnet-announcement-f05de7f2bab1" target="_blank" class="text-blue-500 underline hover:text-blue-400">(More Info)</a>
+					</p>
+				</div>
+				<i class="fas fa-arrow-right place-self-center mx-5 fa-2x"></i>
+				<button class="place-self-center bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" on:click={() => goto('/accounts')}>Link Accounts</button>
+			</div>
+			<button class="place-self-end self-center ml-4" on:click={() => showNotice = false}>
+				<i class="fas fa-times fa-2x"></i>
+			</button>
+		</div>
+	{/if}
 	<main>
 		<slot />
 	</main>

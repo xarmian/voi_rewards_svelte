@@ -1,11 +1,11 @@
-import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
+import type { User, SupabaseClient, User } from '@supabase/supabase-js'
 
 declare global {
   namespace App {
     // interface Error {}
     interface Locals {
       supabase: SupabaseClient
-      getSession: () => Promise< Session | null>
+      getUser: () => Promise< User | null>
       session: Session | null
       user: User | null
     }

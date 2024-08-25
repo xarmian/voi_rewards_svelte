@@ -4,12 +4,16 @@ import { supabasePrivateClient as supabasePrivateClient } from '$lib/supabase-se
 import { verifyToken } from 'avm-wallet-svelte';
 
 export const load: PageServerLoad = async ({ params, cookies, url, locals }) => {
-    const user = (await locals.getSession())?.user;
-    
+    const user = (await locals.getUser());
     const wallets = [];
 
     // get all addresses connected to user's discord id
-    if (user && user.user_metadata && user.user_metadata.provider_id) {
+    if (user && user.identities) {
+        // create list of user identity discord ids where identity.provider == discord
+        const discordIds = user.identities
+            .filter(identity => identity.provider === 'discord')
+            .map(identity => identity.id);
+
         const { data, error: supaError } = await supabasePrivateClient
             .from('addresses')
             .select(`
@@ -19,7 +23,7 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
                     discord_id
                 )
             `)
-            .eq('users.discord_id', user.user_metadata.provider_id)
+            .in('users.discord_id', discordIds)
             .eq('disconnected', false);
             
         if (supaError) {
@@ -51,7 +55,7 @@ export const actions = {
         }
 
         // get user's discord ID
-        const authUser = (await locals.getSession())?.user;
+        const authUser = (await locals.getUser());
         const discordId = authUser?.user_metadata?.provider_id;
 
         if (!authUser || !discordId) {
@@ -112,7 +116,7 @@ export const actions = {
         }
 
         // get user's discord ID
-        const authUser = (await locals.getSession())?.user;
+        const authUser = (await locals.getUser());
         const discordId = authUser?.user_metadata?.provider_id;
 
         if (!authUser || !discordId) {
@@ -155,7 +159,7 @@ export const actions = {
         const optin = formData.get('optin')?.toString();
 
         // get user's discord ID
-        const authUser = (await locals.getSession())?.user;
+        const authUser = (await locals.getUser());
         const discordId = authUser?.user_metadata?.provider_id;
 
         if (!authUser || !discordId) {
