@@ -25,7 +25,8 @@
     $: discordAccounts = [] as DiscordAccount[];
     $: voiWallets = [] as VoiWallet[];
     let user: User | null = data.server_data.user;
-    let optinGroup = 'optout';
+    let optinGroup = data.server_data.optinGroup;
+    console.log('optinGroup', optinGroup);
     const supabase = data.supabase;
 
     onMount(() => {
@@ -43,6 +44,7 @@
                 is_primary: wallet.is_primary
             };
         });
+        voiWallets.sort((a, b) => a.address.localeCompare(b.address));
     });
 
     function disconnectDiscord(accountId: string) {
@@ -88,6 +90,7 @@
 
             if (!voiWallets.some(w => w.address === wallet.address)) {
                 voiWallets = [...voiWallets, { address: wallet.address, is_primary: is_primary }];
+                voiWallets.sort((a, b) => a.address.localeCompare(b.address));
             }
 		}
 	});
