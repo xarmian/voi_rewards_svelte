@@ -14,10 +14,14 @@
 	</body>
 	<script async src="https://www.googletagmanager.com/gtag/js?id=G-NDX21XVC4G"></script>
 	<script>
-	window.dataLayer = window.dataLayer || [];
-	function gtag(){dataLayer.push(arguments);}
-	gtag('js', new Date());
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
 
-	gtag('config', 'G-NDX21XVC4G');
+		gtag('config', 'G-NDX21XVC4G');
+
+		function onRecaptchaLoad() {
+			grecaptcha.render('g-recaptcha');
+		}
 	</script>
 </html>

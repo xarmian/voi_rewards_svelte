@@ -26,7 +26,7 @@
     $: voiWallets = [] as VoiWallet[];
     let user: User | null = data.server_data.user;
     let optinGroup = data.server_data.optinGroup;
-    console.log('optinGroup', optinGroup);
+
     const supabase = data.supabase;
 
     onMount(() => {
@@ -54,19 +54,20 @@
 
       data.supabase.auth.signOut();
     }
-  
+
     async function connectDiscord() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'discord',
             options: {
-                redirectTo: `${window.location.origin}/accounts/auth`
+                redirectTo: `${window.location.origin}/accounts/auth`,
             }
         });
+        
         if (error) console.error('Error signing in with Discord:', error);
     }
 
-	setOnAuthHandler(async (wallet) => {
-		console.log('Wallet authenticated', wallet);
+    setOnAuthHandler(async (wallet) => {
+        console.log('Wallet authenticated', wallet);
 
 		const response = await fetch('/api/auth/wallet', {
 			method: 'POST',

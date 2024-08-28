@@ -1,12 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { supabasePrivateClient as supabasePrivateClient } from '$lib/supabase-server';
-import { verifyToken } from 'avm-wallet-svelte';
 
 export const load: PageServerLoad = async ({ params, cookies, url, locals }) => {
     const user = (await locals.getUser());
     const wallets = [];
     let optinGroup = 'optout';
+    let hasUserData = false;
+    
     // get all addresses connected to user's discord id
     if (user && user.identities) {
         // create list of user identity discord ids where identity.provider == discord
@@ -14,13 +15,17 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
             .filter(identity => identity.provider === 'discord')
             .map(identity => identity.id);
         
-        const { data: userData } = await supabasePrivateClient
+        const { data: userData, error: userDataError } = await supabasePrivateClient
             .from('users')
             .select('email_consent')
-            .eq('discord_id', discordIds[0]);
+            .eq('discord_id', discordIds[0])
+            .single();
 
-        if (userData) {
-            optinGroup = userData[0].email_consent ? 'optin' : 'optout';
+        if (userDataError) {
+            console.error('Error fetching user data:', userDataError);
+        } else if (userData) {
+            hasUserData = true;
+            optinGroup = userData.email_consent ? 'optin' : 'optout';
         }
 
         const { data, error: supaError } = await supabasePrivateClient
@@ -48,7 +53,11 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
     }
 
     return {
-        server_data: { user, wallets, optinGroup },
+        server_data: { 
+            user: hasUserData ? user : null,
+            wallets, 
+            optinGroup,
+        },
     }
 }
 
