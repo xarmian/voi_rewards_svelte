@@ -12,15 +12,31 @@
     $: selectedWallet = data.props.wallet as string | undefined;
     let searchText: string | undefined;
     let projectId = data.props.projectId;
+    let isEligible = false;
+    let loaded = false;
+
+    const updateEligibility = (wallet: string) => {
+        fetch(`/api/eligibility?wallet=${wallet}`).then(r => r.json()).then(d => {
+            isEligible = d.isEligible;
+            loaded = true;
+        });
+    }
 
     onMount(() => {
         if (selectedWallet) {
             searchText = selectedWallet;
+
+            updateEligibility(selectedWallet);
         }
         else if (searchText) {
             selectedWallet = searchText;
         }
     });
+
+    $: if (selectedWallet) {
+        updateEligibility(selectedWallet);
+    }
+
 </script>
 <div class="flex flex-col bg-[rgb(111,42,226)]">
     <div class="flex flex-col">
@@ -82,10 +98,34 @@
                             <a class="text-blue-500 underline hover:text-blue-400 pointer" href="/leaderboard">Leaderboard Position</a>
                         </div>
                     </div>
+                    <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
+                        <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
+                            {#if loaded}
+                                {#if !isEligible}
+                                    <div class="relative text-2xl font-semibold text-yellow-800 dark:text-yellow-300 text-center">Address NOT Registered</div>
+                                    <div class="text-sm">For Phase 2</div>
+                                    <a class="text-blue-500 underline hover:text-blue-400 pointer" href="/accounts">Manage Account</a>
+                                    <div class="absolute top-1 right-1">
+                                        <InfoButton noAbsolute={true}>
+                                            <div class="text-sm">
+                                                Register your addresses at the link above to be eligible for the Phase 2 Testnet Rewards.
+                                            </div>
+                                        </InfoButton>
+                                    </div>
+                                {:else}
+                                    <div class="text-xl font-semibold text-green-800 dark:text-green-300 text-center">🎉 Address Registered 🎉</div>
+                                    <div class="text-sm">For Phase 2</div>
+                                    <a class="text-blue-500 underline hover:text-blue-400 pointer" href="/accounts">Manage Account</a>
+                                {/if}
+                            {/if}
+                        </div>
+                    </div>
                 </div>
                 <div class="items-center sm:items-start sm:ml-4 m-1">
-                    NOTICE: Data above is delayed. Last Updated
-                    <Time timestamp={data.props.leaderboardData.last_modified} format="MMM D, YYYY h:mm A" relative />
+                    <div class="text-sm">
+                        NOTICE: Data above is delayed. Last Updated
+                        <Time timestamp={data.props.leaderboardData.last_modified} format="MMM D, YYYY h:mm A" relative />
+                    </div>
                 </div>
             </div>
         {/if}
