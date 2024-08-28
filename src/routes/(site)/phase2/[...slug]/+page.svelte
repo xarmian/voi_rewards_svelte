@@ -117,6 +117,8 @@
                                     <div class="text-sm">For Phase 2</div>
                                     <a class="text-blue-500 underline hover:text-blue-400 pointer" href="/accounts">Manage Account</a>
                                 {/if}
+                            {:else}
+                                <div class="text-xl font-semibold text-gray-800 dark:text-white text-center">Checking Phase 2 Registration Status...</div>
                             {/if}
                         </div>
                     </div>
