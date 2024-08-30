@@ -5,7 +5,7 @@ const projects = [
         type: "Social Quests",
         category: "Social Quests",
         description: "Complete Social Quests on Galxe. Register your social media account(s) and perform qualifying activities to earn Quest Points",
-        guide: "https://dashboard.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GCr1MtdQcK",
+        guide: "https://app.galxe.com/quest/87cpJsQTTj3A9XnXam47tQ/GC3GJtdqwY",
         logo: "/logos/galxe.png",
         status: "active",
         realtime: true,
