@@ -11,7 +11,7 @@
     font-semibold m-2
      
      border-blue-200 dark:border-blue-700">
-    <div class="p-4 h-full bg-gray-100 dark:bg-slate-900 flex flex-col justify-between space-y-4 cursor-pointer">
+    <div class="p-4 h-full bg-gray-100 dark:bg-slate-900 flex flex-col justify-between space-y-2 cursor-pointer">
         <div class="flex flex-col items-center">
             {#if project.logo}
                 <img src={project.logo} alt={project.title} class="h-12" />
@@ -27,7 +27,9 @@
                 <p class="text-green-500">{leaderboardData[project.column]} actions completed 🎉</p>
             {/if}
         </div>
-        
+        {#if project.title == 'Voi Network'}
+            <div class="text-xs text-red-800">NOTE: New nodes started after July 31st do not earn TestNet Phase 2 points.</div>
+        {/if}
         <div>
             {#if (project.status ?? 'inactive') !== 'active'}
                 <p class="text-center text-xs py-2 rounded bg-red-200 text-red-700">Coming soon!</p>

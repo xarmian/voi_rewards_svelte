@@ -658,6 +658,9 @@
     <div class="flex flex-col md:flex-row md:items-center space-x-4">
         <div class="mb-4 md:mb-0 w-2/5 self-start">
             <p class="text-gray-800 dark:text-gray-200 text-lg">{project.description}</p>
+            {#if project.title == 'Voi Network'}
+                <div class="text-red-800">NOTE: Nodes that join the network after July 31st will not be eligible for TestNet Phase 2 reward points.</div>
+            {/if}
             {#if !project.realtime}
                 <div class="text-xs text-red-800">Live quest tracking is not yet available for this project.</div>
             {/if}

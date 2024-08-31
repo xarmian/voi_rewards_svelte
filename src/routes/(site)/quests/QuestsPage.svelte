@@ -28,7 +28,7 @@
     const keep = ['Kibisis', 'Social Quests', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator', 'MechaSwap', 'AlgoLeagues', 'Chubs'];
     const keptProjects = projects.filter(project => keep.includes(project.title)).sort((a, b) => keep.indexOf(a.title) - keep.indexOf(b.title));
     const otherProjects = projects.filter(project => !keep.includes(project.title));
-    const filteredProjects = keptProjects.concat(otherProjects).filter(project => project.title !== 'Voi Network');
+    const filteredProjects = keptProjects.concat(otherProjects);
 
 </script>
 
@@ -84,6 +84,9 @@
                     <div class="text-2xl h-20 content-center">{project.title}</div>
                   {/if}
                   <p class="text-lg text-[#68727D] dark:text-gray-200">{project.description}</p>
+                  {#if project.title === 'Voi Network'}
+                    <p class="text-sm text-red-800 dark:text-red-400 mt-2">NOTE: Nodes that join the network after July 31st will not be eligible for TestNet Phase 2 reward points.</p>
+                  {/if}
                 </div>
                 <div class="flex flex-col space-y-2 h-48">
                   {#if project.title == 'Social Quests'}

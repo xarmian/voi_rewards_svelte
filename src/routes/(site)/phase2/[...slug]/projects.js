@@ -17,7 +17,7 @@ const projects = [
         type: "Node Running",
         category: "Core",
         column: "network",
-        description: "Run a participation node and help maintain the security and integrity of the Voi Network while earning Voi Points. NOTE: Nodes that join the network after July 31st will not be eligible for TestNet Phase 2 reward points.",
+        description: "Run a participation node and help maintain the security and integrity of the Voi Network while earning Voi Points.",
         url: 'https://voi.network',
         guide: "https://voinetwork.github.io/voi-swarm/getting-started/introduction/",
         twitter: "https://x.com/Voi_Net",
