@@ -8,10 +8,8 @@ async function verifyRecaptcha(token: string) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `secret=${PRIVATE_RECAPTCHA_SECRET_KEY}&response=${token}`
     });
-    console.log('recaptchaResponse', recaptchaResponse);
 
     const recaptchaResult = await recaptchaResponse.json();
-    console.log('recaptchaResult', recaptchaResult);
     return recaptchaResult.success;
 }
 
@@ -44,6 +42,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
         const discordUser = await discordResponse.json();
 
+        // Capture user's IP address
+        const forwardedFor = request.headers.get('x-forwarded-for');
+        const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip');
+
+        if (!clientIp) {
+            console.warn('Unable to determine client IP address');
+        }
+
         // Log Discord information to your database
         const { error } = await supabase
             .from('users')
@@ -51,6 +57,7 @@ export const POST: RequestHandler = async ({ request }) => {
                 discord_id: discordUser.id,
                 username: discordUser.username,
                 email: discordUser.email,
+                user_ip: clientIp,
             }, {
                 onConflict: 'discord_id',
             });

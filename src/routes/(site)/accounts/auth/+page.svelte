@@ -67,7 +67,6 @@
 
       if (session) {
           try {
-              console.log('PUBLIC_RECAPTCHA_SITE_KEY', PUBLIC_RECAPTCHA_SITE_KEY);
               const token = grecaptcha.getResponse();
 
               if (token === '') {
