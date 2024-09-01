@@ -43,8 +43,10 @@ export const POST: RequestHandler = async ({ request }) => {
         const discordUser = await discordResponse.json();
 
         // Capture user's IP address
-        const forwardedFor = request.headers.get('x-forwarded-for');
-        const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip');
+        const clientIp = request.headers.get('cf-connecting-ip') || 
+                         request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                         request.headers.get('x-real-ip') || 
+                         'Unknown';
 
         if (!clientIp) {
             console.warn('Unable to determine client IP address');
