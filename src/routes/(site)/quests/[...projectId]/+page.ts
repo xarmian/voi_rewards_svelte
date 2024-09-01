@@ -1,7 +1,8 @@
-import projects from '../../phase2/[...slug]/projects';
+import { fetchProjects } from '../../phase2/[...slug]/projects';
 
 export const load = async ({ params }) => {
     const { projectId } = params;
+    const projects = await fetchProjects();
     let project;
 
     if (projectId) {

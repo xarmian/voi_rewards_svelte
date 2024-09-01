@@ -3,11 +3,14 @@
 	import Navbar from './Navbar.svelte';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 
 	export let data;
 
-	let showNotice = true;
-	if (data.session?.user) showNotice = false;
+	let showNotice = false;
+	onMount(() => {
+		if (!data.session?.user) showNotice = true;
+	});
 
 	const options = {
   	}

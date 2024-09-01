@@ -131,6 +131,6 @@
                 </div>
             </div>
         {/if}
-        <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} leaderboardData={data.props.leaderboardData} />
+        <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} leaderboardData={data.props.leaderboardData} projects={data.props.projects} />
     </div>
 </div>

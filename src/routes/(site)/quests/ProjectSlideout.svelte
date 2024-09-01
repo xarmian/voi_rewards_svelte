@@ -3,9 +3,11 @@
 	import ProjectModal from './ProjectModal.svelte';
     //import { fly } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
+    import type { IProject } from '$lib/data/types';
 
     export let projectid: number | null = null;
     export let walletId: string | undefined = undefined;
+    export let projects: IProject[] = [];
 
     $: if (projectid || projectid == null) {
         if (browser && document) {
@@ -25,7 +27,7 @@
             <i class="fas fa-times"></i>
         </button>
         <div class="flex-grow overflow-auto">
-            <ProjectModal bind:projectId={projectid} bind:searchWallet={walletId} />
+            <ProjectModal bind:projectId={projectid} bind:searchWallet={walletId} {projects} />
         </div>
     </div>
   </div>

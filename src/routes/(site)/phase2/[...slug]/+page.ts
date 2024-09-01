@@ -1,11 +1,12 @@
 import { supabasePublicClient, type PLeaderboard } from '$lib/supabase';
-import projects from '../../phase2/[...slug]/projects';
+import { fetchProjects } from '../../phase2/[...slug]/projects';
 
 export const load = async ({ params }) => {
     const { slug } = params;
     const parts = slug.split('/');
     const wallet = (parts[0] && parts[0] === '_') ? '' : parts[0] ?? '';
 
+    const projects = await fetchProjects();
     const project = projects.find((p) => p.column === parts[1]) ?? projects.find((p) => p.id === Number(parts[1]));
     const projectId = project?.id ?? 0;
 
@@ -39,6 +40,7 @@ export const load = async ({ params }) => {
             wallet,
             projectId,
             leaderboardData,
+            projects,
         },
         pageMetaTags,
     };

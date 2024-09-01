@@ -1,13 +1,20 @@
 <script lang="ts">
-  import ProjectSlideout from './ProjectSlideout.svelte';
-    //import VoiLogo from '$lib/assets/Voi_Logo_Animation_White_on_Purple_Background1080x1080.gif';
+    import ProjectSlideout from './ProjectSlideout.svelte';
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
-    import projects from '../phase2/[...slug]/projects';
+    import { fetchProjects } from '../phase2/[...slug]/projects';
     import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
-  
+	  import { goto } from '$app/navigation';
+    import type { IProject } from '$lib/data/types.js';
+    import { onMount } from 'svelte';
 
     export let selectedProjectId: number | null = null;
+    export let filteredProjects: IProject[] = [];
+
+    let projects: IProject[] = [];
+
+    onMount(async () => {
+      projects = await fetchProjects();
+    });
 
     $: if (selectedProjectId || selectedProjectId == null) {
       if (browser && document) {
@@ -24,11 +31,13 @@
       }
     }
 
-    // filter projects list by title, keep only the titles in the keep array and sort by keep array
-    const keep = ['Kibisis', 'Social Quests', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator', 'MechaSwap', 'AlgoLeagues', 'Chubs'];
-    const keptProjects = projects.filter(project => keep.includes(project.title)).sort((a, b) => keep.indexOf(a.title) - keep.indexOf(b.title));
-    const otherProjects = projects.filter(project => !keep.includes(project.title));
-    const filteredProjects = keptProjects.concat(otherProjects);
+    $: if (projects.length > 0) {
+      // filter projects list by title, keep only the titles in the keep array and sort by keep array
+      const keep = ['Kibisis', 'Social Quests', 'Nomadex', 'Humble', 'High Forge', 'Nautilus', 'NFT Navigator', 'MechaSwap', 'AlgoLeagues', 'Chubs'];
+      const keptProjects = projects.filter(project => keep.includes(project.title)).sort((a, b) => keep.indexOf(a.title) - keep.indexOf(b.title));
+      const otherProjects = projects.filter(project => !keep.includes(project.title));
+      filteredProjects = keptProjects.concat(otherProjects);
+    }
 
 </script>
 
@@ -140,7 +149,7 @@
   </div>
 </div>
 {#if selectedProjectId}
-    <ProjectSlideout bind:projectid={selectedProjectId}></ProjectSlideout>
+    <ProjectSlideout bind:projectid={selectedProjectId} {projects}></ProjectSlideout>
 {/if}
 
 <style>

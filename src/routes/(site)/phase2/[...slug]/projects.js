@@ -1,6 +1,6 @@
 import { supabasePublicClient } from '$lib/supabase';
 
-async function fetchProjects() {
+export async function fetchProjects() {
   // Fetch projects
   const { data: projectsData, error: projectsError } = await supabasePublicClient
     .from('vr_projects')
@@ -30,6 +30,4 @@ async function fetchProjects() {
   return projects;
 }
 
-const projects = await fetchProjects();
-
-export default projects;
+export default fetchProjects;

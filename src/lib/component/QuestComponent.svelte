@@ -3,13 +3,15 @@
 
     import type { IProject } from "$lib/data/types.js";
 	import type { PLeaderboard } from "$lib/supabase.js";
-    import projects from "../../routes/(site)/phase2/[...slug]/projects.js";
+    // import { fetchProjects } from "../../routes/(site)/phase2/[...slug]/projects.js";
 	import ProjectSlideout from "../../routes/(site)/quests/ProjectSlideout.svelte";
 
     export let walletId: string | undefined;
-    let isDropdownOpen: boolean = false;
     export let selectedTab = 0;
     export let leaderboardData: PLeaderboard | undefined = undefined;
+    export let projects: IProject[] = [];
+
+    let isDropdownOpen: boolean = false;
 
     // sort projects with status='active' and realtime=true first, then by id
     projects.sort((a, b) => {
@@ -54,9 +56,8 @@
 
     $: {
         selectedProject = projects.find((project) => project.id == selectedTab);
+        console.log(selectedProject);
     }
-
-// console.log(leaderboardData);
 </script>
 <div class="flex flex-wrap sm:justify-center mx-auto sm:w-3/4 {selectedTab ? 'blur-sm' : ''}">
     <div class="flex flex-col sm:w-full lg:w-full m-2">
@@ -75,5 +76,5 @@
     </div>
 </div>
 {#if selectedTab}
-    <ProjectSlideout bind:projectid={selectedTab} bind:walletId={walletId}></ProjectSlideout>
+    <ProjectSlideout bind:projectid={selectedTab} bind:walletId={walletId} {projects}></ProjectSlideout>
 {/if}

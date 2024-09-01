@@ -1,16 +1,18 @@
 <script lang="ts">
     import WalletSearch from "$lib/component/WalletSearch.svelte";
 	import Project from "$lib/component/Project.svelte";
-    import projects from "../phase2/[...slug]/projects.js";
 	import { onDestroy, onMount } from "svelte";
     import { browser } from '$app/environment';
+	import type { IProject } from "$lib/data/types.js";
 
     let selectedWallet: string | undefined;
     export let searchWallet: string | undefined = selectedWallet;
     export let projectId;
+    export let projects: IProject[] = [];
+
     $: project = projects.find((p) => p.id == projectId);
 
-    onMount(() => {
+    onMount(async () => {
         if (searchWallet) {
             selectedWallet = searchWallet;
         }
