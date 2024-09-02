@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
             console.error('Error fetching user data:', userDataError);
         } else if (userData) {
             hasUserData = true;
-            optinGroup = userData.email_consent ? 'optin' : 'optout';
+            optinGroup = userData.email_consent;
         }
 
         const { data, error: supaError } = await supabasePrivateClient
@@ -193,7 +193,7 @@ export const actions = {
         // update user's record to opt-in
         const { error: optinError } = await supabasePrivateClient
             .from('users')
-            .update({ email_consent: optin === 'optin' })
+            .update({ email_consent: optin === 'true' })
             .eq('discord_id', discordId);
 
         if (optinError) {

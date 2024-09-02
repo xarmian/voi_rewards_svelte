@@ -25,7 +25,7 @@
     $: discordAccounts = [] as DiscordAccount[];
     $: voiWallets = [] as VoiWallet[];
     let user: User | null = data.server_data.user;
-    let optinGroup = data.server_data.optinGroup;
+    let isOptedIn = data.server_data.optinGroup;
 
     const supabase = data.supabase;
 
@@ -154,10 +154,10 @@
         }
     }
 
-    async function handleOptInOut(value) {
+    async function handleOptInOut(value: boolean) {
         console.log('Opt in/out value:', value);
         const formData = new FormData();
-        formData.append('optin', value);
+        formData.append('optin', value.toString());
 
         const response = await fetch('?/optin', {
             method: 'POST',
@@ -211,13 +211,18 @@
             </button>
             {/if}
             {#if discordAccounts.length > 0}
-                <div class="m-4 flex justify-center">
-                    <ButtonGroup>
-                        <RadioButton on:change={() => handleOptInOut(optinGroup)} value="optin" bind:group={optinGroup}><div class='w-28'>Opt in to receive Voi Notification E-mails</div></RadioButton>
-                        <RadioButton on:change={() => handleOptInOut(optinGroup)} value="optout" bind:group={optinGroup}><div class='w-28'>Do not send me Voi Notification E-Mails</div></RadioButton>
-                    </ButtonGroup>
+                <div class="m-4 flex items-center justify-center">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            bind:checked={isOptedIn}
+                            on:change={() => handleOptInOut(isOptedIn)}
+                            class="form-checkbox h-5 w-5 text-blue-600"
+                        />
+                        <span class="text-gray-700 dark:text-gray-300">Opt in to receive Voi Notification E-mails</span>
+                    </label>
                 </div>
-                {#if optinGroup === 'optout'}
+                {#if !isOptedIn}
                     <div class="text-red-500 text-center">You are opted out of receiving Notification E-Mails.</div>
                 {/if}
             {/if}
