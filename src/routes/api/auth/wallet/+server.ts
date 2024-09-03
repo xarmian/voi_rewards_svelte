@@ -39,11 +39,27 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
         });
     }
 
+    // Disconnect any existing connections for this address
+    const { error: disconnectError } = await supabasePrivateClient
+        .from('addresses')
+        .update({ disconnected: true })
+        .eq('address', walletId)
+        .neq('user_id', user.id)
+        .eq('disconnected', false);
+
+    if (disconnectError) {
+        console.error('Error disconnecting existing addresses:', disconnectError);
+        return new Response(JSON.stringify({ error: 'Failed to update existing address connections' }), {
+            status: 500,
+        });
+    }
+
     // check if user already has a wallet, if not then this will be their primary wallet
     const { data: existingWallets, error: existingWalletsError } = await supabasePrivateClient
         .from('addresses')
         .select('id')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('disconnected', false);
 
     if (existingWalletsError) {
         return new Response(JSON.stringify({ error: 'Failed to fetch wallet information' }), {
