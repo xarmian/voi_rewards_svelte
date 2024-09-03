@@ -357,9 +357,9 @@
         }
     }
 
-    function calculateChubsHoldPoints(data) {
+    function calculateChubsHoldPoints(data: TransferData) {
       const balances = {};
-      const weeklyMinBalances = {};
+      const weeklyMinBalances = {} as any;
     
       // Helper function to get the Monday of the week for a given date
       const getMonday = (d) => {
@@ -376,8 +376,12 @@
         return previousMonday;
     };
     
+    if (data.transfers.length == 0) {
+        return [];
+    }
+
       // Helper function to format date as YYYY-MM-DD
-      const formatDate = (date) => date.toISOString().split('T')[0];
+      const formatDate = (date: Date) => date.toISOString().split('T')[0];
     
       // Find the earliest and latest dates 0:00 UTC
       let earliestDate = new Date(data.transfers[0].timestamp * 1000);
@@ -493,6 +497,10 @@
 }
 
     function calculateChubsSharePoints(transferData: TransferData): WalletPoints[] {
+        if (transferData.transfers.length == 0) {
+            return [];
+        }
+        
         const walletWeeklyTransfers: Map<string, boolean> = new Map();
 
         // Helper function to get the week number

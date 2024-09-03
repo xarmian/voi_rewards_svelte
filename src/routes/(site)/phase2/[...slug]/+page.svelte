@@ -14,6 +14,7 @@
     let projectId = data.props.projectId;
     let isEligible = false;
     let loaded = false;
+    let mounted = false;
 
     const updateEligibility = (wallet: string) => {
         fetch(`/api/eligibility?wallet=${wallet}`).then(r => r.json()).then(d => {
@@ -26,14 +27,15 @@
         if (selectedWallet) {
             searchText = selectedWallet;
 
-            updateEligibility(selectedWallet);
+            // updateEligibility(selectedWallet);
         }
         else if (searchText) {
             selectedWallet = searchText;
         }
+        mounted = true;
     });
 
-    $: if (selectedWallet) {
+    $: if (selectedWallet && mounted) {
         updateEligibility(selectedWallet);
     }
 
