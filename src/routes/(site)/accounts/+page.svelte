@@ -295,6 +295,7 @@
                             <li>Discord account information</li>
                             <li>Voi wallet information</li>
                             <li>Any other information you choose to provide</li>
+                            <li>Hash of your IP address</li>
                         </ul>
                         
                         <h2 class="text-xl font-semibold mb-2">3. How We Use Your Information</h2>

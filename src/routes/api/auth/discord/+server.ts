@@ -1,6 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { supabasePrivateClient as supabase } from '$lib/supabase-server';
 import { PRIVATE_RECAPTCHA_SECRET_KEY } from '$env/static/private';
+import crypto from 'crypto';
 
 async function verifyRecaptcha(token: string) {
     const recaptchaResponse = await fetch('https://www.google.com/recaptcha/api/siteverify', {
@@ -47,8 +48,13 @@ export const POST: RequestHandler = async ({ request }) => {
                          request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
                          request.headers.get('x-real-ip') || 
                          'Unknown';
+                         
+        // generate hash of ip address
+        const ipHash = clientIp !== 'Unknown' 
+            ? crypto.createHash('sha256').update(clientIp).digest('hex')
+            : 'Unknown';
 
-        if (!clientIp) {
+        if (clientIp === 'Unknown') {
             console.warn('Unable to determine client IP address');
         }
 
@@ -59,7 +65,7 @@ export const POST: RequestHandler = async ({ request }) => {
                 discord_id: discordUser.id,
                 username: discordUser.username,
                 email: discordUser.email,
-                user_ip: clientIp,
+                user_ip: ipHash,
             }, {
                 onConflict: 'discord_id',
             });
