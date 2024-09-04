@@ -191,7 +191,7 @@
             // for each quest, check if action is in completedActions
             for (let i = 0; i < project.quests.length; i++) {
                 const quest = project.quests[i];
-                if (data && data.quests && data.quests[`algo-leagues-${quest.id}`]?.completed) {
+                if (data && data.quests && data.quests[quest.name??'']?.completed) {
                     quest.earned = 1;
                 }
                 else {
@@ -500,7 +500,7 @@
         if (transferData.transfers.length == 0) {
             return [];
         }
-        
+
         const walletWeeklyTransfers: Map<string, boolean> = new Map();
 
         // Helper function to get the week number

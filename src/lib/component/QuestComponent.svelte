@@ -17,49 +17,47 @@
         if (projects.length == 0) {
             projects = await fetchProjects();
         }
+
+            // sort projects with status='active' and realtime=true first, then by id
+            projects.sort((a, b) => {
+                if (a.status === 'active' && b.status !== 'active') return -1;
+                if (a.status !== 'active' && b.status === 'active') return 1;
+                if (a.realtime && !b.realtime) return -1;
+                if (!a.realtime && b.realtime) return 1;
+                return a.id - b.id;
+            });
+
+
+            projects.forEach(project => {
+                if (project.title == 'Social Quests') return;
+                if (!groupedProjects[project.category]) {
+                    groupedProjects[project.category] = [];
+                }
+                groupedProjects[project.category].push(project);
+            });
+
+            let sortOrder = ["Core", "Wallets", "DEXes", "NFTs", "Tools", "Other"];
+
+            let sortedKeys = Object.keys(groupedProjects).sort((a, b) => {
+                let indexA = sortOrder.indexOf(a);
+                let indexB = sortOrder.indexOf(b);
+
+                if (indexA === -1) indexA = sortOrder.length - 1;
+                if (indexB === -1) indexB = sortOrder.length - 1;
+
+                return indexA - indexB;
+            });
+
+            sortedKeys.forEach(key => {
+                sortedGroupedProjects[key] = groupedProjects[key];
+            });
+
+            groupedProjects = sortedGroupedProjects;
     });
 
     let isDropdownOpen: boolean = false;
     let groupedProjects: { [key: string]: IProject[] } = {};
     let sortedGroupedProjects: { [key: string]: IProject[] } = {};
-
-    $: if (projects.length > 0) {
-    // sort projects with status='active' and realtime=true first, then by id
-        projects.sort((a, b) => {
-            if (a.status === 'active' && b.status !== 'active') return -1;
-            if (a.status !== 'active' && b.status === 'active') return 1;
-            if (a.realtime && !b.realtime) return -1;
-            if (!a.realtime && b.realtime) return 1;
-            return a.id - b.id;
-        });
-
-
-        projects.forEach(project => {
-            if (project.title == 'Social Quests') return;
-            if (!groupedProjects[project.category]) {
-                groupedProjects[project.category] = [];
-            }
-            groupedProjects[project.category].push(project);
-        });
-
-        let sortOrder = ["Core", "Wallets", "DEXes", "NFTs", "Tools", "Other"];
-
-        let sortedKeys = Object.keys(groupedProjects).sort((a, b) => {
-            let indexA = sortOrder.indexOf(a);
-            let indexB = sortOrder.indexOf(b);
-
-            if (indexA === -1) indexA = sortOrder.length - 1;
-            if (indexB === -1) indexB = sortOrder.length - 1;
-
-            return indexA - indexB;
-        });
-
-        sortedKeys.forEach(key => {
-            sortedGroupedProjects[key] = groupedProjects[key];
-        });
-
-        groupedProjects = sortedGroupedProjects;
-    }
 
     let selectedProject: IProject | undefined = undefined;
 
