@@ -182,6 +182,23 @@
             Use of this site requires connecting a Discord account and one or more Voi wallets. The Discord account is used to verify your identity and Voi wallets are used to calculate and receive rewards.
             View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
         </div>
+
+        <a href="https://discord.com/channels/1055863853633785857/1278379464019152998"
+            target="_blank"
+            class="flex flex-col text-center text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-800 dark:hover:bg-blue-700 rounded-lg shadow-md p-6 mb-6 transition-colors">
+            <div class="text-xl font-semibold mb-4">
+                Get the most from your Phase 2 Airdrop
+            </div>
+            <div class="flex text-2xl underline self-center items-center">
+                Complete Human Verification!
+                <InfoButton noAbsolute={true}>
+                    <div class="text-xs">
+                        While Human verification is not required to receive the Phase 2 Airdrop, doing so will provide a boost to your rewards.
+                    </div>
+                </InfoButton>
+            </div>
+        </a>
+        
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
             <h2 class="text-2xl font-semibold mb-4">Discord Account</h2>
             <div class="text-gray-600 dark:text-gray-400 mb-4">
