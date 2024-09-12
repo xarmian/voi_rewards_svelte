@@ -104,8 +104,8 @@
                     </div>
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
                         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
-                            <!--<div class="text-2xl font-semibold text-gray-800 dark:text-white">{data.props.leaderboardData.row_number??0}</div>-->
-                            <div class="text-2xl font-semibold text-gray-800 dark:text-white">Not Available</div>
+                            <div class="text-2xl font-semibold text-gray-800 dark:text-white">{data.props.leaderboardData.row_number??0}</div>
+                            <!--<div class="text-2xl font-semibold text-gray-800 dark:text-white">Not Available</div>-->
                             <a class="text-blue-500 underline hover:text-blue-400 pointer" href="/leaderboard">Leaderboard Position</a>
                         </div>
                     </div>
