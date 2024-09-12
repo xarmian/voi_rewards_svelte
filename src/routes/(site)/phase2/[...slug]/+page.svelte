@@ -64,11 +64,11 @@
         </div>
         {#if data.props.wallet && data.props.leaderboardData}
             <div class="flex flex-col place-items-center pt-4">
-                <div class="items-center sm:items-start sm:ml-4 m-1 mb-8">
+                <!--<div class="items-center sm:items-start sm:ml-4 m-1 mb-8">
                     <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-3xl" on:click={() => showAllocationModal = true}>
                         🎉 View your Phase 2 Estimated Rewards! 🎉
                     </button>
-                </div>
+                </div>-->
                 <div class="flex flex-wrap place-self-center">
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
                         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
