@@ -185,9 +185,12 @@
 
         <a href="https://discord.com/channels/1055863853633785857/1278379464019152998"
             target="_blank"
-            class="flex flex-col text-center text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-800 dark:hover:bg-blue-700 rounded-lg shadow-md p-6 mb-6 transition-colors">
-            <div class="text-xl font-semibold mb-4">
+            class="flex flex-col text-center space-y-1 text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-800 dark:hover:bg-blue-700 rounded-lg shadow-md p-3 mb-6 transition-colors">
+            <div class="text-xl font-semibold">
                 Get the most from your Phase 2 Airdrop
+            </div>
+            <div class="text-sm">
+                After connecting your Discord account
             </div>
             <div class="flex text-2xl underline self-center items-center">
                 Complete Human Verification!
@@ -226,6 +229,9 @@
                 >
                 Connect Discord Account
             </button>
+            <div class="text-sm">
+                NOTE: Your Discord account E-Mail address must be verified with Discord for this connection to work.
+            </div>
             {/if}
             {#if discordAccounts.length > 0}
                 <div class="m-4 flex items-center justify-center">
