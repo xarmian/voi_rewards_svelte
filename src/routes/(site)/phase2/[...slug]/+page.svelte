@@ -187,7 +187,7 @@
                                 {/if}
                             </div>
                             <div class="flex items-center">
-                                <span class="mr-2">Phase 2 Discord Role:</span>
+                                <span class="mr-2">Phase 2 Discord Role (Human Verification):</span>
                                 {#if data.props.questData?.discord_roles?.includes('Phase 2')}
                                     <span class="text-green-500">✓ Assigned</span>
                                 {:else}
@@ -203,7 +203,7 @@
                         </div>
                     </div>
                     <table class="w-full">
-                        <thead>
+                        <thead class="hidden">
                             <tr>
                                 <th class="text-left">Quest</th>
                                 <th></th>
@@ -212,6 +212,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {#if false}
                             {#each data.props.projects as project}
                                 {#if data.props.questList.filter(quest => quest.project === project.id).length > 0}
                                     <tr>
@@ -273,6 +274,7 @@
                                     {(data.props.totalPoints * data.props.discordMultiplier * data.props.humanMultiplier).toFixed(6)}
                                 </td>
                             </tr>
+                            {/if}
                             <tr>
                                 <td colspan="3" class="text-xl font-bold pt-2 pb-4">Estimated $VOI Phase 2 Reward</td>
                                 <td class="text-right">
