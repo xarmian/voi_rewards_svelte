@@ -159,8 +159,15 @@
                 </div>
                 <div class="overflow-y-auto flex-grow pr-4">
                     <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
-                        <p class="font-bold">Disclaimer:</p>
-                        <p>All points and values shown here are estimates based on preliminary data and are subject to change. Final rewards may differ from these estimates.</p>
+                        <h3 class="text-lg font-semibold mb-2">Phase 2 Token Allocations</h3>
+                        <p class="mb-2">The token numbers displayed on the Testnet Phase 2 airdrop site are estimates due to:</p>
+                        <ul class="list-disc list-inside mb-2">
+                            <li>Sybil account filtering</li>
+                            <li>New eligibility registrations</li>
+                            <li>Stale data missing a few days of quest activity</li>
+                            <li>Data analysis for proof of humanity levels, where each earns a different bonus</li>
+                        </ul>
+                        <p>The score multiplier per proof of humanity level isn't final until October 28th when contracts are funded.</p>
                     </div>
                     <div class="mb-4">
                         <h3 class="text-xl font-semibold mb-2">Discord Status</h3>
