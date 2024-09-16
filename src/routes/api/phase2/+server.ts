@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { supabasePublicClient, type VrPhase2, type VrQuest } from '$lib/supabase';
+import { supabasePublicClient } from '$lib/supabase';
 
 const systemPoints = 650988517.55; // $POINTS total supply
 const systemVoiPoints = 4985925.676; // $VOI total supply
@@ -30,12 +30,21 @@ const roleMultipliers = {
     'Grand Voiager': 1.1,
 };
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+};
+
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
     const wallet = url.searchParams.get('wallet');
 
     if (!wallet) {
-        return json({ error: 'Missing required parameter: wallet' }, { status: 400 });
+        return json({ error: 'Missing required parameter: wallet' }, { 
+            status: 400,
+            headers: corsHeaders
+        });
     }
 
     try {
@@ -72,14 +81,14 @@ export async function GET({ url }) {
             for (const role of questData.discord_roles) {
                 if (role in roleMultipliers) {
                     if (role === 'Phase 2') {
-                        humanMultiplier = roleMultipliers[role];
+                        humanMultiplier = roleMultipliers[role as keyof typeof roleMultipliers];
                     } else {
-                        discordMultiplier *= roleMultipliers[role];
+                        discordMultiplier *= roleMultipliers[role as keyof typeof roleMultipliers];
                     }
                 }
             }
         }
-console.log(totalPoints, discordMultiplier, humanMultiplier);
+
         // Calculate estimated reward
         const estimatedReward = Math.min(
             ((totalPoints * discordMultiplier * humanMultiplier) * voiRewardRate) + 
@@ -90,10 +99,21 @@ console.log(totalPoints, discordMultiplier, humanMultiplier);
         return json({ 
             wallet,
             estimatedReward 
+        }, {
+            headers: corsHeaders
         });
 
     } catch (error) {
         console.error('Error calculating estimated reward:', error);
-        return json({ error: 'An error occurred while calculating the estimated reward' }, { status: 500 });
+        return json({ error: 'An error occurred while calculating the estimated reward' }, { 
+            status: 500,
+            headers: corsHeaders
+        });
     }
+}
+
+export function OPTIONS() {
+    return new Response(null, {
+        headers: corsHeaders
+    });
 }
