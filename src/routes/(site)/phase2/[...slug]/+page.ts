@@ -126,7 +126,7 @@ export const load = async ({ params }) => {
             }
         }
 
-        estimatedReward = ((totalPoints * discordMultiplier * humanMultiplier) * voiRewardRate) + ((Number(questData?.points_tokens)??0 / Math.pow(10, 6)) * pointsRewardRate / Math.pow(10, 6));
+        estimatedReward = Math.min(((totalPoints * discordMultiplier * humanMultiplier) * voiRewardRate) + ((Number(questData?.points_tokens)??0 / Math.pow(10, 6)) * pointsRewardRate / Math.pow(10, 6)), 50000);
         console.log('estimatedReward', estimatedReward);
     }
 
