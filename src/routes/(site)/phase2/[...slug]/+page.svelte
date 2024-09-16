@@ -36,7 +36,7 @@
         }
         mounted = true;
 
-        if ($page.url.searchParams.get('reward') && $page.url.searchParams.get('reward') == '1') {
+        if ($page.url.searchParams.get('rewards') && $page.url.searchParams.get('rewards') == '1') {
             showAllocationModal = true;
         }
     });
