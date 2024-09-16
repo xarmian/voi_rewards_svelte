@@ -7,7 +7,7 @@
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
     import Time from 'svelte-time';
 	import InfoButton from "$lib/component/ui/InfoButton.svelte";
-    import type { VrPhase2 } from '$lib/supabase';
+    import { page } from '$app/stores'; 
 
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | undefined;
@@ -35,6 +35,10 @@
             selectedWallet = searchText;
         }
         mounted = true;
+
+        if ($page.url.searchParams.get('reward') && $page.url.searchParams.get('reward') == '1') {
+            showAllocationModal = true;
+        }
     });
 
     let totalPoints = 0;
@@ -64,11 +68,11 @@
         </div>
         {#if data.props.wallet && data.props.leaderboardData}
             <div class="flex flex-col place-items-center pt-4">
-                <!--<div class="items-center sm:items-start sm:ml-4 m-1 mb-8">
+                <div class="hidden items-center sm:items-start sm:ml-4 m-1 mb-8">
                     <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-3xl" on:click={() => showAllocationModal = true}>
                         🎉 View your Phase 2 Estimated Rewards! 🎉
                     </button>
-                </div>-->
+                </div>
                 <div class="flex flex-wrap place-self-center">
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
                         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
@@ -154,6 +158,10 @@
                     <button class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700" on:click={() => showAllocationModal = false}>X</button>
                 </div>
                 <div class="overflow-y-auto flex-grow pr-4">
+                    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
+                        <p class="font-bold">Disclaimer:</p>
+                        <p>All points and values shown here are estimates based on preliminary data and are subject to change. Final rewards may differ from these estimates.</p>
+                    </div>
                     <div class="mb-4">
                         <h3 class="text-xl font-semibold mb-2">Discord Status</h3>
                         <div class="flex flex-col space-y-2 ml-4">
@@ -225,7 +233,7 @@
                                 {/if}
                             {/each}
                             <tr>
-                                <td colspan="2" class="text-xl font-bold pt-4 pb-2">$POINTS Tokens</td>
+                                <td colspan="3" class="text-xl font-bold pt-4 pb-2">$POINTS Token Balance</td>
                                 <td class="text-right">
                                     {#if data.props.questData?.points_tokens}
                                         {(data.props.questData.points_tokens / Math.pow(10, 6)).toFixed(6)}
@@ -233,14 +241,35 @@
                                         N/A
                                     {/if}
                                 </td>
-                                <td class="text-right">
-                                    {data.props.questData?.points_tokens ? (data.props.questData.points_tokens / Math.pow(10, 6) * 0.001) : 'N/A'}
-                                </td>
                             </tr>
                             <tr class="border-t-2 border-gray-300">
-                                <td colspan="3" class="text-xl font-bold pt-2 pb-4">Estimated $VOI Rewards</td>
-                                <td class="text-right">
+                                <td colspan="3" class="text-base font-bold pt-4">Base Quest Points</td>
+                                <td class="text-right pt-4 pb-0">
                                     {data.props.totalPoints}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-base font-bold pt-0">Discord Multiplier</td>
+                                <td class="text-right pt-0 pb-0">
+                                    {Math.round(data.props.discordMultiplier * 100)/100}x
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-base font-bold pt-0 pb-4">Proof of Humanity Multiplier</td>
+                                <td class="text-right pt-0 pb-4">
+                                    {Math.round(data.props.humanMultiplier * 100)/100}x
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-lg font-bold pt-0 pb-4">Total Quest Points</td>
+                                <td class="text-right pt-0 pb-4">
+                                    {(data.props.totalPoints * data.props.discordMultiplier * data.props.humanMultiplier).toFixed(6)}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-xl font-bold pt-2 pb-4">Estimated $VOI Phase 2 Reward</td>
+                                <td class="text-right">
+                                    {data.props.estimatedReward.toFixed(6)}
                                 </td>
                             </tr>
         
