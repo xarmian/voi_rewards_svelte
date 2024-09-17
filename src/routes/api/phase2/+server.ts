@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { supabasePublicClient } from '$lib/supabase';
 
 const systemPoints = 650988517.55; // $POINTS total supply
-const systemVoiPoints = 4985925.676; // $VOI total supply
+const systemVoiPoints = 9034747.39; // $VOI total supply
 const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
 const voiRewardRate = 99000000 / systemVoiPoints; // $VOI reward rate
 

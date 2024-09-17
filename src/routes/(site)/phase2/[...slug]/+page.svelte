@@ -184,7 +184,14 @@
                         </ul>
                         <p>The score multiplier per proof of humanity level isn't final until October 28th when contracts are funded.</p>
                     </div>
-                    <div class="mb-4">
+                    <div class="mb-4 relative">
+                        <div class="flex items-center absolute top-0 right-0 text-sm">
+                            <span class="mr-2">Last Data Refresh:</span>
+                            <Time timestamp={data.props.questData?.last_modified} format="MMM D, YYYY h:mm A" />
+                            <InfoButton noAbsolute={true}>
+                                <div class="text-sm">Data is refreshed periodically. If your Discord account was connected or Human Verification was completed recently, the status and estimated rewards may not be updated until the next refresh.</div>
+                            </InfoButton>
+                        </div>
                         <h3 class="text-xl font-semibold mb-2">Discord Status</h3>
                         <div class="flex flex-col space-y-2 ml-4">
                             <div class="flex items-center">
