@@ -62,7 +62,7 @@
             <h1 class="text-5xl font-bold text-center">Voi Ecosystem Quests</h1>
         </div>
     </div>
-    <div class="flex space-x-4 place-self-center mb-8">
+    <div class="hidden flex space-x-4 place-self-center mb-8">
         <a href="https://voiager.org/get-started" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-500 text-white font-medium rounded-md shadow hover:bg-blue-700 transition duration-150 ease-in-out">
             <i class="fas fa-faucet mr-2"></i> $VOI Faucet
         </a>
@@ -72,6 +72,9 @@
     </div>
     <div class="flex flex-col w-full bg-white dark:bg-gray-800 place-items-center">
         <div class="px-2 m-4 w-full sm:w-1/2">
+            <div class="text-center mb-4">
+                Phase 2 has completed and Mainnet is live! Search for your address below to view your estimated Phase 2 rewards.
+            </div>
             <WalletSearch onSubmit={(v) => {goto(`/phase2/${v}`)}} {searchText} />
         </div>
         {#if data.props.wallet || data.props.leaderboardData}
@@ -158,7 +161,7 @@
                 {/if}
             </div>
         {/if}
-        <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} leaderboardData={data.props.leaderboardData} projects={data.props.projects} />
+        <!--<QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} leaderboardData={data.props.leaderboardData} projects={data.props.projects} />-->
     </div>
 </div>
 {#if showAllocationModal}

@@ -103,11 +103,11 @@
 
 <div class="bg-white dark:bg-gray-800 pt-8 flex flex-col">
 	<div class="bg-[rgb(111,42,226)] text-white text-center py-4 mb-4 w-1/2 rounded-full place-self-center">
-		<h2 class="text-2xl font-bold">Looking for Voi TestNet Quests?</h2>
-		<p>Visit our <a href="/quests" class="underline">Questing Page Here!</a></p>
+		<h2 class="text-2xl font-bold">Looking for Your TestNet Phase 2 Estimated Rewards?</h2>
+		<p>Visit our <a href="/phase2" class="underline">Visit our Phase 2 Page Here!</a></p>
 	</div>
 
-	<div class="dashboard justify-evenly">
+	<!--<div class="dashboard justify-evenly">
 		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
 			<div class="cardInner">
 				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -165,46 +165,52 @@
 				</p>
 			</div>
 		</Card>
-	</div>
-	<div class="text-center">
-		<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
-	</div>
-	<div class="notices">
-		<div class="flex flex-col place-items-center">
-			<!--<span style="font-weight:bold;"
-				>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
-				Chris said it best:</span
-			>
-			<div class="quote bg-gray-200 dark:bg-gray-600">
-				<blockquote>
-					"After testnet is over the game will also be over and the points will be tallied. A new
-					entity that follows proper roles and regulations will decide the rewards of the game. There
-					is a chance they might decide zero, but I believe that would be against their best interest
-					and against the mission of Voi."
-				</blockquote>
-				<cite>- Chris Swenor</cite>
-			</div>-->
-			<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
-				Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
-			</div>
-			<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
+	</div>-->
+	{#if false}
+		<div class="text-center">
+			<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
+		</div>
+		<div class="notices">
+			<div class="flex flex-col place-items-center">
+				<!--<span style="font-weight:bold;"
+					>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
+					Chris said it best:</span
+				>
+				<div class="quote bg-gray-200 dark:bg-gray-600">
+					<blockquote>
+						"After testnet is over the game will also be over and the points will be tallied. A new
+						entity that follows proper roles and regulations will decide the rewards of the game. There
+						is a chance they might decide zero, but I believe that would be against their best interest
+						and against the mission of Voi."
+					</blockquote>
+					<cite>- Chris Swenor</cite>
+				</div>-->
+				<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
+					Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
+				</div>
+				<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
 
-			<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center mt-4">
-				NOTICE: New nodes that join the network after July 31st will not be eligible for TestNet Phase 2 points.
-			</div>
-	
-			<div class="flex flex-row place-items-center space-x-4">
-				<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
-					<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank">Learn to Run a Node</a>
-				</button>
-				<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
-					<a href="/leaderboard">Phase 2 Leaderboard</a>
-				</button>
+				<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center mt-4">
+					NOTICE: New nodes that join the network after July 31st will not be eligible for TestNet Phase 2 points.
+				</div>
+		
+				<div class="flex flex-row place-items-center space-x-4">
+					<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
+						<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank">Learn to Run a Node</a>
+					</button>
+					<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
+						<a href="/leaderboard">Phase 2 Leaderboard</a>
+					</button>
+				</div>
 			</div>
 		</div>
-	</div>
-	{#if dataArrays.length > 0}
-		<RewardsTable items={dataArrays} />
+		{#if dataArrays.length > 0}
+			<RewardsTable items={dataArrays} />
+		{/if}
+	{:else}
+		<div class="text-center">
+			Mainnet is Coming... Keep an eye out here and on Discord for more information!
+		</div>
 	{/if}
 </div>
 

@@ -19,7 +19,7 @@
     <NavLi class="text-xl" href="/how_to_node"><div class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'} transition:fly={{ y: 50, duration: 400 }}>Run a Node</div></NavLi>
     <NavLi class="text-xl" href="/phase1"><div class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'} transition:fly={{ y: 50, duration: 400 }}>Phase 1</div></NavLi>
     <NavLi class="text-xl" href="/phase2"><div class:selected={activeLink === '/phase2'} on:click={() => activeLink = '/phase2'} transition:fly={{ y: 50, duration: 400 }}>Phase 2</div></NavLi>
-    <NavLi class="text-xl" href="/quests"><div class:selected={activeLink === '/quests'} on:click={() => activeLink = '/quests'} transition:fly={{ y: 50, duration: 400 }}>Quests</div></NavLi>
+    <!--<NavLi class="text-xl" href="/quests"><div class:selected={activeLink === '/quests'} on:click={() => activeLink = '/quests'} transition:fly={{ y: 50, duration: 400 }}>Quests</div></NavLi>-->
     <DarkMode />
   </NavUl>
   <div class="hidden sm:flex flex-row p-4 mt-0 text-sm font-medium place-items-center space-x-2">
@@ -31,7 +31,7 @@
     <DarkMode />
   </div>
   <NavHamburger />
-  <a class="hidden sm:block text-lg bg-[#d0bff2] px-12 py-2 rounded-full text-black mr-8 hover:bg-white" href="/quests" on:click={() => activeLink = '/quests'}>Quests</a>
+  <!--<a class="hidden sm:block text-lg bg-[#d0bff2] px-12 py-2 rounded-full text-black mr-8 hover:bg-white" href="/quests" on:click={() => activeLink = '/quests'}>Quests</a>-->
 </Navbar>
 
 <style>
