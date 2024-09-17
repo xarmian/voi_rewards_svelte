@@ -7,7 +7,8 @@ const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
 const voiRewardRate = 99000000 / systemVoiPoints; // $VOI reward rate
 
 const roleMultipliers = {
-    'Phase 2': 2.5,
+    'Phase 2': 10.0,
+    'Phase 2-Manual': 10.0,
     'Recruit': 1.1,
     'Apprentice': 1.1,
     'Cadet': 1.1,
@@ -80,7 +81,7 @@ export async function GET({ url }) {
         if (questData?.discord_roles) {
             for (const role of questData.discord_roles) {
                 if (role in roleMultipliers) {
-                    if (role === 'Phase 2') {
+                    if (role === 'Phase 2' || role === 'Phase 2-Manual') {
                         humanMultiplier = roleMultipliers[role as keyof typeof roleMultipliers];
                     } else {
                         discordMultiplier *= roleMultipliers[role as keyof typeof roleMultipliers];

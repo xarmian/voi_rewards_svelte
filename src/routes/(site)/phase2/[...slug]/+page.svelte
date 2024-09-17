@@ -8,6 +8,9 @@
     import Time from 'svelte-time';
 	import InfoButton from "$lib/component/ui/InfoButton.svelte";
     import { page } from '$app/stores'; 
+    //@ts-ignore
+    import RangeSlider from "svelte-range-slider-pips";
+    import { Card } from "flowbite-svelte";
 
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | undefined;
@@ -17,6 +20,11 @@
     let loaded = false;
     let mounted = false;
     let showAllocationModal = false;
+    let lockYears: number = 0;
+    const compoundRates = [0, 0.1, 0.12, 0.15, 0.18, 0.2];
+    $: airdrop = data.props.estimatedReward;
+    $: myStake = airdrop ? (airdrop * Math.pow(1 + compoundRates[lockYears], lockYears)) : 0;
+
 
     const updateEligibility = (wallet: string) => {
         fetch(`/api/eligibility?wallet=${wallet}`).then(r => r.json()).then(d => {
@@ -68,7 +76,7 @@
         </div>
         {#if data.props.wallet && data.props.leaderboardData}
             <div class="flex flex-col place-items-center pt-4">
-                <div class="hidden items-center sm:items-start sm:ml-4 m-1 mb-8">
+                <div class="items-center sm:items-start sm:ml-4 m-1 mb-8">
                     <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-3xl" on:click={() => showAllocationModal = true}>
                         🎉 View your Phase 2 Estimated Rewards! 🎉
                     </button>
@@ -277,13 +285,65 @@
                             {/if}
                             <tr>
                                 <td colspan="3" class="text-xl font-bold pt-2 pb-4">Estimated $VOI Phase 2 Reward</td>
-                                <td class="text-right">
-                                    {data.props.estimatedReward.toFixed(6)}
+                                <td class="text-right pb-4 text-2xl">
+                                    {data.props.estimatedReward.toFixed(6)} VOI
                                 </td>
                             </tr>
         
                         </tbody>
                     </table>
+                    <div class="flex flex-col place-items-center mt-4">
+                        <div class="flex flex-col place-items-center">
+                            <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white flex place-content-center">
+                                Lockup Option
+                            </h1>
+                            <ul class="max-w-xl">
+                                <li>Airdrop may be locked for one to five years for a 10%-20% componded bonus per year</li>
+                                <li>Bonus is earned immediately and may be used for node block rewards</li>
+                            </ul>
+                            <br/>
+                            <p>Select a lockup period to calculate your stakable balance:</p>
+                        </div>
+                        <div class="w-80">
+                            <RangeSlider values={[0]} min={0} max={5} pips={true} all="label" on:change={(e) => lockYears = e.detail.value} />
+                        </div>
+                        <div class="flex flex-row">
+                            <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                                <InfoButton>
+                                    When tokens are locked, the full future bonus amount is allocated and made 
+                                    available for staking on a participation node, to earn node rewards.
+                                    This number reflects the total amount with the bonus applied, which may be used
+                                    to earn node participation rewards.
+                                </InfoButton>
+                                <div class="cardInner">
+                                    <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                        Stakable Balance
+                                        <br/>
+                                        <div class="text-sm">Balance with {lockYears} year lockup</div>
+                                    </h5>
+                                    <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                        {myStake.toLocaleString()}
+                                    </p>
+                                </div>
+                            </Card> 
+                            <Card class="bg-blue-100 dark:bg-blue-700 h-42 w-60 m-2 relative">
+                                <InfoButton>
+                                    After the selected lock-up period, tokens will vest at a rate of 1/12 per month for one year.
+                                    This number reflects the amount a user may withdraw each month after the lock-up period.
+                                </InfoButton>
+                                <div class="cardInner">
+                                    <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                        Monthly Withdrawable
+                                        <br/>
+                                        <div class="text-sm">Vesting after lock-up period</div>
+                                    </h5>
+                                    <p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
+                                        {(myStake / 12).toLocaleString()}
+                                    </p>
+                                </div>
+                            </Card> 
+                        </div>
+                    </div>
                 </div>
                 <div class="mt-4">
                     <button class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700" on:click={() => showAllocationModal = false}>Close</button>
