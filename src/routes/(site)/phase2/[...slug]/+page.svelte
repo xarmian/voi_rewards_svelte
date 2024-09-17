@@ -165,6 +165,13 @@
                     <h2 class="text-2xl font-bold">Your Phase 2 Estimated Rewards</h2>
                     <button class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700" on:click={() => showAllocationModal = false}>X</button>
                 </div>
+                {#if !data.props.questData}
+                    <div class="flex flex-col place-items-center">
+                        <div class="text-xl font-bold max-w-96">
+                            Token Allocation not found for this Address. If this address is linked to a Discord account, your combined token allocation will be listed under your Primary address.
+                        </div>
+                    </div>
+                {:else}
                 <div class="overflow-y-auto flex-grow pr-4">
                     <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
                         <h3 class="text-lg font-semibold mb-2">Phase 2 Token Allocations</h3>
@@ -196,7 +203,7 @@
                             </div>
                             <div class="flex items-center">
                                 <span class="mr-2">Phase 2 Discord Role (Human Verification):</span>
-                                {#if data.props.questData?.discord_roles?.includes('Phase 2')}
+                                {#if data.props.questData?.discord_roles?.includes('Phase 2') || data.props.questData?.discord_roles?.includes('Phase 2-Manual')}
                                     <span class="text-green-500">✓ Assigned</span>
                                 {:else}
                                     <span class="text-red-500 flex flex-row">✗ Not Assigned
@@ -345,6 +352,7 @@
                         </div>
                     </div>
                 </div>
+                {/if}
                 <div class="mt-4">
                     <button class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700" on:click={() => showAllocationModal = false}>Close</button>
                 </div>
