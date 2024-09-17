@@ -74,13 +74,16 @@
         <div class="px-2 m-4 w-full sm:w-1/2">
             <WalletSearch onSubmit={(v) => {goto(`/phase2/${v}`)}} {searchText} />
         </div>
-        {#if data.props.wallet && data.props.leaderboardData}
+        {#if data.props.wallet || data.props.leaderboardData}
             <div class="flex flex-col place-items-center pt-4">
+                {#if data.props.wallet}
                 <div class="items-center sm:items-start sm:ml-4 m-1 mb-8">
                     <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-3xl" on:click={() => showAllocationModal = true}>
                         🎉 View your Phase 2 Estimated Rewards! 🎉
                     </button>
                 </div>
+                {/if}
+                {#if data.props.leaderboardData}
                 <div class="flex flex-wrap place-self-center">
                     <div class="flex flex-col items-center sm:items-start sm:ml-4 m-1">
                         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 shadow-md h-48 w-48 flex flex-col items-center justify-center">
@@ -152,6 +155,7 @@
                         <Time timestamp={data.props.leaderboardData.last_modified} format="MMM D, YYYY h:mm A" relative />
                     </div>
                 </div>
+                {/if}
             </div>
         {/if}
         <QuestComponent walletId={selectedWallet} bind:selectedTab={projectId} leaderboardData={data.props.leaderboardData} projects={data.props.projects} />
@@ -169,6 +173,8 @@
                     <div class="flex flex-col place-items-center">
                         <div class="text-xl font-bold max-w-96">
                             Token Allocation not found for this Address. If this address is linked to a Discord account, your combined token allocation will be listed under your Primary address.
+                            <br/>
+                            NOTE: Some users are unable to see their estimated rewards. Please check back again later.
                         </div>
                     </div>
                 {:else}
