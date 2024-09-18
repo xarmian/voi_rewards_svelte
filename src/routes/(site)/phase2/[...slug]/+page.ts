@@ -2,11 +2,6 @@ import { supabasePublicClient, type PLeaderboard, type VrPhase2, type VrQuest } 
 import { fetchProjects } from '../../phase2/[...slug]/projects';
 
 export const load = async ({ params }) => {
-    const systemPoints = 650988517.55; // $POINTS total supply
-    const systemVoiPoints = 9034747.39; // $VOI total supply
-    const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
-    const voiRewardRate = 99000000 / systemVoiPoints; // $VOI reward rate
-
     const { slug } = params;
     const parts = slug.split('/');
     const wallet = (parts[0] && parts[0] === '_') ? '' : parts[0] ?? '';
@@ -97,6 +92,19 @@ export const load = async ({ params }) => {
                 }
             }
         }
+
+        const { data: pointsData, error: pointsError } = await supabasePublicClient
+            .from('vr_phase2_counts')
+            .select('*')
+            .single();
+
+        if (pointsError) throw pointsError;
+
+        const systemPoints = pointsData.total_points_tokens / Math.pow(10, 6);
+        const systemVoiPoints = pointsData.total_quest_points;
+        const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
+        const voiRewardRate = 99000000 / systemVoiPoints; // $VOI reward rate
+
 
         estimatedReward = Math.min(
             ((totalPoints * discordMultiplier * humanMultiplier) * voiRewardRate) + 
