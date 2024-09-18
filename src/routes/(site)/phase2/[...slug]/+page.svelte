@@ -12,6 +12,8 @@
     import RangeSlider from "svelte-range-slider-pips";
     import { Card } from "flowbite-svelte";
 
+    let dataUpdating = false;
+
     export let data: PageData;
     $: selectedWallet = data.props.wallet as string | undefined;
     let searchText: string | undefined;
@@ -81,18 +83,21 @@
             <div class="flex flex-col place-items-center pt-4">
                 {#if data.props.wallet}
                 <div class="items-center sm:items-start sm:ml-4 m-1 mb-8">
-                    <button class="hidden bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-3xl" on:click={() => showAllocationModal = true}>
-                        🎉 View your Phase 2 Estimated Rewards! 🎉
-                    </button>
-                    <div class="flex flex-col place-items-center text-xl bg-yellow-100 dark:bg-yellow-900 p-6 rounded-lg shadow-md">
-                        <i class="fas fa-sync-alt animate-spin text-3xl mb-4 text-yellow-600 dark:text-yellow-400"></i>
-                        <p class="text-center text-yellow-800 dark:text-yellow-200 font-semibold">
-                            Rewards data is currently updating!
-                        </p>
-                        <p class="text-center text-yellow-700 dark:text-yellow-300 mt-2">
-                            Please check back again later.
-                        </p>
-                    </div>
+                    {#if !dataUpdating}
+                        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-3xl" on:click={() => showAllocationModal = true}>
+                            🎉 View your Phase 2 Estimated Rewards! 🎉
+                        </button>
+                    {:else}
+                        <div class="hidden flex-col place-items-center text-xl bg-yellow-100 dark:bg-yellow-900 p-6 rounded-lg shadow-md">
+                                <i class="fas fa-sync-alt animate-spin text-3xl mb-4 text-yellow-600 dark:text-yellow-400"></i>
+                            <p class="text-center text-yellow-800 dark:text-yellow-200 font-semibold">
+                                Rewards data is currently updating!
+                            </p>
+                            <p class="text-center text-yellow-700 dark:text-yellow-300 mt-2">
+                                Please check back again later.
+                            </p>
+                        </div>
+                    {/if}
                 </div>
                 {/if}
                 {#if data.props.leaderboardData}
@@ -163,7 +168,7 @@
                 </div>
                 <div class="items-center sm:items-start sm:ml-4 m-1">
                     <div class="text-sm">
-                        NOTICE: Data above is delayed. Last Updated
+                        <span class="text-red-500">NOTICE:</span> Data above is delayed. Last Updated
                         <Time timestamp={data.props.leaderboardData.last_modified} format="MMM D, YYYY h:mm A" relative />
                     </div>
                 </div>
@@ -239,6 +244,10 @@
                                         </InfoButton>
                                     </span>
                                 {/if}
+                            </div>
+                            <div class="text-center text-red-800 dark:text-red-400">
+                                <span class="">NOTICE:</span> Discord Status and Roles are delayed. Last Updated:
+                                <Time timestamp={data.props.questData?.last_modified} format="MMM D, YYYY h:mm A" relative />
                             </div>
                         </div>
                     </div>
