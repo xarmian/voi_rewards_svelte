@@ -13,12 +13,12 @@ export const load = async ({ params }) => {
     let leaderboardData: PLeaderboard | undefined;
     let questData: VrPhase2 | undefined;
     let questList: VrQuest[] | [] = [];
-    let totalPoints = 0;
+    const totalPoints = 0;
     const discordMultiplier = 1;
     const humanMultiplier = 1;
     let estimatedReward = 0;
     
-    /*const roleMultipliers = {
+    const roleMultipliers = {
         'Phase 2': 10.0,
         'Phase2-Manual': 10.0,
         'Recruit': 1.1,
@@ -41,7 +41,7 @@ export const load = async ({ params }) => {
         'Senior Chief': 1.1,
         'Master Chief': 1.1,
         'Grand Voiager': 1.1,
-    };*/
+    };
     
     if (wallet.length > 0) {
         const { data, error } = await supabasePublicClient
@@ -72,13 +72,13 @@ export const load = async ({ params }) => {
         }
 
         // estimate total rewards by adding all points together
-        if (questData) {
+        /*if (questData) {
             for (const quest of Object.keys(questData.quest_data ?? {})) {
                 if (questData.quest_data[quest]) {
                     totalPoints += questData.quest_data[quest] * (questList.find(q => q.id === Number(quest))?.reward ?? 0);
                 }
             }
-        }
+        }*/
 
         /*if (questData?.discord_roles) {
             for (const role of questData.discord_roles) {
@@ -103,11 +103,10 @@ export const load = async ({ params }) => {
         const systemPoints = pointsData.total_points_tokens / Math.pow(10, 6);
         const systemVoiPoints = pointsData.total_quest_points;
         const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
-        const voiRewardRate = 99000000 / systemVoiPoints; // $VOI reward rate
-
+        const voiRewardRate = 104000000 / systemVoiPoints; // $VOI reward rate
 
         estimatedReward = Math.min(
-            ((totalPoints * discordMultiplier * humanMultiplier) * voiRewardRate) + 
+            (questData?.total_quest_points * voiRewardRate) + 
             ((Number(questData?.points_tokens)??0 / Math.pow(10, 6)) * pointsRewardRate / Math.pow(10, 6)), 50000);
     }
 

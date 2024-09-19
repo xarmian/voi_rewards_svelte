@@ -102,7 +102,7 @@ export async function GET({ url }) {
 
         // Calculate estimated reward
         const estimatedReward = Math.min(
-            ((totalPoints * discordMultiplier * humanMultiplier) * voiRewardRate) + 
+            (questData.total_quest_points * voiRewardRate) + 
             ((Number(questData?.points_tokens) ?? 0 / Math.pow(10, 6)) * pointsRewardRate / Math.pow(10, 6)),
             50000
         );
