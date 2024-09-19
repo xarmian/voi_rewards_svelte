@@ -2,11 +2,7 @@ import { writable } from 'svelte/store';
 
 export const rewardParams = writable({
     block_reward_pool: 0,
-    health_reward_pool: 0,
     total_blocks: 0,
-    total_healthy_nodes: 0,
-    total_extra_nodes: 0,
-    minimum_algod: '3.0.0',
 });
 
 function createDataTable() {

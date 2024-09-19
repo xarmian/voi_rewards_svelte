@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-    import { A, Card } from 'flowbite-svelte';
-	import { algodClient } from '$lib/utils/algod';
+    import { onMount } from 'svelte';
+    import { Badge, Card, Spinner } from 'flowbite-svelte';
+    import { algodClient } from '$lib/utils/algod';
 
     export let walletId: string;
     let accountInfo: any;
@@ -63,133 +63,64 @@
     }
 </script>
 
-<div class='flex flex-row flex-wrap justify-center'>
-    <div class='cardContainer'>
-        <Card padding="md" size="lg">
-            <h3>Node</h3>
-            {#if Object.keys(apiData).length > 0 && Object.keys(nodeData).length == 0}
-                <div class="cardContents">
-                    <p>No Telemetry Data Available</p>
+<div class='grid grid-cols-1 md:grid-cols-2 gap-4'>
+    <Card padding="lg" class="bg-white dark:bg-gray-800 shadow-md rounded-lg">
+        <h3 class="text-xl font-bold mb-4 text-center">Current Epoch</h3>
+        <div class="space-y-2">
+            {#if typeof apiData.total_blocks == 'undefined'}
+                <div class="flex justify-center items-center h-24">
+                    <Spinner size="16" />
                 </div>
             {:else}
-                <div class="cardContents">
-                    <p>
-                        <span class="label">Status:</span>
-                        <span class="{nodeData.health_score ? (nodeData.health_score >= 5.0 ? 'bg-green-500 dark:bg-green-800 text-white' : 'bg-red-500 dark:bg-red-800 text-white') : ''} p-1 rounded-md">
-                            {nodeData.health_score ? (nodeData.health_score >= 5.0 ? 'Healthy' : 'Unhealthy') : 'Loading...'}
-                        </span>
-                    </p>
-                    <p>
-                        <span class="label">Telemetry ID:</span>
-                        <span><A href="https://voi-nodes.dev/node/{nodeData.node_host}" target="_blank">{nodeData.node_host??'Loading...'}</A></span>
-                    </p>
-                    <p>
-                        <span class="label">Telemetry Name:</span>
-                        <span>{nodeData.node_name??'Loading...'}</span>
-                    </p>
-                    <p>
-                        <span class="label">Algod Version:</span>
-                        <span>{nodeData.ver??'Loading...'}</span>
-                    </p>
-                    <p>
-                        <span class="label">Health Score:</span>
-                        <span>{nodeData.health_score??'Loading...'}</span>
-                    </p>
-                    <p>
-                        <span class="label">Wallets on Node:</span>
-                        <span>{nodeData.health_divisor??'Loading...'}</span>
-                    </p>
-                    {#if nodeData.health_hours && nodeData.health_hours < 168}
-                        <p class="mt-2">
-                            NOTE: New nodes may take up to 7 days to reach full health.
-                        </p>
-                    {/if}
-                </div>
-            {/if}
-        </Card>
-    </div>
-    <div class='cardContainer'>
-        <Card padding="md" size="lg">
-            <h3>Current Epoch</h3>
-            <div class="cardContents">
-                <p>
-                    <span class="label">Est. Proposals:</span>
-                    <span>{typeof apiData.total_blocks != 'undefined' ? estimatedBlocks : 'Loading...'}</span>
+                <p class="flex justify-between">
+                    <span class="font-semibold">Est. Proposals:</span>
+                    <span>{estimatedBlocks}</span>
                 </p>
-                <p>
-                    <span class="label">Actual Proposals:</span>
-                    <span>{apiData.total_blocks??'Loading...'}</span>
+                <p class="flex justify-between">
+                    <span class="font-semibold">Actual Proposals:</span>
+                    <span>{apiData.total_blocks}</span>
                 </p>
-                <p>
-                    <span class="label">Diff:</span>
+                <p class="flex justify-between">
+                    <span class="font-semibold">Diff:</span>
                     <span>
-                        {#if typeof apiData.total_blocks != 'undefined'}
-                            {(estimatedBlocks - apiData.total_blocks)*-1} 
-                            ({estimatedBlocks > 0 ?
-                                (estimatedBlocks < apiData.total_blocks ? '+' : '-') +
-                                Math.abs(Math.round((estimatedBlocks - apiData.total_blocks) / estimatedBlocks * 10000)/100) : '0'}%)
-                        {:else}
-                            Loading...
-                        {/if}
+                        {(estimatedBlocks - apiData.total_blocks)*-1} 
+                        ({estimatedBlocks > 0 ?
+                            (estimatedBlocks < apiData.total_blocks ? '+' : '-') +
+                            Math.abs(Math.round((estimatedBlocks - apiData.total_blocks) / estimatedBlocks * 10000)/100) : '0'}%)
                     </span>
                 </p>
+            {/if}
+        </div>
+    </Card>
+
+    {#if accountInfo && accountInfo.status=='Online'}
+        <Card padding="lg" class="bg-white dark:bg-gray-800 shadow-md rounded-lg">
+            <h3 class="text-xl font-bold mb-4 text-center">Consensus</h3>
+            <div class="space-y-2">
+                {#if !accountInfo}
+                    <div class="flex justify-center items-center h-32">
+                        <Spinner size="xl" />
+                    </div>
+                {:else}
+                    <p class="flex justify-between">
+                        <span class="font-semibold">Vote Key Expires:</span>
+                        <span>{formatTime((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)}</span>
+                    </p>
+                    <p class="flex justify-between">
+                        <span class="font-semibold">Expiry Date:</span>
+                        <span>{dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)}</span>
+                    </p>
+                    <p class="flex justify-between">
+                        <span class="font-semibold">Expiry Block:</span>
+                        <span>{accountInfo['participation']['vote-last-valid'].toLocaleString()}</span>
+                    </p>
+                {/if}
             </div>
         </Card>
-    </div>
-    {#if accountInfo && accountInfo.status=='Online'}
-        <div class='cardContainer'>
-            <Card padding="md" size="lg">
-                <h3>Consensus</h3>
-                <div class="cardContents">
-                    <p>
-                        <span class="label">Vote Key Expires:</span>
-                        <span>{accountInfo ? (formatTime((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)) : 'Loading...'}</span>
-                    </p>
-                    <p>
-                        <span class="label"></span>
-                        <span>{accountInfo ? (dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)) : 'Loading...'}</span>
-                    </p>
-                    <p>
-                        <span class="label"></span>
-                        <span>{accountInfo ? `Block ${accountInfo['participation']['vote-last-valid'].toLocaleString()}` : 'Loading...'}</span>
-                    </p>
-                </div>
-            </Card>
-        </div>
     {/if}
 </div>
 
-
 <style>
-    h3 {
-        font-weight:bold;
-        margin-bottom: 10px;
-        font-size:larger;
-        text-align: center;
-    }
-    div.cardContainer {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin: 10px;
-    }
-    div.cardContents {
-        display:flex;
-        flex-flow: column wrap;
-        align-content: center;
-    }
-    .label {
-        font-weight:bold;
-        width:9rem;
-        display:inline-block;
-        /*text-align:right;*/
-        margin-right:8px;
-        box-sizing: border-box;
-    }
-    @media (max-width: 768px) {
-        .cardContainer {
-            width: 100%;
-        }
-    }
+    /* Remove existing styles */
 </style>
 

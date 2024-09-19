@@ -7,24 +7,94 @@
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
 	import { compareVersions } from 'compare-versions';
+	import DashboardCard from '$lib/components/DashboardCard.svelte';
+	import RecentProposers from '$lib/components/RecentProposers.svelte';
+	import { writable } from 'svelte/store';
+
+	const latestBlock = writable({ block: 0, timestamp: '' });
+
+	function handleLatestBlock(event: CustomEvent) {
+		latestBlock.set(event.detail);
+	}
 
 	$: totalBlocks = 0;
 	$: totalWallets = 0;
 	$: block_height = 0;
 	$: block_height_timestamp = '';
-	$: totalHealthyNodes = 0;
-	$: totalEmptyNodes = 0;
-	$: totalExtraNodes = 0;
-	$: minimumAlgod = '3.0.0';
 	$: selectedDate = '';
 	$: dataArrays = [];
-	$: MIN_ALGOD_VERSION = '3.0.0';
+	$: dataIncomplete = false;
+	let dates: { id: string; desc: string; }[] = [];
+	let supply = {};
+	let ballasts: string[] = [];
 
-	let supply: any;
-	$: supply = {};
+	const populateDateDropdown = async () => {
+		const url = 'https://api.voirewards.com/proposers/index_main.php';
+		await fetch(url, { cache: 'no-store' })
+			.then((response) => response.json())
+			.then((data) => {
+				//const minTimestamp = new Date(data.min_timestamp);
+                const minTimestamp = new Date('2023-10-02T00:00:00Z');
+				const maxTimestamp = new Date(data.max_timestamp);
 
-	const loadDashboardData = async () => {
-		const url = `https://api.voirewards.com/proposers/index_p2.php`;
+				dates = [];
+
+				let currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
+				while (currentDate <= maxTimestamp) {
+					const startOfWeek = new Date(currentDate);
+					startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 1); // Monday
+					const endOfWeek = new Date(startOfWeek);
+					endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6); // Sunday
+					const dateStr = `${startOfWeek
+						.toISOString()
+						.substring(0, 10)
+						.replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
+					dates = [
+						...dates,
+						{
+							id: dateStr,
+							desc: dateStr.replace(
+								/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
+								'$1-$2-$3 to $4-$5-$6'
+							)
+						}
+					];
+					currentDate.setUTCDate(currentDate.getUTCDate() + 7); // Next week
+				}
+				selectedDate = dates[dates.length - 1].id;
+			})
+			.catch((error) => {
+				console.error(error);
+			});
+	};
+
+	const loadDashboardData = async (selectedDate: string) => {
+		// derive start and end dates from the selected date of format YYYYMMDD-YYYYMMDD
+		const startDate =
+			selectedDate.substring(0, 4) +
+			'-' +
+			selectedDate.substring(4, 6) +
+			'-' +
+			selectedDate.substring(6, 8);
+		const endDate =
+			selectedDate.substring(9, 13) +
+			'-' +
+			selectedDate.substring(13, 15) +
+			'-' +
+			selectedDate.substring(15, 17);
+		const url = `https://api.voirewards.com/proposers/index_main.php?start=${startDate}&end=${endDate}`;
+
+		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
+		const endOfEpoch = new Date(
+			Date.UTC(
+				parseInt(selectedDate.substring(9, 13)),
+				parseInt(selectedDate.substring(13, 15)) - 1,
+				parseInt(selectedDate.substring(15, 17))
+			)
+		);
+
+		// set default rewards based on epoch
+		endOfEpoch.setUTCHours(23, 59, 59, 999);
 
 		// reinitialize totals
 		totalWallets = 0;
@@ -34,13 +104,22 @@
 		fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
 			.then(async (data) => {
-				MIN_ALGOD_VERSION = data.minimum_algod;
+				// check if the end date selected in dropdown is more than maxTimestamp. If so, add notice below date selection that data is incomplete
+				const checkDate = new Date(
+					Date.UTC(
+						parseInt(selectedDate.substring(9, 13)),
+						parseInt(selectedDate.substring(13, 15)) - 1,
+						parseInt(selectedDate.substring(15, 17))
+					)
+				);
+				const endOfDay = new Date(checkDate);
+				endOfDay.setUTCHours(23, 59, 59, 999);
+
+				dataIncomplete = endOfDay > new Date(data.max_timestamp) ? true : false;
 
 				// Sort the data by block count
 				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
 				dataArrays = data.data;
-
-				//console.log(data.data);
 
                 dataArrays.forEach((row: any) => {
                     totalWallets++;
@@ -55,27 +134,23 @@
 						}
 					}
 
-					if (nodeVer && (compareVersions(nodeVer,MIN_ALGOD_VERSION) >= 0)) {
-						totalBlocks += row.block_count;
-					}
-					else {
-						row.block_count = 0;
-					}
+					totalBlocks += row.block_count;
 				});
 
+				//calcRewards();
 				block_height = data.block_height;
 				block_height_timestamp = new Date(data.max_timestamp).toLocaleString('en-US', {
 					timeZone: 'UTC'
 				});
-				totalHealthyNodes = data.healthy_node_count;
-				totalEmptyNodes = data.empty_node_count;
-				totalExtraNodes = data.extra_node_count;
-				minimumAlgod = data.minimum_algod;
+
+				ballasts = data.blacklist;
 			});
 	};
 
+
 	onMount(async () => {
-		loadDashboardData();
+		await populateDateDropdown();
+		loadDashboardData(selectedDate);
 
 		// get online stake
 		supply = await algodClient.supply().do();
@@ -84,184 +159,55 @@
 	$: {
 		rewardParams.set({
 			block_reward_pool: 0,
-			health_reward_pool: 0,
 			total_blocks: totalBlocks,
-			total_healthy_nodes: totalHealthyNodes - totalEmptyNodes,
-			total_extra_nodes: totalExtraNodes,
-			minimum_algod: minimumAlgod,
 		});
+	}
+
+	async function refreshDashboardData() {
+		await loadDashboardData(selectedDate);
 	}
 </script>
 
-<!--<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
-	<p class="font-bold">Notice:</p>
-	<p>Visit our <a href="/quests" class="underline text-yellow-700">Quest</a> page for details about Phase 2 Quests.</p>
-	<p>This page now shows cumulative points toward Phase 2 for running a Healthy node. Visit the <a href="https://discord.gg/voi-network" target="_blank" class="underline text-yellow-700">Voi Discord</a>
-		for more information.
-	</p>
-</div>-->
-
-<div class="bg-white dark:bg-gray-800 pt-8 flex flex-col">
-	<div class="bg-[rgb(111,42,226)] text-white text-center py-4 mb-4 w-1/2 rounded-full place-self-center">
-		<h2 class="text-2xl font-bold">Looking for Your TestNet Phase 2 Estimated Rewards?</h2>
-		<p>Visit our <a href="/phase2" class="underline">Visit our Phase 2 Page Here!</a></p>
-	</div>
-
-	<!--<div class="dashboard justify-evenly">
-		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-			<div class="cardInner">
-				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-					Min Algod Version
-				</h5>
-				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-					{MIN_ALGOD_VERSION == '3.0.0' ? '...Loading...' : MIN_ALGOD_VERSION}
-				</p>
-			</div>
-		</Card>
-		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-			<div class="cardInner">
-				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-					Last Block
-				</h5>
-				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-					{#if block_height == 0}
-						...Loading...
-					{:else}
-						{block_height.toLocaleString()}
-						<br />
-						<div class="text-sm my-1">
-							{block_height_timestamp} UTC
-						</div>
-					{/if}
-				</p>
-			</div>
-		</Card>
-		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-			<div class="cardInner">
-				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-					Participating Wallets
-				</h5>
-				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-					{totalWallets == 0 ? '...Loading...' : totalWallets}
-				</p>
-			</div>
-			<br/>
-			<div class="cardInner">
-				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-					Online Stake
-				</h5>
-				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-					{(supply['online-money']??0) == 0 ? '...Loading...' : Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString()+' VOI'}
-				</p>
-			</div>
-		</Card>
-		<Card class="bg-gray-100 dark:bg-gray-700 h-42 w-60 m-2">
-			<div class="cardInner">
-				<h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-					Total Healthy Nodes
-				</h5>
-				<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-					{totalHealthyNodes == 0 ? '...Loading...' : totalHealthyNodes}
-				</p>
-			</div>
-		</Card>
-	</div>-->
-	{#if false}
-		<div class="text-center">
-			<WalletSearch onSubmit={(addr) => goto(`/wallet/${addr.toUpperCase()}`)} loadPreviousValue={false} />
+<div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+	<div class="max-w-7xl mx-auto">
+		<!-- Phase 2 Banner -->
+		<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg mb-8 p-6 text-center">
+			<h2 class="text-2xl font-bold mb-2">Looking for Your TestNet Phase 2 Estimated Rewards?</h2>
+			<a href="/phase2" class="inline-block bg-white text-purple-600 font-semibold px-4 py-2 rounded-full hover:bg-purple-100 transition duration-300">Visit our Phase 2 Page Here!</a>
 		</div>
-		<div class="notices">
-			<div class="flex flex-col place-items-center">
-				<!--<span style="font-weight:bold;"
-					>PLEASE BE AWARE that VOI TestNet tokens have no inherent value. The VOI TestNet is a game.
-					Chris said it best:</span
-				>
-				<div class="quote bg-gray-200 dark:bg-gray-600">
-					<blockquote>
-						"After testnet is over the game will also be over and the points will be tallied. A new
-						entity that follows proper roles and regulations will decide the rewards of the game. There
-						is a chance they might decide zero, but I believe that would be against their best interest
-						and against the mission of Voi."
-					</blockquote>
-					<cite>- Chris Swenor</cite>
-				</div>-->
-				<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center">
-					Phase 2 Node points are cumulative. Nodes will accrue one point per healthy week.
-				</div>
-				<div class='w-full md:w-3/4'>For Voi Testnet Phase 2, nodes will be rewarded based on the number of weeks the node is healthy (score >5.0) during the Phase 2 time period.</div>
 
-				<div class="font-bold text-red-900 dark:text-red-400 text-lg text-center mt-4">
-					NOTICE: New nodes that join the network after July 31st will not be eligible for TestNet Phase 2 points.
-				</div>
+		<!-- Dashboard Cards -->
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+			<DashboardCard title="Last Block" value={$latestBlock.block.toLocaleString()} subvalue={$latestBlock.timestamp + " UTC"} />
+			<DashboardCard title="Participating Wallets" value={totalWallets.toLocaleString()} />
+			<DashboardCard title="Online Stake" value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} />
+			
+		</div>
 		
-				<div class="flex flex-row place-items-center space-x-4">
-					<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
-						<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank">Learn to Run a Node</a>
-					</button>
-					<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded mt-6 text-2xl">
-						<a href="/leaderboard">Phase 2 Leaderboard</a>
-					</button>
-				</div>
-			</div>
+		<RecentProposers on:latestBlock={handleLatestBlock} {ballasts} />
+
+		<!-- Action Buttons -->
+		<div class="flex flex-col sm:flex-row justify-center gap-4 mb-8">
+			<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank" class="btn-primary">
+				Learn to Run a Node
+			</a>
+			<a href="/leaderboard" class="btn-secondary">
+				Phase 2 Leaderboard
+			</a>
 		</div>
+
+		<!-- Rewards Table -->
 		{#if dataArrays.length > 0}
-			<RewardsTable items={dataArrays} />
+			<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />
 		{/if}
-	{:else}
-		<div class="text-center">
-			Mainnet is Coming... Keep an eye out here and on Discord for more information!
-		</div>
-	{/if}
+	</div>
 </div>
 
 <style>
-	.notices {
-		margin: 10px;
-		font-size: 14px;
-		line-height: 1.5;
+	.btn-primary {
+		@apply bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
 	}
-	.dashboard {
-		margin: 10px;
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-	}
-	/*.quote {
-		margin: 1rem 0;
-		padding: 1rem;
-		border-left: 5px solid #007bff;
-		font-size: 14px;
-	}
-	blockquote {
-		margin: 0;
-		font-size: 1.2rem;
-		font-style: italic;
-	}
-	cite {
-		display: block;
-		margin-top: 1rem;
-		font-size: 1rem;
-		font-weight: bold;
-		text-align: right;
-	}*/
-	.cardInner {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		transition: all 0.3s ease-in-out;
-	}
-	/*.cardInner:hover {
-		transform: translateY(-5px);
-	}*/
-	.cardInner h5 {
-		font-size: 18px;
-		margin-bottom: 5px;
-		text-align: center;
-	}
-	.cardInner p {
-		font-size: 24px;
-		font-weight: bold;
-		text-align: center;
+	.btn-secondary {
+		@apply bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
 	}
 </style>

@@ -4,16 +4,16 @@
     import RewardsComponent from '$lib/component/RewardsComponent.svelte';
     import PointsComponent from '$lib/component/PointsComponent.svelte';
     import QuestComponent from '$lib/component/QuestComponent.svelte';
+    import { Spinner } from 'flowbite-svelte';
 
 	import { onMount } from 'svelte';
     import { Card } from 'flowbite-svelte';
 	import { algodClient } from '$lib/utils/algod';
-    //@ts-ignore
-    import Device from 'svelte-device-info';
     import { getNFD } from '$lib/utils/nfd'
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
     import { page } from '$app/stores';
+    import { Badge } from 'flowbite-svelte';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
@@ -25,7 +25,6 @@
     export let isModal = true;
     let accountInfo: any;
     $: balance = 0;
-    $: isMobile = false;
     $: nfDomain = '';
 
     $: {
@@ -33,8 +32,6 @@
     }
 
     onMount(async () => {
-        isMobile = Device.isMobile;
-
         try {
             // Get account information
             accountInfo = await algodClient.accountInformation(walletId).do();
@@ -50,8 +47,8 @@
         {name: 'Node', component: NodeComponent},
         {name: 'Proposals', component: ProposalsComponent},
         //{name: 'Rewards', component: RewardsComponent},
-        {name: 'Weekly Health', component: PointsComponent},
-        {name: 'Quests', component: QuestComponent},
+        //{name: 'Weekly Health', component: PointsComponent},
+        //{name: 'Quests', component: QuestComponent},
     ];
 
     $: selectedTab = (urlParams.has('tab')) ? urlParams.get('tab') : 'Node';
@@ -59,101 +56,74 @@
 
 </script>
 
-<div class='cardContainer' style='margin:0;margin-top:18px;'>
-    <Card padding="md" size="lg">
-        <h3 class="relative flex items-center justify-center">
+<div class='max-w-3xl mx-auto mt-8'>
+    {#if !accountInfo}
+        <div class="flex justify-center items-center h-64">
+            <Spinner size="16" />
+        </div>
+    {:else}
+    <Card size="xl" padding="xl" class="bg-white dark:bg-gray-800 shadow-lg rounded-lg">
+        <h3 class="text-2xl font-bold mb-4 flex items-center justify-between">
             <span>Account</span>
-            <div class="absolute right-0">
-                <button class="inline mr-1" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
+            <div>
+                <button class="text-gray-500 hover:text-gray-700 mr-2" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
                     <i class="fas fa-copy"></i>
                 </button>
                 {#if isModal}
-                    <a href="/wallet/{walletId}" target="_blank" title="Open Wallet View in new page">
+                    <a href="/wallet/{walletId}" class="text-gray-500 hover:text-gray-700" target="_blank" title="Open Wallet View in new page">
                         <i class="fas fa-external-link-alt"></i>
                     </a>
                 {/if}
             </div>
         </h3>
-        <h1 class="font-bold">
-            <a href='https://voi.observer/explorer/account/{walletId}/transactions'
-             title="Open wallet in Voi.Observer"
-             target='_blank' class="text-blue-500 hover:text-blue-800 hover:underline">
-                {#if isMobile}
-                    {walletId.substring(0, 8)}...{walletId.substring(walletId.length - 8, walletId.length)}
-                {:else}
-                    {walletId}
-                {/if}
+        <h1 class="text-xl mb-2 text-center">
+            <a href='https://explorer.voi.network/explorer/account/{walletId}/transactions'
+             title="Open wallet in Voi Explorer"
+             target='_blank' class="text-blue-500 hover:text-blue-700 hover:underline">
+             <span class="font-mono text-lg overflow-hidden whitespace-nowrap text-ellipsis max-w-full">
+                {walletId.substring(0, 10)}...{walletId.substring(walletId.length - 10)}
+            </span>
             </a>
         </h1>
         {#if nfDomain}
-            <p class="text-center">
-                <span>
-                    <a href='https://app.nf.domains/name/{nfDomain}' target='_blank' class="text-blue-500 hover:text-blue-800 hover:underline">
-                        {nfDomain}
-                    </a>
-                </span>
+            <p class="text-center mb-4">
+                <a href='https://app.nf.domains/name/{nfDomain}' target='_blank' class="text-blue-500 hover:text-blue-700 hover:underline">
+                    {nfDomain}
+                </a>
             </p>
         {/if}
-        <br/>
-        <div class="cardContents">
+        <div class="space-y-2">
             {#if !accountInfo}
-                <p>Loading...</p>
+                <p class="text-center">Loading...</p>
             {:else}
-                <p>
-                    <span class="label" style='width:5.2rem;'>Balance:</span>
+                <p class="flex justify-between">
+                    <span class="font-semibold">Balance:</span>
                     <span>{displayBalance(balance)} VOI</span>
                 </p>
-                <p>
-                    <span class="label" style='width:5.2rem;'>Consensus:</span>
-                    <span class="p-1 rounded-lg border-solid text-white {accountInfo.status=='Online' ? 'bg-green-500' : 'bg-gray-300'}">{accountInfo.status}</span>
+                <p class="flex justify-between items-center">
+                    <span class="font-semibold">Consensus:</span>
+                    <Badge color={accountInfo.status === 'Online' ? 'green' : 'gray'}>
+                        {accountInfo.status}
+                    </Badge>
                 </p>
             {/if}
         </div>
     </Card>
-</div>
-<br/>
-<div class="flex border-b justify-center">
-    {#each tabs as tab}
-        <button class="py-2 px-4 border-b-2 font-medium text-sm focus:outline-none
-            {(selectedTab === tab.name) ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-            on:click|stopPropagation={() => selectedTab = tab.name}>
-            {tab.name}
-        </button>
-    {/each}
+    {/if}
 </div>
 
-<div class="p-4">
-    <svelte:component this={selectedTabComponent.component} walletId={walletId} />
+<div class="max-w-3xl mx-auto mt-8">
+    <div class="flex border-b justify-center mb-4">
+        {#each tabs as tab}
+            <button class="py-2 px-4 border-b-2 font-medium text-sm focus:outline-none transition-colors duration-200
+                {(selectedTab === tab.name) ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+                on:click|stopPropagation={() => selectedTab = tab.name}>
+                {tab.name}
+            </button>
+        {/each}
+    </div>
+
+    <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <svelte:component this={selectedTabComponent.component} walletId={walletId} />
+    </div>
 </div>
-<style>
-    h3 {
-        font-weight:bold;
-        margin-bottom: 10px;
-        font-size:larger;
-        text-align: center;
-    }
-    div.cardContainer {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin: 10px;
-    }
-    div.cardContents {
-        display:flex;
-        flex-flow: column wrap;
-        align-content: center;
-    }
-    .label {
-        font-weight:bold;
-        width:9rem;
-        display:inline-block;
-        /*text-align:right;*/
-        margin-right:8px;
-        box-sizing: border-box;
-    }
-    @media (max-width: 768px) {
-        .cardContainer {
-            width: 100%;
-        }
-    }
-</style>
