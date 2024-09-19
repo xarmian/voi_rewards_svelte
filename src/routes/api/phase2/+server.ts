@@ -98,7 +98,7 @@ export async function GET({ url }) {
         const systemPoints = pointsData.total_points_tokens / Math.pow(10, 6);
         const systemVoiPoints = pointsData.total_quest_points;
         const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
-        const voiRewardRate = 99000000 / systemVoiPoints; // $VOI reward rate
+        const voiRewardRate = 104000000 / systemVoiPoints; // $VOI reward rate
 
         // Calculate estimated reward
         const estimatedReward = Math.min(
