@@ -14,13 +14,13 @@ export const load = async ({ params }) => {
     let questData: VrPhase2 | undefined;
     let questList: VrQuest[] | [] = [];
     let totalPoints = 0;
-    let discordMultiplier = 1;
-    let humanMultiplier = 1;
+    const discordMultiplier = 1;
+    const humanMultiplier = 1;
     let estimatedReward = 0;
     
-    const roleMultipliers = {
+    /*const roleMultipliers = {
         'Phase 2': 10.0,
-        'Phase 2-Manual': 10.0,
+        'Phase2-Manual': 10.0,
         'Recruit': 1.1,
         'Apprentice': 1.1,
         'Cadet': 1.1,
@@ -41,7 +41,7 @@ export const load = async ({ params }) => {
         'Senior Chief': 1.1,
         'Master Chief': 1.1,
         'Grand Voiager': 1.1,
-    };
+    };*/
     
     if (wallet.length > 0) {
         const { data, error } = await supabasePublicClient
@@ -80,7 +80,7 @@ export const load = async ({ params }) => {
             }
         }
 
-        if (questData?.discord_roles) {
+        /*if (questData?.discord_roles) {
             for (const role of questData.discord_roles) {
                 if (role in roleMultipliers) {
                     if (role == 'Phase 2' || role == 'Phase 2-Manual') {
@@ -91,7 +91,7 @@ export const load = async ({ params }) => {
                     }
                 }
             }
-        }
+        }*/
 
         const { data: pointsData, error: pointsError } = await supabasePublicClient
             .from('vr_phase2_counts')

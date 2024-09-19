@@ -4,9 +4,9 @@ import { supabasePublicClient } from '$lib/supabase';
 //const systemPoints = 650988517.55; // $POINTS total supply
 //const systemVoiPoints = 9034747.39; // $VOI total supply
 
-const roleMultipliers = {
+/*const roleMultipliers = {
     'Phase 2': 10.0,
-    'Phase 2-Manual': 10.0,
+    'Phase2-Manual': 10.0,
     'Recruit': 1.1,
     'Apprentice': 1.1,
     'Cadet': 1.1,
@@ -27,7 +27,7 @@ const roleMultipliers = {
     'Senior Chief': 1.1,
     'Master Chief': 1.1,
     'Grand Voiager': 1.1,
-};
+};*/
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -63,8 +63,8 @@ export async function GET({ url }) {
         if (questListError) throw questListError;
 
         let totalPoints = 0;
-        let discordMultiplier = 1;
-        let humanMultiplier = 1;
+        const discordMultiplier = 1;
+        const humanMultiplier = 1;
 
         // Calculate total points
         if (questData?.quest_data) {
@@ -76,17 +76,17 @@ export async function GET({ url }) {
         }
 
         // Calculate multipliers
-        if (questData?.discord_roles) {
+        /*if (questData?.discord_roles) {
             for (const role of questData.discord_roles) {
                 if (role in roleMultipliers) {
-                    if (role === 'Phase 2' || role === 'Phase 2-Manual') {
+                    if (role === 'Phase 2' || role === 'Phase2-Manual') {
                         humanMultiplier = roleMultipliers[role as keyof typeof roleMultipliers];
                     } else {
                         discordMultiplier *= roleMultipliers[role as keyof typeof roleMultipliers];
                     }
                 }
             }
-        }
+        }*/
 
         const { data: pointsData, error: pointsError } = await supabasePublicClient
             .from('vr_phase2_counts')
