@@ -34,7 +34,7 @@
 </script>
 <div class="bg-[rgb(111,42,226)] dark:bg-[#2C037A]">
     <div class="container mx-auto pt-6 text-lg">
-        <a href="/quests" class="text-blue-200">← Back to Quests</a>
+        <a href="/" class="text-blue-200">← Back to Home</a>
     </div>
     <div class="flex flex-col sm:flex-row justify-center items-center mt-4">
         <div class="flex flex-col items-center sm:items-start sm:mr-4">
