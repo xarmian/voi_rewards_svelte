@@ -233,7 +233,7 @@
                             </div>
                             <div class="flex items-center">
                                 <span class="mr-2">Phase 2 Discord Role (Human Verification):</span>
-                                {#if data.props.questData?.discord_roles?.includes('Phase 2') || data.props.questData?.discord_roles?.includes('Phase 2-Manual')}
+                                {#if data.props.questData?.discord_roles?.includes('Phase 2') || data.props.questData?.discord_roles?.includes('Phase2-Manual')}
                                     <span class="text-green-500">✓ Assigned</span>
                                 {:else}
                                     <span class="text-red-500 flex flex-row">✗ Not Assigned
