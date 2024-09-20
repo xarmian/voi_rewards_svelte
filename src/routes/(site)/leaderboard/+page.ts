@@ -1,20 +1,16 @@
 import { supabasePublicClient } from '$lib/supabase';
-import type { PLeaderboard } from '$lib/supabase';
+import type { VRPhase2 } from '$lib/supabase';
 
 export const load = async () => {
     const { data, error } = await supabasePublicClient
-        .from('leaderboard')
+        .from('vr_phase2')
         .select('*')
-        .order('row_number', { ascending: true }).limit(100);
+        .order('total_quest_points', { ascending: false }).limit(50);
 
     // get count of number of rows in leaderboard table
     const { count, error: countError } = await supabasePublicClient
-        .from('leaderboard')
+        .from('vr_phase2')
         .select('count', { count: 'exact' });
-
-    const { data: totalPoints } = await supabasePublicClient
-        .from('leaderboard_sum')
-        .select('total_points');
 
     if (error || countError) {
         console.error(error, countError);
@@ -31,9 +27,8 @@ export const load = async () => {
     };
 
     return {
-        ranks: data as PLeaderboard[],
+        ranks: data as VRPhase2[],
         total_accounts: count,
-        total_points: totalPoints && totalPoints[0]?.total_points || 0,
         pageMetaTags,
     };
 };

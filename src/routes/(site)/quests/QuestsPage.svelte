@@ -48,7 +48,13 @@
         <h1 class="text-5xl font-bold text-center">Get Your<br class="sm:hidden"/> Quest On</h1>
     </div>
   </div>
+  <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-8 w-full max-w-4xl" role="alert">
+    <p class="font-bold">Important Notice:</p>
+    <p>Testnet Phase 2 has concluded. The quests listed below are no longer active for reward purposes.</p>
+    <p class="mt-2">To view your estimated token rewards for Testnet Phase 2 participation, please visit the <a href="/phase2" class="underline font-semibold hover:text-red-800">Phase 2 Rewards page</a>.</p>
+  </div>
 
+  
   <div class="restofpage">
       <div class="hero-section py-16">
           <div class="mt-12 text-3xl">Getting Started</div>
