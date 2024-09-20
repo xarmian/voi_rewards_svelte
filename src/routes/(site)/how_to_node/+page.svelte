@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TwitterSolid, DiscordSolid, GlobeOutline, LinkSolid, LinkOutline } from 'flowbite-svelte-icons';
+	import { LinkOutline } from 'flowbite-svelte-icons';
     import { A } from 'flowbite-svelte';
     import faucetImg from '$lib/assets/voi-testnet-faucet.png';
 
@@ -39,17 +39,17 @@
     {
         heading: 'Additional Resources and Guides',
         links: [
-            {
+            /*{
                 text: 'VOI Node Metrics (Node Health Stats and History)',
                 url: 'https://voi-nodes.dev/',
-            },
+            },*/
             {
                 text: 'Guide to Setting up a *Relay Node*',
-                url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md',
+                url: 'https://voinetwork.github.io/voi-swarm/advanced-node-running/relay-node/',
             },
             {
-                text: 'VOI Node Running Guides, Details, and Specifications Document',
-                url: 'https://docs.google.com/document/d/16n0yEivEUjFtSypiZ4TRaZQmRi_emMtFPrgAarsSNSE/edit#heading=h.fx33lxdr6ymi',
+                text: 'VOI Node Running System Requirements (for Voi Swarm)',
+                url: 'https://voinetwork.github.io/voi-swarm/installation/system-requirements/',
             },
         ]
     },
@@ -78,58 +78,43 @@
     
 </script>
 
-<div class="about bg-white dark:bg-gray-800 pt-4">
-    <header class="bg-purple-200 dark:bg-purple-800 my-4 mx-8 p-4 rounded-xl">
-        <h1 class="text-2xl font-bold">Node Running Resources</h1>
-        <h2 class="text-lg font-medium text-gray-600 dark:text-gray-200">Interested in Running a Node? Check out the resources and links below</h2>
-        <div class="mt-2 text-sm">
-            In Phase 2 of TestNet, Node Runners earn quest points for each week their node remains healthy.
-        </div>
+<div class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="bg-white dark:bg-gray-800 shadow-lg rounded-2xl p-6 mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">Node Running Resources</h1>
+            <p class="mt-2 text-xl text-gray-600 dark:text-gray-300">Interested in Running a Node? Check out the resources and links below</p>
+            <p class="mt-4 text-gray-600 dark:text-gray-400">
+                Node Runners earn block rewards for each block they propose. Block proposals are a key part of the Voi consensus mechanism.
+            </p>
         </header>
-    <ul class="m-10">
-        <header class="bg-gray-100 dark:bg-gray-700 py-4 px-8">
-            <h1 class="text-xl font-bold">Quick Start Guide</h1>
-        </header>
-        <li class='ml-10 m-2'>
-            1. Set up a Node using one of the <b>Participation Node Setup Guides</b> below.
-        </li>
-        <li class='ml-10 m-2'>
-            2. Go to the <b>Voi Faucet</b> located here: <A href="https://voiager.org/get-started" target="_blank">Voi Faucet</A> and follow the instructions to receive TestNet Voi.
-        </li>
-        <li class='ml-10 m-2'>
-            3. Bring your wallet "online" as explained in the Guide you used to set up your node. 
-        </li>
-        <li class='ml-10 m-2'>
-            4. Wait a few hours for your node to appear on the <A href="https://voi-nodes.dev/">Voi-Node Metrics Dashboard</A>, then periodically monitor your node's health. On the Monday following a Healthy <b>weekly</b> score of 5.0 or higher, you will be awarded quest points, which can be seen in the <A href="/phase2">Voi Rewards Quest Tracker</A>.
-        </li>
-        <li class='ml-10 m-2'>
-            <b>NEED HELP?</b> If you have any questions or need help, visit the <A href="https://discord.gg/voi-network" target="_blank">Voi Discord</A> for assistance.
-        </li>
-    </ul>
-    {#each categories as category}
-        <ul class="p-10">
-            <header class="bg-gray-100 dark:bg-gray-700 py-4 px-8">
-                <h1 class="text-xl font-bold">{category.heading}</h1>
-                {#if category.subheading}
-                    <h2 class="text-lg font-medium text-gray-600 dark:text-gray-300">{category.subheading}</h2>
-                {/if}
-            </header>
-            {#each category.links as link}
-                <li class='ml-10'>
-                    <A href={link.url} target="_blank">
-                        <LinkOutline class="inline" />
-                        <span class='m-2'>
-                            {#each link.text.split('*') as text, i}
-                                {#if i % 2 === 0}
-                                    <span> {text} </span>
-                                {:else}
-                                    <span class="font-bold"> {text} </span>
-                                {/if}
-                            {/each}
-                        </span>
-                    </A>
-                </li>
-            {/each}
-        </ul>
-    {/each}
+
+        {#each categories as category}
+            <section class="mb-8 bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
+                <header class="bg-purple-600 dark:bg-purple-800 py-4 px-6">
+                    <h2 class="text-2xl font-bold text-white">{category.heading}</h2>
+                    {#if category.subheading}
+                        <p class="text-purple-200 dark:text-purple-300 mt-1">{category.subheading}</p>
+                    {/if}
+                </header>
+                <ul class="py-4">
+                    {#each category.links as link}
+                        <li class="px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
+                            <A href={link.url} target="_blank" class="flex items-center text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400">
+                                <LinkOutline class="w-5 h-5 mr-3" />
+                                <span>
+                                    {#each link.text.split('*') as text, i}
+                                        {#if i % 2 === 0}
+                                            <span>{text}</span>
+                                        {:else}
+                                            <span class="font-semibold text-purple-600 dark:text-purple-400">{text}</span>
+                                        {/if}
+                                    {/each}
+                                </span>
+                            </A>
+                        </li>
+                    {/each}
+                </ul>
+            </section>
+        {/each}
+    </div>
 </div>

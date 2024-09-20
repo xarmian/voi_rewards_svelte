@@ -194,6 +194,9 @@
 			<a href="/leaderboard" class="btn-secondary">
 				Phase 2 Leaderboard
 			</a>
+			<a href="/phase2" class="btn-secondary">
+				Phase 2 Reward Estimates
+			</a>
 		</div>
 
 		<!-- Rewards Table -->
