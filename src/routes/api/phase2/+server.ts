@@ -49,13 +49,13 @@ export async function GET({ url }) {
     try {
         const { data: questData, error: questError } = await supabasePublicClient
             .from('vr_phase2')
-            .select('*')
+            .select('airdrop_amount')
             .eq('address', wallet)
             .single();
 
         if (questError) throw questError;
 
-        const { data: questList, error: questListError } = await supabasePublicClient
+        /*const { data: questList, error: questListError } = await supabasePublicClient
             .from('vr_quests')
             .select('*')
             .or('status.is.null,status.neq.inactive');
@@ -76,7 +76,7 @@ export async function GET({ url }) {
         }
 
         // Calculate multipliers
-        /*if (questData?.discord_roles) {
+        if (questData?.discord_roles) {
             for (const role of questData.discord_roles) {
                 if (role in roleMultipliers) {
                     if (role === 'Phase 2' || role === 'Phase2-Manual') {
@@ -88,7 +88,7 @@ export async function GET({ url }) {
             }
         }*/
 
-        const { data: pointsData, error: pointsError } = await supabasePublicClient
+        /*const { data: pointsData, error: pointsError } = await supabasePublicClient
             .from('vr_phase2_counts')
             .select('*')
             .single();
@@ -105,7 +105,9 @@ export async function GET({ url }) {
             (questData.total_quest_points * voiRewardRate) + 
             ((Number(questData?.points_tokens) ?? 0 / Math.pow(10, 6)) * pointsRewardRate / Math.pow(10, 6)),
             50000
-        );
+        );*/
+
+        const estimatedReward = questData?.airdrop_amount??0;
 
         return json({ 
             wallet,

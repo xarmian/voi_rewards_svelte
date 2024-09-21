@@ -93,14 +93,14 @@ export const load = async ({ params }) => {
             }
         }*/
 
-        const { data: pointsData, error: pointsError } = await supabasePublicClient
+        /*const { data: pointsData, error: pointsError } = await supabasePublicClient
             .from('vr_phase2_counts')
             .select('*')
             .single();
 
         if (pointsError) throw pointsError;
 
-        /*const systemPoints = pointsData.total_points_tokens / Math.pow(10, 6);
+        const systemPoints = pointsData.total_points_tokens / Math.pow(10, 6);
         const systemVoiPoints = pointsData.total_quest_points;
         const pointsRewardRate = 1000000 / systemPoints; // $POINTS reward rate
         const voiRewardRate = 104000000 / systemVoiPoints; // $VOI reward rate
