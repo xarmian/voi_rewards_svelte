@@ -15,6 +15,8 @@
 
 	function handleLatestBlock(event: CustomEvent) {
 		latestBlock.set(event.detail);
+		// Update total blocks count
+		totalBlocks += event.detail.newNonBallastBlocks;
 	}
 
 	$: totalBlocks = 0;
@@ -144,6 +146,7 @@
 				});
 
 				ballasts = data.blacklist;
+				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
 			});
 	};
 
@@ -178,9 +181,9 @@
 
 		<!-- Dashboard Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-			<DashboardCard title="Last Block" value={$latestBlock.block.toLocaleString()} subvalue={$latestBlock.timestamp + " UTC"} />
-			<DashboardCard title="Participating Wallets" value={totalWallets.toLocaleString()} />
-			<DashboardCard title="Community Produced Blocks" value={totalBlocks.toLocaleString()} />
+			<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} />
+			<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} />
+			<DashboardCard title="Community Produced Blocks" value={totalBlocks > 0 ? totalBlocks.toLocaleString() : null} />
 			<DashboardCard title="Online Stake" value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} />
 			
 		</div>

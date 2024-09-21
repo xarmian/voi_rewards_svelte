@@ -13,27 +13,42 @@
   export let ballasts: string[] = [];
   let proposers: Proposer[] = [];
   let intervalId: NodeJS.Timeout;
+  let isLoaded = false;
+  let processedBlocks = new Set<number>();
 
   async function fetchRecentProposers() {
     try {
       const response = await fetch('https://api.voirewards.com/proposers/index_main.php?action=recent');
       const data = await response.json();
       
-      const newProposers = data.slice(0, 5).map((p: any) => ({
+      const newProposers = data.slice(0, 10).map((p: any) => ({
         address: p.proposer,
         timestamp: new Date(p.timestamp).toLocaleString(),
         block: p.block
       }));
 
+      // Count new non-Ballast blocks that haven't been processed before
+      const newNonBallastBlocks = newProposers.filter((p: Proposer) => 
+        !ballasts.includes(p.address) && !processedBlocks.has(p.block)
+      ).length;
+
+      // Update the set of processed blocks
+      newProposers.forEach((p: Proposer) => processedBlocks.add(p.block));
+
       proposers = [...newProposers, ...proposers].slice(0, 5);
 
-      // Dispatch the latest block number
-      if (newProposers.length > 0) {
+      // Dispatch the latest block number and new non-Ballast block count
+      if (isLoaded && newProposers.length > 0) {
         dispatch('latestBlock', {
           block: newProposers[0].block,
-          timestamp: newProposers[0].timestamp
+          timestamp: newProposers[0].timestamp,
+          newNonBallastBlocks
         });
       }
+
+      // trim the processed blocks to the last 100
+      processedBlocks = new Set(Array.from(processedBlocks).slice(-100));
+      isLoaded = true;
     } catch (error) {
       console.error('Error fetching recent proposers:', error);
     }
