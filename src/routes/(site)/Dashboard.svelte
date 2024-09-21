@@ -177,9 +177,10 @@
 		</div>
 
 		<!-- Dashboard Cards -->
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 			<DashboardCard title="Last Block" value={$latestBlock.block.toLocaleString()} subvalue={$latestBlock.timestamp + " UTC"} />
 			<DashboardCard title="Participating Wallets" value={totalWallets.toLocaleString()} />
+			<DashboardCard title="Community Produced Blocks" value={totalBlocks.toLocaleString()} />
 			<DashboardCard title="Online Stake" value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} />
 			
 		</div>
