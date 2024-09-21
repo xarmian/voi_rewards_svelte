@@ -271,7 +271,7 @@
                                     </InfoButton>
                                 </span>
                             {:else}
-                                <span class="text-blue-500 cursor-pointer flex" on:click={() => setPrimary(wallet.address)}>
+                                <span class="hidden text-blue-500 cursor-pointer" on:click={() => setPrimary(wallet.address)}>
                                     <div>Set as Primary</div>
                                 </span>
                             {/if}

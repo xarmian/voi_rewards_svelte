@@ -63,6 +63,8 @@ export const load: PageServerLoad = async ({ params, cookies, url, locals }) => 
 
 export const actions = {
     setPrimaryWallet: async ({ request, params, cookies, locals }) => {
+        error(500, 'Not permitted');
+
         const formData = await request.formData();
         const wallet = formData.get('wallet')?.toString();
 
