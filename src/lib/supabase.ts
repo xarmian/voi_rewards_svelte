@@ -24,6 +24,24 @@ export interface PLeaderboard {
     points? : number;
 }
 
+export interface VRPhase2 {
+    id: bigint; // Primary key
+    user_id: string | null; // UUID of the user (foreign key referencing users(id))
+    address: string; // text
+    quest_data: object | null; // jsonb
+    airdrop_amount: number; // numeric
+    points_tokens: number; // numeric
+    discord_roles: string[]; // text[]
+    discord_member: boolean; // boolean
+    last_modified: string; // timestamp with time zone
+    discord_linked: boolean; // boolean
+    join_discord_server: string | null; // timestamp with time zone
+    created_discord_account: string | null; // timestamp with time zone
+    total_quest_points: number | null; // numeric
+    blacklisted: boolean; // boolean
+    row_number?: number;
+}
+
 export interface VrPhase2 {
         id: number; // bigint
         user_id?: string | null; // uuid
@@ -35,6 +53,10 @@ export interface VrPhase2 {
         discord_member: boolean; // boolean
         last_modified: string; // timestamp with time zone
         discord_linked: boolean; // boolean
+        join_discord_server: string | null; // timestamp with time zone
+        created_discord_account: string | null; // timestamp with time zone
+        total_quest_points: number | null; // numeric
+        blacklisted: boolean; // boolean
 }
 
 export interface VrQuest {

@@ -29,7 +29,7 @@
         {#each data as row, i}
             <tr class={i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-slate-800'}>
                 <td class="px-1 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {row.row_number}
+                    {row.row_number??(i+1)}
                 </td>
                 <td class="px-1 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
                     title={row.address}>
