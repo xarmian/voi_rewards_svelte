@@ -128,6 +128,11 @@ export const actions = {
         };
     },
     disconnectWallet: async ({ request, params, cookies, locals }) => {
+        return {
+            status: 200,
+            body: { success: false, error: 'Not permitted' },
+        };
+
         const formData = await request.formData();
         const wallet = formData.get('wallet')?.toString();
 
@@ -152,7 +157,7 @@ export const actions = {
         // get user's uuid from users table using discord_id
         const { data: user, error: supaError } = await supabasePrivateClient
             .from('users')
-            .select('id')
+            .select('id,flagged')
             .eq('discord_id', discordId)
             .single();
 
@@ -162,6 +167,10 @@ export const actions = {
 
         if (!user) {
             error(404, 'User not found');
+        }
+
+        if (user.flagged) {
+            error(403, 'Unknown error');
         }
 
         // disconnect the wallet by updating column `disconnected` to true

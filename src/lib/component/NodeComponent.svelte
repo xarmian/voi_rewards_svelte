@@ -19,6 +19,7 @@
     $: if (supply && apiData.first_block && balance > 0) {
         // calculate expected block proposals in current epoch
         const epochBlocks = apiData.last_block - apiData.first_block;
+        console.log(epochBlocks);
         estimatedBlocks = Math.round(balance / supply['online-money'] * epochBlocks);
     }
     

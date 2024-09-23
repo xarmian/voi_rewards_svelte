@@ -126,18 +126,6 @@
 				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
 				dataArrays = data.data;
 
-                dataArrays.forEach((row: any) => {
-					let nodeVer = '0';
-					if (row.nodes) {
-						for (let j = 0; j < row.nodes.length; j++) {
-							const node = row.nodes[j];
-							if (node.ver && compareVersions(node.ver,nodeVer) >= 0) {
-								nodeVer = node.ver;
-							}
-						}
-					}
-				});
-
 				//calcRewards();
 				block_height = data.block_height;
 				block_height_timestamp = new Date(data.max_timestamp).toLocaleString('en-US', {

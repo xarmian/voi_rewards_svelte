@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
     import { RadioButton, ButtonGroup } from 'flowbite-svelte';
     import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
+    import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 
     interface DiscordAccount {
       id: string;
@@ -81,10 +82,14 @@
 		});
 
 		if (!response.ok) {
-			console.error('Failed to send wallet data to backend', await response.text());
+            const err = await response.text();
+			console.error('Error: ', err);
+
+            const resp = JSON.parse(err);
+            alert(`ERROR: ${resp.error}`);
 		}
 		else {
-			const data = await response.json();
+            const data = await response.json();
             console.log('Wallet data sent to backend', data);
 
             const is_primary = (voiWallets.length == 0);
@@ -183,6 +188,14 @@
             View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
         </div>
 
+        <CountdownTimer 
+            divClass="bg-white dark:bg-gray-700 rounded-lg shadow-lg mb-8 p-6 text-center relative animate-background mx-auto px-16"
+            targetDate="2024-09-25T00:00:00Z"
+            title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
+            subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
+            link="https://staking.voi.network"
+        />
+
         <a href="https://discord.com/channels/1055863853633785857/1278379464019152998"
             target="_blank"
             class="flex flex-col text-center space-y-1 text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-800 dark:hover:bg-blue-700 rounded-lg shadow-md p-3 mb-6 transition-colors">
@@ -277,7 +290,7 @@
                             {/if}
                             <button
                             on:click={() => disconnectVoi(wallet.address)}
-                            class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
+                            class="hidden bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
                             >
                                 Disconnect
                             </button>
