@@ -3,7 +3,7 @@
 	import { goto } from "$app/navigation";
     import type { PageData } from './$types';
 	import QuestComponent from "$lib/component/QuestComponent.svelte";
-	import { onMount } from "svelte";
+	import { onMount, onDestroy } from "svelte";
     import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
     import Time from 'svelte-time';
 	import InfoButton from "$lib/component/ui/InfoButton.svelte";
@@ -11,6 +11,7 @@
     //@ts-ignore
     import RangeSlider from "svelte-range-slider-pips";
     import { Card } from "flowbite-svelte";
+    import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 
     let dataUpdating = false;
 
@@ -26,7 +27,6 @@
     const compoundRates = [0, 0.1, 0.12, 0.15, 0.18, 0.2];
     $: airdrop = data.props.estimatedReward;
     $: myStake = airdrop ? (airdrop * Math.pow(1 + compoundRates[lockYears], lockYears)) : 0;
-
 
     const updateEligibility = (wallet: string) => {
         fetch(`/api/eligibility?wallet=${wallet}`).then(r => r.json()).then(d => {
@@ -64,6 +64,16 @@
             <h1 class="text-5xl font-bold text-center">Voi Ecosystem Quests</h1>
         </div>
     </div>
+    
+    <!-- Countdown Timer -->
+    <CountdownTimer 
+        divClass="bg-white dark:bg-gray-700 rounded-lg shadow-lg mb-8 p-6 text-center relative animate-background mx-auto px-16"
+        targetDate="2024-09-25T00:00:00Z"
+        title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
+        subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
+        link="https://staking.voi.network"
+        />
+
     <div class="hidden flex space-x-4 place-self-center mb-8">
         <a href="https://voiager.org/get-started" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-500 text-white font-medium rounded-md shadow hover:bg-blue-700 transition duration-150 ease-in-out">
             <i class="fas fa-faucet mr-2"></i> $VOI Faucet
@@ -394,3 +404,12 @@
         </div>
     </div>
 {/if}
+
+<style>
+    .btn-primary {
+        @apply bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
+    }
+    .btn-secondary {
+        @apply bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
+    }
+</style>

@@ -2,7 +2,7 @@
 	import Leaderboard from "./Leaderboard.svelte";
     import { supabasePublicClient } from "$lib/supabase";
     import type { VRPhase2 } from "$lib/supabase"
-
+    import CountdownTimer from "$lib/components/CountdownTimer.svelte";
     import type { PageData } from './$types';
 	import InfoButton from "$lib/component/ui/InfoButton.svelte";
 	import Time from "svelte-time/Time.svelte";
@@ -36,6 +36,14 @@
     <div class="container mx-auto pt-6 text-lg">
         <a href="/" class="text-blue-200">← Back to Home</a>
     </div>
+    <CountdownTimer 
+    divClass="bg-white dark:bg-gray-700 rounded-lg shadow-lg mb-8 p-6 text-center relative animate-background mx-auto max-w-3xl px-16"
+    targetDate="2024-09-25T00:00:00Z"
+    title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
+    subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
+    link="https://staking.voi.network"
+/>
+
     <div class="container mx-auto my-6">
         <div class="p-2 sm:p-8 rounded-2xl bg-white dark:bg-gray-900 shadow-md">
             <div class="flex flex-col sm:flex-row sm:justify-between">

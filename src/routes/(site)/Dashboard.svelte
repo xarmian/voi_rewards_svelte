@@ -11,6 +11,7 @@
 	import RecentProposers from '$lib/components/RecentProposers.svelte';
 	import { writable } from 'svelte/store';
 	import { config } from '$lib/config';
+	import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
@@ -30,25 +31,6 @@
 	let dates: { id: string; desc: string; }[] = [];
 	let supply = {};
 	let ballasts: string[] = [];
-
-	// New countdown timer logic
-	let countdown = { days: 0, hours: 0, minutes: 0, seconds: 0 };
-	let countdownInterval: NodeJS.Timeout;
-
-	function updateCountdown() {
-		const now = new Date().getTime();
-		const targetDate = new Date('2024-09-25T00:00:00Z').getTime();
-		const difference = targetDate - now;
-
-		if (difference > 0) {
-			countdown.days = Math.floor(difference / (1000 * 60 * 60 * 24));
-			countdown.hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-			countdown.minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-			countdown.seconds = Math.floor((difference % (1000 * 60)) / 1000);
-		} else {
-			clearInterval(countdownInterval);
-		}
-	}
 
 	const populateDateDropdown = async () => {
 		const url = `${config.proposalApiBaseUrl}`;
@@ -176,14 +158,6 @@
 
 		// get online stake
 		supply = await algodClient.supply().do();
-
-		// Start the countdown
-		updateCountdown();
-		countdownInterval = setInterval(updateCountdown, 1000);
-	});
-
-	onDestroy(() => {
-		if (countdownInterval) clearInterval(countdownInterval);
 	});
 
 	$: {
@@ -207,31 +181,12 @@
 		</div>
 
 		<!-- Countdown Timer -->
-		<div class="bg-white dark:bg-gray-700 rounded-lg shadow-lg mb-8 p-6 text-center">
-			<h2 class="text-xl font-bold mb-4">Testnet Phase 1 and 2 Airdrop contract configuration deadline</h2>
-			<div class="grid grid-cols-4 gap-4">
-				<div>
-					<span class="text-3xl font-bold">{countdown.days}</span>
-					<p class="text-sm">Days</p>
-				</div>
-				<div>
-					<span class="text-3xl font-bold">{countdown.hours}</span>
-					<p class="text-sm">Hours</p>
-				</div>
-				<div>
-					<span class="text-3xl font-bold">{countdown.minutes}</span>
-					<p class="text-sm">Minutes</p>
-				</div>
-				<div>
-					<span class="text-3xl font-bold">{countdown.seconds}</span>
-					<p class="text-sm">Seconds</p>
-				</div>
-			</div>
-			<div class="text-sm mt-2">
-				<div>After this date, the contract configuration will be frozen and no further changes can be made.</div>
-				<a href="https://staking.voi.network" target="_blank" class="text-blue-500 hover:text-blue-600 text-lg">https://staking.voi.network</a>
-			</div>
-		</div>
+		<CountdownTimer 
+			targetDate="2024-09-25T00:00:00Z"
+			title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
+			subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
+			link="https://staking.voi.network"
+		/>
 
 		<!-- Dashboard Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
