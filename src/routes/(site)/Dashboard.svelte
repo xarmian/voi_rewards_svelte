@@ -10,6 +10,7 @@
 	import DashboardCard from '$lib/components/DashboardCard.svelte';
 	import RecentProposers from '$lib/components/RecentProposers.svelte';
 	import { writable } from 'svelte/store';
+	import { config } from '$lib/config';
 
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
@@ -31,7 +32,7 @@
 	let ballasts: string[] = [];
 
 	const populateDateDropdown = async () => {
-		const url = 'https://api.voirewards.com/proposers/index_main.php';
+		const url = `${config.proposalApiBaseUrl}`;
 		await fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
 			.then((data) => {
@@ -84,8 +85,8 @@
 			selectedDate.substring(13, 15) +
 			'-' +
 			selectedDate.substring(15, 17);
-		// const url = `https://api.voirewards.com/proposers/index_main.php?start=${startDate}&end=${endDate}`;
-		const url = `https://api.voirewards.com/proposers/index_main.php?start=2024-09-16&end=2024-10-28`;
+		// const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
+		const url = `${config.proposalApiBaseUrl}?start=2024-09-16&end=2024-10-28`;
 
 		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
 		const endOfEpoch = new Date(
@@ -125,8 +126,6 @@
 				dataArrays = data.data;
 
                 dataArrays.forEach((row: any) => {
-                    totalWallets++;
-
 					let nodeVer = '0';
 					if (row.nodes) {
 						for (let j = 0; j < row.nodes.length; j++) {
@@ -136,8 +135,6 @@
 							}
 						}
 					}
-
-					totalBlocks += row.block_count;
 				});
 
 				//calcRewards();
@@ -147,6 +144,8 @@
 				});
 
 				ballasts = data.blacklist;
+				totalWallets = data.num_proposers;
+				totalBlocks = data.num_blocks;
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
 			});
 	};

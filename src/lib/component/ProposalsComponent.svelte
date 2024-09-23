@@ -7,7 +7,7 @@
     import { formatDate, PeriodType } from 'svelte-ux';
     import { format } from 'date-fns';
     import { Spinner } from 'flowbite-svelte';
-
+    import { config } from '../config';
     export let walletId: string;
     let apiData: any;
     $: apiData = null;
@@ -16,7 +16,7 @@
 
     onMount(async () => {
         // get proposal data for walletId
-        const url = `https://api.voirewards.com/proposers/index_main.php?action=proposals&wallet=${walletId}`;
+        const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
         await fetch(url, { cache: 'no-store' })
             .then((response) => response.json())
             .then((data) => {

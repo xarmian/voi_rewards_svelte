@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
-
+  import { config } from '../config';
   const dispatch = createEventDispatcher();
 
   interface Proposer {
@@ -18,7 +18,7 @@
 
   async function fetchRecentProposers() {
     try {
-      const response = await fetch('https://api.voirewards.com/proposers/index_main.php?action=recent');
+      const response = await fetch(`${config.proposalApiBaseUrl}?action=recent`);
       const data = await response.json();
       
       const newProposers = data.slice(0, 10).map((p: any) => ({

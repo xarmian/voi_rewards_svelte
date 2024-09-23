@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { Badge, Card, Spinner } from 'flowbite-svelte';
     import { algodClient } from '$lib/utils/algod';
-
+    import { config } from '../config';
     export let walletId: string;
     let accountInfo: any;
     let supply: any;
@@ -33,7 +33,7 @@
         supply = await algodClient.supply().do();
 
         // get node information
-        const url = `https://api.voirewards.com/proposers/index_main.php?action=walletDetails&wallet=${walletId}`;
+        const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${walletId}`;
         await fetch(url, { cache: 'no-store' })
             .then((response) => response.json())
             .then((data) => {
