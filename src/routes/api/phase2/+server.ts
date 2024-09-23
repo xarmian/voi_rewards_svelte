@@ -53,7 +53,12 @@ export async function GET({ url }) {
             .eq('address', wallet)
             .single();
 
-        if (questError) throw questError;
+        if (questError) {
+            return json({ error: 'Address not found' }, { 
+                status: 404,
+                headers: corsHeaders
+            });
+        }
 
         /*const { data: questList, error: questListError } = await supabasePublicClient
             .from('vr_quests')
