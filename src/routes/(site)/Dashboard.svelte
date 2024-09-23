@@ -84,7 +84,8 @@
 			selectedDate.substring(13, 15) +
 			'-' +
 			selectedDate.substring(15, 17);
-		const url = `https://api.voirewards.com/proposers/index_main.php?start=${startDate}&end=${endDate}`;
+		// const url = `https://api.voirewards.com/proposers/index_main.php?start=${startDate}&end=${endDate}`;
+		const url = `https://api.voirewards.com/proposers/index_main.php?start=2024-09-16&end=2024-10-28`;
 
 		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
 		const endOfEpoch = new Date(
