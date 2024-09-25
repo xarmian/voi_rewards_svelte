@@ -9,7 +9,7 @@
 
 	let showNotice = false;
 	onMount(() => {
-		if (!data.session?.user) showNotice = true;
+		//if (!data.session?.user) showNotice = true;
 	});
 
 	const options = {
