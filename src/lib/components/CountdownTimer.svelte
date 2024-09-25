@@ -48,7 +48,7 @@
     <div class="absolute right-0 top-1/2 transform -translate-y-1/2 text-6xl animate-bounce">🚨</div>
     <h2 class="text-xl font-bold mb-4 text-red-600 dark:text-red-400">{title}</h2>
     {#if isPastTargetDate}
-        <img src={countdownImage} alt="Countdown Timer" class="w-1/2 mx-auto" />
+        <img src={countdownImage} alt="Countdown Timer" class="p-4 sm:1/2 md:w-1/4 mx-auto" />
     {:else}
     <div class="grid grid-cols-4 gap-4">
         <div>
