@@ -1,11 +1,19 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-
+    import countdownImage from '$lib/assets/outatime.png';
     export let targetDate: string;
     export let title: string;
     export let subtitle: string;
     export let link: string;
     export let divClass: string = '';
+    
+    let isPastTargetDate: boolean = false;
+
+    $: {
+        const now = new Date().getTime();
+        const target = new Date(targetDate).getTime();
+        isPastTargetDate = now > target;
+    }
 
     let countdown = { days: 0, hours: 0, minutes: 0, seconds: 0 };
     let countdownInterval: NodeJS.Timeout;
@@ -39,6 +47,9 @@
     <div class="absolute left-0 top-1/2 transform -translate-y-1/2 text-6xl animate-bounce">🚨</div>
     <div class="absolute right-0 top-1/2 transform -translate-y-1/2 text-6xl animate-bounce">🚨</div>
     <h2 class="text-xl font-bold mb-4 text-red-600 dark:text-red-400">{title}</h2>
+    {#if isPastTargetDate}
+        <img src={countdownImage} alt="Countdown Timer" class="w-1/2 mx-auto" />
+    {:else}
     <div class="grid grid-cols-4 gap-4">
         <div>
             <span class="text-3xl font-bold text-orange-500 dark:text-orange-300">{countdown.days}</span>
@@ -56,11 +67,12 @@
             <span class="text-3xl font-bold text-orange-500 dark:text-orange-300">{countdown.seconds}</span>
             <p class="text-sm">Seconds</p>
         </div>
-    </div>
+        </div>
     <div class="text-sm mt-2">
         <div class="text-yellow-600 dark:text-yellow-400">{subtitle}</div>
         <a href={link} target="_blank" class="text-blue-500 hover:text-blue-600 text-lg">{link}</a>
     </div>
+    {/if}
 </div>
 
 <style>
