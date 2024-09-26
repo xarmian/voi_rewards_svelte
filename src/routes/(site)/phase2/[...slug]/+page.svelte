@@ -11,7 +11,6 @@
     //@ts-ignore
     import RangeSlider from "svelte-range-slider-pips";
     import { Card } from "flowbite-svelte";
-    import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 
     let dataUpdating = false;
 
@@ -65,15 +64,6 @@
         </div>
     </div>
     
-    <!-- Countdown Timer -->
-    <CountdownTimer 
-        divClass="bg-white dark:bg-gray-700 rounded-lg shadow-lg mb-8 p-6 text-center relative animate-background mx-auto px-16"
-        targetDate="2024-09-25T00:00:00Z"
-        title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
-        subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
-        link="https://staking.voi.network"
-        />
-
     <div class="hidden flex space-x-4 place-self-center mb-8">
         <a href="https://voiager.org/get-started" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-500 text-white font-medium rounded-md shadow hover:bg-blue-700 transition duration-150 ease-in-out">
             <i class="fas fa-faucet mr-2"></i> $VOI Faucet
@@ -271,7 +261,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#if false}
+                            {#if true}
                             {#each data.props.projects as project}
                                 {#if data.props.questList.filter(quest => quest.project === project.id).length > 0}
                                     <tr>

@@ -11,7 +11,6 @@
 	import RecentProposers from '$lib/components/RecentProposers.svelte';
 	import { writable } from 'svelte/store';
 	import { config } from '$lib/config';
-	import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
@@ -168,14 +167,6 @@
 			<a href="/phase2" class="inline-block bg-white text-purple-600 font-semibold px-4 py-2 rounded-full hover:bg-purple-100 transition duration-300">Visit our Phase 2 Page Here!</a>
 		</div>
 
-		<!-- Countdown Timer -->
-		<CountdownTimer 
-			targetDate="2024-09-25T00:00:00Z"
-			title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
-			subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
-			link="https://staking.voi.network"
-		/>
-
 		<!-- Dashboard Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 			<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} />
@@ -200,6 +191,19 @@
 			</a>
 		</div>
 
+
+		<!-- Notice -->
+		<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 w-full justify-between" role="alert">
+			<div class="flex flex-row">
+				<div class="flex flex-col">
+					<p class="font-bold">Notice!</p>
+					<p>
+						Don't be alarmed if you are not currently producing blocks.
+					</p>
+				</div>
+			</div>
+		</div>
+		 
 		<!-- Rewards Table -->
 		{#if dataArrays.length > 0}
 			<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />

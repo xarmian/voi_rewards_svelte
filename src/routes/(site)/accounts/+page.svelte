@@ -8,7 +8,6 @@
 	import { onMount } from 'svelte';
     import { RadioButton, ButtonGroup } from 'flowbite-svelte';
     import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
-    import CountdownTimer from '$lib/components/CountdownTimer.svelte';
 
     interface DiscordAccount {
       id: string;
@@ -187,14 +186,6 @@
             Use of this site requires connecting a Discord account and one or more Voi wallets. The Discord account is used to verify your identity and Voi wallets are used to calculate and receive rewards.
             View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
         </div>
-
-        <CountdownTimer 
-            divClass="bg-white dark:bg-gray-700 rounded-lg shadow-lg mb-8 p-6 text-center relative animate-background mx-auto px-16"
-            targetDate="2024-09-25T00:00:00Z"
-            title="Testnet Phase 1 and 2 Airdrop contract configuration deadline"
-            subtitle="After this date, the contract configuration will be frozen and no further changes can be made."
-            link="https://staking.voi.network"
-        />
 
         <a href="https://discord.com/channels/1055863853633785857/1278379464019152998"
             target="_blank"
