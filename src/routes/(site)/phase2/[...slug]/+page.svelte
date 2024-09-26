@@ -261,7 +261,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#if true}
+                            {#if false}
                             {#each data.props.projects as project}
                                 {#if data.props.questList.filter(quest => quest.project === project.id).length > 0}
                                     <tr>
