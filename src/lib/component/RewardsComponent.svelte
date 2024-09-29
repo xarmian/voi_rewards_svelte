@@ -72,10 +72,10 @@
                 <tbody>
                     {#each transactions as tx}
                         <tr class='dark:border-gray-500'>
-                            <td class='dark:border-gray-500'><a href={'https://voi.observer/explorer/block/'+tx['confirmed-round']+'/transactions'} target='_blank'>{tx['confirmed-round']}</a></td>
+                            <td class='dark:border-gray-500'><a href={'https://explorer.voi.network/explorer/block/'+tx['confirmed-round']+'/transactions'} target='_blank'>{tx['confirmed-round']}</a></td>
                             <td class='dark:border-gray-500'>{new Date(tx['round-time']*1000).toLocaleString()}</td>
                             <td class='dark:border-gray-500'>{(tx['payment-transaction']['amount']/1000000).toLocaleString()} VOI</td>
-                            <td class='dark:border-gray-500'><a href={'https://voi.observer/explorer/transaction/'+tx['id']} target='_blank'>{tx['id']}</a></td>
+                            <td class='dark:border-gray-500'><a href={'https://explorer.voi.network/explorer/transaction/'+tx['id']} target='_blank'>{tx['id']}</a></td>
                         </tr>
                     {/each}
                     {#if false && nextToken.length > 0}
@@ -90,11 +90,11 @@
         {:else}
             {#each transactions as tx}
                 <Card class='bg-gray-100 dark:bg-gray-700 mb-3'>
-                    <h1>Block: <a href={'https://voi.observer/explorer/block/'+tx['confirmed-round']+'/transactions'} target='_blank'>{tx['confirmed-round']}</a></h1>
+                    <h1>Block: <a href={'https://explorer.voi.network/explorer/block/'+tx['confirmed-round']+'/transactions'} target='_blank'>{tx['confirmed-round']}</a></h1>
                     <div class="p-2">
                         <div>Date: {new Date(tx['round-time']*1000).toLocaleString()}</div>
                         <div>Amount: {(tx['payment-transaction']['amount']/1000000).toLocaleString()} VOI</div>
-                        <div>Tx: <a href={'https://voi.observer/explorer/transaction/'+tx['id']} target='_blank'>{tx['id'].slice(0,6)+'...'+tx['id'].slice(-6)}</a></div>
+                        <div>Tx: <a href={'https://explorer.voi.network/explorer/transaction/'+tx['id']} target='_blank'>{tx['id'].slice(0,6)+'...'+tx['id'].slice(-6)}</a></div>
                     </div>
                 </Card>
             {/each}

@@ -85,8 +85,8 @@
                         <tr class="text-gray-700 dark:text-gray-100">
                             <td class="px-4 py-3">{new Date(transfer.timestamp * 1000).toLocaleString()}</td>
                             {#if !isMobile}
-                                <td class="px-4 py-3"><A href="https://voi.observer/explorer/transaction/{transfer.transactionId}" target="_blank">{transfer.transactionId.substring(0,15)}...</A></td>
-                                <td class="px-4 py-3"><A href="https://voi.observer/explorer/block/{transfer.round.toString()}" target="_blank">{transfer.round}</A></td>
+                                <td class="px-4 py-3"><A href="https://explorer.voi.network/explorer/transaction/{transfer.transactionId}" target="_blank">{transfer.transactionId.substring(0,15)}...</A></td>
+                                <td class="px-4 py-3"><A href="https://explorer.voi.network/explorer/block/{transfer.round.toString()}" target="_blank">{transfer.round}</A></td>
                             {/if}
                             <td class="px-4 py-3 flex">
                                 {#if transfer.from == zeroAddress}

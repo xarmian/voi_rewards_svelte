@@ -88,11 +88,11 @@
     <BreadcrumbItem href="/arc72/portfolio/{walletId}" class="hover:text-blue-800">
         <svelte:fragment slot="icon">
             <ChevronDoubleRightOutline class="w-4 h-4 me-2 inline" />
-          </svelte:fragment>Portfolio (<A href="https://voi.observer/explorer/account/{walletId}" target="_blank">{walletNFD??formattedWallet}</A>)
+          </svelte:fragment>Portfolio (<A href="https://explorer.voi.network/explorer/account/{walletId}" target="_blank">{walletNFD??formattedWallet}</A>)
     </BreadcrumbItem>
 </Breadcrumb>
 <div class="text-center">
-    <!--<div><A href="https://voi.observer/explorer/account/{walletId}" target="_blank">{walletNFD??walletId}</A></div>-->
+    <!--<div><A href="https://explorer.voi.network/explorer/account/{walletId}" target="_blank">{walletNFD??walletId}</A></div>-->
     <Tabs style="underline" defaultClass="flex rounded-lg divide-x rtl:divide-x-reverse divide-gray-200 shadow dark:divide-gray-700 justify-center">
         <TabItem open>
             <div slot="title">

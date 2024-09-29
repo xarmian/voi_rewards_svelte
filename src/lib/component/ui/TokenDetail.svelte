@@ -117,7 +117,7 @@
             {#if token.approved && token.approved != 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ'}
                 <div>Approved Spender: <A href="/arc72/portfolio/{token.approved}">{formattedApproved}</A></div>
             {/if}
-            <div>Mint Round: <A href="https://voi.observer/explorer/block/{token.mintRound}/transactions" target="_blank">{token.mintRound}</A></div>
+            <div>Mint Round: <A href="https://explorer.voi.network/explorer/block/{token.mintRound}/transactions" target="_blank">{token.mintRound}</A></div>
             {#if royaltyPercentage > 0}
                 <div>Royalties: {royaltyPercentage / 100}%</div>
             {/if}

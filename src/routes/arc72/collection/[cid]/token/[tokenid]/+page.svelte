@@ -42,7 +42,7 @@
     }
 
     const goToContract = () => {
-        if (token) window.open(`https://voi.observer/explorer/application/${token.contractId}/transactions`, '_blank');
+        if (token) window.open(`https://explorer.voi.network/explorer/application/${token.contractId}/transactions`, '_blank');
     }
 
     const goToProjectPage = () => {
