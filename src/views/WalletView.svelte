@@ -14,6 +14,7 @@
     import { toast } from '@zerodevx/svelte-toast';
     import { page } from '$app/stores';
     import { Badge } from 'flowbite-svelte';
+    import { pan } from 'svelte-gestures';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
@@ -50,6 +51,37 @@
         //{name: 'Weekly Health', component: PointsComponent},
         //{name: 'Quests', component: QuestComponent},
     ];
+
+    let currentIndex = 0;
+    let containerWidth: number;
+
+    function handlePan(event: CustomEvent<{dx: number}>) {
+        const { dx } = event.detail;
+        if (Math.abs(dx) > containerWidth / 4) {
+            if (dx > 0 && currentIndex > 0) {
+                currentIndex--;
+            } else if (dx < 0 && currentIndex < tabs.length - 1) {
+                currentIndex++;
+            }
+            selectedTab = tabs[currentIndex].name;
+        }
+    }
+
+    function handleScroll(event: WheelEvent) {
+        if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+            event.preventDefault();
+            if (event.deltaX > 0 && currentIndex < tabs.length - 1) {
+                currentIndex++;
+            } else if (event.deltaX < 0 && currentIndex > 0) {
+                currentIndex--;
+            }
+            selectedTab = tabs[currentIndex].name;
+        }
+    }
+
+    $: {
+        currentIndex = tabs.findIndex(tab => tab.name === selectedTab);
+    }
 
     $: selectedTab = (urlParams.has('tab')) ? urlParams.get('tab') : 'Node';
     $: selectedTabComponent = tabs.find((tab: { name: string; }) => tab.name === selectedTab);
@@ -113,9 +145,9 @@
 </div>
 
 <div class="max-w-4xl mx-auto mt-8">
-    <div class="flex border-b justify-center mb-6">
-        {#each tabs as tab}
-            <button class="py-2 px-4 border-b-2 font-medium text-sm focus:outline-none transition-colors duration-200
+    <div class="flex border-b justify-center mb-6 overflow-x-auto no-scrollbar">
+        {#each tabs as tab, index}
+            <button class="py-2 px-4 border-b-2 font-medium text-sm focus:outline-none transition-colors duration-200 whitespace-nowrap
                 {(selectedTab === tab.name) ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-gray-300'}"
                 on:click|stopPropagation={() => selectedTab = tab.name}>
                 {tab.name}
@@ -123,7 +155,32 @@
         {/each}
     </div>
 
-    <div class="">
-        <svelte:component this={selectedTabComponent.component} walletId={walletId} />
+    <div class="overflow-hidden" bind:clientWidth={containerWidth}>
+        <div 
+            use:pan={{ delay: 0, threshold: 5, preventDefault: true }}
+            on:panmove={handlePan}
+            on:wheel={handleScroll}
+            class="flex transition-transform duration-300 ease-in-out"
+            style="transform: translateX(-{currentIndex * 100}%);"
+        >
+            {#each tabs as tab}
+                <div class="w-full flex-shrink-0">
+                    <svelte:component this={tab.component} walletId={walletId} />
+                </div>
+            {/each}
+        </div>
     </div>
 </div>
+
+<style>
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+</style>

@@ -5,7 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	export let data;
+	//export let data;
 
 	let showNotice = false;
 	onMount(() => {

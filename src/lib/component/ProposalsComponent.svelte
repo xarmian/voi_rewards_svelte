@@ -1,43 +1,53 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
     import { Chart, Svg, Axis, Bars } from 'layerchart';
-    import { Highlight, RectClipPath, Tooltip, TooltipItem } from 'layerchart';
-    // @ts-ignore
+    import { Highlight, Tooltip } from 'layerchart';
     import { scaleBand } from 'd3-scale';
-    import { formatDate, PeriodType } from 'svelte-ux';
-    import { format } from 'date-fns';
+    import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
+    
     export let walletId: string;
     let apiData: any;
     $: apiData = null;
     let data: any;
     $: data = [];
 
-    onMount(async () => {
-        // get proposal data for walletId
-        const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
-        await fetch(url, { cache: 'no-store' })
-            .then((response) => response.json())
-            .then((data) => {
-                apiData = data;
-            })
-            .catch((error) => {
-                console.error(error);
-            });
-    });
+    let screenSize: number;
+    let idx = 0;
 
     $: {
         if (apiData) {
             // convert apiData to chart format
-            data = Object.keys(apiData).map((date) => {
-                return {
-                    date: new Date(date+'T00:00:00'),
-                    value: apiData[date].length,
-                };
-            });
+            data = Object.keys(apiData).map((date) => ({
+                date: new Date(date+'T00:00:00'),
+                value: apiData[date].length,
+            }));
+
+            // sort data by date
+            data.sort((a: {date: Date}, b: {date: Date}) => a.date.getTime() - b.date.getTime());
         }
     }
+
+    const xAxisFormat = (d: Date) => {
+            idx++;
+            if (screenSize < 768 && (idx-1) % 5 !== 0) {
+                return '';
+            }
+            return format(d, PeriodType.Day, { variant: "short" });
+    };
+
+    onMount(async () => {
+        // get proposal data for walletId
+        const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
+        try {
+            const response = await fetch(url, { cache: 'no-store' });
+            apiData = await response.json();
+        } catch (error) {
+            console.error(error);
+        }
+    });
+
 </script>
 
 <div class="p-6 bg-white dark:bg-gray-900 rounded-lg shadow-md">
@@ -46,62 +56,67 @@
         <div class="flex justify-center items-center h-64">
             <Spinner size="16" />
         </div>
-    {:else if apiData.length == 0}
+    {:else if Object.keys(apiData).length === 0}
         <div class="text-center text-gray-500 dark:text-gray-400 py-8">
             No proposals found in last 30 days
         </div>
     {:else}
-        <div class="h-[300px]">
-            <Chart
-                {data}
-                x="date"
-                xScale={scaleBand().padding(0.4)}
-                y="value"
-                yDomain={[0, null]}
-                yNice
-                padding={{ left: 40, bottom: 40, right: 20, top: 20 }}
-                tooltip={{ mode: "band" }}
-            >
-                <Svg>
-                    <Axis placement="left" grid rule 
-                    labelProps={{
-                        class: "text-sm font-light",
-                    }}
-                    />
-                    <Axis
-                        placement="bottom"
-                        rule
-                        format={(d) => formatDate(d, PeriodType.Day, "short")}
-                        labelProps={{
-                            rotate: 315,
-                            textAnchor: "end",
-                            class: "text-sm font-light",
-                        }}
-                    />
-                    <Bars
-                        radius={4}
-                        strokeWidth={1}
-                        class="fill-blue-500 hover:fill-blue-600 transition-colors"
-                    />
-                    <Highlight area>
-                        <svelte:fragment slot="area" let:area>
-                            <RectClipPath
-                                x={area.x}
-                                y={area.y}
-                                width={area.width}
-                                height={area.height}
-                                spring
-                            >
-                                <Bars radius={4} strokeWidth={1} class="fill-blue-600" />
-                            </RectClipPath>
-                        </svelte:fragment>
-                    </Highlight>
-                </Svg>
-                <Tooltip header={(data) => format(data.date, "EEEE, MMMM do")} let:data>
-                    <TooltipItem label="Proposals" value={data.value} class="text-gray-800 dark:text-gray-200" />
-                </Tooltip>
-            </Chart>
-        </div>
+    <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
+        <Chart
+          {data}
+          x="date"
+          xScale={scaleBand().padding(0.4)}
+          y="value"
+          yDomain={[0, null]}
+          yNice={4}
+          padding={{ left: 40, bottom: 40, right: 20, top: 20 }}
+          tooltip={{ mode: "band" }}
+        >
+          <Svg>
+            <Axis 
+              placement="left" 
+              grid 
+              rule={{ class: "stroke-danger" }}
+              tickLabelProps={{
+                class: "fill-gray-600 dark:fill-gray-300 text-sm",
+              }}
+            />
+            <Axis
+              placement="bottom"
+              format={xAxisFormat}
+              rule={{ class: "stroke-gray-200 dark:stroke-gray-700" }}
+              tickLabelProps={{
+                class: "fill-gray-600 dark:fill-gray-300 text-sm",
+                rotate: 315,
+                textAnchor: "end",
+              }}
+            />
+            <Bars 
+              radius={4} 
+              strokeWidth={1} 
+              class="fill-blue-500 dark:fill-blue-400 hover:fill-blue-600 dark:hover:fill-blue-500 transition-colors" 
+            />
+            <Highlight area={{ class: "fill-blue-200 dark:fill-blue-400 opacity-30" }} />
+          </Svg>
+          <Tooltip.Root let:data>
+            <div class="bg-white dark:bg-gray-800 p-2 rounded shadow">
+              <Tooltip.Header class="font-bold text-gray-800 dark:text-gray-200">
+                {format(data.date, PeriodType.Custom, {
+                  custom: "eee, MMMM do",
+                })}
+              </Tooltip.Header>
+              <Tooltip.List>
+                <Tooltip.Item 
+                  label="Proposals" 
+                  value={data.value} 
+                  labelClass="text-gray-600 dark:text-gray-300"
+                  valueClass="text-gray-800 dark:text-gray-100 font-semibold"
+                />
+              </Tooltip.List>
+            </div>
+          </Tooltip.Root>
+        </Chart>
+      </div>
     {/if}
 </div>
 <style>

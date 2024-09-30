@@ -130,7 +130,7 @@
                             <span class="text-gray-800 dark:text-gray-200">{formatTime((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)}</span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                            <span class="font-medium text-gray-600 dark:text-gray-400">Expiry Date:</span>
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Expiry Date (approx):</span>
                             <span class="text-gray-800 dark:text-gray-200">{dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)}</span>
                         </p>
                         <p class="flex justify-between items-center py-2">
