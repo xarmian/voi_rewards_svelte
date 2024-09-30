@@ -169,10 +169,10 @@
 
 		<!-- Dashboard Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-			<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} />
-			<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} />
-			<DashboardCard title="Community Produced Blocks" value={totalBlocks > 0 ? totalBlocks.toLocaleString() : null} />
-			<DashboardCard title="Online Stake" value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} />
+			<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />
+			<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />
+			<DashboardCard title="Community Produced Blocks" value={totalBlocks > 0 ? totalBlocks.toLocaleString() : null} info="The number of blocks produced by the community." />
+			<DashboardCard title="Online Stake" value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} info="The total amount of VOI that is currently online and participating in the network." />
 			
 		</div>
 		
@@ -192,18 +192,6 @@
 		</div>
 
 
-		<!-- Notice -->
-		<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 w-full justify-between" role="alert">
-			<div class="flex flex-row">
-				<div class="flex flex-col">
-					<p class="font-bold">Notice!</p>
-					<p>
-						Don't be alarmed if you are not currently producing blocks.
-					</p>
-				</div>
-			</div>
-		</div>
-		 
 		<!-- Rewards Table -->
 		{#if dataArrays.length > 0}
 			<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />

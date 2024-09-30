@@ -2,7 +2,7 @@
     import { Popover } from "flowbite-svelte";
 
     export let noAbsolute = false;
-    export let buttonColor = "text-blue-200";
+    export let buttonColor = "dark:text-blue-200 text-blue-600";
 
     let id = `info-${Math.random().toString(36).substring(2, 11)}`;
 </script>

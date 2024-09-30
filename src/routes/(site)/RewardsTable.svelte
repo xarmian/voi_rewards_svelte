@@ -306,8 +306,8 @@
     </button>
   </div>
 </div>
-<Modal bind:open={viewWallet} autoclose size='lg' outsideclose>
-<WalletView walletId={viewWalletId}></WalletView>
+<Modal bind:open={viewWallet} autoclose size='lg' outsideclose class="bg-gray-100 dark:bg-black rounded-xl shadow-lg transition-all duration-300 w-full max-w-4xl mx-auto border-2 border-gray-300">
+  <WalletView walletId={viewWalletId}></WalletView>
 </Modal>
 <style>
 a {

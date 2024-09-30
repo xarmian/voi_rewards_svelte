@@ -56,27 +56,27 @@
 
 </script>
 
-<div class='max-w-3xl mx-auto mt-8'>
+<div class='max-w-4xl mx-auto'>
     {#if !accountInfo}
         <div class="flex justify-center items-center h-64">
             <Spinner size="16" />
         </div>
     {:else}
-    <Card size="xl" padding="xl" class="bg-white dark:bg-gray-800 shadow-lg rounded-lg">
-        <h3 class="text-2xl font-bold mb-4 flex items-center justify-between">
+    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl p-6">
+        <h3 class="text-2xl font-bold mb-4 flex items-center justify-between text-gray-800 dark:text-gray-200">
             <span>Account</span>
             <div>
-                <button class="text-gray-500 hover:text-gray-700 mr-2" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
+                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mr-2" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
                     <i class="fas fa-copy"></i>
                 </button>
                 {#if isModal}
-                    <a href="/wallet/{walletId}" class="text-gray-500 hover:text-gray-700" target="_blank" title="Open Wallet View in new page">
+                    <a href="/wallet/{walletId}" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" target="_blank" title="Open Wallet View in new page">
                         <i class="fas fa-external-link-alt"></i>
                     </a>
                 {/if}
             </div>
         </h3>
-        <h1 class="text-xl mb-2 text-center">
+        <h1 class="text-xl mb-4 text-center">
             <a href='https://explorer.voi.network/explorer/account/{walletId}/transactions'
              title="Open wallet in Voi Explorer"
              target='_blank' class="text-blue-500 hover:text-blue-700 hover:underline">
@@ -86,44 +86,44 @@
             </a>
         </h1>
         {#if nfDomain}
-            <p class="text-center mb-4">
+            <p class="text-center mb-6">
                 <a href='https://app.nf.domains/name/{nfDomain}' target='_blank' class="text-blue-500 hover:text-blue-700 hover:underline">
                     {nfDomain}
                 </a>
             </p>
         {/if}
-        <div class="space-y-2">
+        <div class="space-y-3">
             {#if !accountInfo}
-                <p class="text-center">Loading...</p>
+                <p class="text-center text-gray-600 dark:text-gray-400">Loading...</p>
             {:else}
-                <p class="flex justify-between">
-                    <span class="font-semibold">Balance:</span>
-                    <span>{displayBalance(balance)} VOI</span>
+                <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span class="font-medium text-gray-600 dark:text-gray-400">Balance:</span>
+                    <span class="text-gray-800 dark:text-gray-200">{displayBalance(balance)} VOI</span>
                 </p>
-                <p class="flex justify-between items-center">
-                    <span class="font-semibold">Consensus:</span>
+                <p class="flex justify-between items-center py-2">
+                    <span class="font-medium text-gray-600 dark:text-gray-400">Consensus:</span>
                     <Badge color={accountInfo.status === 'Online' ? 'green' : 'gray'}>
                         {accountInfo.status}
                     </Badge>
                 </p>
             {/if}
         </div>
-    </Card>
+    </div>
     {/if}
 </div>
 
-<div class="max-w-3xl mx-auto mt-8">
-    <div class="flex border-b justify-center mb-4">
+<div class="max-w-4xl mx-auto mt-8">
+    <div class="flex border-b justify-center mb-6">
         {#each tabs as tab}
             <button class="py-2 px-4 border-b-2 font-medium text-sm focus:outline-none transition-colors duration-200
-                {(selectedTab === tab.name) ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+                {(selectedTab === tab.name) ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-gray-300'}"
                 on:click|stopPropagation={() => selectedTab = tab.name}>
                 {tab.name}
             </button>
         {/each}
     </div>
 
-    <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+    <div class="">
         <svelte:component this={selectedTabComponent.component} walletId={walletId} />
     </div>
 </div>

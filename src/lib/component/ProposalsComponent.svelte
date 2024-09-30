@@ -40,7 +40,8 @@
     }
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+<div class="p-6 bg-white dark:bg-gray-900 rounded-lg shadow-md">
+    <h3 class="text-xl font-bold mb-6 text-gray-800 dark:text-gray-200">Proposals</h3>
     {#if apiData == null}
         <div class="flex justify-center items-center h-64">
             <Spinner size="16" />
@@ -64,7 +65,7 @@
                 <Svg>
                     <Axis placement="left" grid rule 
                     labelProps={{
-                        class: "fill-gray-700 dark:fill-black text-white",
+                        class: "text-sm font-light",
                     }}
                     />
                     <Axis
@@ -74,7 +75,7 @@
                         labelProps={{
                             rotate: 315,
                             textAnchor: "end",
-                            class: "fill-gray-700 dark:fill-black text-white",
+                            class: "text-sm font-light",
                         }}
                     />
                     <Bars
@@ -97,7 +98,7 @@
                     </Highlight>
                 </Svg>
                 <Tooltip header={(data) => format(data.date, "EEEE, MMMM do")} let:data>
-                    <TooltipItem label="Proposals" value={data.value} />
+                    <TooltipItem label="Proposals" value={data.value} class="text-gray-800 dark:text-gray-200" />
                 </Tooltip>
             </Chart>
         </div>
