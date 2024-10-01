@@ -41,7 +41,7 @@ body {
   @apply border-l-4 border-gray-200 dark:border-gray-700 pl-4 italic;
 }
 .markdown ul, .markdown ol {
-  @apply list-disc list-inside;
+  @apply list-disc list-inside mb-4 mt-4;
 }
 .markdown img {
   @apply max-w-full h-auto;
