@@ -1,8 +1,7 @@
-import { faqData } from '$lib/data/faq';
+import faqData from '$lib/data/faq.json';
 
 export const load = async ({ url }) => {
-    console.log(url);
-    const hash = url.href.split('#')[1]; //url.hash.slice(1);
+    const hash = url.href.split('#')[1];
     let highlightedFAQ = null;
     let pageMetaTags = {
         title: 'Frequently Asked Questions | Voi Network',
@@ -11,7 +10,7 @@ export const load = async ({ url }) => {
     };
 
     if (hash) {
-        highlightedFAQ = faqData.find(item => slugify(item.question) === hash);
+        highlightedFAQ = faqData.faqs.find(item => slugify(item.question) === hash);
         if (highlightedFAQ) {
             pageMetaTags = {
                 title: `FAQ: ${highlightedFAQ.question} | Voi Network`,
@@ -22,7 +21,7 @@ export const load = async ({ url }) => {
     }
 
     return {
-        faqData,
+        faqData: faqData.faqs,
         highlightedFAQ,
         pageMetaTags,
     };

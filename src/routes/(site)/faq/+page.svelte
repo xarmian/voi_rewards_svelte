@@ -1,8 +1,8 @@
 <script lang="ts">
   import Markdown from 'svelte-markdown';
   import ExternalLink from '$lib/components/ExternalLink.svelte';
-  import { Accordion, AccordionItem, Toast } from 'flowbite-svelte';
-  import { LinkOutline, ClipboardOutline } from 'flowbite-svelte-icons';
+  import { Accordion, AccordionItem, Toast, Input } from 'flowbite-svelte';
+  import { LinkOutline, ClipboardOutline, SearchOutline } from 'flowbite-svelte-icons';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
 
@@ -13,11 +13,40 @@
   let expandAll = false;
   let highlightedFAQ = initialHighlightedFAQ;
   let showToast = false;
+  let searchQuery = '';
 
   $: categories = ['All', ...new Set(faqData.map(item => item.category))];
-  $: filteredFAQ = selectedCategory === 'All' 
-    ? faqData 
-    : faqData.filter(item => item.category === selectedCategory);
+  $: groupedFAQ = groupFAQByCategory(faqData);
+  $: filteredGroupedFAQ = filterGroupedFAQ(groupedFAQ, selectedCategory, searchQuery);
+
+  function groupFAQByCategory(faqItems: any[]) {
+    return faqItems.reduce((acc: any, item: any) => {
+      if (!acc[item.category]) {
+        acc[item.category] = [];
+      }
+      acc[item.category].push(item);
+      return acc;
+    }, {});
+  }
+
+  function filterGroupedFAQ(groupedFAQ: any, category: string, query: string) {
+    const lowercaseQuery = query.toLowerCase();
+    const filteredGroups: any = {};
+
+    Object.entries(groupedFAQ).forEach(([groupCategory, items]) => {
+      if (category === 'All' || category === groupCategory) {
+        const filteredItems = items.filter((item: any) =>
+          item.question.toLowerCase().includes(lowercaseQuery) ||
+          item.answer.toLowerCase().includes(lowercaseQuery)
+        );
+        if (filteredItems.length > 0) {
+          filteredGroups[groupCategory] = filteredItems;
+        }
+      }
+    });
+
+    return filteredGroups;
+  }
 
   function toggleAll() {
     expandAll = !expandAll;
@@ -66,19 +95,30 @@
     </header>
 
     <section class="mb-8 bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
-      <header class="bg-purple-600 dark:bg-purple-800 py-4 px-6 flex justify-between items-center">
+      <header class="bg-purple-600 dark:bg-purple-800 py-4 px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h2 class="text-2xl font-bold text-white">FAQ Categories</h2>
-        <div class="flex items-center">
-          <label for="category" class="text-white mr-2">Filter:</label>
-          <select 
-            id="category" 
-            bind:value={selectedCategory}
-            class="p-2 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
-          >
-            {#each categories as category}
-              <option value={category}>{category}</option>
-            {/each}
-          </select>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center">
+            <label for="category" class="text-white mr-2">Filter:</label>
+            <select 
+              id="category" 
+              bind:value={selectedCategory}
+              class="p-2 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+            >
+              {#each categories as category}
+                <option value={category}>{category}</option>
+              {/each}
+            </select>
+          </div>
+          <div class="relative">
+            <Input
+              type="search"
+              placeholder="Search FAQs"
+              bind:value={searchQuery}
+              class="pl-10"
+            />
+            <SearchOutline class="w-5 h-5 text-gray-500 dark:text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
         </div>
       </header>
       
@@ -123,40 +163,51 @@
           </Accordion>
         {/if}
 
-        <Accordion class="divide-y divide-gray-200 dark:divide-gray-700">
-          {#each filteredFAQ as item}
-            <AccordionItem open={expandAll} id={slugify(item.question)}>
-              <svelte:fragment slot="header">
-                <div class="flex items-center justify-between w-full">
-                  <div class="flex items-center">
-                    <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
-                    <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                      <a href={`#${slugify(item.question)}`} class="hover:underline">
-                        {#each item.question.split('**') as part, index}
-                          {#if index % 2 === 0}
-                            {part}
-                          {:else}
-                            <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
-                          {/if}
-                        {/each}
-                      </a>
-                    </span>
+        {#each Object.entries(filteredGroupedFAQ) as [category, items]}
+          <div class="mb-8">
+            <h3 class="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-4">{category}</h3>
+            <Accordion class="divide-y divide-gray-200 dark:divide-gray-700">
+              {#each items as item}
+                <AccordionItem open={expandAll} id={slugify(item.question)}>
+                  <svelte:fragment slot="header">
+                    <div class="flex items-center justify-between w-full">
+                      <div class="flex items-center">
+                        <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
+                        <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                          <a href={`#${slugify(item.question)}`} class="hover:underline">
+                            {#each item.question.split('**') as part, index}
+                              {#if index % 2 === 0}
+                                {part}
+                              {:else}
+                                <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
+                              {/if}
+                            {/each}
+                          </a>
+                        </span>
+                      </div>
+                      <button
+                        on:click|stopPropagation={() => copyLinkToClipboard(item.question)}
+                        class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
+                        title="Copy link to clipboard"
+                      >
+                        <ClipboardOutline class="w-5 h-5" />
+                      </button>
+                    </div>
+                  </svelte:fragment>
+                  <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
+                    <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
                   </div>
-                  <button
-                    on:click|stopPropagation={() => copyLinkToClipboard(item.question)}
-                    class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
-                    title="Copy link to clipboard"
-                  >
-                    <ClipboardOutline class="w-5 h-5" />
-                  </button>
-                </div>
-              </svelte:fragment>
-              <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
-                <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
-              </div>
-            </AccordionItem>
-          {/each}
-        </Accordion>
+                </AccordionItem>
+              {/each}
+            </Accordion>
+          </div>
+        {/each}
+
+        {#if Object.keys(filteredGroupedFAQ).length === 0}
+          <p class="text-center text-gray-600 dark:text-gray-400 mt-4">
+            No FAQs found matching your search criteria.
+          </p>
+        {/if}
       </div>
     </section>
   </div>

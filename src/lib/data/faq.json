@@ -1,0 +1,54 @@
+{
+  "faqs": [
+    {
+      "question": "What is Voi?",
+      "answer": "Voi is a Layer-1 blockchain network and Smart Contract platform designed to provide fast, secure, and scalable transactions. It aims to solve common blockchain issues such as high fees and slow transaction times, by offering:\n\n- An average block time of approximately 2.8 seconds\n- The resiliency of the AVM (Algorand Virtual Machine)",
+      "category": "General"
+    },
+    {
+      "question": "What is the **Voi Staking Program**?",
+      "answer": "The Voi Staking Program is a key initiative designed to incentivize early participation and long-term commitment to the Voi network. It offers two main ways to earn rewards:\n\n1. Locking up tokens: By locking VOI tokens in a special contract, you can earn bonus rewards through an airdrop. The bonus depends on when you stake (earlier weeks offer higher rewards) and how long you lock up (longer periods provide higher bonus rates).\n\n2. Staking for network security: By staking your locked and bonus tokens on a node, you contribute to network security and earn block rewards.\n\nKey features include:\n- Exclusive access through partner exchanges\n- Incentivized early lockup with decreasing weekly bonuses\n- Flexible lockup durations (1-18 months)\n- Weekly cap of 50 million tokens with an overflow mechanism\n- Immediate bonus and block rewards\n\nThe program started on September 30th, following the exchange listings on September 26th. For detailed information and participation instructions, refer to the [Voi Staking Guide](https://medium.com/@voifoundation/staking-program-how-to-guide-382ea5085dab).",
+      "category": "Staking"
+    },
+    {
+        "question": "What is a **Voi Account**?",
+        "answer": "A Voi Account is a unique digital identity on the Voi network. It is associated with a Voi Wallet and a 25-word mnemonic or secret key. The mnemonic is used to access your Voi Account, and the secret key is used to sign transactions. Your Voi Account is necessary to participate in the Voi ecosystem, including staking, locking, and voting.",
+        "category": "Accounts"
+    },
+    {
+        "question": "What is a **Voi Wallet**?",
+        "answer": "A Voi Wallet is a digital wallet that allows you to access your Voi Account. It is necessary to have a Voi Wallet to participate in the Voi ecosystem, including staking, locking, and voting. Voi Wallets allow you to access dApps using your Voi Network account(s). Voi Wallets can be used to generate new accounts, or you may import existing ones.\n\nThere are multiple wallet options available, including:\n\n- [Kibisis](https://kibis.is/) (browser extension)\n- [Lute](https://lute.io/) (webapp and extension, with Ledger support)\n- [Biatec Wallet](https://wallet.biatec.io/) (webapp)\n\n",
+        "category": "Wallets"
+    },
+    {
+      "question": "How do I create a Voi Account?",
+      "answer": "To create your first Voi Account, you will first need to choose a Voi Wallet. There are multiple wallet options available, including:\n\n- [Kibisis](https://kibis.is/) (browser extension)\n- [Lute](https://lute.io/) (webapp and extension, with Ledger support)\n- [Biatec Wallet](https://wallet.biatec.io/) (webapp)\n\nFor more information, visit the [official Voi documentation on wallets](https://docs.voi.network/ecosystem/wallets/). Each wallet will allow you to create one or more Voi Accounts, and each account will have a unique 25-word mnemonic, or secret key. Store this secret key in a secure location, and do not share it with anyone. You will need this secret key to access your Voi Account.",
+      "category": "Wallets"
+    },
+    {
+      "question": "If I have a Kibisis Wallet, can I move my account to Lute or Biatec Wallet?",
+      "answer": "Yes, you can move your Kibisis account to Lute or Biatec Wallet. To do this, you will need to export your 25-word mnemonic from Kibisis, and then import it into Lute or Biatec Wallet.",
+      "category": "Wallets"
+    },
+    {
+      "question": "I have an **Algorand** account. Can I use it to access the Voi Network?",
+      "answer": "The mnemonic for your Algorand account can be used on the Voi Network to generate the same Voi Account Address. It is important to note that the re-key state of your Algorand account will not be preserved on the Voi Network, and you will not be able to access your Algorand account from your Voi Account. Your Voi Account will be a separate entity from your Algorand account, sharing only the same Voi Account Address.",
+      "category": "Accounts"
+    },
+    {
+      "question": "What does it mean to **Stake** my Voi?",
+      "answer": "Staking in Voi refers to the process of delegating your VOI tokens to support the network's operations. By staking, the tokens in your account will contribute toward voting for the inclusion of new blocks. The proposer of each block will be rewarded for each block that is proposed.\n\nFor additional information about running a Node and staking, please refer to the [How to Node](/how_to_node) section of this website.",
+      "category": "Staking"
+    },
+    {
+      "question": "What does it mean to **Lock** my Voi?",
+      "answer": "Locking in Voi refers to the process of locking up your VOI tokens in a Smart Contract until a specified date and vesting period. By Locking tokens, you will earn an up-front bonus on the locked tokens, and the full future value of your tokens may be used to Stake on the network and earn block rewards. For additional information on the Voi Staking Program, please refer to the [Voi Foundation Medium Article](https://medium.com/@voifoundation/vois-staking-program-140mm-voi-4cbfd3a27f63) on the Voi Staking Program.",
+      "category": "Staking"
+    },
+    {
+        "question": "What is a **Bridge**?",
+        "answer": "A Bridge is a tool that allows you to transfer assets between different blockchain networks. The **Aramid Bridge** is a bridge that connects the Voi Network to the following networks:\n\n- Base\n- Arbitrum\n- Algorand.\n\nFor more information and a guide to using the Aramid Bridge, please refer to the [Aramid Bridge Documentation](/bridges).",
+        "category": "Bridges"
+    }
+  ]
+}
