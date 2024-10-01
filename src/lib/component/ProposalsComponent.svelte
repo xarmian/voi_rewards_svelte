@@ -6,7 +6,7 @@
     import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
-    
+
     export let walletId: string;
     let apiData: any;
     $: apiData = null;

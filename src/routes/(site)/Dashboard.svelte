@@ -191,6 +191,14 @@
 			</a>
 		</div>
 
+		<!-- Notice that vote count has been added to the table -->
+		<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8" role="alert">
+			<p class="font-bold">Notice:</p>
+			<p>
+				The vote count has been added to the table. This is the total number of votes cast by each wallet.
+				This metric is to assist in determining that an account is active on the network.
+			</p>
+		</div>
 
 		<!-- Rewards Table -->
 		{#if dataArrays.length > 0}

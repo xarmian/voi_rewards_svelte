@@ -1,6 +1,7 @@
 <script lang="ts">
     import NodeComponent from '../lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
+    import LockVestComponent from '$lib/component/LockVestComponent.svelte';
     import RewardsComponent from '$lib/component/RewardsComponent.svelte';
     import PointsComponent from '$lib/component/PointsComponent.svelte';
     import QuestComponent from '$lib/component/QuestComponent.svelte';
@@ -47,6 +48,7 @@
     const tabs: any = [
         {name: 'Node', component: NodeComponent},
         {name: 'Proposals', component: ProposalsComponent},
+        {name: 'Lock+Vest', component: LockVestComponent},
         //{name: 'Rewards', component: RewardsComponent},
         //{name: 'Weekly Health', component: PointsComponent},
         //{name: 'Quests', component: QuestComponent},
@@ -67,25 +69,32 @@
         }
     }
 
+    let isTabChanging = false;
+
     function handleScroll(event: WheelEvent) {
-        if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && !isTabChanging) {
             event.preventDefault();
+            isTabChanging = true;
+
             if (event.deltaX > 0 && currentIndex < tabs.length - 1) {
                 currentIndex++;
             } else if (event.deltaX < 0 && currentIndex > 0) {
                 currentIndex--;
             }
+
             selectedTab = tabs[currentIndex].name;
+
+            setTimeout(() => {
+                isTabChanging = false;
+            }, 1000);
         }
     }
 
     $: {
-        currentIndex = tabs.findIndex(tab => tab.name === selectedTab);
+        currentIndex = tabs.findIndex((tab: { name: string; }) => tab.name === selectedTab);
     }
 
     $: selectedTab = (urlParams.has('tab')) ? urlParams.get('tab') : 'Node';
-    $: selectedTabComponent = tabs.find((tab: { name: string; }) => tab.name === selectedTab);
-
 </script>
 
 <div class='max-w-4xl mx-auto'>

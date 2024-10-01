@@ -21,7 +21,6 @@
     $: if (supply && apiData.first_block && balance > 0) {
         // calculate expected block proposals in current epoch
         const epochBlocks = apiData.last_block - apiData.first_block;
-        console.log(epochBlocks);
         estimatedBlocks = Math.round(balance / supply['online-money'] * epochBlocks);
     }
     
@@ -133,9 +132,23 @@
                             <span class="font-medium text-gray-600 dark:text-gray-400">Expiry Date (approx):</span>
                             <span class="text-gray-800 dark:text-gray-200">{dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)}</span>
                         </p>
-                        <p class="flex justify-between items-center py-2">
+                        <p class="flex justify-between items-center py-2 border-b-2 border-gray-400 dark:border-gray-800">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Expiry Block:</span>
                             <span class="text-gray-800 dark:text-gray-200">{accountInfo['participation']['vote-last-valid'].toLocaleString()}</span>
+                        </p>
+                        <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Hard Votes:</span>
+                            <span class="text-gray-800 dark:text-gray-200">{apiData && apiData.vote_count ? apiData.vote_count : 'Loading...'}</span>
+                        </p>
+                        <p class="flex justify-between items-center py-2">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Last Hard Vote:</span>
+                            <span class="text-gray-800 dark:text-gray-200">
+                                {#if apiData && apiData.last_vote_timestamp}
+                                    {new Date(apiData.last_vote_timestamp).toLocaleString()}
+                                {:else}
+                                    Loading...
+                                {/if}
+                            </span>
                         </p>
                     {/if}
                 </div>

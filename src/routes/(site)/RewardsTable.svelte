@@ -176,6 +176,7 @@
   ];
 
   columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet during this Epoch' });
+  columns.push({ id: 'vote_count', desc: 'Hard Votes', tooltip: 'Total votes cast by each wallet during this Epoch' });
 </script>
 
 <div class="overflow-auto ml-0 mr-0 md:ml-6 md:mr-6 flex flex-col">
@@ -247,10 +248,11 @@
               </a>
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
+            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.vote_count)}</TableBodyCell>
         </TableBodyRow>
         {#if expandedRow === i}
           <TableBodyRow>
-            <TableBodyCell colspan="3" class="p-0" on:click={() => toggleRow(i)}>
+            <TableBodyCell colspan="4" class="p-0" on:click={() => toggleRow(i)}>
               <div class="px-2 py-3 m-4" transition:slide={{ duration: 300, axis: 'y' }}>
                 <div>
                   <!-- address and nfd -->
@@ -285,6 +287,7 @@
           <TableBodyCell class="p-2">
             {items.reduce((sum, item) => sum + item.block_count, 0)}
           </TableBodyCell>
+          <TableBodyCell colspan="1" class="p-2"></TableBodyCell>
       </TableBodyRow>
     </TableBody>
   </Table>
