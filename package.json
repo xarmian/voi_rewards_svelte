@@ -63,6 +63,7 @@
 		"layerchart": "^0.52.1",
 		"svelte-device-info": "^1.0.0",
 		"svelte-gestures": "^5.0.4",
+		"svelte-markdown": "^0.4.1",
 		"svelte-meta-tags": "^3.1.2",
 		"svelte-time": "^0.9.0",
 		"svelte-ux": "^0.74.9"

@@ -15,6 +15,7 @@
   <div class="flex-grow"></div>
   <NavUl ulClass="flex flex-col p-4 mt-4 sm:hidden">
     <NavLi class="text-lg" href="/"><div class:selected={activeLink === '/'} on:click={() => activeLink = '/'} transition:fly={{y: 50, duration: 400}}>Home</div></NavLi>
+    <NavLi class="text-lg" href="/faq"><div class:selected={activeLink === '/faq'} on:click={() => activeLink = '/faq'} transition:fly={{ y: 50, duration: 400 }}>FAQ</div></NavLi>
     <NavLi class="text-lg" href="/what_is_voi"><div class:selected={activeLink === '/what_is_voi'} on:click={() => activeLink = '/what_is_voi'} transition:fly={{ y: 50, duration: 400 }}>What is Voi?</div></NavLi>
     <NavLi class="text-lg" href="/how_to_node"><div class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'} transition:fly={{ y: 50, duration: 400 }}>Run a Node</div></NavLi>
     <NavLi class="text-lg" href="/phase1"><div class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'} transition:fly={{ y: 50, duration: 400 }}>Phase 1</div></NavLi>
@@ -24,6 +25,7 @@
   </NavUl>
   <div class="hidden sm:flex flex-row p-4 mt-0 text-sm font-medium place-items-center space-x-2">
     <a class="text-xl navButton" href="/" class:selected={activeLink === '/'} on:click={() => activeLink = '/'}>Home</a>
+    <a class="text-xl navButton" href="/faq" class:selected={activeLink === '/faq'} on:click={() => activeLink = '/faq'}>FAQ</a>
     <a class="text-xl navButton" href="/what_is_voi" class:selected={activeLink === '/what_is_voi'} on:click={() => activeLink = '/what_is_voi'}>What is Voi?</a>
     <a class="text-xl navButton" href="/how_to_node" class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'}>Run a Node</a>
     <a class="text-xl navButton" href="/phase1" class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'}>Phase 1</a>
