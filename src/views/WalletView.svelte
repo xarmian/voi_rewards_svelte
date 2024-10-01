@@ -1,7 +1,7 @@
 <script lang="ts">
     import NodeComponent from '../lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
-    import LockVestComponent from '$lib/component/LockVestComponent.svelte';
+    //import LockVestComponent from '$lib/component/LockVestComponent.svelte';
     import RewardsComponent from '$lib/component/RewardsComponent.svelte';
     import PointsComponent from '$lib/component/PointsComponent.svelte';
     import QuestComponent from '$lib/component/QuestComponent.svelte';
@@ -48,7 +48,7 @@
     const tabs: any = [
         {name: 'Node', component: NodeComponent},
         {name: 'Proposals', component: ProposalsComponent},
-        {name: 'Lock+Vest', component: LockVestComponent},
+        //{name: 'Lock+Vest', component: LockVestComponent},
         //{name: 'Rewards', component: RewardsComponent},
         //{name: 'Weekly Health', component: PointsComponent},
         //{name: 'Quests', component: QuestComponent},
