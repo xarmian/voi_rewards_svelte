@@ -11,6 +11,11 @@
       "category": "Staking"
     },
     {
+        "question": "How can I obtain **VOI** tokens?",
+        "answer": "VOI tokens can be obtained via one of the following methods:\n\n #### Option 1: Purchase VOI tokens on a centralized exchange. VOI is currently available on\n- [Mexc](https://www.mexc.com/exchange/VOI_USDT)\n- [Coinstore](https://www.coinstore.com/spot/VOIUSDT) \n\n #### Option 2: Purchase VOI from a decentralized exchange and bridge to Voi Network using the [Aramid Bridge](https://biatec.notion.site/Aramid-Bridge-User-Guide-10cb2ccb197f809cb3c3de8c93cd67f8). VOI is currently available on the following networks:\n - Algorand ([Pact](https://app.pact.fi/swap?pair=USDC:31566704/ARAMID+VOI:2320775407), [Tinyman](https://app.tinyman.org/swap?asset_in=31566704&asset_out=2320775407))\n - Base\n - Arbitrum \n\n #### Option 3: Bridge USDC to Voi Network from Algorand, Base, or Arbitrum using the [Aramid Bridge](https://biatec.notion.site/Aramid-Bridge-User-Guide-10cb2ccb197f809cb3c3de8c93cd67f8). Then swap aUSDC (which you'll receive in your Voi Account after bridging) to VOI on [HumbleSwap](https://voi.humble.sh/#/swap?poolId=395553).",
+        "category": "General"
+    },
+    {
         "question": "What is a **Voi Account**?",
         "answer": "A Voi Account is a unique digital identity on the Voi network. It is associated with a Voi Wallet and a 25-word mnemonic or secret key. The mnemonic is used to access your Voi Account, and the secret key is used to sign transactions. Your Voi Account is necessary to participate in the Voi ecosystem, including staking, locking, and voting.",
         "category": "Accounts"
