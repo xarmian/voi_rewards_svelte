@@ -14,4 +14,4 @@ VOI tokens can be obtained via one of the following methods:
  - Base
  - Arbitrum 
 
-#### Option 3: Bridge USDC to Voi Network from Algorand, Base, or Arbitrum using the [Aramid Bridge](https://biatec.notion.site/Aramid-Bridge-User-Guide-10cb2ccb197f809cb3c3de8c93cd67f8). Then swap aUSDC (which you'll receive in your Voi Account after bridging) to VOI on [HumbleSwap](https://voi.humble.sh/#/swap?poolId=395553).
+#### Option 3: Bridge USDC to Voi Network from Algorand, Base, or Arbitrum using the [Aramid Bridge](https://biatec.notion.site/Aramid-Bridge-User-Guide-10cb2ccb197f809cb3c3de8c93cd67f8). Then swap aUSDC (which you'll receive in your Voi Account after bridging) to VOI on [HumbleSwap](https://voi.humble.sh/#/swap?poolId=395553). For more information on bridging, please view the [Aramid Bridge User Guide](https://biatec.notion.site/Aramid-Bridge-User-Guide-10cb2ccb197f809cb3c3de8c93cd67f8).

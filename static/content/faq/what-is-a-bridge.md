@@ -9,4 +9,4 @@ A Bridge is a tool that allows you to transfer assets between different blockcha
 - Arbitrum
 - Algorand
 
-For more information and a guide to using the Aramid Bridge, please refer to the [Aramid Bridge Documentation](/bridges).
+For more information and a guide to using the Aramid Bridge, please refer to the [Aramid Bridge User Guide](https://biatec.notion.site/Aramid-Bridge-User-Guide-10cb2ccb197f809cb3c3de8c93cd67f8).
