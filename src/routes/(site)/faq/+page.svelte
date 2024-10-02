@@ -131,9 +131,10 @@
         </button>
 
         {#if highlightedFAQ}
-          <Accordion class="divide-y divide-gray-200 dark:divide-gray-700 mb-8">
+          <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700 mb-8">
             <AccordionItem open={true}>
               <svelte:fragment slot="header">
+                <a href={`#${slugify(highlightedFAQ.question)}`} class="w-full">
                 <div class="flex items-center justify-between w-full">
                   <div class="flex items-center">
                     <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
@@ -155,6 +156,7 @@
                     <ClipboardOutline class="w-5 h-5" />
                   </button>
                 </div>
+                </a>
               </svelte:fragment>
               <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
                 <Markdown source={highlightedFAQ.answer} renderers={{ link: ExternalLink }}/>
@@ -166,15 +168,16 @@
         {#each Object.entries(filteredGroupedFAQ) as [category, items]}
           <div class="mb-8">
             <h3 class="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-4">{category}</h3>
-            <Accordion class="divide-y divide-gray-200 dark:divide-gray-700">
+            <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700">
               {#each items as item}
                 <AccordionItem open={expandAll} id={slugify(item.question)}>
                   <svelte:fragment slot="header">
+                    <a href={`#${slugify(item.question)}`} class="w-full">
                     <div class="flex items-center justify-between w-full">
                       <div class="flex items-center">
                         <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
                         <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                          <a href={`#${slugify(item.question)}`} class="hover:underline">
+                          
                             {#each item.question.split('**') as part, index}
                               {#if index % 2 === 0}
                                 {part}
@@ -182,7 +185,6 @@
                                 <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
                               {/if}
                             {/each}
-                          </a>
                         </span>
                       </div>
                       <button
@@ -193,7 +195,8 @@
                         <ClipboardOutline class="w-5 h-5" />
                       </button>
                     </div>
-                  </svelte:fragment>
+                </a>
+            </svelte:fragment>
                   <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
                     <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
                   </div>
