@@ -1,9 +1,4 @@
-import { readdirSync, readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import faqDataRaw from '$lib/faqData.json';
 
 interface FAQItem {
   question: string;
@@ -12,64 +7,4 @@ interface FAQItem {
   sort: number;
 }
 
-function parseFrontmatter(frontmatter: string): { question: string; category: string; sort: number } {
-  const lines = frontmatter.split('\n');
-  const result: { [key: string]: string | number } = {};
-
-  for (const line of lines) {
-    const [key, ...valueParts] = line.split(':').map(part => part.trim());
-    if (key && valueParts.length > 0) {
-      const value = valueParts.join(':').trim();
-      if (key === 'sort') {
-        result[key] = parseInt(value, 10);
-      } else {
-        // Remove surrounding quotes and preserve internal formatting
-        result[key] = value.replace(/^['"]|['"]$/g, '');
-      }
-    }
-  }
-
-  return {
-    question: result.question as string || '',
-    category: result.category as string || '',
-    sort: result.sort as number || 0
-  };
-}
-
-function findFaqDir(): string | null {
-  const faqPath = join('static', 'content', 'faq');
-  console.log(`Checking FAQ path: ${faqPath}`);
-  
-  if (existsSync(faqPath)) {
-    console.log(`Found FAQ directory at: ${faqPath}`);
-    return faqPath;
-  }
-
-  console.error(`FAQ directory not found at: ${faqPath}`);
-  return null;
-}
-
-const faqDir = findFaqDir();
-const faqItems: FAQItem[] = [];
-
-if (faqDir) {
-  const files = readdirSync(faqDir);
-
-  for (const file of files) {
-    if (file.endsWith('.md')) {
-      const content = readFileSync(join(faqDir, file), 'utf-8');
-      const [frontmatter, ...answerParts] = content.split('---').filter(Boolean);
-      const { question, category, sort } = parseFrontmatter(frontmatter.trim());
-      const answer = answerParts.join('---').trim();
-
-      faqItems.push({ question, answer, category, sort });
-    }
-  }
-
-  // Sort the FAQ items based on the 'sort' field
-  faqItems.sort((a, b) => a.sort - b.sort);
-} else {
-  console.error('FAQ directory not found');
-}
-
-export const faqData = faqItems;
+export const faqData: FAQItem[] = faqDataRaw.sort((a, b) => a.sort - b.sort);
