@@ -1,5 +1,9 @@
-import { readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { readdirSync, readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface FAQItem {
   question: string;
@@ -32,22 +36,47 @@ function parseFrontmatter(frontmatter: string): { question: string; category: st
   };
 }
 
-const faqDir = join(process.cwd(), 'src', 'content', 'faq');
-const files = readdirSync(faqDir);
-const faqItems: FAQItem[] = [];
+function findFaqDir(): string | null {
+  const possiblePaths = [
+    join(process.cwd(), 'src', 'content', 'faq'),
+    join(__dirname, '..', '..', 'src', 'content', 'faq'),
+    join(__dirname, '..', 'content', 'faq'),
+    join(__dirname, 'content', 'faq')
+  ];
 
-for (const file of files) {
-  if (file.endsWith('.md')) {
-    const content = readFileSync(join(faqDir, file), 'utf-8');
-    const [frontmatter, ...answerParts] = content.split('---').filter(Boolean);
-    const { question, category, sort } = parseFrontmatter(frontmatter.trim());
-    const answer = answerParts.join('---').trim();
-
-    faqItems.push({ question, answer, category, sort });
+  for (const path of possiblePaths) {
+    console.log(`Checking path: ${path}`);
+    if (existsSync(path)) {
+      console.log(`Found FAQ directory at: ${path}`);
+      return path;
+    }
   }
+
+  console.error('FAQ directory not found in any of the checked locations');
+  return null;
 }
 
-// Sort the FAQ items based on the 'sort' field
-faqItems.sort((a, b) => a.sort - b.sort);
+const faqDir = findFaqDir();
+const faqItems: FAQItem[] = [];
+
+if (faqDir) {
+  const files = readdirSync(faqDir);
+
+  for (const file of files) {
+    if (file.endsWith('.md')) {
+      const content = readFileSync(join(faqDir, file), 'utf-8');
+      const [frontmatter, ...answerParts] = content.split('---').filter(Boolean);
+      const { question, category, sort } = parseFrontmatter(frontmatter.trim());
+      const answer = answerParts.join('---').trim();
+
+      faqItems.push({ question, answer, category, sort });
+    }
+  }
+
+  // Sort the FAQ items based on the 'sort' field
+  faqItems.sort((a, b) => a.sort - b.sort);
+} else {
+  console.error('FAQ directory not found');
+}
 
 export const faqData = faqItems;
