@@ -15,7 +15,6 @@
   let showToast = false;
   let searchQuery = '';
 
-  console.log(faqData);
   $: categories = ['All', ...new Set(faqData.map(item => item.category))];
   $: groupedFAQ = groupFAQByCategory(faqData);
   $: filteredGroupedFAQ = filterGroupedFAQ(groupedFAQ, selectedCategory, searchQuery);
