@@ -1,5 +1,5 @@
 ---
-question: Can **Locked** or Non-vested Voi tokens earn rewards?
+question: Can **Locked** or Non-vested Voi tokens earn block rewards?
 category: Staking
 sort: 13
 ---
