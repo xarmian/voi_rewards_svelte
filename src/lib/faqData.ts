@@ -37,7 +37,7 @@ function parseFrontmatter(frontmatter: string): { question: string; category: st
 }
 
 function findFaqDir(): string | null {
-  const faqPath = join('static', 'content', 'faq');
+  const faqPath = join(__dirname, '..', '..', 'static', 'content', 'faq');
   console.log(`Checking FAQ path: ${faqPath}`);
   
   if (existsSync(faqPath)) {
