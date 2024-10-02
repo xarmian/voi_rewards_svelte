@@ -177,7 +177,6 @@
             <h3 class="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-4">{category}</h3>
             <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700">
               {#each items as item}
-                {#if item !== highlightedFAQ}
                   <AccordionItem open={expandAll} id={slugify(item.question)}>
                     <svelte:fragment slot="header">
                     <a href={`#${slugify(item.question)}`} class="w-full">
@@ -209,7 +208,6 @@
                     <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
                   </div>
                 </AccordionItem>
-              {/if}
               {/each}
             </Accordion>
           </div>
