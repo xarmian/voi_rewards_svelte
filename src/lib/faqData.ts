@@ -37,22 +37,15 @@ function parseFrontmatter(frontmatter: string): { question: string; category: st
 }
 
 function findFaqDir(): string | null {
-  const possiblePaths = [
-    join(process.cwd(), 'src', 'content', 'faq'),
-    join(__dirname, '..', '..', 'src', 'content', 'faq'),
-    join(__dirname, '..', 'content', 'faq'),
-    join(__dirname, 'content', 'faq')
-  ];
-
-  for (const path of possiblePaths) {
-    console.log(`Checking path: ${path}`);
-    if (existsSync(path)) {
-      console.log(`Found FAQ directory at: ${path}`);
-      return path;
-    }
+  const faqPath = join('static', 'content', 'faq');
+  console.log(`Checking FAQ path: ${faqPath}`);
+  
+  if (existsSync(faqPath)) {
+    console.log(`Found FAQ directory at: ${faqPath}`);
+    return faqPath;
   }
 
-  console.error('FAQ directory not found in any of the checked locations');
+  console.error(`FAQ directory not found at: ${faqPath}`);
   return null;
 }
 
