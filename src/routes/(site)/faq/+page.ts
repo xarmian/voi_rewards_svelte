@@ -1,6 +1,7 @@
-import faqData from '$lib/data/faq.json';
+import type { PageLoad } from './$types';
 
-export const load = async ({ url }) => {
+export const load: PageLoad = async ({ url, data }) => {
+    const { faqData } = data;
     const hash = url.href.split('#')[1];
     let highlightedFAQ = null;
     let pageMetaTags = {
@@ -10,7 +11,7 @@ export const load = async ({ url }) => {
     };
 
     if (hash) {
-        highlightedFAQ = faqData.faqs.find(item => slugify(item.question) === hash);
+        highlightedFAQ = faqData.find(item => slugify(item.question) === hash);
         if (highlightedFAQ) {
             pageMetaTags = {
                 title: `FAQ: ${highlightedFAQ.question} | Voi Network`,
@@ -21,9 +22,9 @@ export const load = async ({ url }) => {
     }
 
     return {
-        faqData: faqData.faqs,
         highlightedFAQ,
         pageMetaTags,
+        faqData
     };
 };
 

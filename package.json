@@ -66,6 +66,7 @@
 		"svelte-markdown": "^0.4.1",
 		"svelte-meta-tags": "^3.1.2",
 		"svelte-time": "^0.9.0",
-		"svelte-ux": "^0.74.9"
+		"svelte-ux": "^0.74.9",
+		"yaml": "^2.5.1"
 	}
 }

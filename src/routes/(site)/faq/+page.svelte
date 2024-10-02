@@ -15,6 +15,7 @@
   let showToast = false;
   let searchQuery = '';
 
+  console.log(faqData);
   $: categories = ['All', ...new Set(faqData.map(item => item.category))];
   $: groupedFAQ = groupFAQByCategory(faqData);
   $: filteredGroupedFAQ = filterGroupedFAQ(groupedFAQ, selectedCategory, searchQuery);
@@ -35,7 +36,7 @@
 
     Object.entries(groupedFAQ).forEach(([groupCategory, items]) => {
       if (category === 'All' || category === groupCategory) {
-        const filteredItems = items.filter((item: any) =>
+        const filteredItems = items.filter(item =>
           item.question.toLowerCase().includes(lowercaseQuery) ||
           item.answer.toLowerCase().includes(lowercaseQuery)
         );
