@@ -1,5 +1,11 @@
 [
   {
+    "question": "Can **Locked** or Non-vested Voi tokens earn rewards?",
+    "answer": "Yes, tokens locked in a Voi Locking and Vesting Contract can earn block rewards by staking the contract's account on a node. This allows the contract's Voi tokens to contribute to the network's security, and for each block proposed by the contract's account the contract will receive a portion of the block rewards.\n\nAll tokens in the locked contract can be staked, and any block rewards earned from staking will be added to the contract's balance. This allows your vested tokens to automatically compound, and earned rewards above your locked and/or un-vested balance are available for withdrawal at any time.",
+    "category": "Staking",
+    "sort": 13
+  },
+  {
     "question": "How do I create a Voi Account?",
     "answer": "To create your first Voi Account, you will first need to choose a Voi Wallet. There are multiple wallet options available, including:\n\n- [Kibisis](https://kibis.is/) (browser extension)\n- [Lute](https://lute.io/) (webapp and extension, with Ledger support)\n- [Biatec Wallet](https://wallet.biatec.io/) (webapp)\n\nFor more information, visit the [official Voi documentation on wallets](https://docs.voi.network/ecosystem/wallets/). Each wallet will allow you to create one or more Voi Accounts, and each account will have a unique 25-word mnemonic, or secret key. Store this secret key in a secure location, and do not share it with anyone. You will need this secret key to access your Voi Account.",
     "category": "Wallets",
@@ -58,6 +64,12 @@
     "answer": "Staking in Voi refers to the process of delegating your VOI tokens to support the network's operations. By staking, the tokens in your account will contribute toward voting for the inclusion of new blocks. The proposer of each block will be rewarded for each block that is proposed.\n\nFor additional information about running a Node and staking, please refer to the [How to Node](/how_to_node) section of this website.",
     "category": "Staking",
     "sort": 9
+  },
+  {
+    "question": "What does **Vesting** mean?",
+    "answer": "Vesting is the process of gradually releasing tokens from a locked account over a specified period of time. This is a common practice in blockchain projects to ensure a smooth transition from the initial token distribution phase to the mainnet launch.\n\nTokens typically vest over a period of 12 months, with an equal portion of the tokens being released each month.\n\nFor example, if you received 12,000 VOI tokens during Testnet Phase 2, then after any optional lock-up period ends you would receive 1,000 VOI tokens each month for the next 12 months. On Voi, locking and vesting is done using Smart Contracts, and as such at the specified interval (usually once per month) your vested tokens will be available for withdrawal from the contract.\n\nAll tokens in the locked contract can be staked, and any block rewards earned from staking will be added to the contract's balance. This allows your vested tokens to automatically compound, and earned rewards above your locked and/or un-vested balance are available for withdrawal at any time.",
+    "category": "Staking",
+    "sort": 12
   },
   {
     "question": "What is a **Voi Wallet**?",
