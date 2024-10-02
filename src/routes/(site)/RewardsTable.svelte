@@ -12,8 +12,7 @@
   import { getNFD } from '$lib/utils/nfd';
   import WalletView from '../../views/WalletView.svelte';
   import { compareVersions } from 'compare-versions';
-  import { formatDistanceToNow } from 'date-fns';
-
+  
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
 
