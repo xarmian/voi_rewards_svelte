@@ -2,7 +2,7 @@
   import Markdown from 'svelte-markdown';
   import ExternalLink from '$lib/components/ExternalLink.svelte';
   import { Accordion, AccordionItem, Toast, Input } from 'flowbite-svelte';
-  import { LinkOutline, ClipboardOutline, SearchOutline } from 'flowbite-svelte-icons';
+  import { LinkOutline, ClipboardOutline, SearchOutline, ChevronDownOutline } from 'flowbite-svelte-icons';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
 
@@ -165,13 +165,21 @@
           </Accordion>
         {/if}
 
+        {#if highlightedFAQ}
+          <div class="text-center text-gray-600 dark:text-gray-400 my-4">
+            <p>More questions and answers below</p>
+            <ChevronDownOutline class="w-6 h-6 mx-auto mt-2 animate-bounce" />
+          </div>
+        {/if}
+
         {#each Object.entries(filteredGroupedFAQ) as [category, items]}
           <div class="mb-8">
             <h3 class="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-4">{category}</h3>
             <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700">
               {#each items as item}
-                <AccordionItem open={expandAll} id={slugify(item.question)}>
-                  <svelte:fragment slot="header">
+                {#if item !== highlightedFAQ}
+                  <AccordionItem open={expandAll} id={slugify(item.question)}>
+                    <svelte:fragment slot="header">
                     <a href={`#${slugify(item.question)}`} class="w-full">
                     <div class="flex items-center justify-between w-full">
                       <div class="flex items-center">
@@ -196,11 +204,12 @@
                       </button>
                     </div>
                 </a>
-            </svelte:fragment>
+                </svelte:fragment>
                   <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
                     <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
                   </div>
                 </AccordionItem>
+              {/if}
               {/each}
             </Accordion>
           </div>
