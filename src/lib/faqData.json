@@ -36,6 +36,12 @@
     "sort": 11
   },
   {
+    "question": "What can I do with my VOI Tokens?",
+    "answer": "There are many things you can do with your Voi, and more being added every day! The Voi token's primary purpose is to be the currency used to pay for transactions on the Voi blockchain.\n\nYou can also stake your Voi and operate a node to earn Voi as a reward each week, participate in Decentralized Finance (DeFi), purchase and trade NFTs, and more.\n\nFor more information about staking in the Voi Staking Program, please refer to the [Voi Staking Guide](https://medium.com/@voifoundation/staking-program-how-to-guide-382ea5085dab).\n\nVisit the following applications to explore the Voi ecosystem:\n\n**Blockchain**\n- [Voi Block Explorer](https://explorer.voi.network)\n- [Voi Staking](https://staking.voi.network/)\n- [Voi Swarm Node](https://voinetwork.github.io/voi-swarm/getting-started/introduction/)\n\n**Wallets**\n- [Kibisis Wallet](https://kibis.is)\n- [Lute Wallet](https://lute.app)\n- [Biatec Wallet](https://wallet.biatec.io)\n\n**DEX**\n- [HumbleSwap DEX](https://voi.humble.sh)\n- [Nomadex DEX](https://nomadex.io) - Coming Soon\n\n**NFTs**\n- [High Forge NFT Launchpad](https://highforge.io)\n- [Nautilus NFT Marketplace](https://nautilus.sh) - Coming Soon\n- [NFT Navigator](https://nftnavigator.xyz)\n\n**Bridge**\n- [Aramid Bridge](https://app.aramid.finance/)",
+    "category": "General",
+    "sort": 10
+  },
+  {
     "question": "What is a **Voi Account**?",
     "answer": "A Voi Account is a unique digital identity on the Voi network. It is associated with a Voi Wallet and a 25-word mnemonic or secret key. The mnemonic is used to access your Voi Account, and the secret key is used to sign transactions. Your Voi Account is necessary to participate in the Voi ecosystem, including staking, locking, and voting.",
     "category": "Accounts",
