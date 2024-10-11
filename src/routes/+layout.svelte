@@ -9,6 +9,15 @@
 	// inject({ mode: dev ? 'development' : 'production' });
 	import { invalidate } from '$app/navigation'
 	import { onMount } from 'svelte'
+	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
+	import { startLoading, stopLoading } from '$lib/stores/loadingStore';
+	import { navigating } from '$app/stores';
+
+	$: if ($navigating) {
+		startLoading();
+	} else {
+		stopLoading();
+	}
 
 	export let data;
 
@@ -52,4 +61,7 @@
 	<!--<meta name="twitter:site" content="{twitterHandle}" />
 	<meta name="twitter:creator" content="{twitterHandle}" />-->
 </svelte:head>
+
+<LoadingIndicator />
+
 <slot />

@@ -6,7 +6,6 @@
 	import type { PageData } from '../$types';
 	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 	import { onMount } from 'svelte';
-    import { RadioButton, ButtonGroup } from 'flowbite-svelte';
     import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 
     interface DiscordAccount {
@@ -255,7 +254,7 @@
             {/if}
         </div>
 
-        <div class="bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 {discordAccounts.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
+        <div class="flex flex-col bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 {discordAccounts.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
             <h2 class="text-2xl font-semibold mb-4">Voi Accounts</h2>
             <div class="text-gray-600 dark:text-gray-400 mb-4">
                 Connect your Voi addresses here. Your accounts will be aggregated, and any rewards will be sent to the wallet designated as Primary.
@@ -291,8 +290,21 @@
             {:else}
                 <p class="text-gray-600 dark:text-gray-400">No Voi accounts connected.</p>
             {/if}
-            <div class="mt-4">
-                <Web3Wallet availableWallets={['WalletConnect','Kibisis','LuteWallet']} connectButtonType="static" modalType="modal" showAuthButtons={true} algodClient={algodClient} indexerClient={algodIndexer} {wcProjectId} walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"/>
+            <div class="mt-4 place-self-center">
+                <Web3Wallet 
+                    availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
+                    connectButtonType="static" modalType="modal"
+                    showAuthButtons={true}
+                    algodClient={algodClient}
+                    indexerClient={algodIndexer}
+                    wcProject={{
+                        projectId: wcProjectId,
+                        projectName: 'Voi Rewards Auditor',
+                        projectDescription: 'Voi Rewards Auditor',
+                        projectUrl: 'https://voirewards.com',
+                        projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
+                    }}
+                    walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"/>
             </div>
             <!--<button
                 on:click={connectVoi}

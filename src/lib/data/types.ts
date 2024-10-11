@@ -80,3 +80,34 @@ export type IQuest = {
     isOpen?: boolean;
 };
 
+export interface LockContract {
+    contractId: number;
+    contractAddress: string;
+    creator: string;
+    createRound: number;
+    lastSyncRound: number;
+    global_funder: string; // address of funder
+    global_funding: number; // funding amount
+    global_owner: string; // address of owner
+    global_period: number; // number of periods (global_period_seconds * global_lockup_delay) of locking
+    global_total: string; // total amount of tokens ?
+    global_period_seconds: number; // number of seconds per lockup_delay
+    global_lockup_delay: number; // divisor of a period
+    global_vesting_delay: number;
+    global_period_limit: number; // max number of periods to lock
+    global_delegate: string; // address of delegate
+    global_deployer: string; // address of deployer
+    global_parent_id: number; // id of parent
+    global_messenger_id: number; // id of messenger
+    global_initial: string; // initial amount of tokens
+    global_deadline: number; // deadline to configure lock period
+    global_distribution_count: number; // number of distributions
+    global_distribution_seconds: number; // number of seconds per distribution
+    part_vote_k: string;
+    part_sel_k: string;
+    part_vote_fst: number;
+    part_vote_lst: number;
+    part_vote_kd: number;
+    part_sp_key: string;
+    deleted: null;
+}

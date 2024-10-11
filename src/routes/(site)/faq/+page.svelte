@@ -177,37 +177,38 @@
             <h3 class="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-4">{category}</h3>
             <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700">
               {#each items as item}
+                {#if item !== highlightedFAQ}
                   <AccordionItem open={expandAll} id={slugify(item.question)}>
                     <svelte:fragment slot="header">
-                    <a href={`#${slugify(item.question)}`} class="w-full">
-                    <div class="flex items-center justify-between w-full">
-                      <div class="flex items-center">
-                        <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
-                        <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                          
-                            {#each item.question.split('**') as part, index}
-                              {#if index % 2 === 0}
-                                {part}
-                              {:else}
-                                <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
-                              {/if}
-                            {/each}
-                        </span>
+                      <a href={`#${slugify(item.question)}`} class="w-full">
+                        <div class="flex items-center justify-between w-full">
+                          <div class="flex items-center">
+                            <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
+                            <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                                {#each item.question.split('**') as part, index}
+                                  {#if index % 2 === 0}
+                                    {part}
+                                  {:else}
+                                    <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
+                                  {/if}
+                                {/each}
+                            </span>
+                        </div>
+                          <button
+                            on:click|stopPropagation={() => copyLinkToClipboard(item.question)}
+                            class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
+                            title="Copy link to clipboard"
+                          >
+                           <ClipboardOutline class="w-5 h-5" />
+                        </button>
                       </div>
-                      <button
-                        on:click|stopPropagation={() => copyLinkToClipboard(item.question)}
-                        class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
-                        title="Copy link to clipboard"
-                      >
-                        <ClipboardOutline class="w-5 h-5" />
-                      </button>
+                      </a>
+                    </svelte:fragment>
+                    <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
+                      <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
                     </div>
-                </a>
-                </svelte:fragment>
-                  <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
-                    <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
-                  </div>
-                </AccordionItem>
+                  </AccordionItem>
+                {/if}
               {/each}
             </Accordion>
           </div>
