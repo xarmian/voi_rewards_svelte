@@ -49,7 +49,11 @@
     goto(newPath, { replaceState: true });
   }
 
-  let url = window.location.href;
+  let url = '';
+  $: if (typeof window !== 'undefined') {
+    url = window.location.href;
+  }
+  
   let text = 'Do you know about the @Voi_Net Ecosystem? Check it out here! #Voiagers';
   $: if (selectedCategory !== 'All') {
     text = `${selectedCategory}? @Voi_Net has that. Check out ${selectedCategory} in the Voi Ecosystem, right here! #Voiagers`;
