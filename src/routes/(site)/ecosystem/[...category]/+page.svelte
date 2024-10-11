@@ -25,7 +25,9 @@
   $: {
     filteredProjects = projects.filter(project => 
       project.status === 'active'
-      && project.title.toLowerCase().includes(searchTerm.toLowerCase())
+      && (project.title.toLowerCase().includes(searchTerm.toLowerCase())
+      || project.description.toLowerCase().includes(searchTerm.toLowerCase())
+      || project.category.toLowerCase().includes(searchTerm.toLowerCase()))
       && (selectedCategory === 'All' || project.category === selectedCategory)
     ).sort((a, b) => {
       const indexA = categorySort.indexOf(a.category);
@@ -53,7 +55,7 @@
   $: if (typeof window !== 'undefined') {
     url = window.location.href;
   }
-  
+
   let text = 'Do you know about the @Voi_Net Ecosystem? Check it out here! #Voiagers';
   $: if (selectedCategory !== 'All') {
     text = `${selectedCategory}? @Voi_Net has that. Check out ${selectedCategory} in the Voi Ecosystem, right here! #Voiagers`;
@@ -61,10 +63,13 @@
 </script>
 
 <div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8 relative">
-    <h1 class="text-5xl font-bold text-center mb-4">Voi Ecosystem Map</h1>
-    <div class="absolute top-6 right-6">
+  <div class="flex flex-col md:flex-row items-center mt-4 mb-4 justify-between">
+    <span> </span>
+    <h1 class="text-5xl font-bold text-center mb-4">Voi Ecosystem Hub</h1>
+    <div class="text-center md:self-start">
       <Share {url} {text} />
     </div>
+  </div>
   <div class="container mx-auto px-4">
     
     <div class="flex flex-col md:flex-row justify-between items-center mb-4">
