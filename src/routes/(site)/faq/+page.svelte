@@ -268,6 +268,9 @@
               </li>
             {/each}
           </ul>
+          <a href="https://medium.com/@voifoundation" target="_blank" rel="noopener noreferrer" class="block mt-4 text-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 font-semibold">
+            View all posts
+          </a>
         </div>
       </div>
     </div>
@@ -300,6 +303,9 @@
             </li>
           {/each}
         </ul>
+        <a href="https://medium.com/@voifoundation" target="_blank" rel="noopener noreferrer" class="block mt-4 text-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 font-semibold">
+          View all posts
+        </a>
       </div>
     </div>
 
