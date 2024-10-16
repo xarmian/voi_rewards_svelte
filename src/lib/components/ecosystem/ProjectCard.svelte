@@ -6,30 +6,36 @@
   
   const dispatch = createEventDispatcher();
 
-  function handleCategoryClick() {
+  function handleCategoryClick(event: Event) {
+    event.stopPropagation();
     dispatch('categoryClick', project.category);
+  }
+
+  function handleLinkClick(event: Event) {
+    event.stopPropagation();
   }
 </script>
 
 <div class="card-wrapper">
-  <div 
-    class="card bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-xl"
+  <a 
+    href={project.url} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    class="card bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-xl block"
   >
     <div class="flex flex-col justify-between p-6 h-full">
         <div>
             <div class="flex items-center justify-between mb-4">
-                <a href={project.url} target="_blank" rel="noopener noreferrer">
-                    {#if project.logo}
-                        <img src={project.logo} alt={project.title} class="h-12 object-contain" />
-                    {:else}
-                        <div class="h-12 w-12 bg-purple-600 rounded-full flex items-center justify-center text-xl font-bold">
-                            {project.title[0]}
-                        </div>
-                    {/if}
-                </a>
+                {#if project.logo}
+                    <img src={project.logo} alt={project.title} class="h-12 object-contain" />
+                {:else}
+                    <div class="h-12 w-12 bg-purple-600 rounded-full flex items-center justify-center text-xl font-bold text-white">
+                        {project.title[0]}
+                    </div>
+                {/if}
                 <button 
-                on:click={handleCategoryClick}
-                class="px-3 py-1 text-sm font-semibold text-purple-800 bg-purple-200 dark:bg-purple-800 dark:text-purple-200 rounded-full hover:bg-purple-300 transition-colors duration-200"
+                  on:click|stopPropagation|preventDefault={handleCategoryClick}
+                  class="px-3 py-1 text-sm font-semibold text-purple-800 bg-purple-200 dark:bg-purple-800 dark:text-purple-200 rounded-full hover:bg-purple-300 transition-colors duration-200"
                 >
                     {project.category}
                 </button>
@@ -39,18 +45,30 @@
         </div>
         <div class="flex space-x-4">
             {#if project.url}
-            <a href={project.url} target="_blank" rel="noopener noreferrer" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors duration-200">
+            <a 
+              href={project.url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors duration-200"
+              on:click={handleLinkClick}
+            >
                 <i class="fas fa-globe"></i> Website
             </a>
             {/if}
             {#if project.twitter}
-            <a href={project.twitter} target="_blank" rel="noopener noreferrer" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors duration-200">
+            <a 
+              href={project.twitter} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors duration-200"
+              on:click={handleLinkClick}
+            >
                 <i class="fab fa-x-twitter"></i>/Twitter
             </a>
             {/if}
         </div>
     </div>
-  </div>
+  </a>
 </div>
 
 <style>
