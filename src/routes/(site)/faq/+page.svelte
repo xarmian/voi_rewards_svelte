@@ -6,6 +6,7 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { formatDistance } from 'date-fns';
+  import type { FAQItem } from '$lib/faqData.js';
 
   export let data;
   const { faqData, highlightedFAQ: initialHighlightedFAQ, lastFivePosts, recentFAQs } = data;
@@ -36,7 +37,7 @@
 
     Object.entries(groupedFAQ).forEach(([groupCategory, items]) => {
       if (category === 'All' || category === groupCategory) {
-        const filteredItems = items.filter(item =>
+        const filteredItems = (items as FAQItem[]).filter((item: FAQItem) =>
           item.question.toLowerCase().includes(lowercaseQuery) ||
           item.answer.toLowerCase().includes(lowercaseQuery)
         );
@@ -163,7 +164,7 @@
                       </span>
                     </div>
                     <button
-                      on:click|stopPropagation={() => copyLinkToClipboard(highlightedFAQ.question)}
+                      on:click|stopPropagation={() => copyLinkToClipboard(highlightedFAQ?.question ?? '')}
                       class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
                       title="Copy link to clipboard"
                     >

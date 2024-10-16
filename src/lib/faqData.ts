@@ -1,6 +1,6 @@
 import faqDataRaw from '$lib/faqData.json';
 
-interface FAQItem {
+export interface FAQItem {
   question: string;
   answer: string;
   category: string;
