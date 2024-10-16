@@ -2,6 +2,7 @@
 question: I'm a developer. How can I build on Voi Network?
 category: Development
 sort: 30
+recent: true
 ---
 Voi Network is an AVM (Algorand Virtual Machine) based blockchain, and as such it supports all Algorand developer tools and documentation. This includes the Algorand SDKs such as the [Python SDK](https://github.com/algorand/py-algorand-sdk) and [Javascript SDK](https://github.com/algorand/js-algorand-sdk).
 

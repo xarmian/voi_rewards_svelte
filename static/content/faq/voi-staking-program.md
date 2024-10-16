@@ -2,6 +2,7 @@
 question: What is the **Voi Staking Program**?
 category: Staking
 sort: 3
+recent: true
 ---
 The Voi Staking Program is a key initiative designed to incentivize early participation and long-term commitment to the Voi network. It offers two main ways to earn rewards:
 

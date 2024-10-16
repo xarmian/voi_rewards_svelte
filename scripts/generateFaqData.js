@@ -28,10 +28,10 @@ for (const file of files) {
   if (file.endsWith('.md')) {
     const content = readFileSync(join(faqDir, file), 'utf-8');
     const [frontmatter, ...answerParts] = content.split('---').filter(Boolean);
-    const { question, category, sort } = parseFrontmatter(frontmatter.trim());
+    const { question, category, sort, recent } = parseFrontmatter(frontmatter.trim());
     const answer = answerParts.join('---').trim();
 
-    faqItems.push({ question, answer, category, sort });
+    faqItems.push({ question, answer, category, sort, recent });
   }
 }
 

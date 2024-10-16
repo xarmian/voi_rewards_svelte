@@ -1,7 +1,7 @@
 <script lang="ts">
     export let href: string;
     export let text: string;
-    export let details: string;
+    export let details: string | undefined = undefined;
     export let hideLinkText: boolean = false;
 
     let isHovered = false;

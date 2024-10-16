@@ -1,6 +1,6 @@
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ url, data }) => {
+export const load: PageLoad = async ({ url, fetch, data }) => {
     const { faqData } = data;
     const hash = url.href.split('#')[1];
     let highlightedFAQ = null;
@@ -21,10 +21,17 @@ export const load: PageLoad = async ({ url, data }) => {
         }
     }
 
+    const mediumPostsResponse = await fetch('/api/medium-posts');
+    const lastFivePosts = await mediumPostsResponse.json();
+
+    const recentFAQs = faqData.filter(item => item.recent === 'true').slice(0, 3);
+
     return {
         highlightedFAQ,
         pageMetaTags,
-        faqData
+        faqData,
+        lastFivePosts,
+        recentFAQs
     };
 };
 

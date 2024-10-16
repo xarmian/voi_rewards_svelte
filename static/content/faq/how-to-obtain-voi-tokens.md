@@ -2,6 +2,7 @@
 question: How can I obtain **VOI** tokens?
 category: General
 sort: 2
+recent: true
 ---
 VOI tokens can be obtained via one of the following methods:
 
