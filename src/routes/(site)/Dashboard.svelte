@@ -1,16 +1,18 @@
 <script lang="ts">
-	import { Card } from 'flowbite-svelte';
-	import { onMount, onDestroy } from 'svelte';
-	import RewardsTable from './RewardsTable.svelte';
-	import { rewardParams } from '../../stores/dataTable';
+	import { onMount } from 'svelte';
+	//import { rewardParams } from '../../stores/dataTable';
     import { algodClient } from '$lib/utils/algod';
-	import WalletSearch from '$lib/component/WalletSearch.svelte';
-	import { goto } from '$app/navigation';
-	import { compareVersions } from 'compare-versions';
-	import DashboardCard from '$lib/components/DashboardCard.svelte';
-	import RecentProposers from '$lib/components/RecentProposers.svelte';
 	import { writable } from 'svelte/store';
 	import { config } from '$lib/config';
+	import { Modal } from 'flowbite-svelte';
+	import RewardsTable from './RewardsTable.svelte';
+	import DashboardCard from '$lib/components/DashboardCard.svelte';
+	import RecentProposers from '$lib/components/RecentProposers.svelte';
+	import MiniStakeChart from '$lib/components/MiniStakeChart.svelte';
+
+	interface Supply {
+		[key: string]: number;
+	}
 
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
@@ -28,15 +30,16 @@
 	$: dataArrays = [];
 	$: dataIncomplete = false;
 	let dates: { id: string; desc: string; }[] = [];
-	let supply = {};
+	let supply: Supply = {};
 	let ballasts: string[] = [];
+	let showEnlargedChart = false;
+	let onlineStakeHistory: any[] = [];
 
 	const populateDateDropdown = async () => {
 		const url = `${config.proposalApiBaseUrl}`;
 		await fetch(url, { cache: 'no-store' })
 			.then((response) => response.json())
 			.then((data) => {
-				//const minTimestamp = new Date(data.min_timestamp);
                 const minTimestamp = new Date('2023-10-02T00:00:00Z');
 				const maxTimestamp = new Date(data.max_timestamp);
 
@@ -140,22 +143,32 @@
 
 
 	onMount(async () => {
-		await populateDateDropdown();
+		//await populateDateDropdown();
 		loadDashboardData(selectedDate);
 
 		// get online stake
 		supply = await algodClient.supply().do();
 	});
 
-	$: {
+	/*$: {
 		rewardParams.set({
 			block_reward_pool: 0,
 			total_blocks: totalBlocks,
 		});
-	}
+	}*/
 
 	async function refreshDashboardData() {
 		await loadDashboardData(selectedDate);
+	}
+
+	async function fetchOnlineStakeHistory() {
+		const response = await fetch('https://api.voirewards.com/proposers/index_main_3.php?action=online-stake-history');
+		onlineStakeHistory = await response.json();
+	}
+
+	function handleChartClick() {
+		fetchOnlineStakeHistory();
+		showEnlargedChart = true;
 	}
 </script>
 
@@ -172,7 +185,14 @@
 			<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />
 			<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />
 			<DashboardCard title="Community Produced Blocks" value={totalBlocks > 0 ? totalBlocks.toLocaleString() : null} info="The number of blocks produced by the community." />
-			<DashboardCard title="Online Stake" value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} info="The total amount of VOI that is currently online and participating in the network." />
+			<div on:click={handleChartClick} class="cursor-pointer">
+				<DashboardCard 
+					title="Online Stake" 
+					value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
+					info="The total amount of VOI that is currently online and participating in the network." 
+					showChart={true}
+				/>
+			</div>
 			
 		</div>
 		
@@ -206,6 +226,17 @@
 		{/if}
 	</div>
 </div>
+
+{#if showEnlargedChart}
+<Modal bind:open={showEnlargedChart} size="xl">
+	<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
+	{#if onlineStakeHistory.length > 0}
+		<MiniStakeChart chartData={onlineStakeHistory} />
+	{:else}
+		<p>Loading chart data...</p>
+	{/if}
+	</Modal>
+{/if}
 
 <style>
 	.btn-primary {

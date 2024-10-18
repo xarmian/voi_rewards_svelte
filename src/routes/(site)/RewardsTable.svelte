@@ -3,7 +3,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
   import RewardsTableHeader from './RewardsTableHeader.svelte';
-  import { rewardParams } from '../../stores/dataTable';
+  //import { rewardParams } from '../../stores/dataTable';
   import { CopySolid, LinkSolid } from 'flowbite-svelte-icons';
   import { Modal } from 'flowbite-svelte';
   import { copy } from 'svelte-copy';
@@ -62,12 +62,12 @@
     nfdData = await getNFD(allAddresses);
   });
 
-  $: unsubRewardParams = rewardParams.subscribe(async (value) => {
+  /*$: unsubRewardParams = rewardParams.subscribe(async (value) => {
     totalBlockRewards = value.block_reward_pool;
     totalBlocks = value.total_blocks;
   });
 
-  $: onDestroy(unsubRewardParams);
+  $: onDestroy(unsubRewardParams);*/
 
   let searchTerm: string = '';
 

@@ -59,7 +59,7 @@
 
   onMount(() => {
     fetchRecentProposers();
-    intervalId = setInterval(fetchRecentProposers, 5000);
+    intervalId = setInterval(fetchRecentProposers, 10000);
   });
 
   onDestroy(() => {
