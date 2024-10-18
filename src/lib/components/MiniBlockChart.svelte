@@ -19,8 +19,6 @@
   const yAxisFormat = (d: number) => d.toLocaleString();
 
   const xScale = scaleBand().padding(0.4);
-  const yScale = scaleLinear().domain([0, 50000]);
-
 </script>
 
 <div class="h-[400px] max-h-svh w-full">
@@ -29,8 +27,7 @@
     x="x"
     y="y"
     xScale={xScale}
-    yScale={yScale}
-    yDomain={[0, 50000]}
+    yDomain={[0, null]}
     yNice={4}
     padding={{ left: 40, bottom: 20, right: 10, top: 10 }}
     tooltip={{ mode: "band" }}

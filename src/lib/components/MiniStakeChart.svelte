@@ -8,7 +8,6 @@
   export let chartData: Array<{ date: string; avg_online_stake: number; max_timestamp: string }>;
 
   const xScale = scaleBand().padding(0.4);
-  const yScale = scaleLinear();
 
   $: data = chartData
     .filter(d => d.avg_online_stake !== null)
@@ -27,7 +26,6 @@
     x="x"
     y="y"
     xScale={xScale}
-    yScale={yScale}
     yDomain={[0, null]}
     yNice={4}
     padding={{ left: 40, bottom: 20, right: 10, top: 10 }}
