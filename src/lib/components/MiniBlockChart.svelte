@@ -1,24 +1,26 @@
 <script lang="ts">
   import { Chart, Svg, Axis, Bars } from 'layerchart';
   import { Highlight, Tooltip } from 'layerchart';
-  import { format, PeriodType } from 'svelte-ux';
-  import { scaleBand, scaleLinear } from 'd3-scale';
   import { format as fnsFormat } from 'date-fns';
+  import { scaleBand } from 'd3-scale';
+  import { format, PeriodType } from 'svelte-ux';
+  import { scaleLinear } from 'd3-scale';
 
-  export let chartData: Array<{ date: string; avg_online_stake: number; max_timestamp: string }>;
-
-  const xScale = scaleBand().padding(0.4);
-  const yScale = scaleLinear();
+  export let chartData: Array<{ date: string; avg_online_stake: number; max_timestamp: string, min_block: number, max_block: number }>;
 
   $: data = chartData
-    .filter(d => d.avg_online_stake !== null)
+    .filter(d => d.min_block !== null && d.max_block !== null)
     .map(d => ({
       x: new Date(d.date + 'T00:00:00'),
-      y: d.avg_online_stake / 1e6
+      y: d.max_block - d.min_block
     }));
 
   const xAxisFormat = (date: Date) => fnsFormat(date, 'MMM d');
-  const yAxisFormat = (d: number) => `${(d / 1e6).toFixed(0)}M`;
+  const yAxisFormat = (d: number) => d.toLocaleString();
+
+  const xScale = scaleBand().padding(0.4);
+  const yScale = scaleLinear().domain([0, 50000]);
+
 </script>
 
 <div class="h-[400px] max-h-svh w-full">
@@ -28,7 +30,7 @@
     y="y"
     xScale={xScale}
     yScale={yScale}
-    yDomain={[0, null]}
+    yDomain={[0, 50000]}
     yNice={4}
     padding={{ left: 40, bottom: 20, right: 10, top: 10 }}
     tooltip={{ mode: "band" }}
@@ -67,7 +69,7 @@
         </Tooltip.Header>
         <Tooltip.List>
           <Tooltip.Item 
-            label="Stake" 
+            label="Proposals" 
             value={data.y.toLocaleString()} 
             labelClass="text-gray-600 dark:text-gray-300"
             valueClass="text-gray-800 dark:text-gray-100 font-semibold"

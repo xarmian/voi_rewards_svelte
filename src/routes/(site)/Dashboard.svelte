@@ -9,7 +9,7 @@
 	import DashboardCard from '$lib/components/DashboardCard.svelte';
 	import RecentProposers from '$lib/components/RecentProposers.svelte';
 	import MiniStakeChart from '$lib/components/MiniStakeChart.svelte';
-
+	import MiniBlockChart from '$lib/components/MiniBlockChart.svelte';
 	interface Supply {
 		[key: string]: number;
 	}
@@ -32,7 +32,8 @@
 	let dates: { id: string; desc: string; }[] = [];
 	let supply: Supply = {};
 	let ballasts: string[] = [];
-	let showEnlargedChart = false;
+	let showEnlargedStakeChart = false;
+	let showEnlargedBlockChart = false;
 	let onlineStakeHistory: any[] = [];
 
 	const populateDateDropdown = async () => {
@@ -166,10 +167,16 @@
 		onlineStakeHistory = await response.json();
 	}
 
-	function handleChartClick() {
+	function handleStakeChartClick() {
 		fetchOnlineStakeHistory();
-		showEnlargedChart = true;
+		showEnlargedStakeChart = true;
 	}
+
+	function handleBlockChartClick() {
+		fetchOnlineStakeHistory();
+		showEnlargedBlockChart = true;
+	}
+
 </script>
 
 <div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -184,8 +191,10 @@
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 			<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />
 			<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />
-			<DashboardCard title="Community Produced Blocks" value={totalBlocks > 0 ? totalBlocks.toLocaleString() : null} info="The number of blocks produced by the community." />
-			<div on:click={handleChartClick} class="cursor-pointer">
+			<div on:click={handleBlockChartClick} class="cursor-pointer">
+				<DashboardCard title="Community Produced Blocks" value={totalBlocks > 0 ? totalBlocks.toLocaleString() : null} info="The number of blocks produced by the community." />
+			</div>
+			<div on:click={handleStakeChartClick} class="cursor-pointer">
 				<DashboardCard 
 					title="Online Stake" 
 					value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
@@ -227,11 +236,22 @@
 	</div>
 </div>
 
-{#if showEnlargedChart}
-<Modal bind:open={showEnlargedChart} size="xl">
+{#if showEnlargedStakeChart}
+<Modal bind:open={showEnlargedStakeChart} size="xl">
 	<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
 	{#if onlineStakeHistory.length > 0}
 		<MiniStakeChart chartData={onlineStakeHistory} />
+	{:else}
+		<p>Loading chart data...</p>
+	{/if}
+	</Modal>
+{/if}
+
+{#if showEnlargedBlockChart}
+<Modal bind:open={showEnlargedBlockChart} size="xl">
+	<h2 class="text-2xl font-bold mb-4">Block Production History</h2>
+	{#if onlineStakeHistory.length > 0}
+		<MiniBlockChart chartData={onlineStakeHistory} />
 	{:else}
 		<p>Loading chart data...</p>
 	{/if}
