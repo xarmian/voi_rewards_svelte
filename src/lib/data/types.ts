@@ -49,7 +49,7 @@ export interface Metadata {
     royalties: string;
 }
 
-export type IProject = {
+export interface IProject {
     id: number;
     title: string;
     description: string;
@@ -64,7 +64,8 @@ export type IProject = {
     realtime?: boolean;
     status?: string; // 'active' or 'inactive'
     logo?: string;
-};
+    new?: boolean;
+}
 
 export type IQuest = {
     id: number;

@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ fetch }) => {
     const parser = new XMLParser();
     const result = parser.parse(xmlData);
     
-    const posts = result.rss.channel.item.slice(0, 5).map((item: any) => ({
+    const posts = result.rss.channel.item.slice(0, 5).map((item: { title: string; link: string; pubDate: string; }) => ({
       title: item.title,
       link: item.link,
       pubDate: item.pubDate

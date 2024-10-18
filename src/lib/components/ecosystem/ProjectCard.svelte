@@ -21,8 +21,13 @@
     href={project.url} 
     target="_blank" 
     rel="noopener noreferrer"
-    class="card bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-xl block"
+    class="card bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-xl block relative"
   >
+    {#if project.new}
+      <div class="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-bl-lg z-10">
+        New
+      </div>
+    {/if}
     <div class="flex flex-col justify-between p-6 h-full">
         <div>
             <div class="flex items-center justify-between mb-4">

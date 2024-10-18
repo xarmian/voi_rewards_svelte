@@ -28,7 +28,11 @@
       && (project.title.toLowerCase().includes(searchTerm.toLowerCase())
       || project.description.toLowerCase().includes(searchTerm.toLowerCase())
       || project.category.toLowerCase().includes(searchTerm.toLowerCase()))
-      && (selectedCategory === 'All' || project.category === selectedCategory)
+      && (
+        selectedCategory === 'All' || 
+        (selectedCategory === 'New' && project.new === true) || 
+        project.category === selectedCategory
+      )
     ).sort((a, b) => {
       const indexA = categorySort.indexOf(a.category);
       const indexB = categorySort.indexOf(b.category);
@@ -93,6 +97,15 @@
             {category}
           </button>
         {/each}
+        <button
+          class="px-4 py-2 rounded-full text-sm font-semibold {selectedCategory === 'New' ? 'bg-red-600 dark:bg-red-200 text-white dark:text-red-800' : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'}"
+          on:click={() => {
+            selectedCategory = 'New';
+            updateURL('New');
+          }}
+        >
+          New
+        </button>
       </div>
     </div>
 
