@@ -58,18 +58,45 @@ export const POST: RequestHandler = async ({ request }) => {
             console.warn('Unable to determine client IP address');
         }
 
-        // Log Discord information to your database
+        // Check if the user already exists
+        const { data: existingUser, error: fetchError } = await supabase
+            .from('users')
+            .select('discord_id')
+            .eq('discord_id', discordUser.id)
+            .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+            console.error('Error fetching user:', fetchError);
+            return new Response(JSON.stringify({ error: 'Failed to check existing user' }), {
+                status: 500,
+            });
+        }
+
+        interface UpsertDataObject {
+            discord_id: string;
+            username: string;
+            email: string;
+            user_ip?: string;
+        }
+
+        // Prepare upsert data
+        const upsertData: UpsertDataObject = {
+            discord_id: discordUser.id,
+            username: discordUser.username,
+            email: discordUser.email,
+        };
+
+        // Only include user_ip if it's a new record
+        if (!existingUser) {
+            upsertData.user_ip = ipHash;
+        }
+
+        // Log user information to supabase
         const { error } = await supabase
             .from('users')
-            .upsert({
-                discord_id: discordUser.id,
-                username: discordUser.username,
-                email: discordUser.email,
-                user_ip: ipHash,
-            }, {
+            .upsert(upsertData, {
                 onConflict: 'discord_id',
             });
-
         if (error) {
             console.error('Error logging Discord information:', error);
             return new Response(JSON.stringify({ error: 'Failed to log Discord information' }), {
