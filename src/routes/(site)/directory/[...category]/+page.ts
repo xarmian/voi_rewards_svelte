@@ -6,6 +6,7 @@ export const load: PageLoad = async ({ params }) => {
   const pageMetaTags = {
     title: 'Voi Directory',
     description: 'Explore the Voi Ecosystem',
+    imageUrl: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png'  
   };
 
   if (category !== 'All') {
