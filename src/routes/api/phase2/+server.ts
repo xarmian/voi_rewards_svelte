@@ -28,6 +28,7 @@ export async function GET({ url }) {
             const { data: allData, error: allError, count } = await supabasePublicClient
                 .from('vr_phase2')
                 .select('address, airdrop_amount', { count: 'exact' })
+                .not('blacklisted', 'is', true)
                 .order('address', { ascending: true })
                 .range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -56,6 +57,7 @@ export async function GET({ url }) {
                 .from('vr_phase2')
                 .select('airdrop_amount')
                 .eq('address', wallet)
+                .not('blacklisted', 'is', true)
                 .single();
 
             if (questError) {
