@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Chart, Svg, Axis, Bars } from 'layerchart';
   import { Highlight, Tooltip } from 'layerchart';
-  import { format as fnsFormat } from 'date-fns';
+  import { formatDate } from '$lib/utils';
   import { scaleBand } from 'd3-scale';
   import { format, PeriodType } from 'svelte-ux';
   import { scaleLinear } from 'd3-scale';
@@ -15,7 +15,7 @@
       y: d.max_block - d.min_block
     }));
 
-  const xAxisFormat = (date: Date) => fnsFormat(date, 'MMM d');
+  const xAxisFormat = (date: Date) => formatDate(date, 'MMM d');
   const yAxisFormat = (d: number) => d.toLocaleString();
 
   const xScale = scaleBand().padding(0.4);

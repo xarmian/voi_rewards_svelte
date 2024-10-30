@@ -5,7 +5,7 @@
   import { LinkOutline, ClipboardOutline, SearchOutline, ChevronDownOutline, BrainOutline } from 'flowbite-svelte-icons';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { formatDistance } from 'date-fns';
+  import { formatDistanceToNow } from '$lib/utils.js';
   import type { FAQItem } from '$lib/faqData.js';
 
   export let data;
@@ -68,8 +68,8 @@
   }
 
   function formatDate(dateString: string) {
-    const date = new Date(dateString);
-    return formatDistance(date, new Date(), { addSuffix: true });
+    const date = new Date(dateString);    
+    return formatDistanceToNow(date);
   }
 
   onMount(() => {

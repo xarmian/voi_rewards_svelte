@@ -3,7 +3,7 @@
   import { Highlight, Tooltip } from 'layerchart';
   import { format, PeriodType } from 'svelte-ux';
   import { scaleBand, scaleLinear } from 'd3-scale';
-  import { format as fnsFormat } from 'date-fns';
+  import { formatDate } from '$lib/utils';
 
   export let chartData: Array<{ date: string; avg_online_stake: number; max_timestamp: string }>;
 
@@ -16,7 +16,7 @@
       y: d.avg_online_stake / 1e6
     }));
 
-  const xAxisFormat = (date: Date) => fnsFormat(date, 'MMM d');
+  const xAxisFormat = (date: Date) => formatDate(date, 'MMM d');
   const yAxisFormat = (d: number) => `${(d / 1e6).toFixed(0)}M`;
 </script>
 
