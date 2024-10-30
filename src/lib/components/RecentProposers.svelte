@@ -67,42 +67,26 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-700 rounded-lg shadow-lg p-6 mb-8">
-  <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Recent Block Proposers</h3>
-  <div class="h-[180px] overflow-hidden -mt-9">
+<div class="bg-white dark:bg-gray-700 rounded-lg shadow-lg p-6 h-56 overflow-hidden">
+  <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Recent Blocks</h3>
+  <div>
     <ul class="space-y-2">
-      <li class="flex flex-col justify-between md:grid md:grid-cols-4 md:gap-4 text-gray-700 dark:text-gray-300 h-[24px]">
-        <span class="font-medium col-span-1"></span>
-        <span class="text-sm text-gray-500 dark:text-gray-400 col-span-1 md:block hidden">Time</span>
-        <span class="text-sm text-gray-500 dark:text-gray-400 col-span-1 place-self-end">Block #</span>
-        <span class="text-sm text-gray-500 dark:text-gray-400 col-span-1 md:block hidden place-self-end">Votes</span>
-      </li>
       {#each proposers as proposer, i (proposer.address + proposer.timestamp)}
         <li 
           in:fade={{ duration: 500, delay: i * 100 }}
           out:fade={{ duration: 500 }}
-          class="flex flex-row justify-between md:grid md:grid-cols-4 md:gap-4 text-gray-700 dark:text-gray-300 h-[24px]"
+          class="flex flex-row justify-between text-gray-700 dark:text-gray-300"
         >
-          <span class="font-medium md:col-span-1">
+          <a class="text-sm md:col-span-1 block hover:underline" href={`/wallet/${proposer.address}`}>
             {proposer.address.slice(0, 8)}...{proposer.address.slice(-8)}
-            {#if ballasts.includes(proposer.address)}
-              <span class="text-xs text-gray-500 dark:text-gray-400"> (Ballast)</span>
-            {:else}
-              <span class="text-xs text-green-500 dark:text-green-400"> 🎉</span>
-            {/if}
-          </span>
-          <span class="text-sm text-gray-500 dark:text-gray-400 md:col-span-1 md:block hidden">{proposer.timestamp}</span>
-          <span class="text-sm text-gray-500 dark:text-gray-400 md:col-span-1 text-right">{proposer.block}</span>
-          <span class="text-sm text-gray-500 dark:text-gray-400 md:col-span-1 md:block hidden text-right">{proposer.votes}</span>
+          </a>
+          <a class="text-sm text-gray-500 dark:text-gray-400 hover:underline" href={`https://explorer.voi.network/explorer/block/${proposer.block}`} target="_blank">{proposer.block}</a>
         </li>
       {/each}
       {#if proposers.length === 0}
         {#each Array(5) as _, i}
-          <li class="flex flex-col justify-between md:grid md:grid-cols-3 md:gap-4 text-gray-400 dark:text-gray-600 h-[46px]">
+          <li class="flex flex-col md:grid md:grid-cols-3 md:gap-4 text-gray-400 dark:text-gray-600 h-[46px]">
             <span class="font-medium col-span-1">Loading...</span>
-            <span class="text-sm col-span-1 md:block hidden">--:--:--</span>
-            <span class="text-sm col-span-1"></span>
-            <span class="text-sm col-span-1 md:block hidden"></span>
           </li>
         {/each}
       {/if}

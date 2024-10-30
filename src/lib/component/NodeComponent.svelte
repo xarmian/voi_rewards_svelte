@@ -4,6 +4,7 @@
     import { algodClient } from '$lib/utils/algod';
     import { config } from '../config';
 	import InfoButton from './ui/InfoButton.svelte';
+    import { startLoading, stopLoading } from '$lib/stores/loadingStore';
 
     export let walletId: string;
 
@@ -25,25 +26,37 @@
     }
     
     onMount(async () => {
+
+    });
+
+    $: if (walletId) {
+        console.log('walletId',walletId);
+        fetchNodeData();
+    }
+
+    async function fetchNodeData() {
+        startLoading();
         try {
             // Get account information
             accountInfo = await algodClient.accountInformation(walletId).do();
             supply = await algodClient.supply().do();
-        } catch (error) {
-            console.error('Failed to fetch account balance:', error);
-        }
 
-        // get node information
-        const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${walletId}`;
-        await fetch(url, { cache: 'no-store' })
-            .then((response) => response.json())
-            .then((data) => {
-                apiData = data;
-            })
-            .catch((error) => {
-                console.error(error);
-            });
-    });
+            // get node information
+            const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${walletId}`;
+            await fetch(url, { cache: 'no-store' })
+                .then((response) => response.json())
+                .then((data) => {
+                    apiData = data;
+                })
+                .catch((error) => {
+                    console.error(error);
+                });
+        } catch (error) {
+            console.error('Failed to fetch node data:', error);
+        } finally {
+            stopLoading();
+        }
+    }
 
     function formatTime(seconds: number) {
         const days = seconds / (24 * 60 * 60);
@@ -87,30 +100,40 @@
                     </InfoButton>
                 </span>
             </h3>
-            <div class="space-y-3">
-                {#if typeof apiData.total_blocks == 'undefined' || !supply || !apiData.first_block}
-                    <div class="flex justify-center items-center h-24">
-                        <Spinner size="16" />
-                    </div>
-                {:else}
-                    <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span class="font-medium text-gray-600 dark:text-gray-400">Avg Block every:</span>
-                        <span class="text-gray-800 dark:text-gray-200">{formatTime(calculateAverageBlockTime())}</span>
-                    </p>
-                    <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per day:</span>
-                        <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(1).toFixed(2)}</span>
-                    </p>
-                    <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per week:</span>
-                        <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(7).toFixed(2)}</span>
-                    </p>
-                    <p class="flex justify-between items-center py-2">
-                        <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per month:</span>
-                        <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(30).toFixed(2)}</span>
-                    </p>
-                {/if}
-            </div>
+            {#if typeof apiData.total_blocks == 'undefined' || !supply || !apiData.first_block}
+                <div class="flex justify-center items-center h-24">
+                    <Spinner size="16" />
+                </div>
+            {:else if balance == 0 || supply['online-money'] == 0}
+                <div class="flex justify-center items-center h-24">
+                    <span class="text-gray-600 dark:text-gray-400">No data available</span>
+                </div>
+            {:else}
+                <div class="space-y-3">
+                    {#if typeof apiData.total_blocks == 'undefined' || !supply || !apiData.first_block}
+                        <div class="flex justify-center items-center h-24">
+                            <Spinner size="16" />
+                        </div>
+                    {:else}
+                        <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Block every:</span>
+                            <span class="text-gray-800 dark:text-gray-200">{formatTime(calculateAverageBlockTime())}</span>
+                        </p>
+                        <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per day:</span>
+                            <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(1).toFixed(2)}</span>
+                        </p>
+                        <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per week:</span>
+                            <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(7).toFixed(2)}</span>
+                        </p>
+                        <p class="flex justify-between items-center py-2">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per month:</span>
+                            <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(30).toFixed(2)}</span>
+                        </p>
+                    {/if}
+                </div>
+            {/if}
         </div>
     </div>
 
@@ -158,6 +181,5 @@
 </div>
 
 <style>
-    /* Remove existing styles */
 </style>
 

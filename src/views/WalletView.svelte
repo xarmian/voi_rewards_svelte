@@ -1,7 +1,8 @@
 <script lang="ts">
     import NodeComponent from '../lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
-    //import LockVestComponent from '$lib/component/LockVestComponent.svelte';
+    import LockVestComponent from '$lib/component/LockVestComponent.svelte';
+    import RewardCalcComponent from '$lib/component/RewardCalcComponent.svelte';
     import RewardsComponent from '$lib/component/RewardsComponent.svelte';
     import PointsComponent from '$lib/component/PointsComponent.svelte';
     import QuestComponent from '$lib/component/QuestComponent.svelte';
@@ -46,6 +47,7 @@
     });
 
     const tabs: any = [
+        //{name: 'Rewards', component: RewardCalcComponent},
         {name: 'Node', component: NodeComponent},
         {name: 'Proposals', component: ProposalsComponent},
         //{name: 'Lock+Vest', component: LockVestComponent},

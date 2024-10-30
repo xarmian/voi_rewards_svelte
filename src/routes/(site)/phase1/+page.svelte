@@ -1,9 +1,12 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
+    export let data;
+
     import InfoButton from '../../../lib/component/ui/InfoButton.svelte';
 
     import WalletSearch from "$lib/component/WalletSearch.svelte";
     import { Card, Popover } from "flowbite-svelte";
-    import snapshotTSV from "./snapshot.txt?raw";
+    import snapshotTSV from "./snapshot_noescrow.txt?raw";
     //@ts-ignore
     import RangeSlider from "svelte-range-slider-pips";
 
@@ -14,7 +17,7 @@
         viaBalance: number;
     }
 
-    const total_testnet_tokens = 3_421_845_187.26;
+    let total_testnet_tokens = 3_421_845_187.26;
     const snapshot_block = 6522332;
     let selectedWallet: string | null = null;
     let airdrop: number | null = null;
@@ -37,6 +40,8 @@
         };
     });
 
+    total_testnet_tokens = snapshot.reduce((acc, curr) => acc + curr.voiBalance + curr.viaBalance, 0);
+
     $: if (selectedWallet && snapshot) {
         totalBalance = (snapshot.find((s) => s.account === selectedWallet)?.voiBalance??0) + (snapshot.find((s) => s.account === selectedWallet)?.viaBalance??0);
         airdrop = totalBalance / total_testnet_tokens * 150_000_000;
@@ -45,6 +50,21 @@
         airdrop = ((totalBalance??0) / total_testnet_tokens * 150_000_000);
     }
     
+
+    // If CSV is requested, trigger download
+    onMount(() => {
+        if (data.wantsCsv) {
+            const blob = new Blob([data.csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'voi_phase1_airdrop.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        }
+    });
 
 </script>
 <div class="flex flex-col bg-white dark:bg-gray-800">

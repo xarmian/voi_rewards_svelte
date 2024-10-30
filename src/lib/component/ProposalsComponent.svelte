@@ -6,6 +6,7 @@
     import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
+    import { algodClient } from '$lib/utils/algod';
 
     export let walletId: string;
     let apiData: any;
@@ -15,6 +16,11 @@
 
     let screenSize: number;
     let idx = 0;
+
+    let supply: any;
+    let accountInfo: any;
+
+    let expectedBlockTime: string | null = null;
 
     $: {
         if (apiData) {
@@ -41,17 +47,57 @@
         // get proposal data for walletId
         const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
         try {
-            const response = await fetch(url, { cache: 'no-store' });
+            const [response, accountInfo, supply] = await Promise.all([
+                fetch(url, { cache: 'no-store' }),
+                algodClient.accountInformation(walletId).do(),
+                algodClient.supply().do()
+            ]);
+            
             apiData = await response.json();
+            
+            // Calculate expected block time once
+            if (accountInfo?.amount && supply?.['online-money']) {
+                const balance = Number(accountInfo.amount);
+                const secondsPerDay = 24 * 60 * 60;
+                const blocksPerDay = secondsPerDay / 2.8;
+                const dailyBlocks = (balance / supply['online-money']) * blocksPerDay;
+                const avgBlockTime = secondsPerDay / dailyBlocks;
+                
+                const hours = Math.floor(avgBlockTime / (60 * 60));
+                const minutes = Math.floor((avgBlockTime % (60 * 60)) / 60);
+                expectedBlockTime = `${hours}h ${minutes}m`;
+            }
         } catch (error) {
             console.error(error);
         }
     });
 
+    function formatTime(seconds: number) {
+        const hours = Math.floor(seconds / (60 * 60));
+        const minutes = Math.floor((seconds % (60 * 60)) / 60);
+        return `${hours}h ${minutes}m`;
+    }
+
+    function calculateAverageBlockTime() {
+        if (!accountInfo?.amount || !supply?.['online-money']) return null;
+        const balance = Number(accountInfo.amount);
+        const secondsPerDay = 24 * 60 * 60;
+        const blocksPerDay = secondsPerDay / 2.8; // 2.8 seconds per block
+        const dailyBlocks = (balance / supply['online-money']) * blocksPerDay;
+        return secondsPerDay / dailyBlocks;
+    }
+
 </script>
 
 <div class="p-6 bg-white dark:bg-gray-900 rounded-lg shadow-md">
-    <h3 class="text-xl font-bold mb-6 text-gray-800 dark:text-gray-200">Proposals</h3>
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-bold text-gray-800 dark:text-gray-200">Proposals</h3>
+        {#if expectedBlockTime}
+            <div class="text-sm text-gray-600 dark:text-gray-400">
+                Expected block every: {expectedBlockTime}
+            </div>
+        {/if}
+    </div>
     {#if apiData == null}
         <div class="flex justify-center items-center h-64">
             <Spinner size="16" />

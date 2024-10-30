@@ -3,7 +3,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
   import RewardsTableHeader from './RewardsTableHeader.svelte';
-  //import { rewardParams } from '../../stores/dataTable';
+  import { rewardParams } from '../../stores/dataTable';
   import { CopySolid, LinkSolid } from 'flowbite-svelte-icons';
   import { Modal } from 'flowbite-svelte';
   import { copy } from 'svelte-copy';
@@ -12,12 +12,14 @@
   import { getNFD } from '$lib/utils/nfd';
   import WalletView from '../../views/WalletView.svelte';
   import { compareVersions } from 'compare-versions';
+  import { algodClient } from '$lib/utils/algod';
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
 
   $: totalBlockRewards = 0;
   $: totalBlocks = 0;
+  $: selectedBalance = 'Loading...' as string | number;
 
   let nfdData: any[] = [];
   let expandedRow: number | null = null;
@@ -52,22 +54,30 @@
       expandedRow = null;
     } else {
       expandedRow = row;
+
+      selectedBalance = 'Loading...';
+      if (items[row]) {
+        algodClient.accountInformation(items[row].proposer).do().then((res) => {
+          selectedBalance = (res.amount / Math.pow(10,6)).toLocaleString()+ ' $VOI';
+        });
+      }
     }
+    
   }
 
   onMount(async () => {
     lastUpdateTime = new Date();
     // convert to NFDs
     const allAddresses = items.map((row: any) => row.proposer);
-    nfdData = await getNFD(allAddresses);
+    //nfdData = await getNFD(allAddresses);
   });
 
-  /*$: unsubRewardParams = rewardParams.subscribe(async (value) => {
+  $: unsubRewardParams = rewardParams.subscribe(async (value) => {
     totalBlockRewards = value.block_reward_pool;
     totalBlocks = value.total_blocks;
   });
 
-  $: onDestroy(unsubRewardParams);*/
+  $: onDestroy(unsubRewardParams);
 
   let searchTerm: string = '';
 
@@ -93,12 +103,12 @@
     //if (typeof event !== 'undefined') event.stopPropagation(); // Stop event propagation
 
     // Get the table data
-    const data = filterItems.map((row: { proposer: any; points: any; }) => {
-      return [row.proposer, row.points];
+    const data = filterItems.map((row: { proposer: any; block_rewards: any; }) => {
+      return [row.proposer, row.block_rewards];
     });
 
     // Create the CSV content
-    const headers = ['account', 'points'];
+    const headers = ['account', 'block_rewards'];
     const csvContent = headers.join(',') + '\n' + data.map((row: any[]) => row.join(',')).join('\n');
 
     // Download the CSV file
@@ -106,7 +116,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    const filename = 'phase2_health_points.csv';
+    const filename = 'phase2_rewards.csv';
     link.setAttribute('download', filename);
     link.style.display = 'none';
     document.body.appendChild(link);
@@ -121,7 +131,8 @@
 
     for (let i = 0; i < $sortItems.length; i++) {
       const item = $sortItems[i];
-      item.block_rewards = Math.floor(Math.floor(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
+      item.epoch_block_rewards = Math.floor(Math.floor(totalBlockRewards * 0.75 / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
+      item.block_rewards = Math.round(totalBlockRewards / 216000 * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
 
       blockTotal += item.block_rewards;
 
@@ -174,8 +185,8 @@
       { id: 'proposer', desc: 'Wallet', tooltip: null },
   ];
 
-  columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet during this Epoch' });
-  columns.push({ id: 'vote_count', desc: 'Hard Votes', tooltip: 'Total votes cast by each wallet during this Epoch' });
+  columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet so far this Epoch' });
+  columns.push({ id: 'block_rewards', desc: 'Est. Earned Reward', tooltip: 'Estimated block rewards earned by each wallet so far this Epoch' });
 </script>
 
 <div class="overflow-auto ml-0 mr-0 md:ml-6 md:mr-6 flex flex-col">
@@ -247,7 +258,7 @@
               </a>
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
-            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.vote_count)}</TableBodyCell>
+            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_rewards.toFixed(2))} VOI</TableBodyCell>
         </TableBodyRow>
         {#if expandedRow === i}
           <TableBodyRow>
@@ -256,17 +267,22 @@
                 <div>
                   <!-- address and nfd -->
                   <div>
-                    <Label defaultClass="text-sm font-medium inline-block w-28">Wallet:</Label>
-                    <button on:click|stopPropagation={() => {
-                        viewWallet = true;
-                        if (viewWalletId != item.proposer) viewWalletId = item.proposer;
-                      }} class="text-blue-500 hover:text-blue-800 hover:underline">
+                    <Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
+                    <a on:click|stopPropagation href="/wallet/{item.proposer}" class="text-blue-500 hover:text-blue-800 hover:underline">
                       {item.proposer.substring(0,20)}...
-                    </button>
+                    </a>
+                  </div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-40">Balance:</Label>
+                    <span class="text-gray-500">{selectedBalance}</span>
+                  </div>
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-40">Est. Reward (full epoch):</Label>
+                    <span class="text-gray-500">{(item.epoch_block_rewards).toFixed(2)} VOI</span>
                   </div>
                   {#if item.nfd}
                     <div>
-                      <Label defaultClass="text-sm font-medium inline-block w-28">NFD:</Label>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">NFD:</Label>
                       <a on:click|stopPropagation href="https://app.nf.domains/name/{item.nfd}" target="_blank" class="hover:underline active:text-gray-500">{item.nfd}</a>
                     </div>
                   {/if}
@@ -286,7 +302,9 @@
           <TableBodyCell class="p-2">
             {items.reduce((sum, item) => sum + item.block_count, 0)}
           </TableBodyCell>
-          <TableBodyCell colspan="1" class="p-2"></TableBodyCell>
+          <TableBodyCell colspan="1" class="p-2">
+            <!--{Math.round(items.reduce((sum, item) => sum + item.block_rewards, 0))}-->
+          </TableBodyCell>
       </TableBodyRow>
     </TableBody>
   </Table>
