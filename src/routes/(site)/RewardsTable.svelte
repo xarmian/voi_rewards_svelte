@@ -69,7 +69,7 @@
     lastUpdateTime = new Date();
     // convert to NFDs
     const allAddresses = items.map((row: any) => row.proposer);
-    //nfdData = await getNFD(allAddresses);
+    nfdData = await getNFD(allAddresses);
   });
 
   $: unsubRewardParams = rewardParams.subscribe(async (value) => {
@@ -182,7 +182,7 @@
 
   let columns: any = [
       { id: 'rank', desc: 'Rank', tooltip: null },
-      { id: 'proposer', desc: 'Wallet', tooltip: null },
+      { id: 'proposer', desc: 'Address', tooltip: null },
   ];
 
   columns.push({ id: 'block_count', desc: 'Blocks', tooltip: 'Total blocks produced by each wallet so far this Epoch' });

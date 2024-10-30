@@ -244,7 +244,7 @@
 				<DashboardCard title="Rewarded Blocks this Epoch" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={'~' + (totalBlocks > 0 ? ($rewardParams.block_reward_pool / totalBlocks).toFixed(2) + ' $VOI/block' : '')} info="The number of blocks produced by the community." />
 			</div>-->
 			<div on:click={handleBlockChartClick} class="cursor-pointer">
-				<DashboardCard title="Blocks per Epoch" value="~{"216,000".toLocaleString()}" subvalue={'~' + ($rewardParams.block_reward_pool / 216000).toFixed(2) + ' $VOI/block'} info="The number of blocks produced in a typical epoch." />
+				<DashboardCard title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch} value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`} subvalue={'~' + ($rewardParams.block_reward_pool / 216000).toFixed(2) + ' $VOI/block'} info="The number of blocks produced in a typical epoch." />
 			</div>
 			<div on:click={handleStakeChartClick} class="cursor-pointer">
 				<DashboardCard 
