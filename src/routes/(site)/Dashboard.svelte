@@ -12,7 +12,7 @@
 	import MiniBlockChart from '$lib/components/MiniBlockChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
-	import { utcToLocalDate } from 'svelte-ux/utils/date';
+
 	interface Supply {
 		[key: string]: number;
 	}
@@ -22,7 +22,7 @@
 	function handleLatestBlock(event: CustomEvent) {
 		latestBlock.set(event.detail);
 		// Update total blocks count
-		totalBlocks += event.detail.newNonBallastBlocks;
+		//totalBlocks += event.detail.newNonBallastBlocks;
 	}
 
 	$: totalBlocks = 0;
@@ -38,6 +38,7 @@
 	let showEnlargedStakeChart = false;
 	let showEnlargedBlockChart = false;
 	let onlineStakeHistory: any[] = [];
+	let blacklistedBalanceTotal = 0;
 
 	const populateDateDropdown = async () => {
 		const url = `${config.proposalApiBaseUrl}`;
@@ -176,7 +177,8 @@
 
 				ballasts = data.blacklist;
 				totalWallets = data.num_proposers;
-				totalBlocks = data.num_blocks;
+				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
+				blacklistedBalanceTotal = data.blacklist_balance_total;
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
 				updateRewardParams();
 			});
@@ -193,9 +195,13 @@
 
 	const updateRewardParams = async () => {
 		const tokens = await getTokensByEpoch(dates.find(date => date.id === selectedDate)?.epoch || 1);
+		const rewardPerBlock = extrapolateRewardPerBlock();
+
 		rewardParams.set({
 			block_reward_pool: tokens,
 			total_blocks: totalBlocks,
+			reward_per_block: rewardPerBlock.projectedRewardPerBlock,
+			total_blocks_projected: rewardPerBlock.projectedTotalBlocks,
 		});
 	}
 
@@ -208,7 +214,7 @@
 	}
 
 	async function fetchOnlineStakeHistory() {
-		const response = await fetch('https://api.voirewards.com/proposers/index_main_3.php?action=online-stake-history');
+		const response = await fetch(`${config.proposalApiBaseUrl}?action=online-stake-history`);
 		onlineStakeHistory = await response.json();
 	}
 
@@ -226,6 +232,43 @@
 		goto(`/wallet/${address}`);
 	}
 
+	function extrapolateRewardPerBlock() {
+		// Get current date in UTC
+		const now = new Date();
+		
+		// Parse the end date from selectedDate (format: YYYYMMDD-YYYYMMDD)
+		const endDate = new Date(
+			parseInt(selectedDate.substring(9, 13)),
+			parseInt(selectedDate.substring(13, 15)) - 1,
+			parseInt(selectedDate.substring(15, 17))
+		);
+		endDate.setUTCHours(23, 59, 59, 999);
+
+		// Calculate remaining time in milliseconds
+		const remainingTime = endDate.getTime() - now.getTime();
+		const remainingDays = Math.max(0, remainingTime / (1000 * 60 * 60 * 24));
+		
+		// Calculate blocks per day based on current data
+		const epochDays = 7; // Each epoch is 7 days
+		const currentBlocksPerDay = totalBlocks / (7 - remainingDays);
+		
+		// Extrapolate total blocks by end of epoch
+		const projectedTotalBlocks = totalBlocks + (currentBlocksPerDay * remainingDays);
+		
+		// Calculate projected reward per block
+		const projectedRewardPerBlock = $rewardParams.block_reward_pool / projectedTotalBlocks;
+		
+		return {
+			projectedTotalBlocks: Math.round(projectedTotalBlocks),
+			projectedRewardPerBlock: projectedRewardPerBlock
+		};
+	}
+
+	function getEligibleOnlineStake() {
+		const commonBalance = supply['online-money'] - blacklistedBalanceTotal;
+		return Math.round((commonBalance + Math.min(blacklistedBalanceTotal, commonBalance/3))/Math.pow(10,6));
+	}
+
 </script>
 
 <div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -239,22 +282,36 @@
 		<!-- Dashboard Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 			<!--<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />-->
-			<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />
-			<!--<div on:click={handleBlockChartClick} class="cursor-pointer">
-				<DashboardCard title="Rewarded Blocks this Epoch" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={'~' + (totalBlocks > 0 ? ($rewardParams.block_reward_pool / totalBlocks).toFixed(2) + ' $VOI/block' : '')} info="The number of blocks produced by the community." />
-			</div>-->
+			<!--<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />-->
+			<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks in this Epoch earning rewards." />
 			<div on:click={handleBlockChartClick} class="cursor-pointer">
-				<DashboardCard title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch} value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`} subvalue={'~' + ($rewardParams.block_reward_pool / 216000).toFixed(2) + ' $VOI/block'} info="The number of blocks produced in a typical epoch." />
+				<DashboardCard title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch} value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`} subvalue={'~' + (totalBlocks > 0 ? $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : '')} info="The number of blocks produced in a typical epoch." />
 			</div>
 			<div on:click={handleStakeChartClick} class="cursor-pointer">
 				<DashboardCard 
 					title="Online Stake" 
 					value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
+					subvalue={`Eligible: ${blacklistedBalanceTotal > 0 ? getEligibleOnlineStake().toLocaleString() + ' VOI' : ''}`}
 					info="The total amount of VOI that is currently online and participating in the network." 
 					showChart={true}
 				/>
 			</div>
 			<RecentProposers on:latestBlock={handleLatestBlock} {ballasts} />
+		</div>
+
+		<div class="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 p-4 mb-6">
+			<div class="flex">
+				<div class="flex-shrink-0">
+					<svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+					</svg>
+				</div>
+				<div class="ml-3">
+					<p class="text-sm text-yellow-700 dark:text-yellow-200">
+						Note: All reward calculations and estimates shown are preliminary and subject to change. The final reward distribution may differ from what is displayed.
+					</p>
+				</div>
+			</div>
 		</div>
 
 		<div class="flex justify-center items-center gap-3 mb-6">

@@ -58,7 +58,7 @@
       selectedBalance = 'Loading...';
       if (items[row]) {
         algodClient.accountInformation(items[row].proposer).do().then((res) => {
-          selectedBalance = (res.amount / Math.pow(10,6)).toLocaleString()+ ' $VOI';
+          selectedBalance = (res.amount / Math.pow(10,6)).toLocaleString()+ ' VOI';
         });
       }
     }
@@ -132,7 +132,7 @@
     for (let i = 0; i < $sortItems.length; i++) {
       const item = $sortItems[i];
       item.epoch_block_rewards = Math.floor(Math.floor(totalBlockRewards * 0.75 / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
-      item.block_rewards = Math.round(totalBlockRewards / 216000 * item.block_count * Math.pow(10,6)) / Math.pow(10,6);
+      item.block_rewards = item.block_count * $rewardParams.reward_per_block;
 
       blockTotal += item.block_rewards;
 
@@ -294,7 +294,7 @@
         {/if}
       {/each}
    
-      <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
+      <TableBodyRow class="bg-gray-50 dark:bg-gray-900 hidden">
         <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
         <TableBodyCell colspan="2" class="p-2">
           Total Blocks:

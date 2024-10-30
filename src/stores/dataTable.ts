@@ -3,6 +3,8 @@ import { writable } from 'svelte/store';
 export const rewardParams = writable({
     block_reward_pool: 0,
     total_blocks: 0,
+    reward_per_block: 0,
+    total_blocks_projected: 0
 });
 
 function createDataTable() {
