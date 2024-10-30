@@ -48,7 +48,8 @@
 			<FooterLink href="/faq">FAQ</FooterLink>
 			<FooterLink href="/what_is_voi">What is Voi?</FooterLink>
 			<FooterLink href="/how_to_node">Run a Node</FooterLink>
-			<FooterLink href="/phase1">Phase 1</FooterLink>
+			<FooterLink href="/wallet">Account</FooterLink>
+			<!--<FooterLink href="/phase1">Phase 1</FooterLink>-->
 			<!--<FooterLink href="/quests">Quests</FooterLink>-->
 			<FooterLink href="/about">About</FooterLink>
 		  </FooterLinkGroup>

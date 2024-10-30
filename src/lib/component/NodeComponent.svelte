@@ -1,10 +1,8 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import { Badge, Card, Spinner } from 'flowbite-svelte';
     import { algodClient } from '$lib/utils/algod';
     import { config } from '../config';
 	import InfoButton from './ui/InfoButton.svelte';
-    import { startLoading, stopLoading } from '$lib/stores/loadingStore';
 
     export let walletId: string;
 
@@ -12,34 +10,27 @@
     let supply: any;
     $: estimatedBlocks = 0;
     $: balance = 0;
-    let apiData: any;
-    $: apiData = {};
+    $: apiData = {} as any;
 
-    $: {
-        balance = Number(accountInfo?.amount??0);
-    }
-
-    $: if (supply && apiData.first_block && balance > 0) {
-        // calculate expected block proposals in current epoch
-        const epochBlocks = apiData.last_block - apiData.first_block;
-        estimatedBlocks = Math.round(balance / supply['online-money'] * epochBlocks);
-    }
-    
-    onMount(async () => {
-
-    });
+    $: averageBlockTime = 0;
+    $: expectedBlocksPerDay = 0;
+    $: expectedBlocksPerWeek = 0;
+    $: expectedBlocksPerMonth = 0;
 
     $: if (walletId) {
-        console.log('walletId',walletId);
+        //console.log('walletId',walletId);
         fetchNodeData();
     }
 
+    $: loading = false;
+
     async function fetchNodeData() {
-        startLoading();
+        loading = true;
         try {
             // Get account information
             accountInfo = await algodClient.accountInformation(walletId).do();
             supply = await algodClient.supply().do();
+            balance = Number(accountInfo?.amount??0);
 
             // get node information
             const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${walletId}`;
@@ -47,14 +38,22 @@
                 .then((response) => response.json())
                 .then((data) => {
                     apiData = data;
+
+                    const epochBlocks = apiData.last_block - apiData.first_block;
+                    estimatedBlocks = Math.round(balance / supply['online-money'] * epochBlocks);
+
+                    averageBlockTime = calculateAverageBlockTime();
+                    expectedBlocksPerDay = calculateExpectedBlocks(1);
+                    expectedBlocksPerWeek = calculateExpectedBlocks(7);
+                    expectedBlocksPerMonth = calculateExpectedBlocks(30);
+
+                    loading = false;
                 })
                 .catch((error) => {
                     console.error(error);
                 });
         } catch (error) {
             console.error('Failed to fetch node data:', error);
-        } finally {
-            stopLoading();
         }
     }
 
@@ -100,7 +99,7 @@
                     </InfoButton>
                 </span>
             </h3>
-            {#if typeof apiData.total_blocks == 'undefined' || !supply || !apiData.first_block}
+            {#if loading}
                 <div class="flex justify-center items-center h-24">
                     <Spinner size="16" />
                 </div>
@@ -117,19 +116,19 @@
                     {:else}
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Avg Block every:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{formatTime(calculateAverageBlockTime())}</span>
+                            <span class="text-gray-800 dark:text-gray-200">{formatTime(averageBlockTime)}</span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per day:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(1).toFixed(2)}</span>
+                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerDay.toFixed(2)}</span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per week:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(7).toFixed(2)}</span>
+                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerWeek.toFixed(2)}</span>
                         </p>
                         <p class="flex justify-between items-center py-2">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per month:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{calculateExpectedBlocks(30).toFixed(2)}</span>
+                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerMonth.toFixed(2)}</span>
                         </p>
                     {/if}
                 </div>
@@ -142,9 +141,9 @@
             <div class="p-6">
                 <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Consensus</h3>
                 <div class="space-y-3">
-                    {#if !accountInfo}
+                    {#if loading}
                         <div class="flex justify-center items-center h-32">
-                            <Spinner size="xl" />
+                            <Spinner size="16" />
                         </div>
                     {:else}
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
