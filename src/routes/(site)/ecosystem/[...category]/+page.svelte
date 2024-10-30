@@ -39,8 +39,21 @@
   <header class="hero parallax bg-purple-900 text-white">
     <div class="container mx-auto px-4 py-20 text-center">
       <h1 class="text-6xl font-bold mb-4">Voi Ecosystem Hub</h1>
-      <p class="text-2xl">Discover the future of Community Blockchain</p>
+      <p class="text-2xl mb-12">Discover the future of Community Blockchain</p>
+      
+      <div class="mt-28">
+        <h2 class="text-3xl font-semibold mb-4">Need Voi?</h2>
+        <a 
+          href="https://www.mexc.com/exchange/VOI_USDT"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200"
+        >
+          Buy on MEXC
+        </a>
+      </div>
     </div>
+    <div></div>
   </header>
 
   {#each categorySort as category, index}
