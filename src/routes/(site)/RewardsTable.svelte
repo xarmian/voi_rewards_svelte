@@ -4,7 +4,7 @@
   import { writable } from 'svelte/store';
   import RewardsTableHeader from './RewardsTableHeader.svelte';
   import { rewardParams } from '../../stores/dataTable';
-  import { CopySolid, LinkSolid } from 'flowbite-svelte-icons';
+  import { CopySolid, LinkSolid, StarSolid, StarOutline } from 'flowbite-svelte-icons';
   import { Modal } from 'flowbite-svelte';
   import { copy } from 'svelte-copy';
   import { toast } from '@zerodevx/svelte-toast';
@@ -13,6 +13,7 @@
   import WalletView from '../../views/WalletView.svelte';
   import { compareVersions } from 'compare-versions';
   import { algodClient } from '$lib/utils/algod';
+  import { favorites } from '../../stores/favorites';
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
@@ -35,6 +36,8 @@
 
   let isRefreshing = false;
   let lastUpdateTime: Date | null = null;
+
+  let showOnlyFavorites = false;
 
   async function handleRefresh() {
     isRefreshing = true;
@@ -174,10 +177,20 @@
     });
     sortItems.set(sorted);
 
-    filterItems = $sortItems.filter((item: { proposer: string; nfd: string | undefined; nodes: { node_name: string | null; }[]; }) => 
-    (item.proposer.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) 
-    || (item.nfd !== undefined && item.nfd?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)
-    || (item.nodes?.some((node: { node_name: string | null; }) => node.node_name !== null && node.node_name?.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)));
+    filterItems = $sortItems.filter((item: { proposer: string; nfd: string | undefined; nodes: { node_name: string | null; }[]; }) => {
+      const matchesSearch = (
+        item.proposer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.nfd !== undefined && item.nfd?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.nodes?.some((node: { node_name: string | null; }) => 
+          node.node_name !== null && 
+          node.node_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        ))
+      );
+
+      const matchesFavorites = !showOnlyFavorites || $favorites.includes(item.proposer);
+
+      return matchesSearch && matchesFavorites;
+    });
   }
 
   let columns: any = [
@@ -190,30 +203,38 @@
 </script>
 
 <div class="overflow-auto ml-0 mr-0 md:ml-6 md:mr-6 flex flex-col">
-    <div class="flex justify-between items-center">
-      <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm} innerDivClass="w-1/2" />
-        <button
-          on:click={handleRefresh}
-          class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
-        disabled={isRefreshing} >
+    <div class="flex justify-between items-center gap-4">
+      <div class="flex flex-col md:flex-row items-center gap-4 flex-1">
+        <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm} innerDivClass="w-full" />
+        <div class="flex items-center gap-2">
+          <Toggle bind:checked={showOnlyFavorites}>
+            <StarSolid class="w-4 h-4 text-yellow-300" />
+            Favorites Only
+          </Toggle>
+        </div>
+      </div>
+      <button
+        on:click={handleRefresh}
+        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
+        disabled={isRefreshing}
+      >
         <i class="fas fa-sync-alt mr-2 {isRefreshing ? 'animate-spin' : ''}"></i>
         <span class="hidden md:block">Refresh</span>
       </button>
-  </div>
+    </div>
     {#if lastUpdateTime}
       <p class="text-sm text-gray-600 mb-2 place-self-end">
         Last updated: {lastUpdateTime.toLocaleString()}
       </p>
     {/if}
-
   <Table>
     <TableHead>
         {#each columns as column, i}
             <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
-                <span>
+                <span class="flex flex-col md:flex-row">
                   {#if column.id === 'proposer'}
-                    <span class="inline-block negTranslate">{column.desc}</span>
-                    <span class="inline-block ml-4" on:click|stopPropagation><Toggle bind:checked={showWalletNFD}>NFD</Toggle></span>
+                    <span class="negTranslate">{column.desc}</span>
+                    <span class="md:ml-4" on:click|stopPropagation><Toggle bind:checked={showWalletNFD}>NFD</Toggle></span>
                   {:else}
                     {column.desc}
                   {/if}
@@ -232,6 +253,16 @@
         {#each filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) as item, i}
         <TableBodyRow on:click={() => toggleRow(i)}>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
+              <button 
+                on:click|stopPropagation={() => favorites.toggle(item.proposer)}
+                class="mr-2 hover:scale-110 transition-transform"
+              >
+                {#if $favorites.includes(item.proposer)}
+                  <StarSolid class="w-4 h-4 text-yellow-300" />
+                {:else}
+                  <StarOutline class="w-4 h-4" />
+                {/if}
+              </button>
               {item.rank}
               {#if item.expires_in_hrs <= 0}
                 <i class="fas fa-ban text-red-500 ml-2" title="Consensus Participation Key has Expired"></i>
@@ -245,7 +276,7 @@
                 if (viewWalletId != item.proposer) viewWalletId = item.proposer;
               }} class="text-blue-500 hover:text-blue-800 hover:underline">
                 {#if showWalletNFD && item.nfd !== undefined}
-                  <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,16)+'...' : item.nfd}</span>
+                  <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,10)+'...' : item.nfd}</span>
                 {:else}
                   {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
                 {/if}

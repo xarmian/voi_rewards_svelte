@@ -21,7 +21,6 @@ function createDataTable() {
         set,
         update 
     };
-          
 }
 
 export const dataTable = createDataTable();

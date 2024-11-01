@@ -272,99 +272,102 @@
 
 </script>
 
-<div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+<div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8">
 	<div class="max-w-7xl mx-auto">
-		<!-- Phase 2 Banner -->
-		<!--<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg mb-8 p-6 text-center">
-			<h2 class="text-2xl font-bold mb-2">Looking for Your TestNet Phase 2 Estimated Rewards?</h2>
-			<a href="/phase2" class="inline-block bg-white text-purple-600 font-semibold px-4 py-2 rounded-full hover:bg-purple-100 transition duration-300">Visit our Phase 2 Page Here!</a>
-		</div>-->
+		<div class="px-4 sm:px-6 lg:px-8">
+			<!--<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg mb-8 p-6 text-center">
+				<h2 class="text-2xl font-bold mb-2">Looking for Your TestNet Phase 2 Estimated Rewards?</h2>
+				<a href="/phase2" class="inline-block bg-white text-purple-600 font-semibold px-4 py-2 rounded-full hover:bg-purple-100 transition duration-300">Visit our Phase 2 Page Here!</a>
+			</div>-->
 
-		<!-- Dashboard Cards -->
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-			<!--<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />-->
-			<!--<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />-->
-			<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks in this Epoch earning rewards." />
-			<div on:click={handleBlockChartClick} class="cursor-pointer">
-				<DashboardCard
-					title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch}
-					value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`}
-					subvalue={totalBlocks > 0 ? '~' + $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : ''}
-					subvalue2={eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
-					info="The number of blocks produced in a typical epoch."
-				/>
-			</div>
-			<div on:click={handleStakeChartClick} class="cursor-pointer">
-				<DashboardCard 
-					title="Online Stake" 
-					value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
-					subvalue={`Eligible: ${blacklistedBalanceTotal > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
-					info="The total amount of VOI that is currently online and participating in the network." 
-					showChart={true}
-				/>
-			</div>
-			<RecentProposers on:latestBlock={handleLatestBlock} {ballasts} />
-		</div>
-
-		<div class="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 p-4 mb-6">
-			<div class="flex">
-				<div class="flex-shrink-0">
-					<svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-					</svg>
+			<!-- Dashboard Cards -->
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+				<!--<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />-->
+				<!--<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />-->
+				<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks in this Epoch earning rewards." />
+				<div on:click={handleBlockChartClick} class="cursor-pointer">
+					<DashboardCard
+						title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch}
+						value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`}
+						subvalue={totalBlocks > 0 ? '~' + $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : ''}
+						subvalue2={eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
+						info="The number of blocks produced in a typical epoch."
+					/>
 				</div>
-				<div class="ml-3">
-					<p class="text-sm text-yellow-700 dark:text-yellow-200">
-						Note: All reward calculations and estimates shown are preliminary and subject to change. The final reward distribution may differ from what is displayed.
-					</p>
+				<div on:click={handleStakeChartClick} class="cursor-pointer">
+					<DashboardCard 
+						title="Online Stake" 
+						value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
+						subvalue={`Eligible: ${blacklistedBalanceTotal > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
+						info="The total amount of VOI that is currently online and participating in the network." 
+						showChart={true}
+					/>
+				</div>
+				<RecentProposers on:latestBlock={handleLatestBlock} {ballasts} />
+			</div>
+
+			<div class="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 p-4 mb-6">
+				<div class="flex">
+					<div class="flex-shrink-0">
+						<svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+						</svg>
+					</div>
+					<div class="ml-3">
+						<p class="text-sm text-yellow-700 dark:text-yellow-200">
+							Note: All reward calculations and estimates shown are preliminary and subject to change. The final reward distribution may differ from what is displayed.
+						</p>
+					</div>
 				</div>
 			</div>
-		</div>
 
-		<div class="flex justify-center items-center gap-3 mb-6">
-			<label 
-				for="epoch-selector" 
-				class="font-medium text-gray-700 dark:text-gray-300"
-			>
-				Epoch:
-			</label>
-			<select
-				id="epoch-selector"
-				bind:value={selectedDate}
-				class="block w-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-					   rounded-lg px-4 py-2
-					   focus:ring-2 focus:ring-purple-500 focus:border-purple-500
-					   dark:text-gray-300 dark:focus:ring-purple-400
-					   transition-colors duration-200"
-			>
-				{#each dates as date}
-					<option value={date.id}>
-						{date.desc}
-					</option>
-				{/each}
-			</select>
-		</div>
+			<div class="flex justify-center items-center gap-3 mb-6">
+				<label 
+					for="epoch-selector" 
+					class="font-medium text-gray-700 dark:text-gray-300"
+				>
+					Epoch:
+				</label>
+				<select
+					id="epoch-selector"
+					bind:value={selectedDate}
+					class="block w-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
+						rounded-lg px-4 py-2
+						focus:ring-2 focus:ring-purple-500 focus:border-purple-500
+						dark:text-gray-300 dark:focus:ring-purple-400
+						transition-colors duration-200"
+				>
+					{#each dates as date}
+						<option value={date.id}>
+							{date.desc}
+						</option>
+					{/each}
+				</select>
+			</div>
 
-		<div class="mb-6">
-			<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
-		</div>
+			<div class="mb-6">
+				<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
+			</div>
 
-		<!-- Action Buttons -->
-		<div class="flex-col sm:flex-row justify-center gap-4 mb-8 hidden">
-			<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank" class="btn-primary">
-				Learn to Run a Node
-			</a>
-			<a href="/leaderboard" class="btn-secondary">
-				Phase 2 Leaderboard
-			</a>
-			<a href="/phase2" class="btn-secondary">
-				Phase 2 Reward Estimates
-			</a>
+			<!-- Action Buttons -->
+			<div class="flex-col sm:flex-row justify-center gap-4 mb-8 hidden">
+				<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank" class="btn-primary">
+					Learn to Run a Node
+				</a>
+				<a href="/leaderboard" class="btn-secondary">
+					Phase 2 Leaderboard
+				</a>
+				<a href="/phase2" class="btn-secondary">
+					Phase 2 Reward Estimates
+				</a>
+			</div>
 		</div>
 		
 		<!-- Rewards Table -->
 		{#if dataArrays.length > 0}
-			<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />
+			<div class="sm:px-4">
+				<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />
+			</div>
 		{/if}
 	</div>
 </div>
