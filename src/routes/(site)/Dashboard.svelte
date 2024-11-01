@@ -39,7 +39,7 @@
 	let showEnlargedBlockChart = false;
 	let onlineStakeHistory: any[] = [];
 	let blacklistedBalanceTotal = 0;
-
+	let eligibleOnlineStake = 0;
 	const populateDateDropdown = async () => {
 		const url = `${config.proposalApiBaseUrl}`;
 		await fetch(url, { cache: 'no-store' })
@@ -181,6 +181,8 @@
 				blacklistedBalanceTotal = data.blacklist_balance_total;
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
 				updateRewardParams();
+
+				eligibleOnlineStake = getEligibleOnlineStake();
 			});
 	};
 
@@ -249,7 +251,6 @@
 		const remainingDays = Math.max(0, remainingTime / (1000 * 60 * 60 * 24));
 		
 		// Calculate blocks per day based on current data
-		const epochDays = 7; // Each epoch is 7 days
 		const currentBlocksPerDay = totalBlocks / (7 - remainingDays);
 		
 		// Extrapolate total blocks by end of epoch
@@ -285,13 +286,19 @@
 			<!--<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />-->
 			<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks in this Epoch earning rewards." />
 			<div on:click={handleBlockChartClick} class="cursor-pointer">
-				<DashboardCard title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch} value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`} subvalue={'~' + (totalBlocks > 0 ? $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : '')} info="The number of blocks produced in a typical epoch." />
+				<DashboardCard
+					title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch}
+					value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`}
+					subvalue={totalBlocks > 0 ? '~' + $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : ''}
+					subvalue2={eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
+					info="The number of blocks produced in a typical epoch."
+				/>
 			</div>
 			<div on:click={handleStakeChartClick} class="cursor-pointer">
 				<DashboardCard 
 					title="Online Stake" 
 					value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
-					subvalue={`Eligible: ${blacklistedBalanceTotal > 0 ? getEligibleOnlineStake().toLocaleString() + ' VOI' : ''}`}
+					subvalue={`Eligible: ${blacklistedBalanceTotal > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
 					info="The total amount of VOI that is currently online and participating in the network." 
 					showChart={true}
 				/>

@@ -4,6 +4,7 @@
   export let title: string;
   export let value: string | null;
   export let subvalue: string = '';
+  export let subvalue2: string = '';
   export let info: string = '';
   export let showChart: boolean = false;
 
@@ -38,6 +39,9 @@
       <p class="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
       {#if subvalue.length > 0}
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{subvalue}</p>
+      {/if}
+      {#if subvalue2.length > 0}
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{subvalue2}</p>
       {/if}
     {:else}
       <p class="text-lg text-gray-500 dark:text-gray-400">Loading{dots}</p>

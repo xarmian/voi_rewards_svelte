@@ -36,7 +36,14 @@
     </div>
 
     <div>
-        <h2 class="text-lg font-semibold mb-2">Estimated Blocks</h2>
+        <h2 class="text-lg font-semibold mb-2">
+            <div class="flex items-center">
+                Estimated Blocks
+                {#if !account.isParticipating}
+                    (if participating)
+                {/if}
+            </div>
+        </h2>
         <div class="grid grid-cols-3 gap-2">
             {#each blockPeriods as { period, amount }}
                 <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 text-center">

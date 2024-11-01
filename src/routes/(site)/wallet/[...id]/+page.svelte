@@ -32,6 +32,7 @@
 
     selectedWallet.subscribe((wallet) => {
         if (!loading && wallet && wallet.address && wallet.address.length > 0 && walletId != wallet.address) {
+            activeSection = 'consensus';
             goto(`/wallet/${wallet.address}`);
         }
     });
@@ -78,50 +79,54 @@
       primaryAccountInfo = null;
       childAccounts = [];
 
-      supply = await algodClient.supply().do();
-      const accountInfo = await algodClient.accountInformation(address).do();
+      try {
+        supply = await algodClient.supply().do();
+        const accountInfo = await algodClient.accountInformation(address).do();
 
-      // get node information
-      const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
-      fetch(url, { cache: 'no-store' })
-        .then((response) => response.json())
-        .then((data) => {
-            apiData = data;
-
-            primaryAccountInfo = {
-              address: address,
-              isParticipating: accountInfo.status === 'Online',
-              balance: accountInfo.amount / 1e6,
-              blocksProduced24h: 0,
-              expectedBlocksPerDay: calculateExpectedBlocks(1, accountInfo.amount),
-              expectedBlocksPerWeek: calculateExpectedBlocks(7, accountInfo.amount),
-              expectedBlocksPerMonth: calculateExpectedBlocks(30, accountInfo.amount)
-            }
-        })
-        .catch((error) => {
-            console.error(error);
-        });
-
-        // get child accounts from staking api
-        const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
-        fetch(curl, { cache: 'no-store' })
+        // get node information
+        const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
+        fetch(url, { cache: 'no-store' })
           .then((response) => response.json())
           .then((data) => {
-            data.accounts.forEach(async (account: LockContract) => {
-                const accountInfo = await algodClient.accountInformation(account.contractAddress).do();
+              apiData = data;
 
-                childAccounts.push({
-                    address: account.contractAddress,
-                    isParticipating: accountInfo.status === 'Online',
-                    balance: accountInfo.amount / 1e6,
-                    blocksProduced24h: 0,
-                    expectedBlocksPerDay: calculateExpectedBlocks(1, accountInfo.amount),
-                    expectedBlocksPerWeek: calculateExpectedBlocks(7, accountInfo.amount),
-                    expectedBlocksPerMonth: calculateExpectedBlocks(30, accountInfo.amount)
-                });
-            });
+              primaryAccountInfo = {
+                address: address,
+                isParticipating: accountInfo.status === 'Online',
+                balance: accountInfo.amount / 1e6,
+                blocksProduced24h: 0,
+                expectedBlocksPerDay: calculateExpectedBlocks(1, accountInfo.amount),
+                expectedBlocksPerWeek: calculateExpectedBlocks(7, accountInfo.amount),
+                expectedBlocksPerMonth: calculateExpectedBlocks(30, accountInfo.amount)
+              }
+          })
+          .catch((error) => {
+              console.error(error);
           });
 
+          // get child accounts from staking api
+          const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
+          fetch(curl, { cache: 'no-store' })
+            .then((response) => response.json())
+            .then((data) => {
+              data.accounts.forEach(async (account: LockContract) => {
+                  const accountInfo = await algodClient.accountInformation(account.contractAddress).do();
+
+                  childAccounts.push({
+                      address: account.contractAddress,
+                      isParticipating: accountInfo.status === 'Online',
+                      balance: accountInfo.amount / 1e6,
+                      blocksProduced24h: 0,
+                      expectedBlocksPerDay: calculateExpectedBlocks(1, accountInfo.amount),
+                      expectedBlocksPerWeek: calculateExpectedBlocks(7, accountInfo.amount),
+                      expectedBlocksPerMonth: calculateExpectedBlocks(30, accountInfo.amount)
+                  });
+              });
+            });
+
+      } catch (error) {
+        console.error(error);
+      }
     }
 
     $: {

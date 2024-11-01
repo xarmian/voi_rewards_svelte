@@ -58,7 +58,7 @@
       selectedBalance = 'Loading...';
       if (items[row]) {
         algodClient.accountInformation(items[row].proposer).do().then((res) => {
-          selectedBalance = (res.amount / Math.pow(10,6)).toLocaleString()+ ' VOI';
+          selectedBalance = (res.amount / Math.pow(10,6));
         });
       }
     }
@@ -273,13 +273,19 @@
                     </a>
                   </div>
                   <div>
-                    <Label defaultClass="text-sm font-medium inline-block w-40">Balance:</Label>
-                    <span class="text-gray-500">{selectedBalance}</span>
+                    <Label defaultClass="text-sm font-medium inline-block w-40">Account Balance:</Label>
+                    <span class="text-gray-500">{selectedBalance.toLocaleString()} VOI</span>
                   </div>
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Est. Reward (full epoch):</Label>
-                    <span class="text-gray-500">{(item.epoch_block_rewards).toFixed(2)} VOI</span>
+                    <span class="text-gray-500">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
                   </div>
+                  {#if false}
+                    <div>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">Est. APR:</Label>
+                      <span class="text-gray-500">{((item.epoch_block_rewards / Number(selectedBalance)) * 52 * 100).toFixed(2)}%</span>
+                    </div>
+                  {/if}
                   {#if item.nfd}
                     <div>
                       <Label defaultClass="text-sm font-medium inline-block w-40">NFD:</Label>
