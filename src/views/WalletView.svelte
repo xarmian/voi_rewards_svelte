@@ -120,12 +120,12 @@
             </div>
         </h3>
         <h1 class="text-xl mb-4 text-center">
-            <a href='https://explorer.voi.network/explorer/account/{walletId}/transactions'
-             title="Open wallet in Voi Explorer"
-             target='_blank' class="text-blue-500 hover:text-blue-700 hover:underline">
-             <span class="font-mono text-lg overflow-hidden whitespace-nowrap text-ellipsis max-w-full">
-                {walletId.substring(0, 10)}...{walletId.substring(walletId.length - 10)}
-            </span>
+            <a href='/wallet/{walletId}'
+             title="Open account in new page"
+             class="text-blue-500 hover:text-blue-700 hover:underline">
+                <span class="font-mono text-lg overflow-hidden whitespace-nowrap text-ellipsis max-w-full">
+                    {walletId.substring(0, 10)}...{walletId.substring(walletId.length - 10)}
+                </span>
             </a>
         </h1>
         {#if nfDomain}

@@ -6,7 +6,7 @@
     import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
-    import { algodClient } from '$lib/utils/algod';
+    import { getSupplyInfo, getAccountInfo, getConsensusInfo } from '$lib/stores/accounts';
 
     export let walletId: string;
     let apiData: any;
@@ -44,23 +44,22 @@
     };
 
     onMount(async () => {
-        // get proposal data for walletId
         const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
         try {
             const [response, accountInfo, supply] = await Promise.all([
                 fetch(url, { cache: 'no-store' }),
-                algodClient.accountInformation(walletId).do(),
-                algodClient.supply().do()
+                getAccountInfo(walletId),
+                getSupplyInfo()
             ]);
             
             apiData = await response.json();
-            
+                        
             // Calculate expected block time once
             if (accountInfo?.amount && supply?.['online-money']) {
-                const balance = Number(accountInfo.amount);
+                const balance = Number(accountInfo?.amount);
                 const secondsPerDay = 24 * 60 * 60;
                 const blocksPerDay = secondsPerDay / 2.8;
-                const dailyBlocks = (balance / supply['online-money']) * blocksPerDay;
+                const dailyBlocks = (balance / Number(supply?.['online-money'] ?? 0)) * blocksPerDay;
                 const avgBlockTime = secondsPerDay / dailyBlocks;
                 
                 const hours = Math.floor(avgBlockTime / (60 * 60));

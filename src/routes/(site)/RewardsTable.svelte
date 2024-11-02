@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { A, Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Toggle, Tooltip } from 'flowbite-svelte';
+  import { Label, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableSearch, Toggle, Tooltip } from 'flowbite-svelte';
   import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
   import RewardsTableHeader from './RewardsTableHeader.svelte';
@@ -9,20 +9,21 @@
   import { copy } from 'svelte-copy';
   import { toast } from '@zerodevx/svelte-toast';
   import { slide } from 'svelte/transition';
-  import { getNFD } from '$lib/utils/nfd';
   import WalletView from '../../views/WalletView.svelte';
   import { compareVersions } from 'compare-versions';
-  import { algodClient } from '$lib/utils/algod';
   import { favorites } from '../../stores/favorites';
+  import { getAccountInfo, getNFDomains } from '$lib/stores/accounts';
+  import type { NFDomainResponse } from '$lib/stores/accounts';
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
 
   $: totalBlockRewards = 0;
   $: totalBlocks = 0;
+  $: rewardPerBlock = 0;
   $: selectedBalance = 'Loading...' as string | number;
 
-  let nfdData: any[] = [];
+  let nfdData: Record<string, NFDomainResponse | null> = {};
   let expandedRow: number | null = null;
   let showWalletNFD: boolean = true;
   let sortItems = writable<any[]>([]);
@@ -52,7 +53,7 @@
     }
   }
 
-  const toggleRow = (row: number) => {
+  const toggleRow = async (row: number) => {
     if (expandedRow === row) {
       expandedRow = null;
     } else {
@@ -60,9 +61,9 @@
 
       selectedBalance = 'Loading...';
       if (items[row]) {
-        algodClient.accountInformation(items[row].proposer).do().then((res) => {
-          selectedBalance = (res.amount / Math.pow(10,6));
-        });
+        
+        const accountInfo = await getAccountInfo(items[row].proposer);
+        selectedBalance = (Number(accountInfo?.amount??0) / Math.pow(10,6));
       }
     }
     
@@ -72,12 +73,13 @@
     lastUpdateTime = new Date();
     // convert to NFDs
     const allAddresses = items.map((row: any) => row.proposer);
-    nfdData = await getNFD(allAddresses);
+    nfdData = await getNFDomains(allAddresses);
   });
 
   $: unsubRewardParams = rewardParams.subscribe(async (value) => {
     totalBlockRewards = value.block_reward_pool;
     totalBlocks = value.total_blocks;
+    rewardPerBlock = value.reward_per_block;
   });
 
   $: onDestroy(unsubRewardParams);
@@ -130,19 +132,15 @@
   $: {
     sortItems = writable(items.slice()); // make a copy of the items array
 
-    let blockTotal = 0;
-
     for (let i = 0; i < $sortItems.length; i++) {
       const item = $sortItems[i];
       item.epoch_block_rewards = Math.floor(Math.floor(totalBlockRewards * 0.75 / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
-      item.block_rewards = item.block_count * $rewardParams.reward_per_block;
-
-      blockTotal += item.block_rewards;
+      item.block_rewards = item.block_count * rewardPerBlock;
 
       item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
 
       if (typeof item.nfd === 'undefined') {
-        item.nfd = nfdData.find((nfd) => nfd.key === item.proposer)?.replacementValue;
+        item.nfd = nfdData[item.proposer]?.name;
       }
       if (typeof item.rank === 'undefined') {
         item.rank = i + 1;

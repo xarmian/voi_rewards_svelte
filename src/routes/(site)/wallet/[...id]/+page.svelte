@@ -10,6 +10,7 @@
 	  import { onMount } from 'svelte';
     import NodeComponent from '$lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
+    import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
 
     export let data: {
         walletId: string;
@@ -80,46 +81,36 @@
       childAccounts = [];
 
       try {
-        supply = await algodClient.supply().do();
-        const accountInfo = await algodClient.accountInformation(address).do();
+        supply = await getSupplyInfo();
+        const accountInfo = await getAccountInfo(address);
+        //const apiData = await getConsensusInfo(address);
 
-        // get node information
-        const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
-        fetch(url, { cache: 'no-store' })
-          .then((response) => response.json())
-          .then((data) => {
-              apiData = data;
+        primaryAccountInfo = {
+          address: address,
+          isParticipating: accountInfo?.status === 'Online',
+          balance: Number(accountInfo?.amount??0) / 1e6,
+          blocksProduced24h: 0,
+          expectedBlocksPerDay: calculateExpectedBlocks(1, Number(accountInfo?.amount??0)),
+          expectedBlocksPerWeek: calculateExpectedBlocks(7, Number(accountInfo?.amount??0)),
+          expectedBlocksPerMonth: calculateExpectedBlocks(30, Number(accountInfo?.amount??0))
+        }
 
-              primaryAccountInfo = {
-                address: address,
-                isParticipating: accountInfo.status === 'Online',
-                balance: accountInfo.amount / 1e6,
-                blocksProduced24h: 0,
-                expectedBlocksPerDay: calculateExpectedBlocks(1, accountInfo.amount),
-                expectedBlocksPerWeek: calculateExpectedBlocks(7, accountInfo.amount),
-                expectedBlocksPerMonth: calculateExpectedBlocks(30, accountInfo.amount)
-              }
-          })
-          .catch((error) => {
-              console.error(error);
-          });
-
-          // get child accounts from staking api
-          const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
-          fetch(curl, { cache: 'no-store' })
+        // get child accounts from staking api
+        const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
+        fetch(curl, { cache: 'no-store' })
             .then((response) => response.json())
             .then((data) => {
               data.accounts.forEach(async (account: LockContract) => {
-                  const accountInfo = await algodClient.accountInformation(account.contractAddress).do();
+                  const accountInfo = await getAccountInfo(account.contractAddress);
 
                   childAccounts.push({
                       address: account.contractAddress,
-                      isParticipating: accountInfo.status === 'Online',
-                      balance: accountInfo.amount / 1e6,
+                      isParticipating: accountInfo?.status === 'Online',
+                      balance: Number(accountInfo?.amount??0) / 1e6,
                       blocksProduced24h: 0,
-                      expectedBlocksPerDay: calculateExpectedBlocks(1, accountInfo.amount),
-                      expectedBlocksPerWeek: calculateExpectedBlocks(7, accountInfo.amount),
-                      expectedBlocksPerMonth: calculateExpectedBlocks(30, accountInfo.amount)
+                      expectedBlocksPerDay: calculateExpectedBlocks(1, Number(accountInfo?.amount??0)),
+                      expectedBlocksPerWeek: calculateExpectedBlocks(7, Number(accountInfo?.amount??0)),
+                      expectedBlocksPerMonth: calculateExpectedBlocks(30, Number(accountInfo?.amount??0))
                   });
               });
             });

@@ -33,13 +33,23 @@ export async function getAddressesForNFD(nfdName: string): Promise<string[]> {
     return [];
 }
 
-export async function getNFD(data: string[]) {
-    const aggregatedNFDs: string[] = [];
+interface NFDomainResult {
+    key: string;
+    replacementValue: string;
+}
+
+interface NFDomainApiResponse {
+    name: string;
+    [key: string]: unknown;
+}
+
+export async function getNFD(addresses: string[]): Promise<NFDomainResult[]> {
+    const aggregatedNFDs: NFDomainResult[] = [];
     const addressChunks = [];
     const chunkSize = 20;
 
-    for (let i = 0; i < data.length; i += chunkSize) {
-        addressChunks.push(data.slice(i, i + chunkSize));
+    for (let i = 0; i < addresses.length; i += chunkSize) {
+        addressChunks.push(addresses.slice(i, i + chunkSize));
     }
 
     const allFetches = addressChunks.map((addressChunk) => {
@@ -59,14 +69,21 @@ export async function getNFD(data: string[]) {
             .then(response => response.json())
             .then(additionalData => {
                 Object.entries(additionalData).forEach((val) => {
-                    const key = val[0];
-                    const value: any = val[1];
-
-                    const replacementValue = value.name;
-                    aggregatedNFDs.push({ key, replacementValue });
+                    const [key, value] = val;
+                    const domainData = value as NFDomainApiResponse;
+                    
+                    if (domainData.name) {
+                        aggregatedNFDs.push({
+                            key,
+                            replacementValue: domainData.name
+                        });
+                    }
                 });
             })
-            .catch(error => {}); //console.error("Error fetching additional data:", error));
+            .catch(() => {
+                // console.error("Error fetching nfd data:", error);
+                return [];
+            });
     });
 
     await Promise.all(allFetches);

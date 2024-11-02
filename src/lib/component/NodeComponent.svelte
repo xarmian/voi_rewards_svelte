@@ -1,8 +1,10 @@
 <script lang="ts">
     import { Badge, Card, Spinner } from 'flowbite-svelte';
-    import { algodClient } from '$lib/utils/algod';
     import { config } from '../config';
 	import InfoButton from './ui/InfoButton.svelte';
+    import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
+    import { onMount } from 'svelte';
+    import { getTokensByEpoch } from '$lib/utils';
 
     export let walletId: string;
 
@@ -16,44 +18,48 @@
     $: expectedBlocksPerDay = 0;
     $: expectedBlocksPerWeek = 0;
     $: expectedBlocksPerMonth = 0;
+    $: voiPerBlock = 0;
 
     $: if (walletId) {
-        //console.log('walletId',walletId);
         fetchNodeData();
     }
 
     $: loading = false;
 
+    onMount(async () => {
+        supply = await getSupplyInfo();
+        
+        // epoch number = number of weeks since 2024-10-30
+        const epoch = Math.floor((Date.now() - new Date('2024-10-30T00:00:00Z').getTime()) / (7 * 24 * 60 * 60 * 1000))+1;
+        const tokensReward = await getTokensByEpoch(epoch);
+
+        //const numBlocks = apiData.last_block - apiData.first_block;
+
+        //voiPerBlock = tokensReward / 1e6;
+    });
+
     async function fetchNodeData() {
         loading = true;
         try {
             // Get account information
-            accountInfo = await algodClient.accountInformation(walletId).do();
-            supply = await algodClient.supply().do();
+            accountInfo = await getAccountInfo(walletId);
+
             balance = Number(accountInfo?.amount??0);
+            apiData = await getConsensusInfo(walletId);
+            
+            const epochBlocks = apiData.last_block - apiData.first_block;
+            estimatedBlocks = Math.round(balance / Number(supply?.['online-money']??0) * epochBlocks);
 
-            // get node information
-            const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${walletId}`;
-            await fetch(url, { cache: 'no-store' })
-                .then((response) => response.json())
-                .then((data) => {
-                    apiData = data;
+            averageBlockTime = calculateAverageBlockTime();
+            expectedBlocksPerDay = calculateExpectedBlocks(1);
+            expectedBlocksPerWeek = calculateExpectedBlocks(7);
+            expectedBlocksPerMonth = calculateExpectedBlocks(30);
 
-                    const epochBlocks = apiData.last_block - apiData.first_block;
-                    estimatedBlocks = Math.round(balance / supply['online-money'] * epochBlocks);
-
-                    averageBlockTime = calculateAverageBlockTime();
-                    expectedBlocksPerDay = calculateExpectedBlocks(1);
-                    expectedBlocksPerWeek = calculateExpectedBlocks(7);
-                    expectedBlocksPerMonth = calculateExpectedBlocks(30);
-
-                    loading = false;
-                })
-                .catch((error) => {
-                    console.error(error);
-                });
+            loading = false;
         } catch (error) {
             console.error('Failed to fetch node data:', error);
+        } finally {
+            loading = false;
         }
     }
 
@@ -84,7 +90,7 @@
     function calculateExpectedBlocks(days: number) {
         const secondsPerDay = 24 * 60 * 60;
         const blocksPerDay = secondsPerDay / 2.8; // Assuming 2.8 seconds per block
-        return (balance / supply['online-money']) * blocksPerDay * days;
+        return (balance / Number(supply?.['online-money']??0)) * blocksPerDay * days;
     }
 </script>
 
@@ -103,7 +109,7 @@
                 <div class="flex justify-center items-center h-24">
                     <Spinner size="16" />
                 </div>
-            {:else if balance == 0 || supply['online-money'] == 0}
+            {:else if balance == 0 || Number(supply?.['online-money']??0) == 0}
                 <div class="flex justify-center items-center h-24">
                     <span class="text-gray-600 dark:text-gray-400">No data available</span>
                 </div>
@@ -120,7 +126,9 @@
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per day:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerDay.toFixed(2)}</span>
+                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerDay.toFixed(2)}
+                                <span class="text-gray-600 dark:text-gray-400 hidden">({(voiPerBlock * expectedBlocksPerDay).toFixed(2)} VOI)</span>
+                            </span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per week:</span>

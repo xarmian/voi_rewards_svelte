@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { rewardParams } from '../../stores/dataTable';
-    import { algodClient } from '$lib/utils/algod';
 	import { writable } from 'svelte/store';
 	import { config } from '$lib/config';
 	import { Modal } from 'flowbite-svelte';
@@ -12,10 +11,9 @@
 	import MiniBlockChart from '$lib/components/MiniBlockChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
-
-	interface Supply {
-		[key: string]: number;
-	}
+	import { getSupplyInfo } from '$lib/stores/accounts';
+	import type { SupplyInfo } from '$lib/stores/accounts';
+	import { getTokensByEpoch } from '$lib/utils';
 
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
@@ -33,13 +31,14 @@
 	$: dataArrays = [];
 	$: dataIncomplete = false;
 	let dates: { id: string; desc: string; epoch: number; }[] = [];
-	let supply: Supply = {};
+	let supply: SupplyInfo | null = null;
 	let ballasts: string[] = [];
 	let showEnlargedStakeChart = false;
 	let showEnlargedBlockChart = false;
 	let onlineStakeHistory: any[] = [];
-	let blacklistedBalanceTotal = 0;
 	let eligibleOnlineStake = 0;
+	let isLoading = true;
+
 	const populateDateDropdown = async () => {
 		const url = `${config.proposalApiBaseUrl}`;
 		await fetch(url, { cache: 'no-store' })
@@ -84,128 +83,113 @@
 			});
 	};
 
-	const findCommonRatio = (a: number, totalSum: number, n: number) => {
-		// Using numerical method (binary search) to find r
-		// where a(1-r^n)/(1-r) = totalSum
-		let left = 0.1;  // Lower bound for r
-		let right = 2.0; // Upper bound for r
-		const epsilon = 0.0000001; // Precision
-
-		while (right - left > epsilon) {
-			const mid = (left + right) / 2;
-			const sum = a * (1 - Math.pow(mid, n)) / (1 - mid);
-			
-			if (sum < totalSum) {
-				left = mid;
-			} else {
-				right = mid;
-			}
-		}
-		
-		return (left + right) / 2;
-	}
-
-	const getTokensByEpoch = async (epoch: number) => {
-		// tokens = 3000000 for epoch 1
-		// tokens = a * r^(i-1)
-		const a = 3_000_000;
-		const totalSum = 1_000_000_000;
-		const n = 1042;
-		const r = findCommonRatio(a, totalSum, n);
-		return Math.round(a * Math.pow(r, epoch - 1));
-	}
-
 	const loadDashboardData = async (selectedDate: string) => {
-		// derive start and end dates from the selected date of format YYYYMMDD-YYYYMMDD
-		const startDate =
-			selectedDate.substring(0, 4) +
-			'-' +
-			selectedDate.substring(4, 6) +
-			'-' +
-			selectedDate.substring(6, 8);
-		const endDate =
-			selectedDate.substring(9, 13) +
-			'-' +
-			selectedDate.substring(13, 15) +
-			'-' +
-			selectedDate.substring(15, 17);
-		// const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
-		const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
+		isLoading = true;
+		try {
+			// derive start and end dates from the selected date of format YYYYMMDD-YYYYMMDD
+			const startDate =
+				selectedDate.substring(0, 4) +
+				'-' +
+				selectedDate.substring(4, 6) +
+				'-' +
+				selectedDate.substring(6, 8);
+			const endDate =
+				selectedDate.substring(9, 13) +
+				'-' +
+				selectedDate.substring(13, 15) +
+				'-' +
+				selectedDate.substring(15, 17);
+			// const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
+			const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
 
-		// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
-		const endOfEpoch = new Date(
-			Date.UTC(
-				parseInt(selectedDate.substring(9, 13)),
-				parseInt(selectedDate.substring(13, 15)) - 1,
-				parseInt(selectedDate.substring(15, 17))
-			)
-		);
+			// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
+			const endOfEpoch = new Date(
+				Date.UTC(
+					parseInt(selectedDate.substring(9, 13)),
+					parseInt(selectedDate.substring(13, 15)) - 1,
+					parseInt(selectedDate.substring(15, 17))
+				)
+			);
 
-		// set default rewards based on epoch
-		endOfEpoch.setUTCHours(23, 59, 59, 999);
+			// set default rewards based on epoch
+			endOfEpoch.setUTCHours(23, 59, 59, 999);
 
-		// reinitialize totals
-		totalWallets = 0;
-		totalBlocks = 0;
-		block_height = 0;
+			// reinitialize totals
+			totalWallets = 0;
+			totalBlocks = 0;
+			block_height = 0;
 
-		fetch(url, { cache: 'no-store' })
-			.then((response) => response.json())
-			.then(async (data) => {
-				// check if the end date selected in dropdown is more than maxTimestamp. If so, add notice below date selection that data is incomplete
-				const checkDate = new Date(
-					Date.UTC(
-						parseInt(selectedDate.substring(9, 13)),
-						parseInt(selectedDate.substring(13, 15)) - 1,
-						parseInt(selectedDate.substring(15, 17))
-					)
-				);
-				const endOfDay = new Date(checkDate);
-				endOfDay.setUTCHours(23, 59, 59, 999);
+			fetch(url, { cache: 'no-store' })
+				.then((response) => response.json())
+				.then(async (data) => {
+					// check if the end date selected in dropdown is more than maxTimestamp. If so, add notice below date selection that data is incomplete
+					const checkDate = new Date(
+						Date.UTC(
+							parseInt(selectedDate.substring(9, 13)),
+							parseInt(selectedDate.substring(13, 15)) - 1,
+							parseInt(selectedDate.substring(15, 17))
+						)
+					);
+					const endOfDay = new Date(checkDate);
+					endOfDay.setUTCHours(23, 59, 59, 999);
 
-				dataIncomplete = endOfDay > new Date(data.max_timestamp) ? true : false;
+					dataIncomplete = endOfDay > new Date(data.max_timestamp) ? true : false;
 
-				// Sort the data by block count
-				data.data.sort((a: any, b: any) => b.block_count - a.block_count);
-				dataArrays = data.data;
+					// Sort the data by block count
+					data.data.sort((a: any, b: any) => b.block_count - a.block_count);
+					dataArrays = data.data;
 
-				//calcRewards();
-				block_height = data.block_height;
-				block_height_timestamp = new Date(data.max_timestamp).toLocaleString('en-US', {
-					timeZone: 'UTC'
+					//calcRewards();
+					block_height = data.block_height;
+					block_height_timestamp = new Date(data.max_timestamp).toLocaleString('en-US', {
+						timeZone: 'UTC'
+					});
+
+					ballasts = data.blacklist;
+					totalWallets = data.num_proposers;
+					totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
+					latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
+					await updateRewardParams();
+
+					eligibleOnlineStake = getEligibleOnlineStake();
 				});
-
-				ballasts = data.blacklist;
-				totalWallets = data.num_proposers;
-				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
-				blacklistedBalanceTotal = data.blacklist_balance_total;
-				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
-				updateRewardParams();
-
-				eligibleOnlineStake = getEligibleOnlineStake();
-			});
+		} catch (error) {
+			console.error('Error loading dashboard data:', error);
+		} finally {
+			isLoading = false;
+		}
 	};
 
 
 	onMount(async () => {
 		// get online stake
-		supply = await algodClient.supply().do();
+		supply = await getSupplyInfo();
 
 		await populateDateDropdown();
-		await loadDashboardData(selectedDate);
+		//await loadDashboardData(selectedDate);
 	});
 
 	const updateRewardParams = async () => {
-		const tokens = await getTokensByEpoch(dates.find(date => date.id === selectedDate)?.epoch || 1);
-		const rewardPerBlock = extrapolateRewardPerBlock();
-
-		rewardParams.set({
+		const currentEpoch = dates.find(date => date.id === selectedDate)?.epoch || 1;
+		const tokens = await getTokensByEpoch(currentEpoch);
+		
+		// First update the block_reward_pool
+		rewardParams.update((params) => ({
+			...params,
 			block_reward_pool: tokens,
+		}));
+
+		// Then calculate projections using the updated reward pool
+		const { projectedTotalBlocks, projectedRewardPerBlock } = extrapolateRewardPerBlock();
+
+		// Finally update the remaining parameters
+		rewardParams.update((params) => ({
+			...params,
 			total_blocks: totalBlocks,
-			reward_per_block: rewardPerBlock.projectedRewardPerBlock,
-			total_blocks_projected: rewardPerBlock.projectedTotalBlocks,
-		});
-	}
+			reward_per_block: projectedRewardPerBlock,
+			total_blocks_projected: projectedTotalBlocks,
+		}));
+	};
 
 	$: if (selectedDate) {
 		loadDashboardData(selectedDate);
@@ -235,10 +219,7 @@
 	}
 
 	function extrapolateRewardPerBlock() {
-		// Get current date in UTC
 		const now = new Date();
-		
-		// Parse the end date from selectedDate (format: YYYYMMDD-YYYYMMDD)
 		const endDate = new Date(
 			parseInt(selectedDate.substring(9, 13)),
 			parseInt(selectedDate.substring(13, 15)) - 1,
@@ -246,28 +227,28 @@
 		);
 		endDate.setUTCHours(23, 59, 59, 999);
 
-		// Calculate remaining time in milliseconds
 		const remainingTime = endDate.getTime() - now.getTime();
 		const remainingDays = Math.max(0, remainingTime / (1000 * 60 * 60 * 24));
-		
-		// Calculate blocks per day based on current data
 		const currentBlocksPerDay = totalBlocks / (7 - remainingDays);
+		const projectedTotalBlocks = Math.round(totalBlocks + (currentBlocksPerDay * remainingDays));
 		
-		// Extrapolate total blocks by end of epoch
-		const projectedTotalBlocks = totalBlocks + (currentBlocksPerDay * remainingDays);
+		// Get the current reward pool value
+		let currentRewardPool = 0;
+		rewardParams.subscribe(params => {
+			currentRewardPool = params.block_reward_pool;
+		})();
 		
-		// Calculate projected reward per block
-		const projectedRewardPerBlock = $rewardParams.block_reward_pool / projectedTotalBlocks;
-		
+		const projectedRewardPerBlock = currentRewardPool / projectedTotalBlocks;
+
 		return {
-			projectedTotalBlocks: Math.round(projectedTotalBlocks),
-			projectedRewardPerBlock: projectedRewardPerBlock
+			projectedTotalBlocks,
+			projectedRewardPerBlock
 		};
 	}
 
 	function getEligibleOnlineStake() {
-		const commonBalance = supply['online-money'] - blacklistedBalanceTotal;
-		return Math.round((commonBalance + Math.min(blacklistedBalanceTotal, commonBalance/3))/Math.pow(10,6));
+		const commonBalance = (supply?.['online-money'] ?? 0) - (supply?.['blacklisted-money'] ?? 0);
+		return Math.round((commonBalance + Math.min(supply?.['blacklisted-money'] ?? 0, commonBalance/3))/Math.pow(10,6));
 	}
 
 </script>
@@ -288,7 +269,7 @@
 				<div on:click={handleBlockChartClick} class="cursor-pointer">
 					<DashboardCard
 						title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch}
-						value={`${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`}
+						value={$rewardParams.block_reward_pool > 0 ? `${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI` : null}
 						subvalue={totalBlocks > 0 ? '~' + $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : ''}
 						subvalue2={eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
 						info="The number of blocks produced in a typical epoch."
@@ -297,8 +278,8 @@
 				<div on:click={handleStakeChartClick} class="cursor-pointer">
 					<DashboardCard 
 						title="Online Stake" 
-						value={Math.round(supply['online-money']/Math.pow(10,6)).toLocaleString() + ' VOI'} 
-						subvalue={`Eligible: ${blacklistedBalanceTotal > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
+						value={supply ? Math.round((supply?.['online-money']??0)/Math.pow(10,6)).toLocaleString() + ' VOI' : null} 
+						subvalue={`Eligible: ${eligibleOnlineStake > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
 						info="The total amount of VOI that is currently online and participating in the network." 
 						showChart={true}
 					/>

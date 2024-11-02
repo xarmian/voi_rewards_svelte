@@ -62,3 +62,35 @@ export function formatDistanceToNow(date: Date): string {
 export const truncateAddress = (address: string, chars = 6) => {
   return `${address.slice(0, chars)}...${address.slice(-chars)}`;
 };
+
+const findCommonRatio = (a: number, totalSum: number, n: number) => {
+  // Using numerical method (binary search) to find r
+  // where a(1-r^n)/(1-r) = totalSum
+  let left = 0.1;  // Lower bound for r
+  let right = 2.0; // Upper bound for r
+  const epsilon = 0.0000001; // Precision
+
+  while (right - left > epsilon) {
+    const mid = (left + right) / 2;
+    const sum = a * (1 - Math.pow(mid, n)) / (1 - mid);
+    
+    if (sum < totalSum) {
+      left = mid;
+    } else {
+      right = mid;
+    }
+  }
+  
+  return (left + right) / 2;
+}
+
+export const getTokensByEpoch = async (epoch: number) => {
+  // tokens = 3000000 for epoch 1
+  // tokens = a * r^(i-1)
+  const a = 3_000_000;
+  const totalSum = 1_000_000_000;
+  const n = 1042;
+  const r = findCommonRatio(a, totalSum, n);
+  return Math.round(a * Math.pow(r, epoch - 1));
+}
+
