@@ -295,7 +295,7 @@
                   <!-- address and nfd -->
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
-                    <span class="text-gray-600">{item.proposer}</span>
+                    <span class="text-gray-600 dark:text-gray-400">{item.proposer}</span>
                     
                     <!-- Action buttons group -->
                     <div class="mt-2 flex gap-2">
@@ -303,7 +303,7 @@
                         use:copy={item.proposer} 
                         on:click|stopPropagation 
                         on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
                       >
                         <CopySolid size="sm" />
                         Copy Address
@@ -314,7 +314,7 @@
                           viewWallet = true;
                           if (viewWalletId != item.proposer) viewWalletId = item.proposer;
                         }}
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
                       >
                         <i class="fas fa-expand-alt"></i>
                         Quick View
@@ -323,7 +323,7 @@
                       <a 
                         href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
                         target="_blank"
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                         on:click|stopPropagation
                       >
                         <i class="fas fa-search"></i>
@@ -334,12 +334,12 @@
 
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Account Balance:</Label>
-                    <span class="text-gray-500">{selectedBalance.toLocaleString()} VOI</span>
+                    <span class="text-gray-600 dark:text-gray-400">{selectedBalance.toLocaleString()} VOI</span>
                   </div>
 
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Est. Reward (full epoch):</Label>
-                    <span class="text-gray-500">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
+                    <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
                   </div>
 
                   {#if item.nfd}
