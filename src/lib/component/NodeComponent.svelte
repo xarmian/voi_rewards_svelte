@@ -4,7 +4,8 @@
 	import InfoButton from './ui/InfoButton.svelte';
     import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
     import { onMount } from 'svelte';
-    import { getTokensByEpoch } from '$lib/utils';
+    import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
+    import { dataTable } from '../../stores/dataTable';
 
     export let walletId: string;
 
@@ -19,6 +20,9 @@
     $: expectedBlocksPerWeek = 0;
     $: expectedBlocksPerMonth = 0;
     $: voiPerBlock = 0;
+    $: estimatedRewardsPerDay = 0;
+    $: estimatedRewardsPerWeek = 0;
+    $: estimatedRewardsPerMonth = 0;
 
     $: if (walletId) {
         fetchNodeData();
@@ -27,33 +31,41 @@
     $: loading = false;
 
     onMount(async () => {
-        supply = await getSupplyInfo();
-        
-        // epoch number = number of weeks since 2024-10-30
-        const epoch = Math.floor((Date.now() - new Date('2024-10-30T00:00:00Z').getTime()) / (7 * 24 * 60 * 60 * 1000))+1;
-        const tokensReward = await getTokensByEpoch(epoch);
-
-        //const numBlocks = apiData.last_block - apiData.first_block;
-
-        //voiPerBlock = tokensReward / 1e6;
     });
 
     async function fetchNodeData() {
         loading = true;
         try {
+            supply = await getSupplyInfo();
+            
+            // Get latest epoch data
+            const dates = await dataTable.fetchDateRanges();
+            const latestEpoch = dates[dates.length - 1];
+            const epochData = await dataTable.fetchData(latestEpoch.id);
+            
+            if (epochData) {
+                const tokens = await getTokensByEpoch(latestEpoch.epoch);
+                const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
+                const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
+                
+                voiPerBlock = rewardData.projectedRewardPerBlock;
+            }
+
             // Get account information
             accountInfo = await getAccountInfo(walletId);
 
             balance = Number(accountInfo?.amount??0);
             apiData = await getConsensusInfo(walletId);
             
-            const epochBlocks = apiData.last_block - apiData.first_block;
-            estimatedBlocks = Math.round(balance / Number(supply?.['online-money']??0) * epochBlocks);
-
             averageBlockTime = calculateAverageBlockTime();
             expectedBlocksPerDay = calculateExpectedBlocks(1);
             expectedBlocksPerWeek = calculateExpectedBlocks(7);
             expectedBlocksPerMonth = calculateExpectedBlocks(30);
+
+            // Calculate estimated rewards
+            estimatedRewardsPerDay = expectedBlocksPerDay * voiPerBlock;
+            estimatedRewardsPerWeek = expectedBlocksPerWeek * voiPerBlock;
+            estimatedRewardsPerMonth = expectedBlocksPerMonth * voiPerBlock;
 
             loading = false;
         } catch (error) {
@@ -82,9 +94,15 @@
     }
 
     function calculateAverageBlockTime() {
-        const epochBlocks = apiData.last_block - apiData.first_block;
-        const epochSeconds = epochBlocks * 2.8; // Assuming 2.8 seconds per block
-        return epochSeconds / estimatedBlocks;
+        // Calculate user's stake percentage of total online stake
+        const userStakePercentage = balance / Number(supply?.['online-money']??0);
+        
+        // Network produces a block every 2.8 seconds
+        const secondsPerBlock = 2.8;
+        
+        // User will propose blocks proportional to their stake percentage
+        // So they'll propose a block every (secondsPerBlock / userStakePercentage) seconds
+        return secondsPerBlock / userStakePercentage;
     }
 
     function calculateExpectedBlocks(days: number) {
@@ -101,7 +119,7 @@
                 <span class="flex items-center justify-between">
                     <div>Anticipated Proposals</div>
                     <InfoButton noAbsolute>
-                        <p>This is the calculated average block proposals for the selected account based on account balance and the total online stake.</p>
+                        <p>This is the calculated average block proposals and rewards for the selected account based on account balance and the total online stake.</p>
                     </InfoButton>
                 </span>
             </h3>
@@ -125,18 +143,35 @@
                             <span class="text-gray-800 dark:text-gray-200">{formatTime(averageBlockTime)}</span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per day:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerDay.toFixed(2)}
-                                <span class="text-gray-600 dark:text-gray-400 hidden">({(voiPerBlock * expectedBlocksPerDay).toFixed(2)} VOI)</span>
+                            <span class="font-medium text-gray-600 dark:text-gray-400 self-start">Avg Blocks per day:</span>
+                            <span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
+                                {expectedBlocksPerDay.toLocaleString()}
+                                <span class="text-gray-600 dark:text-gray-400 ml-2">
+                                    ~{estimatedRewardsPerDay.toLocaleString()} VOI
+                                </span>
                             </span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per week:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerWeek.toFixed(2)}</span>
+                            <span class="font-medium text-gray-600 dark:text-gray-400 self-start">Avg Blocks per week:</span>
+                            <span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
+                                {expectedBlocksPerWeek.toLocaleString()}
+                                <span class="text-gray-600 dark:text-gray-400 ml-2">
+                                    ~{estimatedRewardsPerWeek.toLocaleString()} VOI
+                                </span>
+                            </span>
                         </p>
                         <p class="flex justify-between items-center py-2">
-                            <span class="font-medium text-gray-600 dark:text-gray-400">Avg Blocks per month:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{expectedBlocksPerMonth.toFixed(2)}</span>
+                            <span class="font-medium text-gray-600 dark:text-gray-400 self-start">Avg Blocks per month:</span>
+                            <span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
+                                {expectedBlocksPerMonth.toLocaleString()}
+                                <span class="text-gray-600 dark:text-gray-400 ml-2">
+                                    ~{estimatedRewardsPerMonth.toLocaleString()} VOI
+                                </span>
+                            </span>
+                        </p>
+                        <p class="flex justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700">
+                            <span class="font-medium text-gray-600 dark:text-gray-400">Approx APR:</span>
+                            <span class="text-gray-800 dark:text-gray-200">{((voiPerBlock * expectedBlocksPerDay * 365 / balance * 1e6) * 100).toFixed(2)}%</span>
                         </p>
                     {/if}
                 </div>

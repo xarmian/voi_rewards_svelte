@@ -135,7 +135,12 @@
 
     for (let i = 0; i < $sortItems.length; i++) {
       const item = $sortItems[i];
-      item.epoch_block_rewards = Math.floor(Math.floor(totalBlockRewards * 0.75 / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
+      if (i == 0) {
+        console.log('totalBlockRewards', totalBlockRewards);
+        console.log('totalBlocks', totalBlocks);
+        console.log('item.block_count', item.block_count);
+      }
+      item.epoch_block_rewards = Math.floor(Math.floor(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
       item.block_rewards = item.block_count * rewardPerBlock;
 
       item.total_rewards = Math.round((item.block_rewards + item.health_rewards) * Math.pow(10,6)) / Math.pow(10,6);
@@ -270,7 +275,7 @@
               {/if}
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
-              <div class="flex items-center gap-2">
+              <div class="flex justify-between items-center gap-2">
                 <button 
                   on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
                   class="hover:text-blue-600 transition-colors flex items-center gap-2"
@@ -281,6 +286,17 @@
                     {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
                   {/if}
                   <WalletSolid size="sm" class="text-gray-400 group-hover:text-blue-600" />
+                </button>
+                
+                <button
+                  on:click|stopPropagation={() => {
+                    viewWallet = true;
+                    if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+                  }}
+                  class="inline-flex items-center gap-1 px-2 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                  title="Quick View"
+                >
+                  <i class="fas fa-expand-alt"></i>
                 </button>
               </div>
             </TableBodyCell>

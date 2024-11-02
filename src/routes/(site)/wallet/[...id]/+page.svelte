@@ -7,7 +7,7 @@
     import { config } from '$lib/config';
     import type { LockContract } from '$lib/data/types';
 	  import { goto } from '$app/navigation';
-	  import { onMount } from 'svelte';
+	  import { onDestroy, onMount } from 'svelte';
     import NodeComponent from '$lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
     import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
@@ -31,13 +31,17 @@
         }
     });
 
-    selectedWallet.subscribe((wallet) => {
-        if (!loading && wallet && wallet.address && wallet.address.length > 0 && walletId != wallet.address) {
+    const unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
+        if (!loading && wallet?.address && wallet.address.length > 0 && walletId !== wallet.address) {
             activeSection = 'consensus';
             goto(`/wallet/${wallet.address}`);
         }
     });
-    
+
+    onDestroy(() => {
+        unsubSelectedWallet();
+    });
+
     const sections = [
       { id: 'consensus', name: 'Consensus' },
       { id: 'staking', name: 'Staking' },
@@ -131,8 +135,17 @@
   
   <div class="flex h-fit min-h-screen">
     <aside class="w-64 bg-gray-100 dark:bg-gray-800 p-5">
-      <nav>
-        <ul class="space-y-2">
+      <nav class="flex flex-col gap-4">
+          <a
+              href="/"
+              class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow transition-colors duration-200"
+          >
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Dashboard
+          </a>
+          <ul class="space-y-2">
           {#each sections as section}
             <li>
               <button

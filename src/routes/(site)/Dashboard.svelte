@@ -13,8 +13,9 @@
 	import { goto } from '$app/navigation';
 	import { getSupplyInfo } from '$lib/stores/accounts';
 	import type { SupplyInfo } from '$lib/stores/accounts';
-	import { getTokensByEpoch } from '$lib/utils';
+	import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
 	import { dataTable } from '../..//stores/dataTable';
+	
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
 	function handleLatestBlock(event: CustomEvent) {
@@ -97,18 +98,17 @@
 		const currentEpoch = dates.find(date => date.id === selectedDate)?.epoch || 1;
 		const tokens = await getTokensByEpoch(currentEpoch);
 		
-		// First update the block_reward_pool
+		// Calculate projections using the utility function
+		const { projectedTotalBlocks, projectedRewardPerBlock } = extrapolateRewardPerBlock(
+			totalBlocks,
+			tokens,
+			selectedDate
+		);
+
+		// Update the reward parameters
 		rewardParams.update((params) => ({
 			...params,
 			block_reward_pool: tokens,
-		}));
-
-		// Then calculate projections using the updated reward pool
-		const { projectedTotalBlocks, projectedRewardPerBlock } = extrapolateRewardPerBlock();
-
-		// Finally update the remaining parameters
-		rewardParams.update((params) => ({
-			...params,
 			total_blocks: totalBlocks,
 			reward_per_block: projectedRewardPerBlock,
 			total_blocks_projected: projectedTotalBlocks,
@@ -140,34 +140,6 @@
 
 	function handleWalletSearch(address: string) {
 		goto(`/wallet/${address}`);
-	}
-
-	function extrapolateRewardPerBlock() {
-		const now = new Date();
-		const endDate = new Date(
-			parseInt(selectedDate.substring(9, 13)),
-			parseInt(selectedDate.substring(13, 15)) - 1,
-			parseInt(selectedDate.substring(15, 17))
-		);
-		endDate.setUTCHours(23, 59, 59, 999);
-
-		const remainingTime = endDate.getTime() - now.getTime();
-		const remainingDays = Math.max(0, remainingTime / (1000 * 60 * 60 * 24));
-		const currentBlocksPerDay = totalBlocks / (7 - remainingDays);
-		const projectedTotalBlocks = Math.round(totalBlocks + (currentBlocksPerDay * remainingDays));
-		
-		// Get the current reward pool value
-		let currentRewardPool = 0;
-		rewardParams.subscribe(params => {
-			currentRewardPool = params.block_reward_pool;
-		})();
-		
-		const projectedRewardPerBlock = currentRewardPool / projectedTotalBlocks;
-
-		return {
-			projectedTotalBlocks,
-			projectedRewardPerBlock
-		};
 	}
 
 	function getEligibleOnlineStake() {
