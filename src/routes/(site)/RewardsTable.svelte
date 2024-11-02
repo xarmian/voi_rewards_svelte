@@ -182,6 +182,7 @@
       const matchesSearch = (
         item.proposer.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.nfd !== undefined && item.nfd?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        ($nicknames[item.proposer]?.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.nodes?.some((node: { node_name: string | null; }) => 
           node.node_name !== null && 
           node.node_name?.toLowerCase().includes(searchTerm.toLowerCase())
