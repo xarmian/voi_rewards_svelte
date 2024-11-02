@@ -86,29 +86,42 @@
         return (balance / supply['online-money']) * blocksPerDay * days;
     }
 
+    let isInitialized = false;
+
     const updateAccountInfo = async (address: string) => {
       primaryAccountInfo = null;
       childAccounts = [];
 
       try {
-        supply = await getSupplyInfo();
-        const accountInfo = await getAccountInfo(address);
+        const [supplyData, accountInfo, dates] = await Promise.all([
+          getSupplyInfo(),
+          getAccountInfo(address),
+          dataTable.fetchDateRanges()
+        ]);
         
-        // Get latest epoch data for VOI per block calculation
-        const dates = await dataTable.fetchDateRanges();
+        supply = supplyData;
+        
         const latestEpoch = dates[dates.length - 1];
-        const epochData = await dataTable.fetchData(latestEpoch.id);
+        const [epochData, tokens] = await Promise.all([
+          dataTable.fetchData(latestEpoch.id),
+          getTokensByEpoch(latestEpoch.epoch)
+        ]);
+
         let voiPerBlock = 0;
         
         if (epochData) {
-          const tokens = await getTokensByEpoch(latestEpoch.epoch);
           const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
           const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
           voiPerBlock = rewardData.projectedRewardPerBlock;
         }
 
-        const balance = Number(accountInfo?.amount??0);
-        const onlineMoney = Number(supply?.['online-money']??0);
+        if (voiPerBlock === 0) {
+          console.error('Warning: voiPerBlock calculation resulted in 0');
+          return;
+        }
+
+        const balance = Number(accountInfo?.amount ?? 0);
+        const onlineMoney = Number(supply?.['online-money'] ?? 0);
         
         const rewards = calculateRewards(balance, onlineMoney, voiPerBlock);
 
@@ -120,36 +133,34 @@
           ...rewards
         };
 
-        // Update child accounts calculation
         const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
-        fetch(curl, { cache: 'no-store' })
-          .then((response) => response.json())
-          .then((data) => {
-            data.accounts.forEach(async (account: LockContract) => {
-              const accountInfo = await getAccountInfo(account.contractAddress);
-              const balance = Number(accountInfo?.amount??0);
-              const rewards = calculateRewards(balance, onlineMoney, voiPerBlock);
+        const response = await fetch(curl, { cache: 'no-store' });
+        const data = await response.json();
 
-              childAccounts.push({
-                address: account.contractAddress,
-                isParticipating: accountInfo?.status === 'Online',
-                balance: balance / 1e6,
-                blocksProduced24h: 0,
-                ...rewards
-              });
-            });
-          });
+        await Promise.all(data.accounts.map(async (account: LockContract) => {
+          const childAccountInfo = await getAccountInfo(account.contractAddress);
+          const childBalance = Number(childAccountInfo?.amount ?? 0);
+          const childRewards = calculateRewards(childBalance, onlineMoney, voiPerBlock);
+
+          childAccounts = [...childAccounts, {
+            address: account.contractAddress,
+            isParticipating: childAccountInfo?.status === 'Online',
+            balance: childBalance / 1e6,
+            blocksProduced24h: 0,
+            ...childRewards
+          }];
+        }));
+
+        isInitialized = true;
 
       } catch (error) {
-        console.error(error);
+        console.error('Error updating account info:', error);
       }
-    }
+    };
 
     $: {
-      if (parentWalletId) {
-        updateAccountInfo(parentWalletId);
-      } else if (walletId && walletId.length > 0) {
-        updateAccountInfo(walletId);
+      if (!isInitialized && (parentWalletId || (walletId && walletId.length > 0))) {
+        updateAccountInfo(parentWalletId || walletId);
       }
     }
 

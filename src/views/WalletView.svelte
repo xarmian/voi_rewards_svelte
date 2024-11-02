@@ -18,6 +18,9 @@
     import { Badge } from 'flowbite-svelte';
     import { pan } from 'svelte-gestures';
     import { calculateRewards } from '$lib/utils/rewards';
+	import { getSupplyInfo } from '$lib/stores/accounts';
+	import { dataTable } from '../stores/dataTable';
+	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();

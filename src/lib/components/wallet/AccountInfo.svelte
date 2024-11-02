@@ -145,7 +145,7 @@
     </button>
 
     <!-- Metrics Grid - Hidden by default on mobile -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" class:hidden={!isExpanded} class:md:block={true}>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" class:hidden={!isExpanded} class:md:grid={true}>
         {#each blockPeriods as { period, amount, rewards }}
             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 transition-all hover:shadow-md">
                 <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
