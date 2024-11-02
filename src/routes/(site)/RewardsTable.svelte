@@ -63,13 +63,11 @@
       expandedRow = row;
 
       selectedBalance = 'Loading...';
-      if (items[row]) {
-        
+      if (filterItems[row]) {
         const accountInfo = await getAccountInfo(filterItems[row].proposer);
         selectedBalance = (Number(accountInfo?.amount??0) / Math.pow(10,6));
       }
     }
-    
   }
 
   onMount(async () => {
