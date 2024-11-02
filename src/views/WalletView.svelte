@@ -17,6 +17,7 @@
     import { page } from '$app/stores';
     import { Badge } from 'flowbite-svelte';
     import { pan } from 'svelte-gestures';
+    import { calculateRewards } from '$lib/utils/rewards';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
@@ -38,8 +39,33 @@
         try {
             // Get account information
             accountInfo = await algodClient.accountInformation(walletId).do();
+            
+            // Get supply and VOI per block data
+            const [supplyInfo, dates] = await Promise.all([
+                getSupplyInfo(),
+                dataTable.fetchDateRanges()
+            ]);
+            
+            const latestEpoch = dates[dates.length - 1];
+            const epochData = await dataTable.fetchData(latestEpoch.id);
+            let voiPerBlock = 0;
+            
+            if (epochData) {
+                const tokens = await getTokensByEpoch(latestEpoch.epoch);
+                const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
+                const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
+                voiPerBlock = rewardData.projectedRewardPerBlock;
+            }
+
+            const balance = Number(accountInfo?.amount??0);
+            const onlineMoney = Number(supplyInfo?.['online-money']??0);
+            
+            const rewards = calculateRewards(balance, onlineMoney, voiPerBlock);
+            
+            // You can now use rewards.averageBlockTime, rewards.expectedBlocksPerDay, etc.
+            
         } catch (error) {
-            console.error('Failed to fetch account balance:', error);
+            console.error('Failed to fetch account data:', error);
         }
 
         const nfdData: any = await getNFD([walletId]);

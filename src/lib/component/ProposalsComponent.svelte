@@ -6,10 +6,9 @@
     import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
-    import { getSupplyInfo, getAccountInfo, getConsensusInfo } from '$lib/stores/accounts';
+    import { getSupplyInfo, getAccountInfo, getConsensusInfo, onlineStakeStore } from '$lib/stores/accounts';
 
     export let walletId: string;
-    export let chartData: Array<{ date: string; avg_online_stake: number; max_timestamp: string }>;
     
     let apiData: any;
     $: apiData = null;
@@ -31,8 +30,7 @@
     }
 
     async function fetchOnlineStakeHistory() {
-        const response = await fetch(`${config.proposalApiBaseUrl}?action=online-stake-history`);
-        return await response.json();
+        return await onlineStakeStore.getData();
     }
 
     async function updateChartData() {
@@ -114,112 +112,117 @@
         return secondsPerDay / dailyBlocks;
     }
 
+    $: screenSize = window?.innerWidth ?? 1024;
 </script>
 
-<div class="p-6 bg-white dark:bg-gray-900 rounded-lg shadow-md">
-    <div class="flex justify-between items-center mb-6">
-        <h3 class="text-xl font-bold text-gray-800 dark:text-gray-200">Proposals</h3>
-        {#if expectedBlockTime}
-            <div class="text-sm text-gray-600 dark:text-gray-400">
-                Expected block every: {expectedBlockTime}
+<svelte:window bind:innerWidth={screenSize} />
+
+<div class="bg-white dark:bg-gray-900 rounded-lg shadow-md w-full">
+    <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-gray-800 dark:text-gray-200">Proposals</h3>
+            {#if expectedBlockTime}
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                    Expected block every: {expectedBlockTime}
+                </div>
+            {/if}
+        </div>
+        {#if apiData == null}
+            <div class="flex justify-center items-center h-64">
+                <Spinner size="16" />
             </div>
+        {:else if Object.keys(apiData).length === 0}
+            <div class="text-center text-gray-500 dark:text-gray-400 py-8">
+                No proposals found in last 30 days
+            </div>
+        {:else}
+        <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
+            <Chart
+                {data}
+                x="date"
+                xScale={scaleBand().padding(0.4)}
+                y={["actual", "expected"]}
+                yDomain={[0, null]}
+                yNice={4}
+                padding={{ left: 40, bottom: 40, right: 20, top: 40 }}
+                tooltip={{ mode: "band" }}
+            >
+                        <Legend
+                            class="text-sm text-gray-600 dark:text-gray-300 flex flex-row"
+                            placement="top-right"
+                        >
+                            <div class="w-4 h-4 rounded bg-blue-500 dark:bg-blue-400 mr-2"/>
+                            <div class="text-gray-600 dark:text-gray-300 mr-4">Actual Proposals</div>
+                            <div class="w-4 h-4 rounded bg-green-500 dark:bg-green-400 mr-2"/>
+                            <div class="text-gray-600 dark:text-gray-300 mr-2">Expected Proposals</div>
+                        </Legend>
+                
+                <Svg>
+                    <Axis 
+                        placement="left" 
+                        grid 
+                        rule={{ class: "stroke-danger" }}
+                        tickLabelProps={{
+                            class: "fill-gray-600 dark:fill-gray-300 text-sm",
+                        }}
+                    />
+                    <Axis
+                        placement="bottom"
+                        format={xAxisFormat}
+                        rule={{ class: "stroke-gray-200 dark:stroke-gray-700" }}
+                        tickLabelProps={{
+                            class: "fill-gray-600 dark:fill-gray-300 text-sm",
+                            rotate: 315,
+                            textAnchor: "end",
+                        }}
+                    />
+                    <Bars 
+                        y="actual"
+                        radius={4} 
+                        strokeWidth={1} 
+                        class="fill-blue-500 dark:fill-blue-400 hover:fill-blue-600 dark:hover:fill-blue-500 transition-colors"
+                    />
+                    <Bars 
+                        y="expected"
+                        radius={4} 
+                        strokeWidth={1} 
+                        class="fill-green-500 dark:fill-green-400 hover:fill-green-600 dark:hover:fill-green-500 transition-colors w-2" 
+                    />
+                    <Highlight area={{ class: "fill-blue-200 dark:fill-blue-400 opacity-30" }} />
+                </Svg>
+                <Tooltip.Root let:data>
+                    <div class="bg-white dark:bg-gray-800 p-2 rounded shadow">
+                        <Tooltip.Header class="font-bold text-gray-800 dark:text-gray-200">
+                            {format(data.date, PeriodType.Custom, {
+                                custom: "eee, MMMM do",
+                            })}
+                        </Tooltip.Header>
+                        <Tooltip.List>
+                          <Tooltip.Item 
+                            label="Expected Proposals" 
+                            value={data.expected.toFixed(0)} 
+                            labelClass="text-gray-600 dark:text-gray-300"
+                            valueClass="text-green-500 dark:text-green-400 font-semibold"
+                          />
+                          <Tooltip.Item 
+                              label="Actual Proposals" 
+                              value={data.actual.toFixed(0)} 
+                              labelClass="text-gray-600 dark:text-gray-300"
+                              valueClass="text-blue-500 dark:text-blue-400 font-semibold"
+                          />
+                          <Tooltip.Item 
+                            label="Difference" 
+                            value={`${data.actual > data.expected ? '+' : ''}${(data.actual - data.expected).toFixed(0)}`} 
+                            labelClass="text-gray-600 dark:text-gray-300"
+                            valueClass="text-red-500 dark:text-red-400 font-semibold pt-2"
+                          />
+                        </Tooltip.List>
+                    </div>
+                </Tooltip.Root>
+            </Chart>
+        </div>
         {/if}
     </div>
-    {#if apiData == null}
-        <div class="flex justify-center items-center h-64">
-            <Spinner size="16" />
-        </div>
-    {:else if Object.keys(apiData).length === 0}
-        <div class="text-center text-gray-500 dark:text-gray-400 py-8">
-            No proposals found in last 30 days
-        </div>
-    {:else}
-    <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
-        <Chart
-            {data}
-            x="date"
-            xScale={scaleBand().padding(0.4)}
-            y={["actual", "expected"]}
-            yDomain={[0, null]}
-            yNice={4}
-            padding={{ left: 40, bottom: 40, right: 20, top: 40 }}
-            tooltip={{ mode: "band" }}
-        >
-                    <Legend
-                        class="text-sm text-gray-600 dark:text-gray-300 flex flex-row"
-                        placement="top-right"
-                    >
-                        <div class="w-4 h-4 rounded bg-blue-500 dark:bg-blue-400 mr-2"/>
-                        <div class="text-gray-600 dark:text-gray-300 mr-4">Actual Proposals</div>
-                        <div class="w-4 h-4 rounded bg-green-500 dark:bg-green-400 mr-2"/>
-                        <div class="text-gray-600 dark:text-gray-300 mr-2">Expected Proposals</div>
-                    </Legend>
-            
-            <Svg>
-                <Axis 
-                    placement="left" 
-                    grid 
-                    rule={{ class: "stroke-danger" }}
-                    tickLabelProps={{
-                        class: "fill-gray-600 dark:fill-gray-300 text-sm",
-                    }}
-                />
-                <Axis
-                    placement="bottom"
-                    format={xAxisFormat}
-                    rule={{ class: "stroke-gray-200 dark:stroke-gray-700" }}
-                    tickLabelProps={{
-                        class: "fill-gray-600 dark:fill-gray-300 text-sm",
-                        rotate: 315,
-                        textAnchor: "end",
-                    }}
-                />
-                <Bars 
-                    y="actual"
-                    radius={4} 
-                    strokeWidth={1} 
-                    class="fill-blue-500 dark:fill-blue-400 hover:fill-blue-600 dark:hover:fill-blue-500 transition-colors"
-                />
-                <Bars 
-                    y="expected"
-                    radius={4} 
-                    strokeWidth={1} 
-                    class="fill-green-500 dark:fill-green-400 hover:fill-green-600 dark:hover:fill-green-500 transition-colors w-2" 
-                />
-                <Highlight area={{ class: "fill-blue-200 dark:fill-blue-400 opacity-30" }} />
-            </Svg>
-            <Tooltip.Root let:data>
-                <div class="bg-white dark:bg-gray-800 p-2 rounded shadow">
-                    <Tooltip.Header class="font-bold text-gray-800 dark:text-gray-200">
-                        {format(data.date, PeriodType.Custom, {
-                            custom: "eee, MMMM do",
-                        })}
-                    </Tooltip.Header>
-                    <Tooltip.List>
-                      <Tooltip.Item 
-                        label="Expected Proposals" 
-                        value={data.expected.toFixed(0)} 
-                        labelClass="text-gray-600 dark:text-gray-300"
-                        valueClass="text-green-500 dark:text-green-400 font-semibold"
-                      />
-                      <Tooltip.Item 
-                          label="Actual Proposals" 
-                          value={data.actual.toFixed(0)} 
-                          labelClass="text-gray-600 dark:text-gray-300"
-                          valueClass="text-blue-500 dark:text-blue-400 font-semibold"
-                      />
-                      <Tooltip.Item 
-                        label="Difference" 
-                        value={`${data.actual > data.expected ? '+' : ''}${(data.actual - data.expected).toFixed(0)}`} 
-                        labelClass="text-gray-600 dark:text-gray-300"
-                        valueClass="text-red-500 dark:text-red-400 font-semibold pt-2"
-                      />
-                    </Tooltip.List>
-                </div>
-            </Tooltip.Root>
-        </Chart>
-    </div>
-    {/if}
 </div>
 <style>
 </style>

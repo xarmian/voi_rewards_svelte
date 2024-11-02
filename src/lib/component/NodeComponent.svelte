@@ -112,7 +112,7 @@
     }
 </script>
 
-<div class='grid grid-cols-1 md:grid-cols-2 gap-6'>
+<div class='grid grid-cols-1 md:grid-cols-2 gap-6 w-full'>
     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
         <div class="p-6">
             <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">

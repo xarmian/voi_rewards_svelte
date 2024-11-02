@@ -38,6 +38,62 @@ interface NFDomainResult {
     replacementValue: string;
 }
 
+interface OnlineStakeData {
+  date: string;
+  avg_online_stake: number;
+  max_timestamp: string;
+}
+
+interface OnlineStakeStore {
+  data: OnlineStakeData[];
+  lastFetched: number | null;
+}
+
+function createOnlineStakeStore() {
+  const { subscribe, update } = writable<OnlineStakeStore>({
+    data: [],
+    lastFetched: null
+  });
+
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  async function fetchData() {
+    try {
+      const response = await fetch(`${config.proposalApiBaseUrl}?action=online-stake-history`);
+      const data = await response.json();
+      update(() => ({
+        data,
+        lastFetched: Date.now()
+      }));
+      return data;
+    } catch (error) {
+      console.error('Error fetching online stake history:', error);
+      return [];
+    }
+  }
+
+  async function getData() {
+    let currentValue: OnlineStakeStore | undefined;
+    subscribe(store => {
+      currentValue = store;
+    })();
+
+    if (!currentValue?.lastFetched || Date.now() - currentValue.lastFetched > CACHE_DURATION) {
+      return await fetchData();
+    }
+
+    return currentValue.data;
+  }
+
+  return {
+    subscribe,
+    getData,
+    refresh: fetchData
+  };
+}
+
+export const onlineStakeStore = createOnlineStakeStore();
+
 // Stores
 export const consensusInfo = writable<ConsensusInfo>({});
 export const accountInfo = writable<Record<string, algosdk.modelsv2.Account>>({});

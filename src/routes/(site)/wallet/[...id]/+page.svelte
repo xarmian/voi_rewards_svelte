@@ -11,6 +11,9 @@
     import NodeComponent from '$lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
     import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
+    import { dataTable } from '../../../../stores/dataTable';
+    import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
+    import { calculateRewards } from '$lib/utils/rewards';
 
     export let data: {
         walletId: string;
@@ -63,6 +66,9 @@
       expectedBlocksPerDay: number;
       expectedBlocksPerWeek: number;
       expectedBlocksPerMonth: number;
+      estimatedRewardsPerDay: number;
+      estimatedRewardsPerWeek: number;
+      estimatedRewardsPerMonth: number;
     }
 
     let primaryAccountInfo: Account | null = null;
@@ -87,37 +93,52 @@
       try {
         supply = await getSupplyInfo();
         const accountInfo = await getAccountInfo(address);
-        //const apiData = await getConsensusInfo(address);
+        
+        // Get latest epoch data for VOI per block calculation
+        const dates = await dataTable.fetchDateRanges();
+        const latestEpoch = dates[dates.length - 1];
+        const epochData = await dataTable.fetchData(latestEpoch.id);
+        let voiPerBlock = 0;
+        
+        if (epochData) {
+          const tokens = await getTokensByEpoch(latestEpoch.epoch);
+          const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
+          const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
+          voiPerBlock = rewardData.projectedRewardPerBlock;
+        }
+
+        const balance = Number(accountInfo?.amount??0);
+        const onlineMoney = Number(supply?.['online-money']??0);
+        
+        const rewards = calculateRewards(balance, onlineMoney, voiPerBlock);
 
         primaryAccountInfo = {
           address: address,
           isParticipating: accountInfo?.status === 'Online',
-          balance: Number(accountInfo?.amount??0) / 1e6,
+          balance: balance / 1e6,
           blocksProduced24h: 0,
-          expectedBlocksPerDay: calculateExpectedBlocks(1, Number(accountInfo?.amount??0)),
-          expectedBlocksPerWeek: calculateExpectedBlocks(7, Number(accountInfo?.amount??0)),
-          expectedBlocksPerMonth: calculateExpectedBlocks(30, Number(accountInfo?.amount??0))
-        }
+          ...rewards
+        };
 
-        // get child accounts from staking api
+        // Update child accounts calculation
         const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
         fetch(curl, { cache: 'no-store' })
-            .then((response) => response.json())
-            .then((data) => {
-              data.accounts.forEach(async (account: LockContract) => {
-                  const accountInfo = await getAccountInfo(account.contractAddress);
+          .then((response) => response.json())
+          .then((data) => {
+            data.accounts.forEach(async (account: LockContract) => {
+              const accountInfo = await getAccountInfo(account.contractAddress);
+              const balance = Number(accountInfo?.amount??0);
+              const rewards = calculateRewards(balance, onlineMoney, voiPerBlock);
 
-                  childAccounts.push({
-                      address: account.contractAddress,
-                      isParticipating: accountInfo?.status === 'Online',
-                      balance: Number(accountInfo?.amount??0) / 1e6,
-                      blocksProduced24h: 0,
-                      expectedBlocksPerDay: calculateExpectedBlocks(1, Number(accountInfo?.amount??0)),
-                      expectedBlocksPerWeek: calculateExpectedBlocks(7, Number(accountInfo?.amount??0)),
-                      expectedBlocksPerMonth: calculateExpectedBlocks(30, Number(accountInfo?.amount??0))
-                  });
+              childAccounts.push({
+                address: account.contractAddress,
+                isParticipating: accountInfo?.status === 'Online',
+                balance: balance / 1e6,
+                blocksProduced24h: 0,
+                ...rewards
               });
             });
+          });
 
       } catch (error) {
         console.error(error);
@@ -131,95 +152,168 @@
         updateAccountInfo(walletId);
       }
     }
+
+    let isMobileMenuOpen = false;
+
+    function toggleMobileMenu() {
+        isMobileMenuOpen = !isMobileMenuOpen;
+    }
   </script>
   
-  <div class="flex h-fit min-h-screen">
-    <aside class="w-64 bg-gray-100 dark:bg-gray-800 p-5">
-      <nav class="flex flex-col gap-4">
-          <a
-              href="/"
-              class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow transition-colors duration-200"
-          >
-              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Dashboard
-          </a>
-          <ul class="space-y-2">
-          {#each sections as section}
-            <li>
-              <button
-                class="w-full text-left py-2 px-4 rounded transition-colors duration-200 ease-in-out {activeSection === section.id ? 'bg-gray-200 dark:bg-gray-700 font-bold' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}"
-                on:click={() => setActiveSection(section.id)}
-              >
-                {section.name}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </nav>
+  <div class="flex flex-col md:flex-row">
+    <!-- Mobile Header -->
+    <div class="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-800">
+        <button
+            class="text-gray-600 dark:text-gray-200"
+            on:click={toggleMobileMenu}
+            aria-label="Toggle menu"
+        >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path 
+                    stroke-linecap="round" 
+                    stroke-linejoin="round" 
+                    stroke-width="2" 
+                    d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+                />
+            </svg>
+        </button>
+        <div class="flex-1 mx-4">
+            <Web3Wallet
+                availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
+                showAuthButtons={false}
+                {algodClient}
+                indexerClient={algodIndexer}
+                wcProject={{
+                    projectId: wcProjectId,
+                    projectName: 'Voi Rewards Auditor',
+                    projectDescription: 'Voi Rewards Auditor',
+                    projectUrl: 'https://voirewards.com',
+                    projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
+                }}
+                walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+                allowWatchAccounts={true}
+                showAuthenticated={false}
+                modalType="dropdown"
+            />
+        </div>
+    </div>
+
+    <!-- Sidebar - Desktop & Mobile -->
+    <aside class={`
+        ${isMobileMenuOpen ? 'block' : 'hidden'} 
+        md:block 
+        w-full md:w-64 
+        bg-gray-100 dark:bg-gray-800 
+        p-5
+        ${isMobileMenuOpen ? 'fixed inset-0 z-50' : ''}
+        md:relative
+        md:flex-shrink-0
+        overflow-y-auto
+    `}>
+        <button
+            class="md:hidden absolute top-20 right-4 text-gray-600 dark:text-gray-200"
+            on:click={toggleMobileMenu}
+            aria-label="Close menu"
+        >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path 
+                    stroke-linecap="round" 
+                    stroke-linejoin="round" 
+                    stroke-width="2" 
+                    d="M6 18L18 6M6 6l12 12"
+                />
+            </svg>
+        </button>
+
+        <nav class="flex flex-col gap-4">
+            <div class="h-20 md:h-0"></div>
+            <a
+                href="/"
+                class="hidden md:inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow transition-colors duration-200"
+            >
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Dashboard
+            </a>
+            <ul class="space-y-2">
+                {#each sections as section}
+                    <li>
+                        <button
+                            class="w-full text-left py-2 px-4 rounded transition-colors duration-200 ease-in-out {activeSection === section.id ? 'bg-gray-200 dark:bg-gray-700 font-bold' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}"
+                            on:click={() => {
+                                setActiveSection(section.id);
+                                if (window.innerWidth < 768) {
+                                    toggleMobileMenu();
+                                }
+                            }}
+                        >
+                            {section.name}
+                        </button>
+                    </li>
+                {/each}
+            </ul>
+        </nav>
     </aside>
     
-    <main class="flex-grow p-5 bg-white dark:bg-gray-900">
-      <div class="w-full flex justify-end mb-4">
-        <Web3Wallet
-            availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
-            showAuthButtons={false}
-            {algodClient}
-            indexerClient={algodIndexer}
-            wcProject={{
-                projectId: wcProjectId,
-                projectName: 'Voi Rewards Auditor',
-                projectDescription: 'Voi Rewards Auditor',
-                projectUrl: 'https://voirewards.com',
-                projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
-            }}
-            walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
-            allowWatchAccounts={true}
-            showAuthenticated={false}
-            modalType="dropdown"
-        />
-      </div>
+    <main class="flex-1 bg-white dark:bg-gray-900">
+        <!-- Desktop Wallet Connection -->
+        <div class="sticky top-0 z-10 hidden md:flex w-full justify-end p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <Web3Wallet
+                availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
+                showAuthButtons={false}
+                {algodClient}
+                indexerClient={algodIndexer}
+                wcProject={{
+                    projectId: wcProjectId,
+                    projectName: 'Voi Rewards Auditor',
+                    projectDescription: 'Voi Rewards Auditor',
+                    projectUrl: 'https://voirewards.com',
+                    projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
+                }}
+                walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+                allowWatchAccounts={true}
+                showAuthenticated={false}
+                modalType="dropdown"
+            />
+        </div>
 
-      {#if walletId}
-        {#if activeSection === 'staking'}
-          <div class="space-y-6">
-            {#if primaryAccountInfo}
-              <h3 class="text-xl font-semibold mb-2">Primary Account</h3>
-              <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow">
-                <AccountInfo account={primaryAccountInfo} addressLink={walletId != primaryAccountInfo.address} />
-              </div>
-            {:else}
-              <p class="text-gray-600">Loading...</p>
-            {/if}
-            
-            {#if childAccounts.length > 0}
-              <div class="space-y-4">
-                <h3 class="text-xl font-semibold">Staking Contracts</h3>
-                {#each childAccounts as childAccount}
-                  {#if childAccount.balance > 0.1}
-                    <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow">
-                      <AccountInfo account={childAccount} addressLink={walletId != childAccount.address} />
+        <div class="p-4 md:p-5">
+            {#if walletId}
+                {#if activeSection === 'staking'}
+                    <div class="space-y-4 md:space-y-6">
+                        {#if primaryAccountInfo}
+                            <h3 class="text-lg md:text-xl font-semibold mb-2">Primary Account</h3>
+                            <div class="bg-gray-50 dark:bg-gray-800 p-3 md:p-4 rounded-lg shadow">
+                                <AccountInfo account={primaryAccountInfo} addressLink={walletId != primaryAccountInfo.address} />
+                            </div>
+                        {:else}
+                            <p class="text-gray-600">Loading...</p>
+                        {/if}
+                        
+                        {#if childAccounts.length > 0}
+                            <div class="space-y-3 md:space-y-4">
+                                <h3 class="text-lg md:text-xl font-semibold">Staking Contracts</h3>
+                                {#each childAccounts as childAccount}
+                                    {#if childAccount.balance > 0.1}
+                                        <div class="bg-gray-50 dark:bg-gray-800 p-3 md:p-4 rounded-lg shadow">
+                                            <AccountInfo account={childAccount} addressLink={walletId != childAccount.address} />
+                                        </div>
+                                    {/if}
+                                {/each}
+                            </div>
+                        {/if}
                     </div>
-                  {/if}
-                {/each}
-              </div>
+                {:else if activeSection === 'consensus'}
+                    <h2 class="text-xl md:text-2xl font-bold mb-4">Consensus</h2>
+                    <NodeComponent walletId={walletId} />
+                {:else if activeSection === 'proposals'}
+                    <h2 class="text-xl md:text-2xl font-bold mb-4">Proposals</h2>
+                    <ProposalsComponent walletId={walletId} />
+                {/if}
+            {:else}
+                <p class="text-gray-600">Please connect a wallet to view account information.</p>
             {/if}
-            
-            <!--<div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h3 class="text-xl font-semibold mb-2">Total for All Accounts</h3>
-              <TotalAccountsInfo accounts={[...childAccounts]} />
-            </div>-->
-          </div>
-        {:else if activeSection === 'consensus'}
-          <h2 class="text-2xl font-bold mb-4">Consensus</h2>
-          <NodeComponent walletId={walletId} />
-        {:else if activeSection === 'proposals'}
-          <h2 class="text-2xl font-bold mb-4">Proposals</h2>
-          <ProposalsComponent walletId={walletId} />
-        {/if}
-      {:else}
-        <p class="text-gray-600">Please connect a wallet to view account information.</p>
-      {/if}
+        </div>
     </main>
   </div>

@@ -11,7 +11,7 @@
 	import MiniBlockChart from '$lib/components/MiniBlockChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
-	import { getSupplyInfo } from '$lib/stores/accounts';
+	import { getSupplyInfo, onlineStakeStore } from '$lib/stores/accounts';
 	import type { SupplyInfo } from '$lib/stores/accounts';
 	import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
 	import { dataTable } from '../..//stores/dataTable';
@@ -124,8 +124,7 @@
 	}
 
 	async function fetchOnlineStakeHistory() {
-		const response = await fetch(`${config.proposalApiBaseUrl}?action=online-stake-history`);
-		onlineStakeHistory = await response.json();
+		onlineStakeHistory = await onlineStakeStore.getData();
 	}
 
 	function handleStakeChartClick() {

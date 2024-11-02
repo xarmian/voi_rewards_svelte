@@ -15,6 +15,8 @@
   import { getAccountInfo, getNFDomains } from '$lib/stores/accounts';
   import type { NFDomainResponse } from '$lib/stores/accounts';
 	import { goto } from '$app/navigation';
+  import { nicknames } from '$lib/stores/nicknames';
+  import NicknameManager from '$lib/components/NicknameManager.svelte';
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
@@ -135,11 +137,6 @@
 
     for (let i = 0; i < $sortItems.length; i++) {
       const item = $sortItems[i];
-      if (i == 0) {
-        console.log('totalBlockRewards', totalBlockRewards);
-        console.log('totalBlocks', totalBlocks);
-        console.log('item.block_count', item.block_count);
-      }
       item.epoch_block_rewards = Math.floor(Math.floor(totalBlockRewards / totalBlocks * item.block_count * Math.pow(10,7)) /10) / Math.pow(10,6);
       item.block_rewards = item.block_count * rewardPerBlock;
 
@@ -280,7 +277,9 @@
                   on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
                   class="hover:text-blue-600 transition-colors flex items-center gap-2"
                 >
-                  {#if showWalletNFD && item.nfd !== undefined}
+                  {#if $nicknames[item.proposer]}
+                    <span class='inline-block'>{$nicknames[item.proposer]}</span>
+                  {:else if showWalletNFD && item.nfd !== undefined}
                     <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,10)+'...' : item.nfd}</span>
                   {:else}
                     {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
@@ -288,16 +287,39 @@
                   <WalletSolid size="sm" class="text-gray-400 group-hover:text-blue-600" />
                 </button>
                 
-                <button
-                  on:click|stopPropagation={() => {
-                    viewWallet = true;
-                    if (viewWalletId != item.proposer) viewWalletId = item.proposer;
-                  }}
-                  class="inline-flex items-center gap-1 px-2 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
-                  title="Quick View"
-                >
-                  <i class="fas fa-expand-alt"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                      on:click|stopPropagation={() => {
+                      const row = filterItems[i];
+                      row.showNicknameInput = !row.showNicknameInput;
+                      filterItems = filterItems;
+                    }}
+                    class="text-gray-500 hover:text-gray-600 px-2"
+                    title="Set Nickname"
+                  >
+                    <i class="fas fa-tag"></i>
+                  </button>
+
+                  <button
+                    on:click|stopPropagation={() => {
+                      viewWallet = true;
+                      if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+                    }}
+                    class="inline-flex items-center gap-1 px-2 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                    title="Quick View"
+                  >
+                    <i class="fas fa-expand-alt"></i>
+                  </button>
+                </div>
+              </div>
+              
+              <div class="mt-2" on:click|stopPropagation>
+                {#if item.showNicknameInput}
+                  <NicknameManager 
+                    address={item.proposer} 
+                    bind:showInput={item.showNicknameInput}
+                  />
+                {/if}
               </div>
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
