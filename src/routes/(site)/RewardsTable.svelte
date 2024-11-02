@@ -358,6 +358,11 @@
                     <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
                   </div>
 
+                  <div>
+                    <Label defaultClass="text-sm font-medium inline-block w-40">Est. APR:</Label>
+                    <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards / Number(selectedBalance) * 52 * 100).toFixed(2)}%</span>
+                  </div>
+
                   {#if item.nfd}
                     <div>
                       <Label defaultClass="text-sm font-medium inline-block w-40">NFD:</Label>

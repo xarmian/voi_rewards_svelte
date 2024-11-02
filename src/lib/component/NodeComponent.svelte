@@ -47,7 +47,7 @@
                 const tokens = await getTokensByEpoch(latestEpoch.epoch);
                 const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
                 const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
-                
+
                 voiPerBlock = rewardData.projectedRewardPerBlock;
             }
 
@@ -169,9 +169,9 @@
                                 </span>
                             </span>
                         </p>
-                        <p class="flex justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700">
+                        <p class="justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700 hidden">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Approx APR:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{((voiPerBlock * expectedBlocksPerDay * 365 / balance * 1e6) * 100).toFixed(2)}%</span>
+                            <span class="text-gray-800 dark:text-gray-200">{((voiPerBlock * expectedBlocksPerWeek * 52 / balance * 1e6) * 100).toFixed(2)}%</span>
                         </p>
                     {/if}
                 </div>
