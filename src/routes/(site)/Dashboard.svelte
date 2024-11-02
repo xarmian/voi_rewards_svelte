@@ -14,7 +14,7 @@
 	import { getSupplyInfo } from '$lib/stores/accounts';
 	import type { SupplyInfo } from '$lib/stores/accounts';
 	import { getTokensByEpoch } from '$lib/utils';
-
+	import { dataTable } from '../..//stores/dataTable';
 	const latestBlock = writable({ block: 0, timestamp: '' });
 
 	function handleLatestBlock(event: CustomEvent) {
@@ -40,119 +40,43 @@
 	let isLoading = true;
 
 	const populateDateDropdown = async () => {
-		const url = `${config.proposalApiBaseUrl}`;
-		await fetch(url, { cache: 'no-store' })
-			.then((response) => response.json())
-			.then((data) => {
-                const minTimestamp = new Date('2024-10-30T00:00:00Z');
-				const maxTimestamp = new Date(data.max_timestamp);
-
-				dates = [];
-
-				let currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
-				let epoch = 1;
-				while (currentDate <= maxTimestamp) {
-					let startOfWeek = new Date(currentDate);
-					startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3); // Wednesday
-
-					const endOfWeek = new Date(startOfWeek);
-					endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6); // Tuesday
-
-					const dateStr = `${startOfWeek
-						.toISOString()
-						.substring(0, 10)
-						.replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
-					dates = [
-						...dates,
-						{
-							id: dateStr,
-							desc: dateStr.replace(
-								/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
-								'$1-$2-$3 to $4-$5-$6'
-							),
-							epoch: epoch
-						}
-					];
-					currentDate.setUTCDate(currentDate.getUTCDate() + 7); // Next week
-					epoch++;
-				}
-				selectedDate = dates[dates.length - 1].id;
-			})
-			.catch((error) => {
-				console.error(error);
-			});
+		try {
+			dates = await dataTable.fetchDateRanges();
+			selectedDate = dates[dates.length - 1].id;
+		} catch (error) {
+			console.error(error);
+		}
 	};
 
 	const loadDashboardData = async (selectedDate: string) => {
 		isLoading = true;
 		try {
-			// derive start and end dates from the selected date of format YYYYMMDD-YYYYMMDD
-			const startDate =
-				selectedDate.substring(0, 4) +
-				'-' +
-				selectedDate.substring(4, 6) +
-				'-' +
-				selectedDate.substring(6, 8);
-			const endDate =
-				selectedDate.substring(9, 13) +
-				'-' +
-				selectedDate.substring(13, 15) +
-				'-' +
-				selectedDate.substring(15, 17);
-			// const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
-			const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
+			const data = await dataTable.fetchData(selectedDate);
+			
+			dataIncomplete = false;
+			if (data) {
+				const checkDate = new Date(
+					Date.UTC(
+						parseInt(selectedDate.substring(9, 13)),
+						parseInt(selectedDate.substring(13, 15)) - 1,
+						parseInt(selectedDate.substring(15, 17))
+					)
+				);
+				const endOfDay = new Date(checkDate);
+				endOfDay.setUTCHours(23, 59, 59, 999);
 
-			// check endDate, if 2023-12-31 or more recent, set block reward pool to 25000000, otherwise set block reward pool to 12500000
-			const endOfEpoch = new Date(
-				Date.UTC(
-					parseInt(selectedDate.substring(9, 13)),
-					parseInt(selectedDate.substring(13, 15)) - 1,
-					parseInt(selectedDate.substring(15, 17))
-				)
-			);
-
-			// set default rewards based on epoch
-			endOfEpoch.setUTCHours(23, 59, 59, 999);
-
-			// reinitialize totals
-			totalWallets = 0;
-			totalBlocks = 0;
-			block_height = 0;
-
-			fetch(url, { cache: 'no-store' })
-				.then((response) => response.json())
-				.then(async (data) => {
-					// check if the end date selected in dropdown is more than maxTimestamp. If so, add notice below date selection that data is incomplete
-					const checkDate = new Date(
-						Date.UTC(
-							parseInt(selectedDate.substring(9, 13)),
-							parseInt(selectedDate.substring(13, 15)) - 1,
-							parseInt(selectedDate.substring(15, 17))
-						)
-					);
-					const endOfDay = new Date(checkDate);
-					endOfDay.setUTCHours(23, 59, 59, 999);
-
-					dataIncomplete = endOfDay > new Date(data.max_timestamp) ? true : false;
-
-					// Sort the data by block count
-					data.data.sort((a: any, b: any) => b.block_count - a.block_count);
-					dataArrays = data.data;
-
-					//calcRewards();
-					block_height = data.block_height;
-					block_height_timestamp = new Date(data.max_timestamp).toLocaleString('en-US', {
-						timeZone: 'UTC'
-					});
-
-					ballasts = data.blacklist;
-					totalWallets = data.num_proposers;
-					totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
-					latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
-					await updateRewardParams();
-
-					eligibleOnlineStake = getEligibleOnlineStake();
-				});
+				dataIncomplete = endOfDay > new Date(data.max_timestamp);
+				
+				// Update local state
+				dataArrays = data.data;
+				ballasts = data.blacklist;
+				totalWallets = data.num_proposers;
+				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
+				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
+				
+				await updateRewardParams();
+				eligibleOnlineStake = getEligibleOnlineStake();
+			}
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
 		} finally {

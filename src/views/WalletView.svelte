@@ -113,7 +113,7 @@
                     <i class="fas fa-copy"></i>
                 </button>
                 {#if isModal}
-                    <a href="/wallet/{walletId}" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" target="_blank" title="Open Wallet View in new page">
+                    <a href="https://explorer.voi.network/explorer/account/{walletId}/transactions" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" target="_blank" title="Open Account on Voi Explorer">
                         <i class="fas fa-external-link-alt"></i>
                     </a>
                 {/if}

@@ -4,7 +4,7 @@
   import { writable } from 'svelte/store';
   import RewardsTableHeader from './RewardsTableHeader.svelte';
   import { rewardParams } from '../../stores/dataTable';
-  import { CopySolid, LinkSolid, StarSolid, StarOutline } from 'flowbite-svelte-icons';
+  import { CopySolid, LinkSolid, StarSolid, StarOutline, WalletSolid } from 'flowbite-svelte-icons';
   import { Modal } from 'flowbite-svelte';
   import { copy } from 'svelte-copy';
   import { toast } from '@zerodevx/svelte-toast';
@@ -14,6 +14,7 @@
   import { favorites } from '../../stores/favorites';
   import { getAccountInfo, getNFDomains } from '$lib/stores/accounts';
   import type { NFDomainResponse } from '$lib/stores/accounts';
+	import { goto } from '$app/navigation';
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
@@ -269,22 +270,19 @@
               {/if}
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
-              <button on:click|stopPropagation={() => {
-                viewWallet = true;
-                if (viewWalletId != item.proposer) viewWalletId = item.proposer;
-              }} class="text-blue-500 hover:text-blue-800 hover:underline">
-                {#if showWalletNFD && item.nfd !== undefined}
-                  <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,10)+'...' : item.nfd}</span>
-                {:else}
-                  {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
-                {/if}
-              </button>
-              <button use:copy={item.proposer} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}>
-                <CopySolid size='sm' class='inline' />
-              </button> 
-              <a on:click|stopPropagation href='https://explorer.voi.network/explorer/account/{item.proposer}/transactions' target='_blank'>
-                <LinkSolid size='sm' class='inline' />
-              </a>
+              <div class="flex items-center gap-2">
+                <button 
+                  on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
+                  class="hover:text-blue-600 transition-colors flex items-center gap-2"
+                >
+                  {#if showWalletNFD && item.nfd !== undefined}
+                    <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,10)+'...' : item.nfd}</span>
+                  {:else}
+                    {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
+                  {/if}
+                  <WalletSolid size="sm" class="text-gray-400 group-hover:text-blue-600" />
+                </button>
+              </div>
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_rewards.toFixed(2))} VOI</TableBodyCell>
@@ -293,36 +291,71 @@
           <TableBodyRow>
             <TableBodyCell colspan="4" class="p-0" on:click={() => toggleRow(i)}>
               <div class="px-2 py-3 m-4" transition:slide={{ duration: 300, axis: 'y' }}>
-                <div>
+                <div class="space-y-3">
                   <!-- address and nfd -->
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
-                    <a on:click|stopPropagation href="/wallet/{item.proposer}" class="text-blue-500 hover:text-blue-800 hover:underline">
-                      {item.proposer.substring(0,20)}...
-                    </a>
+                    <span class="text-gray-600">{item.proposer}</span>
+                    
+                    <!-- Action buttons group -->
+                    <div class="mt-2 flex gap-2">
+                      <button 
+                        use:copy={item.proposer} 
+                        on:click|stopPropagation 
+                        on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      >
+                        <CopySolid size="sm" />
+                        Copy Address
+                      </button>
+
+                      <button 
+                        on:click|stopPropagation={() => {
+                          viewWallet = true;
+                          if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+                        }}
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      >
+                        <i class="fas fa-expand-alt"></i>
+                        Quick View
+                      </button>
+
+                      <a 
+                        href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
+                        target="_blank"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        on:click|stopPropagation
+                      >
+                        <i class="fas fa-search"></i>
+                        View in Explorer
+                      </a>
+                    </div>
                   </div>
+
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Account Balance:</Label>
                     <span class="text-gray-500">{selectedBalance.toLocaleString()} VOI</span>
                   </div>
+
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Est. Reward (full epoch):</Label>
                     <span class="text-gray-500">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
                   </div>
-                  {#if false}
-                    <div>
-                      <Label defaultClass="text-sm font-medium inline-block w-40">Est. APR:</Label>
-                      <span class="text-gray-500">{((item.epoch_block_rewards / Number(selectedBalance)) * 52 * 100).toFixed(2)}%</span>
-                    </div>
-                  {/if}
+
                   {#if item.nfd}
                     <div>
                       <Label defaultClass="text-sm font-medium inline-block w-40">NFD:</Label>
-                      <a on:click|stopPropagation href="https://app.nf.domains/name/{item.nfd}" target="_blank" class="hover:underline active:text-gray-500">{item.nfd}</a>
+                      <a 
+                        href="https://app.nf.domains/name/{item.nfd}" 
+                        target="_blank" 
+                        class="text-blue-500 hover:text-blue-700 hover:underline"
+                        on:click|stopPropagation
+                      >
+                        {item.nfd}
+                      </a>
                     </div>
                   {/if}
                 </div>
-                <br/>
               </div>
             </TableBodyCell>
           </TableBodyRow>
@@ -379,5 +412,27 @@ a:active {
 }
 .negTranslate {
   transform: translateY(-6px);
+}
+
+/* Add to existing styles */
+.group {
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .group:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 50;
+  }
 }
 </style>
