@@ -33,6 +33,8 @@ export interface NFDomainResponse {
     };
 }
 
+export type Account = algosdk.modelsv2.Account;
+
 interface NFDomainResult {
     key: string;
     replacementValue: string;

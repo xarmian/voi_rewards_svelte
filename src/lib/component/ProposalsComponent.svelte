@@ -7,7 +7,7 @@
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
     import { getSupplyInfo, getAccountInfo, getConsensusInfo, onlineStakeStore } from '$lib/stores/accounts';
-
+    import type { Account } from '$lib/stores/accounts';
     export let walletId: string;
     
     let apiData: any;
@@ -19,7 +19,7 @@
     let idx = 0;
 
     let supply: any;
-    let accountInfo: any;
+    let accountInfo: Account | null = null;
     let expectedBlockTime: string | null = null;
     let historicalExpectedProposals: any = {};
 
@@ -77,7 +77,7 @@
             ]);
             
             apiData = await response.json();
-            accountInfo = accountInfoResult;
+            accountInfo = accountInfoResult ?? null;
             supply = supplyResult;
             
             // Calculate expected block time using current supply
@@ -136,8 +136,26 @@
                 No proposals found in last 30 days
             </div>
         {:else}
-        <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
-            <Chart
+            {#if accountInfo?.status !== 'Online'}
+              <div class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-50 rounded-lg dark:bg-yellow-900 dark:text-yellow-100">
+                <div class="flex items-center mb-2">
+                  <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L1 21h22L12 2zm0 3.45l8.4 14.55H3.6L12 5.45z"/>
+                    <path d="M11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+                  </svg>
+                  <span class="font-medium text-base">Important Notice</span>
+                </div>
+                <div class="ml-7 space-y-2">
+                  <p>This account is not participating in consensus. You will not be able to propose or vote on blocks. <a href="/faq#how-do-i-get-started-running-a-node-" class="text-yellow-900 dark:text-yellow-200 underline hover:no-underline">Learn how to get started running a node</a>.</p>
+                  <div class="flex items-center pt-1">
+                    <span class="font-medium">Account:</span>
+                    <span class="ml-2 font-mono bg-yellow-100 dark:bg-yellow-800 px-2 py-0.5 rounded">{walletId}</span>
+                  </div>
+                </div>
+              </div>
+            {/if}
+            <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
+                <Chart
                 {data}
                 x="date"
                 xScale={scaleBand().padding(0.4)}

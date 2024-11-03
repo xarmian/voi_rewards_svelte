@@ -2,10 +2,12 @@ import type { PageLoad } from './$types';
 import { get } from 'svelte/store';
 import { selectedWallet } from 'avm-wallet-svelte';
 import { config } from '$lib/config';
-export const load = (async ({ params, fetch }) => {
+
+export const load = (async ({ params, fetch, depends }) => {
+	depends('wallet:id');
+	
 	let parentWalletId: string | null = null;
 	if (params.id) {
-		// check if address is a contract address
 		const response = await fetch(`${config.lockvestApiBaseUrl}?contractAddress=${params.id}`);
 		if (response.ok) {
 			const data = await response.json();

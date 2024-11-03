@@ -239,9 +239,9 @@
     <TableHead>
         {#each columns as column, i}
             <RewardsTableHeader columnId={column.id} on:sort={handleSort} sortDirection={$sortDirection} sortKey={$sortKey}>
-                <span class="flex flex-col md:flex-row">
+                <span class="flex flex-col md:flex-row items-center">
                   {#if column.id === 'proposer'}
-                    <span class="negTranslate">{column.desc}</span>
+                    <span>{column.desc}</span>
                     <span class="md:ml-4" on:click|stopPropagation><Toggle bind:checked={showWalletNFD}>NFD</Toggle></span>
                   {:else}
                     {column.desc}
@@ -412,16 +412,16 @@
         {/if}
       {/each}
    
-      <TableBodyRow class="bg-gray-50 dark:bg-gray-900 hidden">
+      <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
         <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
         <TableBodyCell colspan="2" class="p-2">
-          Total Blocks:
+          Blocks:
         </TableBodyCell>
           <TableBodyCell class="p-2">
-            {items.reduce((sum, item) => sum + item.block_count, 0)}
+            {filterItems.reduce((sum, item) => sum + item.block_count, 0)}
           </TableBodyCell>
           <TableBodyCell colspan="1" class="p-2">
-            <!--{Math.round(items.reduce((sum, item) => sum + item.block_rewards, 0))}-->
+            {Math.round(filterItems.reduce((sum, item) => sum + item.block_rewards, 0)).toLocaleString()} VOI
           </TableBodyCell>
       </TableBodyRow>
     </TableBody>
@@ -459,8 +459,5 @@ a:hover {
 
 a:active {
   color: #6b7280;
-}
-.negTranslate {
-  transform: translateY(-6px);
 }
 </style>

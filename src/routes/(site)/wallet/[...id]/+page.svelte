@@ -14,10 +14,13 @@
     import { dataTable } from '../../../../stores/dataTable';
     import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
     import { calculateRewards } from '$lib/utils/rewards';
+    import { browser } from '$app/environment';
+    import { page } from '$app/stores';
 
     export let data: {
         walletId: string;
         parentWalletId: string | null;
+        hash: string;
     };
 
     let activeSection = 'consensus';
@@ -27,22 +30,52 @@
     $: parentWalletId = data.parentWalletId;
     let loading = true;
 
+    $: {
+        const hash = $page.url.hash.slice(1);
+        if (hash && sections.some(section => section.id === hash)) {
+            activeSection = hash;
+        }
+    }
+
     onMount(() => {
         loading = false;
         if (data.walletId && data.walletId.length > 0 && data.walletId != $selectedWallet?.address) {
             selectedWallet.set({address: data.walletId, app: ''});
         }
-    });
 
-    const unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
-        if (!loading && wallet?.address && wallet.address.length > 0 && walletId !== wallet.address) {
-            activeSection = 'consensus';
-            goto(`/wallet/${wallet.address}`);
+        if (browser) {
+            window.addEventListener('hashchange', handleHashChange);
         }
     });
 
     onDestroy(() => {
         unsubSelectedWallet();
+        
+        if (browser) {
+            window.removeEventListener('hashchange', handleHashChange);
+        }
+    });
+
+    function handleHashChange() {
+        if (!browser) return;
+        const hash = window.location.hash.slice(1);
+        if (hash && sections.some(section => section.id === hash)) {
+            activeSection = hash;
+        }
+    }
+
+    function setActiveSection(sectionId: string): void {
+        activeSection = sectionId;
+        if (browser) {
+            history.pushState(null, '', `#${sectionId}`);
+        }
+    }
+
+    const unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
+        if (!loading && wallet?.address && wallet.address.length > 0 && walletId !== wallet.address) {
+            const hash = $page.url.hash || '#consensus';
+            goto(`/wallet/${wallet.address}${hash}`, { invalidateAll: true });
+        }
     });
 
     const sections = [
@@ -54,10 +87,6 @@
       //{ id: 'billing', name: 'Billing Information' }
     ];
     
-    function setActiveSection(sectionId: string): void {
-      activeSection = sectionId;
-    }
-
     interface Account {
       address: string;
       isParticipating: boolean;
@@ -85,8 +114,6 @@
         const blocksPerDay = secondsPerDay / 2.8; // Assuming 2.8 seconds per block
         return (balance / supply['online-money']) * blocksPerDay * days;
     }
-
-    let isInitialized = false;
 
     const updateAccountInfo = async (address: string) => {
       primaryAccountInfo = null;
@@ -117,7 +144,6 @@
 
         if (voiPerBlock === 0) {
           console.error('Warning: voiPerBlock calculation resulted in 0');
-          return;
         }
 
         const balance = Number(accountInfo?.amount ?? 0);
@@ -151,17 +177,15 @@
           }];
         }));
 
-        isInitialized = true;
-
       } catch (error) {
         console.error('Error updating account info:', error);
       }
     };
 
     $: {
-      if (!isInitialized && (parentWalletId || (walletId && walletId.length > 0))) {
-        updateAccountInfo(parentWalletId || walletId);
-      }
+        if (walletId && walletId.length > 0) {
+            updateAccountInfo(parentWalletId || walletId);
+        }
     }
 
     let isMobileMenuOpen = false;

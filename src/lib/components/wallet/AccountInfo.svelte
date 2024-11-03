@@ -24,6 +24,7 @@
 
     let isExpanded = false;
     let showNicknameInput = false;
+    let showOfflineInfo = false;
 
     const blockPeriods = [
         { period: 'Daily', amount: account.expectedBlocksPerDay, rewards: account.estimatedRewardsPerDay },
@@ -40,6 +41,10 @@
 
     function toggleExpand() {
         isExpanded = !isExpanded;
+    }
+
+    function toggleOfflineInfo() {
+        showOfflineInfo = !showOfflineInfo;
     }
 </script>
 
@@ -133,6 +138,15 @@
                     }`}>
                         {account.isParticipating ? 'Online' : 'Offline'}
                     </span>
+                    {#if !account.isParticipating}
+                        <button
+                            on:click|stopPropagation={toggleOfflineInfo}
+                            class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 absolute top-4 right-4 text-xl"
+                            title="Account offline info"
+                        >
+                            <i class="fas fa-triangle-exclamation fa-lg"></i>
+                        </button>
+                    {/if}
                     <span class="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {account.balance.toLocaleString()} VOI
                     </span>
@@ -169,3 +183,35 @@
         {/each}
     </div>
 </div>
+
+{#if showOfflineInfo}
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" on:click|self={toggleOfflineInfo}>
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full shadow-xl">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="text-lg font-semibold dark:text-gray-100">Offline Account Status</h3>
+                <button 
+                    on:click={toggleOfflineInfo}
+                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <p class="text-gray-600 dark:text-gray-300">
+                    This account is currently offline and not participating in consensus. The values shown are estimates of what could be earned if the account was participating in consensus.
+                </p>
+                <p class="text-gray-600 dark:text-gray-300">
+                    To start earning rewards, you'll need to set up and run a participation node.
+                </p>
+                <a 
+                    href="/faq#how-do-i-get-started-running-a-node-"
+                    class="inline-block text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                >
+                    Learn how to get started running a node →
+                </a>
+            </div>
+        </div>
+    </div>
+{/if}
