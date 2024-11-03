@@ -64,10 +64,14 @@
 
       selectedBalance = 'Loading...';
       if (filterItems[row]) {
-        const accountInfo = await getAccountInfo(filterItems[row].proposer);
-        selectedBalance = (Number(accountInfo?.amount??0) / Math.pow(10,6));
+        updateSelectedBalance(row);
       }
     }
+  }
+
+  const updateSelectedBalance = async (row: number) => {
+    const accountInfo = await getAccountInfo(filterItems[row].proposer);
+    selectedBalance = (Number(accountInfo?.amount??0) / Math.pow(10,6));
   }
 
   onMount(async () => {
@@ -191,6 +195,10 @@
 
       return matchesSearch && matchesFavorites;
     });
+
+    if (filterItems.length > 0 && expandedRow != null) {
+      updateSelectedBalance(expandedRow);
+    }
   }
 
   let columns: any = [
@@ -454,27 +462,5 @@ a:active {
 }
 .negTranslate {
   transform: translateY(-6px);
-}
-
-/* Add to existing styles */
-.group {
-  position: relative;
-}
-
-@media (max-width: 768px) {
-  .group:hover::after {
-    content: attr(title);
-    position: absolute;
-    bottom: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    white-space: nowrap;
-    z-index: 50;
-  }
 }
 </style>
