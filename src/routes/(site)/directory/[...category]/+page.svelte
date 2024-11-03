@@ -51,7 +51,7 @@
   }
 
   function updateURL(category: string) {
-    const newPath = category === 'All' ? '/ecosystem' : `/ecosystem/${category}`;
+    const newPath = category === 'All' ? '/directory' : `/directory/${category}`;
     goto(newPath, { replaceState: true });
   }
 
@@ -63,7 +63,7 @@
     url = data.url.href;
   }
   else {
-    text = 'Do you know about the @Voi_Net Ecosystem? Check it out here! #Voiagers';
+    text = 'Do you know about the @Voi_Net Ecosystem Directory? Check it out here! #Voiagers';
     url = data.url.href;
   }
 </script>
