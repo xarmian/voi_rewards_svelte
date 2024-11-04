@@ -24,6 +24,11 @@
     $: estimatedRewardsPerWeek = 0;
     $: estimatedRewardsPerMonth = 0;
 
+    let rewardStake = 0;
+    let currentEpoch: number;
+    let epochRewards: number[] = [];
+    const EPOCHS_PER_YEAR = 52;
+
     $: if (walletId) {
         fetchNodeData();
     }
@@ -41,20 +46,24 @@
             // Get latest epoch data
             const dates = await dataTable.fetchDateRanges();
             const latestEpoch = dates[dates.length - 1];
+            currentEpoch = latestEpoch.epoch;
             const epochData = await dataTable.fetchData(latestEpoch.id);
+
+            // Fetch next year's worth of epoch rewards
+            const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) => 
+                getTokensByEpoch(currentEpoch + i)
+            );
+            epochRewards = await Promise.all(epochPromises);
             
             if (epochData) {
-                const tokens = await getTokensByEpoch(latestEpoch.epoch);
-                const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
-                const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
-
-                voiPerBlock = rewardData.projectedRewardPerBlock;
+                // Calculate community stake
+                const communityStake = Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
+                rewardStake = communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
             }
 
             // Get account information
             accountInfo = await getAccountInfo(walletId);
-
-            balance = Number(accountInfo?.amount??0);
+            balance = Number(accountInfo?.amount ?? 0);
             apiData = await getConsensusInfo(walletId);
             
             averageBlockTime = calculateAverageBlockTime();
@@ -62,10 +71,10 @@
             expectedBlocksPerWeek = calculateExpectedBlocks(7);
             expectedBlocksPerMonth = calculateExpectedBlocks(30);
 
-            // Calculate estimated rewards
-            estimatedRewardsPerDay = expectedBlocksPerDay * voiPerBlock;
-            estimatedRewardsPerWeek = expectedBlocksPerWeek * voiPerBlock;
-            estimatedRewardsPerMonth = expectedBlocksPerMonth * voiPerBlock;
+            // Calculate estimated rewards using epoch rewards
+            estimatedRewardsPerDay = calculateRewardsForPeriod(1/7); // 1/7 of a week
+            estimatedRewardsPerWeek = calculateRewardsForPeriod(1);
+            estimatedRewardsPerMonth = calculateRewardsForPeriod(30.44/7); // ~4.33 weeks
 
             loading = false;
         } catch (error) {
@@ -73,6 +82,41 @@
         } finally {
             loading = false;
         }
+    }
+
+    function calculateRewardsForPeriod(epochCount: number): number {
+        if (!supply?.['online-money'] || balance <= 0 || !rewardStake) return 0;
+
+        const shareOfStake = balance / (rewardStake / 1e6);
+        let totalReward = 0;
+
+        // Handle the full epochs
+        const fullEpochs = Math.floor(epochCount);
+        for (let i = 0; i < fullEpochs && i < epochRewards.length; i++) {
+            totalReward += shareOfStake * epochRewards[i];
+        }
+
+        // Handle the partial epoch if there is one
+        const partialEpoch = epochCount - fullEpochs;
+        if (partialEpoch > 0 && fullEpochs < epochRewards.length) {
+            totalReward += shareOfStake * epochRewards[fullEpochs] * partialEpoch;
+        }
+
+        return totalReward / 1e6;
+    }
+
+    function calculateExpectedBlocks(days: number) {
+        if (!supply?.['online-money'] || balance <= 0) return 0;
+        const secondsPerDay = 24 * 60 * 60;
+        const blocksPerDay = secondsPerDay / 2.8; // Assuming 2.8 seconds per block
+        return (balance / Number(supply['online-money'])) * blocksPerDay * days;
+    }
+
+    function calculateAverageBlockTime() {
+        if (!supply?.['online-money'] || balance <= 0) return 0;
+        const userStakePercentage = balance / Number(supply['online-money']);
+        const secondsPerBlock = 2.8;
+        return secondsPerBlock / userStakePercentage;
     }
 
     function formatTime(seconds: number) {
@@ -91,24 +135,6 @@
         const date = new Date();
         date.setSeconds(date.getSeconds() + seconds);
         return date.toLocaleString();
-    }
-
-    function calculateAverageBlockTime() {
-        // Calculate user's stake percentage of total online stake
-        const userStakePercentage = balance / Number(supply?.['online-money']??0);
-        
-        // Network produces a block every 2.8 seconds
-        const secondsPerBlock = 2.8;
-        
-        // User will propose blocks proportional to their stake percentage
-        // So they'll propose a block every (secondsPerBlock / userStakePercentage) seconds
-        return secondsPerBlock / userStakePercentage;
-    }
-
-    function calculateExpectedBlocks(days: number) {
-        const secondsPerDay = 24 * 60 * 60;
-        const blocksPerDay = secondsPerDay / 2.8; // Assuming 2.8 seconds per block
-        return (balance / Number(supply?.['online-money']??0)) * blocksPerDay * days;
     }
 </script>
 
@@ -145,33 +171,33 @@
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400 self-start">Avg Blocks per day:</span>
                             <span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
-                                {expectedBlocksPerDay.toLocaleString()}
+                                {expectedBlocksPerDay.toLocaleString(undefined, {maximumFractionDigits: 1})}
                                 <span class="text-gray-600 dark:text-gray-400 ml-2">
-                                    ~{estimatedRewardsPerDay.toLocaleString()} VOI
+                                    ~{estimatedRewardsPerDay.toLocaleString(undefined, {maximumFractionDigits: 2})} VOI
                                 </span>
                             </span>
                         </p>
                         <p class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400 self-start">Avg Blocks per week:</span>
                             <span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
-                                {expectedBlocksPerWeek.toLocaleString()}
+                                {expectedBlocksPerWeek.toLocaleString(undefined, {maximumFractionDigits: 1})}
                                 <span class="text-gray-600 dark:text-gray-400 ml-2">
-                                    ~{estimatedRewardsPerWeek.toLocaleString()} VOI
+                                    ~{estimatedRewardsPerWeek.toLocaleString(undefined, {maximumFractionDigits: 2})} VOI
                                 </span>
                             </span>
                         </p>
                         <p class="flex justify-between items-center py-2">
                             <span class="font-medium text-gray-600 dark:text-gray-400 self-start">Avg Blocks per month:</span>
                             <span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
-                                {expectedBlocksPerMonth.toLocaleString()}
+                                {expectedBlocksPerMonth.toLocaleString(undefined, {maximumFractionDigits: 1})}
                                 <span class="text-gray-600 dark:text-gray-400 ml-2">
-                                    ~{estimatedRewardsPerMonth.toLocaleString()} VOI
+                                    ~{estimatedRewardsPerMonth.toLocaleString(undefined, {maximumFractionDigits: 2})} VOI
                                 </span>
                             </span>
                         </p>
-                        <p class="justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700 hidden">
+                        <p class="justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700">
                             <span class="font-medium text-gray-600 dark:text-gray-400">Approx APR:</span>
-                            <span class="text-gray-800 dark:text-gray-200">{((voiPerBlock * expectedBlocksPerWeek * 52 / balance * 1e6) * 100).toFixed(2)}%</span>
+                            <span class="text-gray-800 dark:text-gray-200">{(estimatedRewardsPerWeek / balance * 1e6 * 52 * 100).toFixed(2)}%</span>
                         </p>
                     {/if}
                 </div>

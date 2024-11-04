@@ -10,6 +10,7 @@
 	  import { onDestroy, onMount } from 'svelte';
     import NodeComponent from '$lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
+    import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
     import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
     import { dataTable } from '../../../../stores/dataTable';
     import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
@@ -30,10 +31,21 @@
     $: parentWalletId = data.parentWalletId;
     let loading = true;
 
+    const sections = [
+      { id: 'consensus', name: 'Consensus' },
+      { id: 'staking', name: 'Staking' },
+      { id: 'proposals', name: 'Proposals' },
+      { id: 'calculator', name: 'Calculator' },
+      //{ id: 'preferences', name: 'Preferences' },
+      //{ id: 'billing', name: 'Billing Information' }
+    ];
+    
     $: {
-        const hash = $page.url.hash.slice(1);
-        if (hash && sections.some(section => section.id === hash)) {
-            activeSection = hash;
+        if (browser) {
+          const hash = window.location.hash.slice(1);
+          if (hash && sections.some(section => section.id === hash)) {
+              activeSection = hash;
+          }
         }
     }
 
@@ -78,15 +90,6 @@
         }
     });
 
-    const sections = [
-      { id: 'consensus', name: 'Consensus' },
-      { id: 'staking', name: 'Staking' },
-      { id: 'proposals', name: 'Proposals' },
-      //{ id: 'security', name: 'Security Settings' },
-      //{ id: 'preferences', name: 'Preferences' },
-      //{ id: 'billing', name: 'Billing Information' }
-    ];
-    
     interface Account {
       address: string;
       isParticipating: boolean;
@@ -134,31 +137,60 @@
           getTokensByEpoch(latestEpoch.epoch)
         ]);
 
-        let voiPerBlock = 0;
+        let rewardStake = 0;
         
         if (epochData) {
-          const rewardedBlocks = epochData.num_blocks + Math.min(epochData.num_blocks / 3, epochData.num_blocks_ballast);
-          const rewardData = extrapolateRewardPerBlock(rewardedBlocks, tokens);
-          voiPerBlock = rewardData.projectedRewardPerBlock;
-        }
-
-        if (voiPerBlock === 0) {
-          console.error('Warning: voiPerBlock calculation resulted in 0');
+          // get community stake
+          const communityStake = Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
+          rewardStake = communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
         }
 
         const balance = Number(accountInfo?.amount ?? 0);
-        const onlineMoney = Number(supply?.['online-money'] ?? 0);
+        const shareOfStake = balance / rewardStake;
         
-        const rewards = calculateRewards(balance, onlineMoney, voiPerBlock);
+        // Calculate weekly rewards using current epoch tokens
+        const weeklyReward = shareOfStake * tokens;
+        
+        // Calculate monthly rewards (approximately 4.33 weeks)
+        const monthlyEpochs = 30.44 / 7;
+        let monthlyReward = weeklyReward * monthlyEpochs;
+
+        // Calculate yearly rewards with compound interest
+        const EPOCHS_PER_YEAR = 52;
+        let currentBalance = balance;
+        let yearlyReward = 0;
+        let currentShareOfStake = shareOfStake;
+
+        for (let i = 0; i < EPOCHS_PER_YEAR; i++) {
+          const epochReward = currentShareOfStake * tokens;
+          yearlyReward += epochReward;
+
+          // Update share of stake for compound interest
+          currentBalance += epochReward;
+          currentShareOfStake = currentBalance / rewardStake;
+        }
+
+        // Calculate expected blocks
+        const blocksPerDay = (24 * 60 * 60) / 2.8; // Assuming 2.8 seconds per block
+        const shareOfTotalStake = balance / Number(supply['online-money']);
+        const expectedBlocksPerDay = blocksPerDay * shareOfTotalStake;
+        const expectedBlocksPerWeek = expectedBlocksPerDay * 7;
+        const expectedBlocksPerMonth = expectedBlocksPerDay * 30.44;
 
         primaryAccountInfo = {
           address: address,
           isParticipating: accountInfo?.status === 'Online',
           balance: balance / 1e6,
           blocksProduced24h: 0,
-          ...rewards
+          expectedBlocksPerDay,
+          expectedBlocksPerWeek,
+          expectedBlocksPerMonth,
+          estimatedRewardsPerDay: weeklyReward / 7,
+          estimatedRewardsPerWeek: weeklyReward,
+          estimatedRewardsPerMonth: monthlyReward
         };
 
+        // Handle child accounts similarly
         const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
         const response = await fetch(curl, { cache: 'no-store' });
         const data = await response.json();
@@ -166,14 +198,25 @@
         await Promise.all(data.accounts.map(async (account: LockContract) => {
           const childAccountInfo = await getAccountInfo(account.contractAddress);
           const childBalance = Number(childAccountInfo?.amount ?? 0);
-          const childRewards = calculateRewards(childBalance, onlineMoney, voiPerBlock);
+          const childShareOfStake = childBalance / rewardStake;
+          
+          // Calculate rewards for child account
+          const childWeeklyReward = childShareOfStake * tokens;
+          const childMonthlyReward = childWeeklyReward * monthlyEpochs;
+          const childShareOfTotalStake = childBalance / Number(supply['online-money']);
+          const childExpectedBlocksPerDay = blocksPerDay * childShareOfTotalStake;
 
           childAccounts = [...childAccounts, {
             address: account.contractAddress,
             isParticipating: childAccountInfo?.status === 'Online',
             balance: childBalance / 1e6,
             blocksProduced24h: 0,
-            ...childRewards
+            expectedBlocksPerDay: childExpectedBlocksPerDay,
+            expectedBlocksPerWeek: childExpectedBlocksPerDay * 7,
+            expectedBlocksPerMonth: childExpectedBlocksPerDay * 30.44,
+            estimatedRewardsPerDay: childWeeklyReward / 7,
+            estimatedRewardsPerWeek: childWeeklyReward,
+            estimatedRewardsPerMonth: childMonthlyReward
           }];
         }));
 
@@ -292,8 +335,10 @@
     </aside>
     
     <main class="flex-1 bg-white dark:bg-gray-900">
-        <!-- Desktop Wallet Connection -->
-        <div class="sticky top-0 z-10 hidden md:flex w-full justify-end p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div class="sticky top-0 z-10 hidden md:flex w-full space-x-4 justify-end p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <TotalAccountsInfo 
+              primaryAccount={primaryAccountInfo} 
+            />
             <Web3Wallet
                 availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
                 showAuthButtons={false}
@@ -315,6 +360,7 @@
 
         <div class="p-4 md:p-5">
             {#if walletId}
+                
                 {#if activeSection === 'staking'}
                     <div class="space-y-4 md:space-y-6">
                         {#if primaryAccountInfo}
@@ -345,9 +391,16 @@
                 {:else if activeSection === 'proposals'}
                     <h2 class="text-xl md:text-2xl font-bold mb-4">Proposals</h2>
                     <ProposalsComponent walletId={walletId} />
+                {:else if activeSection === 'calculator'}
+                    <h2 class="text-xl md:text-2xl font-bold mb-4">Calculator</h2>
+                    <CalculatorComponent walletAddress={walletId} />
                 {/if}
             {:else}
-                <p class="text-gray-600">Please connect a wallet to view account information.</p>
+                {#if activeSection === 'calculator'}
+                    <CalculatorComponent />
+                {:else}
+                    <p class="text-gray-600">Please connect a wallet to view account information.</p>
+                {/if}
             {/if}
         </div>
     </main>

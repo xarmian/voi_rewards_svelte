@@ -1,58 +1,27 @@
 <script lang="ts">
-    export let accounts: Array<{
-        isParticipating: boolean;
-        balance: number;
-        blocksProduced24h: number;
-        expectedBlocks24h: number;
-        expectedTokensPerDay: number;
-        expectedTokensPerWeek: number;
-        expectedTokensPerMonth: number;
-    }>;
+  interface Account {
+    address: string;
+    isParticipating: boolean;
+    balance: number;
+  }
 
-    $: totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
-    $: totalBlocksProduced24h = accounts.reduce((sum, account) => sum + account.blocksProduced24h, 0);
-    $: totalExpectedBlocks24h = accounts.reduce((sum, account) => sum + account.expectedBlocks24h, 0);
-    $: totalExpectedTokensPerDay = accounts.reduce((sum, account) => sum + account.expectedTokensPerDay, 0);
-    $: totalExpectedTokensPerWeek = accounts.reduce((sum, account) => sum + account.expectedTokensPerWeek, 0);
-    $: totalExpectedTokensPerMonth = accounts.reduce((sum, account) => sum + account.expectedTokensPerMonth, 0);
-    $: participatingAccounts = accounts.filter(account => account.isParticipating).length;
+  export let primaryAccount: Account | null;
 </script>
 
-<div class="overflow-x-auto">
-    <table class="min-w-full bg-white">
-        <tbody>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Accounts</td>
-                <td class="py-2 px-4 border-b">{accounts.length}</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Participating Accounts</td>
-                <td class="py-2 px-4 border-b">{participatingAccounts}</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Balance</td>
-                <td class="py-2 px-4 border-b">{totalBalance.toLocaleString()} VOI</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Blocks Produced (24h)</td>
-                <td class="py-2 px-4 border-b">{totalBlocksProduced24h}</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Expected Blocks (24h)</td>
-                <td class="py-2 px-4 border-b">{totalExpectedBlocks24h}</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Expected Tokens (Day)</td>
-                <td class="py-2 px-4 border-b">{totalExpectedTokensPerDay.toLocaleString()} VOI</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Expected Tokens (Week)</td>
-                <td class="py-2 px-4 border-b">{totalExpectedTokensPerWeek.toLocaleString()} VOI</td>
-            </tr>
-            <tr>
-                <td class="py-2 px-4 border-b font-semibold">Total Expected Tokens (Month)</td>
-                <td class="py-2 px-4 border-b">{totalExpectedTokensPerMonth.toLocaleString()} VOI</td>
-            </tr>
-        </tbody>
-    </table>
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+  <div class="flex flex-row space-x-2">
+    <div class="text-center md:text-left flex space-x-2">
+      <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Account Balance</h3>
+      <p class="text-xl font-semibold text-gray-900 dark:text-white">
+        {(primaryAccount?.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI
+      </p>
+    </div>
+    
+    <div class="text-center md:text-left flex space-x-2">
+      <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Participating?</h3>
+      <p class="text-xl font-semibold text-gray-900 dark:text-white">
+        {primaryAccount?.isParticipating ? 'Yes' : 'No'}
+      </p>
+    </div>
+  </div>
 </div>

@@ -8,6 +8,7 @@
     import { config } from '../config';
     import { getSupplyInfo, getAccountInfo, getConsensusInfo, onlineStakeStore } from '$lib/stores/accounts';
     import type { Account } from '$lib/stores/accounts';
+    
     export let walletId: string;
     
     let apiData: any;
@@ -19,12 +20,12 @@
     let idx = 0;
 
     let supply: any;
-    let accountInfo: Account | null = null;
+    $: accountInfo = null as Account | null;
     let expectedBlockTime: string | null = null;
     let historicalExpectedProposals: any = {};
 
     $: {
-        if (apiData && accountInfo?.amount) {
+        if (walletId) {
             updateChartData();
         }
     }
@@ -34,6 +35,34 @@
     }
 
     async function updateChartData() {
+      const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
+      try {
+        const [response, accountInfoResult, supplyResult] = await Promise.all([
+            fetch(url, { cache: 'no-store' }),
+            getAccountInfo(walletId),
+            getSupplyInfo()
+        ]);
+          
+        apiData = await response.json();
+        accountInfo = accountInfoResult ?? null;
+        supply = supplyResult;
+        
+        // Calculate expected block time using current supply
+        if (accountInfo?.amount && supply?.['online-money']) {
+            const balance = Number(accountInfo?.amount);
+            const secondsPerDay = 24 * 60 * 60;
+            const blocksPerDay = secondsPerDay / 2.8;
+            const dailyBlocks = (balance / Number(supply?.['online-money'] ?? 0)) * blocksPerDay;
+            const avgBlockTime = secondsPerDay / dailyBlocks;
+            
+            const hours = Math.floor(avgBlockTime / (60 * 60));
+            const minutes = Math.floor((avgBlockTime % (60 * 60)) / 60);
+            expectedBlockTime = `${hours}h ${minutes}m`;
+        }
+      } catch (error) {
+          console.error(error);
+      }
+
       const chartData = await fetchOnlineStakeHistory();
 
       // Calculate expected proposals using chartData
@@ -42,7 +71,7 @@
           if (new Date(dayData.date) < new Date('2024-10-30')) return;
           if (dayData.avg_online_stake) {
 
-              const balance = Number(accountInfo.amount);
+              const balance = Number(accountInfo?.amount ?? 0);
               const secondsPerDay = 24 * 60 * 60;
               const blocksPerDay = secondsPerDay / 2.8;
               const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
@@ -68,33 +97,6 @@
     };
 
     onMount(async () => {
-        const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
-        try {
-            const [response, accountInfoResult, supplyResult] = await Promise.all([
-                fetch(url, { cache: 'no-store' }),
-                getAccountInfo(walletId),
-                getSupplyInfo()
-            ]);
-            
-            apiData = await response.json();
-            accountInfo = accountInfoResult ?? null;
-            supply = supplyResult;
-            
-            // Calculate expected block time using current supply
-            if (accountInfo?.amount && supply?.['online-money']) {
-                const balance = Number(accountInfo?.amount);
-                const secondsPerDay = 24 * 60 * 60;
-                const blocksPerDay = secondsPerDay / 2.8;
-                const dailyBlocks = (balance / Number(supply?.['online-money'] ?? 0)) * blocksPerDay;
-                const avgBlockTime = secondsPerDay / dailyBlocks;
-                
-                const hours = Math.floor(avgBlockTime / (60 * 60));
-                const minutes = Math.floor((avgBlockTime % (60 * 60)) / 60);
-                expectedBlockTime = `${hours}h ${minutes}m`;
-            }
-        } catch (error) {
-            console.error(error);
-        }
     });
 
     function formatTime(seconds: number) {
