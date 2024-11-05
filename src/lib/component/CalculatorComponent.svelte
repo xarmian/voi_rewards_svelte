@@ -55,8 +55,13 @@
 
     async function updateWalletBalance() {
         if (walletAddress) {
-            initialBalance = Number((await getAccountInfo(walletAddress))?.amount) / 1e6 || 0;
-            calculateRewards();
+            try {
+                const accountInfo = await getAccountInfo(walletAddress);
+                initialBalance = Number(accountInfo?.amount || 0) / 1e6;
+            } catch (error) {
+                console.error('Error updating wallet balance:', error);
+                initialBalance = 0;
+            }
         }
     }
 
@@ -71,6 +76,7 @@
             supply = supplyData;
             
             const latestEpoch = dates[dates.length - 1];
+            
             currentEpoch = latestEpoch.epoch;
 
             // Fetch next year's worth of epoch rewards
@@ -79,37 +85,22 @@
             );
             epochRewards = await Promise.all(epochPromises);
 
-            const [epochData, tokens] = await Promise.all([
-                dataTable.fetchData(latestEpoch.id),
-                getTokensByEpoch(latestEpoch.epoch)
-            ]);
+            const epochData = await dataTable.fetchData(latestEpoch.id);
 
-            if (epochData) {
-                // get community stake
+            if (epochData && supply?.['online-money']) {
                 const communityStake = Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
                 rewardStake = communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
+                
+                if (walletAddress) {
+                    await updateWalletBalance();
+                } else if (additionalAmount > 0) {
+                    calculateRewards();
+                }
             }
 
-            // Calculate epoch schedule
-            const EPOCH_DURATION_DAYS = 7;
-            const EPOCH_START = new Date('2023-10-30');
-            epochSchedule = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) => {
-                const epochStartDate = new Date(EPOCH_START);
-                epochStartDate.setDate(EPOCH_START.getDate() + (i * EPOCH_DURATION_DAYS));
-                const epochEndDate = new Date(epochStartDate);
-                epochEndDate.setDate(epochStartDate.getDate() + EPOCH_DURATION_DAYS - 1);
-                
-                return {
-                    epochNumber: i + 1, // Start from epoch 1
-                    startDate: epochStartDate,
-                    endDate: epochEndDate,
-                    rewardPool: epochRewards[i] || 0
-                };
-            });
-
-            await updateWalletBalance();
             isLoading = false;
         } catch (err) {
+            console.error('Mount error:', err);
             error = 'Error loading data. Please try again later.';
             isLoading = false;
         }
@@ -118,15 +109,7 @@
     function calculateRewards() {
         totalBalance = initialBalance + additionalAmount;
         
-        if (!supply?.['online-money'] || totalBalance <= 0) {
-            weeklyReward = 0;
-            monthlyReward = 0;
-            yearlyReward = 0;
-            apr = 0;
-            apy = 0;
-            balanceAfterWeek = 0;
-            balanceAfterMonth = 0;
-            balanceAfterYear = 0;
+        if (!supply?.['online-money'] || totalBalance <= 0 || !rewardStake || rewardStake <= 0) {
             return;
         }
 
@@ -138,10 +121,6 @@
         expectedWeeklyBlocks = weeklyBlocks * shareOfTotalStake;
         expectedMonthlyBlocks = monthlyBlocks * shareOfTotalStake;
         expectedYearlyBlocks = yearlyBlocks * shareOfTotalStake;
-
-        // Calculate rewards considering changing epoch rewards
-        let accumulatedReward = 0;
-        let currentBalance = totalBalance;
 
         // Weekly reward (using current epoch)
         weeklyReward = shareOfStake * epochRewards[0];
@@ -156,19 +135,17 @@
 
         // Yearly reward with compound interest
         yearlyReward = 0;
+        let currentBalance = totalBalance;
+        let currentShareOfStake = shareOfStake;
         for (let i = 0; i < EPOCHS_PER_YEAR && i < epochRewards.length; i++) {
-            const epochReward = calculateEpochReward(shareOfStake, epochRewards[i]);
+            const epochReward = calculateEpochReward(currentShareOfStake, epochRewards[i]);
             yearlyReward += epochReward;
-
-            // Update share of stake for compound interest
             currentBalance += epochReward;
-            shareOfStake = currentBalance / (rewardStake / 1e6);
+            currentShareOfStake = currentBalance / (rewardStake / 1e6);
         }
 
-        // Calculate APR using actual yearly reward
+        // Calculate APR and APY
         apr = (weeklyReward / totalBalance) * 52 * 100;
-
-        // Calculate APY considering changing epoch rewards
         apy = ((currentBalance / totalBalance) - 1) * 100;
 
         // Calculate future balances
@@ -184,13 +161,15 @@
 
     // Add wallet address reactivity
     $: {
-        if (!isLoading && walletAddress) {
+        if (!isLoading && walletAddress && rewardStake > 0 && supply?.['online-money']) {
             updateWalletBalance();
         }
     }
 
     $: {
-        calculateRewards();
+        if (!isLoading && rewardStake > 0 && supply?.['online-money'] && (initialBalance > 0 || additionalAmount > 0)) {
+            calculateRewards();
+        }
     }
 
     function formatDate(date: Date): string {

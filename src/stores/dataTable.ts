@@ -105,9 +105,17 @@ function createDataTable() {
   }
 
   async function fetchData(dateRange?: string) {
-    const store = get({ subscribe });
+    let store = get({ subscribe });
     
-    if (store.loading) return;
+    if (store.loading) {
+      // Wait up to 5 seconds for store to load
+      const startTime = Date.now();
+      while (store.loading && Date.now() - startTime < 5000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        store = get({ subscribe });
+      }
+      if (store.loading) return; // Still loading after 5s, return
+    }
 
     try {
       update(state => ({ ...state, loading: true, error: null }));
