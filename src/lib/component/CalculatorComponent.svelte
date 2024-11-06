@@ -1,9 +1,10 @@
 <script lang="ts">
     import { getSupplyInfo } from '$lib/stores/accounts';
     import { dataTable } from '../../stores/dataTable';
-    import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
+    import { getTokensByEpoch } from '$lib/utils';
     import { onMount } from 'svelte';
     import { getAccountInfo } from '$lib/stores/accounts';
+    import { getCurrentEpoch } from '$lib/utils/epoch-utils';
 
     export let walletAddress: string;
     let initialBalance = 0;
@@ -50,8 +51,19 @@
         epochNumber: number,
         startDate: Date,
         endDate: Date,
+        rewardPool: number,
+        isCurrent: boolean
+    }> = [];
+
+    let isPastEpochsVisible = false;
+    let pastEpochSchedule: Array<{
+        epochNumber: number,
+        startDate: Date,
+        endDate: Date,
         rewardPool: number
     }> = [];
+    const PAST_EPOCHS_TO_SHOW = 12; // Show last 3 months
+    const EPOCH_START_DATE = new Date('2024-10-30');
 
     async function updateWalletBalance() {
         if (walletAddress) {
@@ -99,12 +111,74 @@
             }
 
             isLoading = false;
+
+            await initializeEpochSchedule();
         } catch (err) {
             console.error('Mount error:', err);
             error = 'Error loading data. Please try again later.';
             isLoading = false;
         }
     });
+
+    async function initializeEpochSchedule() {
+        const currentDate = new Date();
+        const currentEpochNumber = getCurrentEpoch(currentDate, EPOCH_START_DATE);
+        
+        // Initialize future epochs
+        epochSchedule = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) => {
+            const epochStartDate = new Date(EPOCH_START_DATE);
+            epochStartDate.setDate(EPOCH_START_DATE.getDate() + ((currentEpochNumber + i) * 7));
+            const epochEndDate = new Date(epochStartDate);
+            epochEndDate.setDate(epochStartDate.getDate() + 7 - 1);
+            
+            return {
+                epochNumber: currentEpochNumber + i,
+                startDate: epochStartDate,
+                endDate: epochEndDate,
+                rewardPool: epochRewards[i] || 0,
+                isCurrent: isCurrentEpoch(epochStartDate, epochEndDate, currentDate)
+            };
+        });
+
+        // Initialize past epochs, but only for dates after EPOCH_START_DATE
+        const maxPastEpochs = Math.min(
+            PAST_EPOCHS_TO_SHOW,
+            currentEpochNumber // This limits past epochs to not go before epoch 0
+        );
+
+        if (maxPastEpochs > 0) {
+            // get historical rewards
+            const pastEpochPromises = Array.from({ length: maxPastEpochs }, (_, i) => {
+                return getTokensByEpoch(currentEpochNumber - (maxPastEpochs - i) +1)
+            });
+
+            const pastEpochRewards = await Promise.all(pastEpochPromises);
+
+            pastEpochSchedule = Array.from({ length: maxPastEpochs }, (_, i) => {
+                const epochNumber = currentEpochNumber - (maxPastEpochs - i);
+                const epochStartDate = new Date(EPOCH_START_DATE);
+                epochStartDate.setDate(EPOCH_START_DATE.getDate() + (epochNumber * 7));
+                const epochEndDate = new Date(epochStartDate);
+                epochEndDate.setDate(epochStartDate.getDate() + 7 - 1);
+                const rewardPool = pastEpochRewards[i] || 0;
+                
+                return {
+                    epochNumber,
+                    startDate: epochStartDate,
+                    endDate: epochEndDate,
+                    rewardPool: rewardPool,
+                    isCurrent: false
+                };
+            });
+        } else {
+            // If we're in the first epoch, don't show the past epochs button
+            pastEpochSchedule = [];
+        }
+    }
+
+    function isCurrentEpoch(start: Date, end: Date, current: Date): boolean {
+        return current >= start && current <= end;
+    }
 
     function calculateRewards() {
         totalBalance = initialBalance + additionalAmount;
@@ -173,11 +247,12 @@
     }
 
     function formatDate(date: Date): string {
-        return date.toLocaleDateString('en-US', { 
-            month: 'short', 
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
             day: 'numeric', 
-            year: 'numeric' 
-        });
+            year: 'numeric',
+            timeZone: 'UTC'
+        }) + ' UTC';
     }
 </script>
 
@@ -355,6 +430,15 @@
 
             {#if isRewardScheduleVisible}
                 <div class="overflow-x-auto">
+                    {#if PAST_EPOCHS_TO_SHOW > 0}
+                        <button
+                            class="w-full px-6 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700"
+                            on:click={() => isPastEpochsVisible = !isPastEpochsVisible}
+                        >
+                            {isPastEpochsVisible ? 'Hide' : 'Show'} Previous Epochs
+                        </button>
+                    {/if}
+
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
@@ -370,13 +454,36 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {#if isPastEpochsVisible}
+                                {#each pastEpochSchedule as epoch}
+                                    <tr class="text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            {epoch.epochNumber+1}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            {formatDate(epoch.startDate)} - {formatDate(epoch.endDate)}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            {epoch.rewardPool.toLocaleString(undefined, {
+                                                maximumFractionDigits: 0
+                                            })} VOI
+                                        </td>
+                                    </tr>
+                                {/each}
+                            {/if}
+                            
                             {#each epochSchedule as epoch}
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                        {epoch.epochNumber}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 {epoch.isCurrent ? 'bg-purple-50 dark:bg-purple-900/20' : ''}">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium {epoch.isCurrent ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-gray-100'}">
+                                        {epoch.epochNumber+1}
+                                        {#if epoch.isCurrent}
+                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                                Current
+                                            </span>
+                                        {/if}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                        {epoch.startDate.toISOString().split('T')[0]} - {epoch.endDate.toISOString().split('T')[0]}
+                                        {formatDate(epoch.startDate)} - {formatDate(epoch.endDate)}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         {epoch.rewardPool.toLocaleString(undefined, {

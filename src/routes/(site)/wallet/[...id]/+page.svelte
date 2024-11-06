@@ -337,7 +337,7 @@
     <main class="flex-1 bg-white dark:bg-gray-900">
         <div class="sticky top-0 z-10 hidden md:flex w-full space-x-4 justify-end p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
             <TotalAccountsInfo 
-              primaryAccount={primaryAccountInfo} 
+              primaryAccount={$selectedWallet?.address && $selectedWallet?.address != primaryAccountInfo?.address ? childAccounts.find(account => account.address === $selectedWallet?.address) : primaryAccountInfo} 
             />
             <Web3Wallet
                 availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
