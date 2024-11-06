@@ -331,7 +331,7 @@
                     </div>
                 </div>
                 <div>
-                    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Rates</h3>
+                    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Rate Estimates</h3>
                     <div class="space-y-3">
                         <div>
                             <p class="text-sm text-gray-500 dark:text-gray-400">APR</p>
@@ -501,7 +501,7 @@
         <!-- Additional Info -->
         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-sm text-gray-600 dark:text-gray-400">
             <p>* Calculations assume current network conditions and weekly compounding of rewards.</p>
-            <p>* Actual rewards may vary based on network participation and other factors.</p>
+            <p>* Actual rewards and rates may vary based on network participation and other factors.</p>
         </div>
     {/if}
 </div>

@@ -63,13 +63,17 @@
       expandedRow = row;
 
       selectedBalance = 'Loading...';
-      if (filterItems[row]) {
-        updateSelectedBalance(row);
+      // find row in filterItems, using currentPage and itemsPerPage
+      const index = (currentPage - 1) * itemsPerPage + row;
+      console.log(index);
+      if (filterItems[index]) {
+        updateSelectedBalance(index);
       }
     }
   }
 
   const updateSelectedBalance = async (row: number) => {
+    console.log(row);
     const accountInfo = await getAccountInfo(filterItems[row].proposer);
     selectedBalance = (Number(accountInfo?.amount??0) / Math.pow(10,6));
   }
@@ -197,7 +201,9 @@
     });
 
     if (filterItems.length > 0 && expandedRow != null) {
-      updateSelectedBalance(expandedRow);
+      // find row in filterItems, using currentPage and itemsPerPage
+      const index = (currentPage - 1) * itemsPerPage + expandedRow;
+      updateSelectedBalance(index);
     }
   }
 
