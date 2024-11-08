@@ -11,7 +11,7 @@
     import NodeComponent from '$lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
     import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
-    import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
+    import { getAccountInfo, getSupplyInfo } from '$lib/stores/accounts';
     import { dataTable } from '../../../../stores/dataTable';
     import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
     import { calculateRewards } from '$lib/utils/rewards';

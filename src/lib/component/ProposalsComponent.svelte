@@ -6,7 +6,7 @@
     import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
-    import { getSupplyInfo, getAccountInfo, getConsensusInfo, onlineStakeStore } from '$lib/stores/accounts';
+    import { getSupplyInfo, getAccountInfo, onlineStakeStore } from '$lib/stores/accounts';
     import type { Account } from '$lib/stores/accounts';
     
     export let walletId: string;

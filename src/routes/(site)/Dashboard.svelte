@@ -202,7 +202,6 @@
 					for="epoch-selector" 
 					class="font-medium text-gray-700 dark:text-gray-300"
 				>
-					Epoch:
 				</label>
 				<select
 					id="epoch-selector"
@@ -213,9 +212,9 @@
 						dark:text-gray-300 dark:focus:ring-purple-400
 						transition-colors duration-200"
 				>
-					{#each dates as date}
+					{#each dates as date, index}
 						<option value={date.id}>
-							{date.desc}
+							Epoch {index + 1}: {date.desc}
 						</option>
 					{/each}
 				</select>
