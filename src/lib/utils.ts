@@ -134,3 +134,21 @@ export function extrapolateRewardPerBlock(
   };
 }
 
+export async function getBlocksInRange(startBlock: number, endBlock: number): Promise<number> {
+    try {
+        // If the blocks are invalid, return 0
+        if (!startBlock || !endBlock || startBlock > endBlock) {
+            return 0;
+        }
+
+        // Calculate the actual number of blocks in the range
+        const blocksProduced = endBlock - startBlock + 1;
+        
+        // Cap at 7200 blocks (maximum possible in an epoch)
+        return Math.min(blocksProduced, 7200);
+    } catch (error) {
+        console.error('Error calculating blocks in range:', error);
+        return 0;
+    }
+}
+

@@ -15,7 +15,7 @@ export const rewardParams = writable<RewardParams>({
   total_blocks_projected: 0
 });
 
-interface DateRange {
+export interface DateRange {
   id: string;
   desc: string;
   epoch: number;

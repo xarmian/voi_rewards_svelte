@@ -6,7 +6,7 @@
     import { getAccountInfo } from '$lib/stores/accounts';
     import { getCurrentEpoch } from '$lib/utils/epoch-utils';
 
-    export let walletAddress: string;
+    export let walletAddress: string | undefined = undefined;
     let initialBalance = 0;
     let additionalAmount = 0;
     const maxAdditionalAmount = 1000000; // 1M VOI as maximum

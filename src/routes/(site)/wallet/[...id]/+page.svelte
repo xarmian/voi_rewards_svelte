@@ -13,11 +13,11 @@
     import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
     import { getAccountInfo, getSupplyInfo } from '$lib/stores/accounts';
     import { dataTable } from '../../../../stores/dataTable';
-    import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
-    import { calculateRewards } from '$lib/utils/rewards';
+    import { getTokensByEpoch } from '$lib/utils';
     import { browser } from '$app/environment';
     import { page } from '$app/stores';
-
+    import EpochComponent from '$lib/component/EpochComponent.svelte';
+    
     export let data: {
         walletId: string;
         parentWalletId: string | null;
@@ -35,6 +35,7 @@
       { id: 'consensus', name: 'Consensus' },
       { id: 'staking', name: 'Staking' },
       { id: 'proposals', name: 'Proposals' },
+      { id: 'epochs', name: 'Epochs' },
       { id: 'calculator', name: 'Calculator' },
       //{ id: 'preferences', name: 'Preferences' },
       //{ id: 'billing', name: 'Billing Information' }
@@ -389,11 +390,12 @@
                     <h2 class="text-xl md:text-2xl font-bold mb-4">Consensus</h2>
                     <NodeComponent walletId={walletId} />
                 {:else if activeSection === 'proposals'}
-                    <h2 class="text-xl md:text-2xl font-bold mb-4">Proposals</h2>
                     <ProposalsComponent walletId={walletId} />
                 {:else if activeSection === 'calculator'}
                     <h2 class="text-xl md:text-2xl font-bold mb-4">Calculator</h2>
                     <CalculatorComponent walletAddress={walletId} />
+                {:else if activeSection === 'epochs'}
+                    <EpochComponent walletAddress={walletId} />
                 {/if}
             {:else}
                 {#if activeSection === 'calculator'}
