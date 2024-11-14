@@ -14,6 +14,7 @@
     let epochData: any[] = [];
     let mergedData: any[] = [];
     let isLoading = true;
+    let dataLastUpdated: Date | null = null;
 
     // Add pagination variables
     let currentPage = 1;
@@ -57,7 +58,12 @@
             const epochPromises = dates.map(async (date: DateRange) => {
                 const [startStr] = date.id.split('-');
                 const formattedDate = `${startStr.slice(0,4)}-${startStr.slice(4,6)}-${startStr.slice(6,8)}T00:00:00Z`;
-                const epochData = epochSummary.find((e: any) => e.start_date === formattedDate);
+                const snapshots = epochSummary.snapshots ? epochSummary.snapshots : epochSummary;
+                if (epochSummary.last_updated) {
+                    dataLastUpdated = new Date(epochSummary.last_updated);
+                }
+
+                const epochData = snapshots.find((e: any) => e.start_date === formattedDate);
                 if (!epochData) return null;
 
                 const communityBlocks = epochData.total_blocks ?? 0;
@@ -330,6 +336,11 @@
                 </div>
             {/if}
         </div>
+        {#if dataLastUpdated}
+            <div class="text-sm text-gray-500 dark:text-gray-400 text-right">
+                Data is delayed. Last updated: {dataLastUpdated.toLocaleString()}
+            </div>
+        {/if}
     {/if}
 </div>
 
