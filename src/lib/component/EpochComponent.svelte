@@ -60,7 +60,7 @@
                 const formattedDate = `${startStr.slice(0,4)}-${startStr.slice(4,6)}-${startStr.slice(6,8)}T00:00:00Z`;
                 const snapshots = epochSummary.snapshots ? epochSummary.snapshots : epochSummary;
                 if (epochSummary.last_updated) {
-                    dataLastUpdated = new Date(epochSummary.last_updated);
+                    dataLastUpdated = new Date(epochSummary.last_updated * 1000);
                 }
 
                 const epochData = snapshots.find((e: any) => e.start_date === formattedDate);
