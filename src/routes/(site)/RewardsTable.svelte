@@ -344,7 +344,7 @@
                   <!-- address and nfd -->
                   <div>
                     <Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
-                    <span class="text-gray-600 dark:text-gray-400">{item.proposer}</span>
+                    <button on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)} class="text-blue-500 hover:text-blue-600 underline">{item.proposer}</button>
                     
                     <!-- Action buttons group -->
                     <div class="mt-2 flex gap-2">
