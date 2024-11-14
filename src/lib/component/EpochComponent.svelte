@@ -188,7 +188,7 @@
                                 {/if}
                             </td>
 
-                            <td class="p-2">{data.startDate.toLocaleDateString()} - {data.endDate.toLocaleDateString()}</td>
+                            <td class="p-2">{data.startDate.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' })} - {data.endDate.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</td>
                             <td class="p-2">{data.userBlocksProduced} / {data.totalBlocksProduced}</td>
                             <td class="p-2 text-right">
                                 {data.expectedReward.toFixed(2)} VOI
@@ -275,7 +275,7 @@
                         </div>
                         <a class="grid grid-cols-2 gap-2 text-sm" href={`https://explorer.voi.network/explorer/transaction/${data.rewardTxId}`} target="_blank">
                             <div>Date Range:</div>
-                            <div>{data.startDate.toLocaleDateString()} - {data.endDate.toLocaleDateString()}</div>
+                            <div>{data.startDate.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' })} - {data.endDate.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</div>
                             
                             <div>Blocks:</div>
                             <div>{data.userBlocksProduced} / {data.totalBlocksProduced}</div>
