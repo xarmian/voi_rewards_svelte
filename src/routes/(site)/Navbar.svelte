@@ -1,44 +1,150 @@
-<script>
-  import { Navbar, NavBrand, NavLi, NavUl, NavHamburger, Button, Input, DarkMode } from 'flowbite-svelte';
+<script lang="ts">
+  import { Navbar, NavBrand, DarkMode } from 'flowbite-svelte';
   import Icon from '$lib/assets/android-chrome-192x192.png';
-  import { fly } from 'svelte/transition';
-  import { page } from '$app/stores'
+  import { page } from '$app/stores';
+  import { slide } from 'svelte/transition';
   
+  let isMenuOpen = false;
   let activeLink = $page.url.pathname;
+  let touchStart = 0;
+  let touchX = 0;
+  let menuElement: HTMLElement;
+  let isDragging = false;
+  let menuPosition = 0;
+  
+  const navItems = [
+    { href: '/', label: 'Home' },
+    { href: '/ecosystem', label: 'Ecosystem' },
+    { href: '/faq', label: 'FAQ' },
+    { href: '/what_is_voi', label: 'What is Voi?' },
+    { href: '/how_to_node', label: 'Run a Node' },
+    { href: '/wallet', label: 'Account' }
+  ];
+
+  const handleTouchStart = (e: TouchEvent) => {
+    touchStart = e.touches[0].clientX;
+    isDragging = true;
+    menuElement.style.transition = 'none';
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!isDragging) return;
+    
+    touchX = e.touches[0].clientX;
+    const diff = touchX - touchStart;
+    
+    // Only allow sliding to the right (positive diff)
+    if (diff > 0) {
+      menuPosition = diff;
+      menuElement.style.transform = `translateX(${menuPosition}px)`;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isDragging = false;
+    menuElement.style.transition = 'transform 0.2s ease-out';
+    
+    // If menu is dragged more than 100px to the right, close it
+    if (menuPosition > 100) {
+      closeMenu();
+    } else {
+      // Reset position
+      menuElement.style.transform = 'translateX(0)';
+    }
+    menuPosition = 0;
+  };
+
+  const toggleMenu = () => {
+    isMenuOpen = !isMenuOpen;
+  };
+
+  const closeMenu = () => {
+    isMenuOpen = false;
+  };
 </script>
 
 <Navbar fluid={true} class="!bg-[rgb(111,42,226)] text-white">
   <NavBrand href="https://voirewards.com" class="float-left">
-    <img src="{Icon}" class="ml-12 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
-    <div class="nav-title whitespace-nowrap text-2xl font-semibold">Voi Rewards Auditor</div>
+    <img src="{Icon}" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
+    <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-semibold">Voi Rewards Auditor</div>
   </NavBrand>
-  <div class="flex-grow"></div>
-  <NavUl ulClass="flex flex-col p-4 mt-4 sm:hidden">
-    <NavLi class="text-lg" href="/"><div class:selected={activeLink === '/'} on:click={() => activeLink = '/'} transition:fly={{y: 50, duration: 400}}>Home</div></NavLi>
-    <NavLi class="text-lg" href="/ecosystem"><div class:selected={activeLink === '/ecosystem'} on:click={() => activeLink = '/ecosystem'} transition:fly={{ y: 50, duration: 400 }}>Ecosystem</div></NavLi>
-    <NavLi class="text-lg" href="/faq"><div class:selected={activeLink === '/faq'} on:click={() => activeLink = '/faq'} transition:fly={{ y: 50, duration: 400 }}>FAQ</div></NavLi>
-    <NavLi class="text-lg" href="/what_is_voi"><div class:selected={activeLink === '/what_is_voi'} on:click={() => activeLink = '/what_is_voi'} transition:fly={{ y: 50, duration: 400 }}>What is Voi?</div></NavLi>
-    <NavLi class="text-lg" href="/how_to_node"><div class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'} transition:fly={{ y: 50, duration: 400 }}>Run a Node</div></NavLi>
-    <NavLi class="text-lg" href="/wallet"><div class:selected={activeLink === '/wallet'} on:click={() => activeLink = '/wallet'}>Account</div></NavLi>
-    <!--<NavLi class="text-lg" href="/phase1"><div class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'} transition:fly={{ y: 50, duration: 400 }}>Phase 1</div></NavLi>
-    <NavLi class="text-lg" href="/phase2"><div class:selected={activeLink === '/phase2'} on:click={() => activeLink = '/phase2'} transition:fly={{ y: 50, duration: 400 }}>Phase 2</div></NavLi>-->
-    <!--<NavLi class="text-xl" href="/quests"><div class:selected={activeLink === '/quests'} on:click={() => activeLink = '/quests'} transition:fly={{ y: 50, duration: 400 }}>Quests</div></NavLi>-->
-    <DarkMode />
-  </NavUl>
-  <div class="hidden sm:flex flex-row p-4 mt-0 text-sm font-medium place-items-center space-x-2">
-    <a class="text-xl navButton" href="/" class:selected={activeLink === '/'} on:click={() => activeLink = '/'}>Home</a>
-    <a class="text-xl navButton" href="/ecosystem" class:selected={activeLink === '/ecosystem'} on:click={() => activeLink = '/ecosystem'}>Ecosystem</a>
-    <a class="text-xl navButton" href="/faq" class:selected={activeLink === '/faq'} on:click={() => activeLink = '/faq'}>FAQ</a>
-    <a class="text-xl navButton" href="/what_is_voi" class:selected={activeLink === '/what_is_voi'} on:click={() => activeLink = '/what_is_voi'}>What is Voi?</a>
-    <a class="text-xl navButton" href="/how_to_node" class:selected={activeLink === '/how_to_node'} on:click={() => activeLink = '/how_to_node'}>Run a Node</a>
-    <a class="text-xl navButton" href="/wallet" class:selected={activeLink === '/wallet'} on:click={() => activeLink = '/wallet'}>Account</a>
-    <!--<a class="text-xl navButton" href="/phase1" class:selected={activeLink === '/phase1'} on:click={() => activeLink = '/phase1'}>Phase 1</a>
-    <a class="text-xl navButton" href="/phase2" class:selected={activeLink === '/phase2'} on:click={() => activeLink = '/phase2'}>Phase 2</a>-->
+  
+  <!-- Desktop Navigation -->
+  <div class="hidden sm:flex flex-row items-center ml-auto gap-2 mr-4">
+    {#each navItems as {href, label}}
+      <a 
+        {href} 
+        class="text-lg navButton" 
+        class:selected={activeLink === href} 
+        on:click={() => activeLink = href}
+      >
+        {label}
+      </a>
+    {/each}
     <DarkMode />
   </div>
-  <NavHamburger />
-  <!--<a class="hidden sm:block text-lg bg-[#d0bff2] px-12 py-2 rounded-full text-black mr-8 hover:bg-white" href="/quests" on:click={() => activeLink = '/quests'}>Quests</a>-->
+
+  <!-- Mobile Menu Button -->
+  <button
+    class="sm:hidden ml-auto p-2 focus:outline-none"
+    on:click={toggleMenu}
+    aria-label="Toggle menu"
+  >
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        stroke-width="2" 
+        d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+      />
+    </svg>
+  </button>
 </Navbar>
+
+<!-- Mobile Menu Overlay -->
+{#if isMenuOpen}
+  <div 
+    class="fixed inset-0 bg-black bg-opacity-50 z-40"
+    on:click={closeMenu}
+  ></div>
+{/if}
+
+<!-- Mobile Menu Drawer -->
+{#if isMenuOpen}
+  <div
+    bind:this={menuElement}
+    transition:slide={{ duration: 200 }}
+    class="fixed right-0 top-0 h-full w-64 bg-[rgb(111,42,226)] z-50 shadow-lg touch-pan-x"
+    on:touchstart={handleTouchStart}
+    on:touchmove={handleTouchMove}
+    on:touchend={handleTouchEnd}
+    on:touchcancel={handleTouchEnd}
+  >
+    <div class="flex flex-col p-4 space-y-4">
+      <!-- Swipe hint -->
+      <div class="text-white/50 text-sm text-center pb-2">
+        Swipe right to close
+      </div>
+      
+      {#each navItems as {href, label}}
+        <a
+          {href}
+          class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors"
+          class:selected={activeLink === href}
+          on:click={() => {
+            activeLink = href;
+            closeMenu();
+          }}
+        >
+          {label}
+        </a>
+      {/each}
+      <div class="pt-4">
+        <DarkMode />
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   img {
@@ -50,8 +156,11 @@
   .navButton {
     padding: 0.5rem 1rem;
     border-radius: 9999px;
+    transition: all 0.2s;
   }
-  .navButton:hover,.selected {
+
+  .navButton:hover,
+  .selected {
     background-color: #d0bff2;
     color: black;
   }
