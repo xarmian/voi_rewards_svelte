@@ -5,7 +5,7 @@
   import { slide } from 'svelte/transition';
   
   let isMenuOpen = false;
-  let activeLink = $page.url.pathname;
+  $: activeLink = $page.url.pathname;
   let touchStart = 0;
   let touchX = 0;
   let menuElement: HTMLElement;
@@ -20,6 +20,13 @@
     { href: '/how_to_node', label: 'Run a Node' },
     { href: '/wallet', label: 'Account' }
   ];
+
+  const isActiveLink = (href: string): boolean => {
+    if (href === '/') {
+      return activeLink === '/';
+    }
+    return activeLink.includes(href);
+  };
 
   const handleTouchStart = (e: TouchEvent) => {
     touchStart = e.touches[0].clientX;
@@ -75,7 +82,7 @@
       <a 
         {href} 
         class="text-lg navButton" 
-        class:selected={activeLink === href} 
+        class:selected={activeLink ? isActiveLink(href) : false} 
         on:click={() => activeLink = href}
       >
         {label}
@@ -130,7 +137,7 @@
         <a
           {href}
           class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors"
-          class:selected={activeLink === href}
+          class:selected={activeLink ? isActiveLink(href) : false}
           on:click={() => {
             activeLink = href;
             closeMenu();
