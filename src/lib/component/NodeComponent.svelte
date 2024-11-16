@@ -159,7 +159,7 @@
                 </div>
             {:else}
                 <div class="space-y-3">
-                    {#if typeof apiData.total_blocks == 'undefined' || !supply || !apiData.first_block}
+                    {#if typeof apiData?.total_blocks == 'undefined' || !supply || !apiData?.first_block}
                         <div class="flex justify-center items-center h-24">
                             <Spinner size="16" />
                         </div>

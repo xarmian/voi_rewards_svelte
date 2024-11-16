@@ -344,7 +344,7 @@
     {/if}
 </div>
 
-<style>
+<style lang="postcss">
     th {
         @apply font-semibold;
     }

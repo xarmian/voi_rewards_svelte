@@ -3,7 +3,6 @@
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
     import AccountInfo from '$lib/components/wallet/AccountInfo.svelte';
-    import TotalAccountsInfo from '$lib/components/wallet/TotalAccountsInfo.svelte';
     import { config } from '$lib/config';
     import type { LockContract } from '$lib/data/types';
 	  import { goto } from '$app/navigation';
@@ -33,7 +32,7 @@
 
     const sections = [
       { id: 'consensus', name: 'Consensus' },
-      { id: 'staking', name: 'Staking' },
+      //{ id: 'staking', name: 'Staking' },
       { id: 'proposals', name: 'Proposals' },
       { id: 'epochs', name: 'Epochs' },
       { id: 'calculator', name: 'Calculator' },
@@ -50,14 +49,29 @@
         }
     }
 
+    let isDropdownOpen = false;
+
+    function toggleDropdown() {
+      isDropdownOpen = !isDropdownOpen;
+    }
+
+    function handleClickOutside(event: MouseEvent) {
+      const dropdown = document.getElementById('account-dropdown');
+      if (dropdown && !dropdown.contains(event.target as Node)) {
+        isDropdownOpen = false;
+      }
+      event.stopPropagation();
+    }
+
     onMount(() => {
         loading = false;
         if (data.walletId && data.walletId.length > 0 && data.walletId != $selectedWallet?.address) {
-            selectedWallet.set({address: data.walletId, app: ''});
+            //selectedWallet.set({address: data.walletId, app: ''});
         }
 
         if (browser) {
             window.addEventListener('hashchange', handleHashChange);
+            document.addEventListener('click', handleClickOutside);
         }
     });
 
@@ -66,6 +80,7 @@
         
         if (browser) {
             window.removeEventListener('hashchange', handleHashChange);
+            document.removeEventListener('click', handleClickOutside);
         }
     });
 
@@ -85,9 +100,10 @@
     }
 
     const unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
-        if (!loading && wallet?.address && wallet.address.length > 0 && walletId !== wallet.address) {
-            const hash = $page.url.hash || '#consensus';
-            goto(`/wallet/${wallet.address}${hash}`, { invalidateAll: true });
+        if (!loading && wallet?.address && wallet.address != walletId) {
+            if (parentWalletId != wallet.address) {
+                goto(`/wallet/${wallet.address}`, { invalidateAll: true });
+            }
         }
     });
 
@@ -191,6 +207,8 @@
           estimatedRewardsPerMonth: monthlyReward
         };
 
+        selectedWallet.set({address: address, app: ''});
+
         // Handle child accounts similarly
         const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
         const response = await fetch(curl, { cache: 'no-store' });
@@ -241,22 +259,22 @@
   
   <div class="flex flex-col md:flex-row">
     <!-- Mobile Header -->
-    <div class="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-800">
-        <button
-            class="text-gray-600 dark:text-gray-200"
-            on:click={toggleMobileMenu}
-            aria-label="Toggle menu"
-        >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path 
-                    stroke-linecap="round" 
-                    stroke-linejoin="round" 
-                    stroke-width="2" 
-                    d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
-                />
-            </svg>
-        </button>
-        <div class="flex-1 mx-4">
+    <div class="md:hidden flex-shrink-0 flex flex-col p-4 bg-gray-100 dark:bg-gray-800 relative z-30">
+        <div class="flex items-center justify-between mb-4">
+            <button
+                class="text-gray-600 dark:text-gray-200"
+                on:click={toggleMobileMenu}
+                aria-label="Toggle menu"
+            >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path 
+                        stroke-linecap="round" 
+                        stroke-linejoin="round" 
+                        stroke-width="2" 
+                        d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+                    />
+                </svg>
+            </button>
             <Web3Wallet
                 availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
                 showAuthButtons={false}
@@ -275,6 +293,96 @@
                 modalType="dropdown"
             />
         </div>
+
+        {#if childAccounts.length > 0 && primaryAccountInfo}
+            <div class="relative w-full" id="mobile-account-dropdown">
+                <button
+                    class="w-full flex items-center justify-between px-4 py-2.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 font-medium hover:border-purple-500 dark:hover:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-colors"
+                    on:click|stopPropagation={() => isDropdownOpen = !isDropdownOpen}
+                >
+                    {#if primaryAccountInfo && walletId}
+                        <div class="flex items-center justify-between w-full">
+                            <span class="flex items-center gap-2">
+                                {#if primaryAccountInfo && parentWalletId == null}
+                                    <span>Parent: {walletId.slice(0, 6)}...{walletId.slice(-4)}</span>
+                                    <span class="text-gray-500 dark:text-gray-400">|</span>
+                                    <span>{primaryAccountInfo.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                                    <span class="text-gray-500 dark:text-gray-400">|</span>
+                                    <span class={primaryAccountInfo.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                                        {primaryAccountInfo.isParticipating ? '🟢' : '⚪'}
+                                    </span>
+                                {:else}
+                                    {#each childAccounts as account}
+                                        {#if account.address === walletId}
+                                            <span>Staking: {account.address.slice(0, 4)}...{account.address.slice(-4)}</span>
+                                            <span class="text-gray-500 dark:text-gray-400">|</span>
+                                            <span>{account.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                                            <span class="text-gray-500 dark:text-gray-400">|</span>
+                                            <span class={account.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                                                {account.isParticipating ? '🟢' : '⚪'}
+                                            </span>
+                                        {/if}
+                                    {/each}
+                                {/if}
+                            </span>
+                            <svg class={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    {/if}
+                </button>
+
+                {#if isDropdownOpen}
+                    <div class="fixed left-4 right-4 mt-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg z-40">
+                        <button
+                            class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700"
+                            on:click={() => {
+                                goto(`/wallet/${parentWalletId ?? walletId}`, { invalidateAll: true });
+                                isDropdownOpen = false;
+                            }}
+                        >
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-medium">Parent Account</span>
+                                    <span class={primaryAccountInfo.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                                        {primaryAccountInfo.isParticipating ? '🟢 Online' : '⚪ Offline'}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                    <span>{parentWalletId ? parentWalletId.slice(0, 6) : walletId.slice(0, 6)}...{parentWalletId ? parentWalletId.slice(-4) : walletId.slice(-4)}</span>
+                                    <span class="text-gray-400">|</span>
+                                    <span>{primaryAccountInfo.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                                </div>
+                            </div>
+                        </button>
+
+                        {#each childAccounts as account}
+                            <button
+                                class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b last:border-b-0 border-gray-100 dark:border-gray-700"
+                                on:click={() => {
+                                    goto(`/wallet/${account.address}`, { invalidateAll: true });
+                                    isDropdownOpen = false;
+                                }}
+                            >
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-medium">Staking Account</span>
+                                        <span class={account.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                                            {account.isParticipating ? '🟢 Online' : '⚪ Offline'}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                        <span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
+                                        <span class="text-gray-400">|</span>
+                                        <span>{account.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                                    </div>
+                                </div>
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+        {/if}
     </div>
 
     <!-- Sidebar - Desktop & Mobile -->
@@ -336,27 +444,121 @@
     </aside>
     
     <main class="flex-1 bg-white dark:bg-gray-900">
-        <div class="sticky top-0 z-10 hidden md:flex w-full space-x-4 justify-end p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <TotalAccountsInfo 
-              primaryAccount={$selectedWallet?.address && $selectedWallet?.address != primaryAccountInfo?.address ? childAccounts.find(account => account.address === $selectedWallet?.address) : primaryAccountInfo} 
-            />
-            <Web3Wallet
+        <div class="top-0 z-10 hidden md:flex w-full items-center justify-end p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+
+          <!-- Right side: Wallet controls -->
+          <div class="flex items-center space-x-3">
+            {#if childAccounts.length > 0}
+              <div class="relative min-w-[400px]" id="account-dropdown">
+                <button
+                  class="w-full flex items-center justify-between px-4 py-2.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 font-medium hover:border-purple-500 dark:hover:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-colors"
+                  on:click|stopPropagation={toggleDropdown}
+                >
+                  {#if primaryAccountInfo && walletId}
+                    <div class="flex items-center justify-between w-full">
+                      <span class="flex items-center gap-2">
+                        {#if primaryAccountInfo && parentWalletId == null}
+                          <span>Parent: {walletId.slice(0, 6)}...{walletId.slice(-4)}</span>
+                          <span class="text-gray-500 dark:text-gray-400">|</span>
+                          <span>{primaryAccountInfo.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                          <span class="text-gray-500 dark:text-gray-400">|</span>
+                          <span class={primaryAccountInfo.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                            {primaryAccountInfo.isParticipating ? '🟢 Online' : '⚪ Offline'}
+                          </span>
+                        {:else}
+                          {#each childAccounts as account}
+                            {#if account.address === walletId}
+                              <span>Staking: {account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
+                              <span class="text-gray-500 dark:text-gray-400">|</span>
+                              <span>{account.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                              <span class="text-gray-500 dark:text-gray-400">|</span>
+                              <span class={account.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                                {account.isParticipating ? '🟢 Online' : '⚪ Offline'}
+                              </span>
+                            {/if}
+                          {/each}
+                        {/if}
+                      </span>
+                      <svg class={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  {/if}
+                </button>
+
+                {#if isDropdownOpen && primaryAccountInfo}
+                  <div class="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg max-h-[300px] overflow-y-auto">
+                    <!-- Parent account option -->
+                    <button
+                      class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700"
+                      on:click={() => {
+                        goto(`/wallet/${parentWalletId ?? walletId}`, { invalidateAll: true });
+                        isDropdownOpen = false;
+                      }}
+                    >
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-center justify-between">
+                          <span class="font-medium">Parent Account</span>
+                          <span class={primaryAccountInfo.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                            {primaryAccountInfo.isParticipating ? '🟢 Online' : '⚪ Offline'}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                          <span>{parentWalletId ? parentWalletId.slice(0, 6) : walletId.slice(0, 6)}...{parentWalletId ? parentWalletId.slice(-4) : walletId.slice(-4)}</span>
+                          <span class="text-gray-400">|</span>
+                          <span>{primaryAccountInfo.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                        </div>
+                      </div>
+                    </button>
+                    
+                    {#each childAccounts as account}
+                      <button
+                        class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b last:border-b-0 border-gray-100 dark:border-gray-700"
+                        on:click={() => {
+                          goto(`/wallet/${account.address}`, { invalidateAll: true });
+                          isDropdownOpen = false;
+                        }}
+                      >
+                        <div class="flex flex-col gap-1">
+                          <div class="flex items-center justify-between">
+                            <span class="font-medium">Staking Account</span>
+                            <span class={account.isParticipating ? 'text-green-500' : 'text-gray-500'}>
+                              {account.isParticipating ? '🟢 Online' : '⚪ Offline'}
+                            </span>
+                          </div>
+                          <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
+                            <span class="text-gray-400">|</span>
+                            <span>{account.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
+                          </div>
+                        </div>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+
+            <div class="">
+              <Web3Wallet
                 availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
                 showAuthButtons={false}
                 {algodClient}
                 indexerClient={algodIndexer}
                 wcProject={{
-                    projectId: wcProjectId,
-                    projectName: 'Voi Rewards Auditor',
-                    projectDescription: 'Voi Rewards Auditor',
-                    projectUrl: 'https://voirewards.com',
-                    projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
+                  projectId: wcProjectId,
+                  projectName: 'Voi Rewards Auditor',
+                  projectDescription: 'Voi Rewards Auditor',
+                  projectUrl: 'https://voirewards.com',
+                  projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
                 }}
-                walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+                walletListClass="bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
                 allowWatchAccounts={true}
                 showAuthenticated={false}
                 modalType="dropdown"
-            />
+              />
+            </div>
+          </div>
         </div>
 
         <div class="p-4 md:p-5">
