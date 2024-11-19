@@ -26,7 +26,7 @@
 				<i class="fas fa-arrow-right place-self-center mx-5 fa-2x"></i>
 				<button class="place-self-center bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" on:click={() => goto('/accounts')}>Link Accounts</button>
 			</div>
-			<button class="place-self-end self-center ml-4" on:click={() => showNotice = false}>
+			<button class="place-self-end self-center ml-4" on:click={() => showNotice = false} aria-label="Close Notice">
 				<i class="fas fa-times fa-2x"></i>
 			</button>
 		</div>

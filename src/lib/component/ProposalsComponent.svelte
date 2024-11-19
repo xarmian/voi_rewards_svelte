@@ -24,6 +24,8 @@
     let expectedBlockTime: string | null = null;
     let historicalExpectedProposals: any = {};
 
+    let isLoading = false;
+
     $: {
         if (walletId) {
             updateChartData();
@@ -35,6 +37,7 @@
     }
 
     async function updateChartData() {
+      isLoading = true;
       const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
       try {
         const [response, accountInfoResult, supplyResult] = await Promise.all([
@@ -59,33 +62,36 @@
             const minutes = Math.floor((avgBlockTime % (60 * 60)) / 60);
             expectedBlockTime = `${hours}h ${minutes}m`;
         }
+
+        const chartData = await fetchOnlineStakeHistory();
+
+        // Calculate expected proposals using chartData
+        historicalExpectedProposals = {};
+        chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
+            if (new Date(dayData.date) < new Date('2024-10-30')) return;
+            if (dayData.avg_online_stake) {
+
+                const balance = Number(accountInfo?.amount ?? 0);
+                const secondsPerDay = 24 * 60 * 60;
+                const blocksPerDay = secondsPerDay / 2.8;
+                const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
+                historicalExpectedProposals[dayData.date] = expectedBlocks;
+            }
+        });
+
+        data = Object.keys(apiData).map((date) => ({
+            date: new Date(date+'T00:00:00'),
+            actual: apiData[date].length,
+            expected: historicalExpectedProposals[date] ?? 0
+        }));
+
+        data.sort((a: {date: Date}, b: {date: Date}) => a.date.getTime() - b.date.getTime());
       } catch (error) {
-          console.error(error);
+        console.error(error);
+      } finally {
+        isLoading = false;
       }
 
-      const chartData = await fetchOnlineStakeHistory();
-
-      // Calculate expected proposals using chartData
-      historicalExpectedProposals = {};
-      chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
-          if (new Date(dayData.date) < new Date('2024-10-30')) return;
-          if (dayData.avg_online_stake) {
-
-              const balance = Number(accountInfo?.amount ?? 0);
-              const secondsPerDay = 24 * 60 * 60;
-              const blocksPerDay = secondsPerDay / 2.8;
-              const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
-              historicalExpectedProposals[dayData.date] = expectedBlocks;
-          }
-      });
-
-      data = Object.keys(apiData).map((date) => ({
-          date: new Date(date+'T00:00:00'),
-          actual: apiData[date].length,
-          expected: historicalExpectedProposals[date] ?? 0
-      }));
-
-      data.sort((a: {date: Date}, b: {date: Date}) => a.date.getTime() - b.date.getTime());
     }
 
     const xAxisFormat = (d: Date) => {
@@ -129,7 +135,7 @@
                 </div>
             {/if}
         </div>
-        {#if apiData == null}
+        {#if apiData == null || isLoading}
             <div class="flex justify-center items-center h-64">
                 <Spinner size="16" />
             </div>
@@ -158,25 +164,26 @@
             {/if}
             <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
                 <Chart
-                {data}
-                x="date"
-                xScale={scaleBand().padding(0.4)}
-                y={["actual", "expected"]}
-                yDomain={[0, null]}
-                yNice={4}
-                padding={{ left: 40, bottom: 40, right: 20, top: 40 }}
-                tooltip={{ mode: "band" }}
-            >
-                        <Legend
+                    {data}
+                    x="date"
+                    xScale={scaleBand().padding(0.4)}
+                    y={["actual", "expected"]}
+                    yDomain={[0, null]}
+                    yNice={4}
+                    padding={{ left: 40, bottom: 40, right: 20, top: 40 }}
+                    tooltip={{ mode: "band" }}
+                >
+                    <Legend
                             class="text-sm text-gray-600 dark:text-gray-300 flex flex-row"
                             placement="top-right"
                         >
-                            <div class="w-4 h-4 rounded bg-blue-500 dark:bg-blue-400 mr-2"/>
+                            <div class="w-4 h-4 rounded bg-blue-500 dark:bg-blue-400 mr-2">
+                            </div>
                             <div class="text-gray-600 dark:text-gray-300 mr-4">Actual Proposals</div>
-                            <div class="w-4 h-4 rounded bg-green-500 dark:bg-green-400 mr-2"/>
+                            <div class="w-4 h-4 rounded bg-green-500 dark:bg-green-400 mr-2">
+                            </div>
                             <div class="text-gray-600 dark:text-gray-300 mr-2">Expected Proposals</div>
-                        </Legend>
-                
+                    </Legend>
                 <Svg>
                     <Axis 
                         placement="left" 

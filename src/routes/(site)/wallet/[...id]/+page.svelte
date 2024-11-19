@@ -14,8 +14,10 @@
     import { dataTable } from '../../../../stores/dataTable';
     import { getTokensByEpoch } from '$lib/utils';
     import { browser } from '$app/environment';
-    import { page } from '$app/stores';
     import EpochComponent from '$lib/component/EpochComponent.svelte';
+    import { copy } from 'svelte-copy';
+    import { toast } from '@zerodevx/svelte-toast';
+    import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     
     export let data: {
         walletId: string;
@@ -31,13 +33,13 @@
     let loading = true;
 
     const sections = [
-      { id: 'consensus', name: 'Consensus' },
-      //{ id: 'staking', name: 'Staking' },
-      { id: 'proposals', name: 'Proposals' },
-      { id: 'epochs', name: 'Epochs' },
-      { id: 'calculator', name: 'Calculator' },
-      //{ id: 'preferences', name: 'Preferences' },
-      //{ id: 'billing', name: 'Billing Information' }
+      { id: 'consensus', name: 'Consensus', icon: 'fas fa-hexagon-nodes' },
+      //{ id: 'staking', name: 'Staking', icon: 'fas fa-cog' },
+      { id: 'proposals', name: 'Proposals', icon: 'fas fa-chart-line' },
+      { id: 'epochs', name: 'Epochs', icon: 'fas fa-calendar-alt' },
+      { id: 'calculator', name: 'Calculator', icon: 'fas fa-calculator' },
+      //{ id: 'preferences', name: 'Preferences', icon: 'fas fa-cog' },
+      //{ id: 'billing', name: 'Billing Information', icon: 'fas fa-cog' }
     ];
     
     $: {
@@ -350,6 +352,11 @@
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                     <span>{parentWalletId ? parentWalletId.slice(0, 6) : walletId.slice(0, 6)}...{parentWalletId ? parentWalletId.slice(-4) : walletId.slice(-4)}</span>
+                                    <CopyComponent
+                                      text={parentWalletId ?? walletId}
+                                      toastMessage={`Wallet Copied to Clipboard:<br/> ${parentWalletId ?? walletId.slice(0,20)}...`}
+                                      failureMessage={`Failed to copy wallet address to clipboard.`}
+                                    />
                                     <span class="text-gray-400">|</span>
                                     <span>{primaryAccountInfo.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
                                 </div>
@@ -373,6 +380,11 @@
                                     </div>
                                     <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                         <span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
+                                        <CopyComponent
+                                          text={account.address}
+                                          toastMessage={`Wallet Copied to Clipboard:<br/> ${account.address.slice(0,20)}...`}
+                                          failureMessage={`Failed to copy wallet address to clipboard.`}
+                                        />
                                         <span class="text-gray-400">|</span>
                                         <span>{account.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
                                     </div>
@@ -427,7 +439,7 @@
                 {#each sections as section}
                     <li>
                         <button
-                            class="w-full text-left py-2 px-4 rounded transition-colors duration-200 ease-in-out {activeSection === section.id ? 'bg-gray-200 dark:bg-gray-700 font-bold' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}"
+                            class="w-full flex items-center gap-2 text-left py-2 px-4 rounded transition-colors duration-200 ease-in-out {activeSection === section.id ? 'bg-gray-200 dark:bg-gray-700 font-bold' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}"
                             on:click={() => {
                                 setActiveSection(section.id);
                                 if (window.innerWidth < 768) {
@@ -435,6 +447,7 @@
                                 }
                             }}
                         >
+                            <i class={section.icon}></i>
                             {section.name}
                         </button>
                     </li>
@@ -505,6 +518,11 @@
                         </div>
                         <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                           <span>{parentWalletId ? parentWalletId.slice(0, 6) : walletId.slice(0, 6)}...{parentWalletId ? parentWalletId.slice(-4) : walletId.slice(-4)}</span>
+                          <CopyComponent
+                            text={parentWalletId ?? walletId}
+                            toastMessage={`Wallet Copied to Clipboard:<br/> ${parentWalletId ?? walletId.slice(0,20)}...`}
+                            failureMessage={`Failed to copy wallet address to clipboard.`}
+                          />
                           <span class="text-gray-400">|</span>
                           <span>{primaryAccountInfo.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
                         </div>
@@ -528,6 +546,11 @@
                           </div>
                           <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                             <span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
+                            <CopyComponent
+                              text={account.address}
+                              toastMessage={`Wallet Copied to Clipboard:<br/> ${account.address.slice(0,20)}...`}
+                              failureMessage={`Failed to copy wallet address to clipboard.`}
+                            />
                             <span class="text-gray-400">|</span>
                             <span>{account.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI</span>
                           </div>

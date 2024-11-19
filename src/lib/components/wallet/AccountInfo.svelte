@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { LinkSolid, StarSolid, StarOutline, CopySolid, ChevronDownSolid } from 'flowbite-svelte-icons';
+    import { StarSolid, StarOutline } from 'flowbite-svelte-icons';
     import { favorites } from '../../../stores/favorites';
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
     import { selectedWallet } from 'avm-wallet-svelte';
     import { nicknames } from '$lib/stores/nicknames';
     import NicknameManager from '$lib/components/NicknameManager.svelte';
+	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
 
     export let addressLink: boolean = false;
 
@@ -50,9 +51,12 @@
 
 <div class="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 space-y-6 relative">
     <!-- Header Section with Address and Balance -->
-    <button 
-        class="w-full flex flex-col gap-2 md:gap-0 md:block"
+    <div 
+        class="w-full flex flex-col gap-2 md:gap-0 md:block cursor-pointer"
         on:click={toggleExpand}
+        on:keydown={(e) => e.key === 'Enter' && toggleExpand()}
+        role="button"
+        tabindex="0"
     >
         <div class="flex justify-between items-start">
             <div class="space-y-2">
@@ -79,24 +83,20 @@
                     {/if}
                     
                     <div class="flex items-center gap-1">
-                        <button 
-                            use:copy={account.address}
-                            on:click|stopPropagation 
-                            on:svelte-copy={() => toast.push(`Address copied to clipboard`)}
-                            class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                            title="Copy Address"
-                        >
-                            <CopySolid size="sm" />
-                        </button>
-
+                        <CopyComponent 
+                            text={account.address}
+                            toastMessage={`Address copied to clipboard`}
+                            failureMessage={`Failed to copy address to clipboard`}
+                        />
                         <a 
                             href={`https://explorer.voi.network/explorer/account/${account.address}`}
                             target="_blank"
                             on:click|stopPropagation
                             class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
                             title="View on Explorer"
+                            aria-label="View account on Explorer"
                         >
-                            <LinkSolid size="sm" />
+                            <i class="fas fa-external-link-alt"></i>
                         </a>
                         
                         <button 
@@ -115,6 +115,7 @@
                             on:click|stopPropagation={() => showNicknameInput = !showNicknameInput}
                             class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
                             title="Set Nickname"
+                            aria-label="Set Nickname"
                         >
                             <i class="fas fa-tag"></i>
                         </button>
@@ -122,7 +123,12 @@
                 </div>
 
                 {#if showNicknameInput}
-                    <div class="mt-2" on:click|stopPropagation>
+                    <div 
+                        class="mt-2" 
+                        on:click|stopPropagation 
+                        on:keydown|stopPropagation={(e) => e.key === 'Enter' && e.stopPropagation()}
+                        role="presentation"
+                    >
                         <NicknameManager 
                             address={account.address} 
                             bind:showInput={showNicknameInput}
@@ -143,6 +149,7 @@
                             on:click|stopPropagation={toggleOfflineInfo}
                             class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 absolute top-4 right-4 text-xl"
                             title="Account offline info"
+                            aria-label="Show offline account information"
                         >
                             <i class="fas fa-triangle-exclamation fa-lg"></i>
                         </button>
@@ -153,10 +160,10 @@
                 </div>
             </div>
             <div class="md:hidden transform transition-transform duration-200 absolute top-5 right-5" class:rotate-180={isExpanded}>
-                <ChevronDownSolid size="sm" class="text-gray-400" />
+                <i class="fas fa-chevron-down text-gray-400"></i>
             </div>
         </div>
-    </button>
+    </div>
 
     <!-- Metrics Grid - Hidden by default on mobile -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4" class:hidden={!isExpanded} class:md:grid={true}>
@@ -185,13 +192,20 @@
 </div>
 
 {#if showOfflineInfo}
-    <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" on:click|self={toggleOfflineInfo}>
+    <div 
+        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" 
+        on:click|self={toggleOfflineInfo}
+        on:keydown={(e) => e.key === 'Enter' && toggleOfflineInfo()}
+        role="button"
+        tabindex="0"
+    >
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full shadow-xl">
             <div class="flex justify-between items-start mb-4">
                 <h3 class="text-lg font-semibold dark:text-gray-100">Offline Account Status</h3>
                 <button 
                     on:click={toggleOfflineInfo}
                     class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label="Close offline status modal"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

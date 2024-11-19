@@ -2,6 +2,7 @@
     import { Button, Popover } from 'flowbite-svelte';
     import { toast } from '@zerodevx/svelte-toast';
     import { copy } from 'svelte-copy';
+	import CopyComponent from './CopyComponent.svelte';
   
     export let url: string;
     export let text: string;
@@ -58,12 +59,18 @@
           <i class="fab fa-instagram mr-2"></i>
           Instagram
         </Button>
-        <Button color="alternative">
-          <div class="flex flex-row space-x-2" use:copy={url} on:svelte-copy={() => toast.push(`URL Copied to Clipboard:<br/> ${url.substring(0,20)}...`)}>
-            <i class="fas fa-copy mr-2"></i>
+        <CopyComponent
+            text={url}
+            toastMessage={`URL Copied to Clipboard:<br/> ${url.substring(0,20)}...`}
+            failureMessage={`Failed to copy URL to clipboard.`}
+        >
+            <Button color="alternative">
+                <div class="flex flex-row space-x-2">
+                    <i class="fas fa-copy mr-2"></i>
             Copy URL
-          </div>
-        </Button>
+                </div>
+            </Button>
+        </CopyComponent>
       </div>
     </div>
   </Popover>

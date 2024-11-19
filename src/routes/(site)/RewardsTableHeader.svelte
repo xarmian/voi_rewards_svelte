@@ -1,6 +1,6 @@
 <script lang="ts">
     import { TableHeadCell } from 'flowbite-svelte';
-    import { AngleDownSolid, AngleUpSolid } from 'flowbite-svelte-icons';
+    import { CaretDownSolid, CaretUpSolid } from 'flowbite-svelte-icons';
     import { createEventDispatcher } from 'svelte';
 
     export let sortKey = '';
@@ -20,9 +20,9 @@
         <slot />
         {#if sortKey == columnId}
             {#if sortDirection == 1}
-                <AngleDownSolid class="w-4 h-4 ml-1" />
+                <CaretDownSolid class="w-4 h-4 ml-1" />
             {:else if sortDirection == -1}
-                <AngleUpSolid class="w-4 h-4 ml-1" />
+                <CaretUpSolid class="w-4 h-4 ml-1" />
             {/if}
         {/if}
     </div>

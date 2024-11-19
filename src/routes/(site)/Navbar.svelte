@@ -70,7 +70,7 @@
   };
 </script>
 
-<Navbar fluid={true} class="!bg-[rgb(111,42,226)] text-white">
+<Navbar fluid={true} class="!bg-[rgb(111,42,226)] text-white dark:text-gray-100">
   <NavBrand href="https://voirewards.com" class="float-left">
     <img src="{Icon}" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
     <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-semibold">Voi Rewards Auditor</div>
@@ -113,6 +113,8 @@
   <div 
     class="fixed inset-0 bg-black bg-opacity-50 z-40"
     on:click={closeMenu}
+    aria-label="Close Menu"
+    aria-hidden="true"
   ></div>
 {/if}
 

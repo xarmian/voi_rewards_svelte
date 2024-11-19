@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { rewardParams } from '../../stores/dataTable';
 	import { writable } from 'svelte/store';
-	import { config } from '$lib/config';
 	import { Modal } from 'flowbite-svelte';
 	import RewardsTable from './RewardsTable.svelte';
 	import DashboardCard from '$lib/components/DashboardCard.svelte';
@@ -160,25 +159,32 @@
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 				<!--<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />-->
 				<!--<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />-->
-				<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks in this Epoch earning rewards." />
-				<div on:click={handleBlockChartClick} class="cursor-pointer">
+				<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks produced in this Epoch that are earning rewards." />
+				<button
+					on:click={handleBlockChartClick}
+					on:keydown={(e) => e.key === 'Enter' && handleBlockChartClick()}
+					class="cursor-pointer w-full text-left"
+				>
 					<DashboardCard
 						title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch}
 						value={$rewardParams.block_reward_pool > 0 ? `${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI` : null}
 						subvalue={totalBlocks > 0 ? '~' + $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : ''}
 						subvalue2={eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
-						info="The number of blocks produced in a typical epoch."
+						info="Rewards distributed or to be distributed in the selected Epoch, and the average reward per block and APR based on the eligible online stake."
 					/>
-				</div>
-				<div on:click={handleStakeChartClick} class="cursor-pointer">
+				</button>
+				<button
+					on:click={handleStakeChartClick}
+					on:keydown={(e) => e.key === 'Enter' && handleStakeChartClick()}
+					class="cursor-pointer w-full text-left"
+				>
 					<DashboardCard 
 						title="Online Stake" 
 						value={supply ? Math.round((supply?.['online-money']??0)/Math.pow(10,6)).toLocaleString() + ' VOI' : null} 
 						subvalue={`Eligible: ${eligibleOnlineStake > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
-						info="The total amount of VOI that is currently online and participating in the network." 
-						showChart={true}
+						info="The total amount of VOI that is currently online and participating in the network, and the amount eligible for rewards." 
 					/>
-				</div>
+				</button>
 				<RecentProposers on:latestBlock={handleLatestBlock} {ballasts} />
 			</div>
 
@@ -269,7 +275,7 @@
 	</Modal>
 {/if}
 
-<style>
+<style lang="postcss">
 	.btn-primary {
 		@apply bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
 	}

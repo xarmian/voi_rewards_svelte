@@ -21,6 +21,7 @@
 	import { getSupplyInfo } from '$lib/stores/accounts';
 	import { dataTable } from '../stores/dataTable';
 	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
+	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
 
     const displayBalance = (amt: number) => {
         return (amt / Math.pow(10,6)).toLocaleString();
@@ -138,12 +139,19 @@
         <h3 class="text-2xl font-bold mb-4 flex items-center justify-between text-gray-800 dark:text-gray-200">
             <span>Account</span>
             <div>
-                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mr-2" use:copy={walletId} on:click|stopPropagation on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`)} title="Copy Address">
-                    <i class="fas fa-copy"></i>
-                </button>
+                <CopyComponent
+                    text={walletId}
+                    toastMessage={`Wallet Copied to Clipboard:<br/> ${walletId.substring(0,20)}...`}
+                    failureMessage={`Failed to copy wallet address to clipboard.`}
+                />
                 {#if isModal}
-                    <a href="https://explorer.voi.network/explorer/account/{walletId}/transactions" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" target="_blank" title="Open Account on Voi Explorer">
-                        <i class="fas fa-external-link-alt"></i>
+                    <a href="https://explorer.voi.network/explorer/account/{walletId}/transactions" 
+                       class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" 
+                       target="_blank" 
+                       aria-label="View account on Voi Explorer"
+                       title="View account on Voi Explorer"
+                    >
+                        <i class="fas fa-globe"></i>
                     </a>
                 {/if}
             </div>
@@ -155,6 +163,7 @@
                 <span class="font-mono text-lg overflow-hidden whitespace-nowrap text-ellipsis max-w-full">
                     {walletId.substring(0, 10)}...{walletId.substring(walletId.length - 10)}
                 </span>
+                <i class="fas fa-external-link-alt"></i>
             </a>
         </h1>
         {#if nfDomain}

@@ -4,7 +4,7 @@
   import { writable } from 'svelte/store';
   import RewardsTableHeader from './RewardsTableHeader.svelte';
   import { rewardParams } from '../../stores/dataTable';
-  import { CopySolid, LinkSolid, StarSolid, StarOutline, WalletSolid } from 'flowbite-svelte-icons';
+  import { FileCopySolid, StarSolid, StarOutline, WalletSolid } from 'flowbite-svelte-icons';
   import { Modal } from 'flowbite-svelte';
   import { copy } from 'svelte-copy';
   import { toast } from '@zerodevx/svelte-toast';
@@ -17,6 +17,7 @@
 	import { goto } from '$app/navigation';
   import { nicknames } from '$lib/stores/nicknames';
   import NicknameManager from '$lib/components/NicknameManager.svelte';
+  import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
@@ -30,7 +31,7 @@
   let expandedRow: number | null = null;
   let showWalletNFD: boolean = true;
   let sortItems = writable<any[]>([]);
-  let filterItems = <any[]>([]);
+  let filterItems: any[] = [];
   
   let viewWallet = false;
   let viewWalletId = '';
@@ -246,7 +247,13 @@
                 <span class="flex flex-col md:flex-row items-center">
                   {#if column.id === 'proposer'}
                     <span>{column.desc}</span>
-                    <span class="md:ml-4" on:click|stopPropagation><Toggle bind:checked={showWalletNFD}>NFD</Toggle></span>
+                    <button 
+                      class="md:ml-4" 
+                      on:click|stopPropagation 
+                      aria-label="Show NFD"
+                    >
+                      <Toggle bind:checked={showWalletNFD}>NFD</Toggle>
+                    </button>
                   {:else}
                     {column.desc}
                   {/if}
@@ -256,7 +263,7 @@
                   {/if}
                 </span>
                 {#if column.id === 'block_rewards' || column.id === 'health_points' || column.id === 'total_rewards'}
-                  <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)}></button>
+                  <button title='Download CSV' class='ml-2 fas fa-download' on:click|stopPropagation={() => downloadCSV(column.id)} aria-label="Download CSV"></button>
                 {/if}
             </RewardsTableHeader>
         {/each}
@@ -307,6 +314,7 @@
                     }}
                     class="text-gray-500 hover:text-gray-600 px-2"
                     title="Set Nickname"
+                    aria-label="Set Nickname"
                   >
                     <i class="fas fa-tag"></i>
                   </button>
@@ -318,27 +326,32 @@
                     }}
                     class="inline-flex items-center gap-1 px-2 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
                     title="Quick View"
+                    aria-label="Quick View"
                   >
                     <i class="fas fa-expand-alt"></i>
                   </button>
                 </div>
               </div>
               
-              <div class="mt-2" on:click|stopPropagation>
-                {#if item.showNicknameInput}
+              {#if item.showNicknameInput}
+              <button 
+                class="mt-2" 
+                on:click|stopPropagation 
+                aria-label="Set Nickname"
+              >
                   <NicknameManager 
                     address={item.proposer} 
                     bind:showInput={item.showNicknameInput}
                   />
-                {/if}
-              </div>
+              </button>
+              {/if}
             </TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
             <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_rewards.toFixed(2))} VOI</TableBodyCell>
         </TableBodyRow>
         {#if expandedRow === i}
           <TableBodyRow>
-            <TableBodyCell colspan="4" class="p-0" on:click={() => toggleRow(i)}>
+            <TableBodyCell colspan={4} class="p-0" on:click={() => toggleRow(i)}>
               <div class="px-2 py-3 m-4" transition:slide={{ duration: 300, axis: 'y' }}>
                 <div class="space-y-3">
                   <!-- address and nfd -->
@@ -348,22 +361,23 @@
                     
                     <!-- Action buttons group -->
                     <div class="mt-2 flex gap-2">
-                      <button 
-                        use:copy={item.proposer} 
-                        on:click|stopPropagation 
-                        on:svelte-copy={() => toast.push(`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`)}
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      <CopyComponent
+                        text={item.proposer}
+                        toastMessage={`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`}
+                        failureMessage={`Failed to copy wallet address to clipboard.`}
                       >
-                        <CopySolid size="sm" />
-                        Copy Address
-                      </button>
+                        <span class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                          <FileCopySolid size="sm" />
+                          Copy Address
+                        </span>
+                      </CopyComponent>
 
                       <button 
                         on:click|stopPropagation={() => {
                           viewWallet = true;
                           if (viewWalletId != item.proposer) viewWalletId = item.proposer;
                         }}
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors"
                       >
                         <i class="fas fa-expand-alt"></i>
                         Quick View
@@ -418,13 +432,13 @@
    
       <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
         <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
-        <TableBodyCell colspan="2" class="p-2">
+        <TableBodyCell colspan={2} class="p-2">
           Blocks:
         </TableBodyCell>
           <TableBodyCell class="p-2">
             {filterItems.reduce((sum, item) => sum + item.block_count, 0)}
           </TableBodyCell>
-          <TableBodyCell colspan="1" class="p-2">
+          <TableBodyCell colspan={1} class="p-2">
             {Math.round(filterItems.reduce((sum, item) => sum + item.block_rewards, 0)).toLocaleString()} VOI
           </TableBodyCell>
       </TableBodyRow>
