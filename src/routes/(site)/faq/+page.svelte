@@ -91,6 +91,20 @@
     highlightedFAQ = faq;
     document.getElementById(slugify(faq.question))?.scrollIntoView({ behavior: 'smooth' });
   }
+
+  function handleFAQInteraction(event: MouseEvent, question: string, action: 'copy' | 'link') {
+    if (action === 'copy') {
+      event.preventDefault();
+      event.stopPropagation();
+      copyLinkToClipboard(question);
+    } else if (action === 'link') {
+      event.preventDefault();
+      const element = document.getElementById(slugify(question));
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }
 </script>
 
 <svelte:head>
@@ -149,9 +163,12 @@
             <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700 mb-8" id={slugify(highlightedFAQ.question)}>
               <AccordionItem open={true}>
                 <svelte:fragment slot="header">
-                  <a href={`#${slugify(highlightedFAQ.question)}`} class="w-full">
-                  <div class="flex items-center justify-between w-full">
-                    <div class="flex items-center">
+                  <div class="w-full flex items-center justify-between">
+                    <a 
+                      href={`#${slugify(highlightedFAQ.question)}`} 
+                      class="flex-1 flex items-center"
+                      on:click={(e) => handleFAQInteraction(e, (highlightedFAQ?.question)??'', 'link')}
+                    >
                       <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
                       <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
                         {#each highlightedFAQ.question.split('**') as part, index}
@@ -162,16 +179,18 @@
                           {/if}
                         {/each}
                       </span>
-                    </div>
-                    <button
-                      on:click|stopPropagation={() => copyLinkToClipboard(highlightedFAQ?.question ?? '')}
-                      class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
+                    </a>
+                    <div
+                      role="button"
+                      tabindex="0"
+                      on:click={(e) => handleFAQInteraction(e, (highlightedFAQ?.question)??'', 'copy')}
+                      on:keydown={(e) => e.key === 'Enter' && handleFAQInteraction(e, (highlightedFAQ?.question)??'', 'copy')}
+                      class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 cursor-pointer"
                       title="Copy link to clipboard"
                     >
                       <ClipboardOutline class="w-5 h-5" />
-                    </button>
+                    </div>
                   </div>
-                  </a>
                 </svelte:fragment>
                 <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
                   <Markdown source={highlightedFAQ.answer} renderers={{ link: ExternalLink }}/>
@@ -186,31 +205,36 @@
               <Accordion multiple class="divide-y divide-gray-200 dark:divide-gray-700">
                 {#each items as item}
                   {#if item !== highlightedFAQ}
-                    <AccordionItem open={expandAll} id={slugify(item.question)}>
+                    <AccordionItem open={expandAll}>
                       <svelte:fragment slot="header">
-                        <a href={`#${slugify(item.question)}`} class="w-full">
-                          <div class="flex items-center justify-between w-full">
-                            <div class="flex items-center">
-                              <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
-                              <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                                  {#each item.question.split('**') as part, index}
-                                    {#if index % 2 === 0}
-                                      {part}
-                                    {:else}
-                                      <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
-                                    {/if}
-                                  {/each}
-                              </span>
+                        <div class="w-full flex items-center justify-between">
+                          <a 
+                            href={`#${slugify(item.question)}`} 
+                            class="flex-1 flex items-center"
+                            on:click={(e) => handleFAQInteraction(e, item.question, 'link')}
+                          >
+                            <LinkOutline class="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400" />
+                            <span class="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                              {#each item.question.split('**') as part, index}
+                                {#if index % 2 === 0}
+                                  {part}
+                                {:else}
+                                  <strong class="text-purple-600 dark:text-purple-400">{part}</strong>
+                                {/if}
+                              {/each}
+                            </span>
+                          </a>
+                          <div
+                            role="button"
+                            tabindex="0"
+                            on:click={(e) => handleFAQInteraction(e, item.question, 'copy')}
+                            on:keydown={(e) => e.key === 'Enter' && handleFAQInteraction(e, item.question, 'copy')}
+                            class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 cursor-pointer"
+                            title="Copy link to clipboard"
+                          >
+                            <ClipboardOutline class="w-5 h-5" />
                           </div>
-                            <button
-                              on:click|stopPropagation={() => copyLinkToClipboard(item.question)}
-                              class="ml-2 p-2 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
-                              title="Copy link to clipboard"
-                            >
-                             <ClipboardOutline class="w-5 h-5" />
-                          </button>
                         </div>
-                        </a>
                       </svelte:fragment>
                       <div class="markdown whitespace-pre-wrap prose dark:prose-invert max-w-none py-4">
                         <Markdown source={item.answer} renderers={{ link: ExternalLink }}/>
