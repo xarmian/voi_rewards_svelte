@@ -183,49 +183,72 @@
     function calculateRewards() {
         totalBalance = initialBalance + additionalAmount;
         
-        if (!supply?.['online-money'] || totalBalance <= 0 || !rewardStake || rewardStake <= 0) {
+        if (!supply?.['online-money'] || !rewardStake || rewardStake <= 0) {
             return;
         }
 
+        // Calculate with 1 VOI if balance is 0 to show potential rates
+        const calculationBalance = totalBalance > 0 ? totalBalance : 1;
+        
         const onlineMoney = Number(supply['online-money']);
-        let shareOfStake = totalBalance / (rewardStake / 1e6);
-        let shareOfTotalStake = totalBalance / (onlineMoney / 1e6);
+        let shareOfStake = calculationBalance / (rewardStake / 1e6);
+        let shareOfTotalStake = calculationBalance / (onlineMoney / 1e6);
 
         // Calculate expected blocks based on stake share
         expectedWeeklyBlocks = weeklyBlocks * shareOfTotalStake;
         expectedMonthlyBlocks = monthlyBlocks * shareOfTotalStake;
         expectedYearlyBlocks = yearlyBlocks * shareOfTotalStake;
 
-        // Weekly reward (using current epoch)
-        weeklyReward = shareOfStake * epochRewards[0];
+        // Calculate APR and potential APY regardless of balance
+        let potentialWeeklyReward = shareOfStake * epochRewards[0];
+        apr = (potentialWeeklyReward / calculationBalance) * 52 * 100;
 
-        // Monthly reward (approximately 4.33 weeks)
-        const monthlyEpochs = 30.44 / 7;
-        monthlyReward = 0;
-        for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
-            const epochReward = calculateEpochReward(shareOfStake, epochRewards[i]);
-            monthlyReward += epochReward;
-        }
-
-        // Yearly reward with compound interest
-        yearlyReward = 0;
-        let currentBalance = totalBalance;
+        // Calculate potential APY with compound interest
+        let simulatedBalance = calculationBalance;
         let currentShareOfStake = shareOfStake;
         for (let i = 0; i < EPOCHS_PER_YEAR && i < epochRewards.length; i++) {
             const epochReward = calculateEpochReward(currentShareOfStake, epochRewards[i]);
-            yearlyReward += epochReward;
-            currentBalance += epochReward;
-            currentShareOfStake = currentBalance / (rewardStake / 1e6);
+            simulatedBalance += epochReward;
+            currentShareOfStake = simulatedBalance / (rewardStake / 1e6);
         }
+        apy = ((simulatedBalance / calculationBalance) - 1) * 100;
 
-        // Calculate APR and APY
-        apr = (weeklyReward / totalBalance) * 52 * 100;
-        apy = ((currentBalance / totalBalance) - 1) * 100;
+        if (totalBalance > 0) {
+            // Weekly reward (using current epoch)
+            weeklyReward = shareOfStake * epochRewards[0];
 
-        // Calculate future balances
-        balanceAfterWeek = totalBalance + weeklyReward;
-        balanceAfterMonth = totalBalance + monthlyReward;
-        balanceAfterYear = currentBalance;
+            // Monthly reward (approximately 4.33 weeks)
+            const monthlyEpochs = 30.44 / 7;
+            monthlyReward = 0;
+            for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
+                const epochReward = calculateEpochReward(shareOfStake, epochRewards[i]);
+                monthlyReward += epochReward;
+            }
+
+            // Yearly reward with compound interest
+            yearlyReward = 0;
+            let actualBalance = totalBalance;
+            currentShareOfStake = shareOfStake;
+            for (let i = 0; i < EPOCHS_PER_YEAR && i < epochRewards.length; i++) {
+                const epochReward = calculateEpochReward(currentShareOfStake, epochRewards[i]);
+                yearlyReward += epochReward;
+                actualBalance += epochReward;
+                currentShareOfStake = actualBalance / (rewardStake / 1e6);
+            }
+
+            // Calculate future balances
+            balanceAfterWeek = totalBalance + weeklyReward;
+            balanceAfterMonth = totalBalance + monthlyReward;
+            balanceAfterYear = actualBalance;
+        } else {
+            // Set all reward and balance values to 0 when there's no starting balance
+            weeklyReward = 0;
+            monthlyReward = 0;
+            yearlyReward = 0;
+            balanceAfterWeek = 0;
+            balanceAfterMonth = 0;
+            balanceAfterYear = 0;
+        }
     }
 
     // Helper function to calculate rewards for a specific epoch
@@ -241,7 +264,7 @@
     }
 
     $: {
-        if (!isLoading && rewardStake > 0 && supply?.['online-money'] && (initialBalance > 0 || additionalAmount > 0)) {
+        if (!isLoading && rewardStake > 0 && supply?.['online-money']) {
             calculateRewards();
         }
     }
