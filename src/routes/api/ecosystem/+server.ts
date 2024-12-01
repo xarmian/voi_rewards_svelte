@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { fetchProjects } from '../../(site)/phase2/[...slug]/projects';
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async () => {
     try {
@@ -9,7 +9,8 @@ export const GET: RequestHandler = async () => {
         
         return json(activeProjects, {
             headers: {
-                'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
+                'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
+                'Access-Control-Allow-Origin': '*'
             }
         });
     } catch (error) {
