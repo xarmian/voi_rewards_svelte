@@ -1,13 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchProjects } from './phase2/[...slug]/projects';
 	import type { IProject } from '$lib/data/types';
 
 	let projects: IProject[] = [];
 
 	onMount(async () => {
-		projects = await fetchProjects();
-		projects = projects.filter(p => p.status === 'active');
+		try {
+			const response = await fetch('/api/ecosystem');
+			if (!response.ok) {
+				throw new Error('Failed to fetch ecosystem projects');
+			}
+			projects = await response.json();
+		} catch (error) {
+			console.error('Error loading ecosystem projects:', error);
+			projects = [];
+		}
 	});
 </script>
 

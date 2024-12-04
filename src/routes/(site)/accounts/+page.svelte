@@ -181,137 +181,142 @@
 <div class="bg-gray-100 dark:bg-black">
     <div class="container mx-auto p-4 max-w-3xl">
         <h1 class="text-3xl font-bold mb-6 text-black dark:text-white">Account Management</h1>
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
-            Use of this site requires connecting a Discord account and one or more Voi wallets. The Discord account is used to verify your identity and Voi wallets are used to calculate and receive rewards.
-            View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
+        <div class="flex flex-col md:flex-row">
+            This page is not currently in use and remains only for archival purposes.
         </div>
+        <div class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
+                Use of this site requires connecting a Discord account and one or more Voi wallets. The Discord account is used to verify your identity and Voi wallets are used to calculate and receive rewards.
+                View the <button on:click={() => showPrivacyModal = true} class="text-blue-500">Privacy Policy</button> for more information.
+            </div>
 
-        <a href="https://discord.com/channels/1055863853633785857/1278379464019152998"
-            target="_blank"
-            class="flex flex-col text-center space-y-1 text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-800 dark:hover:bg-blue-700 rounded-lg shadow-md p-3 mb-6 transition-colors">
-            <div class="text-xl font-semibold">
-                Get the most from your Phase 2 Airdrop
-            </div>
-            <div class="text-sm">
-                After connecting your Discord account
-            </div>
-            <div class="flex text-2xl underline self-center items-center">
-                Complete Human Verification!
-                <InfoButton noAbsolute={true}>
-                    <div class="text-xs">
-                        While Human verification is not required to receive the Phase 2 Airdrop, doing so will provide a boost to your rewards.
-                    </div>
-                </InfoButton>
-            </div>
-        </a>
-        
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
-            <h2 class="text-2xl font-semibold mb-4">Discord Account</h2>
-            <div class="text-gray-600 dark:text-gray-400 mb-4">
-                Connect one Discord Account. All Voi addresses will be linked under this account.
-            </div>
-            {#if discordAccounts.length > 0}
-                <ul class="space-y-2">
-                    {#each discordAccounts as account (account.id)}
-                    <li class="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                        <span>{account.username}</span>
-                        <button
-                        on:click={() => disconnectDiscord(account.id)}
-                        class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
-                        >
-                        Logout
-                        </button>
-                    </li>
-                    {/each}
-                </ul>
-            {:else}
-                <p class="text-gray-600 dark:text-gray-400">No Discord accounts connected.</p>
-                <button
-                    on:click={connectDiscord}
-                    class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-                >
-                Connect Discord Account
-            </button>
-            <div class="text-sm">
-                NOTE: Your Discord account E-Mail address must be verified with Discord for this connection to work.
-            </div>
-            {/if}
-            {#if discordAccounts.length > 0}
-                <div class="m-4 flex items-center justify-center">
-                    <label class="flex items-center space-x-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            bind:checked={isOptedIn}
-                            on:change={() => handleOptInOut(isOptedIn)}
-                            class="form-checkbox h-5 w-5 text-blue-600"
-                        />
-                        <span class="text-gray-700 dark:text-gray-300">Opt in to receive Voi Notification E-mails</span>
-                    </label>
+            <a href="https://discord.com/channels/1055863853633785857/1278379464019152998"
+                target="_blank"
+                class="flex flex-col text-center space-y-1 text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-800 dark:hover:bg-blue-700 rounded-lg shadow-md p-3 mb-6 transition-colors">
+                <div class="text-xl font-semibold">
+                    Get the most from your Phase 2 Airdrop
                 </div>
-                {#if !isOptedIn}
-                    <div class="text-red-500 text-center">You are opted out of receiving Notification E-Mails.</div>
-                {/if}
-            {/if}
-        </div>
-
-        <div class="flex flex-col bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 {discordAccounts.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
-            <h2 class="text-2xl font-semibold mb-4">Voi Accounts</h2>
-            <div class="text-gray-600 dark:text-gray-400 mb-4">
-                Connect your Voi addresses here. Your accounts will be aggregated, and any rewards will be sent to the wallet designated as Primary.
-            </div>
-            {#if voiWallets.length > 0}
-                <ul class="space-y-2">
-                    {#each voiWallets as wallet (wallet.address)}
+                <div class="text-sm">
+                    After connecting your Discord account
+                </div>
+                <div class="flex text-2xl underline self-center items-center">
+                    Complete Human Verification!
+                    <InfoButton noAbsolute={true}>
+                        <div class="text-xs">
+                            While Human verification is not required to receive the Phase 2 Airdrop, doing so will provide a boost to your rewards.
+                        </div>
+                    </InfoButton>
+                </div>
+            </a>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6 dark:bg-gray-800">
+                <h2 class="text-2xl font-semibold mb-4">Discord Account</h2>
+                <div class="text-gray-600 dark:text-gray-400 mb-4">
+                    Connect one Discord Account. All Voi addresses will be linked under this account.
+                </div>
+                {#if discordAccounts.length > 0}
+                    <ul class="space-y-2">
+                        {#each discordAccounts as account (account.id)}
                         <li class="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                            <span>{wallet.address.slice(0, 12)}...{wallet.address.slice(-12)}</span>
-                            {#if wallet.is_primary}
-                                <span class="flex">
-                                    <div class="text-green-500">Primary</div>
-                                    <InfoButton noAbsolute={true}>
-                                        <div class="text-xs">
-                                            This wallet is set as your primary wallet. You can only have one primary wallet at a time. Your primary wallet will be used to receive rewards.
-                                        </div>
-                                    </InfoButton>
-                                </span>
-                            {:else}
-                                <span class="hidden text-blue-500 cursor-pointer" on:click={() => setPrimary(wallet.address)}>
-                                    <div>Set as Primary</div>
-                                </span>
-                            {/if}
+                            <span>{account.username}</span>
                             <button
-                            on:click={() => disconnectVoi(wallet.address)}
-                            class="hidden bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
+                            on:click={() => disconnectDiscord(account.id)}
+                            class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
                             >
-                                Disconnect
+                            Logout
                             </button>
                         </li>
-                    {/each}
-                </ul>
-            {:else}
-                <p class="text-gray-600 dark:text-gray-400">No Voi accounts connected.</p>
-            {/if}
-            <div class="mt-4 place-self-center">
-                <Web3Wallet 
-                    availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
-                    connectButtonType="static" modalType="modal"
-                    showAuthButtons={true}
-                    algodClient={algodClient}
-                    indexerClient={algodIndexer}
-                    wcProject={{
-                        projectId: wcProjectId,
-                        projectName: 'Voi Rewards Auditor',
-                        projectDescription: 'Voi Rewards Auditor',
-                        projectUrl: 'https://voirewards.com',
-                        projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
-                    }}
-                    walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"/>
+                        {/each}
+                    </ul>
+                {:else}
+                    <p class="text-gray-600 dark:text-gray-400">No Discord accounts connected.</p>
+                    <button
+                        on:click={connectDiscord}
+                        class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
+                    >
+                    Connect Discord Account
+                </button>
+                <div class="text-sm">
+                    NOTE: Your Discord account E-Mail address must be verified with Discord for this connection to work.
+                </div>
+                {/if}
+                {#if discordAccounts.length > 0}
+                    <div class="m-4 flex items-center justify-center">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                bind:checked={isOptedIn}
+                                on:change={() => handleOptInOut(isOptedIn)}
+                                class="form-checkbox h-5 w-5 text-blue-600"
+                            />
+                            <span class="text-gray-700 dark:text-gray-300">Opt in to receive Voi Notification E-mails</span>
+                        </label>
+                    </div>
+                    {#if !isOptedIn}
+                        <div class="text-red-500 text-center">You are opted out of receiving Notification E-Mails.</div>
+                    {/if}
+                {/if}
             </div>
-            <!--<button
-                on:click={connectVoi}
-                class="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 dark:hover:bg-green-700 transition-colors"
-                >
-                Connect Voi Wallet
-            </button>-->
+
+            <div class="flex flex-col bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 {discordAccounts.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
+                <h2 class="text-2xl font-semibold mb-4">Voi Accounts</h2>
+                <div class="text-gray-600 dark:text-gray-400 mb-4">
+                    Connect your Voi addresses here. Your accounts will be aggregated, and any rewards will be sent to the wallet designated as Primary.
+                </div>
+                {#if voiWallets.length > 0}
+                    <ul class="space-y-2">
+                        {#each voiWallets as wallet (wallet.address)}
+                            <li class="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded">
+                                <span>{wallet.address.slice(0, 12)}...{wallet.address.slice(-12)}</span>
+                                {#if wallet.is_primary}
+                                    <span class="flex">
+                                        <div class="text-green-500">Primary</div>
+                                        <InfoButton noAbsolute={true}>
+                                            <div class="text-xs">
+                                                This wallet is set as your primary wallet. You can only have one primary wallet at a time. Your primary wallet will be used to receive rewards.
+                                            </div>
+                                        </InfoButton>
+                                    </span>
+                                {:else}
+                                    <span class="hidden text-blue-500 cursor-pointer" on:click={() => setPrimary(wallet.address)}>
+                                        <div>Set as Primary</div>
+                                    </span>
+                                {/if}
+                                <button
+                                on:click={() => disconnectVoi(wallet.address)}
+                                class="hidden bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors"
+                                >
+                                    Disconnect
+                                </button>
+                            </li>
+                        {/each}
+                    </ul>
+                {:else}
+                    <p class="text-gray-600 dark:text-gray-400">No Voi accounts connected.</p>
+                {/if}
+                <div class="mt-4 place-self-center">
+                    <Web3Wallet 
+                        availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
+                        connectButtonType="static" modalType="modal"
+                        showAuthButtons={true}
+                        algodClient={algodClient}
+                        indexerClient={algodIndexer}
+                        wcProject={{
+                            projectId: wcProjectId,
+                            projectName: 'Voi Rewards Auditor',
+                            projectDescription: 'Voi Rewards Auditor',
+                            projectUrl: 'https://voirewards.com',
+                            projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
+                        }}
+                        walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"/>
+                </div>
+                <!--<button
+                    on:click={connectVoi}
+                    class="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 dark:hover:bg-green-700 transition-colors"
+                    >
+                    Connect Voi Wallet
+                </button>-->
+            </div>
         </div>
     </div>
 </div>
