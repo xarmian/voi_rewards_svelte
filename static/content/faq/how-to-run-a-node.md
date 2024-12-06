@@ -14,6 +14,10 @@ There are several ways to set up a Voi node:
   - [Voi Swarm Guide](https://voinetwork.github.io/voi-swarm)
   - For troubleshooting: [Voi Swarm Issues](https://github.com/VoiNetwork/voi-swarm/issues)
 
+- **FUNC (Recommended for Linux users)**: Funk's Ultimate Node Controller (FUNC)
+  - [FUNC Guide](https://github.com/GalaxyPay/func)
+  - [FUNC Release Notes](https://github.com/GalaxyPay/func/releases)
+
 - **Aust's One-Click Node (Recommended for Windows users)**: Easy setup for Windows.
   - [Aust's One-Click Node Guide](https://github.com/AustP/austs-one-click-node)
   - For troubleshooting: [A1CN Issues](https://github.com/AustP/austs-one-click-node/issues)

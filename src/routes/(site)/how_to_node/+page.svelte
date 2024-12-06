@@ -15,8 +15,8 @@
                 url: 'https://voinetwork.github.io/voi-swarm',
             },
             {
-                text: 'Video Guide to installing and managing a node with *PixelNode*',
-                url: 'https://www.youtube.com/watch?v=BbuViDosZbE',
+                text: 'Funk\'s Ultimate Node Controller (FUNC)',
+                url: 'https://github.com/GalaxyPay/func',
             },
             {
                 text: 'Guide to Setting up a *Participation Node* on Ubuntu by D13',
