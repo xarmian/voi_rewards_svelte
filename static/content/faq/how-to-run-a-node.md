@@ -10,11 +10,11 @@ Running a node on the Voi Network is an excellent way to participate in the netw
 
 There are several ways to set up a Voi node:
 
-- **Voi Swarm (Recommended for Linux users)**: A streamlined setup process for Linux.
+- **Voi Swarm (Recommended for Linux Server users)**: A streamlined setup process for Linux.
   - [Voi Swarm Guide](https://voinetwork.github.io/voi-swarm)
   - For troubleshooting: [Voi Swarm Issues](https://github.com/VoiNetwork/voi-swarm/issues)
 
-- **FUNC (Recommended for Linux users)**: Funk's Ultimate Node Controller (FUNC)
+- **FUNC (Recommended for Linux, Windows, and MacOS)**: Funk's Ultimate Node Controller (FUNC)
   - [FUNC Guide](https://github.com/GalaxyPay/func)
   - [FUNC Release Notes](https://github.com/GalaxyPay/func/releases)
 
