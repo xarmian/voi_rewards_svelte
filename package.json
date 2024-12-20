@@ -55,7 +55,7 @@
 		"@supabase/supabase-js": "^2.43.2",
 		"@vercel/analytics": "^1.1.1",
 		"algosdk": "^2.7.0",
-		"avm-wallet-svelte": "^0.6.0",
+		"avm-wallet-svelte": "^0.6.2",
 		"compare-versions": "^6.1.0",
 		"d3-scale": "github:d3/d3-scale",
 		"discord.js": "^14.15.3",
