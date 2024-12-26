@@ -264,157 +264,172 @@
     }
 </script>
 
-<div class="container mx-auto px-4 py-8 text-white">
-    <h1 class="text-3xl font-bold mb-6">Weekly Relay Statistics</h1>
+<div class="bg-blue-50 dark:bg-blue-900/80 min-h-screen">
+    <div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8 text-gray-900 dark:text-white">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Weekly Relay Statistics</h1>
 
-    <div class="mb-8 flex gap-4 items-center">
-        <select
-            class="bg-gray-700 text-white px-4 py-2 rounded-lg"
-            bind:value={selectedWeek}
-        >
-            {#each data.weeks as week}
-                <option value={week}>{week.label}</option>
-            {/each}
-        </select>
-
-        <input
-            type="text"
-            placeholder="Filter by hostname..."
-            class="bg-gray-700 text-white px-4 py-2 rounded-lg flex-grow"
-            bind:value={searchTerm}
-        />
-
-        {#if peerData.length > 0}
-            <button
-                on:click={downloadCsv}
-                class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        <!-- Mobile-friendly controls -->
+        <div class="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
+            <select
+                class="bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 w-full sm:w-auto"
+                bind:value={selectedWeek}
             >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
-                Download CSV
-            </button>
+                {#each data.weeks as week}
+                    <option value={week}>{week.label}</option>
+                {/each}
+            </select>
+
+            <div class="flex gap-2 sm:gap-4 flex-1">
+                <input
+                    type="text"
+                    placeholder="Filter by hostname..."
+                    class="bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 flex-1 dark:placeholder-gray-400 min-w-0"
+                    bind:value={searchTerm}
+                />
+
+                {#if peerData.length > 0}
+                    <button
+                        on:click={downloadCsv}
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        <span class="hidden sm:inline">Download CSV</span>
+                    </button>
+                {/if}
+            </div>
+        </div>
+
+        {#if weekStats}
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">Reward Pool</h3>
+                    <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{weekStats.rewardPool.toLocaleString()} VOI</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">Total Relays</h3>
+                    <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{weekStats.totalHosts}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">Avg Peers per Relay</h3>
+                    <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(weekStats.avgPeersPerHost)}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">Avg Reward per Relay</h3>
+                    <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(weekStats.avgRewardPerHost)} VOI</p>
+                </div>
+            </div>
+        {/if}
+
+        {#if error}
+            <div class="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-200 p-3 sm:p-4 rounded-lg mb-6 sm:mb-8 border border-red-200 dark:border-red-800 text-sm sm:text-base">
+                {error}
+            </div>
+        {/if}
+
+        {#if isLoading}
+            <div class="flex justify-center my-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+            </div>
+        {:else if filteredData.length}
+            <div class="overflow-x-auto -mx-2 sm:mx-0">
+                <div class="inline-block min-w-full align-middle">
+                    <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th 
+                                    class="sticky left-0 bg-gray-50 dark:bg-gray-700 px-3 sm:px-4 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm z-10"
+                                    on:click={() => handleSort('host_name')}
+                                >
+                                    Relay
+                                    {#if sortField === 'host_name'}
+                                        <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                                    {/if}
+                                </th>
+                                {#each dates as date}
+                                    <th 
+                                        class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap transition-colors text-xs sm:text-sm"
+                                        on:click={() => handleSort(`daily_${date}`)}
+                                    >
+                                        {formatDate(date)}
+                                        {#if sortField === `daily_${date}`}
+                                            <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                                        {/if}
+                                    </th>
+                                {/each}
+                                <th 
+                                    class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
+                                    on:click={() => handleSort('total_peers')}
+                                >
+                                    Total
+                                    {#if sortField === 'total_peers'}
+                                        <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                                    {/if}
+                                </th>
+                                <th 
+                                    class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
+                                    on:click={() => handleSort('percentage')}
+                                >
+                                    %
+                                    {#if sortField === 'percentage'}
+                                        <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                                    {/if}
+                                </th>
+                                <th 
+                                    class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
+                                    on:click={() => handleSort('reward')}
+                                >
+                                    Reward
+                                    {#if sortField === 'reward'}
+                                        <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                                    {/if}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            {#each filteredData as host}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                    <td class="sticky left-0 bg-white dark:bg-gray-800 px-3 sm:px-4 py-2 font-mono text-gray-900 dark:text-gray-200 text-xs sm:text-sm whitespace-nowrap">{host.host_name}</td>
+                                    {#each dates as date}
+                                        <td class="px-3 sm:px-4 py-2 text-center text-gray-700 dark:text-gray-300 text-xs sm:text-sm">
+                                            {host.daily_peers[date] ? formatNumber(host.daily_peers[date]) : '-'}
+                                        </td>
+                                    {/each}
+                                    <td class="px-3 sm:px-4 py-2 text-center font-medium text-gray-900 dark:text-gray-200 text-xs sm:text-sm">
+                                        {formatNumber(host.total_peers)}
+                                    </td>
+                                    <td class="px-3 sm:px-4 py-2 text-center text-gray-700 dark:text-gray-300 text-xs sm:text-sm">
+                                        {formatNumber(host.percentage)}%
+                                    </td>
+                                    <td class="px-3 sm:px-4 py-2 text-center text-gray-900 dark:text-gray-200 text-xs sm:text-sm">
+                                        {formatNumber(host.reward)}
+                                    </td>
+                                </tr>
+                            {/each}
+                            <tr class="bg-gray-50 dark:bg-gray-700/50 font-medium">
+                                <td class="sticky left-0 bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2 font-mono text-gray-900 dark:text-gray-200 text-xs sm:text-sm whitespace-nowrap">Total</td>
+                                {#each dates as date}
+                                    <td class="px-3 sm:px-4 py-2 text-center text-gray-900 dark:text-gray-200 text-xs sm:text-sm">
+                                        {Math.round(filteredData.reduce((sum, host) => sum + host.daily_peers[date], 0) || 0)}
+                                    </td>
+                                {/each}
+                                <td class="px-3 sm:px-4 py-2 text-center text-gray-900 dark:text-gray-200 text-xs sm:text-sm">
+                                    {Math.round(filteredData.reduce((sum, host) => sum + host.total_peers, 0))}
+                                </td>
+                                <td class="px-3 sm:px-4 py-2 text-center text-gray-900 dark:text-gray-200 text-xs sm:text-sm">
+                                    {Math.round(filteredData.reduce((sum, host) => sum + host.percentage, 0))}%
+                                </td>
+                                <td class="px-3 sm:px-4 py-2 text-center text-gray-900 dark:text-gray-200 text-xs sm:text-sm">
+                                    {Math.round(filteredData.reduce((sum, host) => sum + host.reward, 0) * 100) / 100}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {:else}
+            <p class="text-center text-gray-500 dark:text-gray-400 text-sm sm:text-base">No data available for the selected week.</p>
         {/if}
     </div>
-
-    {#if weekStats}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="bg-gray-800 rounded-lg p-4">
-                <h3 class="text-sm text-gray-400 mb-1">Reward Pool</h3>
-                <p class="text-2xl font-bold">{weekStats.rewardPool.toLocaleString()} VOI</p>
-            </div>
-            <div class="bg-gray-800 rounded-lg p-4">
-                <h3 class="text-sm text-gray-400 mb-1">Total Relays</h3>
-                <p class="text-2xl font-bold">{weekStats.totalHosts}</p>
-            </div>
-            <div class="bg-gray-800 rounded-lg p-4">
-                <h3 class="text-sm text-gray-400 mb-1">Avg Peers per Relay</h3>
-                <p class="text-2xl font-bold">{formatNumber(weekStats.avgPeersPerHost)}</p>
-            </div>
-            <div class="bg-gray-800 rounded-lg p-4">
-                <h3 class="text-sm text-gray-400 mb-1">Avg Reward per Relay</h3>
-                <p class="text-2xl font-bold">{formatNumber(weekStats.avgRewardPerHost)} VOI</p>
-            </div>
-        </div>
-    {/if}
-
-    {#if error}
-        <div class="bg-red-500 text-white p-4 rounded-lg mb-8">
-            {error}
-        </div>
-    {/if}
-
-    {#if isLoading}
-        <div class="flex justify-center my-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-        </div>
-    {:else if filteredData.length}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-gray-800 rounded-lg overflow-hidden">
-                <thead class="bg-gray-700">
-                    <tr>
-                        <th 
-                            class="px-4 py-2 text-left cursor-pointer hover:bg-gray-600"
-                            on:click={() => handleSort('host_name')}
-                        >
-                            Relay
-                            {#if sortField === 'host_name'}
-                                <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                            {/if}
-                        </th>
-                        {#each dates as date}
-                            <th 
-                                class="px-4 py-2 text-center cursor-pointer hover:bg-gray-600 whitespace-nowrap"
-                                on:click={() => handleSort(`daily_${date}`)}
-                            >
-                                {formatDate(date)}
-                                {#if sortField === `daily_${date}`}
-                                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                                {/if}
-                            </th>
-                        {/each}
-                        <th 
-                            class="px-4 py-2 text-center cursor-pointer hover:bg-gray-600"
-                            on:click={() => handleSort('total_peers')}
-                        >
-                            Total
-                            {#if sortField === 'total_peers'}
-                                <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                            {/if}
-                        </th>
-                        <th 
-                            class="px-4 py-2 text-center cursor-pointer hover:bg-gray-600"
-                            on:click={() => handleSort('percentage')}
-                        >
-                            %
-                            {#if sortField === 'percentage'}
-                                <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                            {/if}
-                        </th>
-                        <th 
-                            class="px-4 py-2 text-center cursor-pointer hover:bg-gray-600"
-                            on:click={() => handleSort('reward')}
-                        >
-                            Reward
-                            {#if sortField === 'reward'}
-                                <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                            {/if}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {#each filteredData as host}
-                        <tr class="border-t border-gray-700">
-                            <td class="px-4 py-2 font-mono">{host.host_name}</td>
-                            {#each dates as date}
-                                <td class="px-4 py-2 text-center">
-                                    {host.daily_peers[date] ? formatNumber(host.daily_peers[date]) : '-'}
-                                </td>
-                            {/each}
-                            <td class="px-4 py-2 text-center font-medium">
-                                {formatNumber(host.total_peers)}
-                            </td>
-                            <td class="px-4 py-2 text-center">
-                                {formatNumber(host.percentage)}%
-                            </td>
-                            <td class="px-4 py-2 text-center">
-                                {formatNumber(host.reward)}
-                            </td>
-                        </tr>
-                    {/each}
-                    <tr class="border-t border-gray-700">
-                        <td class="px-4 py-2 font-mono">Total</td>
-                        {#each dates as date}
-                            <td class="px-4 py-2 text-center">{Math.round(filteredData.reduce((sum, host) => sum + host.daily_peers[date], 0) || 0)}</td>
-                        {/each}
-                        <td class="px-4 py-2 text-center font-medium">{Math.round(filteredData.reduce((sum, host) => sum + host.total_peers, 0))}</td>
-                        <td class="px-4 py-2 text-center">{Math.round(filteredData.reduce((sum, host) => sum + host.percentage, 0))}%</td>
-                        <td class="px-4 py-2 text-center">{Math.round(filteredData.reduce((sum, host) => sum + host.reward, 0) * 100) / 100}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    {:else}
-        <p class="text-center text-gray-400">No data available for the selected week.</p>
-    {/if}
-</div> 
+</div>
