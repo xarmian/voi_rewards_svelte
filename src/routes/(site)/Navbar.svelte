@@ -1,10 +1,17 @@
 <script lang="ts">
-  import { Navbar, NavBrand, DarkMode } from 'flowbite-svelte';
+  import { Navbar, NavBrand, DarkMode, Avatar, Dropdown, DropdownItem, DropdownDivider } from 'flowbite-svelte';
   import Icon from '$lib/assets/android-chrome-192x192.png';
   import { page } from '$app/stores';
   import { slide } from 'svelte/transition';
+  import { onMount } from 'svelte';
   
   let isMenuOpen = false;
+  let isDark = false;
+  
+  onMount(() => {
+    isDark = document.documentElement.classList.contains('dark');
+  });
+  
   $: activeLink = $page.url.pathname;
   let touchStart = 0;
   let touchX = 0;
@@ -17,8 +24,7 @@
     { href: '/ecosystem', label: 'Ecosystem' },
     { href: '/faq', label: 'FAQ' },
     { href: '/what_is_voi', label: 'What is Voi?' },
-    { href: '/how_to_node', label: 'Run a Node' },
-    { href: '/wallet', label: 'Account' }
+    { href: '/how_to_node', label: 'Run a Node' }
   ];
 
   const isActiveLink = (href: string): boolean => {
@@ -88,7 +94,24 @@
         {label}
       </a>
     {/each}
-    <DarkMode />
+    
+    <!-- Account Menu -->
+    <div class="relative flex items-center gap-2">
+      <Avatar id="avatar-menu" src="https://api.dicebear.com/7.x/avataaars/svg?seed=voi" class="cursor-pointer" />
+      <Dropdown triggeredBy="#avatar-menu" class="w-48">
+        <DropdownItem href="/wallet#consensus">Consensus</DropdownItem>
+        <DropdownItem href="/wallet#proposals">Proposals</DropdownItem>
+        <DropdownItem href="/wallet#epochs">Epochs</DropdownItem>
+        <DropdownItem href="/wallet#calculator">Calculator</DropdownItem>
+        <DropdownDivider />
+        <div class="px-4 py-2">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-700 dark:text-gray-200">Dark Mode</span>
+            <DarkMode class="ml-3" />
+          </div>
+        </div>
+      </Dropdown>
+    </div>
   </div>
 
   <!-- Mobile Menu Button -->
@@ -148,8 +171,17 @@
           {label}
         </a>
       {/each}
-      <div class="pt-4">
-        <DarkMode />
+
+      <!-- Mobile Account Menu Items -->
+      <div class="border-t border-purple-400 pt-4">
+        <a href="/wallet" class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors">My Account</a>
+        <a href="/wallet/assets" class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors">Assets</a>
+        <a href="/wallet/transactions" class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors">Transactions</a>
+        <a href="/accounts" class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors">Link Accounts</a>
+        <div class="flex items-center justify-between py-2 px-4">
+          <span class="text-white text-lg">Dark Mode</span>
+          <DarkMode class="ml-3" />
+        </div>
       </div>
     </div>
   </div>

@@ -176,8 +176,65 @@ export async function getSupplyInfo(): Promise<SupplyInfo | null> {
     }
 }
 
-// NFDomains fetching with cache - now supports batch operations
 export async function getNFDomains(addresses: string[]): Promise<Record<string, NFDomainResponse | null>> {
+    if (!addresses.length) return {};
+
+    const domains = get(nfDomains);
+    const uncachedAddresses: string[] = [];
+    const results: Record<string, NFDomainResponse | null> = {};
+
+    addresses.forEach(address => {
+        if (address in domains) {
+            results[address] = domains[address];
+        } else {
+            uncachedAddresses.push(address);
+        }
+    });
+
+    if (uncachedAddresses.length > 0) {
+        const addressChunks = [];
+        const chunkSize = 10;
+        for (let i = 0; i < uncachedAddresses.length; i += chunkSize) {
+            addressChunks.push(uncachedAddresses.slice(i, i + chunkSize));
+        }
+
+        // Process all chunks concurrently
+        const chunkPromises = addressChunks.map(async (chunk) => {
+            const newDomains = await getEnvoi(chunk);
+            if (!newDomains.results) return;
+
+            newDomains.results.forEach((result: { address: string, name: string }) => {
+                if (result.address && result.name && result.name.length > 0) {
+                    results[result.address] = {
+                        name: result.name || result.address,
+                        properties: {
+                            address: result.address,
+                            caAlgo: result.address,
+                            verified: true
+                        }
+                    };
+                } else {
+                    results[result.address] = null;
+                }
+            });
+        });
+
+        // Wait for all chunks to complete
+        await Promise.all(chunkPromises);
+    }
+
+    return results;
+}
+
+async function getEnvoi(addresses: string[]): Promise<{ results: { address: string, name: string }[] }> {
+    const url = `https://api.envoi.sh/api/name/${addresses.join(',')}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+}
+
+// NFDomains fetching with cache - now supports batch operations
+export async function getNFDomainsx(addresses: string[]): Promise<Record<string, NFDomainResponse | null>> {
     if (!addresses.length) return {};
     
     const domains = get(nfDomains);
@@ -232,6 +289,8 @@ export async function getNFDomains(addresses: string[]): Promise<Record<string, 
             console.error('Error fetching NFDomains:', error);
         }
     }
+
+    console.log(results);
 
     return results;
 }

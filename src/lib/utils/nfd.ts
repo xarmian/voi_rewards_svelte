@@ -1,79 +1,36 @@
-import { writable, get } from "svelte/store";
-
-interface NFDCache {
-    [key: string]: {
-        addresses: string[];
-        timestamp: number;
-    };
-}
-
-interface AddressCache {
-    [address: string]: {
-        name: string;
-        timestamp: number;
-    };
-}
-
-// Cache expiration time (24 hours in milliseconds)
-const CACHE_EXPIRATION = 24 * 60 * 60 * 1000;
-
-export const nfdData = writable<{
-    nfdCache: NFDCache;
-    addressCache: AddressCache;
-}>({
-    nfdCache: {},
-    addressCache: {}
-});
-
 export async function getAddressesForNFD(nfdName: string): Promise<string[]> {
-    const store = get(nfdData);
-    const normalizedName = nfdName.toLowerCase();
-    const now = Date.now();
-
-    // Check cache first
-    if (store.nfdCache[normalizedName] && 
-        (now - store.nfdCache[normalizedName].timestamp) < CACHE_EXPIRATION) {
-        return store.nfdCache[normalizedName].addresses;
-    }
-
     // Define the API endpoint
-    const url = `https://api.nf.domains/nfd/${normalizedName}?view=brief&poll=false&nocache=false`;
+    const url = `https://api.nf.domains/nfd/${nfdName.toLocaleLowerCase()}?view=brief&poll=false&nocache=false`;
 
     try {
+        // Make a GET request to the API
         const response = await fetch(url);
 
         if (!response.ok) {
+            // If response is not OK, throw an error
             const errorData = await response.json();
             throw new Error(errorData.message || 'An error occurred while fetching data');
         }
 
+        // Parse the JSON response
         const data = await response.json();
-        let addresses: string[] = [];
 
-        if (data.caAlgo || data.unverifiedCaAlgo) {
-            addresses = Array.from(new Set([
-                ...(data.caAlgo || []),
-                ...(data.unverifiedCaAlgo || [])
-            ]));
-
-            // Update cache
-            nfdData.update(store => ({
-                ...store,
-                nfdCache: {
-                    ...store.nfdCache,
-                    [normalizedName]: {
-                        addresses,
-                        timestamp: now
-                    }
-                }
-            }));
+        // merge data.caAlgo and data.unverifiedCaAlgo arrays, but one or both may be undefined
+        if (!data.caAlgo && !data.unverifiedCaAlgo) {
+            return [];
+        } else if (!data.caAlgo) {
+            return data.unverifiedCaAlgo;
+        } else if (!data.unverifiedCaAlgo) {
+            return data.caAlgo;
         }
-
-        return addresses;
+        else {
+            return Array.from(new Set(data.caAlgo.concat(data.unverifiedCaAlgo)));        
+        }
     } catch (error) {
+        // Handle errors (e.g., NFD not found, API issues)
         console.error(`Error: ${(error as Error).message}`);
-        return [];
     }
+    return [];
 }
 
 interface NFDomainResult {
@@ -87,33 +44,12 @@ interface NFDomainApiResponse {
 }
 
 export async function getNFD(addresses: string[]): Promise<NFDomainResult[]> {
-    const store = get(nfdData);
-    const now = Date.now();
     const aggregatedNFDs: NFDomainResult[] = [];
-    const addressesToFetch: string[] = [];
-
-    // Check cache first
-    addresses.forEach(address => {
-        const cachedData = store.addressCache[address];
-        if (cachedData && (now - cachedData.timestamp) < CACHE_EXPIRATION) {
-            aggregatedNFDs.push({
-                key: address,
-                replacementValue: cachedData.name
-            });
-        } else {
-            addressesToFetch.push(address);
-        }
-    });
-
-    if (addressesToFetch.length === 0) {
-        return aggregatedNFDs;
-    }
-
     const addressChunks = [];
     const chunkSize = 20;
 
-    for (let i = 0; i < addressesToFetch.length; i += chunkSize) {
-        addressChunks.push(addressesToFetch.slice(i, i + chunkSize));
+    for (let i = 0; i < addresses.length; i += chunkSize) {
+        addressChunks.push(addresses.slice(i, i + chunkSize));
     }
 
     const allFetches = addressChunks.map((addressChunk) => {
@@ -132,8 +68,6 @@ export async function getNFD(addresses: string[]): Promise<NFDomainResult[]> {
         return fetch(url)
             .then(response => response.json())
             .then(additionalData => {
-                const newCacheEntries: AddressCache = {};
-
                 Object.entries(additionalData).forEach((val) => {
                     const [key, value] = val;
                     const domainData = value as NFDomainApiResponse;
@@ -143,27 +77,11 @@ export async function getNFD(addresses: string[]): Promise<NFDomainResult[]> {
                             key,
                             replacementValue: domainData.name
                         });
-
-                        // Prepare cache entry
-                        newCacheEntries[key] = {
-                            name: domainData.name,
-                            timestamp: now
-                        };
                     }
                 });
-
-                // Update cache with new entries
-                if (Object.keys(newCacheEntries).length > 0) {
-                    nfdData.update(store => ({
-                        ...store,
-                        addressCache: {
-                            ...store.addressCache,
-                            ...newCacheEntries
-                        }
-                    }));
-                }
             })
             .catch(() => {
+                // console.error("Error fetching nfd data:", error);
                 return [];
             });
     });
