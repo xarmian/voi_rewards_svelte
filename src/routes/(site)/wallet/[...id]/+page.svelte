@@ -18,6 +18,7 @@
     import { copy } from 'svelte-copy';
     import { toast } from '@zerodevx/svelte-toast';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
+    import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
     
     export let data: {
         walletId: string;
@@ -38,6 +39,7 @@
       { id: 'proposals', name: 'Proposals', icon: 'fas fa-chart-line' },
       { id: 'epochs', name: 'Epochs', icon: 'fas fa-calendar-alt' },
       { id: 'calculator', name: 'Calculator', icon: 'fas fa-calculator' },
+      //{ id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
       //{ id: 'preferences', name: 'Preferences', icon: 'fas fa-cog' },
       //{ id: 'billing', name: 'Billing Information', icon: 'fas fa-cog' }
     ];
@@ -621,6 +623,8 @@
                     <CalculatorComponent walletAddress={walletId} />
                 {:else if activeSection === 'epochs'}
                     <EpochComponent walletAddress={walletId} />
+                {:else if activeSection === 'portfolio'}
+                    <PortfolioComponent walletAddress={walletId} />
                 {/if}
             {:else}
                 {#if activeSection === 'calculator'}

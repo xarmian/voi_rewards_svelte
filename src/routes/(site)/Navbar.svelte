@@ -1,10 +1,17 @@
 <script lang="ts">
-  import { Navbar, NavBrand, DarkMode } from 'flowbite-svelte';
+  import { Navbar, NavBrand, DarkMode, Avatar, Dropdown, DropdownItem, DropdownDivider } from 'flowbite-svelte';
   import Icon from '$lib/assets/android-chrome-192x192.png';
   import { page } from '$app/stores';
   import { slide } from 'svelte/transition';
+  import { onMount } from 'svelte';
   
   let isMenuOpen = false;
+  let isDark = false;
+  
+  onMount(() => {
+    isDark = document.documentElement.classList.contains('dark');
+  });
+  
   $: activeLink = $page.url.pathname;
   let touchStart = 0;
   let touchX = 0;
@@ -14,11 +21,18 @@
   
   const navItems = [
     { href: '/', label: 'Home' },
-    { href: '/ecosystem', label: 'Ecosystem' },
+    { href: '/directory', label: 'Directory' },
     { href: '/faq', label: 'FAQ' },
     { href: '/what_is_voi', label: 'What is Voi?' },
     { href: '/how_to_node', label: 'Run a Node' },
-    { href: '/wallet', label: 'Account' }
+    { href: 'https://ecosystem.voi.network', label: 'Ecosystem', external: true }
+  ];
+
+  const dropdownItems = [
+    { href: '/wallet#consensus', label: 'Consensus', icon: 'fas fa-hexagon-nodes' },
+    { href: '/wallet#proposals', label: 'Proposals', icon: 'fas fa-chart-line' },
+    { href: '/wallet#epochs', label: 'Epochs', icon: 'fas fa-calendar-alt' },
+    { href: '/wallet#calculator', label: 'Calculator', icon: 'fas fa-calculator' }
   ];
 
   const isActiveLink = (href: string): boolean => {
@@ -68,6 +82,22 @@
   const closeMenu = () => {
     isMenuOpen = false;
   };
+
+  let dropdownInstance: any;
+  
+  const closeDropdown = () => {
+    dropdownInstance?.hide();
+  };
+
+  const handleItemClick = (href: string) => {
+    // Find and click the avatar to close the dropdown
+    const avatar = document.getElementById('avatar-menu');
+    avatar?.click();
+    // Navigate after a small delay to ensure dropdown closes
+    setTimeout(() => {
+      window.location.href = href;
+    }, 100);
+  };
 </script>
 
 <Navbar fluid={true} class="!bg-[rgb(111,42,226)] text-white dark:text-gray-100">
@@ -78,17 +108,47 @@
   
   <!-- Desktop Navigation -->
   <div class="hidden sm:flex flex-row items-center ml-auto gap-2 mr-4">
-    {#each navItems as {href, label}}
+    {#each navItems as {href, label, external}}
       <a 
         {href} 
-        class="text-lg navButton" 
-        class:selected={activeLink ? isActiveLink(href) : false} 
+        class="text-lg navButton flex items-center" 
+        class:selected={activeLink ? isActiveLink(href) : false}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noopener noreferrer' : undefined}
         on:click={() => activeLink = href}
       >
         {label}
+        {#if external}
+          <span class="ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </span>
+        {/if}
       </a>
     {/each}
-    <DarkMode />
+    
+    <!-- Account Menu -->
+    <div class="relative flex items-center gap-2">
+      <button id="avatar-menu" class="w-10 h-10 flex items-center justify-center bg-[#d0bff2] text-black hover:bg-white transition-colors rounded-full">
+        <i class="fas fa-wallet text-lg"></i>
+      </button>
+      <Dropdown triggeredBy="#avatar-menu" class="w-48">
+        {#each dropdownItems as item}
+          <DropdownItem on:click={() => handleItemClick(item.href)}>
+            <i class="{item.icon} mr-2"></i>
+            {item.label}
+          </DropdownItem>
+        {/each}
+        <DropdownDivider />
+        <div class="px-4 py-2">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-700 dark:text-gray-200">Dark Mode</span>
+            <DarkMode class="ml-3" />
+          </div>
+        </div>
+      </Dropdown>
+    </div>
   </div>
 
   <!-- Mobile Menu Button -->
@@ -135,21 +195,52 @@
         Swipe right to close
       </div>
       
-      {#each navItems as {href, label}}
+      {#each navItems as {href, label, external}}
         <a
           {href}
-          class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors"
+          class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors flex items-center"
           class:selected={activeLink ? isActiveLink(href) : false}
+          target={external ? '_blank' : undefined}
+          rel={external ? 'noopener noreferrer' : undefined}
           on:click={() => {
             activeLink = href;
             closeMenu();
           }}
         >
           {label}
+          {#if external}
+            <span class="ml-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </span>
+          {/if}
         </a>
       {/each}
-      <div class="pt-4">
-        <DarkMode />
+
+      <!-- Mobile Wallet Menu Items -->
+      <div class="border-t border-purple-400 pt-4">
+        <div class="text-white/70 text-sm font-medium px-4 mb-2">Wallet Options</div>
+        {#each dropdownItems as item}
+          <a
+            href={item.href}
+            class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors flex items-center"
+            on:click={() => {
+              closeMenu();
+            }}
+          >
+            <i class="{item.icon} mr-2"></i>
+            {item.label}
+          </a>
+        {/each}
+      </div>
+
+      <!-- Dark Mode Toggle -->
+      <div class="border-t border-purple-400 pt-4">
+        <div class="flex items-center justify-between px-4 py-2">
+          <span class="text-white text-lg">Dark Mode</span>
+          <DarkMode class="ml-3" />
+        </div>
       </div>
     </div>
   </div>

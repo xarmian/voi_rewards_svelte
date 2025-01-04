@@ -204,6 +204,16 @@
       const index = (currentPage - 1) * itemsPerPage + expandedRow;
       updateSelectedBalance(index);
     }
+
+    // get page of items
+    //const pageOfItems = filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    //const allAddresses = pageOfItems.map((item: any) => item.proposer);
+    /*(async () => {
+      const nfdData = await getNFDomains(allAddresses);
+      pageOfItems.forEach((item: any) => {
+        item.nfd = nfdData[item.proposer]?.name;
+      });
+    })();*/
   }
 
   let columns: any = [
@@ -250,9 +260,9 @@
                     <button 
                       class="md:ml-4" 
                       on:click|stopPropagation 
-                      aria-label="Show NFD"
+                      aria-label="Show ENS"
                     >
-                      <Toggle bind:checked={showWalletNFD}>NFD</Toggle>
+                      <Toggle bind:checked={showWalletNFD}>enVoi</Toggle>
                     </button>
                   {:else}
                     {column.desc}
@@ -412,9 +422,9 @@
 
                   {#if item.nfd}
                     <div>
-                      <Label defaultClass="text-sm font-medium inline-block w-40">NFD:</Label>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">ENS:</Label>
                       <a 
-                        href="https://app.nf.domains/name/{item.nfd}" 
+                        href="https://app.envoi.sh/#/{item.nfd}" 
                         target="_blank" 
                         class="text-blue-500 hover:text-blue-700 hover:underline"
                         on:click|stopPropagation
