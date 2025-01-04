@@ -193,7 +193,7 @@ export async function getNFDomains(addresses: string[]): Promise<Record<string, 
 
     if (uncachedAddresses.length > 0) {
         const addressChunks = [];
-        const chunkSize = 10;
+        const chunkSize = 50;
         for (let i = 0; i < uncachedAddresses.length; i += chunkSize) {
             addressChunks.push(uncachedAddresses.slice(i, i + chunkSize));
         }
@@ -204,17 +204,34 @@ export async function getNFDomains(addresses: string[]): Promise<Record<string, 
             if (!newDomains.results) return;
 
             newDomains.results.forEach((result: { address: string, name: string }) => {
-                if (result.address && result.name && result.name.length > 0) {
-                    results[result.address] = {
-                        name: result.name || result.address,
+                const domainData = result.address && result.name && result.name.length > 0
+                    ? {
+                        name: result.name,
                         properties: {
                             address: result.address,
                             caAlgo: result.address,
                             verified: true
                         }
-                    };
-                } else {
-                    results[result.address] = null;
+                    }
+                    : null;
+
+                results[result.address] = domainData;
+                
+                // Update the nfDomains store for each new result
+                nfDomains.update(current => ({
+                    ...current,
+                    [result.address]: domainData
+                }));
+            });
+
+            // Cache null results for addresses that didn't return a domain
+            chunk.forEach(address => {
+                if (!(address in results)) {
+                    results[address] = null;
+                    nfDomains.update(current => ({
+                        ...current,
+                        [address]: null
+                    }));
                 }
             });
         });

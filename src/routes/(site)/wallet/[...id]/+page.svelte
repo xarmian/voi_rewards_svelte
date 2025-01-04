@@ -39,7 +39,7 @@
       { id: 'proposals', name: 'Proposals', icon: 'fas fa-chart-line' },
       { id: 'epochs', name: 'Epochs', icon: 'fas fa-calendar-alt' },
       { id: 'calculator', name: 'Calculator', icon: 'fas fa-calculator' },
-      { id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
+      //{ id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
       //{ id: 'preferences', name: 'Preferences', icon: 'fas fa-cog' },
       //{ id: 'billing', name: 'Billing Information', icon: 'fas fa-cog' }
     ];

@@ -2,6 +2,8 @@
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { config } from '../config';
+  import { getNFDomains } from '$lib/stores/accounts';
+  import type { NFDomainResponse } from '$lib/stores/accounts';
   const dispatch = createEventDispatcher();
 
   interface Proposer {
@@ -9,6 +11,7 @@
     timestamp: string;
     block: number;
     votes: number;
+    nfd?: string;
   }
 
   export let ballasts: string[] = [];
@@ -16,6 +19,7 @@
   let intervalId: NodeJS.Timeout;
   let isLoaded = false;
   let processedBlocks = new Set<number>();
+  let nfdData: Record<string, NFDomainResponse | null> = {};
 
   async function fetchRecentProposers() {
     try {
@@ -28,6 +32,16 @@
         block: p.block,
         votes: p.votes
       }));
+
+      // Fetch NFDomains for new proposers
+      const addresses = newProposers.map((p: Proposer) => p.address);
+      const newNfdData = await getNFDomains(addresses);
+      nfdData = { ...nfdData, ...newNfdData };
+
+      // Add NFD names to proposers
+      newProposers.forEach((p: Proposer) => {
+        p.nfd = nfdData[p.address]?.name;
+      });
 
       // Count new non-Ballast blocks that haven't been processed before
       const newNonBallastBlocks = newProposers.filter((p: Proposer) => 
@@ -78,7 +92,11 @@
           class="flex flex-row justify-between text-gray-700 dark:text-gray-300"
         >
           <a class="text-sm md:col-span-1 block hover:underline" href={`/wallet/${proposer.address}`}>
-            {proposer.address.slice(0, 8)}...{proposer.address.slice(-8)}
+            {#if proposer.nfd}
+              {proposer.nfd}
+            {:else}
+              {proposer.address.slice(0, 8)}...{proposer.address.slice(-8)}
+            {/if}
           </a>
           <a class="text-sm text-gray-500 dark:text-gray-400 hover:underline" href={`https://explorer.voi.network/explorer/block/${proposer.block}`} target="_blank">{proposer.block}</a>
         </li>

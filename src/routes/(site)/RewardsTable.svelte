@@ -80,8 +80,8 @@
   onMount(async () => {
     lastUpdateTime = new Date();
     // convert to NFDs
-    //const allAddresses = items.map((row: any) => row.proposer);
-    //nfdData = await getNFDomains(allAddresses);
+    const allAddresses = items.map((row: any) => row.proposer);
+    nfdData = await getNFDomains(allAddresses);
   });
 
   $: unsubRewardParams = rewardParams.subscribe(async (value) => {
@@ -206,14 +206,14 @@
     }
 
     // get page of items
-    const pageOfItems = filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const allAddresses = pageOfItems.map((item: any) => item.proposer);
-    (async () => {
+    //const pageOfItems = filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    //const allAddresses = pageOfItems.map((item: any) => item.proposer);
+    /*(async () => {
       const nfdData = await getNFDomains(allAddresses);
       pageOfItems.forEach((item: any) => {
         item.nfd = nfdData[item.proposer]?.name;
       });
-    })();
+    })();*/
   }
 
   let columns: any = [
