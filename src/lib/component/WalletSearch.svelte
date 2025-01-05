@@ -184,9 +184,24 @@
                         <button class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => handleSubmit(result)}>
-                            <div class="flex flex-col">
-                                <span class="text-lg font-medium truncate">{result.name}</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400 font-mono truncate">{result.address}</span>
+                            <div class="flex items-center gap-3">
+                                {#if result.metadata?.avatar}
+                                    <img 
+                                        src={result.metadata.avatar} 
+                                        alt={`${result.name} avatar`}
+                                        class="w-8 h-8 rounded-full object-cover"
+                                    />
+                                {:else}
+                                    <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                        <span class="text-gray-600 dark:text-gray-300 text-sm">
+                                            {result.name.charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                {/if}
+                                <div class="flex flex-col">
+                                    <span class="text-lg font-medium truncate">{result.name}</span>
+                                    <span class="text-sm text-gray-500 dark:text-gray-400 font-mono truncate">{result.address}</span>
+                                </div>
                             </div>
                         </button>
                     </li>

@@ -1,6 +1,14 @@
 interface EnvoiNameResult {
     address: string;
     name: string;
+    metadata: {
+        url?: string;
+        avatar?: string;
+        location?: string;
+        'com.twitter'?: string;
+        'com.github'?: string;
+        [key: string]: string | undefined;
+    };
     cached: boolean;
 }
 
@@ -29,6 +37,7 @@ export async function getEnvoiNames(addresses: string[]): Promise<EnvoiNameResul
                         aggregatedNames.push({
                             address: result.address,
                             name: result.name,
+                            metadata: result.metadata,
                             cached: result.cached
                         });
                     }
@@ -76,6 +85,14 @@ export interface EnvoiSearchResult {
     address: string;
     name: string;
     cached: boolean;
+    metadata: {
+        url?: string;
+        avatar?: string;
+        location?: string;
+        'com.twitter'?: string;
+        'com.github'?: string;
+        [key: string]: string | undefined;
+    };
 }
 
 export async function searchEnvoi(pattern: string): Promise<EnvoiSearchResult[]> {
