@@ -177,16 +177,16 @@
 
     {#if addressList.length > 0 && searchText.length > 0}
     <div class="absolute z-50 mt-2 w-full">
-        <div class="bg-white dark:bg-gray-800 overflow-hidden max-h-64 rounded-lg shadow-lg">
-            <ul class="inline-block text-left w-full">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-64">
+            <ul class="overflow-y-auto max-h-64 w-full">
                 {#each addressList as result, index}
                     <li>
                         <button class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => handleSubmit(result)}>
                             <div class="flex flex-col">
-                                <span class="text-lg font-medium">{result.name}</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400 font-mono">{result.address}</span>
+                                <span class="text-lg font-medium truncate">{result.name}</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400 font-mono truncate">{result.address}</span>
                             </div>
                         </button>
                     </li>
@@ -199,11 +199,28 @@
 <style lang="postcss">
     ul {
         @apply bg-white dark:bg-gray-800;
-        z-index:1;
+        scrollbar-width: thin;
+        scrollbar-color: theme('colors.gray.400') theme('colors.gray.200');
+    }
+
+    ul::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ul::-webkit-scrollbar-track {
+        @apply bg-gray-200 dark:bg-gray-700 rounded-r-lg;
+    }
+
+    ul::-webkit-scrollbar-thumb {
+        @apply bg-gray-400 dark:bg-gray-500 rounded-full;
     }
 
     li {
         @apply border-b border-gray-200 dark:border-gray-700;
+    }
+
+    li:last-child {
+        @apply border-b-0;
     }
 
     button {
