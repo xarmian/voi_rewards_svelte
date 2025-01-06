@@ -98,6 +98,17 @@
       window.location.href = href;
     }, 100);
   };
+
+  function handleDarkModeChange(e: CustomEvent) {
+    const isDark = e.detail;
+    if (isDark) {
+      localStorage.setItem('color-theme', 'dark');
+      document.documentElement.classList.add('dark');
+    } else {
+      localStorage.setItem('color-theme', 'light');
+      document.documentElement.classList.remove('dark');
+    }
+  }
 </script>
 
 <Navbar fluid={true} class="!bg-[rgb(111,42,226)] text-white dark:text-gray-100">
@@ -144,7 +155,7 @@
         <div class="px-4 py-2">
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-700 dark:text-gray-200">Dark Mode</span>
-            <DarkMode class="ml-3" />
+            <DarkMode class="ml-3" on:change={handleDarkModeChange} />
           </div>
         </div>
       </Dropdown>
@@ -239,7 +250,7 @@
       <div class="border-t border-purple-400 pt-4">
         <div class="flex items-center justify-between px-4 py-2">
           <span class="text-white text-lg">Dark Mode</span>
-          <DarkMode class="ml-3" />
+          <DarkMode class="ml-3" on:change={handleDarkModeChange} />
         </div>
       </div>
     </div>

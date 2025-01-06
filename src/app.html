@@ -14,6 +14,15 @@
 	</body>
 	<script async src="https://www.googletagmanager.com/gtag/js?id=G-NDX21XVC4G"></script>
 	<script>
+		// Check for dark mode preference
+		if (localStorage.getItem('color-theme') === 'dark' || 
+			(!localStorage.getItem('color-theme') && 
+			window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+		document.documentElement.classList.add('dark');
+		} else {
+		document.documentElement.classList.remove('dark');
+		}
+
 		window.dataLayer = window.dataLayer || [];
 		function gtag(){dataLayer.push(arguments);}
 		gtag('js', new Date());
