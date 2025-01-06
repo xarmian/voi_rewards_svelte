@@ -141,7 +141,7 @@
     
     <!-- Account Menu -->
     <div class="relative flex items-center gap-2">
-      <button id="avatar-menu" class="w-10 h-10 flex items-center justify-center bg-[#d0bff2] text-black hover:bg-white transition-colors rounded-full">
+      <button id="avatar-menu" class="w-10 h-10 flex items-center justify-center bg-[#d0bff2] text-black hover:bg-white transition-colors rounded-full" aria-label="Open Account Menu">
         <i class="fas fa-wallet text-lg"></i>
       </button>
       <Dropdown triggeredBy="#avatar-menu" class="w-48">
