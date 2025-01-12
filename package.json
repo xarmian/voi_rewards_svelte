@@ -50,11 +50,12 @@
 	"type": "module",
 	"dependencies": {
 		"@fortawesome/fontawesome-free": "^6.7.0",
+		"@pactfi/pactsdk": "^0.8.1",
 		"@supabase/auth-helpers-sveltekit": "^0.13.0",
 		"@supabase/ssr": "^0.4.0",
 		"@supabase/supabase-js": "^2.43.2",
 		"@vercel/analytics": "^1.1.1",
-		"algosdk": "^2.7.0",
+		"algosdk": "^2.9.0",
 		"avm-wallet-svelte": "^0.6.2",
 		"compare-versions": "^6.1.0",
 		"d3-scale": "github:d3/d3-scale",

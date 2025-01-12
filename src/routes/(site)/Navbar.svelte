@@ -25,6 +25,7 @@
     { href: '/faq', label: 'FAQ' },
     { href: '/what_is_voi', label: 'What is Voi?' },
     { href: '/how_to_node', label: 'Run a Node' },
+    { href: '/markets', label: 'Markets' },
     { href: 'https://ecosystem.voi.network', label: 'Ecosystem', external: true }
   ];
 
