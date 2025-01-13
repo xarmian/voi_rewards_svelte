@@ -19,6 +19,7 @@
     import { toast } from '@zerodevx/svelte-toast';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
+    import { voiPrice } from '$lib/stores/price';
     
     export let data: {
         walletId: string;
@@ -620,7 +621,7 @@
                     <ProposalsComponent walletId={walletId} />
                 {:else if activeSection === 'calculator'}
                     <h2 class="text-xl md:text-2xl font-bold mb-4">Calculator</h2>
-                    <CalculatorComponent walletAddress={walletId} />
+                    <CalculatorComponent walletAddress={walletId} childAccounts={childAccounts} primaryAccountInfo={primaryAccountInfo} />
                 {:else if activeSection === 'epochs'}
                     <EpochComponent walletAddress={walletId} />
                 {:else if activeSection === 'portfolio'}

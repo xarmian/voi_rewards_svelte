@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Card, Tooltip } from 'flowbite-svelte';
     import type { PageData } from './$types';
+    import { updateVoiPrice } from '$lib/stores/price';
   
     export let data: PageData;
   
@@ -80,7 +81,9 @@
             0
         );
 
-        return totalVolume > 0 ? totalWeightedPrice / totalVolume : 0;
+        const price = totalVolume > 0 ? totalWeightedPrice / totalVolume : 0;
+        updateVoiPrice(price);
+        return price;
     })();
 
     // Calculate market caps
