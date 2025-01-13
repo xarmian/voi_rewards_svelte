@@ -94,7 +94,7 @@
   
       <!-- Token Overview Section -->
       <div class="mb-8">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card class="bg-white dark:bg-gray-800">
             <div class="text-center">
               <div class="relative inline-block">
@@ -120,7 +120,7 @@
                     <i class="fas fa-info-circle text-gray-400"></i>
                   </span>
                 </h3>
-                <Tooltip>Combined 24h trading volume from MEXC and Tinyman</Tooltip>
+                <Tooltip>Combined 24h trading volume across all exchanges</Tooltip>
               </div>
               <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {formatCurrency(aggregates.totalVolume)}
@@ -136,11 +136,27 @@
                     <i class="fas fa-info-circle text-gray-400"></i>
                   </span>
                 </h3>
-                <Tooltip>Total Value Locked across all markets</Tooltip>
+                <Tooltip>Total Value Locked across supported pools and exchanges</Tooltip>
               </div>
               <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {formatCurrency(aggregates.totalTVL)}
               </p>
+            </div>
+          </Card>
+          <Card class="bg-white dark:bg-gray-800">
+            <div class="text-center">
+                <div class="relative inline-block">
+                    <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white inline-flex items-center">
+                        Fully Diluted Market Cap
+                        <span class="ml-1 cursor-help">
+                            <i class="fas fa-info-circle text-gray-400"></i>
+                        </span>
+                    </h3>
+                    <Tooltip>Total market cap if all tokens were fully diluted</Tooltip>
+                </div>
+                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {formatCurrency(weightedAveragePrice * 10_000_000_000)}
+                </p>
             </div>
           </Card>
         </div>
