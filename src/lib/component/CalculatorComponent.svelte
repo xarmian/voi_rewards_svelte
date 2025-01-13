@@ -9,9 +9,11 @@
 
     export let walletAddress: string | undefined = undefined;
     export let childAccounts: any[] = [];
-    export let primaryAccountInfo: any;
+    export let primaryAccountInfo: any | undefined = undefined;
     
     let nodeCost = 15; // Default $15/month
+    let isPercentageBased = false; // Default to fixed cost
+    let costPercentage = 10; // Default 10% of rewards
     let calculationAmount = 0; // Amount to use for calculations
     let walletBalance = 0; // Keep track of actual wallet balance
     let profitabilityThreshold = 0; // Amount needed to break even
@@ -93,7 +95,9 @@
     let tooltipVisible = {
         totalStake: false,
         breakEven: false,
-        annualReturns: false
+        annualReturns: false,
+        fixedAmount: false,
+        percentage: false
     };
 
     function showTooltip(key: keyof typeof tooltipVisible) {
@@ -280,47 +284,6 @@
             return;
         }
 
-        // Calculate profitability threshold
-        let testAmount = 1000; // Start with 1000 VOI
-        let monthlyRevenueAtTest = 0;
-        
-        // Binary search for threshold
-        let min = 0;
-        let max = 10_000_000; // 10M VOI as upper limit
-        let iterations = 0;
-        const maxIterations = 20; // Prevent infinite loops
-        
-        while (min <= max && iterations < maxIterations) {
-            testAmount = Math.floor((min + max) / 2);
-            let testShareOfStake = testAmount / (rewardStake / 1e6);
-            
-            // Calculate monthly rewards at test amount
-            let testMonthlyReward = 0;
-            const monthlyEpochs = 30.44 / 7;
-            
-            for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
-                testMonthlyReward += testShareOfStake * epochRewards[i];
-            }
-            
-            monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
-            
-            // Ensure we're slightly above the node cost
-            const targetRevenue = nodeCost * 1.01; // Target 1% above node cost
-            
-            if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
-                break;
-            } else if (monthlyRevenueAtTest < targetRevenue) {
-                min = testAmount + 1;
-            } else {
-                max = testAmount - 1;
-            }
-            
-            iterations++;
-        }
-        
-        // Round up to the nearest 100 VOI for a safety margin
-        profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
-
         // Calculate with 1 VOI if balance is 0 to show potential rates
         const calculationBalance = totalBalance > 0 ? totalBalance : 1;
         
@@ -360,8 +323,14 @@
                 monthlyReward += epochReward;
             }
             monthlyRewardUSD = monthlyReward * effectivePrice;
-            monthlyProfit = monthlyRewardUSD - nodeCost;
-            monthlyProfitPercentage = (monthlyProfit / nodeCost) * 100;
+            
+            // Calculate node cost based on type
+            const effectiveNodeCost = isPercentageBased ? 
+                (monthlyRewardUSD * (costPercentage / 100)) : 
+                nodeCost;
+            
+            monthlyProfit = monthlyRewardUSD - effectiveNodeCost;
+            monthlyProfitPercentage = (monthlyProfit / effectiveNodeCost) * 100;
 
             // Yearly reward with compound interest
             yearlyReward = 0;
@@ -374,10 +343,54 @@
                 currentShareOfStake = actualBalance / (rewardStake / 1e6);
             }
             yearlyRewardUSD = yearlyReward * effectivePrice;
-            yearlyProfit = yearlyRewardUSD - (nodeCost * 12);
-            yearlyProfitPercentage = (yearlyProfit / (nodeCost * 12)) * 100;
+            const yearlyNodeCost = effectiveNodeCost * 12;
+            yearlyProfit = yearlyRewardUSD - yearlyNodeCost;
+            yearlyProfitPercentage = (yearlyProfit / yearlyNodeCost) * 100;
 
-            // Remove breakeven calculation
+            // Calculate profitability threshold based on cost type
+            let testAmount = 1000; // Start with 1000 VOI
+            let monthlyRevenueAtTest = 0;
+            
+            // Binary search for threshold
+            let min = 0;
+            let max = 10_000_000; // 10M VOI as upper limit
+            let iterations = 0;
+            const maxIterations = 20; // Prevent infinite loops
+            
+            while (min <= max && iterations < maxIterations) {
+                testAmount = Math.floor((min + max) / 2);
+                let testShareOfStake = testAmount / (rewardStake / 1e6);
+                
+                // Calculate monthly rewards at test amount
+                let testMonthlyReward = 0;
+                const monthlyEpochs = 30.44 / 7;
+                
+                for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
+                    testMonthlyReward += testShareOfStake * epochRewards[i];
+                }
+                
+                monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
+                const testNodeCost = isPercentageBased ? 
+                    (monthlyRevenueAtTest * (costPercentage / 100)) : 
+                    nodeCost;
+                
+                // Ensure we're slightly above the node cost
+                const targetRevenue = testNodeCost * 1.01; // Target 1% above node cost
+                
+                if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
+                    break;
+                } else if (monthlyRevenueAtTest < targetRevenue) {
+                    min = testAmount + 1;
+                } else {
+                    max = testAmount - 1;
+                }
+                
+                iterations++;
+            }
+            
+            // Round up to the nearest 100 VOI for a safety margin
+            profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
+
             balanceAfterWeek = totalBalance + weeklyReward;
             balanceAfterMonth = totalBalance + monthlyReward;
             balanceAfterYear = actualBalance;
@@ -900,28 +913,127 @@
                 </h3>
 
                 <!-- Node Cost Input -->
-                <div class="mb-6">
+                <div class="mb-3">
                     <div class="flex items-center mb-2">
                         <svg class="w-5 h-5 text-purple-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Node Cost</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Node Cost</p>
                     </div>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-gray-400">
-                            $
-                        </span>
-                        <input
-                            type="number"
-                            id="nodeCost"
-                            bind:value={nodeCost}
-                            min="0"
-                            step="1"
-                            class="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            on:change={() => calculateRewards()}
-                        />
+                    
+                    <!-- Cost Type Toggle -->
+                    <div class="flex items-center space-x-2 mb-3">
+                        <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800">
+                            <button
+                                class="relative px-2 pr-6 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none min-w-[120px] {!isPercentageBased ? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+                                on:click={() => {
+                                    isPercentageBased = false;
+                                    calculateRewards();
+                                }}
+                            >
+                                Fixed Amount
+                                <span
+                                    class="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help"
+                                    on:mouseenter={() => showTooltip('fixedAmount')}
+                                    on:mouseleave={() => hideTooltip('fixedAmount')}
+                                    role="tooltip"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </span>
+                                {#if tooltipVisible.fixedAmount}
+                                    <div class="absolute left-0 transform translate-y-3 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm">
+                                        <div class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"></div>
+                                        <p class="text-gray-600 dark:text-gray-300">
+                                            Running a node on a cloud provider generally costs about $10-$20 per month.
+                                        </p>
+                                    </div>
+                                {/if}
+                            </button>
+                            <button
+                                class="relative px-2 pr-6 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none min-w-[120px] {isPercentageBased ? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+                                on:click={() => {
+                                    isPercentageBased = true;
+                                    calculateRewards();
+                                }}
+                            >
+                                Percentage
+                                <span
+                                    class="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help"
+                                    on:mouseenter={() => showTooltip('percentage')}
+                                    on:mouseleave={() => hideTooltip('percentage')}
+                                    role="tooltip"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </span>
+                                {#if tooltipVisible.percentage}
+                                    <div class="absolute left-0 transform translate-y-3 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm">
+                                        <div class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"></div>
+                                        <p class="text-gray-600 dark:text-gray-300">
+                                            Nautilus charges a rate of 10% of rewards for their Node as a Service offering.
+                                        </p>
+                                    </div>
+                                {/if}
+                            </button>
+                        </div>
                     </div>
+
+                    {#if isPercentageBased}
+                        <div class="relative">
+                            <input
+                                type="number"
+                                bind:value={costPercentage}
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pr-12"
+                                on:change={() => calculateRewards()}
+                            />
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400">
+                                %
+                            </span>
+                        </div>
+                        {#if monthlyRewardUSD > 0}
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                ≈ {formatUSD(monthlyRewardUSD * (costPercentage / 100))} per month
+                            </p>
+                        {/if}
+                    {:else}
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-gray-400">
+                                $
+                            </span>
+                            <input
+                                type="number"
+                                bind:value={nodeCost}
+                                min="0"
+                                step="1"
+                                class="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                on:change={() => calculateRewards()}
+                            />
+                        </div>
+                    {/if}
                 </div>
+
+                {#if !isPercentageBased && monthlyProfit < 0}
+                    <div class="mb-3 text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                        <p>
+                            Not Profitable? Consider using Node as a Service through 
+                            <a 
+                                href="https://nautilus.sh/#/staking" 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                class="text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                                Nautilus Staking
+                            </a> 
+                            for a more cost-effective solution. Use Percentage option above for estimate.
+                        </p>
+                    </div>
+                {/if}
 
                 <!-- Monthly Profit -->
                 <div class="p-4 rounded-lg mb-4 {monthlyProfit >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}">
