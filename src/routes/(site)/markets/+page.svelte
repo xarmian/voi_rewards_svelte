@@ -59,7 +59,7 @@
       return num > 0 ? `+${formatted}%` : `${formatted}%`;
     };
   
-    $: ({ marketData, aggregates } = data);
+    $: ({ marketData, aggregates, circulatingSupply } = data);
 
     // Calculate volume-weighted average price
     $: weightedAveragePrice = (() => {
@@ -82,6 +82,10 @@
 
         return totalVolume > 0 ? totalWeightedPrice / totalVolume : 0;
     })();
+
+    // Calculate market caps
+    $: circulatingMarketCap = weightedAveragePrice * Number(circulatingSupply.circulatingSupply);
+    $: fullyDilutedMarketCap = weightedAveragePrice * 10_000_000_000;
   </script>
   
   <div class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -131,15 +135,18 @@
             <div class="text-center">
               <div class="relative inline-block">
                 <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white inline-flex items-center">
-                  Total TVL
+                  Market Cap
                   <span class="ml-1 cursor-help">
                     <i class="fas fa-info-circle text-gray-400"></i>
                   </span>
                 </h3>
-                <Tooltip>Total Value Locked across supported pools and exchanges</Tooltip>
+                <Tooltip>Market cap based on circulating supply of {Number(circulatingSupply.circulatingSupply).toLocaleString()} VOI</Tooltip>
               </div>
               <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                {formatCurrency(aggregates.totalTVL)}
+                {formatCurrency(circulatingMarketCap)}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {circulatingSupply.percentDistributed}% Distributed
               </p>
             </div>
           </Card>
@@ -152,10 +159,10 @@
                             <i class="fas fa-info-circle text-gray-400"></i>
                         </span>
                     </h3>
-                    <Tooltip>Total market cap if all tokens were fully diluted</Tooltip>
+                    <Tooltip>Market cap if all 10B tokens were in circulation</Tooltip>
                 </div>
                 <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {formatCurrency(weightedAveragePrice * 10_000_000_000)}
+                    {formatCurrency(fullyDilutedMarketCap)}
                 </p>
             </div>
           </Card>

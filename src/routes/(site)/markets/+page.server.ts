@@ -1,5 +1,6 @@
 import { supabasePrivateClient } from '$lib/supabase-server';
 import type { PageServerLoad } from './$types';
+import { fetchCirculatingSupply } from '$lib/utils/voi';
 
 interface MarketData {
   exchange: string;
@@ -38,8 +39,11 @@ interface MarketSnapshot {
 
 export const load: PageServerLoad = async () => {
   try {
-    const { data: marketSnapshots, error } = await supabasePrivateClient
-      .rpc('get_latest_market_data');
+    // Fetch market data and circulating supply in parallel
+    const [{ data: marketSnapshots, error }, circulatingSupplyData] = await Promise.all([
+      supabasePrivateClient.rpc('get_latest_market_data'),
+      fetchCirculatingSupply()
+    ]);
 
     if (error) throw error;
 
@@ -72,7 +76,8 @@ export const load: PageServerLoad = async () => {
         totalVolume,
         totalTVL,
         averagePrice
-      }
+      },
+      circulatingSupply: circulatingSupplyData
     };
   } catch (error) {
     console.error('Error loading market data:', error);
@@ -82,6 +87,13 @@ export const load: PageServerLoad = async () => {
         totalVolume: 0,
         totalTVL: 0,
         averagePrice: 0
+      },
+      circulatingSupply: {
+        circulatingSupply: "0",
+        distributedSupply: "0",
+        percentDistributed: "0",
+        lockedAccounts: [],
+        distributingAccounts: []
       }
     };
   }
