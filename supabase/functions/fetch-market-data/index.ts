@@ -1,22 +1,33 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import algosdk from 'https://esm.sh/algosdk@2.7.0';
-import { swap as Contract } from 'https://esm.sh/ulujs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface MarketSnapshot {
-  trading_pair_id: number;
-  price: number;
-  volume_24h: number;
-  tvl?: number;
-  high_24h?: number;
-  low_24h?: number;
-  price_change_24h?: number;
-  price_change_percentage_24h?: number;
+interface NautilusPool {
+  contractId: number;
+  providerId: string;
+  poolId: string;
+  tokAId: string;
+  tokBId: string;
+  symbolA: string;
+  symbolB: string;
+  poolBalA: string;
+  poolBalB: string;
+  tvlA: string;
+  tvlB: string;
+  volA: string;
+  volB: string;
+  apr: string;
+  supply: string;
+  deleted: number;
+  tokADecimals: number;
+  tokBDecimals: number;
+  tvl: number;
+  creator: string;
+  mintRound: number;
 }
 
 interface NomadexPool {
@@ -32,6 +43,38 @@ interface NomadexPool {
   online: boolean;
 }
 
+interface MarketSnapshot {
+  trading_pair_id: number;
+  price: number;
+  volume_24h: number;
+  tvl?: number;
+  high_24h?: number;
+  low_24h?: number;
+  price_change_24h?: number;
+  price_change_percentage_24h?: number;
+}
+
+interface VestigePool {
+  id: number;
+  token_id: number;
+  application_id: number;
+  provider: string;
+  created_round: number;
+  asset_1_id: number;
+  asset_2_id: number;
+  volatility: number;
+  liquidity: number;
+  address: string;
+  price: number;
+  price1h: number;
+  price24h: number;
+  volume_1_24h: number;
+  volume_2_24h: number;
+  fee: number;
+  token_ratio: number;
+  last_traded: number;
+}
+
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -40,7 +83,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Constants
 const MEXC_ACCOUNT = 'CVYHPHOWCIOCVTS4QEUFPFROILQBVFR6HKSJKPTDWN4TDQ7QYAWPKMCVCM';
 const ALGOD_SERVER_VOI = 'https://mainnet-api.voi.nodely.dev';
-const ALGOD_SERVER_ALGORAND = 'https://mainnet-idx.4160.nodely.dev';
 
 // Helper function to fetch historical price data
 async function fetchHistoricalPrice(tradingPairId: number): Promise<number | null> {
@@ -102,32 +144,31 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
 async function fetchHumbleData(): Promise<MarketSnapshot | null> {
   try {
     const POOL_ID = 395553;
- 
-    // Initialize algod client
-    const algod = new algosdk.Algodv2('', ALGOD_SERVER_VOI, '');
-
-    // Initialize contract with minimal options
-    const opts = {
-      simulate: false,
-      waitForConfirmation: false
-    };
-
-    // Get pool info
-    const ctc = new Contract(POOL_ID, algod, undefined, opts);
-    const ret = await ctc.Info();
-    if (!ret.success) {
-      throw new Error(`Failed to get pool info for Humble pool ${POOL_ID}`);
+    const response = await fetch('https://mainnet-idx.nautilus.sh/nft-indexer/v1/dex/pools?tokenId=390001');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Humble pool data: ${response.statusText}`);
     }
 
-    const info = ret.returnValue;
-    const voiBalance = Number(info.poolBals.B) / 1e6; // Convert from microVOI
-    const usdcBalance = Number(info.poolBals.A) / 1e6; // Convert from microUSDC
+    const data = await response.json();
+    const pool = data.pools.find((p: NautilusPool) => p.contractId === POOL_ID);
 
-    // Calculate price (USDC per VOI)
+    if (!pool) {
+      throw new Error(`Could not find Humble pool with ID ${POOL_ID}`);
+    }
+
+    // Parse balances and calculate price (USDC per VOI)
+    const usdcBalance = parseFloat(pool.poolBalA);
+    const voiBalance = parseFloat(pool.poolBalB);
     const price = usdcBalance / voiBalance;
 
-    // Calculate TVL in USD (multiply by 2 since it's a balanced pool)
-    const tvl = usdcBalance * 2;
+    // Get 24h volume in VOI and convert to USDC
+    const volumeVOI = parseFloat(pool.volA) + parseFloat(pool.volB);
+    const volume24h = volumeVOI * price;
+
+    // Get TVL in VOI and convert to USDC
+    const tvlVOI = parseFloat(pool.tvlB);
+    const tvl = tvlVOI * price;
 
     // Fetch historical price and calculate price change
     const historicalPrice = await fetchHistoricalPrice(2); // Humble trading_pair_id = 2
@@ -139,7 +180,7 @@ async function fetchHumbleData(): Promise<MarketSnapshot | null> {
     return {
       trading_pair_id: 2, // Humble VOI/USDC pair
       price: price,
-      volume_24h: 0, // Not available from contract info
+      volume_24h: volume24h,
       tvl: tvl,
       high_24h: undefined,
       low_24h: undefined,
@@ -257,55 +298,42 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
 
 async function fetchPactFiData(): Promise<MarketSnapshot | null> {
   try {
-    const POOL_ACCOUNT = '3UL4DIAQ6FKXHC7BZQSBQRMY6CT2KWCMRSM5AOHVAIULE2MYSJ3WKBRA2Q';
-    const VOI_ASSET_ID = 2320775407;
-    const USDC_ASSET_ID = 31566704;
+    // Fetch both pools in parallel
+    const [pool1Response, pool2Response] = await Promise.all([
+      fetch('https://free-api.vestige.fi/pool/507607'),
+      fetch('https://free-api.vestige.fi/pool/560706')
+    ]);
 
-    // Fetch pool account information
-    const accountResponse = await fetch(`${ALGOD_SERVER_ALGORAND}/v2/accounts/${POOL_ACCOUNT}`);
-    if (!accountResponse.ok) {
-      throw new Error(`Failed to fetch pool account data: ${accountResponse.statusText}`);
-    }
-    const accountData = await accountResponse.json();
-
-    // Find VOI and USDC balances in the assets array
-    let voiBalance = 0;
-    let usdcBalance = 0;
-
-    // Check other assets
-    for (const asset of accountData.account.assets || []) {
-      if (asset['asset-id'] === VOI_ASSET_ID) {
-        voiBalance = asset.amount;
-      } else if (asset['asset-id'] === USDC_ASSET_ID) {
-        usdcBalance = asset.amount;
-      }
+    if (!pool1Response.ok || !pool2Response.ok) {
+      throw new Error('Failed to fetch one or both PactFi pool data');
     }
 
-    if (voiBalance === 0 || usdcBalance === 0) {
-      throw new Error('Could not find both asset balances in pool');
-    }
+    const pool1: VestigePool = await pool1Response.json();
+    const pool2: VestigePool = await pool2Response.json();
 
-    // Convert from microVOI and microUSDC to VOI and USDC
-    const voiAmount = voiBalance / 1e6;
-    const usdcAmount = usdcBalance / 1e6;
+    // Use the larger pool's price as the reference price
+    const pool1Weight = pool1.liquidity;
+    const pool2Weight = pool2.liquidity;
+    const totalLiquidity = pool1Weight + pool2Weight;
 
-    // Calculate price (USDC per VOI)
-    const price = usdcAmount / voiAmount;
+    // Calculate weighted average price
+    const price = (pool1.price * pool1Weight + pool2.price * pool2Weight) / totalLiquidity;
 
-    // Calculate TVL in USD (multiply by 2 since it's a balanced pool)
-    const tvl = usdcAmount * 2;
+    // Sum volumes and TVL from both pools
+    const volume24h = pool1.volume_2_24h + pool2.volume_2_24h;
+    const tvl = pool1.liquidity + pool2.liquidity;
 
-    // Fetch historical price and calculate price change
-    const historicalPrice = await fetchHistoricalPrice(5); // PactFi trading_pair_id = 5
-    const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
-    const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
-      ? ((price - historicalPrice) / historicalPrice) * 100 
-      : undefined;
+    // Calculate weighted average historical price
+    const price24h = (pool1.price24h * pool1Weight + pool2.price24h * pool2Weight) / totalLiquidity;
+
+    // Calculate price changes based on weighted averages
+    const priceChange24h = price - price24h;
+    const priceChangePercentage24h = ((price - price24h) / price24h) * 100;
 
     return {
       trading_pair_id: 5, // PactFi VOI/USDC pair
       price: price,
-      volume_24h: 0, // Not available from account data
+      volume_24h: volume24h,
       tvl: tvl,
       high_24h: undefined,
       low_24h: undefined,

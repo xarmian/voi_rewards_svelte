@@ -115,7 +115,7 @@
             <div class="text-center">
               <div class="relative inline-block">
                 <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white inline-flex items-center">
-                  24h Volume (MEXC + Tinyman)
+                  24h Volume
                   <span class="ml-1 cursor-help">
                     <i class="fas fa-info-circle text-gray-400"></i>
                   </span>
