@@ -48,9 +48,9 @@ export const GET: RequestHandler = async () => {
 
         const price = totalVolume > 0 ? totalWeightedPrice / totalVolume : 0;
 
-        return json({ price });
+        return json({ price, lastUpdated: marketSnapshots[0].snapshot_time });
     } catch (error) {
         console.error('Error fetching VOI price:', error);
-        return json({ price: 0 });
+        return json({ price: 0, lastUpdated: new Date() });
     }
 }; 

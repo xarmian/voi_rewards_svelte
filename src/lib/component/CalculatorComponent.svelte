@@ -120,11 +120,11 @@
         calculateRewards();
     }
 
-    $: effectivePrice = useCustomPrice && customPrice !== null ? customPrice : $voiPrice;
+    $: effectivePrice = useCustomPrice && customPrice !== null ? customPrice : $voiPrice.price;
 
     function toggleCustomPrice() {
         if (!useCustomPrice) {
-            customPrice = Math.round($voiPrice * 1e8) / 1e8;
+            customPrice = Math.round($voiPrice.price * 1e8) / 1e8;
         }
         useCustomPrice = !useCustomPrice;
         calculateRewards();
@@ -658,14 +658,23 @@
                                 </div>
                             {:else}
                                 <p class="text-3xl font-bold text-purple-600 dark:text-purple-400 text-center">
-                                    {$voiPrice > 0 ? formatUSD($voiPrice, 8) : 'Loading...'}
+                                    {$voiPrice.price > 0 ? formatUSD($voiPrice.price, 8) : 'Loading...'}
                                 </p>
                             {/if}
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center flex items-center justify-center space-x-2">
                                 {#if useCustomPrice}
-                                    Custom price for calculations
+                                    <span>Custom price for calculations</span>
                                 {:else}
-                                    Last updated: {new Date().toLocaleTimeString()}
+                                    <span>Last updated: {$voiPrice.lastUpdated ? $voiPrice.lastUpdated.toLocaleTimeString() : 'Loading...'}</span>
+                                    <button
+                                        class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
+                                        on:click={() => fetchVoiPrice(true)}
+                                        aria-label="Refresh price"
+                                    >
+                                        <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    </button>
                                 {/if}
                             </p>
                         </div>

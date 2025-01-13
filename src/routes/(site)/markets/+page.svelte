@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { Card, Tooltip } from 'flowbite-svelte';
+    import { Card, Tooltip, Button, Spinner } from 'flowbite-svelte';
     import type { PageData } from './$types';
-    import { updateVoiPrice } from '$lib/stores/price';
+    import { invalidateAll } from '$app/navigation';
   
     export let data: PageData;
   
@@ -82,13 +82,23 @@
         );
 
         const price = totalVolume > 0 ? totalWeightedPrice / totalVolume : 0;
-        updateVoiPrice(price);
         return price;
     })();
 
     // Calculate market caps
     $: circulatingMarketCap = weightedAveragePrice * Number(circulatingSupply.circulatingSupply);
     $: fullyDilutedMarketCap = weightedAveragePrice * 10_000_000_000;
+
+    let isRefreshing = false;
+
+    async function refreshData() {
+        isRefreshing = true;
+        try {
+            await invalidateAll();
+        } finally {
+            isRefreshing = false;
+        }
+    }
   </script>
   
   <div class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -175,88 +185,101 @@
       <!-- Markets Grid -->
       <section class="bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
         <header class="bg-purple-600 dark:bg-purple-800 py-4 px-6">
-          <h2 class="text-2xl font-bold text-white">Market Overview</h2>
+          <div class="flex justify-between items-center">
+            <h2 class="text-2xl font-bold text-white">Market Overview</h2>
+            <Button color="light" size="sm" class="flex items-center gap-2" disabled={isRefreshing} on:click={refreshData}>
+              <i class="fas fa-sync-alt {isRefreshing ? 'animate-spin' : ''}"></i>
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
         </header>
         <div class="p-4">
           <div class="overflow-x-auto">
-            <table class="w-full text-left">
-              <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('exchange')}>
-                    Exchange {sortColumn === 'exchange' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('type')}>
-                    Type {sortColumn === 'type' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('network')}>
-                    Network {sortColumn === 'network' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('pair')}>
-                    Pair {sortColumn === 'pair' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('price')}>
-                    Price {sortColumn === 'price' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('price_change_percentage_24h')}>
-                    24h Change {sortColumn === 'price_change_percentage_24h' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('volume_24h')}>
-                    24h Volume {sortColumn === 'volume_24h' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('tvl')}>
-                    TVL {sortColumn === 'tvl' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('lastUpdated')}>
-                    Last Updated {sortColumn === 'lastUpdated' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th class="px-4 py-3 text-gray-900 dark:text-white">Pool</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each sortedMarketData as market}
-                  <tr class="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600">
-                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                      {#if market.url}
-                        <a href={market.url} target="_blank" rel="noopener noreferrer" class="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
-                          {market.exchange}
-                        </a>
-                      {:else}
-                        {market.exchange}
-                      {/if}
-                    </td>
-                    <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs font-semibold rounded-full
-                        {market.type === 'CEX' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'}">
-                        {market.type}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{market.network}</td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{market.pair}</td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{formatPrice(market.price)}</td>
-                    <td class="px-4 py-3">
-                      <span class="font-medium {(market.price_change_percentage_24h ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : (market.price_change_percentage_24h ?? 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}">
-                        {formatPercentage(market.price_change_percentage_24h)}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{formatCurrency(market.volume_24h)}</td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{market.tvl ? formatCurrency(market.tvl) : '-'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                      {market.lastUpdated.toLocaleString()}
-                    </td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                      {#if market.pool_url}
-                        <a href={market.pool_url}
-                        aria-label="View pool on exchange"
-                         target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors">
-                          <i class="fas fa-external-link-alt"></i>
-                        </a>
-                      {/if}
-                    </td>
+            {#if isRefreshing}
+              <div class="flex flex-col items-center justify-center py-12">
+                <Spinner size="12" class="mb-4" />
+                <p class="text-gray-600 dark:text-gray-400">Refreshing market data...</p>
+              </div>
+            {:else}
+              <table class="w-full text-left">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('exchange')}>
+                      Exchange {sortColumn === 'exchange' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('type')}>
+                      Type {sortColumn === 'type' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('network')}>
+                      Network {sortColumn === 'network' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('pair')}>
+                      Pair {sortColumn === 'pair' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('price')}>
+                      Price {sortColumn === 'price' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('price_change_percentage_24h')}>
+                      24h Change {sortColumn === 'price_change_percentage_24h' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('volume_24h')}>
+                      24h Volume {sortColumn === 'volume_24h' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('tvl')}>
+                      TVL {sortColumn === 'tvl' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('lastUpdated')}>
+                      Last Updated {sortColumn === 'lastUpdated' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th class="px-4 py-3 text-gray-900 dark:text-white">Pool</th>
                   </tr>
-                {/each}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {#each sortedMarketData as market}
+                    <tr class="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600">
+                      <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                        {#if market.url}
+                          <a href={market.url} target="_blank" rel="noopener noreferrer" class="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
+                            {market.exchange}
+                          </a>
+                        {:else}
+                          {market.exchange}
+                        {/if}
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full
+                          {market.type === 'CEX' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                          'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'}">
+                          {market.type}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{market.network}</td>
+                      <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{market.pair}</td>
+                      <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{formatPrice(market.price)}</td>
+                      <td class="px-4 py-3">
+                        <span class="font-medium {(market.price_change_percentage_24h ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : (market.price_change_percentage_24h ?? 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}">
+                          {formatPercentage(market.price_change_percentage_24h)}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{formatCurrency(market.volume_24h)}</td>
+                      <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{market.tvl ? formatCurrency(market.tvl) : '-'}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {market.lastUpdated.toLocaleString()}
+                      </td>
+                      <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        {#if market.pool_url}
+                          <a href={market.pool_url}
+                          aria-label="View pool on exchange"
+                           target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors">
+                            <i class="fas fa-external-link-alt"></i>
+                          </a>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
           </div>
         </div>
       </section>
