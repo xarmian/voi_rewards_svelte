@@ -14,6 +14,7 @@
     let chartContainer: HTMLElement;
     let chart: IChartApi;
     let series: ISeriesApi<'Line'>;
+    let isDarkMode = false;
 
     // Time period selection
     export let selectedPeriod: '24h' | '7d';
@@ -56,6 +57,42 @@
         }
     }
 
+    // Watch for theme changes
+    function updateChartTheme() {
+        if (!chart) return;
+        
+        isDarkMode = document.documentElement.classList.contains('dark');
+        const gridColor = isDarkMode ? '#2D3748' : '#E5E7EB';
+        const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
+        
+        chart.applyOptions({
+            layout: {
+                background: { color: 'transparent' },
+                textColor: textColor,
+            },
+            grid: {
+                vertLines: { color: gridColor },
+                horzLines: { color: gridColor },
+            },
+            rightPriceScale: {
+                borderColor: gridColor,
+                scaleMargins: {
+                    top: 0.2,
+                    bottom: 0.2,
+                },
+                mode: 1,
+            },
+            timeScale: {
+                borderColor: gridColor,
+                timeVisible: true,
+                secondsVisible: false,
+                tickMarkFormatter: (time: number) => {
+                    return formatTimeByPeriod(time, selectedPeriod);
+                },
+            },
+        });
+    }
+
     onMount(() => {
         chart = createChart(chartContainer, {
             height,
@@ -63,22 +100,22 @@
             autoSize: false,
             layout: {
                 background: { color: 'transparent' },
-                textColor: '#9CA3AF',
+                textColor: '#4B5563',
             },
             grid: {
-                vertLines: { color: '#2D3748' },
-                horzLines: { color: '#2D3748' },
+                vertLines: { color: '#E5E7EB' },
+                horzLines: { color: '#E5E7EB' },
             },
             rightPriceScale: {
-                borderColor: '#2D3748',
+                borderColor: '#E5E7EB',
                 scaleMargins: {
                     top: 0.2,
                     bottom: 0.2,
                 },
-                mode: 1, // Logarithmic scale
+                mode: 1,
             },
             timeScale: {
-                borderColor: '#2D3748',
+                borderColor: '#E5E7EB',
                 timeVisible: true,
                 secondsVisible: false,
                 tickMarkFormatter: (time: number) => {
@@ -113,6 +150,23 @@
         });
 
         series.setData(data);
+
+        // Set up theme observer
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    updateChartTheme();
+                }
+            });
+        });
+
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+
+        // Initial theme setup
+        updateChartTheme();
 
         // Handle window resize
         const handleResize = () => {
@@ -170,5 +224,5 @@
 </div>
 
 <style>
-    /* Add any custom styles here */
+    /* Chart styles */
 </style> 
