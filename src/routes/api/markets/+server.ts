@@ -17,6 +17,7 @@ interface MarketSnapshot {
 interface Exchange {
     name: string;
     type: string;
+    network: string;
 }
 
 interface RawTradingPair {
@@ -55,7 +56,8 @@ export const GET: RequestHandler = async () => {
                 exchange_id,
                 exchange:exchanges!inner (
                     name,
-                    type
+                    type,
+                    network
                 ),
                 base_token,
                 quote_token,
@@ -87,7 +89,7 @@ export const GET: RequestHandler = async () => {
                     exchange: market.exchange.name,
                     pair: `${market.base_token}/${market.quote_token}`,
                     type: market.exchange.type,
-                    network: 'Algorand', // Since all pairs are on Algorand
+                    network: market.exchange.network,
                     url: null, // We'll need to add this to the schema if needed
                     pool_url: market.pool_url,
                     price: latestSnapshot.price,
