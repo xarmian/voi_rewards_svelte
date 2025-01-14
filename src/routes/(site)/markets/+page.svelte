@@ -2,6 +2,22 @@
     import { Card, Tooltip, Button, Spinner } from 'flowbite-svelte';
     import type { PageData } from './$types';
     import { invalidateAll } from '$app/navigation';
+    import PriceChart from '$lib/components/PriceChart.svelte';
+  
+    interface MarketData {
+        price: number | null;
+        volume_24h: number | null;
+        tvl: number | null;
+        price_change_percentage_24h: number | null;
+        exchange: string;
+        pair: string;
+        type: string;
+        network: string;
+        url: string | null;
+        pool_url: string | null;
+        lastUpdated: Date;
+        trading_pair_id: number;
+    }
   
     export let data: PageData;
   
@@ -64,7 +80,7 @@
 
     // Calculate volume-weighted average price
     $: weightedAveragePrice = (() => {
-        const marketsWithPriceAndVolume = marketData.filter(m => 
+        const marketsWithPriceAndVolume = (marketData as MarketData[]).filter(m => 
             m.price != null && m.price > 0 && 
             m.volume_24h != null && m.volume_24h > 0
         );
@@ -72,12 +88,12 @@
         if (marketsWithPriceAndVolume.length === 0) return 0;
 
         const totalWeightedPrice = marketsWithPriceAndVolume.reduce(
-            (sum, market) => sum + (market.price * market.volume_24h), 
+            (sum: number, market: MarketData) => sum + (market.price! * market.volume_24h!), 
             0
         );
         
         const totalVolume = marketsWithPriceAndVolume.reduce(
-            (sum, market) => sum + market.volume_24h, 
+            (sum: number, market: MarketData) => sum + market.volume_24h!, 
             0
         );
 
@@ -98,6 +114,27 @@
         } finally {
             isRefreshing = false;
         }
+    }
+
+    let selectedPeriod: '24h' | '7d' = '24h';
+    let priceHistory = data.priceHistory;
+
+    async function handlePeriodChange(period: '24h' | '7d') {
+        selectedPeriod = period;
+        const response = await fetch(`/api/price-history?period=${period}${selectedTradingPairId ? `&trading_pair_id=${selectedTradingPairId}` : ''}`);
+        priceHistory = await response.json();
+    }
+
+    let selectedTradingPairId: number | null = null;
+
+    async function handleMarketClick(market: MarketData) {
+        if (selectedTradingPairId === market.trading_pair_id) {
+            selectedTradingPairId = null;
+        } else {
+            selectedTradingPairId = market.trading_pair_id;
+        }
+        const response = await fetch(`/api/price-history?trading_pair_id=${selectedTradingPairId}&period=${selectedPeriod}`);
+        priceHistory = await response.json();
     }
   </script>
   
@@ -181,6 +218,16 @@
           </Card>
         </div>
       </div>
+
+      <!-- Price Chart Section -->
+      <section class="bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden mb-8 p-2 sm:p-6">
+          <PriceChart
+              data={priceHistory}
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={handlePeriodChange}
+              selectedMarket={selectedTradingPairId ? marketData.find((m: MarketData) => m.trading_pair_id === selectedTradingPairId) : null}
+          />
+      </section>
   
       <!-- Markets Grid -->
       <section class="bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
@@ -236,7 +283,8 @@
                 </thead>
                 <tbody>
                   {#each sortedMarketData as market}
-                    <tr class="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <tr class="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer {selectedTradingPairId === market.trading_pair_id ? 'bg-purple-100 dark:bg-purple-800' : ''}" 
+                        on:click={() => handleMarketClick(market)}>
                       <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
                         {#if market.url}
                           <a href={market.url} target="_blank" rel="noopener noreferrer" class="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
@@ -270,7 +318,7 @@
                         {#if market.pool_url}
                           <a href={market.pool_url}
                           aria-label="View pool on exchange"
-                           target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors">
+                           target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors" on:click|stopPropagation>
                             <i class="fas fa-external-link-alt"></i>
                           </a>
                         {/if}
