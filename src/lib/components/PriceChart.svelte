@@ -129,7 +129,13 @@
                 },
             },
             crosshair: {
-                mode: 0,
+                mode: 1,
+                vertLine: {
+                    labelVisible: true,
+                },
+                horzLine: {
+                    labelVisible: true,
+                },
             },
         });
 

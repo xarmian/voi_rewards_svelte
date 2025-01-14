@@ -59,7 +59,7 @@
     // Format currency with $ symbol and 4 decimal places
     const formatPrice = (num: number | null | undefined): string => {
       if (num === null || num === undefined || num === 0) return '-';
-      return `$${formatNumber(num, 5)}`;
+      return `$${formatNumber(num, 6)}`;
     };
   
     // Format currency with $ symbol and 2 decimal places (for volume/TVL)
