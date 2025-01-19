@@ -93,102 +93,125 @@
         });
     }
 
+    function handleResize() {
+        if (chartContainer && chart) {
+            const newWidth = chartContainer.clientWidth;
+            const newHeight = height;
+            chart.resize(newWidth, newHeight);
+        }
+    }
+
     onMount(() => {
-        chart = createChart(chartContainer, {
-            height,
-            width: chartContainer.clientWidth,
-            autoSize: false,
-            layout: {
-                background: { color: 'transparent' },
-                textColor: '#4B5563',
-            },
-            grid: {
-                vertLines: { color: '#E5E7EB' },
-                horzLines: { color: '#E5E7EB' },
-            },
-            rightPriceScale: {
-                borderColor: '#E5E7EB',
-                scaleMargins: {
-                    top: 0.2,
-                    bottom: 0.2,
+        // Wait for next tick to ensure container is rendered
+        setTimeout(() => {
+            chart = createChart(chartContainer, {
+                height,
+                width: chartContainer.clientWidth,
+                layout: {
+                    background: { color: 'transparent' },
+                    textColor: '#4B5563',
                 },
-                mode: 1,
-            },
-            timeScale: {
-                borderColor: '#E5E7EB',
-                timeVisible: true,
-                secondsVisible: false,
-                tickMarkFormatter: (time: number) => {
-                    return formatTimeByPeriod(time, selectedPeriod);
+                grid: {
+                    vertLines: { color: '#E5E7EB' },
+                    horzLines: { color: '#E5E7EB' },
                 },
-            },
-            localization: {
-                timeFormatter: (time: number) => {
-                    const date = new Date(time * 1000);
-                    return date.toLocaleString();
+                rightPriceScale: {
+                    borderColor: '#E5E7EB',
+                    scaleMargins: {
+                        top: 0.2,
+                        bottom: 0.2,
+                    },
+                    mode: 1,
                 },
-            },
-            crosshair: {
-                mode: 1,
-                vertLine: {
-                    labelVisible: true,
+                timeScale: {
+                    borderColor: '#E5E7EB',
+                    timeVisible: true,
+                    secondsVisible: false,
+                    tickMarkFormatter: (time: number) => {
+                        return formatTimeByPeriod(time, selectedPeriod);
+                    },
                 },
-                horzLine: {
-                    labelVisible: true,
+                localization: {
+                    timeFormatter: (time: number) => {
+                        const date = new Date(time * 1000);
+                        return date.toLocaleString();
+                    },
                 },
-            },
-        });
-
-        series = chart.addLineSeries({
-            color: '#8B5CF6',
-            lineWidth: 2,
-            crosshairMarkerVisible: true,
-            lastValueVisible: true,
-            priceLineVisible: true,
-        });
-
-        series.applyOptions({
-            priceFormat: {
-                type: 'price',
-                precision: 6,
-                minMove: 0.000001,
-            },
-        });
-
-        series.setData(data);
-
-        // Set up theme observer
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.attributeName === 'class') {
-                    updateChartTheme();
-                }
+                crosshair: {
+                    mode: 1,
+                    vertLine: {
+                        labelVisible: true,
+                    },
+                    horzLine: {
+                        labelVisible: true,
+                    },
+                },
             });
-        });
 
-        observer.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['class']
-        });
+            series = chart.addLineSeries({
+                color: '#8B5CF6',
+                lineWidth: 2,
+                crosshairMarkerVisible: true,
+                lastValueVisible: true,
+                priceLineVisible: true,
+            });
 
-        // Initial theme setup
-        updateChartTheme();
+            series.applyOptions({
+                priceFormat: {
+                    type: 'price',
+                    precision: 6,
+                    minMove: 0.000001,
+                },
+            });
 
-        // Handle window resize
-        const handleResize = () => {
-            if (chartContainer && chart) {
-                chart.applyOptions({ 
-                    width: chartContainer.clientWidth 
-                });
+            if (data.length > 0) {
+                series.setData(data);
+                // Fit content after setting data
+                chart.timeScale().fitContent();
             }
-        };
 
-        window.addEventListener('resize', handleResize);
-        handleResize();
+            // Set up theme observer
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.attributeName === 'class') {
+                        updateChartTheme();
+                    }
+                });
+            });
 
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+
+            // Initial theme setup
+            updateChartTheme();
+
+            // Initial resize
+            handleResize();
+            
+            // Add resize observer for container size changes
+            const resizeObserver = new ResizeObserver(() => {
+                const newWidth = chartContainer.clientWidth;
+                chart.applyOptions({
+                    width: newWidth,
+                });
+                chart.timeScale().fitContent();
+            });
+            resizeObserver.observe(chartContainer);
+
+            // Add window resize listener
+            window.addEventListener('resize', handleResize);
+
+            return () => {
+                resizeObserver.disconnect();
+                window.removeEventListener('resize', handleResize);
+                observer.disconnect();
+                if (chart) {
+                    chart.remove();
+                }
+            };
+        }, 0);
     });
 
     onDestroy(() => {
@@ -199,6 +222,9 @@
 
     $: if (series && data) {
         series.setData(data);
+        if (chart) {
+            chart.timeScale().fitContent();
+        }
     }
 </script>
 
@@ -226,7 +252,7 @@
             {/each}
         </div>
     </div>
-    <div class="w-full" bind:this={chartContainer}></div>
+    <div class="w-full h-[400px]" bind:this={chartContainer}></div>
 </div>
 
 <style>

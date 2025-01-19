@@ -469,7 +469,7 @@
         bind:value={currentPage}
         min="1"
         max={Math.ceil(filterItems.length / itemsPerPage)}
-        class="w-16 px-2 py-1 border rounded text-center"
+        class="w-16 px-2 py-1 border rounded text-center text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-800"
         on:change={(e) => {
           const value = parseInt(e.currentTarget.value);
           const maxPage = Math.ceil(filterItems.length / itemsPerPage);
