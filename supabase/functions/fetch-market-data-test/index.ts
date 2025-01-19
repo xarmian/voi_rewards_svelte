@@ -135,18 +135,18 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
     // Get price in USDT per VOI
     const price = parseFloat(mexcData.lastPrice);
 
-    // Get volume in VOI (baseVolume)
-    const volume24h = parseFloat(mexcData.volume);
+    // Get volume in VOI (baseVolume), default to 0 if undefined
+    const volume24h = parseFloat(mexcData.volume) || 0;
     
     return {
       trading_pair_id: tradingPairId,
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
-      high_24h: parseFloat(mexcData.highPrice),
-      low_24h: parseFloat(mexcData.lowPrice),
-      price_change_24h: parseFloat(mexcData.priceChange),
-      price_change_percentage_24h: parseFloat(mexcData.priceChangePercent)
+      high_24h: parseFloat(mexcData.highPrice) || undefined,
+      low_24h: parseFloat(mexcData.lowPrice) || undefined,
+      price_change_24h: parseFloat(mexcData.priceChange) || undefined,
+      price_change_percentage_24h: parseFloat(mexcData.priceChangePercent) || undefined
     };
   } catch (error) {
     console.error('Error fetching MEXC data:', error);
@@ -203,7 +203,7 @@ async function getOrCreateTradingPairId(
 
 async function fetchHumbleData(): Promise<MarketSnapshot[]> {
   try {
-    const HUMBLE_EXCHANGE_ID = 2; // Assuming Humble's exchange_id is 2
+    const HUMBLE_EXCHANGE_ID = 2;
     const response = await fetch('https://mainnet-idx.nautilus.sh/nft-indexer/v1/dex/pools?tokenId=390001');
     
     if (!response.ok) {
@@ -234,8 +234,8 @@ async function fetchHumbleData(): Promise<MarketSnapshot[]> {
         // Get TVL in VOI
         const tvl = parseFloat(pool.tvlB);
 
-        // Get volume in VOI
-        const volume24h = parseFloat(pool.volB);
+        // Get volume in VOI, default to 0 if undefined
+        const volume24h = parseFloat(pool.volB) || 0;
 
         // Fetch historical price for this pair
         const historicalPrice = await fetchHistoricalPrice(tradingPairId);
@@ -286,7 +286,7 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
     const poolUrl = `https://app.nomadex.app/pool/${POOL_ID}`;
     const tradingPairId = await getOrCreateTradingPairId(
       NOMADEX_EXCHANGE_ID,
-      'USDC',
+      'aUSDC',
       'VOI',
       poolUrl
     );
@@ -301,8 +301,8 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
     // Get TVL in VOI (alpha token balance * 2 since it's a balanced pool)
     const tvl = voiBalance * 2;
 
-    // Get 24h volume in VOI (alpha token volume)
-    const volume24h = Number(pool.volume[0]) / 1e6;
+    // Get 24h volume in VOI (alpha token volume), default to 0 if undefined
+    const volume24h = (Number(pool.volume[0]) / 1e6) || 0;
 
     // Fetch historical price for this pair
     const historicalPrice = await fetchHistoricalPrice(tradingPairId);
@@ -337,7 +337,7 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
     const tradingPairId = await getOrCreateTradingPairId(
       TINYMAN_EXCHANGE_ID,
       'USDC',
-      'VOI',
+      'aVOI',
       `https://app.tinyman.org/#/pool/${poolId}`
     );
 
@@ -360,8 +360,8 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
     // Get TVL in VOI
     const tvl = parseFloat(poolData.current_asset_1_reserves);
     
-    // Get 24h volume in VOI
-    const volume24h = parseFloat(poolData.last_day_volume_asset_1);
+    // Get 24h volume in VOI, default to 0 if undefined
+    const volume24h = parseFloat(poolData.last_day_volume_asset_1) || 0;
 
     // Fetch historical price for this pair
     const historicalPrice = await fetchHistoricalPrice(tradingPairId);
@@ -406,7 +406,7 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
     const tradingPairId = await getOrCreateTradingPairId(
       PACTFI_EXCHANGE_ID,
       'USDC',
-      'VOI',
+      'aVOI',
       'https://app.pact.fi/swap'
     );
 
@@ -421,8 +421,8 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
     // Get total TVL in VOI
     const tvl = totalVoiLiquidity;
 
-    // Get total 24h volume in VOI
-    const volume24h = pool1.volume_1_24h + pool2.volume_1_24h;
+    // Get total 24h volume in VOI, default to 0 if undefined
+    const volume24h = (pool1.volume_1_24h + pool2.volume_1_24h) || 0;
 
     // Calculate weighted average historical price
     const historicalPrice = await fetchHistoricalPrice(tradingPairId);

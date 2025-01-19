@@ -5,6 +5,24 @@
   import { slide } from 'svelte/transition';
   import { onMount } from 'svelte';
   
+  interface NavItem {
+    href: string;
+    label: string;
+    external?: boolean;
+  }
+
+  interface ResourceItem {
+    href: string;
+    label: string;
+    icon: string;
+  }
+
+  interface WalletItem {
+    href: string;
+    label: string;
+    icon: string;
+  }
+  
   let isMenuOpen = false;
   let isDark = false;
   
@@ -19,17 +37,21 @@
   let isDragging = false;
   let menuPosition = 0;
   
-  const navItems = [
+  const navItems: NavItem[] = [
     { href: '/', label: 'Home' },
-    { href: '/directory', label: 'Directory' },
-    { href: '/faq', label: 'FAQ' },
-    { href: '/what_is_voi', label: 'What is Voi?' },
-    { href: '/how_to_node', label: 'Run a Node' },
     { href: '/markets', label: 'Markets' },
+    { href: '/analytics', label: 'Analytics' },
     { href: 'https://ecosystem.voi.network', label: 'Ecosystem', external: true }
   ];
 
-  const dropdownItems = [
+  const resourceItems: ResourceItem[] = [
+    { href: '/directory', label: 'Directory', icon: 'fas fa-book' },
+    { href: '/faq', label: 'FAQ', icon: 'fas fa-question-circle' },
+    { href: '/what_is_voi', label: 'What is Voi?', icon: 'fas fa-info-circle' },
+    { href: '/how_to_node', label: 'Run a Node', icon: 'fas fa-server' }
+  ];
+
+  const walletItems: WalletItem[] = [
     { href: '/wallet#consensus', label: 'Consensus', icon: 'fas fa-hexagon-nodes' },
     { href: '/wallet#proposals', label: 'Proposals', icon: 'fas fa-chart-line' },
     { href: '/wallet#epochs', label: 'Epochs', icon: 'fas fa-calendar-alt' },
@@ -112,10 +134,10 @@
   }
 </script>
 
-<Navbar fluid={true} class="!bg-[rgb(111,42,226)] text-white dark:text-gray-100">
+<Navbar fluid={true} class="bg-gradient-to-r from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 text-gray-700 dark:text-gray-100 border-b border-gray-200 dark:border-slate-700/50 shadow-sm">
   <NavBrand href="https://voirewards.com" class="float-left">
     <img src="{Icon}" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
-    <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-semibold">Voi Rewards Auditor</div>
+    <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">Voi Rewards Auditor</div>
   </NavBrand>
   
   <!-- Desktop Navigation -->
@@ -123,35 +145,49 @@
     {#each navItems as {href, label, external}}
       <a 
         {href} 
-        class="text-lg navButton flex items-center" 
+        class="text-lg navButton flex items-center text-gray-600 dark:text-gray-200" 
         class:selected={activeLink ? isActiveLink(href) : false}
         target={external ? '_blank' : undefined}
         rel={external ? 'noopener noreferrer' : undefined}
-        on:click={() => activeLink = href}
       >
         {label}
         {#if external}
-          <span class="ml-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </span>
+          <i class="fas fa-external-link-alt ml-2 text-xs opacity-70"></i>
         {/if}
       </a>
     {/each}
-    
-    <!-- Account Menu -->
-    <div class="relative flex items-center gap-2">
-      <button id="avatar-menu" class="w-10 h-10 flex items-center justify-center bg-[#d0bff2] text-black hover:bg-white transition-colors rounded-full" aria-label="Open Account Menu">
-        <i class="fas fa-wallet text-lg"></i>
+
+    <!-- Resources Menu -->
+    <div class="relative flex items-center">
+      <button id="resources-menu" class="text-lg navButton flex items-center text-gray-600 dark:text-gray-200" aria-label="Open Resources Menu">
+        Resources
+        <i class="fas fa-chevron-down ml-2 text-sm"></i>
       </button>
-      <Dropdown triggeredBy="#avatar-menu" class="w-48">
-        {#each dropdownItems as item}
-          <DropdownItem on:click={() => handleItemClick(item.href)}>
+      <Dropdown triggeredBy="#resources-menu" class="w-56">
+        {#each resourceItems as item}
+          <DropdownItem on:click={() => handleItemClick(item.href)} class="py-2">
             <i class="{item.icon} mr-2"></i>
-            {item.label}
+            <span class="truncate">{item.label}</span>
           </DropdownItem>
         {/each}
+      </Dropdown>
+    </div>
+    
+    <!-- Wallet Menu -->
+    <div class="relative flex items-center gap-2">
+      <button id="avatar-menu" class="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors rounded-full" aria-label="Open Wallet Menu">
+        <i class="fas fa-wallet text-lg"></i>
+      </button>
+      <Dropdown triggeredBy="#avatar-menu" class="w-56">
+        <div class="px-4 py-2">
+          <div class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Wallet Options</div>
+          {#each walletItems as item}
+            <DropdownItem on:click={() => handleItemClick(item.href)} class="py-2">
+              <i class="{item.icon} mr-2"></i>
+              <span class="truncate">{item.label}</span>
+            </DropdownItem>
+          {/each}
+        </div>
         <DropdownDivider />
         <div class="px-4 py-2">
           <div class="flex items-center justify-between">
@@ -195,7 +231,7 @@
   <div
     bind:this={menuElement}
     transition:slide={{ duration: 200 }}
-    class="fixed right-0 top-0 h-full w-64 bg-[rgb(111,42,226)] z-50 shadow-lg touch-pan-x"
+    class="fixed right-0 top-0 h-full w-64 bg-gradient-to-b from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 z-50 shadow-lg touch-pan-x"
     on:touchstart={handleTouchStart}
     on:touchmove={handleTouchMove}
     on:touchend={handleTouchEnd}
@@ -203,14 +239,14 @@
   >
     <div class="flex flex-col p-4 space-y-4">
       <!-- Swipe hint -->
-      <div class="text-white/50 text-sm text-center pb-2">
+      <div class="text-gray-400 dark:text-white/50 text-sm text-center pb-2">
         Swipe right to close
       </div>
       
       {#each navItems as {href, label, external}}
         <a
           {href}
-          class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors flex items-center"
+          class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
           class:selected={activeLink ? isActiveLink(href) : false}
           target={external ? '_blank' : undefined}
           rel={external ? 'noopener noreferrer' : undefined}
@@ -221,22 +257,37 @@
         >
           {label}
           {#if external}
-            <span class="ml-1">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </span>
+            <i class="fas fa-external-link-alt ml-2 text-xs opacity-70"></i>
           {/if}
         </a>
       {/each}
 
-      <!-- Mobile Wallet Menu Items -->
-      <div class="border-t border-purple-400 pt-4">
-        <div class="text-white/70 text-sm font-medium px-4 mb-2">Wallet Options</div>
-        {#each dropdownItems as item}
+      <!-- Mobile Resources Menu -->
+      <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+        <div class="text-gray-500 dark:text-white/70 text-sm font-medium px-4 mb-2">Resources</div>
+        {#each resourceItems as item}
           <a
             href={item.href}
-            class="text-white text-lg py-2 px-4 rounded-lg hover:bg-[#d0bff2] hover:text-black transition-colors flex items-center"
+            class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
+            target={item.external ? '_blank' : undefined}
+            rel={item.external ? 'noopener noreferrer' : undefined}
+            on:click={() => {
+              closeMenu();
+            }}
+          >
+            <i class="{item.icon} mr-2"></i>
+            {item.label}
+          </a>
+        {/each}
+      </div>
+
+      <!-- Mobile Wallet Menu -->
+      <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+        <div class="text-gray-500 dark:text-white/70 text-sm font-medium px-4 mb-2">Wallet Options</div>
+        {#each walletItems as item}
+          <a
+            href={item.href}
+            class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
             on:click={() => {
               closeMenu();
             }}
@@ -248,9 +299,9 @@
       </div>
 
       <!-- Dark Mode Toggle -->
-      <div class="border-t border-purple-400 pt-4">
+      <div class="border-t border-gray-200 dark:border-slate-700 pt-4">
         <div class="flex items-center justify-between px-4 py-2">
-          <span class="text-white text-lg">Dark Mode</span>
+          <span class="text-gray-700 dark:text-white text-lg">Dark Mode</span>
           <DarkMode class="ml-3" on:change={handleDarkModeChange} />
         </div>
       </div>
@@ -273,7 +324,13 @@
 
   .navButton:hover,
   .selected {
-    background-color: #d0bff2;
-    color: black;
+    background-color: theme('colors.gray.100');
+    color: theme('colors.gray.900');
+  }
+
+  :global(.dark) .navButton:hover,
+  :global(.dark) .selected {
+    background-color: rgb(51, 65, 85);
+    color: white;
   }
 </style>

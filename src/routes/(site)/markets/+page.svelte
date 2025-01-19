@@ -2,7 +2,10 @@
     import { Card, Tooltip, Button, Spinner } from 'flowbite-svelte';
     import type { PageData } from './$types';
     import { invalidateAll } from '$app/navigation';
+    import { goto } from '$app/navigation';
+    import { browser } from '$app/environment';
     import PriceChart from '$lib/components/PriceChart.svelte';
+    import { TOKENS } from '$lib/utils/tokens';
   
     interface MarketData {
         price: number | null;
@@ -20,7 +23,31 @@
     }
   
     export let data: PageData;
+    $: ({ marketData, aggregates, circulatingSupply } = data);
   
+    // Filter state
+    let selectedToken: string;
+    
+    // Initialize selectedToken from URL or default to VOI
+    $: {
+        if (browser) {
+            const urlParams = new URLSearchParams(window.location.search);
+            selectedToken = urlParams.get('token') || 'VOI';
+        } else {
+            selectedToken = 'VOI';
+        }
+    }
+    
+    // Remove the client-side filtering since we're now doing it server-side
+    $: filteredMarketData = marketData;
+    
+    // Handle token changes
+    async function handleTokenChange(newToken: string) {
+        if (!browser) return;
+        await goto(`?token=${newToken}`, { keepFocus: true });
+        await refreshData();
+    }
+
     // Sorting state
     let sortColumn = 'tvl';
     let sortDirection: 'asc' | 'desc' = 'desc';
@@ -36,7 +63,7 @@
     };
   
     // Reactive sorted data
-    $: sortedMarketData = [...marketData].sort((a, b) => {
+    $: sortedMarketData = [...filteredMarketData].sort((a, b) => {
         const aValue = a[sortColumn as keyof typeof a];
         const bValue = b[sortColumn as keyof typeof b];
         
@@ -76,8 +103,6 @@
       return num > 0 ? `+${formatted}%` : `${formatted}%`;
     };
   
-    $: ({ marketData, aggregates, circulatingSupply } = data);
-
     // Calculate volume-weighted average price
     $: weightedAveragePrice = (() => {
         const marketsWithPriceAndVolume = (marketData as MarketData[]).filter(m => 
@@ -108,6 +133,7 @@
     let isRefreshing = false;
 
     async function refreshData() {
+        if (!browser) return;
         isRefreshing = true;
         try {
             await invalidateAll();
@@ -121,7 +147,7 @@
 
     async function handlePeriodChange(period: '24h' | '7d') {
         selectedPeriod = period;
-        const response = await fetch(`/api/price-history?period=${period}${selectedTradingPairId ? `&trading_pair_id=${selectedTradingPairId}` : ''}`);
+        const response = await fetch(`/api/price-history?period=${period}${selectedTradingPairId ? `&trading_pair_id=${selectedTradingPairId}` : ''}&token=${selectedToken}`);
         priceHistory = await response.json();
     }
 
@@ -133,7 +159,7 @@
         } else {
             selectedTradingPairId = market.trading_pair_id;
         }
-        const response = await fetch(`/api/price-history?trading_pair_id=${selectedTradingPairId}&period=${selectedPeriod}`);
+        const response = await fetch(`/api/price-history?trading_pair_id=${selectedTradingPairId}&period=${selectedPeriod}&token=${selectedToken}`);
         priceHistory = await response.json();
     }
   </script>
@@ -142,8 +168,26 @@
     <div class="max-w-7xl mx-auto">
       <!-- Header Section -->
       <header class="bg-white dark:bg-gray-800 shadow-lg rounded-2xl p-6 mb-8">
-        <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">VOI Markets</h1>
-        <p class="mt-2 text-xl text-gray-600 dark:text-gray-300">Track VOI token prices and market activity across exchanges</p>
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">VOI Markets</h1>
+            <p class="mt-2 text-xl text-gray-600 dark:text-gray-300">Track VOI token prices and market activity across exchanges</p>
+          </div>
+          
+          <div class="mt-4 md:mt-0 flex items-center gap-4">
+            <label for="token" class="text-gray-700 dark:text-gray-300">Token:</label>
+            <select
+              id="token"
+              bind:value={selectedToken}
+              on:change={() => handleTokenChange(selectedToken)}
+              class="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              {#each Object.values(TOKENS) as token}
+                <option value={token.symbol}>{token.symbol}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
       </header>
   
       <!-- Token Overview Section -->
@@ -162,6 +206,9 @@
               </div>
               <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {formatPrice(weightedAveragePrice)}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {Math.round(1 / weightedAveragePrice)} {selectedToken} = 1 USD
               </p>
             </div>
           </Card>

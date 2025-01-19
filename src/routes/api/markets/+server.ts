@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/supabase-server';
 import { fetchCirculatingSupply } from '$lib/utils/voi';
+import { TOKENS } from '$lib/utils/tokens';
 
 interface MarketSnapshot {
     price: number;
@@ -33,8 +34,20 @@ interface RawTradingPair {
     exchange: Exchange;
 }
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ url }) => {
     try {
+        // Get token parameter from URL
+        const token = url.searchParams.get('token');
+        
+        // Get token variants if a token is specified
+        let tokenVariants: string[] | null = null;
+        if (token) {
+            const tokenInfo = Object.values(TOKENS).find(t => t.symbol === token.toUpperCase());
+            if (tokenInfo) {
+                tokenVariants = tokenInfo.equivalents;
+            }
+        }
+
         // Fetch the circulating supply data
         const { circulatingSupply, percentDistributed } = await fetchCirculatingSupply();
 
@@ -48,8 +61,8 @@ export const GET: RequestHandler = async () => {
 
         if (timestampError) throw timestampError;
 
-        // Fetch market data with snapshots from the latest timestamp
-        const { data: marketData, error: marketError } = await supabasePrivateClient
+        // Build the query
+        let query = supabasePrivateClient
             .from('trading_pairs')
             .select(`
                 id,
@@ -78,6 +91,14 @@ export const GET: RequestHandler = async () => {
             `)
             .eq('market_snapshots.timestamp', latestSnapshot.timestamp);
 
+        // Add token filter if specified
+        if (tokenVariants && tokenVariants.length > 0) {
+            query = query.or(`base_token.in.(${tokenVariants.join(',')}),quote_token.in.(${tokenVariants.join(',')})`);
+        }
+
+        // Execute the query
+        const { data: marketData, error: marketError } = await query;
+
         if (marketError) throw marketError;
 
         // Process market data and sort by volume
@@ -90,7 +111,7 @@ export const GET: RequestHandler = async () => {
                     pair: `${market.base_token}/${market.quote_token}`,
                     type: market.exchange.type,
                     network: market.exchange.network,
-                    url: null, // We'll need to add this to the schema if needed
+                    url: null,
                     pool_url: market.pool_url,
                     price: latestSnapshot.price,
                     volume_24h: latestSnapshot.volume_24h,
