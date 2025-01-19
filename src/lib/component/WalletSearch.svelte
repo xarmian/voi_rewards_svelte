@@ -153,7 +153,7 @@
             bind:value={searchText}
             on:input={handleInput}
             class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2 pr-8 text-black dark:text-white"
-            placeholder="Search by name or address"
+            placeholder="Search by enVoi name or address"
         />
         {#if searchText}
             <button

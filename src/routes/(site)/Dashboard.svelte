@@ -4,18 +4,18 @@
 	import { writable } from 'svelte/store';
 	import { Modal } from 'flowbite-svelte';
 	import RewardsTable from './RewardsTable.svelte';
-	import DashboardCard from '$lib/components/DashboardCard.svelte';
-	import RecentProposers from '$lib/components/RecentProposers.svelte';
 	import MiniStakeChart from '$lib/components/MiniStakeChart.svelte';
 	import MiniBlockChart from '$lib/components/MiniBlockChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
 	import { getSupplyInfo, onlineStakeStore } from '$lib/stores/accounts';
 	import type { SupplyInfo } from '$lib/stores/accounts';
-	import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
+	import { getTokensByEpoch, extrapolateRewardPerBlock, formatNumber } from '$lib/utils';
 	import { dataTable } from '../..//stores/dataTable';
 	
 	const latestBlock = writable({ block: 0, timestamp: '' });
+	let currentPrice: number | null = null;
+	let priceChange24h: number | null = null;
 
 	function handleLatestBlock(event: CustomEvent) {
 		latestBlock.set(event.detail);
@@ -38,6 +38,7 @@
 	let onlineStakeHistory: any[] = [];
 	let eligibleOnlineStake = 0;
 	let isLoading = true;
+	let error: string | null = null;
 
 	const populateDateDropdown = async () => {
 		try {
@@ -50,9 +51,22 @@
 
 	const loadDashboardData = async (selectedDate: string) => {
 		isLoading = true;
+		error = null; // Reset error state
 		try {
-			const data = await dataTable.fetchData(selectedDate);
+			const [data, marketsResponse] = await Promise.all([
+				dataTable.fetchData(selectedDate),
+				fetch('/api/markets?token=VOI')
+			]);
 			
+			const marketsData = await marketsResponse.json();
+			if (marketsData.aggregates) {
+				currentPrice = marketsData.aggregates.weightedAveragePrice;
+				const firstMarket = marketsData.marketData[0];
+				if (firstMarket) {
+					priceChange24h = firstMarket.price_change_percentage_24h;
+				}
+			}
+
 			dataIncomplete = false;
 			if (data) {
 				const checkDate = new Date(
@@ -77,21 +91,37 @@
 				await updateRewardParams();
 				eligibleOnlineStake = getEligibleOnlineStake();
 			}
-		} catch (error) {
-			console.error('Error loading dashboard data:', error);
+		} catch (err) {
+			console.error('Error loading dashboard data:', err);
+			error = err instanceof Error ? err.message : 'Failed to load dashboard data';
 		} finally {
 			isLoading = false;
 		}
 	};
 
-
 	onMount(async () => {
-		// get online stake
-		supply = await getSupplyInfo();
-
-		await populateDateDropdown();
-		//await loadDashboardData(selectedDate);
+		isLoading = true;
+		try {
+			// get online stake
+			supply = await getSupplyInfo();
+			await populateDateDropdown();
+			
+			// If selectedDate was set by populateDateDropdown, it will trigger loadDashboardData
+			// If not, we need to load it explicitly
+			if (!selectedDate && dates.length > 0) {
+				selectedDate = dates[dates.length - 1].id;
+				await loadDashboardData(selectedDate);
+			}
+		} catch (error) {
+			console.error('Error initializing dashboard:', error);
+		} finally {
+			isLoading = false;
+		}
 	});
+
+	$: if (selectedDate) {
+		loadDashboardData(selectedDate);
+	}
 
 	const updateRewardParams = async () => {
 		const currentEpoch = dates.find(date => date.id === selectedDate)?.epoch || 1;
@@ -113,10 +143,6 @@
 			total_blocks_projected: projectedTotalBlocks,
 		}));
 	};
-
-	$: if (selectedDate) {
-		loadDashboardData(selectedDate);
-	}
 
 	async function refreshDashboardData() {
 		await loadDashboardData(selectedDate);
@@ -147,112 +173,223 @@
 
 </script>
 
-<div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8">
-	<div class="max-w-7xl mx-auto">
-		<div class="px-4 sm:px-6 lg:px-8">
-			<!--<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg shadow-lg mb-8 p-6 text-center">
-				<h2 class="text-2xl font-bold mb-2">Looking for Your TestNet Phase 2 Estimated Rewards?</h2>
-				<a href="/phase2" class="inline-block bg-white text-purple-600 font-semibold px-4 py-2 rounded-full hover:bg-purple-100 transition duration-300">Visit our Phase 2 Page Here!</a>
-			</div>-->
-
-			<!-- Dashboard Cards -->
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-				<!--<DashboardCard title="Last Block" value={$latestBlock.block > 0 ? $latestBlock.block.toLocaleString() : null} subvalue={$latestBlock.timestamp + " UTC"} info="The last block produced on the network." />-->
-				<!--<DashboardCard title="Participating Wallets" value={totalWallets > 0 ? totalWallets.toLocaleString() : null} info="The number of unique wallets that have proposed a block in the current epoch." />-->
-				<DashboardCard title="Blocks Rewarded" value={totalBlocks > 0 ? Math.floor(totalBlocks).toLocaleString() : null} subvalue={totalWallets > 0 ? totalWallets.toLocaleString() + ' accounts' : ''} info="The number of blocks produced in this Epoch that are earning rewards." />
-				<button
-					on:click={handleBlockChartClick}
-					on:keydown={(e) => e.key === 'Enter' && handleBlockChartClick()}
-					class="cursor-pointer w-full text-left"
-				>
-					<DashboardCard
-						title={"Rewards for Epoch " + dates.find(date => date.id === selectedDate)?.epoch}
-						value={$rewardParams.block_reward_pool > 0 ? `${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI` : null}
-						subvalue={totalBlocks > 0 ? '~' + $rewardParams.reward_per_block.toFixed(2) + ' VOI/block' : ''}
-						subvalue2={eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
-						info="Rewards distributed or to be distributed in the selected Epoch, and the average reward per block and APR based on the eligible online stake."
-					/>
-				</button>
-				<button
-					on:click={handleStakeChartClick}
-					on:keydown={(e) => e.key === 'Enter' && handleStakeChartClick()}
-					class="cursor-pointer w-full text-left"
-				>
-					<DashboardCard 
-						title="Online Stake" 
-						value={supply ? Math.round((supply?.['online-money']??0)/Math.pow(10,6)).toLocaleString() + ' VOI' : null} 
-						subvalue={`Eligible: ${eligibleOnlineStake > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : ''}`}
-						info="The total amount of VOI that is currently online and participating in the network, and the amount eligible for rewards." 
-					/>
-				</button>
-				<RecentProposers on:latestBlock={handleLatestBlock} {ballasts} />
-			</div>
-
-			<div class="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 p-4 mb-6">
-				<div class="flex">
-					<div class="flex-shrink-0">
-						<svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-						</svg>
-					</div>
-					<div class="ml-3">
-						<p class="text-sm text-yellow-700 dark:text-yellow-200">
-							Note: All reward calculations and estimates shown are preliminary and subject to change. The final reward distribution may differ from what is displayed.
-						</p>
-					</div>
+<div class="min-h-screen bg-gradient-to-b from-purple-100 via-white to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-800">
+	<!-- Hero Section -->
+	<div class="relative">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+			<div class="text-center">
+				<h1 class="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+					Welcome to Voi Network
+				</h1>
+				<p class="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+					Explore the ecosystem, track rewards, and participate in the future of decentralized consensus.
+				</p>
+				<div class="max-w-xl mx-auto relative z-20">
+					<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
 				</div>
 			</div>
+		</div>
+	</div>
 
-			<div class="flex justify-center items-center gap-3 mb-6">
-				<label 
-					for="epoch-selector" 
-					class="font-medium text-gray-700 dark:text-gray-300"
-				>
-				</label>
-				<select
-					id="epoch-selector"
-					bind:value={selectedDate}
-					class="block w-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-						rounded-lg px-4 py-2
-						focus:ring-2 focus:ring-purple-500 focus:border-purple-500
-						dark:text-gray-300 dark:focus:ring-purple-400
-						transition-colors duration-200"
-				>
-					{#each dates as date, index}
-						<option value={date.id}>
-							Epoch {index + 1}: {date.desc}
-						</option>
-					{/each}
-				</select>
+	{#if isLoading}
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+				{#each Array(4) as _}
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-pulse">
+						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+						<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
+						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+					</div>
+				{/each}
 			</div>
-
-			<div class="mb-6">
-				<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
+		</div>
+	{:else if error}
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+			<div class="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-100 px-4 py-3 rounded-lg relative" role="alert">
+				<strong class="font-bold">Error!</strong>
+				<span class="block sm:inline ml-2">{error}</span>
 			</div>
+		</div>
+	{:else}
+		<!-- Network Stats Section -->
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 px-8 relative z-10">
+			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Network Overview</h2>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+				<!-- Price Card -->
+				<a href="/markets" class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+					<div class="flex flex-col">
+						<div class="absolute top-2 right-2">
+							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
+								<i class="fas fa-chart-line text-gray-600 dark:text-gray-300 text-sm"></i>
+							</div>
+						</div>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Current Price</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">
+							${currentPrice ? formatNumber(currentPrice, 6) : '-.--'}
+							{#if priceChange24h}
+								<span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
+									{priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
+								</span>
+							{/if}
+						</p>
+					</div>
+					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Markets →</p>
+				</a>
 
-			<!-- Action Buttons -->
-			<div class="flex-col sm:flex-row justify-center gap-4 mb-8 hidden">
-				<a href="https://voinetwork.github.io/voi-swarm/getting-started/introduction/" target="_blank" class="btn-primary">
-					Learn to Run a Node
-				</a>
-				<a href="/leaderboard" class="btn-secondary">
-					Phase 2 Leaderboard
-				</a>
-				<a href="/phase2" class="btn-secondary">
-					Phase 2 Reward Estimates
+				<!-- Online Stake Card -->
+				<button
+					on:click={handleStakeChartClick}
+					class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+				>
+					<div class="flex flex-col">
+						<div class="absolute top-2 right-2">
+							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
+								<i class="fas fa-chart-area text-gray-600 dark:text-gray-300 text-sm"></i>
+							</div>
+						</div>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Online Stake</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">
+							{supply ? Math.round((supply?.['online-money']??0)/Math.pow(10,6)).toLocaleString() + ' VOI' : '-'}
+						</p>
+						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+							Eligible: {eligibleOnlineStake > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : '-'}
+						</p>
+					</div>
+					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Chart →</p>
+				</button>
+
+				<!-- Rewards Card -->
+				<button
+					on:click={handleBlockChartClick}
+					class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+				>
+					<div class="flex flex-col">
+						<div class="absolute top-2 right-2">
+							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
+								<i class="fas fa-gift text-gray-600 dark:text-gray-300 text-sm"></i>
+							</div>
+						</div>
+						<p class="text-sm text-gray-500 dark:text-gray-400">{"Rewards for Epoch " + (dates.find(date => date.id === selectedDate)?.epoch || '-')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">
+							{$rewardParams.block_reward_pool > 0 ? `${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI` : '-'}
+						</p>
+						<p class="text-sm text-gray-500 dark:text-gray-400">
+							{eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
+						</p>
+					</div>
+					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Details →</p>
+				</button>
+
+				<!-- Participation Card -->
+				<a href="/analytics" class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+					<div class="flex flex-col">
+						<div class="absolute top-2 right-2">
+							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
+								<i class="fas fa-users text-gray-600 dark:text-gray-300 text-sm"></i>
+							</div>
+						</div>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Network Participation</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">
+							{totalWallets > 0 ? totalWallets.toLocaleString() : '-'}
+						</p>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Active Accounts</p>
+					</div>
+					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Analytics →</p>
 				</a>
 			</div>
 		</div>
-		
-		<!-- Rewards Table -->
-		{#if dataArrays.length > 0}
-			<div class="sm:px-4">
-				<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />
+
+		<!-- Quick Links Section -->
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Links</h2>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+				<!-- Run a Node Card -->
+				<a href="/how_to_node" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+					<div class="flex items-center mb-4">
+						<div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+							<i class="fas fa-server text-2xl text-purple-600 dark:text-purple-400"></i>
+						</div>
+						<div class="ml-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Run a Node</h3>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Start participating in consensus</p>
+						</div>
+					</div>
+				</a>
+
+				<!-- Calculator Card -->
+				<a href="/calculator" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+					<div class="flex items-center mb-4">
+						<div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+							<i class="fas fa-calculator text-2xl text-purple-600 dark:text-purple-400"></i>
+						</div>
+						<div class="ml-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Calculator</h3>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Calculate potential rewards</p>
+						</div>
+					</div>
+				</a>
+
+				<!-- Directory Card -->
+				<a href="/directory" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+					<div class="flex items-center mb-4">
+						<div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+							<i class="fas fa-book text-2xl text-blue-600 dark:text-blue-400"></i>
+						</div>
+						<div class="ml-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Directory</h3>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Explore the ecosystem</p>
+						</div>
+					</div>
+				</a>
+
+				<!-- FAQ Card -->
+				<a href="/faq" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+					<div class="flex items-center mb-4">
+						<div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+							<i class="fas fa-question-circle text-2xl text-green-600 dark:text-green-400"></i>
+						</div>
+						<div class="ml-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">FAQ</h3>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Get your questions answered</p>
+						</div>
+					</div>
+				</a>
 			</div>
-		{/if}
-	</div>
+		</div>
+
+		<!-- Rewards Section -->
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+			<div class="flex items-center justify-between mb-6">
+				<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Epoch Reward Estimates</h2>
+				<div class="flex items-center gap-4">
+					<select
+						id="epoch-selector"
+						bind:value={selectedDate}
+						class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
+							rounded-lg px-4 py-2
+							focus:ring-2 focus:ring-purple-500 focus:border-purple-500
+							dark:text-gray-300 dark:focus:ring-purple-400
+							transition-colors duration-200"
+					>
+						{#each dates as date, index}
+							<option value={date.id}>
+								Epoch {index + 1}: {date.desc}
+							</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+
+			{#if dataArrays.length > 0}
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden p-4">
+					<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />
+				</div>
+			{/if}
+		</div>
+	{/if}
 </div>
 
+<!-- Modals -->
 {#if showEnlargedStakeChart}
 <Modal bind:open={showEnlargedStakeChart} size="xl">
 	<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
@@ -261,7 +398,7 @@
 	{:else}
 		<p>Loading chart data...</p>
 	{/if}
-	</Modal>
+</Modal>
 {/if}
 
 {#if showEnlargedBlockChart}
@@ -272,14 +409,11 @@
 	{:else}
 		<p>Loading chart data...</p>
 	{/if}
-	</Modal>
+</Modal>
 {/if}
 
-<style lang="postcss">
-	.btn-primary {
-		@apply bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
-	}
-	.btn-secondary {
-		@apply bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
+<style>
+	:global(.rewards-table) {
+		@apply rounded-lg overflow-hidden;
 	}
 </style>

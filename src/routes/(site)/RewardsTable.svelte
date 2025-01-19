@@ -454,17 +454,34 @@
       </TableBodyRow>
     </TableBody>
   </Table>
-  <div class="flex justify-between">
+  <div class="flex justify-between items-center gap-4">
     <button
-      class="px-4 py-2 bg-blue-500 text-white"
+      class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
       on:click={() => currentPage = Math.max(1, currentPage - 1)}
       disabled={currentPage === 1}
     >
       Previous
     </button>
-    <div>Page {currentPage} of {Math.ceil(filterItems.length / itemsPerPage)}</div>
+    <div class="flex items-center gap-2">
+      <span>Page</span>
+      <input
+        type="number"
+        bind:value={currentPage}
+        min="1"
+        max={Math.ceil(filterItems.length / itemsPerPage)}
+        class="w-16 px-2 py-1 border rounded text-center"
+        on:change={(e) => {
+          const value = parseInt(e.currentTarget.value);
+          const maxPage = Math.ceil(filterItems.length / itemsPerPage);
+          if (value < 1) currentPage = 1;
+          else if (value > maxPage) currentPage = maxPage;
+          else currentPage = value;
+        }}
+      />
+      <span>of {Math.ceil(filterItems.length / itemsPerPage)}</span>
+    </div>
     <button
-      class="px-4 py-2 bg-blue-500 text-white"
+      class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
       on:click={() => currentPage = Math.min(Math.ceil(filterItems.length / itemsPerPage), currentPage + 1)}
       disabled={currentPage * itemsPerPage >= filterItems.length}
     >
