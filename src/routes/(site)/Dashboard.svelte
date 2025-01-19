@@ -192,14 +192,45 @@
 
 	{#if isLoading}
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+			<!-- Loading animation for stats cards -->
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-				{#each Array(4) as _}
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-pulse">
-						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
-						<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
-						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+				{#each Array(4) as _, i}
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative overflow-hidden">
+						<!-- Animated gradient overlay -->
+						<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
+						
+						<!-- Card content skeleton -->
+						<div class="flex flex-col gap-3">
+							<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 animate-pulse"></div>
+							<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-2/3 animate-pulse"></div>
+							<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+							
+							<!-- Animated icon placeholder -->
+							<div class="absolute top-2 right-2">
+								<div class="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 animate-spin-slow"></div>
+							</div>
+						</div>
 					</div>
 				{/each}
+			</div>
+
+			<!-- Loading animation for quick links -->
+			<div class="mt-12">
+				<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-6 animate-pulse"></div>
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+					{#each Array(4) as _}
+						<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative overflow-hidden">
+							<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
+							<div class="flex items-center">
+								<div class="w-12 h-12 rounded-lg bg-purple-100/50 dark:bg-purple-900/50 animate-pulse"></div>
+								<div class="ml-4 flex-1">
+									<div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2 animate-pulse"></div>
+									<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
 	{:else if error}

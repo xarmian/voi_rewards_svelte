@@ -77,11 +77,22 @@
         if (browser) {
             window.addEventListener('hashchange', handleHashChange);
             document.addEventListener('click', handleClickOutside);
+            
+            // Initialize wallet subscription only on client side
+            unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
+                if (!loading && wallet?.address && wallet.address != walletId) {
+                    if (parentWalletId != wallet.address) {
+                        goto(`/wallet/${wallet.address}`, { invalidateAll: true });
+                    }
+                }
+            });
         }
     });
 
     onDestroy(() => {
-        unsubSelectedWallet();
+        if (browser && unsubSelectedWallet) {
+            unsubSelectedWallet();
+        }
         
         if (browser) {
             window.removeEventListener('hashchange', handleHashChange);
@@ -104,13 +115,7 @@
         }
     }
 
-    const unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
-        if (!loading && wallet?.address && wallet.address != walletId) {
-            if (parentWalletId != wallet.address) {
-                goto(`/wallet/${wallet.address}`, { invalidateAll: true });
-            }
-        }
-    });
+    let unsubSelectedWallet: (() => void) | undefined;
 
     interface Account {
       address: string;
@@ -212,7 +217,9 @@
           estimatedRewardsPerMonth: monthlyReward
         };
 
-        selectedWallet.set({address: address, app: ''});
+        if (browser) {
+          selectedWallet.set({address: address, app: ''});
+        }
 
         // Handle child accounts similarly
         const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;

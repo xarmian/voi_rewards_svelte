@@ -115,6 +115,24 @@ export async function getConsensusInfo(address: string): Promise<ConsensusDetail
         const response = await fetch(url, { cache: 'no-store' });
         
         if (!response.ok) {
+            if (response.status === 500) {
+                // Return empty consensus info for new/inactive wallets
+                const emptyConsensus: ConsensusDetails = {
+                    first_block: 0,
+                    last_block: 0,
+                    last_vote_block: 0,
+                    last_vote_timestamp: new Date().toISOString(),
+                    total_blocks: 0,
+                    vote_count: 0
+                };
+                
+                consensusInfo.update(current => ({
+                    ...current,
+                    [address]: emptyConsensus
+                }));
+                
+                return emptyConsensus;
+            }
             throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
         }
         
@@ -128,6 +146,7 @@ export async function getConsensusInfo(address: string): Promise<ConsensusDetail
         return data;
     } catch (error) {
         console.error('Error fetching consensus info:', error);
+        // Return undefined to indicate error, but don't cache the error
         return undefined;
     }
 }

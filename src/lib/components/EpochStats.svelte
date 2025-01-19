@@ -253,7 +253,7 @@
             tooltip: {
                 trigger: 'axis',
                 axisPointer: {
-                    type: 'shadow'
+                    type: 'cross'
                 },
                 backgroundColor: isDarkMode ? '#1F2937' : 'white',
                 borderColor: isDarkMode ? '#374151' : '#E5E7EB',
@@ -272,7 +272,7 @@
                 }
             },
             legend: {
-                data: ['Online Stake', 'Eligible Stake', 'Ballast and BA Stake'],
+                data: ['Total Online Stake', 'Eligible Stake', 'Ballast and BA Stake'],
                 textStyle: {
                     color: textColor
                 },
@@ -311,18 +311,26 @@
             },
             series: [
                 {
-                    name: 'Online Stake',
-                    type: 'bar',
-                    stack: 'total',
+                    name: 'Total Online Stake',
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 8,
                     data: epochs.map(e => e.online_stake / 1_000_000),
+                    lineStyle: {
+                        color: isDarkMode ? '#34D399' : '#10B981',
+                        width: 3
+                    },
                     itemStyle: {
-                        color: isDarkMode ? '#34D399' : '#10B981'
+                        color: isDarkMode ? '#34D399' : '#10B981',
+                        borderColor: isDarkMode ? '#1F2937' : 'white',
+                        borderWidth: 2
                     }
                 },
                 {
                     name: 'Eligible Stake',
                     type: 'bar',
-                    stack: 'total',
+                    stack: 'breakdown',
                     data: epochs.map(e => e.eligible_online_stake / 1_000_000),
                     itemStyle: {
                         color: isDarkMode ? '#818CF8' : '#6366F1'
@@ -331,7 +339,7 @@
                 {
                     name: 'Ballast and BA Stake',
                     type: 'bar',
-                    stack: 'total',
+                    stack: 'breakdown',
                     data: epochs.map(e => e.ballast_stake / 1_000_000),
                     itemStyle: {
                         color: isDarkMode ? '#F87171' : '#EF4444'

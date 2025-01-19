@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-    import { Chart, Svg, Axis, Bars, Legend } from 'layerchart';
-    import { Highlight, Tooltip } from 'layerchart';
-    import { scaleBand } from 'd3-scale';
+	import { onMount, onDestroy } from 'svelte';
+    import { browser } from '$app/environment';
+    import * as echarts from 'echarts';
+    import type { EChartsOption } from 'echarts';
     import { format, PeriodType } from 'svelte-ux';
     import { Spinner } from 'flowbite-svelte';
     import { config } from '../config';
@@ -17,7 +17,8 @@
     $: data = [];
 
     let screenSize: number;
-    let idx = 0;
+    let chartDiv: HTMLElement;
+    let chart: echarts.ECharts | null = null;
 
     let supply: any;
     $: accountInfo = null as Account | null;
@@ -25,10 +26,68 @@
     let historicalExpectedProposals: any = {};
 
     let isLoading = false;
+    let isMounted = false;
 
-    $: {
-        if (walletId) {
-            updateChartData();
+    // Watch for wallet changes
+    $: if (walletId && isMounted) {
+        console.log('Wallet ID changed, updating data...', { walletId, isMounted });
+        updateChartData();
+    }
+
+    // Track when chartDiv becomes available and data changes
+    $: if (chartDiv && browser && data.length > 0) {
+        console.log('Chart div available or data updated, ensuring chart is ready');
+        ensureChart();
+    }
+
+    // Track when chartDiv is removed (during loading)
+    $: if (!chartDiv && chart) {
+        console.log('Chart div removed, cleaning up chart instance');
+        chart.dispose();
+        chart = null;
+    }
+
+    function ensureChart() {
+        if (!chartDiv || !browser) return;
+        
+        try {
+            // Force the div to have dimensions if they're missing
+            if (!chartDiv.clientWidth || !chartDiv.clientHeight) {
+                console.log('Forcing chart dimensions');
+                chartDiv.style.width = '100%';
+                chartDiv.style.height = '300px';
+            }
+
+            if (!chart) {
+                console.log('Initializing new chart with div dimensions:', {
+                    width: chartDiv.clientWidth,
+                    height: chartDiv.clientHeight
+                });
+                
+                chart = echarts.init(chartDiv);
+                console.log('Chart initialized:', chart);
+
+                // Set up theme observer
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'class') {
+                            updateChartTheme();
+                        }
+                    });
+                });
+
+                observer.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+
+                window.addEventListener('resize', handleResize);
+            }
+            
+            // Update chart with current data
+            updateChart();
+        } catch (error) {
+            console.error('Error in ensureChart:', error);
         }
     }
 
@@ -37,7 +96,13 @@
     }
 
     async function updateChartData() {
+      if (isLoading) return;
+      
+      console.log('Starting updateChartData...');
       isLoading = true;
+
+      // Don't dispose of the chart here anymore, let the reactive statement handle it
+      
       const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
       try {
         const [response, accountInfoResult, supplyResult] = await Promise.all([
@@ -47,6 +112,7 @@
         ]);
           
         apiData = await response.json();
+        console.log('Received API data:', apiData);
         accountInfo = accountInfoResult ?? null;
         supply = supplyResult;
         
@@ -64,13 +130,13 @@
         }
 
         const chartData = await fetchOnlineStakeHistory();
+        console.log('Received chart data:', chartData);
 
         // Calculate expected proposals using chartData
         historicalExpectedProposals = {};
         chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
             if (new Date(dayData.date) < new Date('2024-10-30')) return;
             if (dayData.avg_online_stake) {
-
                 const balance = Number(accountInfo?.amount ?? 0);
                 const secondsPerDay = 24 * 60 * 60;
                 const blocksPerDay = secondsPerDay / 2.8;
@@ -86,41 +152,174 @@
         }));
 
         data.sort((a: {date: Date}, b: {date: Date}) => a.date.getTime() - b.date.getTime());
+        console.log('Processed data:', data);
       } catch (error) {
-        console.error(error);
+        console.error('Error in updateChartData:', error);
       } finally {
         isLoading = false;
       }
-
     }
 
-    const xAxisFormat = (d: Date) => {
-            idx++;
-            if (screenSize < 768 && (idx-1) % 5 !== 0) {
-                return '';
-            }
-            return format(d, PeriodType.Day, { variant: "short" });
-    };
+    function updateChart() {
+        console.log('updateChart called with conditions:', {
+            chartExists: !!chart,
+            dataLength: data.length,
+            isBrowser: browser,
+            chartDivExists: !!chartDiv
+        });
+        
+        if (!chart || !data.length || !browser) return;
 
-    onMount(async () => {
+        const isDarkMode = document.documentElement.classList.contains('dark');
+        const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
+        const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
+        const backgroundColor = 'transparent';
+
+        const options: EChartsOption = {
+            backgroundColor,
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                backgroundColor: isDarkMode ? '#1F2937' : 'white',
+                borderColor: isDarkMode ? '#374151' : '#E5E7EB',
+                textStyle: {
+                    color: textColor
+                },
+                formatter: (params: any) => {
+                    if (!Array.isArray(params)) return '';
+                    const date = new Date(params[0].axisValue);
+                    const formattedDate = format(date, PeriodType.Custom, {
+                        custom: "eee, MMMM do",
+                    });
+                    let result = `${formattedDate}<br/>`;
+                    const expected = params.find((p: any) => p.seriesName === 'Expected Proposals');
+                    const actual = params.find((p: any) => p.seriesName === 'Actual Proposals');
+                    if (expected) {
+                        result += `Expected Proposals: ${Math.round(expected.value)}<br/>`;
+                    }
+                    if (actual) {
+                        result += `Actual Proposals: ${Math.round(actual.value)}<br/>`;
+                    }
+                    if (expected && actual) {
+                        const diff = actual.value - expected.value;
+                        result += `Difference: ${diff > 0 ? '+' : ''}${Math.round(diff)}`;
+                    }
+                    return result;
+                }
+            },
+            animation: false,
+            legend: {
+                data: ['Expected Proposals', 'Actual Proposals'],
+                textStyle: {
+                    color: textColor
+                },
+                top: 0
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '40',
+                top: '40',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                data: data.map((d: any) => d.date.toISOString()),
+                axisLabel: {
+                    color: textColor,
+                    rotate: 45,
+                    formatter: (value: string) => {
+                        const date = new Date(value);
+                        return format(date, PeriodType.Day, { variant: "short" });
+                    }
+                },
+                axisLine: {
+                    lineStyle: { color: gridColor }
+                },
+                axisTick: {
+                    alignWithLabel: true
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLabel: {
+                    color: textColor
+                },
+                axisLine: {
+                    lineStyle: { color: gridColor }
+                },
+                splitLine: {
+                    lineStyle: { color: gridColor }
+                }
+            },
+            series: [
+                {
+                    name: 'Expected Proposals',
+                    type: 'bar',
+                    data: data.map((d: any) => d.expected),
+                    itemStyle: {
+                        color: isDarkMode ? '#34D399' : '#10B981'
+                    },
+                    barGap: '0%',
+                    barWidth: '40%'
+                },
+                {
+                    name: 'Actual Proposals',
+                    type: 'bar',
+                    data: data.map((d: any) => d.actual),
+                    itemStyle: {
+                        color: isDarkMode ? '#60A5FA' : '#3B82F6'
+                    },
+                    barGap: '0%',
+                    barWidth: '40%'
+                }
+            ]
+        };
+
+        try {
+            console.log('Setting chart options:', options);
+            chart.setOption(options, true);
+            console.log('Chart options set successfully');
+        } catch (error) {
+            console.error('Error updating chart:', error);
+        }
+    }
+
+    function handleResize() {
+        if (!chart || !browser) return;
+        try {
+            chart.resize();
+        } catch (error) {
+            console.error('Error resizing chart:', error);
+        }
+    }
+
+    // Watch for theme changes
+    function updateChartTheme() {
+        if (!chart) return;
+        updateChart();
+    }
+
+    onMount(() => {
+        console.log('Component mounting...', { browser });
+        if (!browser) return;
+        
+        console.log('Browser environment confirmed');
+        isMounted = true;
     });
 
-    function formatTime(seconds: number) {
-        const hours = Math.floor(seconds / (60 * 60));
-        const minutes = Math.floor((seconds % (60 * 60)) / 60);
-        return `${hours}h ${minutes}m`;
-    }
+    onDestroy(() => {
+        if (browser && chart) {
+            chart.dispose();
+        }
+        if (browser) {
+            window.removeEventListener('resize', handleResize);
+        }
+    });
 
-    function calculateAverageBlockTime() {
-        if (!accountInfo?.amount || !supply?.['online-money']) return null;
-        const balance = Number(accountInfo.amount);
-        const secondsPerDay = 24 * 60 * 60;
-        const blocksPerDay = secondsPerDay / 2.8; // 2.8 seconds per block
-        const dailyBlocks = (balance / supply['online-money']) * blocksPerDay;
-        return secondsPerDay / dailyBlocks;
-    }
-
-    $: screenSize = window?.innerWidth ?? 1024;
+    $: screenSize = browser ? window?.innerWidth ?? 1024 : 1024;
 </script>
 
 <svelte:window bind:innerWidth={screenSize} />
@@ -162,95 +361,12 @@
                 </div>
               </div>
             {/if}
-            <div class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded">
-                <Chart
-                    {data}
-                    x="date"
-                    xScale={scaleBand().padding(0.4)}
-                    y={["actual", "expected"]}
-                    yDomain={[0, null]}
-                    yNice={4}
-                    padding={{ left: 40, bottom: 40, right: 20, top: 40 }}
-                    tooltip={{ mode: "band" }}
-                >
-                    <Legend
-                            class="text-sm text-gray-600 dark:text-gray-300 flex flex-row"
-                            placement="top-right"
-                        >
-                            <div class="w-4 h-4 rounded bg-blue-500 dark:bg-blue-400 mr-2">
-                            </div>
-                            <div class="text-gray-600 dark:text-gray-300 mr-4">Actual Proposals</div>
-                            <div class="w-4 h-4 rounded bg-green-500 dark:bg-green-400 mr-2">
-                            </div>
-                            <div class="text-gray-600 dark:text-gray-300 mr-2">Expected Proposals</div>
-                    </Legend>
-                <Svg>
-                    <Axis 
-                        placement="left" 
-                        grid 
-                        rule={{ class: "stroke-danger" }}
-                        tickLabelProps={{
-                            class: "fill-gray-600 dark:fill-gray-300 text-sm",
-                        }}
-                    />
-                    <Axis
-                        placement="bottom"
-                        format={xAxisFormat}
-                        rule={{ class: "stroke-gray-200 dark:stroke-gray-700" }}
-                        tickLabelProps={{
-                            class: "fill-gray-600 dark:fill-gray-300 text-sm",
-                            rotate: 315,
-                            textAnchor: "end",
-                        }}
-                    />
-                    <Bars 
-                        y="actual"
-                        radius={4} 
-                        strokeWidth={1} 
-                        class="fill-blue-500 dark:fill-blue-400 hover:fill-blue-600 dark:hover:fill-blue-500 transition-colors"
-                    />
-                    <Bars 
-                        y="expected"
-                        radius={4} 
-                        strokeWidth={1} 
-                        class="fill-green-500 dark:fill-green-400 hover:fill-green-600 dark:hover:fill-green-500 transition-colors w-2" 
-                    />
-                    <Highlight area={{ class: "fill-blue-200 dark:fill-blue-400 opacity-30" }} />
-                </Svg>
-                <Tooltip.Root let:data>
-                    <div class="bg-white dark:bg-gray-800 p-2 rounded shadow">
-                        <Tooltip.Header class="font-bold text-gray-800 dark:text-gray-200">
-                            {format(data.date, PeriodType.Custom, {
-                                custom: "eee, MMMM do",
-                            })}
-                        </Tooltip.Header>
-                        <Tooltip.List>
-                          <Tooltip.Item 
-                            label="Expected Proposals" 
-                            value={data.expected.toFixed(0)} 
-                            labelClass="text-gray-600 dark:text-gray-300"
-                            valueClass="text-green-500 dark:text-green-400 font-semibold"
-                          />
-                          <Tooltip.Item 
-                              label="Actual Proposals" 
-                              value={data.actual.toFixed(0)} 
-                              labelClass="text-gray-600 dark:text-gray-300"
-                              valueClass="text-blue-500 dark:text-blue-400 font-semibold"
-                          />
-                          <Tooltip.Item 
-                            label="Difference" 
-                            value={`${data.actual > data.expected ? '+' : ''}${(data.actual - data.expected).toFixed(0)}`} 
-                            labelClass="text-gray-600 dark:text-gray-300"
-                            valueClass="text-red-500 dark:text-red-400 font-semibold pt-2"
-                          />
-                        </Tooltip.List>
-                    </div>
-                </Tooltip.Root>
-            </Chart>
-        </div>
+            <div 
+                class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded" 
+                bind:this={chartDiv}
+                style="min-height: 300px; width: 100%; position: relative;"
+            ></div>
         {/if}
     </div>
 </div>
-<style>
-</style>
 
