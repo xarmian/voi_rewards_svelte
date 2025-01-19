@@ -68,7 +68,6 @@
   }
 </script>
 
-<div class="bg-gradient-to-b from-purple-100 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8 relative">
   <div class="flex flex-col md:flex-row items-center mt-4 mb-4 justify-between">
     <span> </span>
     <h1 class="text-5xl font-bold text-center mb-4">Voi Directory</h1>
@@ -119,4 +118,3 @@
       <p class="text-center text-2xl mt-16">Projects Loading...</p>
     {/if}
   </div>
-</div>

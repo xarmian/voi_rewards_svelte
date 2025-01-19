@@ -173,7 +173,6 @@
 
 </script>
 
-<div class="min-h-screen bg-gradient-to-b from-purple-100 via-white to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-800">
 	<!-- Hero Section -->
 	<div class="relative">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
@@ -360,10 +359,10 @@
 		</div>
 
 		<!-- Rewards Section -->
-		<div id="rewards-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-			<div class="flex items-center justify-between mb-6">
+		<div id="rewards-section" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-12 relative z-10">
+			<div class="flex flex-col sm:flex-row items-center justify-between mb-6">
 				<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Epoch Reward Estimates</h2>
-				<div class="flex items-center gap-4">
+				<div class="flex items-center gap-4 mt-4 sm:mt-0">
 					<select
 						id="epoch-selector"
 						bind:value={selectedDate}
@@ -389,7 +388,6 @@
 			{/if}
 		</div>
 	{/if}
-</div>
 
 <!-- Modals -->
 {#if showEnlargedStakeChart}

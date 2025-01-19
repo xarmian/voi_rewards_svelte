@@ -37,7 +37,7 @@
   let viewWalletId = '';
 
   let currentPage = 1;
-  let itemsPerPage = 50;
+  let itemsPerPage = 20;
 
   let isRefreshing = false;
   let lastUpdateTime: Date | null = null;
@@ -228,7 +228,7 @@
 <div class="overflow-auto ml-0 mr-0 md:ml-6 md:mr-6 flex flex-col">
     <div class="flex justify-between items-center gap-4">
       <div class="flex flex-col md:flex-row items-center gap-4 flex-1">
-        <TableSearch placeholder="Filter by Wallet, NFD, or Node name" hoverable={true} bind:inputValue={searchTerm} innerDivClass="w-full" />
+        <TableSearch placeholder="Filter by Address or enVoi name" hoverable={true} bind:inputValue={searchTerm} innerDivClass="w-full" inputClass="w-64 sm:w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 ps-10 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" />
         <div class="flex items-center gap-2">
           <Toggle bind:checked={showOnlyFavorites}>
             <StarSolid class="w-4 h-4 text-yellow-300" />
