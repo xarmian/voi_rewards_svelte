@@ -31,7 +31,7 @@
 			</button>
 		</div>
 	{/if}
-	<main class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+	<main class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-0 sm:px-6 lg:px-8">
 		<slot />
 	</main>
 	<SvelteToast {options} />
