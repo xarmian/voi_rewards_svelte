@@ -67,6 +67,13 @@
 				}
 			}
 
+			const { data: onlineAccountCount, error: onlineAccountCountError } = await fetch('/api/mimir?action=get_online_account_count').then(res => res.json());
+			if (onlineAccountCountError) {
+				console.error('Error fetching online account count:', onlineAccountCountError);
+			} else {
+				totalWallets = onlineAccountCount;
+			}
+
 			dataIncomplete = false;
 			if (data) {
 				const checkDate = new Date(
@@ -84,7 +91,7 @@
 				// Update local state
 				dataArrays = data.data;
 				ballasts = data.blacklist;
-				totalWallets = data.num_proposers;
+				//totalWallets = data.num_proposers;
 				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
 				
@@ -292,7 +299,7 @@
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">
 							{totalWallets > 0 ? totalWallets.toLocaleString() : '-'}
 						</p>
-						<p class="text-sm text-gray-500 dark:text-gray-400">Active Accounts</p>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Online Accounts</p>
 					</div>
 					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Analytics →</p>
 				</a>

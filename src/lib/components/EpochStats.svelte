@@ -42,20 +42,23 @@
     let currentPrice: number | null = null;
     let priceChange24h: number | null = null;
     let priceHistory: PriceData[] = [];
+    let onlineAccountCount: number | null = null;
 
     onMount(() => {
         mounted = true;
         const fetchData = async () => {
             try {
-                const [epochsResponse, marketsResponse, priceHistoryResponse] = await Promise.all([
+                const [epochsResponse, marketsResponse, priceHistoryResponse, onlineAccountsResponse] = await Promise.all([
                     fetch('/api/epochs'),
                     fetch('/api/markets?token=VOI'),
-                    fetch('/api/price-history?period=7d')
+                    fetch('/api/price-history?period=7d'),
+                    fetch('/api/mimir')
                 ]);
                 
                 const epochsData = await epochsResponse.json();
                 const marketsData = await marketsResponse.json();
                 const priceHistoryData = await priceHistoryResponse.json();
+                const onlineAccountsData = await onlineAccountsResponse.json();
                 
                 if ('error' in epochsData) {
                     throw new Error(epochsData.error);
@@ -63,6 +66,7 @@
                 
                 epochs = epochsData.epochs;
                 currentEpoch = epochsData.current_epoch;
+                onlineAccountCount = onlineAccountsData.data;
                 
                 if (marketsData.aggregates) {
                     currentPrice = marketsData.aggregates.weightedAveragePrice;
@@ -572,7 +576,7 @@
                             </div>
                             <p class="text-sm text-gray-500 dark:text-gray-400">Current Price</p>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                                ${currentPrice ? formatNumber(currentPrice, 4) : '-.--'}
+                                ${currentPrice ? formatNumber(currentPrice, 6) : '-.--'}
                                 {#if priceChange24h}
                                     <span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
                                         {priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
@@ -648,7 +652,7 @@
                                 </div>
                             </div>
                             <p class="text-sm text-gray-500 dark:text-gray-400">Participating Accounts</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(latest.participating_wallets)}</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{onlineAccountCount !== null ? formatNumber(onlineAccountCount) : '---'}</p>
                         </div>
                     </div>
                 {/if}
@@ -677,7 +681,7 @@
             <!-- Participating Wallets Chart -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Participating Accounts Trend</h2>
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Rewarded Accounts Trend</h2>
                     <a href="/" class="flex items-center text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
                         View rewards dashboard
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
