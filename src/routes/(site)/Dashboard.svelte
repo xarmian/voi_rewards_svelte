@@ -5,7 +5,6 @@
 	import { Modal } from 'flowbite-svelte';
 	import RewardsTable from './RewardsTable.svelte';
 	import MiniStakeChart from '$lib/components/MiniStakeChart.svelte';
-	import MiniBlockChart from '$lib/components/MiniBlockChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
 	import { getSupplyInfo, onlineStakeStore } from '$lib/stores/accounts';
@@ -34,7 +33,6 @@
 	let supply: SupplyInfo | null = null;
 	let ballasts: string[] = [];
 	let showEnlargedStakeChart = false;
-	let showEnlargedBlockChart = false;
 	let onlineStakeHistory: any[] = [];
 	let eligibleOnlineStake = 0;
 	let isLoading = true;
@@ -164,11 +162,6 @@
 		showEnlargedStakeChart = true;
 	}
 
-	function handleBlockChartClick() {
-		fetchOnlineStakeHistory();
-		showEnlargedBlockChart = true;
-	}
-
 	function handleWalletSearch(address: string) {
 		goto(`/wallet/${address}`);
 	}
@@ -219,7 +212,7 @@
 		</div>
 	{:else}
 		<!-- Network Stats Section -->
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 px-8 relative z-10">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
 			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Network Overview</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 				<!-- Price Card -->
@@ -267,7 +260,9 @@
 
 				<!-- Rewards Card -->
 				<button
-					on:click={handleBlockChartClick}
+					on:click={() => {
+						document.querySelector('#rewards-section')?.scrollIntoView({ behavior: 'smooth' });
+					}}
 					class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
 				>
 					<div class="flex flex-col">
@@ -365,7 +360,7 @@
 		</div>
 
 		<!-- Rewards Section -->
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+		<div id="rewards-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
 			<div class="flex items-center justify-between mb-6">
 				<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Epoch Reward Estimates</h2>
 				<div class="flex items-center gap-4">
@@ -402,17 +397,6 @@
 	<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
 	{#if onlineStakeHistory.length > 0}
 		<MiniStakeChart chartData={onlineStakeHistory} />
-	{:else}
-		<p>Loading chart data...</p>
-	{/if}
-</Modal>
-{/if}
-
-{#if showEnlargedBlockChart}
-<Modal bind:open={showEnlargedBlockChart} size="xl">
-	<h2 class="text-2xl font-bold mb-4">Block Production History</h2>
-	{#if onlineStakeHistory.length > 0}
-		<MiniBlockChart chartData={onlineStakeHistory} />
 	{:else}
 		<p>Loading chart data...</p>
 	{/if}

@@ -310,6 +310,50 @@
         }
         apy = ((simulatedBalance / calculationBalance) - 1) * 100;
 
+        // Calculate profitability threshold regardless of total balance
+        let testAmount = 1000; // Start with 1000 VOI
+        let monthlyRevenueAtTest = 0;
+        
+        // Binary search for threshold
+        let min = 0;
+        let max = 10_000_000; // 10M VOI as upper limit
+        let iterations = 0;
+        const maxIterations = 20; // Prevent infinite loops
+        
+        while (min <= max && iterations < maxIterations) {
+            testAmount = Math.floor((min + max) / 2);
+            let testShareOfStake = testAmount / (rewardStake / 1e6);
+            
+            // Calculate monthly rewards at test amount
+            let testMonthlyReward = 0;
+            const monthlyEpochs = 30.44 / 7;
+            
+            for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
+                testMonthlyReward += testShareOfStake * epochRewards[i];
+            }
+            
+            monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
+            const testNodeCost = isPercentageBased ? 
+                (monthlyRevenueAtTest * (costPercentage / 100)) : 
+                nodeCost;
+            
+            // Ensure we're slightly above the node cost
+            const targetRevenue = testNodeCost * 1.01; // Target 1% above node cost
+            
+            if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
+                break;
+            } else if (monthlyRevenueAtTest < targetRevenue) {
+                min = testAmount + 1;
+            } else {
+                max = testAmount - 1;
+            }
+            
+            iterations++;
+        }
+        
+        // Round up to the nearest 100 VOI for a safety margin
+        profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
+
         if (totalBalance > 0) {
             // Weekly reward (using current epoch)
             weeklyReward = shareOfStake * epochRewards[0];
@@ -346,50 +390,6 @@
             const yearlyNodeCost = effectiveNodeCost * 12;
             yearlyProfit = yearlyRewardUSD - yearlyNodeCost;
             yearlyProfitPercentage = (yearlyProfit / yearlyNodeCost) * 100;
-
-            // Calculate profitability threshold based on cost type
-            let testAmount = 1000; // Start with 1000 VOI
-            let monthlyRevenueAtTest = 0;
-            
-            // Binary search for threshold
-            let min = 0;
-            let max = 10_000_000; // 10M VOI as upper limit
-            let iterations = 0;
-            const maxIterations = 20; // Prevent infinite loops
-            
-            while (min <= max && iterations < maxIterations) {
-                testAmount = Math.floor((min + max) / 2);
-                let testShareOfStake = testAmount / (rewardStake / 1e6);
-                
-                // Calculate monthly rewards at test amount
-                let testMonthlyReward = 0;
-                const monthlyEpochs = 30.44 / 7;
-                
-                for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
-                    testMonthlyReward += testShareOfStake * epochRewards[i];
-                }
-                
-                monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
-                const testNodeCost = isPercentageBased ? 
-                    (monthlyRevenueAtTest * (costPercentage / 100)) : 
-                    nodeCost;
-                
-                // Ensure we're slightly above the node cost
-                const targetRevenue = testNodeCost * 1.01; // Target 1% above node cost
-                
-                if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
-                    break;
-                } else if (monthlyRevenueAtTest < targetRevenue) {
-                    min = testAmount + 1;
-                } else {
-                    max = testAmount - 1;
-                }
-                
-                iterations++;
-            }
-            
-            // Round up to the nearest 100 VOI for a safety margin
-            profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
 
             balanceAfterWeek = totalBalance + weeklyReward;
             balanceAfterMonth = totalBalance + monthlyReward;
