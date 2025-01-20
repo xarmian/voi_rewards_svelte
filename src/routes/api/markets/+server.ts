@@ -108,7 +108,7 @@ export const GET: RequestHandler = async ({ url }) => {
                 return {
                     trading_pair_id: market.id,
                     exchange: market.exchange.name,
-                    pair: `${market.base_token}/${market.quote_token}`,
+                    pair: `${market.quote_token}/${market.base_token}`,
                     type: market.exchange.type,
                     network: market.exchange.network,
                     url: null,

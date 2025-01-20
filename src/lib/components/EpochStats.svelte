@@ -263,6 +263,17 @@
                 formatter: (params: any) => {
                     if (!Array.isArray(params)) return '';
                     let result = `${params[0].name}<br/>`;
+                    
+                    // Find community and ballast stake values
+                    const communityStake = params.find((p: any) => p.seriesName === 'Community Stake')?.value || 0;
+                    const ballastStake = params.find((p: any) => p.seriesName === 'Ballast and BA Stake')?.value || 0;
+                    const totalStake = communityStake + ballastStake;
+                    
+                    // Add total stake first
+                    const totalColor = isDarkMode ? '#34D399' : '#10B981';
+                    result += `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${totalColor};"></span>Total Stake: ${totalStake.toFixed(3)}M<br/>`;
+                    
+                    // Add other values
                     params.forEach((param: any) => {
                         const color = param.color;
                         const marker = `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${color};"></span>`;
@@ -272,7 +283,7 @@
                 }
             },
             legend: {
-                data: ['Total Online Stake', 'Eligible Stake', 'Ballast and BA Stake'],
+                data: ['Total Stake', 'Community Stake', 'Ballast and BA Stake', 'Eligible Stake'],
                 textStyle: {
                     color: textColor
                 },
@@ -311,27 +322,10 @@
             },
             series: [
                 {
-                    name: 'Total Online Stake',
-                    type: 'line',
-                    smooth: true,
-                    symbol: 'circle',
-                    symbolSize: 8,
-                    data: epochs.map(e => e.online_stake / 1_000_000),
-                    lineStyle: {
-                        color: isDarkMode ? '#34D399' : '#10B981',
-                        width: 3
-                    },
-                    itemStyle: {
-                        color: isDarkMode ? '#34D399' : '#10B981',
-                        borderColor: isDarkMode ? '#1F2937' : 'white',
-                        borderWidth: 2
-                    }
-                },
-                {
-                    name: 'Eligible Stake',
+                    name: 'Community Stake',
                     type: 'bar',
-                    stack: 'breakdown',
-                    data: epochs.map(e => e.eligible_online_stake / 1_000_000),
+                    stack: 'total',
+                    data: epochs.map(e => (e.online_stake - e.ballast_stake) / 1_000_000),
                     itemStyle: {
                         color: isDarkMode ? '#818CF8' : '#6366F1'
                     }
@@ -339,10 +333,38 @@
                 {
                     name: 'Ballast and BA Stake',
                     type: 'bar',
-                    stack: 'breakdown',
+                    stack: 'total',
                     data: epochs.map(e => e.ballast_stake / 1_000_000),
                     itemStyle: {
                         color: isDarkMode ? '#F87171' : '#EF4444'
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: (params: any) => {
+                            const index = params.dataIndex;
+                            const total = epochs[index].online_stake / 1_000_000;
+                            return total.toFixed(1) + 'M';
+                        },
+                        distance: 5,
+                        color: textColor
+                    }
+                },
+                {
+                    name: 'Eligible Stake',
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    data: epochs.map(e => e.eligible_online_stake / 1_000_000),
+                    lineStyle: {
+                        color: isDarkMode ? '#F59E0B' : '#D97706',
+                        width: 3
+                    },
+                    itemStyle: {
+                        color: isDarkMode ? '#F59E0B' : '#D97706',
+                        borderColor: isDarkMode ? '#1F2937' : 'white',
+                        borderWidth: 2
                     }
                 }
             ]
