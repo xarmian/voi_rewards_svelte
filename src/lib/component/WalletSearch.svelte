@@ -140,7 +140,6 @@
         addressList = [];
         localStorage.removeItem('searchText');
         selectedAddressIndex = -1;
-        onSubmit('');
         return;
     }
 </script>
@@ -177,11 +176,11 @@
 
     {#if addressList.length > 0 && searchText.length > 0}
     <div class="absolute z-50 mt-2 w-full">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-64">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-64 border border-gray-200 dark:border-gray-700">
             <ul class="overflow-y-auto max-h-64 w-full">
                 {#each addressList as result, index}
                     <li>
-                        <button class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        <button class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => handleSubmit(result)}>
                             <div class="flex items-center gap-3">
