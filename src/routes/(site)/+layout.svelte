@@ -14,8 +14,11 @@
 <div class="dark:text-white relative overflow-hidden">
 	<div class="starfield">
 		<div class="stars-1"></div>
+		<div class="stars-1 stars-1-delayed"></div>
 		<div class="stars-2"></div>
+		<div class="stars-2 stars-2-delayed"></div>
 		<div class="stars-3"></div>
+		<div class="stars-3 stars-3-delayed"></div>
 	</div>
 	<div class="gradient-overlay"></div>
 	<div class="relative z-50">
@@ -104,32 +107,31 @@
 		bottom: 0;
 		background: black;
 		z-index: 10;
+		perspective: 1000px;
+		overflow: hidden;
 	}
 
-	@keyframes stars-move-1 {
-		from { transform: translateY(-1000px); }
-		to { transform: translateY(1000px); }
-	}
-
-	@keyframes stars-move-2 {
-		from { transform: translateY(-1000px); }
-		to { transform: translateY(1000px); }
-	}
-
-	@keyframes stars-move-3 {
-		from { transform: translateY(-1000px); }
-		to { transform: translateY(1000px); }
+	@keyframes stars-move {
+		0% {
+			transform: scale(0.1) translateZ(-500px);
+			opacity: 0;
+		}
+		50% {
+			opacity: 1;
+		}
+		100% {
+			transform: scale(2) translateZ(500px);
+			opacity: 0;
+		}
 	}
 
 	.stars-1, .stars-2, .stars-3 {
 		position: absolute;
-		top: -1000px;
+		top: 0;
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background-repeat: repeat;
-		width: 100%;
-		height: 3000px;
+		transform-origin: center;
 	}
 
 	.stars-1 {
@@ -137,7 +139,11 @@
 						 radial-gradient(1px 1px at 25% 25%, white, rgba(0,0,0,0)),
 						 radial-gradient(1px 1px at 75% 75%, white, rgba(0,0,0,0));
 		background-size: 100px 100px;
-		animation: stars-move-1 90s linear infinite;
+		animation: stars-move 6s linear infinite;
+	}
+
+	.stars-1-delayed {
+		animation-delay: -3s;
 	}
 
 	.stars-2 {
@@ -145,13 +151,21 @@
 						 radial-gradient(2px 2px at 40% 70%, #00ffff, rgba(0,0,0,0)),
 						 radial-gradient(2px 2px at 60% 30%, #ff00ff, rgba(0,0,0,0));
 		background-size: 200px 200px;
-		animation: stars-move-2 60s linear infinite;
+		animation: stars-move 8s linear infinite;
+	}
+
+	.stars-2-delayed {
+		animation-delay: -4s;
 	}
 
 	.stars-3 {
 		background-image: radial-gradient(3px 3px at 15% 15%, white, rgba(0,0,0,0)),
 						 radial-gradient(3px 3px at 85% 85%, white, rgba(0,0,0,0));
 		background-size: 300px 300px;
-		animation: stars-move-3 30s linear infinite;
+		animation: stars-move 10s linear infinite;
+	}
+
+	.stars-3-delayed {
+		animation-delay: -5s;
 	}
 </style>
