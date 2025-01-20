@@ -466,17 +466,6 @@
 		to { transform: translateY(-2000px); }
 	}
 
-	.stars {
-		background: #000 url(http://www.script-tutorials.com/demos/360/images/stars.png) repeat top center;
-		z-index: 0;
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		animation: move 150s linear infinite;
-	}
-
 	.twinkling {
 		background: transparent url(http://www.script-tutorials.com/demos/360/images/twinkling.png) repeat top center;
 		z-index: 1;
@@ -494,10 +483,6 @@
 
 	.glow-text-pink {
 		text-shadow: 0 0 10px #ff00ff;
-	}
-
-	.shadow-neon {
-		box-shadow: 0 0 15px #00ff00;
 	}
 
 	@keyframes rocket {
