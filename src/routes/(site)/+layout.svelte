@@ -31,8 +31,11 @@
 			</button>
 		</div>
 	{/if}
-	<main class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-0 sm:px-6 lg:px-8">
-		<slot />
+	<main class="bg-gradient-to-br from-[#ff00ff] via-[#00ff00] to-[#00ffff] dark:from-[#ff00ff] dark:via-[#00ff00] dark:to-[#00ffff] min-h-screen py-8 px-0 sm:px-6 lg:px-8 bg-animate relative">
+		<div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+		<div class="relative z-10">
+			<slot />
+		</div>
 	</main>
 	<SvelteToast {options} />
 	<Footer footerType="socialmedia">
@@ -58,3 +61,22 @@
 		<hr class="my-6 border-gray-200 sm:mx-auto dark:border-gray-700 lg:my-8" />
 	</Footer>
 </div>
+
+<style>
+	@keyframes backgroundShift {
+		0% {
+			background-position: 0% 50%;
+		}
+		50% {
+			background-position: 100% 50%;
+		}
+		100% {
+			background-position: 0% 50%;
+		}
+	}
+
+	.bg-animate {
+		background-size: 400% 400%;
+		animation: backgroundShift 10s ease infinite;
+	}
+</style>

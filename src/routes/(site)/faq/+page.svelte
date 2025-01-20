@@ -312,48 +312,29 @@
 
 <!-- Drawer for smaller screens -->
 <Drawer placement="right" width="w-80" bind:hidden={drawerHidden} id="sidebar-drawer">
-  <div class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 h-full p-4 space-y-6">
-    <div class="bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
-      <header class="bg-purple-600 dark:bg-purple-800 py-4 px-6">
-        <h2 class="text-2xl font-bold text-white">Latest from Voi Foundation</h2>
+  <div class="bg-black min-h-full p-4 space-y-6">
+    <div class="bg-black border border-[#00ff00] shadow-neon rounded-xl overflow-hidden">
+      <header class="bg-[#00ff00]/20 py-4 px-6">
+        <h2 class="text-2xl font-bold text-[#00ff00] glow-text">Latest from Voi Foundation 🚀</h2>
       </header>
       <div class="p-4">
         <ul class="space-y-4">
           {#each lastFivePosts as post}
             <li>
-              <a href={post.link} target="_blank" rel="noopener noreferrer" class="block hover:bg-gray-100 dark:hover:bg-gray-700 p-3 rounded-lg transition-colors">
-                <h3 class="text-lg font-semibold text-purple-600 dark:text-purple-400">{post.title}</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Published {formatDate(post.pubDate)}</p>
+              <a href={post.link} target="_blank" rel="noopener noreferrer" 
+                class="block hover:bg-[#00ff00]/10 p-3 rounded-lg transition-all duration-200 transform hover:scale-105">
+                <h3 class="text-lg font-semibold text-[#00ff00] glow-text">{post.title}</h3>
+                <p class="text-sm text-[#00ff00]/70 mt-1">Published {formatDate(post.pubDate)}</p>
               </a>
             </li>
           {/each}
         </ul>
-        <a href="https://medium.com/@voifoundation" target="_blank" rel="noopener noreferrer" class="block mt-4 text-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 font-semibold">
-          View all posts
+        <a href="https://medium.com/@voifoundation" target="_blank" rel="noopener noreferrer" 
+          class="block mt-4 text-center text-[#ff00ff] hover:text-[#ff00ff]/80 glow-text-pink font-semibold">
+          View all posts 💎
         </a>
       </div>
     </div>
-
-    <!-- Recently Added FAQs Section in Drawer -->
-    {#if recentFAQs.length > 0}
-      <div class="bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
-        <header class="bg-green-600 dark:bg-green-800 py-4 px-6">
-          <h2 class="text-2xl font-bold text-white">Recently Added FAQs</h2>
-        </header>
-        <div class="p-4">
-          <ul class="space-y-4">
-            {#each recentFAQs as faq}
-              <li>
-                <a href={`#${slugify(faq.question)}`} class="block hover:bg-gray-100 dark:hover:bg-gray-700 p-3 rounded-lg transition-colors">
-                  <h3 class="text-lg font-semibold text-green-600 dark:text-green-400">{faq.question}</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{faq.category}</p>
-                </a>
-              </li>
-            {/each}
-          </ul>
-        </div>
-      </div>
-    {/if}
   </div>
 </Drawer>
 
@@ -366,5 +347,17 @@
 <style>
   :global(body) {
     @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px #00ff00;
+  }
+
+  .glow-text-pink {
+    text-shadow: 0 0 10px #ff00ff;
+  }
+
+  .shadow-neon {
+    box-shadow: 0 0 15px #00ff00;
   }
 </style>

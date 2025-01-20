@@ -134,10 +134,10 @@
   }
 </script>
 
-<Navbar fluid={true} class="bg-gradient-to-r from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 text-gray-700 dark:text-gray-100 border-b border-gray-200 dark:border-slate-700/50 shadow-sm">
+<Navbar fluid={true} class="bg-black border-b border-[#00ff00] shadow-[0_0_10px_#00ff00] text-[#00ff00]">
   <NavBrand href="https://voirewards.com" class="float-left">
-    <img src="{Icon}" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
-    <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">Voi Rewards Auditor</div>
+    <img src="{Icon}" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14 glow-effect" alt="Logo" />
+    <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-bold text-[#00ff00] glow-text">Voi Rewards Auditor</div>
   </NavBrand>
   
   <!-- Desktop Navigation -->
@@ -145,7 +145,7 @@
     {#each navItems as {href, label, external}}
       <a 
         {href} 
-        class="text-lg navButton flex items-center text-gray-600 dark:text-gray-200" 
+        class="text-lg navButton flex items-center text-[#00ff00] hover:text-[#ff00ff] transition-colors duration-200 glow-text-hover" 
         class:selected={activeLink ? isActiveLink(href) : false}
         target={external ? '_blank' : undefined}
         rel={external ? 'noopener noreferrer' : undefined}
@@ -159,7 +159,7 @@
 
     <!-- Resources Menu -->
     <div class="relative flex items-center">
-      <button id="resources-menu" class="text-lg navButton flex items-center text-gray-600 dark:text-gray-200" aria-label="Open Resources Menu">
+      <button id="resources-menu" class="text-lg navButton flex items-center text-[#00ff00] hover:text-[#ff00ff] transition-colors duration-200 glow-text-hover" aria-label="Open Resources Menu">
         Resources
         <i class="fas fa-chevron-down ml-2 text-sm"></i>
       </button>
@@ -332,5 +332,30 @@
   :global(.dark) .selected {
     background-color: rgb(51, 65, 85);
     color: white;
+  }
+
+  .glow-effect {
+    filter: drop-shadow(0 0 10px #00ff00);
+  }
+  
+  .glow-text {
+    text-shadow: 0 0 10px #00ff00;
+  }
+  
+  .glow-text-hover:hover {
+    text-shadow: 0 0 20px #ff00ff;
+  }
+  
+  :global(.dark) .glow-text {
+    text-shadow: 0 0 15px #00ff00;
+  }
+  
+  :global(.dark) .glow-text-hover:hover {
+    text-shadow: 0 0 25px #ff00ff;
+  }
+  
+  .selected {
+    text-shadow: 0 0 20px #ff00ff;
+    color: #ff00ff;
   }
 </style>

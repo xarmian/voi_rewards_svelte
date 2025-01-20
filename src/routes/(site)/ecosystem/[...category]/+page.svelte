@@ -36,24 +36,27 @@
 </script>
 
 <div class="landing-page">
-  <header class="hero parallax bg-purple-900 text-white">
-    <div class="container mx-auto px-4 py-20 text-center">
-      <h1 class="text-6xl font-bold mb-4">Voi Ecosystem Hub</h1>
-      <p class="text-2xl mb-12">Discover the future of Community Blockchain</p>
+  <header class="hero parallax bg-black text-[#00ff00]">
+    <div class="container mx-auto px-4 py-20 text-center relative z-10">
+      <h1 class="text-6xl font-bold mb-4 text-[#00ff00] glow-text uppercase tracking-wider">Voi Ecosystem Hub</h1>
+      <p class="text-2xl mb-12 text-[#ff00ff] glow-text-pink">Discover the future of Community Blockchain 🚀</p>
       
       <div class="mt-28">
-        <h2 class="text-3xl font-semibold mb-4">Need Voi?</h2>
+        <h2 class="text-3xl font-semibold mb-4 text-[#00ffff] glow-text-cyan">Need Voi? 💎🙌</h2>
         <a 
           href="https://www.mexc.com/exchange/VOI_USDT"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200"
+          class="inline-block bg-[#00ff00] hover:bg-[#00ff00]/80 text-black font-bold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-neon"
         >
-          Buy on MEXC
+          Buy on MEXC 🌙
         </a>
       </div>
     </div>
-    <div></div>
+    <div class="absolute inset-0">
+      <div class="stars"></div>
+      <div class="twinkling"></div>
+    </div>
   </header>
 
   {#each categorySort as category, index}
@@ -92,23 +95,23 @@
   {/each}
 
   <!-- Discover more section -->
-  <section class="py-20 bg-purple-100">
+  <section class="py-20 bg-black">
     <div class="container mx-auto px-4 text-center">
-      <h2 class="text-4xl font-bold text-purple-800 mb-6">Discover More</h2>
-      <p class="text-xl text-gray-700 mb-8">Explore the full range of projects and opportunities in the Voi ecosystem.</p>
+      <h2 class="text-4xl font-bold text-[#00ffff] glow-text-cyan mb-6">Discover More</h2>
+      <p class="text-xl text-[#ff00ff] glow-text-pink mb-8">Explore the full range of projects and opportunities in the Voi ecosystem.</p>
       <a 
         href="/directory" 
         rel="noopener noreferrer" 
-        class="inline-block bg-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors duration-200"
+        class="inline-block bg-[#ff00ff] text-white font-bold py-3 px-6 rounded-lg hover:bg-[#ff00ff]/80 transition-all duration-200 transform hover:scale-105 shadow-neon-pink"
       >
-        Visit the Voi Directory
+        Visit the Voi Directory 🚀
       </a>
     </div>
   </section>
 
-  <footer class="bg-purple-900 text-white py-10">
+  <footer class="bg-black text-[#00ff00] py-10">
     <div class="container mx-auto px-4 text-center">
-      <p>&copy; 2024 Voi Rewards. All rights reserved.</p>
+      <p class="glow-text">&copy; 2024 Voi Rewards. All rights reserved. 💎</p>
     </div>
   </footer>
 </div>
@@ -116,6 +119,7 @@
 <style>
   .landing-page {
     overflow-x: hidden;
+    background-color: black;
   }
 
   .parallax {
@@ -126,27 +130,68 @@
   }
 
   .hero {
-    background-image: url('https://source.unsplash.com/random/1920x1080?blockchain');
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
   }
 
-  .parallax-image {
-    background-attachment: fixed;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: cover;
-    transition: transform 0.3s ease-out;
+  @keyframes twinkle {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
   }
 
-  .parallax-image:hover {
-    transform: scale(1.05);
+  @keyframes move {
+    from { transform: translateY(0px); }
+    to { transform: translateY(-2000px); }
+  }
+
+  .stars {
+    background: #000 url(http://www.script-tutorials.com/demos/360/images/stars.png) repeat top center;
+    z-index: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    animation: move 150s linear infinite;
+  }
+
+  .twinkling {
+    background: transparent url(http://www.script-tutorials.com/demos/360/images/twinkling.png) repeat top center;
+    z-index: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    animation: move 100s linear infinite;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px #00ff00;
+  }
+
+  .glow-text-pink {
+    text-shadow: 0 0 10px #ff00ff;
+  }
+
+  .glow-text-cyan {
+    text-shadow: 0 0 10px #00ffff;
+  }
+
+  .shadow-neon {
+    box-shadow: 0 0 15px #00ff00;
+  }
+
+  .shadow-neon-pink {
+    box-shadow: 0 0 15px #ff00ff;
   }
 
   @media (max-width: 768px) {
-    .parallax, .parallax-image {
+    .parallax {
       background-attachment: scroll;
     }
   }

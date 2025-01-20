@@ -189,14 +189,21 @@
 </script>
 
 	<!-- Hero Section -->
-	<div class="relative">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+	<div class="relative overflow-hidden">
+		<div class="absolute inset-0">
+			<div class="stars"></div>
+			<div class="twinkling"></div>
+		</div>
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20 relative">
 			<div class="text-center">
-				<h1 class="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+				<h1 class="text-4xl sm:text-6xl font-bold text-[#00ff00] glow-text mb-6 uppercase tracking-wider">
 					Welcome to Voi Network
+					<span class="inline-block animate-rocket">🚀</span>
 				</h1>
-				<p class="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-					Explore the ecosystem, track rewards, and participate in the future of decentralized consensus.
+				<p class="text-xl text-[#ff00ff] glow-text-pink mb-8 max-w-2xl mx-auto">
+					TO THE MOON! Track rewards and join the future of decentralized consensus.
+					<span class="inline-block animate-bounce">💎</span>
+					<span class="inline-block">🙌</span>
 				</p>
 				<div class="max-w-xl mx-auto relative z-20">
 					<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
@@ -448,7 +455,59 @@
 {/if}
 
 <style>
-	:global(.rewards-table) {
-		@apply rounded-lg overflow-hidden;
+	@keyframes twinkle {
+		0% { opacity: 0; }
+		50% { opacity: 1; }
+		100% { opacity: 0; }
+	}
+
+	@keyframes move {
+		from { transform: translateY(0px); }
+		to { transform: translateY(-2000px); }
+	}
+
+	.stars {
+		background: #000 url(http://www.script-tutorials.com/demos/360/images/stars.png) repeat top center;
+		z-index: 0;
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		animation: move 150s linear infinite;
+	}
+
+	.twinkling {
+		background: transparent url(http://www.script-tutorials.com/demos/360/images/twinkling.png) repeat top center;
+		z-index: 1;
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		animation: move 100s linear infinite;
+	}
+
+	.glow-text {
+		text-shadow: 0 0 10px #00ff00;
+	}
+
+	.glow-text-pink {
+		text-shadow: 0 0 10px #ff00ff;
+	}
+
+	.shadow-neon {
+		box-shadow: 0 0 15px #00ff00;
+	}
+
+	@keyframes rocket {
+		0% { transform: translateY(0) rotate(0deg); }
+		50% { transform: translateY(-20px) rotate(5deg); }
+		100% { transform: translateY(0) rotate(0deg); }
+	}
+
+	.animate-rocket {
+		animation: rocket 2s ease-in-out infinite;
+		display: inline-block;
 	}
 </style>

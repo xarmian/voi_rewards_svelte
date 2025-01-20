@@ -68,53 +68,67 @@
   }
 </script>
 
-  <div class="flex flex-col md:flex-row items-center mt-4 mb-4 justify-between">
-    <span> </span>
-    <h1 class="text-5xl font-bold text-center mb-4">Voi Directory</h1>
-    <div class="text-center md:self-start">
-      <Share {url} {text} />
-    </div>
+<div class="flex flex-col md:flex-row items-center mt-4 mb-4 justify-between">
+  <span> </span>
+  <h1 class="text-5xl font-bold text-center mb-4 text-[#00ff00] glow-text uppercase tracking-wider">Voi Directory 🚀</h1>
+  <div class="text-center md:self-start">
+    <Share {url} {text} />
   </div>
-  <div class="container mx-auto px-4">
-    
-    <div class="flex flex-col md:flex-row justify-between items-center mb-4">
-      <input
-        type="text"
-        placeholder="Search projects..."
-        bind:value={searchTerm}
-        class="w-full md:w-1/3 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4 md:mb-0"
-      />
-      <div class="flex flex-wrap justify-center gap-2">
-        {#each categories as category}
-          <button
-            class="px-4 py-2 rounded-full text-sm font-semibold {selectedCategory === category ? 'bg-purple-600 dark:bg-purple-200 text-white dark:text-purple-800' : 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200'}"
-            on:click={() => {
-              selectedCategory = category;
-              updateURL(category);
-            }}
-          >
-            {category}
-          </button>
-        {/each}
+</div>
+<div class="container mx-auto px-4">
+  
+  <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+    <input
+      type="text"
+      placeholder="Search projects..."
+      bind:value={searchTerm}
+      class="w-full md:w-1/3 px-4 py-2 rounded-lg bg-black border border-[#00ff00] text-[#00ff00] placeholder-[#00ff00]/50 mb-4 md:mb-0 shadow-neon focus:ring-2 focus:ring-[#00ff00] focus:outline-none"
+    />
+    <div class="flex flex-wrap justify-center gap-2">
+      {#each categories as category}
         <button
-          class="px-4 py-2 rounded-full text-sm font-semibold {selectedCategory === 'New' ? 'bg-red-600 dark:bg-red-200 text-white dark:text-red-800' : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'}"
+          class="px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 transform hover:scale-105 {selectedCategory === category ? 'bg-[#00ff00] text-black shadow-neon' : 'bg-black border border-[#00ff00] text-[#00ff00] hover:bg-[#00ff00]/20'}"
           on:click={() => {
-            selectedCategory = 'New';
-            updateURL('New');
+            selectedCategory = category;
+            updateURL(category);
           }}
         >
-          New
+          {category}
         </button>
-      </div>
+      {/each}
+      <button
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 transform hover:scale-105 {selectedCategory === 'New' ? 'bg-[#ff00ff] text-black shadow-neon-pink' : 'bg-black border border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/20'}"
+        on:click={() => {
+          selectedCategory = 'New';
+          updateURL('New');
+        }}
+      >
+        New 💎
+      </button>
     </div>
-
-    {#if filteredProjects.length > 0}
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {#each filteredProjects as project (project.id)}
-          <ProjectCard {project} on:categoryClick={handleCategoryClick} />
-        {/each}
-      </div>
-    {:else}
-      <p class="text-center text-2xl mt-16">Projects Loading...</p>
-    {/if}
   </div>
+
+  {#if filteredProjects.length > 0}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {#each filteredProjects as project (project.id)}
+        <ProjectCard {project} on:categoryClick={handleCategoryClick} />
+      {/each}
+    </div>
+  {:else}
+    <p class="text-center text-2xl mt-16">Projects Loading...</p>
+  {/if}
+</div>
+
+<style>
+  .glow-text {
+    text-shadow: 0 0 10px #00ff00;
+  }
+
+  .shadow-neon {
+    box-shadow: 0 0 15px #00ff00;
+  }
+
+  .shadow-neon-pink {
+    box-shadow: 0 0 15px #ff00ff;
+  }
+</style>
