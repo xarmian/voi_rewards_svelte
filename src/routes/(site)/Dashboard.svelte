@@ -12,6 +12,17 @@
 	import { getTokensByEpoch, extrapolateRewardPerBlock, formatNumber } from '$lib/utils';
 	import { dataTable } from '../..//stores/dataTable';
 	
+	interface DataArrayItem {
+		proposer: string;
+		block_count: number;
+		block_rewards: number;
+		health_rewards: number;
+		nfd?: string;
+		rank?: number;
+		epoch_block_rewards?: number;
+		total_rewards?: number;
+	}
+
 	const latestBlock = writable({ block: 0, timestamp: '' });
 	let currentPrice: number | null = null;
 	let priceChange24h: number | null = null;
@@ -27,7 +38,7 @@
 	$: block_height = 0;
 	$: block_height_timestamp = '';
 	$: selectedDate = '';
-	$: dataArrays = [];
+	$: dataArrays = [] as DataArrayItem[];
 	$: dataIncomplete = false;
 	let dates: { id: string; desc: string; epoch: number; }[] = [];
 	let supply: SupplyInfo | null = null;
@@ -36,6 +47,7 @@
 	let onlineStakeHistory: any[] = [];
 	let eligibleOnlineStake = 0;
 	let isLoading = true;
+	let isRefreshing = false;
 	let error: string | null = null;
 
 	const populateDateDropdown = async () => {
@@ -48,7 +60,8 @@
 	};
 
 	const loadDashboardData = async (selectedDate: string) => {
-		isLoading = true;
+		//isLoading = true;
+		isRefreshing = true;
 		error = null; // Reset error state
 		try {
 			const [data, marketsResponse] = await Promise.all([
@@ -86,9 +99,9 @@
 
 				dataIncomplete = endOfDay > new Date(data.max_timestamp);
 				
-				// Update local state
-				dataArrays = data.data;
-				ballasts = data.blacklist;
+				// Update local state - ensure reactivity by creating a new array
+				dataArrays = [...data.data];
+				ballasts = [...data.blacklist];
 				//totalWallets = data.num_proposers;
 				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
@@ -101,6 +114,7 @@
 			error = err instanceof Error ? err.message : 'Failed to load dashboard data';
 		} finally {
 			isLoading = false;
+			isRefreshing = false;
 		}
 	};
 
@@ -150,6 +164,7 @@
 	};
 
 	async function refreshDashboardData() {
+		dataTable.clearCache(); // Clear the cache before fetching new data
 		await loadDashboardData(selectedDate);
 	}
 
@@ -414,7 +429,7 @@
 
 			{#if dataArrays.length > 0}
 				<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden p-4">
-					<RewardsTable items={dataArrays} refreshData={refreshDashboardData} />
+					<RewardsTable items={dataArrays} refreshData={refreshDashboardData} {isRefreshing} />
 				</div>
 			{/if}
 		</div>

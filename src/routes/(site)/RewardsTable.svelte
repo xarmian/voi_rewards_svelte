@@ -21,6 +21,7 @@
   
   export let items: any[] = [];
   export let refreshData: () => Promise<void>; // Add this line to accept the refresh function as a prop
+  export let isRefreshing: boolean = false;
 
   $: totalBlockRewards = 0;
   $: totalBlocks = 0;
@@ -39,7 +40,6 @@
   let currentPage = 1;
   let itemsPerPage = 20;
 
-  let isRefreshing = false;
   let lastUpdateTime: Date | null = null;
 
   let showOnlyFavorites = false;
@@ -278,181 +278,191 @@
             </RewardsTableHeader>
         {/each}
     </TableHead>
-    <TableBody tableBodyClass="divide-y">
-        {#each filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) as item, i}
-        <TableBodyRow on:click={() => toggleRow(i)}>
-            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
-              <button 
-                on:click|stopPropagation={() => favorites.toggle(item.proposer)}
-                class="mr-2 hover:scale-110 transition-transform"
-              >
-                {#if $favorites.includes(item.proposer)}
-                  <StarSolid class="w-4 h-4 text-yellow-300" />
-                {:else}
-                  <StarOutline class="w-4 h-4" />
-                {/if}
-              </button>
-              {item.rank}
-              {#if item.expires_in_hrs <= 0}
-                <i class="fas fa-ban text-red-500 ml-2" title="Consensus Participation Key has Expired"></i>
-              {:else if item.key_expiring7d}
-                <i class="fas fa-exclamation-triangle text-yellow-400 ml-2" title="Consensus Participation Key is Expiring Soon"></i>
-              {/if}
-            </TableBodyCell>
-            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
-              <div class="flex justify-between items-center gap-2">
-                <button 
-                  on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
-                  class="hover:text-blue-600 transition-colors flex items-center gap-2"
-                >
-                  {#if $nicknames[item.proposer]}
-                    <span class='inline-block'>{$nicknames[item.proposer]}</span>
-                  {:else if showWalletNFD && item.nfd !== undefined}
-                    <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,10)+'...' : item.nfd}</span>
-                  {:else}
-                    {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
-                  {/if}
-                  <WalletSolid size="sm" class="text-gray-400 group-hover:text-blue-600" />
-                </button>
-                
-                <div class="flex items-center gap-2">
-                  <button
-                      on:click|stopPropagation={() => {
-                      const row = filterItems[i];
-                      row.showNicknameInput = !row.showNicknameInput;
-                      filterItems = filterItems;
-                    }}
-                    class="text-gray-500 hover:text-gray-600 px-2"
-                    title="Set Nickname"
-                    aria-label="Set Nickname"
-                  >
-                    <i class="fas fa-tag"></i>
-                  </button>
-
-                  <button
-                    on:click|stopPropagation={() => {
-                      viewWallet = true;
-                      if (viewWalletId != item.proposer) viewWalletId = item.proposer;
-                    }}
-                    class="inline-flex items-center gap-1 px-2 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
-                    title="Quick View"
-                    aria-label="Quick View"
-                  >
-                    <i class="fas fa-expand-alt"></i>
-                  </button>
-                </div>
-              </div>
-              
-              {#if item.showNicknameInput}
-              <button 
-                class="mt-2" 
-                on:click|stopPropagation 
-                aria-label="Set Nickname"
-              >
-                  <NicknameManager 
-                    address={item.proposer} 
-                    bind:showInput={item.showNicknameInput}
-                  />
-              </button>
-              {/if}
-            </TableBodyCell>
-            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
-            <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_rewards.toFixed(2))} VOI</TableBodyCell>
+    {#if isRefreshing}
+      <TableBody tableBodyClass="divide-y">
+        <TableBodyRow>
+          <TableBodyCell colspan={columns.length} class="p-2 text-center text-4xl py-10">
+            <i class="fas fa-spinner fa-spin"></i>
+          </TableBodyCell>
         </TableBodyRow>
-        {#if expandedRow === i}
-          <TableBodyRow>
-            <TableBodyCell colspan={4} class="p-0" on:click={() => toggleRow(i)}>
-              <div class="px-2 py-3 m-4" transition:slide={{ duration: 300, axis: 'y' }}>
-                <div class="space-y-3">
-                  <!-- address and nfd -->
-                  <div>
-                    <Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
-                    <button on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)} class="text-blue-500 hover:text-blue-600 underline">{item.proposer}</button>
-                    
-                    <!-- Action buttons group -->
-                    <div class="mt-2 flex gap-2">
-                      <CopyComponent
-                        text={item.proposer}
-                        toastMessage={`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`}
-                        failureMessage={`Failed to copy wallet address to clipboard.`}
-                      >
-                        <span class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors">
-                          <FileCopySolid size="sm" />
-                          Copy Address
-                        </span>
-                      </CopyComponent>
-
-                      <button 
-                        on:click|stopPropagation={() => {
-                          viewWallet = true;
-                          if (viewWalletId != item.proposer) viewWalletId = item.proposer;
-                        }}
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors"
-                      >
-                        <i class="fas fa-expand-alt"></i>
-                        Quick View
-                      </button>
-
-                      <a 
-                        href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
-                        target="_blank"
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                        on:click|stopPropagation
-                      >
-                        <i class="fas fa-search"></i>
-                        View in Explorer
-                      </a>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label defaultClass="text-sm font-medium inline-block w-40">Account Balance:</Label>
-                    <span class="text-gray-600 dark:text-gray-400">{selectedBalance.toLocaleString()} VOI</span>
-                  </div>
-
-                  <div>
-                    <Label defaultClass="text-sm font-medium inline-block w-40">Est. Reward (full epoch):</Label>
-                    <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
-                  </div>
-
-                  <div>
-                    <Label defaultClass="text-sm font-medium inline-block w-40">Est. APR:</Label>
-                    <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards / Number(selectedBalance) * 52 * 100).toFixed(2)}%</span>
-                  </div>
-
-                  {#if item.nfd}
-                    <div>
-                      <Label defaultClass="text-sm font-medium inline-block w-40">ENS:</Label>
-                      <a 
-                        href="https://app.envoi.sh/#/{item.nfd}" 
-                        target="_blank" 
-                        class="text-blue-500 hover:text-blue-700 hover:underline"
-                        on:click|stopPropagation
-                      >
-                        {item.nfd}
-                      </a>
-                    </div>
+      </TableBody>
+    {:else}
+      <TableBody tableBodyClass="divide-y">
+          {#each filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) as item, i}
+          <TableBodyRow on:click={() => toggleRow(i)}>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">
+                <button 
+                  on:click|stopPropagation={() => favorites.toggle(item.proposer)}
+                  class="mr-2 hover:scale-110 transition-transform"
+                >
+                  {#if $favorites.includes(item.proposer)}
+                    <StarSolid class="w-4 h-4 text-yellow-300" />
+                  {:else}
+                    <StarOutline class="w-4 h-4" />
                   {/if}
+                </button>
+                {item.rank}
+                {#if item.expires_in_hrs <= 0}
+                  <i class="fas fa-ban text-red-500 ml-2" title="Consensus Participation Key has Expired"></i>
+                {:else if item.key_expiring7d}
+                  <i class="fas fa-exclamation-triangle text-yellow-400 ml-2" title="Consensus Participation Key is Expiring Soon"></i>
+                {/if}
+              </TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium" title='{item.proposer}'>
+                <div class="flex justify-between items-center gap-2">
+                  <button 
+                    on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
+                    class="hover:text-blue-600 transition-colors flex items-center gap-2"
+                  >
+                    {#if $nicknames[item.proposer]}
+                      <span class='inline-block'>{$nicknames[item.proposer]}</span>
+                    {:else if showWalletNFD && item.nfd !== undefined}
+                      <span class='inline-block'>{item.nfd.length > 16 ? item.nfd.substring(0,10)+'...' : item.nfd}</span>
+                    {:else}
+                      {item.proposer.substring(0,4)}...{item.proposer.substring(item.proposer.length-4)}
+                    {/if}
+                    <WalletSolid size="sm" class="text-gray-400 group-hover:text-blue-600" />
+                  </button>
+                  
+                  <div class="flex items-center gap-2">
+                    <button
+                        on:click|stopPropagation={() => {
+                        const row = filterItems[i];
+                        row.showNicknameInput = !row.showNicknameInput;
+                        filterItems = filterItems;
+                      }}
+                      class="text-gray-500 hover:text-gray-600 px-2"
+                      title="Set Nickname"
+                      aria-label="Set Nickname"
+                    >
+                      <i class="fas fa-tag"></i>
+                    </button>
+
+                    <button
+                      on:click|stopPropagation={() => {
+                        viewWallet = true;
+                        if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+                      }}
+                      class="inline-flex items-center gap-1 px-2 py-2 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                      title="Quick View"
+                      aria-label="Quick View"
+                    >
+                      <i class="fas fa-expand-alt"></i>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </TableBodyCell>
+                
+                {#if item.showNicknameInput}
+                <button 
+                  class="mt-2" 
+                  on:click|stopPropagation 
+                  aria-label="Set Nickname"
+                >
+                    <NicknameManager 
+                      address={item.proposer} 
+                      bind:showInput={item.showNicknameInput}
+                    />
+                </button>
+                {/if}
+              </TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_count)}</TableBodyCell>
+              <TableBodyCell tdClass="px-2 py-2 whitespace-nowrap font-medium">{(item.block_rewards.toFixed(2))} VOI</TableBodyCell>
           </TableBodyRow>
-        {/if}
-      {/each}
-   
-      <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
-        <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
-        <TableBodyCell colspan={2} class="p-2">
-          Blocks:
-        </TableBodyCell>
-          <TableBodyCell class="p-2">
-            {filterItems.reduce((sum, item) => sum + item.block_count, 0)}
+          {#if expandedRow === i}
+            <TableBodyRow>
+              <TableBodyCell colspan={4} class="p-0" on:click={() => toggleRow(i)}>
+                <div class="px-2 py-3 m-4" transition:slide={{ duration: 300, axis: 'y' }}>
+                  <div class="space-y-3">
+                    <!-- address and nfd -->
+                    <div>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
+                      <button on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)} class="text-blue-500 hover:text-blue-600 underline">{item.proposer}</button>
+                      
+                      <!-- Action buttons group -->
+                      <div class="mt-2 flex gap-2">
+                        <CopyComponent
+                          text={item.proposer}
+                          toastMessage={`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0,20)}...`}
+                          failureMessage={`Failed to copy wallet address to clipboard.`}
+                        >
+                          <span class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                            <FileCopySolid size="sm" />
+                            Copy Address
+                          </span>
+                        </CopyComponent>
+
+                        <button 
+                          on:click|stopPropagation={() => {
+                            viewWallet = true;
+                            if (viewWalletId != item.proposer) viewWalletId = item.proposer;
+                          }}
+                          class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                        >
+                          <i class="fas fa-expand-alt"></i>
+                          Quick View
+                        </button>
+
+                        <a 
+                          href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
+                          target="_blank"
+                          class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          on:click|stopPropagation
+                        >
+                          <i class="fas fa-search"></i>
+                          View in Explorer
+                        </a>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">Account Balance:</Label>
+                      <span class="text-gray-600 dark:text-gray-400">{selectedBalance.toLocaleString()} VOI</span>
+                    </div>
+
+                    <div>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">Est. Reward (full epoch):</Label>
+                      <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards).toLocaleString()} VOI</span>
+                    </div>
+
+                    <div>
+                      <Label defaultClass="text-sm font-medium inline-block w-40">Est. APR:</Label>
+                      <span class="text-gray-600 dark:text-gray-400">{(item.epoch_block_rewards / Number(selectedBalance) * 52 * 100).toFixed(2)}%</span>
+                    </div>
+
+                    {#if item.nfd}
+                      <div>
+                        <Label defaultClass="text-sm font-medium inline-block w-40">ENS:</Label>
+                        <a 
+                          href="https://app.envoi.sh/#/{item.nfd}" 
+                          target="_blank" 
+                          class="text-blue-500 hover:text-blue-700 hover:underline"
+                          on:click|stopPropagation
+                        >
+                          {item.nfd}
+                        </a>
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              </TableBodyCell>
+            </TableBodyRow>
+          {/if}
+        {/each}
+    
+        <TableBodyRow class="bg-gray-50 dark:bg-gray-900">
+          <!-- show sum of rows for blocks, block rewards, health, and total columns using filterItems array -->
+          <TableBodyCell colspan={2} class="p-2">
+            Blocks:
           </TableBodyCell>
-          <TableBodyCell colspan={1} class="p-2">
-            {Math.round(filterItems.reduce((sum, item) => sum + item.block_rewards, 0)).toLocaleString()} VOI
-          </TableBodyCell>
-      </TableBodyRow>
-    </TableBody>
+            <TableBodyCell class="p-2">
+              {filterItems.reduce((sum, item) => sum + item.block_count, 0)}
+            </TableBodyCell>
+            <TableBodyCell colspan={1} class="p-2">
+              {Math.round(filterItems.reduce((sum, item) => sum + item.block_rewards, 0)).toLocaleString()} VOI
+            </TableBodyCell>
+        </TableBodyRow>
+      </TableBody>
+    {/if}
   </Table>
   <div class="flex justify-between items-center gap-4">
     <button
