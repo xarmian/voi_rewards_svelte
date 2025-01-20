@@ -134,7 +134,7 @@
   }
 </script>
 
-<Navbar fluid={true} class="bg-black border-b border-[#00ff00] shadow-[0_0_10px_#00ff00] text-[#00ff00]">
+<Navbar fluid={true} class="bg-black dark:bg-black border-b border-[#00ff00] shadow-[0_0_10px_#00ff00] text-[#00ff00]">
   <NavBrand href="https://voirewards.com" class="float-left">
     <img src="{Icon}" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14 glow-effect" alt="Logo" />
     <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-bold text-[#00ff00] glow-text">Voi Rewards Auditor</div>

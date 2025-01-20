@@ -24,7 +24,7 @@
   }
 </script>
 
-<div class="bg-white dark:bg-gray-700 rounded-lg shadow-lg p-6 transition duration-300 hover:shadow-xl h-56 relative">
+<div class="bg-white dark:bg-black border border-[#00ff00] shadow-[0_0_10px_#00ff00] rounded-lg p-6 transition duration-300 hover:shadow-xl h-56 relative">
   <div class="flex justify-between items-start mb-2">
     <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">
       {title}

@@ -578,127 +578,127 @@
 <div class="container mx-auto px-4 py-8">
     {#if loading}
         <div class="flex justify-center items-center h-64">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#008000] dark:border-[#00ff00]"></div>
         </div>
     {:else if error}
-        <div class="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-100 px-4 py-3 rounded relative" role="alert">
+        <div class="bg-red-100/95 dark:bg-red-900/95 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-100 px-4 py-3 rounded relative backdrop-blur-sm" role="alert">
             <strong class="font-bold">Error!</strong>
             <span class="block sm:inline">{error}</span>
         </div>
     {:else}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Current Epoch Stats -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Current Epoch Statistics</h2>
+            <div class="bg-white/95 dark:bg-black border border-[#00ff00] shadow-neon rounded-lg p-6 backdrop-blur-sm">
+                <h2 class="text-2xl font-bold mb-4 text-[#008000] dark:text-[#00ff00] glow-text">Current Epoch Statistics</h2>
                 {#if epochs.length > 0}
                     {@const latest = epochs[epochs.length - 1]}
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                        <div class="p-4 bg-white/80 dark:bg-gray-900/80 border border-[#00ff00] rounded-lg relative backdrop-blur-sm">
                             <div class="group absolute top-2 right-2">
-                                <button aria-label="Current Price" class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <button aria-label="Current Price" class="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff00]/10 hover:bg-[#00ff00]/20 dark:bg-[#00ff00]/20 dark:hover:bg-[#00ff00]/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#008000] dark:text-[#00ff00]" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
-                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700">
+                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white/95 dark:bg-black text-sm text-[#008000] dark:text-[#00ff00] rounded-lg shadow-neon p-3 right-0 mt-2 border border-[#00ff00] backdrop-blur-sm">
                                     Volume-weighted average price across all markets
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Current Price</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                            <p class="text-sm text-[#008000]/70 dark:text-[#00ff00]/70">Current Price</p>
+                            <p class="text-2xl font-bold text-[#008000] dark:text-[#00ff00]">
                                 ${currentPrice ? formatNumber(currentPrice, 6) : '-.--'}
                                 {#if priceChange24h}
-                                    <span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
+                                    <span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-[#008000] dark:text-[#00ff00] glow-text' : 'text-[#800000] dark:text-[#ff0000] glow-text-red'}">
                                         {priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
                                     </span>
                                 {/if}
                             </p>
                         </div>
-                        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                        <div class="p-4 bg-white/80 dark:bg-gray-900/80 border border-[#00ff00] rounded-lg relative backdrop-blur-sm">
                             <div class="group absolute top-2 right-2">
-                                <button aria-label="Current Block Reward APR" class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <button aria-label="Current Block Reward APR" class="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff00]/10 hover:bg-[#00ff00]/20 dark:bg-[#00ff00]/20 dark:hover:bg-[#00ff00]/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#008000] dark:text-[#00ff00]" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
-                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700">
+                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white/95 dark:bg-black text-sm text-[#008000] dark:text-[#00ff00] rounded-lg shadow-neon p-3 right-0 mt-2 border border-[#00ff00] backdrop-blur-sm">
                                     Annual Percentage Rate based on current epoch rewards and eligible stake
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Current Block Reward APR</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(latest.apr, 2)}%</p>
+                            <p class="text-sm text-[#008000]/70 dark:text-[#00ff00]/70">Current Block Reward APR</p>
+                            <p class="text-2xl font-bold text-[#008000] dark:text-[#00ff00]">{formatNumber(latest.apr, 2)}%</p>
                         </div>
-                        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                        <div class="p-4 bg-white/80 dark:bg-gray-900/80 border border-[#00ff00] rounded-lg relative backdrop-blur-sm">
                             <div class="group absolute top-2 right-2">
-                                <button aria-label="Current Epoch Reward" class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <button aria-label="Current Epoch Reward" class="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff00]/10 hover:bg-[#00ff00]/20 dark:bg-[#00ff00]/20 dark:hover:bg-[#00ff00]/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#008000] dark:text-[#00ff00]" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
-                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700">
+                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white/95 dark:bg-black text-sm text-[#008000] dark:text-[#00ff00] rounded-lg shadow-neon p-3 right-0 mt-2 border border-[#00ff00] backdrop-blur-sm">
                                     Total VOI to be distributed as rewards in the current epoch
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Epoch Reward</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(latest.reward)} VOI</p>
+                            <p class="text-sm text-[#008000]/70 dark:text-[#00ff00]/70">Epoch Reward</p>
+                            <p class="text-2xl font-bold text-[#008000] dark:text-[#00ff00]">{formatNumber(latest.reward)} VOI</p>
                         </div>
-                        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                        <div class="p-4 bg-white/80 dark:bg-gray-900/80 border border-[#00ff00] rounded-lg relative backdrop-blur-sm">
                             <div class="group absolute top-2 right-2">
-                                <button aria-label="Current Online Stake" class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <button aria-label="Current Online Stake" class="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff00]/10 hover:bg-[#00ff00]/20 dark:bg-[#00ff00]/20 dark:hover:bg-[#00ff00]/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#008000] dark:text-[#00ff00]" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
-                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700">
+                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white/95 dark:bg-black text-sm text-[#008000] dark:text-[#00ff00] rounded-lg shadow-neon p-3 right-0 mt-2 border border-[#00ff00] backdrop-blur-sm">
                                     Total amount of VOI staked in online accounts
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Online Stake</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(latest.online_stake / 1_000_000)}M</p>
+                            <p class="text-sm text-[#008000]/70 dark:text-[#00ff00]/70">Online Stake</p>
+                            <p class="text-2xl font-bold text-[#008000] dark:text-[#00ff00]">{formatNumber(latest.online_stake / 1_000_000)}M</p>
                         </div>
-                        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                        <div class="p-4 bg-white/80 dark:bg-gray-900/80 border border-[#00ff00] rounded-lg relative backdrop-blur-sm">
                             <div class="group absolute top-2 right-2">
-                                <button aria-label="Current Eligible Stake" class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <button aria-label="Current Eligible Stake" class="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff00]/10 hover:bg-[#00ff00]/20 dark:bg-[#00ff00]/20 dark:hover:bg-[#00ff00]/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#008000] dark:text-[#00ff00]" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
-                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700">
+                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white/95 dark:bg-black text-sm text-[#008000] dark:text-[#00ff00] rounded-lg shadow-neon p-3 right-0 mt-2 border border-[#00ff00] backdrop-blur-sm">
                                     Amount of online stake eligible for rewards (excludes ballast and caps Block Authority stake)
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Eligible Stake</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(latest.eligible_online_stake / 1_000_000)}M</p>
+                            <p class="text-sm text-[#008000]/70 dark:text-[#00ff00]/70">Eligible Stake</p>
+                            <p class="text-2xl font-bold text-[#008000] dark:text-[#00ff00]">{formatNumber(latest.eligible_online_stake / 1_000_000)}M</p>
                         </div>
-                        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                        <div class="p-4 bg-white/80 dark:bg-gray-900/80 border border-[#00ff00] rounded-lg relative backdrop-blur-sm">
                             <div class="group absolute top-2 right-2">
-                                <button aria-label="Current Participating Accounts" class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <button aria-label="Current Participating Accounts" class="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff00]/10 hover:bg-[#00ff00]/20 dark:bg-[#00ff00]/20 dark:hover:bg-[#00ff00]/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#008000] dark:text-[#00ff00]" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
-                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700">
+                                <div class="invisible group-hover:visible absolute z-10 w-64 bg-white/95 dark:bg-black text-sm text-[#008000] dark:text-[#00ff00] rounded-lg shadow-neon p-3 right-0 mt-2 border border-[#00ff00] backdrop-blur-sm">
                                     Number of accounts participating in block rewards
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Participating Accounts</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">{onlineAccountCount !== null ? formatNumber(onlineAccountCount) : '---'}</p>
+                            <p class="text-sm text-[#008000]/70 dark:text-[#00ff00]/70">Participating Accounts</p>
+                            <p class="text-2xl font-bold text-[#008000] dark:text-[#00ff00]">{onlineAccountCount !== null ? formatNumber(onlineAccountCount) : '---'}</p>
                         </div>
                     </div>
                 {/if}
             </div>
 
             <!-- APR Chart -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Block Reward APR Trend</h2>
+            <div class="bg-white/95 dark:bg-black border border-[#00ff00] shadow-neon rounded-lg p-6 backdrop-blur-sm">
+                <h2 class="text-2xl font-bold mb-4 text-[#008000] dark:text-[#00ff00] glow-text">Block Reward APR Trend</h2>
                 <div class="h-[300px] w-full" bind:this={aprChartDiv}></div>
             </div>
 
             <!-- Price Chart -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <div class="bg-white/95 dark:bg-black border border-[#ff00ff] shadow-neon-pink rounded-lg p-6 backdrop-blur-sm">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Price Trend</h2>
-                    <a href="/markets" class="flex items-center text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+                    <h2 class="text-2xl font-bold text-[#800080] dark:text-[#ff00ff] glow-text-pink">Price Trend</h2>
+                    <a href="/markets" class="flex items-center text-sm text-[#800080] hover:text-[#ff00ff] dark:text-[#ff00ff] dark:hover:text-[#ff00ff]/80 transition-colors">
                         View all markets
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -709,10 +709,10 @@
             </div>
 
             <!-- Participating Wallets Chart -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <div class="bg-white/95 dark:bg-black border border-[#00ffff] shadow-neon-cyan rounded-lg p-6 backdrop-blur-sm">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Rewarded Accounts Trend</h2>
-                    <a href="/" class="flex items-center text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+                    <h2 class="text-2xl font-bold text-[#008080] dark:text-[#00ffff] glow-text-cyan">Rewarded Accounts Trend</h2>
+                    <a href="/" class="flex items-center text-sm text-[#008080] hover:text-[#00ffff] dark:text-[#00ffff] dark:hover:text-[#00ffff]/80 transition-colors">
                         View rewards dashboard
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -723,10 +723,69 @@
             </div>
 
             <!-- Stake Distribution Chart -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:col-span-2">
-                <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Stake Distribution (Millions VOI)</h2>
+            <div class="bg-white/95 dark:bg-black border border-[#00ff00] shadow-neon rounded-lg p-6 md:col-span-2 backdrop-blur-sm">
+                <h2 class="text-2xl font-bold mb-4 text-[#008000] dark:text-[#00ff00] glow-text">Stake Distribution (Millions VOI)</h2>
                 <div class="h-[300px] w-full" bind:this={stakeChartDiv}></div>
             </div>
         </div>
     {/if}
-</div> 
+</div>
+
+<style>
+    .glow-text {
+        text-shadow: 0 0 10px #00ff00;
+    }
+
+    .glow-text-pink {
+        text-shadow: 0 0 10px #ff00ff;
+    }
+
+    .glow-text-cyan {
+        text-shadow: 0 0 10px #00ffff;
+    }
+
+    .glow-text-red {
+        text-shadow: 0 0 10px #ff0000;
+    }
+
+    .shadow-neon {
+        box-shadow: 0 0 15px #00ff00;
+    }
+
+    .shadow-neon-pink {
+        box-shadow: 0 0 15px #ff00ff;
+    }
+
+    .shadow-neon-cyan {
+        box-shadow: 0 0 15px #00ffff;
+    }
+
+    /* Dark mode adjustments */
+    :global(.dark) .glow-text {
+        text-shadow: 0 0 15px #00ff00;
+    }
+
+    :global(.dark) .glow-text-pink {
+        text-shadow: 0 0 15px #ff00ff;
+    }
+
+    :global(.dark) .glow-text-cyan {
+        text-shadow: 0 0 15px #00ffff;
+    }
+
+    :global(.dark) .glow-text-red {
+        text-shadow: 0 0 15px #ff0000;
+    }
+
+    :global(.dark) .shadow-neon {
+        box-shadow: 0 0 20px #00ff00;
+    }
+
+    :global(.dark) .shadow-neon-pink {
+        box-shadow: 0 0 20px #ff00ff;
+    }
+
+    :global(.dark) .shadow-neon-cyan {
+        box-shadow: 0 0 20px #00ffff;
+    }
+</style> 

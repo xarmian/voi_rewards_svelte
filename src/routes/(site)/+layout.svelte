@@ -12,7 +12,7 @@
 </script>
 
 <div class="dark:text-white relative overflow-hidden">
-	<div class="starfield">
+	<div class="starfield fixed inset-0">
 		<div class="stars-1"></div>
 		<div class="stars-1 stars-1-delayed"></div>
 		<div class="stars-2"></div>
@@ -21,7 +21,7 @@
 		<div class="stars-3 stars-3-delayed"></div>
 	</div>
 	<div class="gradient-overlay"></div>
-	<div class="relative z-50">
+	<div class="relative z-[100]">
 		<Navbar />
 		{#if showNotice}
 			<div class="flex flex-row bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 w-full justify-between" role="alert">
@@ -95,20 +95,16 @@
 		background-size: 400% 400%;
 		animation: backgroundShift 20s ease infinite;
 		opacity: 0.3;
-		z-index: 20;
+		z-index: 1;
 		pointer-events: none;
 	}
 
 	.starfield {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: black;
-		z-index: 10;
+		z-index: 0;
 		perspective: 1000px;
 		overflow: hidden;
+		pointer-events: none;
+		background: black;
 	}
 
 	@keyframes stars-move {

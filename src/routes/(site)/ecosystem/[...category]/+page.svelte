@@ -53,10 +53,6 @@
         </a>
       </div>
     </div>
-    <div class="absolute inset-0">
-      <div class="stars"></div>
-      <div class="twinkling"></div>
-    </div>
   </header>
 
   {#each categorySort as category, index}
@@ -157,17 +153,6 @@
     right: 0;
     bottom: 0;
     animation: move 150s linear infinite;
-  }
-
-  .twinkling {
-    background: transparent url(http://www.script-tutorials.com/demos/360/images/twinkling.png) repeat top center;
-    z-index: 1;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    animation: move 100s linear infinite;
   }
 
   .glow-text {

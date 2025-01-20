@@ -189,11 +189,7 @@
 </script>
 
 	<!-- Hero Section -->
-	<div class="relative overflow-hidden">
-		<div class="absolute inset-0">
-			<div class="stars"></div>
-			<div class="twinkling"></div>
-		</div>
+	<div class="relative overflow-visible">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20 relative">
 			<div class="text-center">
 				<h1 class="text-4xl sm:text-6xl font-bold text-[#00ff00] glow-text mb-6 uppercase tracking-wider">
@@ -205,7 +201,7 @@
 					<span class="inline-block animate-bounce">💎</span>
 					<span class="inline-block">🙌</span>
 				</p>
-				<div class="max-w-xl mx-auto relative z-20">
+				<div class="max-w-xl mx-auto relative" style="z-index: 9999;">
 					<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
 				</div>
 			</div>
@@ -265,10 +261,10 @@
 	{:else}
 		<!-- Network Stats Section -->
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Network Overview</h2>
+			<h2 class="text-2xl font-bold text-[#00ff00] glow-text mb-6">Network Overview</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 				<!-- Price Card -->
-				<a href="/markets" class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
+				<a href="/markets" class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 hover:shadow-xl transition-all duration-200">
 					<div class="flex flex-col">
 						<div class="absolute top-2 right-2">
 							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
@@ -355,7 +351,7 @@
 
 		<!-- Quick Links Section -->
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Links</h2>
+			<h2 class="text-2xl font-bold text-[#00ff00] glow-text mb-6">Quick Links</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 				<!-- Run a Node Card -->
 				<a href="/how_to_node" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
@@ -414,7 +410,7 @@
 		<!-- Rewards Section -->
 		<div id="rewards-section" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-12 relative z-10">
 			<div class="flex flex-col sm:flex-row items-center justify-between mb-6">
-				<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Epoch Reward Estimates</h2>
+				<h2 class="text-2xl font-bold text-[#00ff00] glow-text">Current Epoch Reward Estimates</h2>
 				<div class="flex items-center gap-4 mt-4 sm:mt-0">
 					<select
 						id="epoch-selector"
@@ -464,17 +460,6 @@
 	@keyframes move {
 		from { transform: translateY(0px); }
 		to { transform: translateY(-2000px); }
-	}
-
-	.twinkling {
-		background: transparent url(http://www.script-tutorials.com/demos/360/images/twinkling.png) repeat top center;
-		z-index: 1;
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		animation: move 100s linear infinite;
 	}
 
 	.glow-text {

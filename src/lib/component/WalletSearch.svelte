@@ -2,7 +2,7 @@
 	/*
         A Svelte component containing an input field and submit button.
 
-        When text is entered into the input field, if the text contains a period, a search is performed to look for an NFDomain. If an NFDomain match is found, a listing of unverified addresses attached to that NFDomain is shown below the input box as an “autocomplete”, and a user is able to select one of the addresses.
+        When text is entered into the input field, if the text contains a period, a search is performed to look for an NFDomain. If an NFDomain match is found, a listing of unverified addresses attached to that NFDomain is shown below the input box as an "autocomplete", and a user is able to select one of the addresses.
 
         IF the user selects one of the addresses from the NFDomain, enters a full wallet address and presses enter, or clicks the submit button THEN open the page /wallet/[ADDRESS] where [ADDRESS] is the selected address in the input component.
 
@@ -140,19 +140,18 @@
         addressList = [];
         localStorage.removeItem('searchText');
         selectedAddressIndex = -1;
-        onSubmit('');
         return;
     }
 </script>
 
 <div class="mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl relative" bind:this={componentElement}>
-    <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg relative">
+    <div class="dark:bg-black bg-white flex items-center rounded-lg relative border border-[#00ff00] shadow-[0_0_10px_#00ff00]">
         <input
             type="text"
             use:init
             bind:value={searchText}
             on:input={handleInput}
-            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2 pr-8 text-black dark:text-white"
+            class="dark:bg-black bg-gray-100 flex-grow rounded-l-lg p-2 pr-8 text-black dark:text-white"
             placeholder="Search by enVoi name or address"
         />
         {#if searchText}
@@ -181,7 +180,7 @@
             <ul class="overflow-y-auto max-h-64 w-full">
                 {#each addressList as result, index}
                     <li>
-                        <button class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        <button class="p-2 border border-solid border-gray-200 dark:border-gray-700 text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                             class:selected={index === selectedAddressIndex}
                             on:click={() => handleSubmit(result)}>
                             <div class="flex items-center gap-3">
