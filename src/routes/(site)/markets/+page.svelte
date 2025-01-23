@@ -243,7 +243,7 @@
                 {formatCurrency(circulatingMarketCap)}
               </p>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                {circulatingSupply.percentDistributed}% Distributed
+                {Math.round(circulatingSupply.circulatingSupply / 10_000_000_000 * 10000) / 100}% Circulating
               </p>
             </div>
           </Card>
