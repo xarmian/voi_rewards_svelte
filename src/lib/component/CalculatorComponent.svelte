@@ -1054,7 +1054,7 @@
                     </div>
                     <div class="flex justify-between text-sm">
                         <p class="text-gray-500 dark:text-gray-400">Cost</p>
-                        <p class="font-medium text-gray-700 dark:text-gray-300">{formatUSD(nodeCost)}</p>
+                        <p class="font-medium text-gray-700 dark:text-gray-300">{isPercentageBased ? formatUSD(monthlyRewardUSD * (costPercentage / 100)) : formatUSD(nodeCost)}</p>
                     </div>
                     <div class="mt-2 text-xs text-right">
                         <span class="{monthlyProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
@@ -1082,7 +1082,7 @@
                     </div>
                     <div class="flex justify-between text-sm">
                         <p class="text-gray-500 dark:text-gray-400">Cost</p>
-                        <p class="font-medium text-gray-700 dark:text-gray-300">{formatUSD(nodeCost * 12)}</p>
+                        <p class="font-medium text-gray-700 dark:text-gray-300">{isPercentageBased ? formatUSD(yearlyRewardUSD * (costPercentage / 100)) : formatUSD(nodeCost * 12)}</p>
                     </div>
                     <div class="mt-2 text-xs text-right">
                         <span class="{yearlyProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
