@@ -575,7 +575,7 @@
                                                 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300' : 
                                                 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'} 
                                             transition-all duration-200 group"
-                                            on:click={() => setFixedAmount(Math.round(primaryAccountInfo?.balance + childAccounts.reduce((acc, account) => acc + account.balance, 0) * 1e6) / 1e6)}
+                                            on:click={() => setFixedAmount(Math.round((primaryAccountInfo?.balance + childAccounts.reduce((acc, account) => acc + account.balance, 0)) * 1e6) / 1e6)}
                                         >
                                             <div class="flex flex-col items-center">
                                                 <span class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300">All Accounts</span>
