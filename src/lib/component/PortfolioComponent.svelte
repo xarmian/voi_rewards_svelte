@@ -710,15 +710,15 @@
                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rewards Overview</h4>
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600 dark:text-gray-300">Current Epoch</span>
+                            <span class="text-gray-600 dark:text-gray-300">Total Earned</span>
                             <span class="text-lg font-semibold text-gray-900 dark:text-white">
-                                {(pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
+                                {(totalRewards / 1e6).toLocaleString()} VOI
                             </span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600 dark:text-gray-300">Total Earned</span>
-                            <span class="text-sm text-gray-500 dark:text-gray-400">
-                                {(totalRewards / 1e6).toLocaleString()} VOI
+                            <span class="text-gray-600 dark:text-gray-300">Current Epoch</span>
+                            <span class="text-sm text-gray-900 dark:text-white">
+                                {(pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
                             </span>
                         </div>
                         <div class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
