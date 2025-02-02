@@ -740,14 +740,14 @@
             <!-- ASA Tokens -->
             {#if asaTokens.length > 0}
                 <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">ASA Tokens</h4>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">VSA Tokens</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {#each asaTokens as token}
                             {@const details = asaDetails.find(d => d.id === token.assetId)}
                             <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                                 <div class="flex items-center space-x-3">
                                     <div class="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                                        <span class="text-xs font-medium text-purple-700 dark:text-purple-300">ASA</span>
+                                        <span class="text-xs font-medium text-purple-700 dark:text-purple-300">VSA</span>
                                     </div>
                                     <div>
                                         <div class="flex items-center gap-2">
