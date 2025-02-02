@@ -825,7 +825,12 @@
         <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
             {#each fungibleTokens.filter(token => showZeroBalances || token.balance > 0) as token (token.id)}
                 {#if isLPToken(token)}
-                    <FungibleToken {token} voiPrice={$voiPrice.price} />
+                    <FungibleToken {token} voiPrice={$voiPrice.price} 
+                        on:tokenOptedOut={() => {
+                            fetchAccountDetails();
+                            fetchFungibleTokens();
+                        }}
+                    />
                 {/if}
             {/each}
             {#if fungibleTokens.filter(token => isLPToken(token) && (showZeroBalances || token.balance > 0)).length === 0}
@@ -958,7 +963,11 @@
                                 value: details.value || 0,
                                 poolId: details.poolId
                             } : token} 
-                            voiPrice={$voiPrice.price} 
+                            voiPrice={$voiPrice.price}
+                            on:tokenOptedOut={() => {
+                                fetchAccountDetails();
+                                fetchFungibleTokens();
+                            }}
                         />
                     </div>
                 {/if}

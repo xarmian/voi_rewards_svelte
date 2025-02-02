@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Web3Wallet, selectedWallet } from 'avm-wallet-svelte';
+    import { Web3Wallet, selectedWallet, connectedWallets } from 'avm-wallet-svelte';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
     import AccountInfo from '$lib/components/wallet/AccountInfo.svelte';
@@ -219,7 +219,16 @@
         };
 
         if (browser) {
-          selectedWallet.set({address: address, app: ''});
+          // Set the selected wallet if it's different from current
+          if (address && address.length > 0 && (address !== $selectedWallet?.address || $selectedWallet?.app === '')) {
+            // look for app in connectedWallets list
+            const wallet = $connectedWallets.find(w => w.address === address && w.app !== '');
+            if (wallet) {
+              selectedWallet.set({address: address, app: wallet.app});
+            } else {
+              selectedWallet.set({address: address, app: ''});
+            }
+          }
         }
 
         // Handle child accounts similarly
