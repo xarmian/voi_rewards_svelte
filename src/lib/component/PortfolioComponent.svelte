@@ -192,15 +192,18 @@
             asaDetails = await Promise.all(
                 asaTokens.map(async (asa) => {
                     const details = await algodClient.getAssetByID(asa.assetId).do();
+                    console.log(details);
+                    const value = (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount) / Math.pow(10, details.params.decimals);
                     return {
                         id: asa.assetId,
                         creator: asa.creator,
                         frozen: asa.frozen,
-                        name: details.params.name,
-                        unitName: details.params['unit-name'],
+                        name: details.params.name ?? (Buffer.from(details.params['name-b64'], 'base64').toString('utf8') ?? ''),
+                        unitName: details.params['unit-name'] ?? (Buffer.from(details.params['unit-name-b64'], 'base64').toString('utf8') ?? ''),
                         decimals: details.params.decimals,
-                        value: (asa.assetId === 302190 ? asa.amount / Math.pow(10, details.params.decimals) / $voiPrice.price : 0),
-                        poolId: (asa.assetId === 302190 ? 395553 : undefined)
+                        value: (asa.assetId === 302190 ? value / $voiPrice.price : 0),
+                        poolId: (asa.assetId === 302190 ? 395553 : undefined),
+                        amount: (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount)
                     };
                 })
             );
@@ -749,8 +752,8 @@
                                         </div>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">
                                             Balance: {details?.decimals 
-                                                ? (token.amount / Math.pow(10, details.decimals)).toLocaleString() 
-                                                : token.amount.toLocaleString()
+                                                ? (details?.amount / Math.pow(10, details?.decimals)).toLocaleString() 
+                                                : details?.amount.toLocaleString()
                                             } {details?.unitName || ''}
                                         </p>
                                         {#if details?.value}
