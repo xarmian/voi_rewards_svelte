@@ -658,16 +658,21 @@
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 dark:border-gray-700 pb-4">
                 <div class="flex-1">
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Account Overview</h3>
-                    <div class="flex items-center space-x-2">
-                        <p class="text-sm text-gray-500 dark:text-gray-400 font-mono">{walletAddress}</p>
-                        <CopyComponent 
-                            text={walletAddress}
-                            toastMessage={`Address copied to clipboard`}
-                            failureMessage={`Failed to copy address to clipboard`}
-                        />
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                        <div class="flex items-center space-x-2">
+                            <p class="text-sm text-gray-500 dark:text-gray-400 font-mono hidden lg:block">{walletAddress}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 font-mono block lg:hidden">{walletAddress?.slice(0, 6)}...{walletAddress?.slice(-6)}</p>
+                            <CopyComponent 
+                                text={walletAddress}
+                                toastMessage={`Address copied to clipboard`}
+                                failureMessage={`Failed to copy address to clipboard`}
+                            />
+                        </div>
                         {#if envoiName}
-                            <span class="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-sm rounded-full">
-                                {envoiName}
+                            <span class="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-sm rounded-full self-start">
+                                <a href={`https://app.envoi.sh/#/${envoiName}`} target="_blank" rel="noopener noreferrer" class="hover:text-purple-500">
+                                    {envoiName}
+                                </a>
                             </span>
                         {/if}
                     </div>
@@ -886,146 +891,6 @@
                 {/if}
             </div>
 
-            <!-- NFT Tokens Section -->
-            <div class="mt-8">
-                <div class="flex flex-col space-y-4 mb-6">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">NFT Tokens</h3>
-                        {#if nftTokens.length > 0}
-                            <div class="flex items-center space-x-2">
-                                <select
-                                    bind:value={selectedSort}
-                                    class="px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
-                                >
-                                    {#each sortOptions as option}
-                                        <option value={option.id}>{option.label}</option>
-                                    {/each}
-                                </select>
-                                <button
-                                    on:click={toggleSortDirection}
-                                    class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                                >
-                                    {#if sortDirection === 'asc'}
-                                        <i class="fas fa-sort-amount-up-alt"></i>
-                                    {:else}
-                                        <i class="fas fa-sort-amount-down"></i>
-                                    {/if}
-                                </button>
-                            </div>
-                        {/if}
-                    </div>
-
-                    <!-- Marketplace Links -->
-                    <div class="flex flex-col sm:flex-row gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">Looking to buy NFTs? Check out these marketplaces:</p>
-                            <div class="flex gap-2">
-                                <a
-                                    href="https://nautilus.sh"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                                >
-                                    <img 
-                                        src="https://nautilus.sh/favicon.ico" 
-                                        alt="Nautilus" 
-                                        class="w-4 h-4 mr-1.5"
-                                        on:error={handleIconError}
-                                    />
-                                    Nautilus
-                                </a>
-                                <a
-                                    href="https://highforge.io"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                                >
-                                    <img 
-                                        src="https://highforge.io/favicon.ico" 
-                                        alt="Highforge" 
-                                        class="w-4 h-4 mr-1.5"
-                                        on:error={handleIconError}
-                                    />
-                                    Highforge
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {#if isLoading && !nftTokens.length}
-                    <div class="flex justify-center items-center h-32">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-                    </div>
-                {:else if error && !nftTokens.length}
-                    <div class="text-red-500 dark:text-red-400 text-center py-4">
-                        {error}
-                    </div>
-                {:else if !nftTokens.length}
-                    <div class="text-gray-500 dark:text-gray-400 text-center py-4">
-                        No NFTs found in this wallet.
-                    </div>
-                {:else}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {#each sortNFTs(nftTokens) as nft}
-                            <a 
-                                href={getTokenUrl(nft.contractId, nft.tokenId)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="block bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                            >
-                                <div class="flex items-center space-x-4">
-                                    <img 
-                                        src={getOptimizedImageUrl(nft.imageUrl, nft.metadataURI)}
-                                        alt={nft.name} 
-                                        class="w-16 h-16 rounded-lg object-cover"
-                                        on:error={handleImageError}
-                                    />
-                                    <div class="flex-1 min-w-0">
-                                        <h4 class="font-medium text-gray-900 dark:text-white truncate">{nft.name}</h4>
-                                        {#if nft.collection?.name}
-                                            <p class="text-sm text-purple-600 dark:text-purple-400">{nft.collection.name}</p>
-                                        {/if}
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">Token ID: {nft.tokenId}</p>
-                                        {#if nft.metadata?.description}
-                                            <p class="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
-                                                {nft.metadata.description}
-                                            </p>
-                                        {/if}
-                                        <div class="mt-2 space-y-1 text-sm">
-                                            {#if nft.isListed}
-                                                <p class="text-green-600 dark:text-green-400">Listed: ${nft.listingPrice?.toLocaleString() ?? 0}</p>
-                                            {/if}
-                                            {#if nft.lastSalePrice}
-                                                <p class="text-gray-600 dark:text-gray-300">
-                                                    Last Sale: ${nft.lastSalePrice.toLocaleString()}
-                                                    {#if nft.lastSaleTimestamp}
-                                                        <span class="text-xs">
-                                                            ({new Date(nft.lastSaleTimestamp * 1000).toLocaleDateString()})
-                                                        </span>
-                                                    {/if}
-                                                </p>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                </div>
-                            </a>
-                        {/each}
-                    </div>
-
-                    {#if hasNextPage}
-                        <div class="mt-6 text-center">
-                            <button
-                                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors {isLoading ? 'opacity-50 cursor-not-allowed' : ''}"
-                                on:click={loadMore}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? 'Loading...' : 'Load More'}
-                            </button>
-                        </div>
-                    {/if}
-                {/if}
-            </div>
         {:else}
             <AssetsTable
                 {fungibleTokens}
@@ -1035,4 +900,148 @@
             />
         {/if}
     </div>
+
+    {#if viewType === 'cards'}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+
+            <!-- NFT Tokens Section -->
+            <div class="flex flex-col space-y-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">NFT Tokens</h3>
+                    {#if nftTokens.length > 0}
+                        <div class="flex items-center space-x-2">
+                            <select
+                                bind:value={selectedSort}
+                                class="px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                            >
+                                {#each sortOptions as option}
+                                    <option value={option.id}>{option.label}</option>
+                                {/each}
+                            </select>
+                            <button
+                                on:click={toggleSortDirection}
+                                class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                            >
+                                {#if sortDirection === 'asc'}
+                                    <i class="fas fa-sort-amount-up-alt"></i>
+                                {:else}
+                                    <i class="fas fa-sort-amount-down"></i>
+                                {/if}
+                            </button>
+                        </div>
+                    {/if}
+                </div>
+
+                <!-- Marketplace Links -->
+                <div class="flex flex-col sm:flex-row gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex-1">
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">Looking to buy NFTs? Check out these marketplaces:</p>
+                        <div class="flex gap-2">
+                            <a
+                                href="https://nautilus.sh"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                            >
+                                <img 
+                                    src="https://nautilus.sh/favicon.ico" 
+                                    alt="Nautilus" 
+                                    class="w-4 h-4 mr-1.5"
+                                    on:error={handleIconError}
+                                />
+                                Nautilus
+                            </a>
+                            <a
+                                href="https://highforge.io"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                            >
+                                <img 
+                                    src="https://highforge.io/favicon.ico" 
+                                    alt="Highforge" 
+                                    class="w-4 h-4 mr-1.5"
+                                    on:error={handleIconError}
+                                />
+                                Highforge
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {#if isLoading && !nftTokens.length}
+                <div class="flex justify-center items-center h-32">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                </div>
+            {:else if error && !nftTokens.length}
+                <div class="text-red-500 dark:text-red-400 text-center py-4">
+                    {error}
+                </div>
+            {:else if !nftTokens.length}
+                <div class="text-gray-500 dark:text-gray-400 text-center py-4">
+                    No NFTs found in this wallet.
+                </div>
+            {:else}
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {#each sortNFTs(nftTokens) as nft}
+                        <a 
+                            href={getTokenUrl(nft.contractId, nft.tokenId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="block bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            <div class="flex items-center space-x-4">
+                                <img 
+                                    src={getOptimizedImageUrl(nft.imageUrl, nft.metadataURI)}
+                                    alt={nft.name} 
+                                    class="w-16 h-16 rounded-lg object-cover"
+                                    on:error={handleImageError}
+                                />
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-medium text-gray-900 dark:text-white truncate">{nft.name}</h4>
+                                    {#if nft.collection?.name}
+                                        <p class="text-sm text-purple-600 dark:text-purple-400">{nft.collection.name}</p>
+                                    {/if}
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Token ID: {nft.tokenId}</p>
+                                    {#if nft.metadata?.description}
+                                        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                                            {nft.metadata.description}
+                                        </p>
+                                    {/if}
+                                    <div class="mt-2 space-y-1 text-sm">
+                                        {#if nft.isListed}
+                                            <p class="text-green-600 dark:text-green-400">Listed: ${nft.listingPrice?.toLocaleString() ?? 0}</p>
+                                        {/if}
+                                        {#if nft.lastSalePrice}
+                                            <p class="text-gray-600 dark:text-gray-300">
+                                                Last Sale: ${nft.lastSalePrice.toLocaleString()}
+                                                {#if nft.lastSaleTimestamp}
+                                                    <span class="text-xs">
+                                                        ({new Date(nft.lastSaleTimestamp * 1000).toLocaleDateString()})
+                                                    </span>
+                                                {/if}
+                                            </p>
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    {/each}
+                </div>
+
+                {#if hasNextPage}
+                    <div class="mt-6 text-center">
+                        <button
+                            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors {isLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                            on:click={loadMore}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Loading...' : 'Load More'}
+                        </button>
+                    </div>
+                {/if}
+            {/if}
+        </div>
+    {/if}
 </div> 
