@@ -1,0 +1,11 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Outer circle -->
+    <circle cx="50" cy="50" r="45" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
+    
+    <!-- Inner decorative circles -->
+    <circle cx="50" cy="50" r="35" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4 4"/>
+    <circle cx="50" cy="50" r="25" fill="#94A3B8" opacity="0.2"/>
+    
+    <!-- Token symbol -->
+    <path d="M50 30C38.954 30 30 38.954 30 50C30 61.046 38.954 70 50 70C61.046 70 70 61.046 70 50C70 38.954 61.046 30 50 30ZM50 65C41.716 65 35 58.284 35 50C35 41.716 41.716 35 50 35C58.284 35 65 41.716 65 50C65 58.284 58.284 65 50 65Z" fill="#64748B"/>
+</svg>

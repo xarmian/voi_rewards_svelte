@@ -52,6 +52,7 @@
   ];
 
   const walletItems: WalletItem[] = [
+    { href: '/wallet#portfolio', label: 'Portfolio', icon: 'fas fa-wallet' },
     { href: '/wallet#consensus', label: 'Consensus', icon: 'fas fa-hexagon-nodes' },
     { href: '/wallet#proposals', label: 'Proposals', icon: 'fas fa-chart-line' },
     { href: '/wallet#epochs', label: 'Epochs', icon: 'fas fa-calendar-alt' },

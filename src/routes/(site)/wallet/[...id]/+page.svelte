@@ -27,7 +27,7 @@
         hash: string;
     };
 
-    let activeSection = 'consensus';
+    let activeSection = 'portfolio';
     let supply: any;
     let apiData: any;
     $: walletId = data.walletId;
@@ -35,12 +35,12 @@
     let loading = true;
 
     const sections = [
+      { id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
       { id: 'consensus', name: 'Consensus', icon: 'fas fa-hexagon-nodes' },
       //{ id: 'staking', name: 'Staking', icon: 'fas fa-cog' },
       { id: 'proposals', name: 'Proposals', icon: 'fas fa-chart-line' },
       { id: 'epochs', name: 'Epochs', icon: 'fas fa-calendar-alt' },
       { id: 'calculator', name: 'Calculator', icon: 'fas fa-calculator' },
-      //{ id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
       //{ id: 'preferences', name: 'Preferences', icon: 'fas fa-cog' },
       //{ id: 'billing', name: 'Billing Information', icon: 'fas fa-cog' }
     ];
