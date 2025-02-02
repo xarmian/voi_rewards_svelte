@@ -33,6 +33,7 @@
     $: walletId = data.walletId;
     $: parentWalletId = data.parentWalletId;
     let loading = true;
+    let isInitialized = false;
 
     const sections = [
       { id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
@@ -256,9 +257,31 @@
       }
     };
 
+    // Initialize wallet and data loading
+    async function initializeWallet() {
+        if (!browser || isInitialized || !walletId) return;
+        
+        isInitialized = true;
+        loading = true;
+
+        try {
+            // Set the selected wallet if it's different from current
+            if (walletId && walletId.length > 0 && walletId !== $selectedWallet?.address) {
+                selectedWallet.set({ address: walletId, app: '' });
+            }
+            
+            // Now load the wallet data
+            await updateAccountInfo(parentWalletId || walletId);
+        } catch (error) {
+            console.error('Error initializing wallet:', error);
+        } finally {
+            loading = false;
+        }
+    }
+
     $: {
-        if (walletId && walletId.length > 0) {
-            updateAccountInfo(parentWalletId || walletId);
+        if (walletId && !isInitialized) {
+            initializeWallet();
         }
     }
 
