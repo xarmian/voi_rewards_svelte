@@ -254,7 +254,7 @@
             
             {#if !optOutSuccess}
                 <p class="mb-6 text-gray-700 dark:text-gray-300">
-                    You are about to opt out of {token.symbol} ({token.id}). This will remove the asset from your account and decrease your minimum balance requirement by 0.1 VOI. This action cannot be undone.
+                    You are about to opt out of {token.symbol} ({token.id}). This will remove the asset from your account and decrease your minimum balance requirement by 0.1 VOI. Any remaining balance of this asset in your account will be burned. You may opt back into the asset in the future.
                 </p>
                 
                 {#if optOutError}
