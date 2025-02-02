@@ -1,87 +1,108 @@
 <script lang="ts">
     import type { FungibleTokenType, LPToken } from '$lib/types/assets';
+    import { imageCache } from '$lib/stores/imageCache';
+    import { onMount } from 'svelte';
 
     export let token: FungibleTokenType | LPToken;
     export let voiPrice: number;
     let errorHandled = false;
+    let imageLoading = false;
+
+    function getTokenImageUrl(tokenId: string): string {
+        if (tokenId === '390001') {
+            return "/icons/voi-token.png";
+        }
+        else if (tokenId === '302190') {
+            tokenId = '395614';
+        }
+        return `https://asset-verification.nautilus.sh/icons/${tokenId}.png`;
+    }
+
+    function getFallbackUrl(): string {
+        return "/icons/default-token-image.svg";
+    }
+
+    function handleImageError(imageUrl: string, event: Event) {
+        const img = event.target as HTMLImageElement;
+        if (!imageCache.hasFailed(imageUrl)) {
+            imageCache.markAsFailed(imageUrl);
+        }
+        // Always set fallback, even if already marked failed
+        img.src = getFallbackUrl();
+    }
 
     function isLPToken(token: FungibleTokenType | LPToken): token is LPToken {
-        return 'poolInfo' in token;
+        return 'poolInfo' in token && token.poolInfo !== undefined;
     }
 
-    function calculateLPValue(token: LPToken): number {
-        const userShare = Number(token.balance) / Number(token.poolInfo.totalSupply);
-        const tokABalance = Number(token.poolInfo.tokABalance);
-        const tokBBalance = Number(token.poolInfo.tokBBalance);
-
-        // If either token is VOI, use its balance for value calculation
-        if (token.poolInfo.tokAId === '0') {
-            return (tokABalance * userShare * 2) / 1e6; // Multiply by 2 since it's paired
-        } else if (token.poolInfo.tokBId === '0') {
-            return (tokBBalance * userShare * 2) / 1e6;
-        }
-
-        // If neither token is VOI, return 0 for now
-        return 0;
-    }
-
-    function handleImageError(event: Event) {
-        const img = event.target as HTMLImageElement;
-        if (!errorHandled) {
-            img.src = "/icons/default-token-image.svg";
-            errorHandled = true;
-        }
-    }
-
-    function formatNumber(value: number, decimals: number = 6): string {
+    function formatNumber(value: number | undefined, decimals: number = 6): string {
+        if (value === undefined || !isFinite(value)) return '0';
         return value.toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: decimals
         });
     }
 
-    function getTokenImageUrl(tokenId: string): string {
-        if (tokenId === '390001') {
-            return "/icons/voi-token.png";
-        }
-        return `https://asset-verification.nautilus.sh/icons/${tokenId}.png`;
-    }
-
-    $: poolShare = isLPToken(token) ? 
-        (Number(token.balance / Math.pow(10, token.decimals)) / Number(token.poolInfo.totalSupply)) : 
+    $: poolShare = isLPToken(token) && token.poolInfo ? 
+        (Number(token.balance) / Math.pow(10, token.decimals)) / Number(token.poolInfo.totalSupply) : 
         null;
-    $: apr = isLPToken(token) ? Number(token.poolInfo.apr) : null;
+    $: apr = isLPToken(token) && token.poolInfo ? Number(token.poolInfo.apr) : null;
+
+    // Calculate display value based on token type
+    $: displayValue = token.value || 0;
+
+    // Add reactive statement to pre-cache images
+    $: if (token) {
+        (async () => {
+            try {
+                if (isLPToken(token) && token.poolInfo) {
+                    const tokAUrl = getTokenImageUrl(token.poolInfo.tokAId);
+                    const tokBUrl = getTokenImageUrl(token.poolInfo.tokBId);
+                    await imageCache.cacheImage(tokAUrl);
+                    await imageCache.cacheImage(tokBUrl);
+                } else {
+                    const imageUrl = getTokenImageUrl(token.id);
+                    await imageCache.cacheImage(imageUrl);
+                }
+            } catch {} // Errors are handled in the cache
+        })();
+    }
 </script>
 
 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
     <div class="flex items-center space-x-4">
-        {#if isLPToken(token)}
+        {#if isLPToken(token) && token.poolInfo}
+            {@const tokenAUrl = getTokenImageUrl(token.poolInfo.tokAId)}
+            {@const tokenBUrl = getTokenImageUrl(token.poolInfo.tokBId)}
             <div class="relative w-16 h-16">
                 <img 
-                    src={getTokenImageUrl(token.poolInfo.tokAId)} 
+                    src={imageCache.getCachedUrl(tokenAUrl) || (imageCache.hasFailed(tokenAUrl) ? getFallbackUrl() : tokenAUrl)}
                     alt={token.poolInfo.tokASymbol}
                     class="absolute top-0 left-0 w-12 h-12 rounded-lg object-cover border-2 border-gray-50 dark:border-gray-700"
-                    on:error={handleImageError}
+                    on:error={(e) => handleImageError(tokenAUrl, e)}
                 />
                 <img 
-                    src={getTokenImageUrl(token.poolInfo.tokBId)} 
+                    src={imageCache.getCachedUrl(tokenBUrl) || (imageCache.hasFailed(tokenBUrl) ? getFallbackUrl() : tokenBUrl)}
                     alt={token.poolInfo.tokBSymbol}
                     class="absolute bottom-0 right-0 w-12 h-12 rounded-lg object-cover border-2 border-gray-50 dark:border-gray-700"
-                    on:error={handleImageError}
+                    on:error={(e) => handleImageError(tokenBUrl, e)}
                 />
             </div>
         {:else}
-            <img 
-                src={token.imageUrl} 
-                alt={token.name} 
-                class="w-16 h-16 rounded-lg object-cover"
-                on:error={handleImageError}
-            />
+            {@const imageUrl = getTokenImageUrl(token.id)}
+            <div class="relative w-16 h-16">
+                <img 
+                    src={imageCache.getCachedUrl(imageUrl) || (imageCache.hasFailed(imageUrl) ? getFallbackUrl() : imageUrl)}
+                    alt={token.name} 
+                    class="w-16 h-16 rounded-lg object-cover"
+                    on:error={(e) => handleImageError(imageUrl, e)}
+                />
+            </div>
         {/if}
         <div class="flex-1">
             <div class="flex items-center justify-between">
                 <h4 class="font-medium text-gray-900 dark:text-white">
-                    {#if isLPToken(token)}
+                    {#if isLPToken(token) && token.poolInfo}
                         {token.poolInfo.tokASymbol}/{token.poolInfo.tokBSymbol} LP
                     {:else}
                         {token.symbol}
@@ -100,7 +121,7 @@
                         <div>
                             <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Your Share</p>
                             <p class="text-gray-700 dark:text-gray-200">
-                                {formatNumber(token.balance / 10 ** token.decimals)} LP Tokens
+                                {formatNumber(token.balance / Math.pow(10, token.decimals))} LP Tokens
                             </p>
                             <p class="text-gray-600 dark:text-gray-300 text-sm">
                                 ({(poolShare * 100).toFixed(2)}% of pool)
@@ -108,33 +129,18 @@
                         </div>
                         <div>
                             <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Value</p>
-                            <p class="text-gray-700 dark:text-gray-200">{formatNumber(token.value)} VOI</p>
-                            <p class="text-gray-600 dark:text-gray-300 text-sm">
-                                (${formatNumber(token.value * voiPrice)} USD)
+                            <p class="text-gray-700 dark:text-gray-200">{formatNumber(displayValue, 3)} VOI</p>
+                            <p class="text-gray-600 dark:text-gray-300 text-xs">
+                                (${formatNumber(displayValue * voiPrice, 3)} USD)
                             </p>
-                        </div>
-                    </div>
-                    <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
-                        <p class="text-gray-500 dark:text-gray-400 text-xs uppercase mb-1">Your Pool Assets</p>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-700 dark:text-gray-200">
-                                    {formatNumber(Number(token.poolInfo.tokABalance) * poolShare)} {token.poolInfo.tokASymbol}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-gray-700 dark:text-gray-200">
-                                    {formatNumber(Number(token.poolInfo.tokBBalance) * poolShare)} {token.poolInfo.tokBSymbol}
-                                </p>
-                            </div>
                         </div>
                     </div>
                 {:else}
                     <p class="text-gray-600 dark:text-gray-300">
-                        Balance: {formatNumber(token.balance / 10 ** token.decimals)} {token.symbol}
+                        Balance: {formatNumber(token.balance / Math.pow(10, token.decimals))} {token.symbol}
                     </p>
                     <p class="text-gray-600 dark:text-gray-300">
-                        Value: {formatNumber(token.value)} VOI / ${formatNumber(token.value * voiPrice)} USD
+                        Value: {formatNumber(displayValue, 3)} VOI / ${formatNumber(displayValue * voiPrice, 3)} USD
                     </p>
                 {/if}
 

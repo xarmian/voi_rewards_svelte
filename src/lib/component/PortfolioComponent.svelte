@@ -130,6 +130,24 @@
                     asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
                     (accountBalance / 1e6);
 
+    // Add these to your existing type definitions and variables
+    type TokenSortOption = {
+        id: 'name' | 'type' | 'balance' | 'value';
+        label: string;
+    };
+
+    const tokenSortOptions: TokenSortOption[] = [
+        { id: 'value', label: 'Value' },
+        { id: 'name', label: 'Name' },
+        { id: 'type', label: 'Type' },
+        { id: 'balance', label: 'Balance' }
+    ];
+
+    let selectedTokenSort: TokenSortOption['id'] = 'value';
+    let tokenSortDirection: 'asc' | 'desc' = 'desc';
+    let tokenSearchQuery = '';
+    let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
+
     function handleImageError(event: Event) {
         const img = event.target as HTMLImageElement;
         if (img) {
@@ -616,6 +634,61 @@
         sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     }
 
+    function getTokenType(token: any): 'vsa' | 'arc200' {
+        return 'assetId' in token ? 'vsa' : 'arc200';
+    }
+
+    function sortTokens(tokens: any[]): any[] {
+        return [...tokens].sort((a, b) => {
+            const aDetails = asaDetails.find(d => d.id === a.assetId);
+            const bDetails = asaDetails.find(d => d.id === b.assetId);
+            
+            let comparison = 0;
+            switch (selectedTokenSort) {
+                case 'name':
+                    const aName = aDetails?.name || a.name || '';
+                    const bName = bDetails?.name || b.name || '';
+                    comparison = aName.localeCompare(bName);
+                    break;
+                case 'type':
+                    comparison = getTokenType(a).localeCompare(getTokenType(b));
+                    break;
+                case 'balance':
+                    const aBalance = (aDetails?.amount || a.balance || 0) / Math.pow(10, aDetails?.decimals || a.decimals || 0);
+                    const bBalance = (bDetails?.amount || b.balance || 0) / Math.pow(10, bDetails?.decimals || b.decimals || 0);
+                    comparison = aBalance - bBalance;
+                    break;
+                case 'value':
+                    const aValue = aDetails?.value || a.value || 0;
+                    const bValue = bDetails?.value || b.value || 0;
+                    comparison = aValue - bValue;
+                    break;
+            }
+            return tokenSortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    function filterTokens(tokens: any[]): any[] {
+        return tokens.filter(token => {
+            const details = asaDetails.find(d => d.id === token.assetId);
+            const name = (details?.name || token.name || '').toLowerCase();
+            const id = (details?.id || token.id || '').toString();
+            const type = getTokenType(token);
+            
+            // Type filter
+            if (selectedTokenType !== 'all' && type !== selectedTokenType) {
+                return false;
+            }
+            
+            // Search query filter
+            if (tokenSearchQuery) {
+                const query = tokenSearchQuery.toLowerCase();
+                return name.includes(query) || id.includes(query);
+            }
+            
+            return true;
+        });
+    }
 
 	function isLPToken(token: FungibleTokenType | LPToken) {
 		return 'poolInfo' in token && token.poolInfo !== undefined;
@@ -736,61 +809,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- ASA Tokens -->
-            {#if asaTokens.length > 0}
-                <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">VSA Tokens</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {#each asaTokens as token}
-                            {@const details = asaDetails.find(d => d.id === token.assetId)}
-                            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                                        <span class="text-xs font-medium text-purple-700 dark:text-purple-300">VSA</span>
-                                    </div>
-                                    <div>
-                                        <div class="flex items-center gap-2">
-                                            <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                                {details?.name || `#${token.assetId}`}
-                                            </p>
-                                        </div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            Balance: {details?.decimals 
-                                                ? (details?.amount / Math.pow(10, details?.decimals)).toLocaleString() 
-                                                : details?.amount.toLocaleString()
-                                            } {details?.unitName || ''}
-                                        </p>
-                                        {#if details?.value}
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                Value: {details.value.toLocaleString(undefined, {minimumFractionDigits: 3, maximumFractionDigits: 3})} VOI
-                                            </p>
-                                        {/if}
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            <a href={`https://explorer.voi.network/explorer/asset/${details?.id}`} class="text-blue-500 hover:text-blue-600" target="_blank" rel="noopener noreferrer">
-                                                ID: {details?.id}
-                                            </a>
-                                            {#if details?.poolId}
-                                            <span class="text-gray-400">|</span>
-                                            <a href={`https://voi.humble.sh/#/swap?poolId=${details?.poolId}`} target="_blank"
-                                                class="text-purple-500 hover:text-purple-600"
-                                            rel="noopener noreferrer">
-                                            Trade on Humble
-                                        </a>
-                                    {/if}
-                                    </p>
-                                    </div>
-                                </div>
-                                {#if token.frozen}
-                                    <span class="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full">
-                                        Frozen
-                                    </span>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>                    
-                </div>
-            {/if}
         </div>
     </div>
 
@@ -820,13 +838,15 @@
 
     <!-- Fungible Tokens Section -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        {#if viewType === 'cards'}
-            <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white flex items-center justify-between">
+        <div class="flex flex-col space-y-4">
+            <div class="flex items-center justify-between">
                 <div>
-                    Fungible Tokens
-                    <span class="text-sm text-gray-500 dark:text-gray-400">
-                        
-                    </span>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+                        Tokens
+                        <span class="text-sm text-gray-500 dark:text-gray-400">
+                            (VSA & ARC-200 Tokens)
+                        </span>
+                    </h3>
                 </div>
                 <label class="inline-flex items-center cursor-pointer">
                     <input 
@@ -837,68 +857,119 @@
                     <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                     <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Show zero balances</span>
                 </label>
-            </h3>
+            </div>
 
-            <!-- Marketplace Links -->
-            <div class="flex flex-col sm:flex-row gap-3 p-4 mb-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <!-- Token Search and Filters -->
+            <div class="flex flex-col sm:flex-row gap-4">
                 <div class="flex-1">
-                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">Looking to trade Tokens? Check out these marketplaces:</p>
-                    <div class="flex gap-2">
-                        <a
-                            href="https://voi.humble.sh"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                        >
-                            <img 
-                                src="https://voi.humble.sh/favicon.ico" 
-                                alt="Humble" 
-                                class="w-4 h-4 mr-1.5"
-                                on:error={handleIconError}
-                            />
-                            Humble
-                        </a>
-                        <a
-                            href="https://voi.nomadex.app"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                        >
-                            <img 
-                                src="https://voi.nomadex.app/favicon.ico" 
-                                alt="Nomadex" 
-                                class="w-4 h-4 mr-1.5"
-                                on:error={handleIconError}
-                            />
-                            Nomadex
-                        </a>
-                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search by name or ID..."
+                        bind:value={tokenSearchQuery}
+                        class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+                    />
+                </div>
+                <div class="flex items-center gap-2">
+                    <select
+                        bind:value={selectedTokenType}
+                        class="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                    >
+                        <option value="all">All Types</option>
+                        <option value="vsa">VSA</option>
+                        <option value="arc200">ARC-200</option>
+                    </select>
+                    <select
+                        bind:value={selectedTokenSort}
+                        class="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                    >
+                        {#each tokenSortOptions as option}
+                            <option value={option.id}>{option.label}</option>
+                        {/each}
+                    </select>
+                    <button
+                        on:click={() => tokenSortDirection = tokenSortDirection === 'asc' ? 'desc' : 'asc'}
+                        class="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg"
+                    >
+                        {#if tokenSortDirection === 'asc'}
+                            <i class="fas fa-sort-amount-up-alt"></i>
+                        {:else}
+                            <i class="fas fa-sort-amount-down"></i>
+                        {/if}
+                    </button>
                 </div>
             </div>
-            
+        </div>
 
-            <!-- Fungible Tokens Section -->
-            <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
-                {#each fungibleTokens.filter(token => showZeroBalances || token.balance > 0) as token (token.id)}
-                    {#if !isLPToken(token)}
-                        <FungibleToken {token} voiPrice={$voiPrice.price} />
-                    {/if}
-                {/each}
-                {#if fungibleTokens.filter(token => !isLPToken(token) && (showZeroBalances || token.balance > 0)).length === 0}
-                    <div class="text-gray-500 dark:text-gray-400 text-center py-4">
-                        No fungible tokens found in this account.
+        <!-- Marketplace Links -->
+        <div class="flex flex-col sm:flex-row gap-3 p-4 my-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div class="flex-1">
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">Looking to trade Tokens? Check out these marketplaces:</p>
+                <div class="flex gap-2">
+                    <a
+                        href="https://voi.humble.sh"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                    >
+                        <img 
+                            src="/icons/humble_icon.png" 
+                            alt="Humble" 
+                            class="w-4 h-4 mr-1.5"
+                            on:error={handleIconError}
+                        />
+                        Humble
+                    </a>
+                    <a
+                        href="https://voi.nomadex.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                    >
+                        <img 
+                            src="/icons/nomadex_icon.ico" 
+                            alt="Nomadex" 
+                            class="w-4 h-4 mr-1.5"
+                            on:error={handleIconError}
+                        />
+                        Nomadex
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combined Tokens Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
+            {#each sortTokens(filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t))])) as token}
+                {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
+                {#if showZeroBalances || (details ? details.amount > 0 : token.balance > 0)}
+                    <div class="relative">
+                        <span class="absolute top-2 right-2 px-2 py-0.5 text-xs font-medium {details ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
+                            {details ? 'VSA' : 'ARC-200'}
+                        </span>
+                        <FungibleToken 
+                            token={details ? {
+                                id: details.id.toString(),
+                                name: details.name || `Token #${token.assetId}`,
+                                symbol: details.unitName || details.name || `#${token.assetId}`,
+                                balance: details.amount || 0,
+                                decimals: details.decimals || 0,
+                                verified: true,
+                                imageUrl: `https://asset-verification.nautilus.sh/icons/${token.assetId}.png`,
+                                value: details.value || 0,
+                                poolId: details.poolId
+                            } : token} 
+                            voiPrice={$voiPrice.price} 
+                        />
                     </div>
                 {/if}
-            </div>
+            {/each}
 
-        {:else}
-            <AssetsTable
-                {fungibleTokens}
-                {nftTokens}
-                {asaTokens}
-                voiPrice={$voiPrice.price}
-            />
-        {/if}
+            {#if filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t))]).length === 0}
+                <div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3">
+                    No tokens found matching your criteria.
+                </div>
+            {/if}
+        </div>
     </div>
 
     {#if viewType === 'cards'}
