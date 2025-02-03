@@ -12,6 +12,10 @@
     import AssetsTable from '../components/AssetsTable.svelte';
 	import { isAuthImplicitGrantRedirectError } from '@supabase/supabase-js';
 	import type { LPToken } from '$lib/types/assets';
+	import InfoButton from './ui/InfoButton.svelte';
+    import { Modal, Button, Input, Label } from 'flowbite-svelte';
+    import SendTokenModal from './SendTokenModal.svelte';
+
     export let walletAddress: string | undefined = undefined;
 
     type SortOption = {
@@ -89,6 +93,7 @@
         imageUrl: string;
         value: number;
         poolId?: string;
+        type?: 'vsa' | 'arc200';
     }
 
     interface ASAToken {
@@ -99,6 +104,7 @@
         name?: string;
         unitName?: string;
         decimals?: number;
+        type?: 'vsa' | 'arc200';
     }
 
     interface Transaction {
@@ -147,6 +153,22 @@
     let tokenSortDirection: 'asc' | 'desc' = 'desc';
     let tokenSearchQuery = '';
     let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
+
+    let showConsensusTooltip = false;
+
+    let showSendVoiModal = false;
+    let refreshTrigger = 0;
+
+    function handleTokenSent() {
+        refreshTrigger += 1;
+        refreshPortfolio();
+    }
+
+    $: {
+        if (refreshTrigger) {
+            fetchAccountDetails();
+        }
+    }
 
     function handleImageError(event: Event) {
         const img = event.target as HTMLImageElement;
@@ -210,7 +232,6 @@
             asaDetails = await Promise.all(
                 asaTokens.map(async (asa) => {
                     const details = await algodClient.getAssetByID(asa.assetId).do();
-                    console.log(details);
                     const value = (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount) / Math.pow(10, details.params.decimals);
                     return {
                         id: asa.assetId,
@@ -458,7 +479,8 @@
                     imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
                     value: calculateTokenValue(token, poolForToken),
                     id: tokenId,
-                    poolId: poolForToken?.contractId?.toString()
+                    poolId: poolForToken?.contractId?.toString(),
+                    type: 'arc200'
                 };
             });
         } catch (err) {
@@ -568,6 +590,24 @@
         if (nextToken) {
             currentPage++;
             await fetchNFTs(nextToken);
+        }
+    }
+
+    async function refreshPortfolio() {
+        isLoading = true;
+        try {
+            await Promise.all([
+                fetchAccountDetails(),
+                fetchPoolData().then(() => {
+                    fetchNFTs();
+                    fetchFungibleTokens();
+                }),
+                fetchVoiPrice()
+            ]);
+        } catch (error) {
+            console.error('Error refreshing portfolio:', error);
+        } finally {
+            isLoading = false;
         }
     }
 
@@ -700,6 +740,15 @@
     <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Overview</h2>
+            <button
+                on:click={refreshPortfolio}
+                class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                disabled={isLoading}
+                title="Refresh portfolio"
+            >
+                <i class="fas fa-sync-alt {isLoading ? 'animate-spin' : ''}"></i>
+                <span class="sr-only">Refresh portfolio</span>
+            </button>
             <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 hidden">
                 <button
                     class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {viewType === 'cards' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}"
@@ -749,9 +798,44 @@
                             </span>
                         {/if}
                     </div>
+                    <!-- Block Explorer Links -->
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <a 
+                            href={`https://voiager.xyz/account/${walletAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+                        >
+                            Voiager
+                            <i class="fas fa-external-link-alt ml-1"></i>
+                        </a>
+                        <a 
+                            href={`https://explorer.voi.network/explorer/account/${walletAddress}/transactions`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+                        >
+                            Voi Explorer
+                            <i class="fas fa-external-link-alt ml-1"></i>
+                        </a>
+                        <a 
+                            href={`https://block.voi.network/explorer/account/${walletAddress}/transactions`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+                        >
+                            Block Explorer
+                            <i class="fas fa-external-link-alt ml-1"></i>
+                        </a>
+                    </div>
                 </div>
-                <div class="mt-4 md:mt-0 text-right">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Account Status</p>
+                <div class="mt-4 md:mt-0 text-right place-self-start">
+                    <div class="flex items-center justify-end gap-1 mb-1 relative">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Consensus Status</p>
+                        <InfoButton noAbsolute buttonColor="dark:text-gray-400 text-gray-600">
+                            Whether your account has a key registered to participate in Consensus for earning block rewards
+                        </InfoButton>
+                    </div>
                     <div class="flex items-center mt-1 space-x-2">
                         <span class="w-2 h-2 rounded-full {accountStatus === 'Online' ? 'bg-green-500' : 'bg-gray-500'}"></span>
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{accountStatus}</p>
@@ -767,9 +851,17 @@
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600 dark:text-gray-300">Available Balance</span>
-                            <span class="text-lg font-semibold text-gray-900 dark:text-white">
-                                {(accountBalance / 1e6).toLocaleString()} VOI
-                            </span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-lg font-semibold text-gray-900 dark:text-white">
+                                    {(accountBalance / 1e6).toLocaleString()} VOI
+                                </span>
+                                <button
+                                    on:click={() => showSendVoiModal = true}
+                                    class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                >
+                                    Send
+                                </button>
+                            </div>
                         </div>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600 dark:text-gray-300">Minimum Balance</span>
@@ -826,10 +918,8 @@
             {#each fungibleTokens.filter(token => showZeroBalances || token.balance > 0) as token (token.id)}
                 {#if isLPToken(token)}
                     <FungibleToken {token} voiPrice={$voiPrice.price} 
-                        on:tokenOptedOut={() => {
-                            fetchAccountDetails();
-                            fetchFungibleTokens();
-                        }}
+                        on:tokenOptedOut={refreshPortfolio}
+                        on:tokenSent={refreshPortfolio}
                     />
                 {/if}
             {/each}
@@ -961,13 +1051,12 @@
                                 verified: true,
                                 imageUrl: `https://asset-verification.nautilus.sh/icons/${token.assetId}.png`,
                                 value: details.value || 0,
-                                poolId: details.poolId
+                                poolId: details.poolId,
+                                type: (details ? 'vsa' : 'arc200')
                             } : token} 
                             voiPrice={$voiPrice.price}
-                            on:tokenOptedOut={() => {
-                                fetchAccountDetails();
-                                fetchFungibleTokens();
-                            }}
+                            on:tokenOptedOut={refreshPortfolio}
+                            on:tokenSent={refreshPortfolio}
                         />
                     </div>
                 {/if}
@@ -1083,7 +1172,7 @@
                                     {#if nft.collection?.name}
                                         <p class="text-sm text-purple-600 dark:text-purple-400">{nft.collection.name}</p>
                                     {/if}
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">Token ID: {nft.tokenId}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Token ID: {nft.tokenId.length > 6 ? nft.tokenId.slice(0, 6) + '...' : nft.tokenId}</p>
                                     {#if nft.metadata?.description}
                                         <p class="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                                             {nft.metadata.description}
@@ -1124,4 +1213,17 @@
             {/if}
         </div>
     {/if}
+
+    <!-- Send VOI Modal -->
+    <SendTokenModal
+        bind:open={showSendVoiModal}
+        token={{
+            type: 'native',
+            symbol: 'VOI',
+            decimals: 6,
+            balance: accountBalance,
+            name: 'Voi'
+        }}
+        onTokenSent={handleTokenSent}
+    />
 </div> 

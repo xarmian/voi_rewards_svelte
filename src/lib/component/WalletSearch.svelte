@@ -33,6 +33,7 @@
     export let loadPreviousValue: boolean = true;
     export let storeAddress: boolean = false;
     export let clearOnSubmit: boolean = false;
+    export let hideSubmitButton: boolean = false;
     $: isMobile = false;
 
 
@@ -67,6 +68,10 @@
             addressList = [];
             return;
         }
+        else if (searchText.length == 58) {
+            handleSubmit();
+            return;
+        }
         
         // Search as user types
         searchEnvoi(searchText).then((results) => {
@@ -93,6 +98,10 @@
         }
         else if (storeAddress) {
             localStorage.setItem('searchText', addr);
+        }
+
+        if (result) {
+            searchText = result.name;
         }
 
         onSubmit(addr);
@@ -129,6 +138,10 @@
             handleSubmit(addressList[selectedAddressIndex]);
             event.preventDefault();
         }
+        else if (searchText.length == 58) {
+            handleSubmit();
+            event.preventDefault();
+        }
     }
 
     function init(el: any) {
@@ -144,19 +157,19 @@
     }
 </script>
 
-<div class="mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl relative" bind:this={componentElement}>
+<div class="relative" bind:this={componentElement}>
     <div class="dark:bg-gray-800 bg-white flex items-center rounded-lg relative">
         <input
             type="text"
             use:init
             bind:value={searchText}
             on:input={handleInput}
-            class="dark:bg-gray-700 bg-gray-100 flex-grow rounded-l-lg p-2 pr-8 text-black dark:text-white"
+            class="dark:bg-gray-700 bg-gray-100 flex-grow p-2 pr-8 text-black dark:text-white {hideSubmitButton ? 'rounded-lg' : 'rounded-l-lg'}"
             placeholder="Search by enVoi name or address"
         />
         {#if searchText}
             <button
-                class="absolute inset-y-0 right-16 pl-2 pr-4 flex items-center cursor-pointer"
+                class="absolute inset-y-0 {hideSubmitButton ? 'right-0' : 'right-16'} pl-2 pr-4 flex items-center cursor-pointer"
                 on:click={clearSearchText}
                 aria-label="Clear search"
             >
@@ -165,13 +178,15 @@
                 </svg>
             </button>
         {/if}
-        <button on:click={() => handleSubmit()} class="bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg">
-        {#if !isMobile}
-            Submit
-        {:else}
-            <SearchOutline />
+        {#if !hideSubmitButton}
+            <button on:click={() => handleSubmit()} class="bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg">
+            {#if !isMobile}
+                Submit
+            {:else}
+                <SearchOutline />
+            {/if}
+            </button>
         {/if}
-        </button>
     </div>
 
     {#if addressList.length > 0 && searchText.length > 0}

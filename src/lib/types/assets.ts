@@ -8,6 +8,7 @@ export interface FungibleTokenType {
     imageUrl: string;
     value: number;
     poolId?: string;
+    type?: 'vsa' | 'arc200';
 }
 
 export interface LPToken {
