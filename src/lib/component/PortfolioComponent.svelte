@@ -10,11 +10,10 @@
     import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import AssetsTable from '../components/AssetsTable.svelte';
-	import { isAuthImplicitGrantRedirectError } from '@supabase/supabase-js';
 	import type { LPToken } from '$lib/types/assets';
 	import InfoButton from './ui/InfoButton.svelte';
-    import { Modal, Button, Input, Label } from 'flowbite-svelte';
     import SendTokenModal from './SendTokenModal.svelte';
+    import { selectedWallet } from 'avm-wallet-svelte';
 
     export let walletAddress: string | undefined = undefined;
 
@@ -49,6 +48,7 @@
     let currentEpochRewards: number = 0;
     let rewardsHistory: any[] = [];
     let asaDetails: any[] = [];
+    let canSignTransactions = false;
 
     // Add view type state
     let viewType: 'cards' | 'table' = 'cards';
@@ -153,9 +153,6 @@
     let tokenSortDirection: 'asc' | 'desc' = 'desc';
     let tokenSearchQuery = '';
     let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
-
-    let showConsensusTooltip = false;
-
     let showSendVoiModal = false;
     let refreshTrigger = 0;
 
@@ -613,17 +610,11 @@
 
     $: {
         if (walletAddress) {
-            fetchAccountDetails();
-            fetchPoolData().then(() => {
-                fetchNFTs();
-                fetchFungibleTokens();
-            });
+            canSignTransactions = $selectedWallet?.address === walletAddress && $selectedWallet?.app !== '' && $selectedWallet?.app !== 'Watch';
+
+            refreshPortfolio();
         }
     }
-
-    onMount(async () => {
-        await fetchVoiPrice();
-    });
 
     function getOptimizedImageUrl(imageUrl: string, metadataURI: string | undefined, width = 200): string {
         if (!imageUrl) return "https://placehold.co/100x100";
@@ -855,12 +846,14 @@
                                 <span class="text-lg font-semibold text-gray-900 dark:text-white">
                                     {(accountBalance / 1e6).toLocaleString()} VOI
                                 </span>
-                                <button
-                                    on:click={() => showSendVoiModal = true}
-                                    class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                                >
-                                    Send
-                                </button>
+                                {#if canSignTransactions}
+                                    <button
+                                        on:click={() => showSendVoiModal = true}
+                                        class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                    >
+                                        Send
+                                    </button>
+                                {/if}
                             </div>
                         </div>
                         <div class="flex justify-between items-center">
@@ -920,6 +913,7 @@
                     <FungibleToken {token} voiPrice={$voiPrice.price} 
                         on:tokenOptedOut={refreshPortfolio}
                         on:tokenSent={refreshPortfolio}
+                        canSignTransactions={canSignTransactions}
                     />
                 {/if}
             {/each}
@@ -1057,6 +1051,7 @@
                             voiPrice={$voiPrice.price}
                             on:tokenOptedOut={refreshPortfolio}
                             on:tokenSent={refreshPortfolio}
+                            canSignTransactions={canSignTransactions}
                         />
                     </div>
                 {/if}

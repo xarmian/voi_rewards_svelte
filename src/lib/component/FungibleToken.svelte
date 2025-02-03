@@ -9,6 +9,7 @@
 
     export let token: FungibleTokenType | LPToken;
     export let voiPrice: number;
+    export let canSignTransactions = false;
     let showOptOutModal = false;
     let showSendModal = false;
 
@@ -154,7 +155,7 @@
                         rel="noopener noreferrer">
                         ID: {token.id}
                     </a>
-                    {#if isLPToken(token)}
+                    {#if canSignTransactions && isLPToken(token)}
                         <span class="text-gray-400">|</span>
                         <a href={`https://voi.humble.sh/#/pool/add?poolId=${token.poolId}`} target="_blank"
                             class="text-purple-500 hover:text-purple-600"
@@ -172,10 +173,10 @@
                         <a href={`https://voi.humble.sh/#/swap?poolId=${token.poolId}`} target="_blank"
                             class="text-purple-500 hover:text-purple-600"
                             rel="noopener noreferrer">
-                            Trade on Humble
+                            {canSignTransactions ? 'Trade on Humble' : 'View on Humble'}
                         </a>
                     {/if}
-                    {#if !isLPToken(token)}
+                    {#if canSignTransactions && !isLPToken(token)}
                         <span class="text-gray-400">|</span>
                         <button
                             class="text-blue-500 hover:text-blue-600"
@@ -184,7 +185,7 @@
                             Send
                         </button>
                     {/if}
-                    {#if token.balance === 0}
+                    {#if canSignTransactions && token.balance === 0}
                         <span class="text-gray-400">|</span>
                         <button
                             class="text-red-500 hover:text-red-600"
