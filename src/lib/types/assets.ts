@@ -34,6 +34,9 @@ export interface LPToken {
         poolId: string;
         apr: number;
         tvl: number;
+        provider?: 'humble' | 'nomadex';
+        tokAType?: string;
+        tokBType?: string;
     };
 }
 

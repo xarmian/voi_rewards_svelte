@@ -32,6 +32,7 @@
         assetBalance?: number;
     } | null = null;
     let isLoadingRecipient = false;
+    let isValidRecipient = false;
     let note: string = '';
 
     // Helper function to determine if token is native VOI
@@ -46,7 +47,7 @@
 
     $: maxAmount = token.balance / Math.pow(10, token.decimals);
     $: isValidAmount = Number(amount) > 0 && Number(amount) <= maxAmount;
-    $: canSubmit = recipientAddress && isValidAmount && !isSending;
+    $: canSubmit = recipientAddress && isValidAmount && isValidRecipient && !isSending;
 
     async function fetchRecipientInfo(address: string) {
         isLoadingRecipient = true;
@@ -85,15 +86,21 @@
                 hasOptedIn,
                 assetBalance
             };
+
+            isValidRecipient = true;
+            error = null;
         } catch (err) {
             console.error('Error fetching recipient info:', err);
+            error = 'Failed to fetch recipient info. Please try again later.';
             recipientInfo = null;
+            isValidRecipient = false;
         } finally {
             isLoadingRecipient = false;
         }
     }
 
     async function handleRecipientSelected(address: string) {
+        if (address === recipientAddress) return;
         recipientAddress = address;
         error = null;
         await fetchRecipientInfo(address);
@@ -242,7 +249,7 @@
                     {#if recipientAddress}
                         <div class="mt-2 space-y-2 text-sm">
                             <p class="text-green-600 dark:text-green-400">
-                                Selected: {recipientAddress.slice(0, 8)}...{recipientAddress.slice(-8)}
+                                Selected: <a href={`https://explorer.voi.network/explorer/account/${recipientAddress}`} target="_blank" rel="noopener noreferrer" class="hover:text-green-800 dark:hover:text-green-200 truncate">{recipientAddress.slice(0, 8)}...{recipientAddress.slice(-8)}</a>
                             </p>
                             
                             {#if isLoadingRecipient}

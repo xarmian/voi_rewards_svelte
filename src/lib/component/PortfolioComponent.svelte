@@ -4,7 +4,7 @@
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import { getEnvoiNames } from '$lib/utils/envoi';
     import { dataTable } from '../../stores/dataTable';
-    import { getTokensByEpoch } from '$lib/utils';
+    import { getTokensByEpoch, decodeGlobalState } from '$lib/utils';
     import { getSupplyInfo } from '$lib/stores/accounts';
     import { config } from '$lib/config';
     import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
@@ -119,7 +119,10 @@
     let isLoading = true;
     let error: string | null = null;
     let currentPage = 1;
-    let hasNextPage = false;
+    let itemsPerPage = 12;
+    let allNftTokens: NFTToken[] = [];
+    let displayedNftTokens: NFTToken[] = [];
+    let totalPages = 0;
     let nextToken: string | null = null;
     let collections: Map<string, any> = new Map();
     let poolData: Map<string, any> = new Map();
@@ -156,14 +159,38 @@
     let showSendVoiModal = false;
     let refreshTrigger = 0;
 
+    let lastAccountFetch = 0;
+    const CACHE_DURATION = 30000; // 30 seconds
+
     function handleTokenSent() {
-        refreshTrigger += 1;
-        refreshPortfolio();
+        initializePortfolio();
     }
 
     $: {
-        if (refreshTrigger) {
-            fetchAccountDetails();
+        if (walletAddress) {
+            canSignTransactions = $selectedWallet?.address === walletAddress && $selectedWallet?.app !== '' && $selectedWallet?.app !== 'Watch';
+            initializePortfolio();
+        }
+    }
+
+    async function initializePortfolio() {
+        isLoading = true;
+        try {
+            // Fetch pool data first as it's needed by other functions
+            await fetchPoolData();
+            
+            // Then fetch everything else in parallel
+            await Promise.all([
+                fetchAccountDetails(),
+                fetchNFTs(),
+                fetchFungibleTokens(),
+                fetchNomadexLPTokens(),
+                fetchVoiPrice()
+            ]);
+        } catch (error) {
+            console.error('Error initializing portfolio:', error);
+        } finally {
+            isLoading = false;
         }
     }
 
@@ -206,6 +233,11 @@
 
     async function fetchAccountDetails() {
         if (!walletAddress) return;
+        
+        const now = Date.now();
+        if (now - lastAccountFetch < CACHE_DURATION) {
+            return; // Use cached data
+        }
         
         try {
             // Fetch account information
@@ -317,6 +349,7 @@
                 console.error('Error calculating rewards:', err);
             }
 
+            lastAccountFetch = now;
         } catch (err) {
             console.error('Error fetching account details:', err);
             error = 'Failed to load some account details';
@@ -451,12 +484,13 @@
                             tokBSymbol: pool.symbolB,
                             tokABalance: pool.poolBalA,
                             tokBBalance: pool.poolBalB,
-                            totalSupply: pool.supply,
+                            totalSupply: pool.supply * Math.pow(10, 6),
                             poolId: pool.contractId.toString(),
                             apr: pool.apr,
                             tokADecimals: pool.tokADecimals,
                             tokBDecimals: pool.tokBDecimals,
-                            tvl: pool.tvl
+                            tvl: pool.tvl,
+                            provider: 'humble'
                         }
                     };
                 }
@@ -487,7 +521,7 @@
         }
     }
 
-    async function fetchNFTs(pageToken?: string) {
+    async function fetchNFTs() {
         if (!walletAddress) return;
         
         isLoading = true;
@@ -495,10 +529,6 @@
         try {
             const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
             url.searchParams.append('owner', walletAddress);
-            url.searchParams.append('limit', '12');
-            if (pageToken) {
-                url.searchParams.append('next', pageToken);
-            }
 
             const response = await fetch(url.toString());
             if (!response.ok) throw new Error('Failed to fetch NFTs');
@@ -523,7 +553,7 @@
                 });
             }
 
-            const nfts = data.tokens.map((token: any) => {
+            allNftTokens = data.tokens.map((token: any) => {
                 try {
                     let parsedMetadata = token.metadata;
                     if (typeof token.metadata === 'string') {
@@ -572,9 +602,7 @@
                 }
             });
 
-            nftTokens = pageToken ? [...nftTokens, ...nfts] : nfts;
-            nextToken = data['next-token'] || null;
-            hasNextPage = !!data['next-token'];
+            updateDisplayedNfts();
         } catch (err) {
             console.error('Error fetching NFTs:', err);
             error = 'Failed to load NFTs. Please try again later.';
@@ -583,36 +611,136 @@
         }
     }
 
+    function updateDisplayedNfts() {
+        // First sort all NFTs
+        const sortedNfts = sortNFTs(allNftTokens);
+        
+        // Calculate total pages
+        totalPages = Math.ceil(sortedNfts.length / itemsPerPage);
+        
+        // Get the slice of NFTs for the current page
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        displayedNftTokens = sortedNfts.slice(startIndex, endIndex);
+    }
+
     async function loadMore() {
-        if (nextToken) {
+        if (currentPage < totalPages) {
             currentPage++;
-            await fetchNFTs(nextToken);
+            updateDisplayedNfts();
         }
     }
 
-    async function refreshPortfolio() {
-        isLoading = true;
-        try {
-            await Promise.all([
-                fetchAccountDetails(),
-                fetchPoolData().then(() => {
-                    fetchNFTs();
-                    fetchFungibleTokens();
-                }),
-                fetchVoiPrice()
-            ]);
-        } catch (error) {
-            console.error('Error refreshing portfolio:', error);
-        } finally {
-            isLoading = false;
+    function goToPage(page: number) {
+        if (page >= 1 && page <= totalPages) {
+            currentPage = page;
+            updateDisplayedNfts();
         }
     }
 
+    function goToPreviousPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            updateDisplayedNfts();
+        }
+    }
+
+    function goToNextPage() {
+        if (currentPage < totalPages) {
+            currentPage++;
+            updateDisplayedNfts();
+        }
+    }
+
+    // Update the displayed NFTs whenever sort options change
     $: {
-        if (walletAddress) {
-            canSignTransactions = $selectedWallet?.address === walletAddress && $selectedWallet?.app !== '' && $selectedWallet?.app !== 'Watch';
+        if (selectedSort || sortDirection) {
+            updateDisplayedNfts();
+        }
+    }
 
-            refreshPortfolio();
+    async function fetchNomadexLPTokens() {
+        if (!walletAddress) return;
+        
+        try {
+            // Get all Nomadex pools
+            const pools = await fetch(`https://api.voirewards.com/nomadex/index.php`);
+            const poolData = await pools.json();
+            console.log(poolData);
+
+            // Call Nomadex endpoint with the user's wallet address
+            const response = await fetch(`https://voimain-analytics.nomadex.app/pools/${walletAddress}`);
+            if (!response.ok) {
+                console.error('Failed to fetch Nomadex LP tokens');
+                return;
+            }
+            const data = await response.json();
+            
+            // Map through each pool returned by Nomadex
+            const nomadexLPTokens = await Promise.all(data.map(async (pool: any) => {
+                // get global state using algodClient
+                const ctc = await algodClient.getApplicationByID(pool.id).do();
+                const globalState = decodeGlobalState(ctc.params['global-state']);
+
+                const decimals = Number(globalState.find((state: any) => state.key === 'decimals')?.value);
+                const name = globalState.find((state: any) => state.key === 'name')?.value;
+
+                const lpt = Number(pool.balance.lpt);
+                const issuedLpt = Number(pool.balance.issuedLpt);
+                
+                // find pool in poolData
+                const poolInfo = poolData.find((p: any) => p.id === pool.id);
+                let tvl = 0;
+                
+                // if alpha or beta token is 0, then we can figure out TVL from from poolInfo.volume[?]
+                if (poolInfo.alphaId === 0) {
+                    tvl = poolInfo.balances[0] * 2;
+                } else if (poolInfo.betaId === 0) {
+                    tvl = poolInfo.balances[1] * 2;
+                } else {
+                    // we need to map the alpha token to another pool where the alphaId or betaId is 0, and get the tvl from that pool
+                    const alphaPool = poolData.find((p: any) => p.alphaId === 0);
+
+                    
+                }
+
+                return {
+                    name: name,
+                    symbol: `${pool.alphaId}/${pool.betaId}`,
+                    balance: lpt,
+                    decimals: decimals,
+                    verified: true,
+                    imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
+                    id: pool.id,
+                    poolId: String(pool.id),
+                    value: lpt / issuedLpt * tvl / Math.pow(10, 6),
+                    poolInfo: {
+                        tokAId: pool.alphaId,
+                        tokBId: pool.betaId,
+                        tokASymbol: pool.alphaId,
+                        tokBSymbol: pool.betaId,
+                        tokABalance: poolInfo.balances[0],
+                        tokBBalance: poolInfo.balances[1],
+                        tokAType: poolInfo.alphaType,
+                        tokBType: poolInfo.betaType,
+                        totalSupply: issuedLpt,
+                        poolId: String(pool.id),
+                        apr: Math.round(poolInfo.apr * 100) / 100,
+                        tokADecimals: 6,
+                        tokBDecimals: 6,
+                        tvl: tvl,
+                        provider: 'nomadex'
+                    }
+                }
+            }));
+
+            // Append the Nomadex LP tokens to our existing fungibleTokens array
+            fungibleTokens = [
+                ...fungibleTokens,
+                ...nomadexLPTokens
+            ];
+        } catch (err) {
+            console.error('Error fetching Nomadex LP tokens:', err);
         }
     }
 
@@ -732,7 +860,7 @@
         <div class="flex items-center space-x-4">
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Overview</h2>
             <button
-                on:click={refreshPortfolio}
+                on:click={initializePortfolio}
                 class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
                 disabled={isLoading}
                 title="Refresh portfolio"
@@ -902,17 +1030,14 @@
         <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white flex items-center justify-between">
             <div>
                 LP Tokens
-                <span class="text-sm text-gray-500 dark:text-gray-400">
-                    (Humble Swap LP Tokens, Nomadex coming soon)
-                </span>
             </div>
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
             {#each fungibleTokens.filter(token => showZeroBalances || token.balance > 0) as token (token.id)}
                 {#if isLPToken(token)}
                     <FungibleToken {token} voiPrice={$voiPrice.price} 
-                        on:tokenOptedOut={refreshPortfolio}
-                        on:tokenSent={refreshPortfolio}
+                        on:tokenOptedOut={initializePortfolio}
+                        on:tokenSent={initializePortfolio}
                         canSignTransactions={canSignTransactions}
                     />
                 {/if}
@@ -1028,7 +1153,7 @@
 
         <!-- Combined Tokens Grid -->
         <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
-            {#each sortTokens(filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t))])) as token}
+            {#each sortTokens(filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t) && t.verified)])) as token}
                 {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
                 {#if showZeroBalances || (details ? details.amount > 0 : token.balance > 0)}
                     <div class="relative">
@@ -1049,8 +1174,8 @@
                                 type: (details ? 'vsa' : 'arc200')
                             } : token} 
                             voiPrice={$voiPrice.price}
-                            on:tokenOptedOut={refreshPortfolio}
-                            on:tokenSent={refreshPortfolio}
+                            on:tokenOptedOut={initializePortfolio}
+                            on:tokenSent={initializePortfolio}
                             canSignTransactions={canSignTransactions}
                         />
                     </div>
@@ -1072,7 +1197,7 @@
             <div class="flex flex-col space-y-4 mb-6">
                 <div class="flex items-center justify-between">
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white">NFT Tokens</h3>
-                    {#if nftTokens.length > 0}
+                    {#if displayedNftTokens.length > 0}
                         <div class="flex items-center space-x-2">
                             <select
                                 bind:value={selectedSort}
@@ -1134,21 +1259,21 @@
                 </div>
             </div>
 
-            {#if isLoading && !nftTokens.length}
+            {#if isLoading && !displayedNftTokens.length}
                 <div class="flex justify-center items-center h-32">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                 </div>
-            {:else if error && !nftTokens.length}
+            {:else if error && !displayedNftTokens.length}
                 <div class="text-red-500 dark:text-red-400 text-center py-4">
                     {error}
                 </div>
-            {:else if !nftTokens.length}
+            {:else if !displayedNftTokens.length}
                 <div class="text-gray-500 dark:text-gray-400 text-center py-4">
                     No NFTs found in this wallet.
                 </div>
             {:else}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {#each sortNFTs(nftTokens) as nft}
+                    {#each displayedNftTokens as nft}
                         <a 
                             href={getTokenUrl(nft.contractId, nft.tokenId)}
                             target="_blank"
@@ -1194,14 +1319,24 @@
                     {/each}
                 </div>
 
-                {#if hasNextPage}
-                    <div class="mt-6 text-center">
+                {#if totalPages > 1}
+                    <div class="mt-6 flex justify-center items-center space-x-4">
                         <button
-                            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors {isLoading ? 'opacity-50 cursor-not-allowed' : ''}"
-                            on:click={loadMore}
-                            disabled={isLoading}
+                            class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            on:click={goToPreviousPage}
+                            disabled={currentPage === 1}
                         >
-                            {isLoading ? 'Loading...' : 'Load More'}
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            on:click={goToNextPage}
+                            disabled={currentPage === totalPages}
+                        >
+                            <i class="fas fa-chevron-right"></i>
                         </button>
                     </div>
                 {/if}

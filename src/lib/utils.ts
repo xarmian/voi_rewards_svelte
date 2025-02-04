@@ -1,3 +1,5 @@
+import algosdk from "algosdk";
+
 export function slugify(text: string) {
   return text.toLowerCase().replace(/[^\w]+/g, '-');
 }
@@ -159,3 +161,62 @@ export function formatNumber(value: number, decimals: number = 0): string {
     }).format(value);
 }
 
+interface GlobalStateValue {
+  bytes: string;
+  type: 1 | 2;  // 1 for bytes, 2 for uint
+  uint: number;
+}
+
+interface GlobalStateEntry {
+  key: string;
+  value: GlobalStateValue;
+}
+
+export function decodeGlobalState(globalState: GlobalStateEntry[]): { key: string; value: string | number }[] {
+  // Fields that should always be treated as numbers
+  const numericFields = new Set(['total_supply', 'swap_fee', 'decimals', 'beta_id', 'alpha_id', 'factory']);
+
+  return globalState.map(item => {
+    // Decode the base64 key
+    const decodedKey = Buffer.from(item.key, 'base64').toString('utf8');
+    
+    // Initialize with a default value
+    let decodedValue: string | number = '';
+    
+    if (item.value.type === 1) {  // bytes
+      if (item.value.bytes) {
+        const buffer = Buffer.from(item.value.bytes, 'base64');
+        
+        // If it's a numeric field or single byte, decode as number
+        if (numericFields.has(decodedKey) || buffer.length === 1) {
+          if (buffer.length === 1) {
+            decodedValue = buffer.readUInt8(0);
+          } else if (buffer.length === 8) {
+            // For 8-byte numbers (like total_supply), read as BigInt and convert to number
+            decodedValue = Number(buffer.readBigUInt64BE(0));
+          }
+        } else {
+          // Try to decode as UTF-8 string
+          try {
+            decodedValue = buffer.toString('utf8').split('\u0000').join('');
+          } catch {
+            // If UTF-8 decoding fails, use empty string
+            decodedValue = '';
+          }
+        }
+      }
+    } else if (item.value.type === 2) {  // uint
+      decodedValue = item.value.uint;
+    }
+
+    // If we still have an empty value for a numeric field, use the uint value
+    if (decodedValue === '' && numericFields.has(decodedKey)) {
+      decodedValue = item.value.uint;
+    }
+
+    return {
+      key: decodedKey,
+      value: decodedValue
+    };
+  });
+} 

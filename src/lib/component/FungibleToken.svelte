@@ -49,7 +49,7 @@
     }
 
     $: poolShare = isLPToken(token) && token.poolInfo ? 
-        (Number(token.balance) / Math.pow(10, token.decimals)) / Number(token.poolInfo.totalSupply) : 
+        Number(token.balance) / Number(token.poolInfo.totalSupply) : 
         null;
     $: apr = isLPToken(token) && token.poolInfo ? Number(token.poolInfo.apr) : null;
 
@@ -74,7 +74,7 @@
     }
 </script>
 
-<div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+<div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 relative">
     <div class="flex items-center space-x-4">
         {#if isLPToken(token) && token.poolInfo}
             {@const tokenAUrl = getTokenImageUrl(token.poolInfo.tokAId)}
@@ -83,13 +83,13 @@
                 <img 
                     src={imageCache.getCachedUrl(tokenAUrl) || (imageCache.hasFailed(tokenAUrl) ? getFallbackUrl() : tokenAUrl)}
                     alt={token.poolInfo.tokASymbol}
-                    class="absolute top-0 left-0 w-12 h-12 rounded-lg object-cover border-2 border-gray-50 dark:border-gray-700"
+                    class="absolute top-0 left-0 w-12 h-12 rounded-lg object-cover"
                     on:error={(e) => handleImageError(tokenAUrl, e)}
                 />
                 <img 
                     src={imageCache.getCachedUrl(tokenBUrl) || (imageCache.hasFailed(tokenBUrl) ? getFallbackUrl() : tokenBUrl)}
                     alt={token.poolInfo.tokBSymbol}
-                    class="absolute bottom-0 right-0 w-12 h-12 rounded-lg object-cover border-2 border-gray-50 dark:border-gray-700"
+                    class="absolute bottom-0 right-0 w-12 h-12 rounded-lg object-cover"
                     on:error={(e) => handleImageError(tokenBUrl, e)}
                 />
             </div>
@@ -108,12 +108,12 @@
             <div class="flex items-center justify-between">
                 <h4 class="font-medium text-gray-900 dark:text-white">
                     {#if isLPToken(token) && token.poolInfo}
-                        {token.poolInfo.tokASymbol}/{token.poolInfo.tokBSymbol} LP
+                        {token.name}
                     {:else}
                         {token.symbol}
                     {/if}
                 </h4>
-                {#if isLPToken(token) && apr !== null}
+                {#if isLPToken(token) && apr !== null && apr !== 0}
                     <span class="text-sm px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">
                         APR: {formatNumber(apr)}%
                     </span>
@@ -157,23 +157,27 @@
                     </a>
                     {#if canSignTransactions && isLPToken(token)}
                         <span class="text-gray-400">|</span>
-                        <a href={`https://voi.humble.sh/#/pool/add?poolId=${token.poolId}`} target="_blank"
+                        <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/add?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/add`} target="_blank"
                             class="text-purple-500 hover:text-purple-600"
                             rel="noopener noreferrer">
-                            Add Liquidity
+                            <i class="fa-solid fa-plus"></i> Liquidity
                         </a>
                         <span class="text-gray-400">|</span>
-                        <a href={`https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}`} target="_blank"
+                        <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/remove`} target="_blank"
                             class="text-purple-500 hover:text-purple-600"
                             rel="noopener noreferrer">
-                            Remove Liquidity
+                            <i class="fa-solid fa-minus"></i> Liquidity
                         </a>
                     {:else if token.poolId}
                         <span class="text-gray-400">|</span>
                         <a href={`https://voi.humble.sh/#/swap?poolId=${token.poolId}`} target="_blank"
                             class="text-purple-500 hover:text-purple-600"
                             rel="noopener noreferrer">
-                            {canSignTransactions ? 'Trade on Humble' : 'View on Humble'}
+                            {#if canSignTransactions}
+                                <i class="fa-solid fa-exchange-alt"></i> Trade
+                            {:else}
+                                <i class="fa-solid fa-eye"></i> View
+                            {/if}
                         </a>
                     {/if}
                     {#if canSignTransactions && !isLPToken(token)}
@@ -198,6 +202,19 @@
             </div>
         </div>
     </div>
+    {#if isLPToken(token) && token.poolInfo.provider}
+        <div class="absolute bottom-3 left-3">
+            {#if token.poolInfo.provider === 'humble'}
+                <a href="https://voi.humble.sh/#/swap?poolId=${token.poolId}" target="_blank" rel="noopener noreferrer">
+                    <img src="/icons/humble_icon.png" alt="Humble" class="w-6 h-6" />
+                </a>
+            {:else if token.poolInfo.provider === 'nomadex'}
+                <a href={`https://voi.nomadex.app/${token.poolInfo.tokAType}/${token.poolInfo.tokAId}/${token.poolInfo.tokBType}/${token.poolInfo.tokBId}`} target="_blank" rel="noopener noreferrer">
+                    <img src="/icons/nomadex_icon.ico" alt="Nomadex" class="w-6 h-6" />
+                </a>
+            {/if}
+        </div>
+    {/if}
 </div>
 
 {#if showOptOutModal}
