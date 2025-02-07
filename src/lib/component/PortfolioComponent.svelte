@@ -48,6 +48,7 @@
     let pendingRewards: number = 0;
     let totalRewards: number = 0;
     let envoiName: string | null = null;
+    let envoiAvatar: string | undefined = undefined;
     let epochData: any[] = [];
     let currentEpochRewards: number = 0;
     let rewardsHistory: any[] = [];
@@ -383,6 +384,7 @@
             try {
                 const envoiResults = await getEnvoiNames([walletAddress]);
                 envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
+                envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
             } catch (err) {
                 console.error('Error fetching Envoi name:', err);
             }
@@ -1009,34 +1011,62 @@
                             <span class="sr-only">Refresh account overview</span>
                         </button>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <a 
-                            href={`https://voiager.xyz/account/${walletAddress}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
-                        >
-                            Voiager
-                            <i class="fas fa-external-link-alt ml-1"></i>
-                        </a>
-                        <a 
-                            href={`https://explorer.voi.network/explorer/account/${walletAddress}/transactions`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
-                        >
-                            Voi Explorer
-                            <i class="fas fa-external-link-alt ml-1"></i>
-                        </a>
-                        <a 
-                            href={`https://block.voi.network/explorer/account/${walletAddress}/transactions`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
-                        >
-                            Block Explorer
-                            <i class="fas fa-external-link-alt ml-1"></i>
-                        </a>
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="flex items-center gap-2">
+                            {#if envoiAvatar}
+                                <a href={`https://app.envoi.sh/#/${envoiName}`} target="_blank" rel="noopener noreferrer">
+                                    <img 
+                                        src={envoiAvatar} 
+                                        alt="Profile Avatar" 
+                                        class="w-16 h-16 rounded-full object-cover"
+                                        on:error={(e) => {
+                                            const img = e.target as HTMLImageElement;
+                                            img.src = "/icons/default-avatar.png";
+                                        }}
+                                    />
+                                </a>
+                            {/if}
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-mono text-sm text-gray-600 dark:text-gray-300">{walletAddress}</span>
+                                    <CopyComponent text={walletAddress} />
+                                </div>
+                                {#if envoiName}
+                                    <span class="text-purple-600 dark:text-purple-400">({envoiName})</span>
+                                {/if}
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <a 
+                                    href={`https://voiager.xyz/account/${walletAddress}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+                                >
+                                    Voiager
+                                    <i class="fas fa-external-link-alt ml-1"></i>
+                                </a>
+                                <a 
+                                    href={`https://explorer.voi.network/explorer/account/${walletAddress}/transactions`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+                                >
+                                    Voi Explorer
+                                    <i class="fas fa-external-link-alt ml-1"></i>
+                                </a>
+                                <a 
+                                    href={`https://block.voi.network/explorer/account/${walletAddress}/transactions`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+                                >
+                                    Block Explorer
+                                    <i class="fas fa-external-link-alt ml-1"></i>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-4 md:mt-0 text-right">
