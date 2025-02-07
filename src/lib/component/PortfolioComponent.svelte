@@ -1030,7 +1030,8 @@
                         <div class="flex flex-col gap-2">
                             <div class="flex items-center gap-2 mb-2">
                                 <div class="flex items-center gap-2">
-                                    <span class="font-mono text-sm text-gray-600 dark:text-gray-300">{walletAddress}</span>
+                                    <span class="hidden md:block font-mono text-sm text-gray-600 dark:text-gray-300">{walletAddress}</span>
+                                    <span class="block md:hidden font-mono text-sm text-gray-600 dark:text-gray-300">{walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}</span>
                                     <CopyComponent text={walletAddress} />
                                 </div>
                                 {#if envoiName}
