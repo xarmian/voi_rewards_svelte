@@ -9,6 +9,23 @@ export interface FungibleTokenType {
     value: number;
     poolId?: string;
     type?: 'vsa' | 'arc200';
+    poolInfo?: {
+        tokAId: string;
+        tokBId: string;
+        tokASymbol: string;
+        tokBSymbol: string;
+        tokABalance: string;
+        tokBBalance: string;
+        tokAType?: string;
+        tokBType?: string;
+        totalSupply: number;
+        poolId: string;
+        apr: number;
+        tokADecimals: number;
+        tokBDecimals: number;
+        tvl: number;
+        provider: 'humble' | 'nomadex';
+    };
 }
 
 export interface LPToken {
@@ -30,11 +47,11 @@ export interface LPToken {
         tokBBalance: string;
         tokADecimals: number;
         tokBDecimals: number;
-        totalSupply: string;
+        totalSupply: number;
         poolId: string;
         apr: number;
         tvl: number;
-        provider?: 'humble' | 'nomadex';
+        provider: 'humble' | 'nomadex';
         tokAType?: string;
         tokBType?: string;
     };

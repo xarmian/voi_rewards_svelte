@@ -551,6 +551,7 @@
                                         on:click={resetToWalletBalance}
                                     >
                                         <div class="flex flex-col items-center">
+                                            <i class="fas fa-wallet mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"></i>
                                             <span class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300">Current Balance</span>
                                             <span>{walletBalance.toLocaleString()} VOI</span>
                                         </div>
@@ -564,6 +565,7 @@
                                         on:click={() => setCalculationAmount(2)}
                                     >
                                         <div class="flex flex-col items-center">
+                                            <i class="fas fa-chart-line mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"></i>
                                             <span class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300">2x Balance</span>
                                             <span>{(walletBalance * 2).toLocaleString()} VOI</span>
                                         </div>
@@ -578,6 +580,7 @@
                                             on:click={() => setFixedAmount(Math.round((primaryAccountInfo?.balance + childAccounts.reduce((acc, account) => acc + account.balance, 0)) * 1e6) / 1e6)}
                                         >
                                             <div class="flex flex-col items-center">
+                                                <i class="fas fa-users mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"></i>
                                                 <span class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300">All Accounts</span>
                                                 <span>{(primaryAccountInfo?.balance + childAccounts.reduce((acc, account) => acc + account.balance, 0)).toLocaleString()} VOI</span>
                                             </div>
@@ -592,6 +595,7 @@
                                             on:click={() => setCalculationAmount(10)}
                                         >
                                             <div class="flex flex-col items-center">
+                                                <i class="fas fa-rocket mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"></i>
                                                 <span class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300">10x Balance</span>
                                                 <span>{(walletBalance * 10).toLocaleString()} VOI</span>
                                             </div>
@@ -607,6 +611,7 @@
                                     on:click={() => setFixedAmount(profitabilityThreshold)}
                                 >
                                     <div class="flex flex-col items-center">
+                                        <i class="fas fa-balance-scale mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"></i>
                                         <span class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300">Break Even</span>
                                         <span>{profitabilityThreshold.toLocaleString()} VOI</span>
                                     </div>

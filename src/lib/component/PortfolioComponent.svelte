@@ -5,7 +5,7 @@
     import { getEnvoiNames } from '$lib/utils/envoi';
     import { dataTable } from '../../stores/dataTable';
     import { getTokensByEpoch, decodeGlobalState } from '$lib/utils';
-    import { getSupplyInfo } from '$lib/stores/accounts';
+    import { getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
     import { config } from '$lib/config';
     import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -14,6 +14,10 @@
 	import InfoButton from './ui/InfoButton.svelte';
     import SendTokenModal from './SendTokenModal.svelte';
     import { selectedWallet } from 'avm-wallet-svelte';
+    import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
+    import { fade } from 'svelte/transition';
+    import ConsensusDetails from './ConsensusDetails.svelte';
 
     export let walletAddress: string | undefined = undefined;
 
@@ -37,7 +41,7 @@
 
     let selectedSort = sortOptions[0].id;
     let sortDirection: 'asc' | 'desc' = 'asc';
-    let accountBalance: number = 0;
+    let accountBalance = 0;
     let accountCreationDate: string | null = null;
     let accountStatus: string = 'Unknown';
     let minBalance: number = 0;
@@ -49,6 +53,7 @@
     let rewardsHistory: any[] = [];
     let asaDetails: any[] = [];
     let canSignTransactions = false;
+    let totalValue: number = 0;
 
     // Add view type state
     let viewType: 'cards' | 'table' = 'cards';
@@ -123,7 +128,6 @@
     let allNftTokens: NFTToken[] = [];
     let displayedNftTokens: NFTToken[] = [];
     let totalPages = 0;
-    let nextToken: string | null = null;
     let collections: Map<string, any> = new Map();
     let poolData: Map<string, any> = new Map();
     let asaTokens: ASAToken[] = [];
@@ -133,11 +137,6 @@
 
     let showZeroBalances = false;
 
-    // Calculate total portfolio value
-    $: totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
-                    nftTokens.reduce((acc, nft) => acc + (nft.lastSalePrice || 0), 0) +
-                    asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
-                    (accountBalance / 1e6);
 
     // Add these to your existing type definitions and variables
     type TokenSortOption = {
@@ -159,38 +158,135 @@
     let showSendVoiModal = false;
     let refreshTrigger = 0;
 
-    let lastAccountFetch = 0;
-    const CACHE_DURATION = 30000; // 30 seconds
+    let lastInitializedWallet: string | undefined;
+
+    let epochsLinkClicked = false;
+
+    let isLoadingPortfolio = false;
+    let isLoadingLPTokens = false;
+    let isLoadingTokens = false;
+    let isLoadingNFTs = false;
+
+    let voteKeyExpiry: number | undefined;
+    let voteKeyExpiryDate: Date | undefined;
+
+    let poolShare: number | null = null;
+
+    onMount(() => {
+        // Initial fetch
+        if (walletAddress) {
+            //initializePortfolio();
+        }
+    });
+
+    const LoadingOverlay = ({height = 'h-full'}: {height?: string}) => `
+        <div class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center ${height}">
+            <div class="flex flex-col items-center gap-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400"></div>
+                <span class="text-sm text-gray-600 dark:text-gray-300">Refreshing...</span>
+            </div>
+        </div>
+    `;
+
+    async function handleEpochsClick(event: MouseEvent) {
+        event.preventDefault();
+        const targetPath = `/wallet/${walletAddress}`;
+        
+        // If we're already on the wallet page, just update the hash
+        if ($page.url.pathname === targetPath) {
+            window.location.hash = 'epochs';
+            // Ensure the epochs section is scrolled into view
+            document.getElementById('epochs')?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            // Navigate to the wallet page with the epochs hash
+            await goto(`${targetPath}#epochs`);
+        }
+    }
 
     function handleTokenSent() {
-        initializePortfolio();
+        refreshPortfolio();
+        refreshTokens();
     }
 
     $: {
-        if (walletAddress) {
+        if (walletAddress && walletAddress !== lastInitializedWallet) {
+            lastInitializedWallet = walletAddress;
             canSignTransactions = $selectedWallet?.address === walletAddress && $selectedWallet?.app !== '' && $selectedWallet?.app !== 'Watch';
             initializePortfolio();
         }
     }
 
-    async function initializePortfolio() {
-        isLoading = true;
+    async function refreshPortfolio() {
+        isLoadingPortfolio = true;
         try {
-            // Fetch pool data first as it's needed by other functions
-            await fetchPoolData();
-            
-            // Then fetch everything else in parallel
             await Promise.all([
                 fetchAccountDetails(),
-                fetchNFTs(),
-                fetchFungibleTokens(),
-                fetchNomadexLPTokens(),
                 fetchVoiPrice()
+            ]);
+            
+            // Recalculate total value
+            totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
+                        nftTokens.reduce((acc, nft) => acc + (nft.lastSalePrice || 0), 0) +
+                        asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
+                        (accountBalance / 1e6);
+        } catch (error) {
+            console.error('Error refreshing portfolio:', error);
+        } finally {
+            isLoadingPortfolio = false;
+        }
+    }
+
+    async function refreshLPTokens() {
+        isLoadingLPTokens = true;
+        try {
+            await fetchPoolData();
+            await Promise.all([
+                fetchFungibleTokens(),
+                fetchNomadexLPTokens()
+            ]);
+        } catch (error) {
+            console.error('Error refreshing LP tokens:', error);
+        } finally {
+            isLoadingLPTokens = false;
+        }
+    }
+
+    async function refreshTokens() {
+        isLoadingTokens = true;
+        try {
+            await fetchPoolData();
+            await Promise.all([
+                fetchFungibleTokens(),
+                fetchNomadexLPTokens()
+            ]);
+        } catch (error) {
+            console.error('Error refreshing tokens:', error);
+        } finally {
+            isLoadingTokens = false;
+        }
+    }
+
+    async function refreshNFTs() {
+        isLoadingNFTs = true;
+        try {
+            await fetchNFTs();
+        } catch (error) {
+            console.error('Error refreshing NFTs:', error);
+        } finally {
+            isLoadingNFTs = false;
+        }
+    }
+
+    async function initializePortfolio() {
+        try {
+            await Promise.all([
+                refreshPortfolio(),
+                refreshLPTokens(),
+                refreshTokens(),
+                refreshNFTs()
             ]);
         } catch (error) {
             console.error('Error initializing portfolio:', error);
-        } finally {
-            isLoading = false;
         }
     }
 
@@ -234,23 +330,27 @@
     async function fetchAccountDetails() {
         if (!walletAddress) return;
         
-        const now = Date.now();
-        if (now - lastAccountFetch < CACHE_DURATION) {
-            return; // Use cached data
-        }
-        
         try {
             // Fetch account information
+            const accountIndexerInfo = await algodIndexer.lookupAccountByID(walletAddress).do();
             const account = await algodClient.accountInformation(walletAddress).do();
-            accountBalance = account.amount;
-            accountStatus = account.status || 'Offline';
-            minBalance = account['min-balance'] || 0;
+            accountBalance = accountIndexerInfo.account.amount;
+            accountStatus = accountIndexerInfo.account.status || 'Offline';
+            minBalance = accountIndexerInfo.account['min-balance'] || 0;
             
             // Calculate pending rewards
-            pendingRewards = account.rewards || 0;
+            pendingRewards = accountIndexerInfo.account.rewards || 0;
+            
+            // Calculate vote key expiry if account is online
+            if (accountStatus === 'Online' && account.participation) {
+                const currentRound = account.round;
+                const lastValidRound = account.participation['vote-last-valid'];
+                voteKeyExpiry = (lastValidRound - currentRound) * 3.3; // 3.3 seconds per block
+                voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
+            }
             
             // Fetch ASA tokens
-            asaTokens = (account.assets || []).map((asset: any) => ({
+            asaTokens = (accountIndexerInfo.account.assets || []).map((asset: any) => ({
                 assetId: asset['asset-id'],
                 amount: asset.amount,
                 creator: asset.creator,
@@ -276,19 +376,13 @@
                 })
             );
 
-            const accountIndexerInfo = await algodIndexer.lookupAccountByID(walletAddress).do();
             const block = await algodIndexer.lookupBlock(accountIndexerInfo.account['created-at-round']).do();
             accountCreationDate = new Date(block.timestamp * 1000).toLocaleDateString();
 
             // Fetch Envoi name
             try {
                 const envoiResults = await getEnvoiNames([walletAddress]);
-                if (envoiResults.length > 0) {
-                    envoiName = envoiResults[0].name;
-                }
-                else {
-                    envoiName = null;
-                }
+                envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
             } catch (err) {
                 console.error('Error fetching Envoi name:', err);
             }
@@ -348,8 +442,6 @@
             } catch (err) {
                 console.error('Error calculating rewards:', err);
             }
-
-            lastAccountFetch = now;
         } catch (err) {
             console.error('Error fetching account details:', err);
             error = 'Failed to load some account details';
@@ -666,7 +758,6 @@
             // Get all Nomadex pools
             const pools = await fetch(`https://api.voirewards.com/nomadex/index.php`);
             const poolData = await pools.json();
-            console.log(poolData);
 
             // Call Nomadex endpoint with the user's wallet address
             const response = await fetch(`https://voimain-analytics.nomadex.app/pools/${walletAddress}`);
@@ -752,6 +843,9 @@
             if (metadataURI) {
                 return `https://prod.cdn.highforge.io/i/${encodeURIComponent(metadataURI)}?w=${width}`;
             }
+        }
+        else if (imageUrl && imageUrl.includes('ipfs://')) {
+            return imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
         }
         return imageUrl;
     }
@@ -860,13 +954,13 @@
         <div class="flex items-center space-x-4">
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Overview</h2>
             <button
-                on:click={initializePortfolio}
+                on:click={refreshPortfolio}
                 class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                disabled={isLoading}
-                title="Refresh portfolio"
+                disabled={isLoadingPortfolio}
+                title="Refresh portfolio overview"
             >
-                <i class="fas fa-sync-alt {isLoading ? 'animate-spin' : ''}"></i>
-                <span class="sr-only">Refresh portfolio</span>
+                <i class="fas fa-sync-alt {isLoadingPortfolio ? 'animate-spin' : ''}"></i>
+                <span class="sr-only">Refresh portfolio overview</span>
             </button>
             <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 hidden">
                 <button
@@ -893,32 +987,29 @@
     </div>
 
     <!-- User's Account Info -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+        {#if isLoadingPortfolio}
+            <div transition:fade={{ duration: 150 }}>
+                {@html LoadingOverlay({})}
+            </div>
+        {/if}
         <div class="flex flex-col space-y-6">
             <!-- Header with Address -->
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 dark:border-gray-700 pb-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 dark:border-gray-700 pb-4" style="place-items: flex-start;">
                 <div class="flex-1">
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Account Overview</h3>
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                        <div class="flex items-center space-x-2">
-                            <p class="text-sm text-gray-500 dark:text-gray-400 font-mono hidden lg:block">{walletAddress}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 font-mono block lg:hidden">{walletAddress?.slice(0, 6)}...{walletAddress?.slice(-6)}</p>
-                            <CopyComponent 
-                                text={walletAddress}
-                                toastMessage={`Address copied to clipboard`}
-                                failureMessage={`Failed to copy address to clipboard`}
-                            />
-                        </div>
-                        {#if envoiName}
-                            <span class="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-sm rounded-full self-start">
-                                <a href={`https://app.envoi.sh/#/${envoiName}`} target="_blank" rel="noopener noreferrer" class="hover:text-purple-500">
-                                    {envoiName}
-                                </a>
-                            </span>
-                        {/if}
+                    <div class="flex items-center space-x-4 mb-2">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Account Overview</h3>
+                        <button
+                            on:click={refreshPortfolio}
+                            class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            disabled={isLoadingPortfolio}
+                            title="Refresh account overview"
+                        >
+                            <i class="fas fa-sync-alt {isLoadingPortfolio ? 'animate-spin' : ''}"></i>
+                            <span class="sr-only">Refresh account overview</span>
+                        </button>
                     </div>
-                    <!-- Block Explorer Links -->
-                    <div class="mt-2 flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <a 
                             href={`https://voiager.xyz/account/${walletAddress}`}
                             target="_blank"
@@ -948,17 +1039,18 @@
                         </a>
                     </div>
                 </div>
-                <div class="mt-4 md:mt-0 text-right place-self-start">
-                    <div class="flex items-center justify-end gap-1 mb-1 relative">
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Consensus Status</p>
-                        <InfoButton noAbsolute buttonColor="dark:text-gray-400 text-gray-600">
-                            Whether your account has a key registered to participate in Consensus for earning block rewards
-                        </InfoButton>
-                    </div>
-                    <div class="flex items-center mt-1 space-x-2">
-                        <span class="w-2 h-2 rounded-full {accountStatus === 'Online' ? 'bg-green-500' : 'bg-gray-500'}"></span>
-                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{accountStatus}</p>
-                    </div>
+                <div class="mt-4 md:mt-0 text-right">
+                    {#if walletAddress && accountStatus}
+                        <ConsensusDetails
+                            {walletAddress}
+                            {accountStatus}
+                            {accountBalance}
+                            {voteKeyExpiry}
+                            {voteKeyExpiryDate}
+                            autoRefresh={true}
+                            refreshInterval={10000}
+                        />
+                    {/if}
                 </div>
             </div>
 
@@ -1017,7 +1109,13 @@
                         </div>
                         <div class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
                             <span class="text-gray-600 dark:text-gray-300">Total Reward Transactions</span>
-                            <span class="text-sm text-gray-500 dark:text-gray-400">{rewardsHistory.length}</span>
+                            <a 
+                                href={`/wallet/${walletAddress}#epochs`}
+                                on:click={handleEpochsClick}
+                                class="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                            >
+                                {rewardsHistory.length}
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -1026,41 +1124,76 @@
     </div>
 
     <!-- LP Tokens Section -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white flex items-center justify-between">
-            <div>
-                LP Tokens
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-4">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">LP Tokens</h3>
+                <button
+                    on:click={refreshLPTokens}
+                    class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    disabled={isLoadingLPTokens}
+                    title="Refresh LP tokens"
+                >
+                    <i class="fas fa-sync-alt {isLoadingLPTokens ? 'animate-spin' : ''}"></i>
+                    <span class="sr-only">Refresh LP tokens</span>
+                </button>
             </div>
-        </h3>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
-            {#each fungibleTokens.filter(token => showZeroBalances || token.balance > 0) as token (token.id)}
-                {#if isLPToken(token)}
+            {#if isLoadingLPTokens}
+                <div class="col-span-3 flex justify-center items-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+            {:else}
+                {#each fungibleTokens.filter(token => {
+                    // Only show tokens with balance if showZeroBalances is false
+                    if (!showZeroBalances && token.balance <= 0) return false;
+                    // Must be an LP token
+                    if (!isLPToken(token)) return false;
+                    // Get unique identifier based on token ID and provider
+                    const uniqueId = `${token.id}-${token.poolInfo?.provider}`;
+                    // Check if this is the first occurrence of this unique ID
+                    return fungibleTokens.findIndex(t => 
+                        isLPToken(t) && 
+                        `${t.id}-${t.poolInfo?.provider}` === uniqueId
+                    ) === fungibleTokens.indexOf(token);
+                }) as token (`lp-${token.id}-${token.poolInfo?.provider}`)}
                     <FungibleToken {token} voiPrice={$voiPrice.price} 
                         on:tokenOptedOut={initializePortfolio}
                         on:tokenSent={initializePortfolio}
                         canSignTransactions={canSignTransactions}
+                        walletId={walletAddress}
                     />
+                {/each}
+                {#if fungibleTokens.filter(token => isLPToken(token) && (showZeroBalances || token.balance > 0)).length === 0}
+                    <div class="text-gray-500 dark:text-gray-400 text-center py-4">
+                        No LP tokens found in this account.
+                    </div>
                 {/if}
-            {/each}
-            {#if fungibleTokens.filter(token => isLPToken(token) && (showZeroBalances || token.balance > 0)).length === 0}
-                <div class="text-gray-500 dark:text-gray-400 text-center py-4">
-                    No LP tokens found in this account.
-                </div>
             {/if}
         </div>
     </div>
 
     <!-- Fungible Tokens Section -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
         <div class="flex flex-col space-y-4">
             <div class="flex items-center justify-between">
-                <div>
+                <div class="flex items-center space-x-4">
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
                         Tokens
                         <span class="text-sm text-gray-500 dark:text-gray-400">
                             (VSA & ARC-200 Tokens)
                         </span>
                     </h3>
+                    <button
+                        on:click={refreshTokens}
+                        class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        disabled={isLoadingTokens}
+                        title="Refresh tokens"
+                    >
+                        <i class="fas fa-sync-alt {isLoadingTokens ? 'animate-spin' : ''}"></i>
+                        <span class="sr-only">Refresh tokens</span>
+                    </button>
                 </div>
                 <label class="inline-flex items-center cursor-pointer">
                     <input 
@@ -1114,111 +1247,92 @@
             </div>
         </div>
 
-        <!-- Marketplace Links -->
-        <div class="flex flex-col sm:flex-row gap-3 p-4 my-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div class="flex-1">
-                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">Looking to trade Tokens? Check out these marketplaces:</p>
-                <div class="flex gap-2">
-                    <a
-                        href="https://voi.humble.sh"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                    >
-                        <img 
-                            src="/icons/humble_icon.png" 
-                            alt="Humble" 
-                            class="w-4 h-4 mr-1.5"
-                            on:error={handleIconError}
-                        />
-                        Humble
-                    </a>
-                    <a
-                        href="https://voi.nomadex.app"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                    >
-                        <img 
-                            src="/icons/nomadex_icon.ico" 
-                            alt="Nomadex" 
-                            class="w-4 h-4 mr-1.5"
-                            on:error={handleIconError}
-                        />
-                        Nomadex
-                    </a>
-                </div>
-            </div>
-        </div>
-
         <!-- Combined Tokens Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
-            {#each sortTokens(filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t) && t.verified)])) as token}
-                {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
-                {#if showZeroBalances || (details ? details.amount > 0 : token.balance > 0)}
-                    <div class="relative">
-                        <span class="absolute top-2 right-2 px-2 py-0.5 text-xs font-medium {details ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
-                            {details ? 'VSA' : 'ARC-200'}
-                        </span>
-                        <FungibleToken 
-                            token={details ? {
-                                id: details.id.toString(),
-                                name: details.name || `Token #${token.assetId}`,
-                                symbol: details.unitName || details.name || `#${token.assetId}`,
-                                balance: details.amount || 0,
-                                decimals: details.decimals || 0,
-                                verified: true,
-                                imageUrl: `https://asset-verification.nautilus.sh/icons/${token.assetId}.png`,
-                                value: details.value || 0,
-                                poolId: details.poolId,
-                                type: (details ? 'vsa' : 'arc200')
-                            } : token} 
-                            voiPrice={$voiPrice.price}
-                            on:tokenOptedOut={initializePortfolio}
-                            on:tokenSent={initializePortfolio}
-                            canSignTransactions={canSignTransactions}
-                        />
+        <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+            {#if isLoadingTokens}
+                <div class="col-span-3 flex justify-center items-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+            {:else}
+                {#each sortTokens(filterTokens([
+                    ...asaTokens.map(t => ({ ...t, tokenType: 'vsa' as const })),
+                    ...fungibleTokens
+                        .filter(t => !isLPToken(t) && t.verified)
+                        .map(t => ({ ...t, tokenType: 'arc200' as const }))
+                ].filter((t, i, arr) => {
+                    // Get unique identifier based on token type and ID
+                    const getUniqueId = (token: any) => {
+                        if (token.tokenType === 'vsa') {
+                            return `vsa-${token.assetId}`;
+                        } else {
+                            // For ARC-200 tokens, use their contract ID
+                            return `arc200-${token.id}`;
+                        }
+                    };
+                    const currentUniqueId = getUniqueId(t);
+                    // Check if this unique ID appears earlier in the array
+                    return !arr.slice(0, i).some(item => getUniqueId(item) === currentUniqueId);
+                }))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId}` : `arc200-${token.id}`)}
+                    {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
+                    {#if showZeroBalances || (details ? details.amount > 0 : token.balance > 0)}
+                        <div class="relative">
+                            <span class="absolute top-2 right-2 px-2 py-0.5 text-xs font-medium {details ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
+                                {details ? 'VSA' : 'ARC-200'}
+                            </span>
+                            <FungibleToken 
+                                token={details ? {
+                                    id: details.id.toString(),
+                                    name: details.name || `Token #${token.assetId}`,
+                                    symbol: details.unitName || details.name || `#${token.assetId}`,
+                                    balance: details.amount || 0,
+                                    decimals: details.decimals || 0,
+                                    verified: true,
+                                    imageUrl: `https://asset-verification.nautilus.sh/icons/${token.assetId}.png`,
+                                    value: details.value || 0,
+                                    poolId: details.poolId,
+                                    type: (details ? 'vsa' : 'arc200')
+                                } : token} 
+                                voiPrice={$voiPrice.price}
+                                on:tokenOptedOut={initializePortfolio}
+                                on:tokenSent={initializePortfolio}
+                                canSignTransactions={canSignTransactions}
+                                walletId={walletAddress}
+                            />
+                        </div>
+                    {/if}
+                {/each}
+
+                {#if filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t))]).length === 0}
+                    <div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3">
+                        No tokens found matching your criteria.
                     </div>
                 {/if}
-            {/each}
-
-            {#if filterTokens([...asaTokens, ...fungibleTokens.filter(t => !isLPToken(t))]).length === 0}
-                <div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3">
-                    No tokens found matching your criteria.
-                </div>
             {/if}
         </div>
     </div>
 
     {#if viewType === 'cards'}
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+            {#if isLoadingNFTs}
+                <div transition:fade={{ duration: 150 }}>
+                    {@html LoadingOverlay({})}
+                </div>
+            {/if}
             <!-- NFT Tokens Section -->
             <div class="flex flex-col space-y-4 mb-6">
                 <div class="flex items-center justify-between">
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">NFT Tokens</h3>
-                    {#if displayedNftTokens.length > 0}
-                        <div class="flex items-center space-x-2">
-                            <select
-                                bind:value={selectedSort}
-                                class="px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
-                            >
-                                {#each sortOptions as option}
-                                    <option value={option.id}>{option.label}</option>
-                                {/each}
-                            </select>
-                            <button
-                                on:click={toggleSortDirection}
-                                class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                            >
-                                {#if sortDirection === 'asc'}
-                                    <i class="fas fa-sort-amount-up-alt"></i>
-                                {:else}
-                                    <i class="fas fa-sort-amount-down"></i>
-                                {/if}
-                            </button>
-                        </div>
-                    {/if}
+                    <div class="flex items-center space-x-4">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">NFT Tokens</h3>
+                        <button
+                            on:click={refreshNFTs}
+                            class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            disabled={isLoadingNFTs}
+                            title="Refresh NFTs"
+                        >
+                            <i class="fas fa-sync-alt {isLoadingNFTs ? 'animate-spin' : ''}"></i>
+                            <span class="sr-only">Refresh NFTs</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Marketplace Links -->
@@ -1325,6 +1439,7 @@
                             class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             on:click={goToPreviousPage}
                             disabled={currentPage === 1}
+                            aria-label="Previous Page"
                         >
                             <i class="fas fa-chevron-left"></i>
                         </button>
@@ -1335,6 +1450,7 @@
                             class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             on:click={goToNextPage}
                             disabled={currentPage === totalPages}
+                            aria-label="Next Page"
                         >
                             <i class="fas fa-chevron-right"></i>
                         </button>

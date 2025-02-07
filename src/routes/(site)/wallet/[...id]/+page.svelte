@@ -33,7 +33,6 @@
     $: walletId = data.walletId;
     $: parentWalletId = data.parentWalletId;
     let loading = true;
-    let isInitialized = false;
 
     const sections = [
       { id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
@@ -268,15 +267,20 @@
 
     // Initialize wallet and data loading
     async function initializeWallet() {
-        if (!browser || isInitialized || !walletId) return;
+        if (!browser || !walletId) return;
         
-        isInitialized = true;
         loading = true;
 
         try {
             // Set the selected wallet if it's different from current
             if (walletId && walletId.length > 0 && walletId !== $selectedWallet?.address) {
-                selectedWallet.set({ address: walletId, app: '' });
+                // look for app in connectedWallets list
+                const wallet = $connectedWallets.find(w => w.address === walletId && w.app !== '');
+                if (wallet) {
+                    selectedWallet.set({address: walletId, app: wallet.app});
+                } else {
+                    selectedWallet.set({address: walletId, app: ''});
+                }
             }
             
             // Now load the wallet data
@@ -289,7 +293,7 @@
     }
 
     $: {
-        if (walletId && !isInitialized) {
+        if (walletId) {
             initializeWallet();
         }
     }

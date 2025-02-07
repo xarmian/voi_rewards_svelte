@@ -8,6 +8,7 @@ const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KE
 // Define allowed RPC functions to prevent arbitrary function calls
 const ALLOWED_ACTIONS = [
     'get_online_account_count',
+    'get_arc200_transfers',
 ] as const;
 
 type AllowedAction = typeof ALLOWED_ACTIONS[number];
@@ -36,10 +37,13 @@ export async function GET({ url }: RequestEvent) {
             }
         }
 
+        console.log('Calling RPC with params:', action, params);
+
         const { data, error } = await supabaseMimirClient
             .rpc(action, params);
 
         if (error) {
+            console.error('Error:', error);
             return json({ error: error.message }, { status: 500 });
         }
 

@@ -103,12 +103,12 @@ export const supply = writable<SupplyInfo | null>(null);
 export const nfDomains = writable<Record<string, NFDomainResponse | null>>({});
 
 // Consensus Info fetching with cache
-export async function getConsensusInfo(address: string): Promise<ConsensusDetails | undefined> {
+export async function getConsensusInfo(address: string, forceRefresh: boolean = false): Promise<ConsensusDetails | undefined> {
     if (!address) return;
     
     const info = get(consensusInfo);
     
-    if (info[address]) return info[address];
+    if (info[address] && !forceRefresh) return info[address];
     
     try {
         const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
