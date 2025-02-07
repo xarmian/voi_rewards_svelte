@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { ethers } from 'https://esm.sh/ethers@6.9.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,6 +76,18 @@ interface VestigePool {
   last_traded: number;
 }
 
+interface SwapEvent {
+  args: {
+    amount0: bigint;
+    amount1: bigint;
+    sender: string;
+    recipient: string;
+    sqrtPriceX96: bigint;
+    liquidity: bigint;
+    tick: number;
+  };
+}
+
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -83,6 +96,15 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Constants
 const MEXC_ACCOUNT = 'CVYHPHOWCIOCVTS4QEUFPFROILQBVFR6HKSJKPTDWN4TDQ7QYAWPKMCVCM';
 const ALGOD_SERVER_VOI = 'https://mainnet-api.voi.nodely.dev';
+
+// Define the Uniswap V3 Pool ABI inline since we can't import it
+const IUniswapV3PoolABI = [
+  'function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
+  'function liquidity() external view returns (uint128)',
+  'function token0() external view returns (address)',
+  'function token1() external view returns (address)',
+  'event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)'
+];
 
 // Helper function to fetch historical price data
 async function fetchHistoricalPrice(tradingPairId: number): Promise<number | null> {
@@ -108,16 +130,6 @@ async function fetchHistoricalPrice(tradingPairId: number): Promise<number | nul
 
 async function fetchMEXCData(): Promise<MarketSnapshot | null> {
   try {
-    const MEXC_EXCHANGE_ID = 1;
-
-    // Get or create trading pair ID
-    const tradingPairId = await getOrCreateTradingPairId(
-      MEXC_EXCHANGE_ID,
-      'USDT',
-      'VOI',
-      'https://www.mexc.com/exchange/VOI_USDT'
-    );
-
     // Fetch MEXC price data
     const mexcResponse = await fetch('https://api.mexc.com/api/v3/ticker/24hr?symbol=VOIUSDT');
     const mexcData = await mexcResponse.json();
@@ -129,19 +141,15 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
     }
     const accountData = await accountResponse.json();
     
-    // Get TVL in VOI
-    const tvl = accountData.amount / 1e6; // Convert from microVOI to VOI
-    
-    // Get price in USDT per VOI
+    // Calculate TVL: account balance * current price
+    const balance = accountData.amount / 1e6; // Convert from microVOI to VOI
     const price = parseFloat(mexcData.lastPrice);
-
-    // Get volume in VOI (baseVolume)
-    const volume24h = parseFloat(mexcData.volume);
+    const tvl = balance * price;
     
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: 1, // MEXC VOI/USDT pair
       price: price,
-      volume_24h: volume24h,
+      volume_24h: parseFloat(mexcData.quoteVolume), // Using quote volume (USDT)
       tvl: tvl,
       high_24h: parseFloat(mexcData.highPrice),
       low_24h: parseFloat(mexcData.lowPrice),
@@ -154,56 +162,10 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
   }
 }
 
-// Helper function to get or create trading pair ID
-async function getOrCreateTradingPairId(
-  exchangeId: number,
-  baseToken: string,
-  quoteToken: string,
-  poolUrl?: string
-): Promise<number> {
+// TODO: Implement these functions
+async function fetchHumbleData(): Promise<MarketSnapshot | null> {
   try {
-    // First, try to find existing trading pair
-    const { data: existingPair, error: findError } = await supabase
-      .from('trading_pairs')
-      .select('id')
-      .eq('exchange_id', exchangeId)
-      .eq('base_token', baseToken)
-      .eq('quote_token', quoteToken)
-      .single();
-
-    if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found" error
-      throw findError;
-    }
-
-    if (existingPair) {
-      return existingPair.id;
-    }
-
-    // If not found, create new trading pair
-    const { data: newPair, error: insertError } = await supabase
-      .from('trading_pairs')
-      .insert({
-        exchange_id: exchangeId,
-        base_token: baseToken,
-        quote_token: quoteToken,
-        pool_url: poolUrl
-      })
-      .select('id')
-      .single();
-
-    if (insertError) throw insertError;
-    if (!newPair) throw new Error('Failed to create trading pair');
-
-    return newPair.id;
-  } catch (error) {
-    console.error('Error in getOrCreateTradingPairId:', error);
-    throw error;
-  }
-}
-
-async function fetchHumbleData(): Promise<MarketSnapshot[]> {
-  try {
-    const HUMBLE_EXCHANGE_ID = 2; // Assuming Humble's exchange_id is 2
+    const POOL_ID = 395553;
     const response = await fetch('https://mainnet-idx.nautilus.sh/nft-indexer/v1/dex/pools?tokenId=390001');
     
     if (!response.ok) {
@@ -211,62 +173,50 @@ async function fetchHumbleData(): Promise<MarketSnapshot[]> {
     }
 
     const data = await response.json();
-    const pools = data.pools as NautilusPool[];
+    const pool = data.pools.find((p: NautilusPool) => p.contractId === POOL_ID);
 
-    // Filter for pools where VOI is one of the tokens (tokB is always VOI in these pools)
-    const voiPools = pools.filter(p => p.tokBId === '390001' && !p.deleted);
+    if (!pool) {
+      throw new Error(`Could not find Humble pool with ID ${POOL_ID}`);
+    }
 
-    // Process each pool and create market snapshots
-    const snapshots: MarketSnapshot[] = await Promise.all(
-      voiPools.map(async (pool) => {
-        // Get or create trading pair ID
-        const poolUrl = `https://app.humble.sh/pool/${pool.contractId}`;
-        const tradingPairId = await getOrCreateTradingPairId(
-          HUMBLE_EXCHANGE_ID,
-          pool.symbolA,
-          'VOI',
-          poolUrl
-        );
+    // Parse balances and calculate price (USDC per VOI)
+    const usdcBalance = parseFloat(pool.poolBalA);
+    const voiBalance = parseFloat(pool.poolBalB);
+    const price = usdcBalance / voiBalance;
 
-        // Calculate price (token per VOI)
-        const price = parseFloat(pool.poolBalA) / parseFloat(pool.poolBalB);
+    // Get 24h volume in VOI and convert to USDC
+    const volumeVOI = parseFloat(pool.volA) + parseFloat(pool.volB);
+    const volume24h = volumeVOI * price;
 
-        // Get TVL in VOI
-        const tvl = parseFloat(pool.tvlB);
+    // Get TVL in VOI and convert to USDC
+    const tvlVOI = parseFloat(pool.tvlB);
+    const tvl = tvlVOI * price;
 
-        // Get volume in VOI
-        const volume24h = parseFloat(pool.volB);
+    // Fetch historical price and calculate price change
+    const historicalPrice = await fetchHistoricalPrice(2); // Humble trading_pair_id = 2
+    const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
+    const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
+      ? ((price - historicalPrice) / historicalPrice) * 100 
+      : undefined;
 
-        // Fetch historical price for this pair
-        const historicalPrice = await fetchHistoricalPrice(tradingPairId);
-        const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
-        const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
-          ? ((price - historicalPrice) / historicalPrice) * 100 
-          : undefined;
-
-        return {
-          trading_pair_id: tradingPairId,
-          price: price,
-          volume_24h: volume24h,
-          tvl: tvl,
-          high_24h: undefined,
-          low_24h: undefined,
-          price_change_24h: priceChange24h,
-          price_change_percentage_24h: priceChangePercentage24h
-        };
-      })
-    );
-
-    return snapshots;
+    return {
+      trading_pair_id: 2, // Humble VOI/USDC pair
+      price: price,
+      volume_24h: volume24h,
+      tvl: tvl,
+      high_24h: undefined,
+      low_24h: undefined,
+      price_change_24h: priceChange24h,
+      price_change_percentage_24h: priceChangePercentage24h
+    };
   } catch (error) {
     console.error('Error fetching Humble data:', error);
-    return [];
+    return null;
   }
 }
 
 async function fetchNomadexData(): Promise<MarketSnapshot | null> {
   try {
-    const NOMADEX_EXCHANGE_ID = 3;
     const POOL_ID = 411756; // VOI/USDC pool ID
     
     // Fetch pool data from Nomadex API
@@ -282,15 +232,6 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
       throw new Error(`Could not find pool with ID ${POOL_ID}`);
     }
 
-    // Get or create trading pair ID
-    const poolUrl = `https://app.nomadex.app/pool/${POOL_ID}`;
-    const tradingPairId = await getOrCreateTradingPairId(
-      NOMADEX_EXCHANGE_ID,
-      'USDC',
-      'VOI',
-      poolUrl
-    );
-
     // Convert balances from microunits
     const voiBalance = Number(pool.balances[0]) / 1e6; // VOI is alpha (index 0)
     const usdcBalance = Number(pool.balances[1]) / 1e6; // USDC is beta (index 1)
@@ -298,21 +239,21 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
     // Calculate price (USDC per VOI)
     const price = usdcBalance / voiBalance;
 
-    // Get TVL in VOI (alpha token balance * 2 since it's a balanced pool)
-    const tvl = voiBalance * 2;
+    // Calculate TVL in USD (multiply by 2 since it's a balanced pool)
+    const tvl = usdcBalance * 2;
 
-    // Get 24h volume in VOI (alpha token volume)
-    const volume24h = Number(pool.volume[0]) / 1e6;
+    // Get 24h volume in USDC (beta token volume)
+    const volume24h = Number(pool.volume[1]) / 1e6;
 
-    // Fetch historical price for this pair
-    const historicalPrice = await fetchHistoricalPrice(tradingPairId);
+    // Fetch historical price and calculate price change
+    const historicalPrice = await fetchHistoricalPrice(3); // Nomadex trading_pair_id = 3
     const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
     const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
       ? ((price - historicalPrice) / historicalPrice) * 100 
       : undefined;
 
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: 3, // Nomadex VOI/USDC pair
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -329,17 +270,8 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
 
 async function fetchTinymanData(): Promise<MarketSnapshot | null> {
   try {
-    const TINYMAN_EXCHANGE_ID = 4;
     // VOI-USDC pool on Tinyman (Algorand)
     const poolId = 'D6NWRMDOIBMOTAQABMZQW5FO3E5JS4K3ING73FM3YZVFYPS4DQ4NMSQZNA';
-
-    // Get or create trading pair ID
-    const tradingPairId = await getOrCreateTradingPairId(
-      TINYMAN_EXCHANGE_ID,
-      'USDC',
-      'VOI',
-      `https://app.tinyman.org/#/pool/${poolId}`
-    );
 
     // Fetch pool data from Tinyman API
     const response = await fetch(`https://mainnet.analytics.tinyman.org/api/v1/pools/${poolId}`);
@@ -357,21 +289,21 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
     // Calculate price (USDC per VOI)
     const price = parseFloat(poolData.current_asset_2_reserves) / parseFloat(poolData.current_asset_1_reserves);
     
-    // Get TVL in VOI
-    const tvl = parseFloat(poolData.current_asset_1_reserves);
+    // Get TVL in USD (sum of both assets in USD)
+    const tvl = parseFloat(poolData.liquidity_in_usd);
     
-    // Get 24h volume in VOI
-    const volume24h = parseFloat(poolData.last_day_volume_asset_1);
+    // Get 24h volume in USD
+    const volume24h = parseFloat(poolData.last_day_volume_in_usd);
 
-    // Fetch historical price for this pair
-    const historicalPrice = await fetchHistoricalPrice(tradingPairId);
+    // Fetch historical price and calculate price change
+    const historicalPrice = await fetchHistoricalPrice(4); // Tinyman trading_pair_id = 4
     const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
     const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
       ? ((price - historicalPrice) / historicalPrice) * 100 
       : undefined;
     
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: 4, // Tinyman VOI/USDC pair
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -388,7 +320,6 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
 
 async function fetchPactFiData(): Promise<MarketSnapshot | null> {
   try {
-    const PACTFI_EXCHANGE_ID = 5;
     // Fetch both pools in parallel
     const [pool1Response, pool2Response] = await Promise.all([
       fetch('https://free-api.vestige.fi/pool/507607'),
@@ -402,37 +333,27 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
     const pool1: VestigePool = await pool1Response.json();
     const pool2: VestigePool = await pool2Response.json();
 
-    // Get or create trading pair ID
-    const tradingPairId = await getOrCreateTradingPairId(
-      PACTFI_EXCHANGE_ID,
-      'USDC',
-      'VOI',
-      'https://app.pact.fi/swap'
-    );
+    // Use the larger pool's price as the reference price
+    const pool1Weight = pool1.liquidity;
+    const pool2Weight = pool2.liquidity;
+    const totalLiquidity = pool1Weight + pool2Weight;
 
-    // Calculate weighted average price based on VOI liquidity
-    const pool1VoiLiquidity = pool1.liquidity / pool1.price; // Convert USDC liquidity to VOI
-    const pool2VoiLiquidity = pool2.liquidity / pool2.price;
-    const totalVoiLiquidity = pool1VoiLiquidity + pool2VoiLiquidity;
+    // Calculate weighted average price
+    const price = (pool1.price * pool1Weight + pool2.price * pool2Weight) / totalLiquidity;
 
-    // Calculate weighted average price (USDC per VOI)
-    const price = (pool1.price * pool1VoiLiquidity + pool2.price * pool2VoiLiquidity) / totalVoiLiquidity;
-
-    // Get total TVL in VOI
-    const tvl = totalVoiLiquidity;
-
-    // Get total 24h volume in VOI
-    const volume24h = pool1.volume_1_24h + pool2.volume_1_24h;
+    // Sum volumes and TVL from both pools
+    const volume24h = pool1.volume_2_24h + pool2.volume_2_24h;
+    const tvl = pool1.liquidity + pool2.liquidity;
 
     // Calculate weighted average historical price
-    const historicalPrice = await fetchHistoricalPrice(tradingPairId);
-    const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
-    const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
-      ? ((price - historicalPrice) / historicalPrice) * 100 
-      : undefined;
+    const price24h = (pool1.price24h * pool1Weight + pool2.price24h * pool2Weight) / totalLiquidity;
+
+    // Calculate price changes based on weighted averages
+    const priceChange24h = price - price24h;
+    const priceChangePercentage24h = ((price - price24h) / price24h) * 100;
 
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: 5, // PactFi VOI/USDC pair
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -447,6 +368,141 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
   }
 }
 
+async function fetchUniswapData(): Promise<MarketSnapshot | null> {
+  try {
+    const POOL_ADDRESS = '0x11DeE17647b8cC8d1b6897D8f3CdFB50d6A11685';
+    const BASE_RPC = 'https://mainnet.base.org';
+    const CHUNK_SIZE = 9000; // Stay under 10k limit with some buffer
+    
+    // Initialize provider and contract
+    const provider = new ethers.JsonRpcProvider(BASE_RPC);
+    const poolContract = new ethers.Contract(POOL_ADDRESS, IUniswapV3PoolABI, provider);
+
+    // Get current block
+    const currentBlock = await provider.getBlockNumber();
+    
+    // Calculate block from ~24 hours ago (assuming 2 second block time on Base)
+    const blocksIn24Hours = Math.floor(24 * 60 * 60 / 2);
+    const fromBlock = currentBlock - blocksIn24Hours;
+
+    // Fetch pool data
+    const [slot0, token0, token1] = await Promise.all([
+      poolContract.slot0(),
+      poolContract.token0(),
+      poolContract.token1()
+    ]);
+
+    // Fetch swap events in chunks
+    const swapEvents: SwapEvent[] = [];
+    let startBlock = fromBlock;
+    while (startBlock < currentBlock) {
+      const endBlock = Math.min(startBlock + CHUNK_SIZE, currentBlock);
+      const events = await poolContract.queryFilter(
+        poolContract.filters.Swap(),
+        startBlock,
+        endBlock
+      ) as SwapEvent[];
+      swapEvents.push(...events);
+      startBlock = endBlock + 1;
+      
+      // Add a small delay between requests to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // Get token contracts to fetch decimals and balances
+    const token0Contract = new ethers.Contract(
+      token0,
+      ['function decimals() view returns (uint8)', 'function balanceOf(address) view returns (uint256)'],
+      provider
+    );
+    const token1Contract = new ethers.Contract(
+      token1,
+      ['function decimals() view returns (uint8)', 'function balanceOf(address) view returns (uint256)'],
+      provider
+    );
+
+    const [decimals0, decimals1, balance0, balance1] = await Promise.all([
+      token0Contract.decimals(),
+      token1Contract.decimals(),
+      token0Contract.balanceOf(POOL_ADDRESS),
+      token1Contract.balanceOf(POOL_ADDRESS)
+    ]);
+
+    // Calculate price from sqrtPriceX96
+    const sqrtPriceX96 = BigInt(slot0.sqrtPriceX96.toString());
+    const Q96 = BigInt(2) ** BigInt(96);
+    
+    // Calculate price maintaining BigInt precision
+    // Note: token0 is VOI, token1 is USDC, so we need to invert the price
+    const decimalAdjustment = BigInt(10) ** BigInt(decimals1 - decimals0);
+    const priceNumerator = Q96 * Q96;
+    const priceDenominator = sqrtPriceX96 * sqrtPriceX96 * decimalAdjustment;
+    const price = Number(priceNumerator) / Number(priceDenominator);
+
+    // Calculate 24h volume
+    let volume24h = 0;
+    for (const event of swapEvents) {
+      // Convert amounts to proper decimals using BigInt arithmetic
+      const amount0BigInt = BigInt(event.args?.amount0?.toString() || '0');
+      const amount1BigInt = BigInt(event.args?.amount1?.toString() || '0');
+      
+      // Convert to decimal values using BigInt division
+      const amount0Decimal = Number(amount0BigInt) / Math.pow(10, Number(decimals0));
+      const amount1Decimal = Number(amount1BigInt) / Math.pow(10, Number(decimals1));
+      
+      // If amount0 is negative, it means token0 (USDC) is being swapped out
+      // If amount0 is positive, it means token0 (USDC) is being swapped in
+      if (amount0BigInt < BigInt(0)) {
+        // USDC being swapped out - use absolute USDC amount
+        volume24h += Math.abs(amount0Decimal);
+      } else {
+        // VOI being swapped out - convert VOI to USDC value
+        volume24h += Math.abs(amount1Decimal) * price;
+      }
+    }
+
+    // Calculate TVL in USDC using actual token balances
+    // Convert everything to BigInt first to avoid precision loss
+    const balance0BigInt = BigInt(balance0.toString());
+    const balance1BigInt = BigInt(balance1.toString());
+    
+    // Convert price to BigInt with 18 decimals of precision
+    const priceScaled = BigInt(Math.round(price * 1e18));
+    
+    // Calculate VOI value in USDC (all in BigInt)
+    const voiValueScaled = (balance1BigInt * priceScaled) / (BigInt(10) ** BigInt(decimals1));
+    const voiValue = Number(voiValueScaled) / 1e18;
+    
+    // Calculate USDC value (all in BigInt first)
+    const usdcValueScaled = balance0BigInt / (BigInt(10) ** BigInt(decimals0));
+    const usdcValue = Number(usdcValueScaled);
+    
+    // Sum the values
+    const tvl = voiValue + usdcValue;
+
+    // Fetch historical price and calculate price change
+    const historicalPrice = await fetchHistoricalPrice(22); // Uniswap trading_pair_id = 22
+    const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
+    const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
+      ? ((price - historicalPrice) / historicalPrice) * 100 
+      : undefined;
+
+    return {
+      trading_pair_id: 22, // Uniswap VOI/USDC pair
+      price: price,
+      volume_24h: volume24h,
+      tvl: tvl,
+      high_24h: undefined,
+      low_24h: undefined,
+      price_change_24h: priceChange24h,
+      price_change_percentage_24h: priceChangePercentage24h
+    };
+  } catch (error) {
+    console.error('Error fetching Uniswap data:', error);
+    return null;
+  }
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -455,22 +511,18 @@ serve(async (req: Request) => {
 
   try {
     // Fetch data from all sources in parallel
-    const [mexcData, humbleData, nomadexData, tinymanData, pactfiData] = await Promise.all([
+    const [mexcData, humbleData, nomadexData, tinymanData, pactfiData, uniswapData] = await Promise.all([
       fetchMEXCData(),
       fetchHumbleData(),
       fetchNomadexData(),
       fetchTinymanData(),
-      fetchPactFiData()
+      fetchPactFiData(),
+      fetchUniswapData()
     ]);
 
-    // Prepare snapshots array, handling both single and multiple snapshot results
-    const snapshots = [
-      mexcData,
-      ...(Array.isArray(humbleData) ? humbleData : [humbleData]),
-      nomadexData,
-      tinymanData,
-      pactfiData
-    ].filter((data): data is MarketSnapshot => data !== null);
+    // Filter out null results and prepare for insertion
+    const snapshots = [mexcData, humbleData, nomadexData, tinymanData, pactfiData, uniswapData]
+      .filter((data): data is MarketSnapshot => data !== null);
 
     if (snapshots.length > 0) {
       // Insert all snapshots

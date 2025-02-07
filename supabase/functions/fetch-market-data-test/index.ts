@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface TradingPair {
+  id: number;
+  exchange_id: number;
+  base_token: string;
+  quote_token: string;
+  pool_url?: string;
+  base_decimals: number;
+  quote_decimals: number;
+}
+
 interface NautilusPool {
   contractId: number;
   providerId: string;
@@ -111,7 +121,7 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
     const MEXC_EXCHANGE_ID = 1;
 
     // Get or create trading pair ID
-    const tradingPairId = await getOrCreateTradingPairId(
+    const tradingPair = await getOrCreateTradingPair(
       MEXC_EXCHANGE_ID,
       'USDT',
       'VOI',
@@ -139,7 +149,7 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
     const volume24h = parseFloat(mexcData.volume) || 0;
     
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: tradingPair.id,
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -155,12 +165,12 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
 }
 
 // Helper function to get or create trading pair ID
-async function getOrCreateTradingPairId(
+async function getOrCreateTradingPair(
   exchangeId: number,
   baseToken: string,
   quoteToken: string,
   poolUrl?: string
-): Promise<number> {
+): Promise<TradingPair> {
   try {
     // First, try to find existing trading pair
     const { data: existingPair, error: findError } = await supabase
@@ -176,7 +186,7 @@ async function getOrCreateTradingPairId(
     }
 
     if (existingPair) {
-      return existingPair.id;
+      return existingPair;
     }
 
     // If not found, create new trading pair
@@ -194,9 +204,9 @@ async function getOrCreateTradingPairId(
     if (insertError) throw insertError;
     if (!newPair) throw new Error('Failed to create trading pair');
 
-    return newPair.id;
+    return newPair;
   } catch (error) {
-    console.error('Error in getOrCreateTradingPairId:', error);
+    console.error('Error in getOrCreateTradingPair:', error);
     throw error;
   }
 }
@@ -213,6 +223,11 @@ async function fetchHumbleData(): Promise<MarketSnapshot[]> {
     const data = await response.json();
     const pools = data.pools as NautilusPool[];
 
+    // determine the voi/usdc pair price, poolId == 395553
+    const voiUsdcPool = pools.find(p => p.contractId === 395553);
+    const voiUsdcPrice = parseFloat(voiUsdcPool?.poolBalA??'0') / parseFloat(voiUsdcPool?.poolBalB??'0');
+    console.log(`VOI/USDC price: ${voiUsdcPrice}`);
+
     // Filter for pools where VOI is one of the tokens (tokB is always VOI in these pools)
     const voiPools = pools.filter(p => p.tokBId === '390001' && !p.deleted);
 
@@ -220,16 +235,17 @@ async function fetchHumbleData(): Promise<MarketSnapshot[]> {
     const snapshots: MarketSnapshot[] = await Promise.all(
       voiPools.map(async (pool) => {
         // Get or create trading pair ID
-        const poolUrl = `https://app.humble.sh/pool/${pool.contractId}`;
-        const tradingPairId = await getOrCreateTradingPairId(
+        const poolUrl = `https://voi.humble.sh/#/swap?poolId=${pool.contractId}`;
+        const tradingPair = await getOrCreateTradingPair(
           HUMBLE_EXCHANGE_ID,
           pool.symbolA,
-          'VOI',
+          pool.symbolB,
           poolUrl
         );
 
         // Calculate price (token per VOI)
         const price = parseFloat(pool.poolBalA) / parseFloat(pool.poolBalB);
+        // const price = parseFloat(pool.poolBalA) / parseFloat(pool.poolBalB) / 10 ** (pool.tokADecimals - pool.tokBDecimals);
 
         // Get TVL in VOI
         const tvl = parseFloat(pool.tvlB);
@@ -238,14 +254,14 @@ async function fetchHumbleData(): Promise<MarketSnapshot[]> {
         const volume24h = parseFloat(pool.volB) || 0;
 
         // Fetch historical price for this pair
-        const historicalPrice = await fetchHistoricalPrice(tradingPairId);
+        const historicalPrice = await fetchHistoricalPrice(tradingPair.id);
         const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
         const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
           ? ((price - historicalPrice) / historicalPrice) * 100 
           : undefined;
 
         return {
-          trading_pair_id: tradingPairId,
+          trading_pair_id: tradingPair.id,
           price: price,
           volume_24h: volume24h,
           tvl: tvl,
@@ -284,7 +300,7 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
 
     // Get or create trading pair ID
     const poolUrl = `https://app.nomadex.app/pool/${POOL_ID}`;
-    const tradingPairId = await getOrCreateTradingPairId(
+    const tradingPair = await getOrCreateTradingPair(
       NOMADEX_EXCHANGE_ID,
       'aUSDC',
       'VOI',
@@ -305,14 +321,14 @@ async function fetchNomadexData(): Promise<MarketSnapshot | null> {
     const volume24h = (Number(pool.volume[0]) / 1e6) || 0;
 
     // Fetch historical price for this pair
-    const historicalPrice = await fetchHistoricalPrice(tradingPairId);
+    const historicalPrice = await fetchHistoricalPrice(tradingPair.id);
     const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
     const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
       ? ((price - historicalPrice) / historicalPrice) * 100 
       : undefined;
 
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: tradingPair.id,
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -334,7 +350,7 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
     const poolId = 'D6NWRMDOIBMOTAQABMZQW5FO3E5JS4K3ING73FM3YZVFYPS4DQ4NMSQZNA';
 
     // Get or create trading pair ID
-    const tradingPairId = await getOrCreateTradingPairId(
+    const tradingPair = await getOrCreateTradingPair(
       TINYMAN_EXCHANGE_ID,
       'USDC',
       'aVOI',
@@ -364,14 +380,14 @@ async function fetchTinymanData(): Promise<MarketSnapshot | null> {
     const volume24h = parseFloat(poolData.last_day_volume_asset_1) || 0;
 
     // Fetch historical price for this pair
-    const historicalPrice = await fetchHistoricalPrice(tradingPairId);
+    const historicalPrice = await fetchHistoricalPrice(tradingPair.id);
     const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
     const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
       ? ((price - historicalPrice) / historicalPrice) * 100 
       : undefined;
     
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: tradingPair.id,
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -403,7 +419,7 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
     const pool2: VestigePool = await pool2Response.json();
 
     // Get or create trading pair ID
-    const tradingPairId = await getOrCreateTradingPairId(
+    const tradingPair = await getOrCreateTradingPair(
       PACTFI_EXCHANGE_ID,
       'USDC',
       'aVOI',
@@ -425,14 +441,14 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
     const volume24h = (pool1.volume_1_24h + pool2.volume_1_24h) || 0;
 
     // Calculate weighted average historical price
-    const historicalPrice = await fetchHistoricalPrice(tradingPairId);
+    const historicalPrice = await fetchHistoricalPrice(tradingPair.id);
     const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
     const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
       ? ((price - historicalPrice) / historicalPrice) * 100 
       : undefined;
 
     return {
-      trading_pair_id: tradingPairId,
+      trading_pair_id: tradingPair.id,
       price: price,
       volume_24h: volume24h,
       tvl: tvl,
@@ -465,11 +481,11 @@ serve(async (req: Request) => {
 
     // Prepare snapshots array, handling both single and multiple snapshot results
     const snapshots = [
-      mexcData,
+      //mexcData,
       ...(Array.isArray(humbleData) ? humbleData : [humbleData]),
-      nomadexData,
-      tinymanData,
-      pactfiData
+      //nomadexData,
+      //tinymanData,
+      //pactfiData
     ].filter((data): data is MarketSnapshot => data !== null);
 
     if (snapshots.length > 0) {
