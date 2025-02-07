@@ -317,7 +317,70 @@
                     {#each filteredTransfers as transfer, index (`${transfer.transactionid}-${transfer.round}-${index}`)}
                         <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
                             <div class="p-3 md:p-4">
-                                <div class="flex items-start gap-4 md:gap-6">
+                                <!-- Mobile Layout -->
+                                <div class="md:hidden">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                                {transfer.amount} {token.symbol}
+                                            </div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                {formatTimestamp(transfer.timestamp)}
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-sm">
+                                                <span class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                    {formatChange(transfer)} {token.symbol}
+                                                </span>
+                                            </div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                Balance: {calculateRunningBalance(transfer, index)} {token.symbol}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">From</div>
+                                            <a 
+                                                href={`https://explorer.voi.network/explorer/account/${transfer.from}`}
+                                                class="text-blue-500 hover:text-blue-600 transition-colors text-sm block"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <div class="break-all">
+                                                    {#if transfer.from_name}
+                                                        <span class="font-medium">{transfer.from_name}</span>
+                                                        <span class="text-gray-500 dark:text-gray-400 ml-1">({formatAddress(transfer.from)})</span>
+                                                    {:else}
+                                                        {formatAddress(transfer.from)}
+                                                    {/if}
+                                                </div>
+                                            </a>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">To</div>
+                                            <a 
+                                                href={`https://explorer.voi.network/explorer/account/${transfer.to}`}
+                                                class="text-blue-500 hover:text-blue-600 transition-colors text-sm block"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <div class="break-all">
+                                                    {#if transfer.to_name}
+                                                        <span class="font-medium">{transfer.to_name}</span>
+                                                        <span class="text-gray-500 dark:text-gray-400 ml-1">({formatAddress(transfer.to)})</span>
+                                                    {:else}
+                                                        {formatAddress(transfer.to)}
+                                                    {/if}
+                                                </div>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Desktop Layout -->
+                                <div class="hidden md:flex items-start gap-4 md:gap-6">
                                     <div class="flex-none w-44">
                                         <div class="text-sm font-medium text-gray-900 dark:text-white">
                                             {transfer.amount} {token.symbol}
@@ -377,6 +440,7 @@
                                         </div>
                                     </div>
                                 </div>
+
                                 <div class="flex justify-between place-items-start mt-2">
                                     {#if transfer.note}
                                         <div class="md:pl-[12.5rem]">
