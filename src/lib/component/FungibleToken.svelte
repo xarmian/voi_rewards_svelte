@@ -153,6 +153,7 @@
             class="absolute top-3 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
             on:click={() => showOptOutModal = true}
             title="Remove token from wallet"
+            aria-label="Remove token from wallet"
         >
             <i class="fa-solid fa-trash-alt"></i>
         </button>
@@ -297,7 +298,7 @@
                         <div>ID</div>
                         <div>{token.id}</div>
                     </a>
-                    {#if canSignTransactions && isLPToken(token)}
+                    {#if isLPToken(token)}
                         <span class="text-gray-400">|</span>
                         <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/add?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/add`} 
                             target="_blank"
@@ -320,21 +321,21 @@
                             target="_blank"
                             class="flex flex-col items-center group"
                             rel="noopener noreferrer">
-                            <i class="fa-solid fa-{canSignTransactions ? 'right-left' : 'eye'} mb-1 text-purple-500 group-hover:text-purple-600"></i>
-                            <span class="text-purple-500 group-hover:text-purple-600">{canSignTransactions ? 'Trade' : 'View'}</span>
+                            <i class="fa-solid fa-right-left mb-1 text-purple-500 group-hover:text-purple-600"></i>
+                            <span class="text-purple-500 group-hover:text-purple-600">Trade</span>
                         </a>
                     {/if}
-                    {#if canSignTransactions && !isLPToken(token)}
+                    {#if !isLPToken(token)}
                         <span class="text-gray-400">|</span>
                         <button
-                            class="flex flex-col items-center group"
+                            class="flex flex-col items-center group {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
                             on:click={() => showSendModal = true}
+                            aria-label="Send token"
+                            title={canSignTransactions ? 'Send token' : 'Connect wallet to send token'}
                         >
                             <i class="fa-solid fa-paper-plane text-blue-500 group-hover:text-blue-600"></i>
                             <span class="text-blue-500 group-hover:text-blue-600">Send</span>
                         </button>
-                    {/if}
-                    {#if !isLPToken(token)}
                         <span class="text-gray-400">|</span>
                         <button
                             class="flex flex-col items-center group"

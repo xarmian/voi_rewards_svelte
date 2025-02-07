@@ -1103,15 +1103,14 @@
                                     {(accountBalance / 1e6).toLocaleString()} VOI
                                 </span>
                                 <div class="flex items-center gap-2">
-                                    {#if canSignTransactions}
-                                        <button
-                                            on:click={() => showSendVoiModal = true}
-                                            class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                                        >
-                                            <i class="fas fa-paper-plane mr-1"></i>
-                                            Send
-                                        </button>
-                                    {/if}
+                                    <button
+                                        on:click={() => showSendVoiModal = true}
+                                        class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
+                                        title={canSignTransactions ? 'Send VOI' : 'Connect wallet to send VOI'}
+                                    >
+                                        <i class="fas fa-paper-plane mr-1"></i>
+                                        Send
+                                    </button>
                                     <button
                                         on:click={() => showVoiTransfersModal = true}
                                         class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"

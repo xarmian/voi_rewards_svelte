@@ -79,10 +79,8 @@
                 if (updatedConsensus.last_vote_timestamp) {
                     lastVoteTimestamp = new Date(updatedConsensus.last_vote_timestamp).getTime();
                     timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                    // Only update health if details are expanded or during initial load
-                    if (isConsensusDetailsExpanded) {
-                        updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
-                    }
+                    // Always update health status when consensus details are updated
+                    updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
                 }
             }
         } catch (error) {
@@ -115,8 +113,8 @@
         voteTimeInterval = setInterval(() => {
             if (lastVoteTimestamp !== undefined) {
                 timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                // Only update health if details are expanded or during initial load
-                if (accountStatus === 'Online' && consensusDetails && isConsensusDetailsExpanded) {
+                // Always update health status on time interval
+                if (accountStatus === 'Online' && consensusDetails) {
                     updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
                 }
             }
