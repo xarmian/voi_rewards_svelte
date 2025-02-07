@@ -28,44 +28,65 @@
     let consensusUpdateInterval: ReturnType<typeof setInterval> | null = null;
     let initialUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
+    interface ConsensusThreshold {
+        minBalance: number;
+        timeThresholds: {
+            error: number;
+            warning: number;
+        };
+    }
+
+    const consensusThresholds: ConsensusThreshold[] = [
+        {
+            minBalance: 1_000_000,
+            timeThresholds: {
+                error: 600,    // 10 minutes
+                warning: 300,  // 5 minutes
+            }
+        },
+        {
+            minBalance: 100_000,
+            timeThresholds: {
+                error: 1800,   // 30 minutes
+                warning: 1200, // 20 minutes
+            }
+        },
+        {
+            minBalance: 10_000,
+            timeThresholds: {
+                error: 7200,   // 2 hours
+                warning: 3600, // 1 hour
+            }
+        },
+        {
+            minBalance: 1_000,
+            timeThresholds: {
+                error: 86400,  // 1 day
+                warning: 10800, // 3 hours
+            }
+        }
+    ];
+
     function updateConsensusHealth(timeSinceLastVote: number, balanceInVoi: number) {
-        if (balanceInVoi < 1_000) {
+        if (balanceInVoi < 1_000 && timeSinceLastVote > 86400) {
             consensusHealth = 'unknown';
             return;
         }
 
-        if (balanceInVoi > 1_000_000) {
-            if (timeSinceLastVote > 600) { // 10 minutes
-                consensusHealth = 'error';
-            } else if (timeSinceLastVote > 300) { // 5 minutes
-                consensusHealth = 'warning';
-            } else {
-                consensusHealth = 'good';
-            }
-        } else if (balanceInVoi >= 100_000) {
-            if (timeSinceLastVote > 1200) { // 20 minutes
-                consensusHealth = 'error';
-            } else if (timeSinceLastVote > 600) { // 10 minutes
-                consensusHealth = 'warning';
-            } else {
-                consensusHealth = 'good';
-            }
-        } else if (balanceInVoi >= 10_000) {
-            if (timeSinceLastVote > 3600) { // 1 hour
-                consensusHealth = 'error';
-            } else if (timeSinceLastVote > 1200) { // 20 minutes
-                consensusHealth = 'warning';
-            } else {
-                consensusHealth = 'good';
-            }
-        } else { // between 1k and 10k
-            if (timeSinceLastVote > 86400) { // 1 day
-                consensusHealth = 'error';
-            } else if (timeSinceLastVote > 10800) { // 3 hours
-                consensusHealth = 'warning';
-            } else {
-                consensusHealth = 'good';
-            }
+        // Find the applicable threshold based on balance
+        const threshold = consensusThresholds.find(t => balanceInVoi >= t.minBalance);
+
+        if (!threshold) {
+            consensusHealth = 'good';
+            return;
+        }
+
+        if (timeSinceLastVote > threshold.timeThresholds.error) {
+            consensusHealth = 'error';
+        } else if (timeSinceLastVote > threshold.timeThresholds.warning) {
+            consensusHealth = 'warning';
+        } else {
+            consensusHealth = 'good';
         }
     }
 
@@ -79,7 +100,6 @@
                 if (updatedConsensus.last_vote_timestamp) {
                     lastVoteTimestamp = new Date(updatedConsensus.last_vote_timestamp).getTime();
                     timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                    // Always update health status when consensus details are updated
                     updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
                 }
             }
@@ -96,25 +116,30 @@
         }
         
         if (isConsensusDetailsExpanded && autoRefresh) {
-            // Initial update immediately
+            // Initial update when expanded
             updateConsensusDetails();
             // Then start the regular interval
             consensusUpdateInterval = setInterval(updateConsensusDetails, refreshInterval);
         }
     }
 
-    // Watch for changes in accountStatus
-    $: if (accountStatus === 'Online' && walletAddress) {
+    // Watch for changes in walletAddress - single update when wallet changes
+    $: if (walletAddress && accountStatus === 'Online') {
         updateConsensusDetails();
     }
 
     onMount(() => {
-        // Update time since last vote every second
+        // Initial single update on mount
+        if (accountStatus === 'Online' && walletAddress) {
+            updateConsensusDetails();
+        }
+
+        // Update time since last vote every second, but only update health if we have consensus details
         voteTimeInterval = setInterval(() => {
-            if (lastVoteTimestamp !== undefined) {
+            if (lastVoteTimestamp !== undefined && consensusDetails) {
                 timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                // Always update health status on time interval
-                if (accountStatus === 'Online' && consensusDetails) {
+                // Only update health if we have actual consensus details from an API call
+                if (accountStatus === 'Online') {
                     updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
                 }
             }
