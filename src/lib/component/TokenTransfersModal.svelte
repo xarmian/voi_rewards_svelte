@@ -21,6 +21,9 @@
         from_name?: string;
         to_name?: string;
         note?: string;
+        type?: 'payment' | 'fee' | 'inner-payment';
+        parentTxId?: string;
+        fee?: number;
     }
 
     let transfers: Transfer[] = [];
@@ -31,6 +34,7 @@
     let limit = 50;
     let hasMore = true;
     let expandedRows = new Set<string>();
+    let nextToken: string | undefined = undefined;
 
     // Filter states
     let fromAddress = '';
@@ -48,11 +52,15 @@
     }
 
     onMount(() => {
-        document.body.style.overflow = 'hidden';
+        if (document) {
+            document.body.style.overflow = 'hidden';
+        }
     });
 
     onDestroy(() => {
-        document.body.style.overflow = 'unset';
+        if (document) {
+            document.body.style.overflow = 'unset';
+        }
     });
 
     async function fetchTransfers(append = false) {
@@ -62,7 +70,82 @@
         try {
             let newTransfers: Transfer[] = [];
             
-            if (token.type === 'arc200') {
+            if (token.type === 'native') {
+                // Fetch all transactions involving this address
+                const txns = await algodIndexer
+                    .searchForTransactions()
+                    .address(walletId)
+                    .limit(limit)
+                    .nextToken(append && nextToken ? nextToken : '')
+                    .do();
+
+                // Store the next token for pagination
+                nextToken = txns['next-token'];
+                hasMore = !!nextToken;
+
+                // Process each transaction
+                txns.transactions.forEach((tx: any) => {
+                    const transfers: Transfer[] = [];
+
+                    // Always add fee transfer if this address is the sender, regardless of transaction type
+                    if (tx.sender === walletId && tx.fee > 0) {
+                        transfers.push({
+                            from: tx.sender,
+                            to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
+                            amount: (tx.fee / Math.pow(10, token.decimals)).toString(),
+                            round: tx['confirmed-round'],
+                            transactionid: tx.id,
+                            timestamp: tx['round-time'],
+                            note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+                            type: 'fee'
+                        });
+                    }
+
+                    // Handle different transaction types that affect VOI balance
+                    if (tx['tx-type'] === 'pay') {
+                        // Regular payment transaction
+                        transfers.push({
+                            from: tx.sender,
+                            to: tx['payment-transaction'].receiver,
+                            amount: (tx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
+                            round: tx['confirmed-round'],
+                            transactionid: tx.id,
+                            timestamp: tx['round-time'],
+                            note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+                            type: 'payment',
+                            fee: tx.fee
+                        });
+                    }
+
+                    // Handle inner transactions for all transaction types
+                    if (tx['inner-txns']) {
+                        tx['inner-txns'].forEach((innerTx: any) => {
+                            if (innerTx['tx-type'] === 'pay') {
+                                transfers.push({
+                                    from: innerTx.sender,
+                                    to: innerTx['payment-transaction'].receiver,
+                                    amount: (innerTx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
+                                    round: tx['confirmed-round'],
+                                    transactionid: innerTx.id,
+                                    timestamp: tx['round-time'],
+                                    note: innerTx.note ? Buffer.from(innerTx.note, 'base64').toString() : undefined,
+                                    type: 'inner-payment',
+                                    parentTxId: tx.id,
+                                    fee: 0
+                                });
+                            }
+                        });
+                    }
+
+                    // Only add transfers that involve our wallet address
+                    newTransfers.push(...transfers.filter(t => 
+                        t.from === walletId || t.to === walletId
+                    ));
+                });
+
+                // Sort by timestamp descending (most recent first)
+                newTransfers.sort((a, b) => b.timestamp - a.timestamp);
+            } else if (token.type === 'arc200') {
                 // Fetch ARC200 transfers
                 const response = await fetch(`/api/mimir?action=get_arc200_transfers&p_contractid=${token.id}&p_user=${walletId}&p_limit=${limit}&p_offset=${offset}`);
                 const result = await response.json();
@@ -75,6 +158,9 @@
                     ...transfer,
                     amount: (Number(transfer.amount) / Math.pow(10, token.decimals)).toString()
                 }));
+                
+                // For ARC200, use length-based pagination
+                hasMore = newTransfers.length === limit;
             } else {
                 // Fetch VSA transfers
                 const assetId = Number(token.id);
@@ -83,8 +169,12 @@
                     .assetID(assetId)
                     .address(walletId)
                     .limit(limit)
-                    .nextToken(append && offset > 0 ? offset.toString() : '')
+                    .nextToken(append && nextToken ? nextToken : '')
                     .do();
+
+                // Store the next token for pagination
+                nextToken = txns['next-token'];
+                hasMore = !!nextToken;
 
                 newTransfers = txns.transactions
                     .filter((tx: any) => tx['tx-type'] === 'axfer')
@@ -99,9 +189,6 @@
                     }));
             }
 
-            // If we got fewer results than the limit, or no results, there's no more data
-            hasMore = newTransfers.length === limit;
-
             // Don't append empty results
             if (newTransfers.length === 0) {
                 hasMore = false;
@@ -113,8 +200,12 @@
             const uniqueAddresses = [...new Set([...transfers.map((t: Transfer) => t.from), ...newTransfers.map((t: Transfer) => t.from), ...newTransfers.map((t: Transfer) => t.to)])];
             const envoiNames = await getEnvoiNames(uniqueAddresses);
             newTransfers.forEach((t: Transfer) => {
+                if (t.to === 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY') {
+                    t.to_name = 'Fee Sink';
+                } else {
+                    t.to_name = envoiNames.find(n => n.address === t.to)?.name || undefined;
+                }
                 t.from_name = envoiNames.find(n => n.address === t.from)?.name || undefined;
-                t.to_name = envoiNames.find(n => n.address === t.to)?.name || undefined;
             });
 
             if (append) {
@@ -149,8 +240,20 @@
         const target = e.target as HTMLDivElement;
         const bottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
         
+        console.log('Scroll event triggered', {
+            scrollHeight: target.scrollHeight,
+            scrollTop: target.scrollTop,
+            clientHeight: target.clientHeight,
+            bottom,
+            isLoading,
+            hasMore
+        });
+        
         if (bottom && !isLoading && hasMore) {
-            offset += limit;
+            console.log('Loading more transfers', { type: token.type, offset, nextToken });
+            if (token.type === 'arc200') {
+                offset += limit;
+            }
             fetchTransfers(true);
         }
     }
@@ -169,11 +272,16 @@
             const t = filteredTransfers[i];
             const amount = Number(t.amount);
             
-            if (t.to === walletId) {
-                runningBalance -= amount; // Subtract incoming transfers (going backwards)
-            }
-            if (t.from === walletId) {
-                runningBalance += amount; // Add outgoing transfers (going backwards)
+            // When going backwards in time:
+            // 1. If we received money after this point, we need to subtract it to get the historical balance
+            // 2. If we sent money after this point, we need to add it back to get the historical balance
+            // 3. If we paid fees after this point, we need to add them back to get the historical balance
+            if (t.type === 'fee') {
+                runningBalance += amount; // Add back fees that were paid after this point
+            } else if (t.to === walletId) {
+                runningBalance -= amount; // Subtract money we received after this point
+            } else if (t.from === walletId) {
+                runningBalance += amount; // Add back money we sent after this point
             }
         }
         
@@ -183,6 +291,9 @@
     function formatChange(transfer: Transfer): string {
         // Amount is already in decimal form
         const amount = Number(transfer.amount);
+        if (transfer.type === 'fee') {
+            return `-${amount.toFixed(token.decimals)}`; // Fees are always negative
+        }
         if (transfer.to === walletId) {
             return `+${amount.toFixed(token.decimals)}`;
         }
@@ -194,6 +305,9 @@
 
     $: if (open) {
         offset = 0;
+        nextToken = undefined;
+        transfers = [];
+        filteredTransfers = [];
         fetchTransfers();
     }
 
@@ -303,7 +417,11 @@
             </div>
         </div>
 
-        <div class="flex-1 overflow-auto p-4" on:scroll={handleScroll}>
+        <div 
+            class="flex-1 overflow-auto p-4" 
+            on:scroll={handleScroll}
+            style="max-height: calc(90vh - 12rem); min-height: 300px;"
+        >
             {#if error}
                 <div class="text-red-500 text-center py-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
                     {error}
@@ -315,14 +433,23 @@
             {:else}
                 <div class="space-y-3">
                     {#each filteredTransfers as transfer, index (`${transfer.transactionid}-${transfer.round}-${index}`)}
-                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                        <div class="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 {transfer.type === 'inner-payment' ? 'ml-4 border-l-4 border-l-purple-200 dark:border-l-purple-800' : ''}">
                             <div class="p-3 md:p-4">
                                 <!-- Mobile Layout -->
                                 <div class="md:hidden">
                                     <div class="flex justify-between items-start mb-2">
                                         <div>
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
                                                 {transfer.amount} {token.symbol}
+                                                {#if transfer.type === 'fee'}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full">
+                                                        Fee
+                                                    </span>
+                                                {:else if transfer.type === 'inner-payment'}
+                                                    <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 rounded-full">
+                                                        Inner
+                                                    </span>
+                                                {/if}
                                             </div>
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
                                                 {formatTimestamp(transfer.timestamp)}
@@ -333,6 +460,11 @@
                                                 <span class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                     {formatChange(transfer)} {token.symbol}
                                                 </span>
+                                                {#if token.type === 'native' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                        -{(transfer.fee / Math.pow(10, token.decimals)).toFixed(token.decimals)} {token.symbol} fee
+                                                    </div>
+                                                {/if}
                                             </div>
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
                                                 Balance: {calculateRunningBalance(transfer, index)} {token.symbol}
@@ -382,8 +514,17 @@
                                 <!-- Desktop Layout -->
                                 <div class="hidden md:flex items-start gap-4 md:gap-6">
                                     <div class="flex-none w-44">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
                                             {transfer.amount} {token.symbol}
+                                            {#if transfer.type === 'fee'}
+                                                <span class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full">
+                                                    Fee
+                                                </span>
+                                            {:else if transfer.type === 'inner-payment'}
+                                                <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 rounded-full">
+                                                    Inner
+                                                </span>
+                                            {/if}
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-400">
                                             {formatTimestamp(transfer.timestamp)}
@@ -434,6 +575,11 @@
                                             <span class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                 {formatChange(transfer)} {token.symbol}
                                             </span>
+                                                {#if token.type === 'native' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                        -{(transfer.fee / Math.pow(10, token.decimals)).toFixed(token.decimals)} {token.symbol} fee
+                                                    </div>
+                                                {/if}
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-400">
                                             Balance: {calculateRunningBalance(transfer, index)} {token.symbol}
@@ -443,7 +589,7 @@
 
                                 <div class="flex justify-between place-items-start mt-2">
                                     {#if transfer.note}
-                                        <div class="md:pl-[12.5rem]">
+                                        <div class="md:pl-[12.5rem] overflow-auto w-max-300">
                                             <div class="text-gray-500 dark:text-gray-400 font-medium text-xs">Tx Note</div>
                                             <div class="text-gray-600 dark:text-gray-300 text-sm whitespace-pre-wrap break-words">
                                                 {transfer.note}
@@ -453,7 +599,7 @@
                                         <div class="md:pl-[12.5rem]"></div>
                                     {/if}
                                     <a 
-                                        href={`https://explorer.voi.network/explorer/transaction/${Buffer.from(transfer.transactionid, 'hex').toString('utf8')}`}
+                                        href={`https://explorer.voi.network/explorer/transaction/${transfer.type === 'inner-payment' ? transfer.parentTxId : transfer.transactionid}`}
                                         class="text-blue-500 hover:text-blue-600 transition-colors text-xs inline-flex items-center gap-1"
                                         target="_blank"
                                         rel="noopener noreferrer"

@@ -8,36 +8,18 @@ export interface FungibleTokenType {
     imageUrl: string;
     value: number;
     poolId?: string;
-    type?: 'vsa' | 'arc200';
+    type?: 'vsa' | 'arc200' | 'native';
     poolInfo?: {
-        tokAId: string;
-        tokBId: string;
-        tokASymbol: string;
-        tokBSymbol: string;
-        tokABalance: string;
-        tokBBalance: string;
+        provider?: string;
         tokAType?: string;
+        tokAId?: string;
         tokBType?: string;
-        totalSupply: number;
-        poolId: string;
-        apr: number;
-        tokADecimals: number;
-        tokBDecimals: number;
-        tvl: number;
-        provider: 'humble' | 'nomadex';
+        tokBId?: string;
     };
 }
 
-export interface LPToken {
-    id: string;
-    name: string;
-    symbol: string;
-    balance: number;
-    decimals: number;
-    verified: boolean;
-    imageUrl: string;
-    poolId: string;
-    value: number;
+export interface LPToken extends FungibleTokenType {
+    contractId: string;
     poolInfo: {
         tokAId: string;
         tokBId: string;
@@ -45,15 +27,15 @@ export interface LPToken {
         tokBSymbol: string;
         tokABalance: string;
         tokBBalance: string;
-        tokADecimals: number;
-        tokBDecimals: number;
+        tokAType?: string;
+        tokBType?: string;
         totalSupply: number;
         poolId: string;
         apr: number;
+        tokADecimals: number;
+        tokBDecimals: number;
         tvl: number;
         provider: 'humble' | 'nomadex';
-        tokAType?: string;
-        tokBType?: string;
     };
 }
 

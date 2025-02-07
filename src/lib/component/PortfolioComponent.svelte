@@ -18,6 +18,7 @@
     import { page } from '$app/stores';
     import { fade } from 'svelte/transition';
     import ConsensusDetails from './ConsensusDetails.svelte';
+    import TokenTransfersModal from './TokenTransfersModal.svelte';
 
     export let walletAddress: string | undefined = undefined;
 
@@ -172,6 +173,8 @@
     let voteKeyExpiryDate: Date | undefined;
 
     let poolShare: number | null = null;
+
+    let showVoiTransfersModal = false;
 
     onMount(() => {
         // Initial fetch
@@ -1035,7 +1038,9 @@
                                     <CopyComponent text={walletAddress} />
                                 </div>
                                 {#if envoiName}
-                                    <span class="text-purple-600 dark:text-purple-400">({envoiName})</span>
+                                    <a class="text-purple-600 dark:text-purple-400" href={`https://app.envoi.sh/#/${envoiName}`} target="_blank" rel="noopener noreferrer">
+                                        <span >({envoiName})</span>
+                                    </a>
                                 {/if}
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -1097,14 +1102,25 @@
                                 <span class="text-lg font-semibold text-gray-900 dark:text-white">
                                     {(accountBalance / 1e6).toLocaleString()} VOI
                                 </span>
-                                {#if canSignTransactions}
+                                <div class="flex items-center gap-2">
+                                    {#if canSignTransactions}
+                                        <button
+                                            on:click={() => showSendVoiModal = true}
+                                            class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                        >
+                                            <i class="fas fa-paper-plane mr-1"></i>
+                                            Send
+                                        </button>
+                                    {/if}
                                     <button
-                                        on:click={() => showSendVoiModal = true}
-                                        class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                        on:click={() => showVoiTransfersModal = true}
+                                        class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
+                                        title="View VOI transaction history"
                                     >
-                                        Send
+                                        <i class="fas fa-clock-rotate-left"></i>
+                                        History
                                     </button>
-                                {/if}
+                                </div>
                             </div>
                         </div>
                         <div class="flex justify-between items-center">
@@ -1503,4 +1519,23 @@
         }}
         onTokenSent={handleTokenSent}
     />
+
+    <!-- VOI Transfers Modal -->
+    {#if typeof walletAddress === 'string' && showVoiTransfersModal}
+        <TokenTransfersModal
+            bind:open={showVoiTransfersModal}
+            token={{
+                id: '0',
+                type: 'native',
+                symbol: 'VOI',
+                decimals: 6,
+                balance: accountBalance,
+                name: 'Voi',
+                verified: true,
+                imageUrl: '/icons/voi_icon.png',
+                value: accountBalance / 1e6
+            }}
+            walletId={walletAddress}
+        />
+    {/if}
 </div> 

@@ -21,7 +21,7 @@
         total_blocks: number;
         vote_count: number;
     } | undefined;
-    let consensusHealth: 'good' | 'warning' | 'error' | undefined;
+    let consensusHealth: 'good' | 'warning' | 'error' | 'unknown' | undefined;
     let timeSinceLastVote: number | undefined;
     let lastVoteTimestamp: number | undefined;
     let voteTimeInterval: ReturnType<typeof setInterval> | null = null;
@@ -29,14 +29,43 @@
     let initialUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
     function updateConsensusHealth(timeSinceLastVote: number, balanceInVoi: number) {
-        if (balanceInVoi >= 10_000_000) {
-            consensusHealth = timeSinceLastVote > 180 ? 'error' : 'good'; // 3 minutes
-        } else if (balanceInVoi >= 1_000_000) {
-            consensusHealth = timeSinceLastVote > 1800 ? 'error' : 'good'; // 30 minutes
-        } else if (balanceInVoi >= 600) {
-            consensusHealth = timeSinceLastVote > 3600 ? 'warning' : 'good'; // 1 hour
-        } else {
-            consensusHealth = timeSinceLastVote > 86400 ? 'warning' : 'good'; // 1 day
+        if (balanceInVoi < 1_000) {
+            consensusHealth = 'unknown';
+            return;
+        }
+
+        if (balanceInVoi > 1_000_000) {
+            if (timeSinceLastVote > 600) { // 10 minutes
+                consensusHealth = 'error';
+            } else if (timeSinceLastVote > 300) { // 5 minutes
+                consensusHealth = 'warning';
+            } else {
+                consensusHealth = 'good';
+            }
+        } else if (balanceInVoi >= 100_000) {
+            if (timeSinceLastVote > 1200) { // 20 minutes
+                consensusHealth = 'error';
+            } else if (timeSinceLastVote > 600) { // 10 minutes
+                consensusHealth = 'warning';
+            } else {
+                consensusHealth = 'good';
+            }
+        } else if (balanceInVoi >= 10_000) {
+            if (timeSinceLastVote > 3600) { // 1 hour
+                consensusHealth = 'error';
+            } else if (timeSinceLastVote > 1200) { // 20 minutes
+                consensusHealth = 'warning';
+            } else {
+                consensusHealth = 'good';
+            }
+        } else { // between 1k and 10k
+            if (timeSinceLastVote > 86400) { // 1 day
+                consensusHealth = 'error';
+            } else if (timeSinceLastVote > 10800) { // 3 hours
+                consensusHealth = 'warning';
+            } else {
+                consensusHealth = 'good';
+            }
         }
     }
 
@@ -50,7 +79,10 @@
                 if (updatedConsensus.last_vote_timestamp) {
                     lastVoteTimestamp = new Date(updatedConsensus.last_vote_timestamp).getTime();
                     timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                    updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
+                    // Only update health if details are expanded or during initial load
+                    if (isConsensusDetailsExpanded) {
+                        updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
+                    }
                 }
             }
         } catch (error) {
@@ -78,16 +110,13 @@
         updateConsensusDetails();
     }
 
-    onMount(async () => {
-        if (walletAddress && accountStatus === 'Online') {
-            await updateConsensusDetails();
-        }
-
+    onMount(() => {
         // Update time since last vote every second
         voteTimeInterval = setInterval(() => {
             if (lastVoteTimestamp !== undefined) {
                 timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                if (accountStatus === 'Online' && consensusDetails) {
+                // Only update health if details are expanded or during initial load
+                if (accountStatus === 'Online' && consensusDetails && isConsensusDetailsExpanded) {
                     updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
                 }
             }
@@ -140,10 +169,21 @@
     {#if accountStatus === 'Online' && consensusDetails}
         <button
             on:click={() => isConsensusDetailsExpanded = !isConsensusDetailsExpanded}
-            class="text-sm px-2 py-1 rounded-md {consensusHealth === 'good' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : consensusHealth === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'} hover:opacity-90 transition-opacity flex items-center gap-1"
+            class="text-sm px-2 py-1 rounded-md {consensusHealth === 'good' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 
+            consensusHealth === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' : 
+            consensusHealth === 'unknown' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300' :
+            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'} hover:opacity-90 transition-opacity flex items-center gap-1"
         >
             <i class="fas fa-vote-yea text-xs"></i>
-            <span>Voting {timeSinceLastVote && timeSinceLastVote < 180 ? 'Active' : 'Inactive'}</span>
+            <span>
+                {#if consensusHealth === 'good'}
+                    Voting Active
+                {:else if consensusHealth === 'unknown'}
+                    Status Unknown
+                {:else}
+                    Voting Inactive
+                {/if}
+            </span>
             <i class="fas fa-chevron-{isConsensusDetailsExpanded ? 'up' : 'down'} text-xs ml-1"></i>
         </button>
     {/if}
@@ -204,15 +244,24 @@
                 </div>
             </div>
         </div>
-        {#if consensusHealth === 'warning' || consensusHealth === 'error'}
-            <div class="mt-3 p-2 rounded {consensusHealth === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/20' : 'bg-red-100 dark:bg-red-900/20'}">
+        {#if consensusHealth === 'warning' || consensusHealth === 'error' || consensusHealth === 'unknown'}
+            <div class="mt-3 p-2 rounded {consensusHealth === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/20' : 
+            consensusHealth === 'unknown' ? 'bg-gray-100 dark:bg-gray-900/20' :
+            'bg-red-100 dark:bg-red-900/20'}">
                 <div class="flex items-center">
-                    <i class="fas fa-exclamation-triangle {consensusHealth === 'warning' ? 'text-yellow-500' : 'text-red-500'} mr-2"></i>
-                    <p class="text-xs {consensusHealth === 'warning' ? 'text-yellow-700 dark:text-yellow-200' : 'text-red-700 dark:text-red-200'}">
-                        {#if consensusHealth === 'warning'}
-                            Your node hasn't voted in a while. This might affect your rewards.
+                    <i class="fas {consensusHealth === 'unknown' ? 'fa-info-circle' : 'fa-exclamation-triangle'} 
+                    {consensusHealth === 'warning' ? 'text-yellow-500' : 
+                    consensusHealth === 'unknown' ? 'text-gray-500' :
+                    'text-red-500'} mr-2"></i>
+                    <p class="text-xs {consensusHealth === 'warning' ? 'text-yellow-700 dark:text-yellow-200' : 
+                    consensusHealth === 'unknown' ? 'text-gray-700 dark:text-gray-200' :
+                    'text-red-700 dark:text-red-200'}">
+                        {#if consensusHealth === 'unknown'}
+                            Due to your current stake being less than 1,000 VOI, we cannot accurately estimate voting health.
+                        {:else if consensusHealth === 'warning'}
+                            Your node's voting frequency is slower than expected for your stake size. This might affect your rewards.
                         {:else}
-                            Your node is not voting as expected for your stake size.
+                            Your node has not voted in a significant period. Please check your node's status immediately.
                         {/if}
                     </p>
                 </div>
