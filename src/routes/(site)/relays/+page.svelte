@@ -93,7 +93,7 @@
             const epochNumber = getCurrentEpoch(weekStartDate, epochStartDate) + 1;
             
             // Get reward pool for this epoch
-            const rewardPool = await getTokensByEpoch(epochNumber) / 10;
+            const rewardPool = Math.min(await getTokensByEpoch(epochNumber) / 10, 300000);
 
             // Calculate statistics
             const totalHosts = peerData.length;

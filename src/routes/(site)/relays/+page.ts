@@ -26,15 +26,15 @@ function generateWeekRanges(startDate: string, endDate: string): WeekRange[] {
     const weeks: WeekRange[] = [];
     const end = createDate(endDate);
 
-    // Add the first week (Oct 30 - Nov 5)
+    // Add the first week (Sept 18 - Sept 24)
     weeks.push({
-        start: '2024-10-30',
-        end: '2024-11-05',
-        label: `10/30/2024 - 11/05/2024`
+        start: '2024-09-18',
+        end: '2024-09-24',
+        label: `09/18/2024 - 09/24/2024`
     });
 
     // Start from the next week
-    let currentStart = createDate('2024-11-06'); // Start of second week
+    let currentStart = createDate('2024-09-25'); // Start of second week
     
     while (currentStart <= end) {
         const weekEnd = new Date(currentStart);
