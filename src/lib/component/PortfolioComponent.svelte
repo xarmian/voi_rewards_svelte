@@ -305,7 +305,7 @@
         try {
             await Promise.all([
                 refreshPortfolio(),
-                refreshLPTokens(),
+                //refreshLPTokens(),
                 refreshTokens(),
                 refreshNFTs()
             ]);

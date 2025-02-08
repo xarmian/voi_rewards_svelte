@@ -22,7 +22,6 @@
     let creatorEnvoiName: string | null = null;
     let totalSupply: number | null = null;
     let creator: string | null = null;
-    console.log(token, token.balance / Math.pow(10,token.decimals));
 
     async function fetchTokenDetails() {
         try {
