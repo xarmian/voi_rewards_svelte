@@ -22,6 +22,7 @@
     let creatorEnvoiName: string | null = null;
     let totalSupply: number | null = null;
     let creator: string | null = null;
+    console.log(token, token.balance / Math.pow(10,token.decimals));
 
     async function fetchTokenDetails() {
         try {
@@ -150,7 +151,7 @@
 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
     {#if canSignTransactions && token.balance === 0}
         <button
-            class="absolute top-3 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
+            class="absolute top-7 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
             on:click={() => showOptOutModal = true}
             title="Remove token from wallet"
             aria-label="Remove token from wallet"
@@ -238,7 +239,6 @@
             </div>
         </div>
                     <!-- Token Details Section -->
-                    {#if !isLPToken(token)}
                         <button
                             class="flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 mt-2 place-self-center"
                             on:click={toggleExpand}
@@ -248,6 +248,7 @@
                         </button>
 
                         {#if isExpanded}
+                        {#if !isLPToken(token)}
                             <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3 flex flex-col">
                                 <div class="grid grid-cols-2 gap-2 text-sm">
                                     <div>
@@ -260,11 +261,6 @@
                                             {#if totalSupply}
                                                 <span class="group relative inline-block">
                                                     {formatLargeNumber(totalSupply / Math.pow(10, token.decimals))} {token.symbol}
-                                                    <span class="invisible group-hover:visible absolute left-0 -bottom-1 translate-y-full 
-                                                        bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10
-                                                        dark:bg-gray-700">
-                                                        {(totalSupply / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
-                                                    </span>
                                                 </span>
                                             {:else}
                                                 ...
@@ -292,6 +288,46 @@
                                         </div>
                                     {/if}
                                 </div>
+                            </div>
+                        {:else}
+                            <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3 flex flex-col">
+                                <p class="text-gray-500 dark:text-gray-400">
+                                    This token represents your share in a liquidity pool:
+                                </p>
+                                {#if token.poolInfo}
+                                    <div class="grid grid-cols-2 gap-2 text-sm mt-2">
+                                        <div>
+                                            <p class="text-gray-500 dark:text-gray-400">{token.poolInfo.tokASymbol} Amount</p>
+                                            <p class="text-gray-700 dark:text-gray-200">
+                                                {formatNumber(
+                                                    (poolShare || 0) * (
+                                                        token.poolInfo.provider === 'humble' 
+                                                            ? Number(token.poolInfo.tokABalance)
+                                                            : Number(token.poolInfo.tokABalance) / Math.pow(10, token.poolInfo.tokADecimals)
+                                                    )
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p class="text-gray-500 dark:text-gray-400">{token.poolInfo.tokBSymbol} Amount</p>
+                                            <p class="text-gray-700 dark:text-gray-200">
+                                                {formatNumber(
+                                                    (poolShare || 0) * (
+                                                        token.poolInfo.provider === 'humble' 
+                                                            ? Number(token.poolInfo.tokBBalance)
+                                                            : Number(token.poolInfo.tokBBalance) / Math.pow(10, token.poolInfo.tokBDecimals)
+                                                    )
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <p class="text-gray-500 dark:text-gray-400">Pool Provider</p>
+                                            <p class="text-gray-700 dark:text-gray-200 capitalize">
+                                                {token.poolInfo.provider}
+                                            </p>
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
                     {/if}
