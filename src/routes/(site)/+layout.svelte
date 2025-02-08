@@ -51,7 +51,7 @@
 			<FooterLinkGroup ulClass="flex flex-wrap items-center mb-6 text-sm text-gray-500 sm:mb-0 dark:text-gray-400">
 				<FooterLink href="https://twitter.com/xarmian" target="_blank">My Twitter</FooterLink>
 				<FooterLink href="https://twitter.com/Voi_Net" target="_blank">Voi Twitter</FooterLink>
-				<FooterLink href="https://discord.gg/voi-network" target="_blank">Voi Discord</FooterLink>
+				<FooterLink href="https://discord.gg/vnFbrJrHeW" target="_blank">Voi Discord</FooterLink>
 				<FooterLink href="https://github.com/xarmian/voi_rewards_svelte" target="_blank">Source Code</FooterLink>
 			</FooterLinkGroup>
 		</div>
