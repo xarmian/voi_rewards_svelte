@@ -147,7 +147,7 @@
     }
 </script>
 
-<div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 relative">
+<div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
     {#if canSignTransactions && token.balance === 0}
         <button
             class="absolute top-3 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
@@ -158,7 +158,8 @@
             <i class="fa-solid fa-trash-alt"></i>
         </button>
     {/if}
-    <div class="flex items-center space-x-4">
+    <div class="flex items-start space-x-4 flex-col">
+        <div class="flex flex-row items-center gap-4 justify-start">
         {#if isLPToken(token) && token.poolInfo}
             {@const tokenAUrl = getTokenImageUrl(token.poolInfo.tokAId)}
             {@const tokenBUrl = getTokenImageUrl(token.poolInfo.tokBId)}
@@ -187,168 +188,169 @@
                 />
             </div>
         {/if}
-        <div class="flex-1">
-            <div class="flex items-center justify-between">
-                <h4 class="font-medium text-gray-900 dark:text-white">
-                    {#if isLPToken(token) && token.poolInfo}
-                        {token.name}
-                    {:else}
-                        {token.symbol}
+            <div class="flex-1">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-medium text-gray-900 dark:text-white">
+                        {#if isLPToken(token) && token.poolInfo}
+                            {token.name}
+                        {:else}
+                            {token.symbol}
+                        {/if}
+                    </h4>
+                    {#if isLPToken(token) && apr !== null && apr !== 0}
+                        <span class="text-sm px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">
+                            APR: {formatNumber(apr)}%
+                        </span>
                     {/if}
-                </h4>
-                {#if isLPToken(token) && apr !== null && apr !== 0}
-                    <span class="text-sm px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">
-                        APR: {formatNumber(apr)}%
-                    </span>
-                {/if}
-            </div>
+                </div>
 
-            <div class="mt-2 space-y-2 text-sm">
-                {#if isLPToken(token) && poolShare}
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Your Share</p>
-                            <p class="text-gray-700 dark:text-gray-200">
-                                {formatNumber(token.balance / Math.pow(10, token.decimals))} LP Tokens
-                            </p>
-                            <p class="text-gray-600 dark:text-gray-300 text-sm">
-                                ({(poolShare * 100).toFixed(2)}% of pool)
-                            </p>
-                        </div>
-                        <div>
-                            <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Value</p>
-                            <p class="text-gray-700 dark:text-gray-200">{formatNumber(displayValue, 3)} VOI</p>
-                            <p class="text-gray-600 dark:text-gray-300 text-xs">
-                                (${formatNumber(displayValue * voiPrice, 3)} USD)
-                            </p>
-                        </div>
-                    </div>
-                {:else}
-                    <p class="text-gray-600 dark:text-gray-300">
-                        Balance: {formatNumber(token.balance / Math.pow(10, token.decimals))} {token.symbol}
-                    </p>
-                    <p class="text-gray-600 dark:text-gray-300">
-                        Value: {formatNumber(displayValue, 3)} VOI / ${formatNumber(displayValue * voiPrice, 3)} USD
-                    </p>
-                {/if}
-
-                <!-- Token Details Section -->
-                {#if !isLPToken(token)}
-                    <button
-                        class="flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 mt-2"
-                        on:click={toggleExpand}
-                    >
-                        <i class="fas fa-chevron-{isExpanded ? 'up' : 'down'} text-xs"></i>
-                        <span class="text-sm">{isExpanded ? 'Less' : 'More'} Details</span>
-                    </button>
-
-                    {#if isExpanded}
-                        <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3">
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <p class="text-gray-500 dark:text-gray-400">Decimals</p>
-                                    <p class="text-gray-700 dark:text-gray-200">{token.decimals}</p>
-                                </div>
-                                <div>
-                                    <p class="text-gray-500 dark:text-gray-400">Total Supply</p>
-                                    <p class="text-gray-700 dark:text-gray-200">
-                                        {#if totalSupply}
-                                            <span class="group relative inline-block">
-                                                {formatLargeNumber(totalSupply / Math.pow(10, token.decimals))} {token.symbol}
-                                                <span class="invisible group-hover:visible absolute left-0 -bottom-1 translate-y-full 
-                                                    bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10
-                                                    dark:bg-gray-700">
-                                                    {(totalSupply / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
-                                                </span>
-                                            </span>
-                                        {:else}
-                                            ...
-                                        {/if}
-                                    </p>
-                                </div>
-                                {#if creator}
-                                    <div class="col-span-2">
-                                        <p class="text-gray-500 dark:text-gray-400">Creator</p>
-                                        <div class="flex items-center gap-2">
-                                            <a 
-                                                href={`https://voiager.xyz/account/${creator}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-mono text-xs truncate"
-                                            >
-                                                {creator}
-                                            </a>
-                                            {#if creatorEnvoiName}
-                                                <span class="text-purple-500 dark:text-purple-400">
-                                                    ({creatorEnvoiName})
-                                                </span>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                {/if}
+                <div class="mt-2 space-y-2 text-sm">
+                    {#if isLPToken(token) && poolShare}
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Your Share</p>
+                                <p class="text-gray-700 dark:text-gray-200">
+                                    {formatNumber(token.balance / Math.pow(10, token.decimals))} LP Tokens
+                                </p>
+                                <p class="text-gray-600 dark:text-gray-300 text-sm">
+                                    ({(poolShare * 100).toFixed(2)}% of pool)
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Value</p>
+                                <p class="text-gray-700 dark:text-gray-200">{formatNumber(displayValue, 3)} VOI</p>
+                                <p class="text-gray-600 dark:text-gray-300 text-xs">
+                                    (${formatNumber(displayValue * voiPrice, 3)} USD)
+                                </p>
                             </div>
                         </div>
+                    {:else}
+                        <p class="text-gray-600 dark:text-gray-300">
+                            Balance: {formatNumber(token.balance / Math.pow(10, token.decimals))} {token.symbol}
+                        </p>
+                        <p class="text-gray-600 dark:text-gray-300">
+                            Value: {formatNumber(displayValue, 3)} VOI / ${formatNumber(displayValue * voiPrice, 3)} USD
+                        </p>
                     {/if}
-                {/if}
 
-                <div class="flex items-center gap-3 text-xs font-mono pt-2">
-                    <a href={`https://voiager.xyz/token/${token.id}`} target="_blank" 
-                        class="flex flex-col items-center text-blue-500 hover:text-blue-600"
-                        rel="noopener noreferrer">
-                        <div>ID</div>
-                        <div>{token.id}</div>
-                    </a>
-                    {#if isLPToken(token)}
-                        <span class="text-gray-400">|</span>
-                        <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/add?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/add`} 
-                            target="_blank"
-                            class="flex flex-col items-center group"
-                            rel="noopener noreferrer">
-                            <i class="fa-solid fa-circle-plus text-purple-500 group-hover:text-purple-600"></i>
-                            <span class="text-purple-500 group-hover:text-purple-600">Liquidity</span>
-                        </a>
-                        <span class="text-gray-400">|</span>
-                        <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/remove`} 
-                            target="_blank"
-                            class="flex flex-col items-center group"
-                            rel="noopener noreferrer">
-                            <i class="fa-solid fa-circle-minus text-purple-500 group-hover:text-purple-600"></i>
-                            <span class="text-purple-500 group-hover:text-purple-600">Liquidity</span>
-                        </a>
-                    {:else if token.poolId}
-                        <span class="text-gray-400">|</span>
-                        <a href={`https://voi.humble.sh/#/swap?poolId=${token.poolId}`} 
-                            target="_blank"
-                            class="flex flex-col items-center group"
-                            rel="noopener noreferrer">
-                            <i class="fa-solid fa-right-left mb-1 text-purple-500 group-hover:text-purple-600"></i>
-                            <span class="text-purple-500 group-hover:text-purple-600">Trade</span>
-                        </a>
-                    {/if}
-                    {#if !isLPToken(token)}
-                        <span class="text-gray-400">|</span>
-                        <button
-                            class="flex flex-col items-center group {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
-                            on:click={() => showSendModal = true}
-                            aria-label="Send token"
-                            title={canSignTransactions ? 'Send token' : 'Connect wallet to send token'}
-                        >
-                            <i class="fa-solid fa-paper-plane text-blue-500 group-hover:text-blue-600"></i>
-                            <span class="text-blue-500 group-hover:text-blue-600">Send</span>
-                        </button>
-                        <span class="text-gray-400">|</span>
-                        <button
-                            class="flex flex-col items-center group"
-                            on:click={() => showTransfersModal = true}
-                        >
-                            <i class="fa-solid fa-clock-rotate-left text-blue-500 group-hover:text-blue-600"></i>
-                            <span class="text-blue-500 group-hover:text-blue-600">Transfers</span>
-                        </button>
-                    {/if}
+
                 </div>
             </div>
         </div>
-    </div>
+                    <!-- Token Details Section -->
+                    {#if !isLPToken(token)}
+                        <button
+                            class="flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 mt-2 place-self-center"
+                            on:click={toggleExpand}
+                        >
+                            <i class="fas fa-chevron-{isExpanded ? 'up' : 'down'} text-xs"></i>
+                            <span class="text-sm">{isExpanded ? 'Less' : 'More'} Details</span>
+                        </button>
+
+                        {#if isExpanded}
+                            <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3 flex flex-col">
+                                <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <p class="text-gray-500 dark:text-gray-400">Decimals</p>
+                                        <p class="text-gray-700 dark:text-gray-200">{token.decimals}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 dark:text-gray-400">Total Supply</p>
+                                        <p class="text-gray-700 dark:text-gray-200">
+                                            {#if totalSupply}
+                                                <span class="group relative inline-block">
+                                                    {formatLargeNumber(totalSupply / Math.pow(10, token.decimals))} {token.symbol}
+                                                    <span class="invisible group-hover:visible absolute left-0 -bottom-1 translate-y-full 
+                                                        bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10
+                                                        dark:bg-gray-700">
+                                                        {(totalSupply / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
+                                                    </span>
+                                                </span>
+                                            {:else}
+                                                ...
+                                            {/if}
+                                        </p>
+                                    </div>
+                                    {#if creator}
+                                        <div class="col-span-2">
+                                            <p class="text-gray-500 dark:text-gray-400">Creator</p>
+                                            <div class="flex items-center gap-2">
+                                                <a 
+                                                    href={`https://voiager.xyz/account/${creator}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-mono text-xs truncate"
+                                                >
+                                                    {creator}
+                                                </a>
+                                                {#if creatorEnvoiName}
+                                                    <span class="text-purple-500 dark:text-purple-400">
+                                                        ({creatorEnvoiName})
+                                                    </span>
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
+                    {/if}
+        <div class="flex items-center gap-3 text-xs font-mono pt-2 place-self-center">
+            <a href={`https://voiager.xyz/token/${token.id}`} target="_blank" 
+                class="flex flex-col items-center text-blue-500 hover:text-blue-600"
+                rel="noopener noreferrer">
+                <div>ID</div>
+                <div>{token.id}</div>
+            </a>
+            {#if isLPToken(token)}
+                <span class="text-gray-400">|</span>
+                <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/add?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/add`} 
+                    target="_blank"
+                    class="flex flex-col items-center group"
+                    rel="noopener noreferrer">
+                    <i class="fa-solid fa-circle-plus text-purple-500 group-hover:text-purple-600"></i>
+                    <span class="text-purple-500 group-hover:text-purple-600">Liquidity</span>
+                </a>
+                <span class="text-gray-400">|</span>
+                <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/remove`} 
+                    target="_blank"
+                    class="flex flex-col items-center group"
+                    rel="noopener noreferrer">
+                    <i class="fa-solid fa-circle-minus text-purple-500 group-hover:text-purple-600"></i>
+                    <span class="text-purple-500 group-hover:text-purple-600">Liquidity</span>
+                </a>
+            {:else if token.poolId}
+                <span class="text-gray-400">|</span>
+                <a href={`https://voi.humble.sh/#/swap?poolId=${token.poolId}`} 
+                    target="_blank"
+                    class="flex flex-col items-center group"
+                    rel="noopener noreferrer">
+                    <i class="fa-solid fa-right-left mb-1 text-purple-500 group-hover:text-purple-600"></i>
+                    <span class="text-purple-500 group-hover:text-purple-600">Trade</span>
+                </a>
+            {/if}
+            {#if !isLPToken(token)}
+                <span class="text-gray-400">|</span>
+                <button
+                    class="flex flex-col items-center group {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
+                    on:click={() => showSendModal = true}
+                    aria-label="Send token"
+                    title={canSignTransactions ? 'Send token' : 'Connect wallet to send token'}
+                >
+                    <i class="fa-solid fa-paper-plane text-blue-500 group-hover:text-blue-600"></i>
+                    <span class="text-blue-500 group-hover:text-blue-600">Send</span>
+                </button>
+                <span class="text-gray-400">|</span>
+                <button
+                    class="flex flex-col items-center group"
+                    on:click={() => showTransfersModal = true}
+                >
+                    <i class="fa-solid fa-clock-rotate-left text-blue-500 group-hover:text-blue-600"></i>
+                    <span class="text-blue-500 group-hover:text-blue-600">Transfers</span>
+                </button>
+            {/if}
+        </div>
+</div>
     {#if isLPToken(token) && token.poolInfo.provider}
         <div class="absolute bottom-3 left-3">
             {#if token.poolInfo.provider === 'humble'}

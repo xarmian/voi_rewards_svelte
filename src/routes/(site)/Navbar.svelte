@@ -232,78 +232,78 @@
   <div
     bind:this={menuElement}
     transition:slide={{ duration: 200 }}
-    class="fixed right-0 top-0 h-full w-64 bg-gradient-to-b from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 z-50 shadow-lg touch-pan-x"
+    class="fixed right-0 top-0 h-full w-64 bg-gradient-to-b from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 z-50 shadow-lg touch-pan-x flex flex-col"
     on:touchstart={handleTouchStart}
     on:touchmove={handleTouchMove}
     on:touchend={handleTouchEnd}
     on:touchcancel={handleTouchEnd}
   >
-    <div class="flex flex-col p-4 space-y-4">
-      <!-- Swipe hint -->
-      <div class="text-gray-400 dark:text-white/50 text-sm text-center pb-2">
-        Swipe right to close
-      </div>
-      
-      {#each navItems as {href, label, external}}
-        <a
-          {href}
-          class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
-          class:selected={activeLink ? isActiveLink(href) : false}
-          target={external ? '_blank' : undefined}
-          rel={external ? 'noopener noreferrer' : undefined}
-          on:click={() => {
-            activeLink = href;
-            closeMenu();
-          }}
-        >
-          {label}
-          {#if external}
-            <i class="fas fa-external-link-alt ml-2 text-xs opacity-70"></i>
-          {/if}
-        </a>
-      {/each}
-
-      <!-- Mobile Resources Menu -->
-      <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
-        <div class="text-gray-500 dark:text-white/70 text-sm font-medium px-4 mb-2">Resources</div>
-        {#each resourceItems as item}
+    <!-- Swipe hint -->
+    <div class="text-gray-400 dark:text-white/50 text-sm text-center py-2 border-b border-gray-200 dark:border-slate-700">
+      Swipe right to close
+    </div>
+    
+    <div class="flex-1 overflow-y-auto">
+      <div class="flex flex-col p-4 space-y-4">
+        {#each navItems as {href, label, external}}
           <a
-            href={item.href}
+            {href}
             class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
-            target={item.external ? '_blank' : undefined}
-            rel={item.external ? 'noopener noreferrer' : undefined}
+            class:selected={activeLink ? isActiveLink(href) : false}
+            target={external ? '_blank' : undefined}
+            rel={external ? 'noopener noreferrer' : undefined}
             on:click={() => {
+              activeLink = href;
               closeMenu();
             }}
           >
-            <i class="{item.icon} mr-2"></i>
-            {item.label}
+            {label}
+            {#if external}
+              <i class="fas fa-external-link-alt ml-2 text-xs opacity-70"></i>
+            {/if}
           </a>
         {/each}
-      </div>
 
-      <!-- Mobile Wallet Menu -->
-      <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
-        <div class="text-gray-500 dark:text-white/70 text-sm font-medium px-4 mb-2">Wallet Options</div>
-        {#each walletItems as item}
-          <a
-            href={item.href}
-            class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
-            on:click={() => {
-              closeMenu();
-            }}
-          >
-            <i class="{item.icon} mr-2"></i>
-            {item.label}
-          </a>
-        {/each}
-      </div>
+        <!-- Mobile Resources Menu -->
+        <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+          <div class="text-gray-500 dark:text-white/70 text-sm font-medium px-4 mb-2">Resources</div>
+          {#each resourceItems as item}
+            <a
+              href={item.href}
+              class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
+              on:click={() => {
+                closeMenu();
+              }}
+            >
+              <i class="{item.icon} mr-2"></i>
+              {item.label}
+            </a>
+          {/each}
+        </div>
 
-      <!-- Dark Mode Toggle -->
-      <div class="border-t border-gray-200 dark:border-slate-700 pt-4">
-        <div class="flex items-center justify-between px-4 py-2">
-          <span class="text-gray-700 dark:text-white text-lg">Dark Mode</span>
-          <DarkMode class="ml-3" on:change={handleDarkModeChange} />
+        <!-- Mobile Wallet Menu -->
+        <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+          <div class="text-gray-500 dark:text-white/70 text-sm font-medium px-4 mb-2">Wallet Options</div>
+          {#each walletItems as item}
+            <a
+              href={item.href}
+              class="text-gray-700 dark:text-white text-lg py-2 px-4 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center"
+              on:click={() => {
+                closeMenu();
+              }}
+            >
+              <i class="{item.icon} mr-2"></i>
+              {item.label}
+            </a>
+          {/each}
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <div class="border-t border-gray-200 dark:border-slate-700 pt-4">
+          <div class="flex items-center justify-between px-4 py-2">
+            <span class="text-gray-700 dark:text-white text-lg">Dark Mode</span>
+            <DarkMode class="ml-3" on:change={handleDarkModeChange} />
+          </div>
         </div>
       </div>
     </div>

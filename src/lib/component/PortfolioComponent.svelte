@@ -992,7 +992,7 @@
     </div>
 
     <!-- User's Account Info -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-6 relative">
         {#if isLoadingPortfolio}
             <div transition:fade={{ duration: 150 }}>
                 {@html LoadingOverlay({})}
@@ -1075,7 +1075,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="mt-4 md:mt-0 text-right">
+                <div class="mt-4 md:mt-0 text-right place-self-end">
                     {#if walletAddress && accountStatus}
                         <ConsensusDetails
                             {walletAddress}
@@ -1170,7 +1170,7 @@
     </div>
 
     <!-- LP Tokens Section -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-6 relative">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-4">
                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white">LP Tokens</h3>
@@ -1221,7 +1221,7 @@
     </div>
 
     <!-- Fungible Tokens Section -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-6 relative">
         <div class="flex flex-col space-y-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
@@ -1358,7 +1358,7 @@
     </div>
 
     {#if viewType === 'cards'}
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-6 relative">
             {#if isLoadingNFTs}
                 <div transition:fade={{ duration: 150 }}>
                     {@html LoadingOverlay({})}
