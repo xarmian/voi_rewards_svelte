@@ -5,7 +5,6 @@
     import SendTokenModal from './SendTokenModal.svelte';
     import OptOutModal from './OptOutModal.svelte';
     import TokenTransfersModal from './TokenTransfersModal.svelte';
-    import { onMount } from 'svelte';
     import { getEnvoiNames } from '$lib/utils/envoi';
     import { algodClient } from '$lib/utils/algod';
 
@@ -225,7 +224,7 @@
                             </div>
                         </div>
                     {:else}
-                        <p class="text-gray-600 dark:text-gray-300">
+                        <p class="text-gray-600 dark:text-gray-300" title={token.balance / Math.pow(10, token.decimals) + ' ' + token.symbol}>
                             Balance: {formatNumber(token.balance / Math.pow(10, token.decimals))} {token.symbol}
                         </p>
                         <p class="text-gray-600 dark:text-gray-300">

@@ -1242,7 +1242,7 @@
             {:else}
                 {#each fungibleTokens.filter(token => {
                     // Only show tokens with balance if showZeroBalances is false
-                    if (!showZeroBalances && token.balance <= 0) return false;
+                    if (!showZeroBalances && token.value <= 1) return false;
                     // Must be an LP token
                     if (!isLPToken(token)) return false;
                     // Get unique identifier based on token ID and provider
@@ -1369,7 +1369,7 @@
                     return !arr.slice(0, i).some(item => getUniqueId(item) === currentUniqueId);
                 }))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId}` : `arc200-${token.id}`)}
                     {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
-                    {#if showZeroBalances || (details ? (Number(details.amount) / Math.pow(10, details.decimals)) > 0.01 : (Number(token.balance) / Math.pow(10, token.decimals) > 0.01))}
+                    {#if showZeroBalances || (details ? (details?.value ? details?.value > 0.1 : details?.amount / Math.pow(10, details?.decimals || 0) > 0.01) : (token?.value ? token?.value > 0.1 : token?.balance / Math.pow(10, token?.decimals || 0) > 0.01))}
                         <div class="relative min-w-80">
                             <span class="absolute z-10 top-2 right-2 px-2 py-0.5 text-xs font-medium {details ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
                                 {details ? 'VSA' : 'ARC-200'}
