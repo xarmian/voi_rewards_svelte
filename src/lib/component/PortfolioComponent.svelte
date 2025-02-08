@@ -260,23 +260,9 @@
         }
     }
 
-    async function refreshLPTokens() {
-        isLoadingLPTokens = true;
-        try {
-            await fetchPoolData();
-            await Promise.all([
-                fetchFungibleTokens(),
-                fetchNomadexLPTokens()
-            ]);
-        } catch (error) {
-            console.error('Error refreshing LP tokens:', error);
-        } finally {
-            isLoadingLPTokens = false;
-        }
-    }
-
     async function refreshTokens() {
         isLoadingTokens = true;
+        isLoadingLPTokens = true;
         try {
             await fetchPoolData();
             await Promise.all([
@@ -287,6 +273,7 @@
             console.error('Error refreshing tokens:', error);
         } finally {
             isLoadingTokens = false;
+            isLoadingLPTokens = false;
         }
     }
 
@@ -305,7 +292,6 @@
         try {
             await Promise.all([
                 refreshPortfolio(),
-                //refreshLPTokens(),
                 refreshTokens(),
                 refreshNFTs()
             ]);
@@ -1238,7 +1224,7 @@
             <div class="flex items-center space-x-4">
                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white">LP Tokens</h3>
                 <button
-                    on:click={refreshLPTokens}
+                    on:click={refreshTokens}
                     class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
                     disabled={isLoadingLPTokens}
                     title="Refresh LP tokens"
