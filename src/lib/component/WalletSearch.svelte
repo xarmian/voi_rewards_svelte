@@ -2,7 +2,7 @@
 	/*
         A Svelte component containing an input field and submit button.
 
-        When text is entered into the input field, if the text contains a period, a search is performed to look for an NFDomain. If an NFDomain match is found, a listing of unverified addresses attached to that NFDomain is shown below the input box as an “autocomplete”, and a user is able to select one of the addresses.
+        When text is entered into the input field, if the text contains a period, a search is performed to look for an NFDomain. If an NFDomain match is found, a listing of unverified addresses attached to that NFDomain is shown below the input box as an "autocomplete", and a user is able to select one of the addresses.
 
         IF the user selects one of the addresses from the NFDomain, enters a full wallet address and presses enter, or clicks the submit button THEN open the page /wallet/[ADDRESS] where [ADDRESS] is the selected address in the input component.
 
@@ -203,11 +203,11 @@
                                     <img 
                                         src={result.metadata.avatar} 
                                         alt={`${result.name} avatar`}
-                                        class="w-8 h-8 rounded-full object-cover"
+                                        class="w-8 h-8 rounded-full object-cover object-center flex-shrink-0"
                                     />
                                 {:else}
                                     <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                                        <span class="text-gray-600 dark:text-gray-300 text-sm">
+                                        <span class="text-gray-600 dark:text-gray-300 text-sm w-8 h-8 flex items-center justify-center">
                                             {result.name.charAt(0).toUpperCase()}
                                         </span>
                                     </div>

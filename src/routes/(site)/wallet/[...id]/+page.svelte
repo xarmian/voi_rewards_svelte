@@ -20,6 +20,9 @@
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
     import { voiPrice } from '$lib/stores/price';
+    import { slide } from 'svelte/transition';
+    import { quintOut } from 'svelte/easing';
+    import WalletSearch from '$lib/component/WalletSearch.svelte';
     
     export let data: {
         walletId: string;
@@ -55,6 +58,7 @@
     }
 
     let isDropdownOpen = false;
+    let isSearchOpen = (data.walletId && data.walletId.length > 0) ? false : true;
 
     function toggleDropdown() {
       isDropdownOpen = !isDropdownOpen;
@@ -66,6 +70,11 @@
         isDropdownOpen = false;
       }
       event.stopPropagation();
+    }
+
+    function handleSearchSubmit(address: string) {
+      goto(`/wallet/${address}`, { invalidateAll: true });
+      isSearchOpen = false;
     }
 
     onMount(() => {
@@ -309,20 +318,31 @@
     <!-- Mobile Header -->
     <div class="md:hidden flex-shrink-0 flex flex-col p-4 bg-gray-100 dark:bg-gray-800 relative z-30">
         <div class="flex items-center justify-between mb-4">
-            <button
-                class="text-gray-600 dark:text-gray-200"
-                on:click={toggleMobileMenu}
-                aria-label="Toggle menu"
-            >
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path 
-                        stroke-linecap="round" 
-                        stroke-linejoin="round" 
-                        stroke-width="2" 
-                        d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
-                    />
-                </svg>
-            </button>
+            <div class="flex items-center gap-2">
+                <button
+                    class="text-gray-600 dark:text-gray-200"
+                    on:click={toggleMobileMenu}
+                    aria-label="Toggle menu"
+                >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path 
+                            stroke-linecap="round" 
+                            stroke-linejoin="round" 
+                            stroke-width="2" 
+                            d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+                        />
+                    </svg>
+                </button>
+                <button
+                    class="p-2 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                    on:click={() => isSearchOpen = !isSearchOpen}
+                    aria-label="Toggle search"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+            </div>
             <Web3Wallet
                 availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
                 showAuthButtons={false}
@@ -341,6 +361,16 @@
                 modalType="dropdown"
             />
         </div>
+
+        {#if isSearchOpen}
+            <div class="mb-4" transition:slide|local={{ duration: 300, easing: quintOut }}>
+                <WalletSearch 
+                    onSubmit={handleSearchSubmit}
+                    hideSubmitButton={true}
+                    clearOnSubmit={true}
+                />
+            </div>
+        {/if}
 
         {#if childAccounts.length > 0 && primaryAccountInfo}
             <div class="relative w-full" id="mobile-account-dropdown">
@@ -504,6 +534,27 @@
     
     <main class="flex-1 bg-white dark:bg-gray-900">
         <div class="top-0 z-10 hidden md:flex w-full items-center justify-end p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+          <!-- Left side: Search -->
+          <div class="flex-1 flex items-center">
+            {#if isSearchOpen}
+              <div class="w-96" transition:slide|local={{ duration: 300, easing: quintOut }}>
+                <WalletSearch 
+                  onSubmit={handleSearchSubmit}
+                  hideSubmitButton={true}
+                  clearOnSubmit={true}
+                />
+              </div>
+            {/if}
+            <button
+              class="p-2 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+              on:click={() => isSearchOpen = !isSearchOpen}
+              aria-label="Toggle search"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          </div>
 
           <!-- Right side: Wallet controls -->
           <div class="flex items-center space-x-3">
@@ -674,7 +725,7 @@
                 {#if activeSection === 'calculator'}
                     <CalculatorComponent />
                 {:else}
-                    <p class="text-gray-600">Please connect a wallet to view account information.</p>
+                    <p class="text-gray-600">Please connect a wallet or use the search bar to view account information.</p>
                 {/if}
             {/if}
         </div>
