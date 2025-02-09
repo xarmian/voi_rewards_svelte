@@ -1352,7 +1352,7 @@
                 {#each sortTokens(filterTokens([
                     ...asaTokens.map(t => ({ ...t, tokenType: 'vsa' as const })),
                     ...fungibleTokens
-                        .filter(t => !isLPToken(t) && t.verified)
+                        .filter(t => !isLPToken(t) && t.balance > 0)
                         .map(t => ({ ...t, tokenType: 'arc200' as const }))
                 ].filter((t, i, arr) => {
                     // Get unique identifier based on token type and ID
