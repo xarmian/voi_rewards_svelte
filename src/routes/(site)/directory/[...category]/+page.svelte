@@ -68,7 +68,7 @@
   }
 </script>
 
-  <div class="flex flex-col md:flex-row items-center mt-4 mb-4 justify-between">
+  <div class="flex flex-col md:flex-row items-center pt-4 mb-4 justify-between">
     <span> </span>
     <h1 class="text-5xl font-bold text-center mb-4">Voi Directory</h1>
     <div class="text-center md:self-start">
