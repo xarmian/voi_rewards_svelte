@@ -240,17 +240,7 @@
         const target = e.target as HTMLDivElement;
         const bottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
         
-        console.log('Scroll event triggered', {
-            scrollHeight: target.scrollHeight,
-            scrollTop: target.scrollTop,
-            clientHeight: target.clientHeight,
-            bottom,
-            isLoading,
-            hasMore
-        });
-        
         if (bottom && !isLoading && hasMore) {
-            console.log('Loading more transfers', { type: token.type, offset, nextToken });
             if (token.type === 'arc200') {
                 offset += limit;
             }
