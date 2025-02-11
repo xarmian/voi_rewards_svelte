@@ -44,6 +44,7 @@
     let sortDirection: 'asc' | 'desc' = 'asc';
     let accountBalance = 0;
     let accountCreationDate: string | null = null;
+    let accountCreationDateDays: number | null = null;
     let accountStatus: string = 'Unknown';
     let minBalance: number = 0;
     let pendingRewards: number = 0;
@@ -388,7 +389,8 @@
 
             const block = await algodIndexer.lookupBlock(accountIndexerInfo.account['created-at-round']).do();
             accountCreationDate = new Date(block.timestamp * 1000).toLocaleDateString();
-
+            accountCreationDateDays = Math.floor((new Date().getTime() - new Date(accountCreationDate).getTime()) / (1000 * 60 * 60 * 24));
+            
             // Fetch Envoi name
             try {
                 const envoiResults = await getEnvoiNames([walletAddress]);
@@ -1180,7 +1182,7 @@
                         {#if accountCreationDate}
                             <div class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
                                 <span class="text-gray-600 dark:text-gray-300">Account Created</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{accountCreationDate}</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">{accountCreationDate} ({accountCreationDateDays} days ago)</span>
                             </div>
                         {/if}
                     </div>

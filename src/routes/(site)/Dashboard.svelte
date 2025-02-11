@@ -6,6 +6,7 @@
 	import RewardsTable from './RewardsTable.svelte';
 	import MiniStakeChart from '$lib/components/MiniStakeChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
+	import NFTGamesAd from '$lib/component/NFTGamesAd.svelte';
 	import { goto } from '$app/navigation';
 	import { getSupplyInfo, onlineStakeStore } from '$lib/stores/accounts';
 	import type { SupplyInfo } from '$lib/stores/accounts';
@@ -190,7 +191,7 @@
 
 	<!-- Hero Section -->
 	<div class="relative">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:pt-20">
 			<div class="text-center">
 				<h1 class="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-6">
 					Welcome to Voi Network
@@ -203,6 +204,11 @@
 				</div>
 			</div>
 		</div>
+	</div>
+
+	<!-- NFT Games Ad Banner -->
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+		<NFTGamesAd />
 	</div>
 
 	{#if isLoading}

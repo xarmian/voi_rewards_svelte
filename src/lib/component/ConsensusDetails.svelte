@@ -27,6 +27,7 @@
     let voteTimeInterval: ReturnType<typeof setInterval> | null = null;
     let consensusUpdateInterval: ReturnType<typeof setInterval> | null = null;
     let initialUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+    let lastWalletAddress: string | undefined;
 
     interface ConsensusThreshold {
         minBalance: number;
@@ -124,15 +125,16 @@
     }
 
     // Watch for changes in walletAddress - single update when wallet changes
-    $: if (walletAddress && accountStatus === 'Online') {
+    $: if (walletAddress && accountStatus === 'Online' && walletAddress !== lastWalletAddress) {
         updateConsensusDetails();
+        lastWalletAddress = walletAddress;
     }
 
     onMount(() => {
-        // Initial single update on mount
+        /*// Initial single update on mount
         if (accountStatus === 'Online' && walletAddress) {
             updateConsensusDetails();
-        }
+        }*/
 
         // Update time since last vote every second, but only update health if we have consensus details
         voteTimeInterval = setInterval(() => {
