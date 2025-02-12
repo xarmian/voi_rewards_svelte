@@ -69,9 +69,10 @@
                 if (!epochData) return null;
 
                 const communityBlocks = epochData.total_blocks ?? 0;
-                const totalBlocksProduced = Math.round(communityBlocks + (Math.min(epochData.ballast_blocks ?? 0, communityBlocks) / 3));
+                const totalBlocksProduced = Math.round(communityBlocks + (Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)));
                 const userBlocksProduced = epochData.proposers[walletAddress] ?? 0;
                 const tokens = await getTokensByEpoch(date.epoch);
+                console.log(tokens, userBlocksProduced, totalBlocksProduced, communityBlocks);
                 const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
 
                 return {
