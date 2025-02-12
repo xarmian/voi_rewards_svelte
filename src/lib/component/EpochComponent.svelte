@@ -129,9 +129,9 @@
         paginatedData = mergedData.slice(startIndex, endIndex);
     };
 
-    // Add reactive statement for pagination
+    // Add reactive statement for pagination and currentPage changes
     $: {
-        if (mergedData.length > 0) {
+        if (mergedData.length > 0 || currentPage) {
             updatePagination();
         }
     }
@@ -166,7 +166,7 @@
                 </div>
                 <EpochTable 
                     {mergedData}
-                    {currentPage}
+                    bind:currentPage
                     {totalPages}
                     {paginatedData}
                     {dataLastUpdated}
