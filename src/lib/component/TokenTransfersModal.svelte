@@ -41,6 +41,7 @@
     let toAddress = '';
     let note = '';
     let showMobileFilters = false;
+    let showFeeTransactions = false;
 
     function toggleRow(transactionId: string) {
         if (expandedRows.has(transactionId)) {
@@ -87,20 +88,6 @@
                 txns.transactions.forEach((tx: any) => {
                     const transfers: Transfer[] = [];
 
-                    // Always add fee transfer if this address is the sender, regardless of transaction type
-                    if (tx.sender === walletId && tx.fee > 0) {
-                        transfers.push({
-                            from: tx.sender,
-                            to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
-                            amount: (tx.fee / Math.pow(10, token.decimals)).toString(),
-                            round: tx['confirmed-round'],
-                            transactionid: tx.id,
-                            timestamp: tx['round-time'],
-                            note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
-                            type: 'fee'
-                        });
-                    }
-
                     // Handle different transaction types that affect VOI balance
                     if (tx['tx-type'] === 'pay') {
                         // Regular payment transaction
@@ -114,6 +101,18 @@
                             note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
                             type: 'payment',
                             fee: tx.fee
+                        });
+                    } else if (tx.sender === walletId && tx.fee > 0 && tx['tx-type'] !== 'pay') {
+                        // Only add standalone fee transfer if this is not a payment transaction
+                        transfers.push({
+                            from: tx.sender,
+                            to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
+                            amount: (tx.fee / Math.pow(10, token.decimals)).toString(),
+                            round: tx['confirmed-round'],
+                            transactionid: tx.id,
+                            timestamp: tx['round-time'],
+                            note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+                            type: 'fee'
                         });
                     }
 
@@ -224,6 +223,11 @@
 
     function applyFilters() {
         filteredTransfers = transfers.filter(transfer => {
+            // First apply fee transaction filter
+            if (!showFeeTransactions && transfer.type === 'fee') {
+                return false;
+            }
+
             const matchesFromAddress = !fromAddress || 
                 transfer.from.toLowerCase().includes(fromAddress.toLowerCase()) ||
                 transfer.from_name?.toLowerCase().includes(fromAddress.toLowerCase());
@@ -305,6 +309,7 @@
         fromAddress;
         toAddress;
         note;
+        showFeeTransactions;
         applyFilters();
     }
 </script>
@@ -333,7 +338,7 @@
         <!-- Filters Section -->
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
             <!-- Desktop Filters -->
-            <div class="hidden md:grid grid-cols-3 gap-4">
+            <div class="hidden md:grid grid-cols-{token.type === 'native' ? '4' : '3'} gap-4">
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">From Address</label>
                     <input
@@ -361,6 +366,20 @@
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                     />
                 </div>
+                {#if token.type === 'native'}
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Show Fee Transactions</label>
+                        <div class="flex items-center">
+                            <button
+                                class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md w-full text-left flex justify-between items-center {showFeeTransactions ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : 'bg-gray-50 dark:bg-gray-700/50'}"
+                                on:click={() => showFeeTransactions = !showFeeTransactions}
+                            >
+                                <span class="text-sm text-gray-700 dark:text-gray-300">{showFeeTransactions ? 'Showing' : 'Hidden'}</span>
+                                <i class="fas fa-toggle-{showFeeTransactions ? 'on text-blue-500' : 'off text-gray-400'}"></i>
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             </div>
 
             <!-- Mobile Filters -->
@@ -402,6 +421,15 @@
                             />
                             <i class="fas fa-note-sticky absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         </div>
+                        {#if token.type === 'native'}
+                            <button
+                                class="w-full px-4 py-2 text-left text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-md flex justify-between items-center {showFeeTransactions ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : 'bg-gray-50 dark:bg-gray-700/50'}"
+                                on:click={() => showFeeTransactions = !showFeeTransactions}
+                            >
+                                <span class="text-gray-700 dark:text-gray-300">Show Fee Transactions</span>
+                                <i class="fas fa-toggle-{showFeeTransactions ? 'on text-blue-500' : 'off text-gray-400'}"></i>
+                            </button>
+                        {/if}
                     </div>
                 {/if}
             </div>
@@ -450,7 +478,7 @@
                                                 <span class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                     {formatChange(transfer)} {token.symbol}
                                                 </span>
-                                                {#if token.type === 'native' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
+                                                {#if token.type === 'native' && transfer.type === 'payment' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
                                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                                         -{(transfer.fee / Math.pow(10, token.decimals)).toFixed(token.decimals)} {token.symbol} fee
                                                     </div>
@@ -565,7 +593,7 @@
                                             <span class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                 {formatChange(transfer)} {token.symbol}
                                             </span>
-                                                {#if token.type === 'native' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
+                                                {#if token.type === 'native' && transfer.type === 'payment' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
                                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                                         -{(transfer.fee / Math.pow(10, token.decimals)).toFixed(token.decimals)} {token.symbol} fee
                                                     </div>

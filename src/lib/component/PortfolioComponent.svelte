@@ -390,7 +390,7 @@
             const block = await algodIndexer.lookupBlock(accountIndexerInfo.account['created-at-round']).do();
             accountCreationDate = new Date(block.timestamp * 1000).toLocaleDateString();
             accountCreationDateDays = Math.floor((new Date().getTime() - new Date(accountCreationDate).getTime()) / (1000 * 60 * 60 * 24));
-            
+
             // Fetch Envoi name
             try {
                 const envoiResults = await getEnvoiNames([walletAddress]);
@@ -419,7 +419,7 @@
                     if (!epochData) return null;
 
                     const communityBlocks = epochData.total_blocks ?? 0;
-                    const totalBlocksProduced = Math.round(communityBlocks + (Math.min(epochData.ballast_blocks ?? 0, communityBlocks) / 3));
+                    const totalBlocksProduced = Math.round(communityBlocks + (Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)));
                     const userBlocksProduced = epochData.proposers[walletAddress] ?? 0;
                     const tokens = await getTokensByEpoch(date.epoch);
                     const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
@@ -435,7 +435,7 @@
                 });
 
                 epochData = (await Promise.all(epochPromises)).filter((data): data is NonNullable<typeof data> => data !== null);
-                
+
                 // Calculate current epoch rewards
                 const now = new Date();
                 const currentEpoch = epochData.find(epoch => 
@@ -1199,7 +1199,7 @@
                             </span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600 dark:text-gray-300">Current Epoch</span>
+                            <span class="text-gray-600 dark:text-gray-300">Current Epoch (estimate)</span>
                             <span class="text-sm text-gray-900 dark:text-white">
                                 {(pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
                             </span>
