@@ -227,9 +227,13 @@
 </div>
 <style lang="postcss">
     ul {
-        @apply bg-white dark:bg-gray-800;
+        @apply bg-white;
         scrollbar-width: thin;
         scrollbar-color: theme('colors.gray.400') theme('colors.gray.200');
+    }
+
+    :global(.dark) ul {
+        @apply bg-gray-800;
     }
 
     ul::-webkit-scrollbar {
@@ -237,15 +241,27 @@
     }
 
     ul::-webkit-scrollbar-track {
-        @apply bg-gray-200 dark:bg-gray-700 rounded-r-lg;
+        @apply bg-gray-200 rounded-r-lg;
+    }
+
+    :global(.dark) ul::-webkit-scrollbar-track {
+        @apply bg-gray-700;
     }
 
     ul::-webkit-scrollbar-thumb {
-        @apply bg-gray-400 dark:bg-gray-500 rounded-full;
+        @apply bg-gray-400 rounded-full;
+    }
+
+    :global(.dark) ul::-webkit-scrollbar-thumb {
+        @apply bg-gray-500;
     }
 
     li {
-        @apply border-b border-gray-200 dark:border-gray-700;
+        @apply border-b border-gray-200;
+    }
+
+    :global(.dark) li {
+        @apply border-gray-700;
     }
 
     li:last-child {
@@ -253,10 +269,18 @@
     }
 
     button {
-        @apply text-gray-900 dark:text-white;
+        @apply text-gray-900;
+    }
+
+    :global(.dark) button {
+        @apply text-white;
     }
 
     .selected {
-        @apply bg-gray-300 dark:bg-gray-700;
+        @apply bg-gray-300;
+    }
+
+    :global(.dark) .selected {
+        @apply bg-gray-700;
     }
 </style>

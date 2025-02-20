@@ -368,6 +368,7 @@
                     onSubmit={handleSearchSubmit}
                     hideSubmitButton={true}
                     clearOnSubmit={true}
+                    loadPreviousValue={false}
                 />
             </div>
         {/if}
@@ -542,6 +543,7 @@
                   onSubmit={handleSearchSubmit}
                   hideSubmitButton={true}
                   clearOnSubmit={true}
+                  loadPreviousValue={false}
                 />
               </div>
             {/if}

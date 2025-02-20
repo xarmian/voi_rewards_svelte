@@ -367,7 +367,7 @@
                 <span class="text-gray-400">|</span>
                 <button
                     class="flex flex-col items-center group {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
-                    on:click={() => showSendModal = true}
+                    on:click={() => canSignTransactions ? showSendModal = true : null}
                     aria-label="Send token"
                     title={canSignTransactions ? 'Send token' : 'Connect wallet to send token'}
                 >

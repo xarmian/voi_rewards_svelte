@@ -54,7 +54,7 @@
 	class="block w-full overflow-hidden bg-gradient-to-r from-blue-900 via-purple-900 to-blue-900 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-200 my-4"
 >
 	<div class="relative px-6 py-4 text-white">
-		<div class="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10"></div>
+		<div class="absolute inset-0 opacity-10"></div>
 		
 		<div class="relative flex flex-col sm:flex-row items-center justify-between gap-4">
 			<div class="flex-1">
