@@ -87,8 +87,12 @@
     function formatNumber(value: number | undefined, decimals: number = 6): string {
         if (value === undefined || !isFinite(value)) return '0';
 
-        if (BigInt(value) >= BigInt(10_000_000_000_000_000_000_000_000_000_000)) {
-            return 'Unlimited';
+        try {
+            if (BigInt(value) >= BigInt(10_000_000_000_000_000_000_000_000_000_000)) {
+                return 'Unlimited';
+            }
+        } catch (err) {
+            // silent fail
         }
 
         return value.toLocaleString('en-US', {
