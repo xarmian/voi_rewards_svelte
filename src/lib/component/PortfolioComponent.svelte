@@ -461,6 +461,19 @@
         }
     }
 
+    function formatNumber(value: number | undefined, decimals: number = 6): string {
+        if (value === undefined || !isFinite(value)) return '0';
+
+        if (BigInt(value) >= BigInt(10_000_000_000_000_000_000_000_000_000_000)) {
+            return 'Unlimited';
+        }
+
+        return value.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: decimals
+        });
+    }
+
     async function fetchSalesHistory(contractId: string, tokenId: string) {
         try {
             const response = await fetch(
@@ -1037,8 +1050,8 @@
         </div>
         <div class="text-right">
             <p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white">{totalValue.toLocaleString()} VOI</p>
-            <p class="text-sm font-bold text-gray-900 dark:text-white">${(totalValue * $voiPrice.price).toLocaleString()} USD</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(totalValue)} VOI</p>
+            <p class="text-sm font-bold text-gray-900 dark:text-white">${formatNumber(totalValue * $voiPrice.price)} USD</p>
         </div>
     </div>
 
