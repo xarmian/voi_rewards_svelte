@@ -154,7 +154,7 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
       high_24h: parseFloat(mexcData.highPrice),
       low_24h: parseFloat(mexcData.lowPrice),
       price_change_24h: parseFloat(mexcData.priceChange),
-      price_change_percentage_24h: parseFloat(mexcData.priceChangePercent)
+      price_change_percentage_24h: parseFloat(mexcData.priceChangePercent) * 100
     };
   } catch (error) {
     console.error('Error fetching MEXC data:', error);
