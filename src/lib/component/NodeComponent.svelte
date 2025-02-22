@@ -6,11 +6,14 @@
     import { onMount } from 'svelte';
     import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
     import { dataTable } from '../../stores/dataTable';
-
+    import RegisterVoteKey from './RegisterVoteKey.svelte';
+    
     export let walletId: string;
-
+    export let parentWalletId: string | null;
+    export let contractId: number | null;
     let accountInfo: any;
     let supply: any;
+    let showRegisterVoteKey = false;
     $: estimatedBlocks = 0;
     $: balance = 0;
     $: apiData = {} as any;
@@ -138,6 +141,16 @@
     }
 </script>
 
+<div class="flex items-center justify-between">
+    <h2 class="text-xl md:text-2xl font-bold mb-4">Consensus</h2>
+    <button
+        on:click={() => showRegisterVoteKey = true}
+        class="text-sm px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
+    >
+        <i class="fas fa-key text-xs"></i>
+        <span>{accountInfo?.status === 'Online' ? 'Update' : 'Register'} Participation Key</span>
+    </button>
+</div>
 <div class='grid grid-cols-1 md:grid-cols-2 gap-6 w-full'>
     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
         <div class="p-6">
@@ -247,7 +260,14 @@
         </div>
     {/if}
 </div>
-
+{#if showRegisterVoteKey}
+    <RegisterVoteKey 
+        walletAddress={walletId} 
+        parentWalletAddress={parentWalletId}
+        contractId={contractId}
+        bind:showModal={showRegisterVoteKey} 
+    />
+{/if}
 <style>
 </style>
 

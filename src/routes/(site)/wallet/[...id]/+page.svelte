@@ -137,6 +137,7 @@
       estimatedRewardsPerDay: number;
       estimatedRewardsPerWeek: number;
       estimatedRewardsPerMonth: number;
+      contractId: number;
     }
 
     let primaryAccountInfo: Account | null = null;
@@ -223,7 +224,8 @@
           expectedBlocksPerMonth,
           estimatedRewardsPerDay: weeklyReward / 7,
           estimatedRewardsPerWeek: weeklyReward,
-          estimatedRewardsPerMonth: monthlyReward
+          estimatedRewardsPerMonth: monthlyReward,
+          contractId: 0
         };
 
         if (browser) {
@@ -256,6 +258,7 @@
           const childExpectedBlocksPerDay = blocksPerDay * childShareOfTotalStake;
 
           childAccounts = [...childAccounts, {
+            contractId: account.contractId,
             address: account.contractAddress,
             isParticipating: childAccountInfo?.status === 'Online',
             balance: childBalance / 1e6,
@@ -711,8 +714,7 @@
                         {/if}
                     </div>
                 {:else if activeSection === 'consensus'}
-                    <h2 class="text-xl md:text-2xl font-bold mb-4">Consensus</h2>
-                    <NodeComponent walletId={walletId} />
+                    <NodeComponent walletId={walletId} parentWalletId={parentWalletId ?? null} contractId={childAccounts.find(account => account.address === walletId)?.contractId ?? null} />
                 {:else if activeSection === 'proposals'}
                     <ProposalsComponent walletId={walletId} />
                 {:else if activeSection === 'calculator'}
