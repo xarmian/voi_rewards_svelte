@@ -8,11 +8,17 @@
     import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
     import OneClickInstructions from './node-instructions/OneClickInstructions.svelte';
     import FuncInstructions from './node-instructions/FuncInstructions.svelte';
+    import { goto } from '$app/navigation';
+    import { createEventDispatcher } from 'svelte';
+
+    const dispatch = createEventDispatcher();
 
     export let walletAddress: string;
     export let parentWalletAddress: string | null;
     export let contractId: number | null;
     export let showModal = true;
+    export let isOnline = false;
+    export let onSuccess: (forceRefresh?: boolean) => void;
     
     type NodeType = 'voi-swarm' | 'one-click' | 'func' | 'other';
 
@@ -48,7 +54,7 @@
             description: 'Simple one-click installation for Voi nodes'
         },
         'func': {
-            title: 'Func Node',
+            title: 'Funk\'s Ultimate Node Controller (FUNC)',
             description: 'Node with web management interface'
         },
         'other': {
@@ -149,7 +155,6 @@
             console.log('Account is a staking contract');
             registerStakingContractVoteKey();
         }
-
     }
 
     async function registerStakingContractVoteKey() {
@@ -236,6 +241,7 @@
             if (result) {
                 transactionStatus = 'success';
                 transactionId = txid;
+                onSuccess?.(true);
             }
             else {
                 error = 'Failed to register vote key';
@@ -275,10 +281,142 @@
                 transactionStatus = 'confirming';
                 await algosdk.waitForConfirmation(algodClient, signedTxns[0], 4);
                 transactionStatus = 'success';
+                onSuccess?.(true);
             }
         } catch (err) {
             console.error('Error registering vote key:', err);
             error = err instanceof Error ? err.message : 'Failed to register vote key';
+            transactionStatus = 'idle';
+        }
+    }
+
+    async function goOfflineWalletVoteKey() {
+        error = null;
+        try {
+            transactionStatus = 'building';
+            const params = await algodClient.getTransactionParams().do();
+            params.fee = 1000;
+
+            // For going offline, we use a key registration transaction with nonParticipation set to true
+            const tx = algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
+                from: walletAddress,
+                nonParticipation: true,
+                suggestedParams: params
+            });
+
+            const txid = tx.txID();
+
+            transactionStatus = 'signing';
+            const signedTxns = await signAndSendTransactions([[tx]]);
+            
+            if (signedTxns && Array.isArray(signedTxns) && signedTxns.length > 0) {
+                transactionId = txid;
+                transactionStatus = 'confirming';
+                await algosdk.waitForConfirmation(algodClient, signedTxns[0], 4);
+                transactionStatus = 'success';
+                onSuccess?.(true);
+            }
+        } catch (err) {
+            console.error('Error going offline:', err);
+            error = err instanceof Error ? err.message : 'Failed to go offline';
+            transactionStatus = 'idle';
+        }
+    }
+
+    async function goOfflineStakingContractVoteKey() {
+        error = null;
+        console.log('Going offline for staking contract');
+
+        if (!parentWalletAddress || !contractId) {
+            error = 'Missing parent wallet address or contract ID';
+            return;
+        }
+
+        try {
+            transactionStatus = 'building';
+            const ctcInfo = Number(contractId);
+
+            const schema = {
+                name: "Participate",
+                desc: "Participate in the staking contract",
+                methods: [
+                    {
+                        name: "participate",
+                        desc: "",
+                        args: [
+                            { name: "votekey", type: "byte[32]" },
+                            { name: "selkey", type: "byte[32]" },
+                            { name: "votefst", type: "uint64" },
+                            { name: "votelst", type: "uint64" },
+                            { name: "votekd", type: "uint64" },
+                            { name: "spkey", type: "byte[64]" },
+                        ],
+                        returns: { type: "void" },
+                    },
+                ],
+                events: [],
+            };
+
+            const builder = {
+                wnt: new CONTRACT(
+                ctcInfo,
+                algodClient,
+                null,
+                schema,
+                {
+                    addr: parentWalletAddress,
+                    sk: new Uint8Array(0),
+                },
+                true,
+                false,
+                true
+                ),
+            };
+
+            const ci = new CONTRACT(ctcInfo, algodClient, null, abi.custom, {
+                addr: parentWalletAddress,
+                sk: new Uint8Array(0),
+            });
+
+            const txnO = {
+                ...(
+                await builder.wnt.participate(
+                    new Uint8Array(32),  // Empty voting key
+                    new Uint8Array(32),  // Empty selection key
+                    0,                   // First round
+                    0,                   // Last round
+                    0,                   // Key dilution
+                    new Uint8Array(64),  // Empty state proof key
+                )
+                ).obj,
+                payment: 1000,
+            };
+
+            ci.setFee(1000);
+            ci.setEnableGroupResourceSharing(true);
+            ci.setExtraTxns([txnO]);
+            const customR = await ci.custom();
+
+            transactionStatus = 'signing';
+            const txns: algosdk.Transaction[] = customR.txns.map((txn: string) => algosdk.decodeUnsignedTransaction(new Uint8Array(Buffer.from(txn, 'base64'))));
+
+            const txid = txns[1].txID();
+
+            transactionStatus = 'submitting';
+            
+            const result = await signAndSendTransactions([txns]);
+            if (result) {
+                transactionStatus = 'success';
+                transactionId = txid;
+                onSuccess?.(true);
+            }
+            else {
+                error = 'Failed to go offline';
+                transactionStatus = 'idle';
+            }
+        } catch (err) {
+            console.error('Error going offline:', err);
+            error = err instanceof Error ? err.message : 'Failed to go offline';
             transactionStatus = 'idle';
         }
     }
@@ -549,6 +687,22 @@
                     <i class="fas fa-check"></i>
                     <span>Register Key</span>
                 </button>
+                {#if isOnline}
+                    <button
+                        on:click={() => {
+                            if (parentWalletAddress === null) {
+                                goOfflineWalletVoteKey();
+                            } else {
+                                goOfflineStakingContractVoteKey();
+                            }
+                        }}
+                        class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={transactionStatus !== 'idle' && transactionStatus !== 'success'}
+                    >
+                        <i class="fas fa-power-off"></i>
+                        <span>Go Offline</span>
+                    </button>
+                {/if}
             </div>
         </div>
     </div>

@@ -152,12 +152,12 @@ export async function getConsensusInfo(address: string, forceRefresh: boolean = 
 }
 
 // Account Information fetching with cache
-export async function getAccountInfo(address: string): Promise<algosdk.modelsv2.Account | undefined> {
+export async function getAccountInfo(address: string, forceRefresh: boolean = false): Promise<algosdk.modelsv2.Account | undefined> {
     if (!address) return;
 
     const info = get(accountInfo);
 
-    if (info[address]) return info[address];
+    if (info[address] && !forceRefresh) return info[address];
 
     try {
         const data = await algodClient.accountInformation(address).do() as algosdk.modelsv2.Account;

@@ -43,10 +43,12 @@
     onMount(async () => {
     });
 
-    async function fetchNodeData() {
+    async function fetchNodeData(forceRefresh: boolean = false) {
+        console.log('fetchNodeData');
         loading = true;
         try {
             supply = await getSupplyInfo();
+            console.log('supply', supply);
             
             // Get latest epoch data
             const dates = await dataTable.fetchDateRanges();
@@ -66,10 +68,10 @@
                 rewardStake = communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
             }
 
-            // Get account information
-            accountInfo = await getAccountInfo(walletId);
+            // Get account information with force refresh option
+            accountInfo = await getAccountInfo(walletId, forceRefresh);
             balance = Number(accountInfo?.amount ?? 0);
-            apiData = await getConsensusInfo(walletId);
+            apiData = await getConsensusInfo(walletId, forceRefresh);
             
             averageBlockTime = calculateAverageBlockTime();
             expectedBlocksPerDay = calculateExpectedBlocks(1);
@@ -176,7 +178,7 @@
                 </div>
             {:else}
                 <div class="space-y-3">
-                    {#if typeof apiData?.total_blocks == 'undefined' || !supply || !apiData?.first_block}
+                    {#if typeof apiData?.total_blocks == 'undefined' || !supply}
                         <div class="flex justify-center items-center h-24">
                             <Spinner size="16" />
                         </div>
@@ -262,6 +264,16 @@
                 </div>
             </div>
         </div>
+    {:else}
+        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
+            <div class="p-6">
+                <div class="space-y-3">
+                    <p class="text-gray-600 dark:text-gray-400">
+                        NOTE: This account is not currently participating in the consensus. Register a participation key to begin participating.
+                    </p>
+                </div>
+            </div>
+        </div>
     {/if}
 </div>
 {#if showRegisterVoteKey}
@@ -269,7 +281,9 @@
         walletAddress={walletId} 
         parentWalletAddress={parentWalletId}
         contractId={contractId}
-        bind:showModal={showRegisterVoteKey} 
+        isOnline={accountInfo?.status === 'Online'}
+        bind:showModal={showRegisterVoteKey}
+        onSuccess={fetchNodeData}
     />
 {/if}
 <style>
