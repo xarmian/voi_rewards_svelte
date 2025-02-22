@@ -7,10 +7,12 @@
     import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
     import { dataTable } from '../../stores/dataTable';
     import RegisterVoteKey from './RegisterVoteKey.svelte';
+    import { selectedWallet } from 'avm-wallet-svelte';
     
     export let walletId: string;
     export let parentWalletId: string | null;
     export let contractId: number | null;
+
     let accountInfo: any;
     let supply: any;
     let showRegisterVoteKey = false;
@@ -143,13 +145,15 @@
 
 <div class="flex items-center justify-between">
     <h2 class="text-xl md:text-2xl font-bold mb-4">Consensus</h2>
-    <button
-        on:click={() => showRegisterVoteKey = true}
+    {#if $selectedWallet?.app !== 'Watch' && $selectedWallet?.app !== '' && ($selectedWallet?.address === walletId || $selectedWallet?.address === parentWalletId)}
+        <button
+            on:click={() => showRegisterVoteKey = true}
         class="text-sm px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
     >
         <i class="fas fa-key text-xs"></i>
-        <span>{accountInfo?.status === 'Online' ? 'Update' : 'Register'} Participation Key</span>
-    </button>
+            <span>{accountInfo?.status === 'Online' ? 'Update' : 'Register'} Participation Key</span>
+        </button>
+    {/if}
 </div>
 <div class='grid grid-cols-1 md:grid-cols-2 gap-6 w-full'>
     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
