@@ -599,6 +599,7 @@
                         id: tokenId,
                         poolId: pool.contractId.toString(),
                         value: Number(pool.tvl * (Number(token.balance / Math.pow(10, token.decimals)) / Number(pool.supply))),
+                        type: 'arc200',
                         poolInfo: {
                             tokAId: pool.tokAId,
                             tokBId: pool.tokBId,
@@ -878,6 +879,7 @@
                     id: pool.id,
                     poolId: String(pool.id),
                     value: lpt / issuedLpt * tvl / Math.pow(10, 6),
+                    type: 'arc200',
                     poolInfo: {
                         tokAId: pool.alphaId,
                         tokBId: pool.betaId,

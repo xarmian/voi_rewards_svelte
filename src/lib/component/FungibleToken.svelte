@@ -383,15 +383,15 @@
                     <i class="fa-solid fa-paper-plane text-blue-500 group-hover:text-blue-600"></i>
                     <span class="text-blue-500 group-hover:text-blue-600">Send</span>
                 </button>
-                <span class="text-gray-400">|</span>
-                <button
-                    class="flex flex-col items-center group"
-                    on:click={() => showTransfersModal = true}
-                >
-                    <i class="fa-solid fa-clock-rotate-left text-blue-500 group-hover:text-blue-600"></i>
-                    <span class="text-blue-500 group-hover:text-blue-600">Transfers</span>
-                </button>
             {/if}
+            <span class="text-gray-400">|</span>
+            <button
+                class="flex flex-col items-center group"
+                on:click={() => showTransfersModal = true}
+            >
+                <i class="fa-solid fa-clock-rotate-left text-blue-500 group-hover:text-blue-600"></i>
+                <span class="text-blue-500 group-hover:text-blue-600">Transfers</span>
+            </button>
         </div>
 </div>
     {#if isLPToken(token) && token.poolInfo.provider}
@@ -434,5 +434,59 @@
         bind:open={showTransfersModal}
         {token}
         {walletId}
+        currentPoolBalance={isLPToken(token) && token.poolInfo ? {
+            tokenA: calculateUserTokenShare(token, 'A'),
+            tokenB: calculateUserTokenShare(token, 'B')
+        } : null}
     />
 {/if}
+
+<script context="module">
+    // Helper function to calculate user's share of a token in the pool
+    function calculateUserTokenShare(token: LPToken, tokenType: 'A' | 'B'): number {
+        try {
+            // User's LP token balance in decimal form
+            const userLpBalance = Number(token.balance) / Math.pow(10, token.decimals);
+            
+            // Total supply of LP tokens
+            let totalSupply;
+            
+            // For Humble pools, the totalSupply is already in decimal form
+            if (token.poolInfo.provider === 'humble') {
+                totalSupply = Number(token.poolInfo.totalSupply / Math.pow(10, 6));
+            } else {
+                // For other providers, we need to divide by 10^decimals
+                totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, token.decimals);
+            }
+            
+            if (totalSupply <= 0 || userLpBalance <= 0) return 0;
+            
+            // Calculate user's share as a decimal (0-1)
+            const userShare = userLpBalance / totalSupply;
+            
+            // Get the token balance from the pool
+            const tokenBalance = tokenType === 'A' 
+                ? Number(token.poolInfo.tokABalance) 
+                : Number(token.poolInfo.tokBBalance);
+                
+            // Get the token decimals
+            const tokenDecimals = tokenType === 'A'
+                ? token.poolInfo.tokADecimals
+                : token.poolInfo.tokBDecimals;
+            
+            // For Humble, the balance is already in decimal form
+            // For other providers, we need to divide by 10^decimals
+            let result;
+            if (token.poolInfo.provider === 'humble') {
+                result = userShare * tokenBalance;
+            } else {
+                result = userShare * (tokenBalance / Math.pow(10, tokenDecimals));
+            }
+            
+            return result;
+        } catch (error) {
+            console.error(`Error calculating token ${tokenType} share:`, error);
+            return 0;
+        }
+    }
+</script>

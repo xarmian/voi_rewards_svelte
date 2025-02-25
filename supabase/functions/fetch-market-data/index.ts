@@ -190,7 +190,7 @@ async function fetchHumbleData(): Promise<MarketSnapshot | null> {
 
     // Get TVL in VOI and convert to USDC
     const tvlVOI = parseFloat(pool.tvlB);
-    const tvl = tvlVOI * price;
+    const tvl = tvlVOI * price * 2;
 
     // Fetch historical price and calculate price change
     const historicalPrice = await fetchHistoricalPrice(2); // Humble trading_pair_id = 2
