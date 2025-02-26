@@ -10,6 +10,7 @@
     import NodeComponent from '$lib/component/NodeComponent.svelte';
     import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
     import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
+    import LockVestComponent from '$lib/component/LockVestComponent.svelte';
     import { getAccountInfo, getSupplyInfo } from '$lib/stores/accounts';
     import { dataTable } from '../../../../stores/dataTable';
     import { getTokensByEpoch } from '$lib/utils';
@@ -19,6 +20,7 @@
     import { toast } from '@zerodevx/svelte-toast';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
+    import NotificationsComponent from '$lib/component/NotificationsComponent.svelte';
     import { voiPrice } from '$lib/stores/price';
     import { slide } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
@@ -40,9 +42,10 @@
     const sections = [
       { id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
       { id: 'consensus', name: 'Consensus', icon: 'fas fa-hexagon-nodes' },
-      //{ id: 'staking', name: 'Staking', icon: 'fas fa-cog' },
       { id: 'proposals', name: 'Proposals', icon: 'fas fa-chart-line' },
       { id: 'epochs', name: 'Epochs', icon: 'fas fa-calendar-alt' },
+      { id: 'lockvest', name: 'Lock/Vest', icon: 'fas fa-cog' },
+      //{ id: 'notifications', name: 'Notifications', icon: 'fas fa-bell' },
       { id: 'calculator', name: 'Calculator', icon: 'fas fa-calculator' },
       //{ id: 'preferences', name: 'Preferences', icon: 'fas fa-cog' },
       //{ id: 'billing', name: 'Billing Information', icon: 'fas fa-cog' }
@@ -722,8 +725,12 @@
                     <CalculatorComponent walletAddress={walletId} childAccounts={childAccounts} primaryAccountInfo={primaryAccountInfo} />
                 {:else if activeSection === 'epochs'}
                     <EpochComponent walletAddress={walletId} />
+                {:else if activeSection === 'notifications'}
+                    <NotificationsComponent primaryAccountInfo={primaryAccountInfo} childAccounts={childAccounts} />
                 {:else if activeSection === 'portfolio'}
-                    <PortfolioComponent walletAddress={walletId} />
+                    <PortfolioComponent walletAddress={walletId} parentWalletAddress={parentWalletId ?? null} />
+                {:else if activeSection === 'lockvest'}
+                    <LockVestComponent {childAccounts} />
                 {/if}
             {:else}
                 {#if activeSection === 'calculator'}

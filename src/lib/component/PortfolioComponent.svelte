@@ -19,7 +19,9 @@
     import { fade } from 'svelte/transition';
     import ConsensusDetails from './ConsensusDetails.svelte';
     import TokenTransfersModal from './TokenTransfersModal.svelte';
+	import StakingComponent from './ui/StakingComponent.svelte';
 
+    export let parentWalletAddress: string | null = null;
     export let walletAddress: string | undefined = undefined;
 
     type SortOption = {
@@ -1218,13 +1220,13 @@
                             </span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600 dark:text-gray-300">Current Epoch (estimate)</span>
-                            <span class="text-sm text-gray-900 dark:text-white">
+                            <span class="text-gray-600 dark:text-gray-300">Current Epoch</span>
+                            <span class="text-sm font-medium text-gray-900 dark:text-white">
                                 {(pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
                             </span>
                         </div>
                         <div class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                            <span class="text-gray-600 dark:text-gray-300">Total Reward Transactions</span>
+                            <span class="text-gray-600 dark:text-gray-300">Total Transactions</span>
                             <a 
                                 href={`/wallet/${walletAddress}#epochs`}
                                 on:click={handleEpochsClick}
@@ -1236,6 +1238,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Staking Overview -->
+            {#if parentWalletAddress && walletAddress}
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <div class="flex items-center mb-2 space-x-8">
+                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Lock/Vest Contract Overview</h4>
+                        <a
+                            href="https://voix.nautilus.sh/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex items-center text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                            <span>Manage on VoiX</span>
+                            <i class="fas fa-external-link-alt ml-1 text-xs"></i>
+                        </a>
+                    </div>
+                    <div class="mt-2">
+                        <StakingComponent address={walletAddress} minimal={true} />
+                    </div>
+                </div>
+            {/if}
         </div>
     </div>
 
