@@ -56,7 +56,7 @@
     { href: '/wallet#consensus', label: 'Consensus', icon: 'fas fa-hexagon-nodes' },
     { href: '/wallet#proposals', label: 'Proposals', icon: 'fas fa-chart-line' },
     { href: '/wallet#epochs', label: 'Epochs', icon: 'fas fa-calendar-alt' },
-    { href: '/wallet#lockvest', label: 'Lock+Vest', icon: 'fas fa-cog' },
+    { href: '/wallet#lockvest', label: 'Lock+Vest', icon: 'fas fa-key' },
     { href: '/wallet#calculator', label: 'Calculator', icon: 'fas fa-calculator' }
   ];
 

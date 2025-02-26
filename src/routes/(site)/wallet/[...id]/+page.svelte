@@ -44,7 +44,7 @@
       { id: 'consensus', name: 'Consensus', icon: 'fas fa-hexagon-nodes' },
       { id: 'proposals', name: 'Proposals', icon: 'fas fa-chart-line' },
       { id: 'epochs', name: 'Epochs', icon: 'fas fa-calendar-alt' },
-      { id: 'lockvest', name: 'Lock/Vest', icon: 'fas fa-cog' },
+      { id: 'lockvest', name: 'Lock+Vest', icon: 'fas fa-key' },
       //{ id: 'notifications', name: 'Notifications', icon: 'fas fa-bell' },
       { id: 'calculator', name: 'Calculator', icon: 'fas fa-calculator' },
       //{ id: 'preferences', name: 'Preferences', icon: 'fas fa-cog' },
