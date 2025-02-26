@@ -335,10 +335,14 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                    Contract {contract.contractId}
+                                    Contract <a href={`https://explorer.voi.network/explorer/application/${contract.contractId}`} target="_blank" class="text-blue-500 hover:text-blue-600">
+                                        {contract.contractId}
+                                    </a>
                                 </h3>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                                    {truncateAddress(contract.contractAddress)}
+                                    <a href={`https://explorer.voi.network/explorer/account/${contract.contractAddress}`} target="_blank" class="text-blue-500 hover:text-blue-600">
+                                        {truncateAddress(contract.contractAddress)}
+                                    </a>
                                 </p>
                             </div>
                             <div class="flex items-center space-x-2">
