@@ -245,7 +245,9 @@
                         remainingVestingAmount = totalBalance;
                     } else if (elapsedTime >= fullVestingTime) {
                         // Past both lockup and vesting delay - start regular vesting
-                        const vestingElapsedTime = elapsedTime - fullVestingTime;
+                        // If there's no lockup period, we start counting from funding time
+                        const vestingStartTime = lockupPeriod === 0 ? fundingTime : fundingTime + fullVestingTime;
+                        const vestingElapsedTime = now - vestingStartTime;
                         const periodsPassed = Math.floor(vestingElapsedTime / Number(contractData.global_distribution_seconds));
                         const periodsRemaining = Number(contractData.global_distribution_count) - periodsPassed;
                         
@@ -258,7 +260,6 @@
                             remainingVestingAmount = 0;
                         } else {
                             // In vesting period
-                            const vestingStartTime = fundingTime + fullVestingTime;
                             const nextVestingTime = vestingStartTime + ((periodsPassed + 1) * Number(contractData.global_distribution_seconds));
                             nextVestingDate = new Date(nextVestingTime * 1000);
                             
@@ -278,8 +279,9 @@
                         remainingVestingAmount = totalBalance;
                     }
 
-                    // Calculate available withdrawal as the difference between current balance and locked balance
-                    availableForWithdrawal = Math.max(0, currentBalance - lockedBalance);
+                    // Calculate available withdrawal amount considering minimum balance
+                    const minimumBalance = accountInfo['min-balance'];
+                    availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
                 }
             }
         } catch (err) {

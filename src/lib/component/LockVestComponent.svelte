@@ -198,7 +198,9 @@
                             remainingVestingAmount = totalBalance;
                         }
 
-                        availableForWithdrawal = Math.max(0, currentBalance - lockedBalance);
+                        // Calculate available withdrawal amount considering minimum balance
+                        const minimumBalance = accountInfo['min-balance'];
+                        availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
                     }
 
                     return {
