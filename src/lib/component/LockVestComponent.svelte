@@ -167,10 +167,12 @@
                             nextVestingAmount = totalBalance / Number(decodedState.global_distribution_count ?? 1);
                             remainingVestingAmount = totalBalance;
                         } else if (elapsedTime >= fullVestingTime) {
-                            const vestingElapsedTime = elapsedTime - fullVestingTime;
+                            // If there's no lockup period, we start counting from funding time
+                            const vestingStartTime = lockupPeriod === 0 ? fundingTime : fundingTime + fullVestingTime;
+                            const vestingElapsedTime = now - vestingStartTime;
                             const periodsPassed = Math.floor(vestingElapsedTime / Number(decodedState.global_distribution_seconds ?? 1));
                             const periodsRemaining = Number(decodedState.global_distribution_count ?? 0) - periodsPassed;
-                            
+
                             if (periodsPassed >= Number(decodedState.global_distribution_count ?? 0)) {
                                 nextVestingDate = null;
                                 lockedBalance = 0;
@@ -178,7 +180,6 @@
                                 nextVestingAmount = 0;
                                 remainingVestingAmount = 0;
                             } else {
-                                const vestingStartTime = fundingTime + fullVestingTime;
                                 const nextVestingTime = vestingStartTime + ((periodsPassed + 1) * Number(decodedState.global_distribution_seconds ?? 0));
                                 nextVestingDate = new Date(nextVestingTime * 1000);
                                 
