@@ -11,7 +11,7 @@
     export let childAccounts: any[] = [];
     export let primaryAccountInfo: any | undefined = undefined;
     
-    let nodeCost = 15; // Default $15/month
+    let nodeCost = 10; // Default $15/month
     let isPercentageBased = false; // Default to fixed cost
     let costPercentage = 10; // Default 10% of rewards
     let calculationAmount = 0; // Amount to use for calculations
