@@ -48,7 +48,8 @@
     { href: '/directory', label: 'Directory', icon: 'fas fa-book' },
     { href: '/faq', label: 'FAQ', icon: 'fas fa-question-circle' },
     { href: '/what_is_voi', label: 'What is Voi?', icon: 'fas fa-info-circle' },
-    { href: '/how_to_node', label: 'Run a Node', icon: 'fas fa-server' }
+    { href: '/how_to_node', label: 'Run a Node', icon: 'fas fa-server' },
+    { href: '/calculator', label: 'Rewards Calculator', icon: 'fas fa-calculator' }
   ];
 
   const walletItems: WalletItem[] = [
