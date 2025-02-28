@@ -133,24 +133,27 @@
                 sk: new Uint8Array()
             }
         });
+
+        // Get transactions from simulation - let the contract handle group assignment
         const resp = await contract.arc200_transfer(recipientAddress, BigInt(amount), true, false);
 
-        if (resp && resp.success) {
-            const decodedTxns: algosdk.Transaction[] = [];
-            const txnsForSigning = resp.txns;
-
-            // base64 decode signed transactions
-            for (let i = 0; i < txnsForSigning.length; i++) {
-                const bytes = Buffer.from(txnsForSigning[i],'base64');
-                let tx = algosdk.decodeUnsignedTransaction(bytes);
-                transactionId = tx.txID();
-                decodedTxns.push(tx);
-            }
-
-            return decodedTxns;
+        if (!resp.success || !resp.txns) {
+            throw new Error('Failed to build ARC-200 transaction');
         }
 
-        throw new Error('Failed to build ARC-200 transaction');
+        const decodedTxns: algosdk.Transaction[] = [];
+
+        // Decode all transactions from the simulation response
+        for (const txn of resp.txns) {
+            const bytes = Buffer.from(txn, 'base64');
+            let tx = algosdk.decodeUnsignedTransaction(bytes);
+            decodedTxns.push(tx);
+        }
+
+        // Set transaction ID from the last transaction in the group
+        transactionId = decodedTxns[decodedTxns.length - 1].txID();
+
+        return decodedTxns;
     }
 
     async function buildVOITransaction(recipientAddress: string, amount: number, suggestedParams: algosdk.SuggestedParams): Promise<algosdk.Transaction[]> {
@@ -198,7 +201,8 @@
             const signedTxns = await signTransactions([txns]);
             
             if (signedTxns) {
-                const response = await algodClient.sendRawTransaction(signedTxns[0]).do();
+                // For transaction groups, we need to send all transactions together
+                const response = await algodClient.sendRawTransaction(signedTxns).do();
                 await algosdk.waitForConfirmation(algodClient, response.txId, 4);
                 success = true;
                 onTokenSent();
