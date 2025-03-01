@@ -65,6 +65,8 @@ export interface IProject {
     status?: string; // 'active' or 'inactive'
     logo?: string;
     new?: boolean;
+    logo_dark_mode?: 'invert' | 'light-bg' | 'none'; // How to handle the logo in dark mode
+    logo_light_mode?: 'invert' | 'dark-bg' | 'none'; // How to handle the logo in light mode
 }
 
 export type IQuest = {
