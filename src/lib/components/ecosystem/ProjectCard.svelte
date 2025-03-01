@@ -38,11 +38,7 @@
                         
                         <!-- Main container -->
                         <div class="relative flex items-center justify-center h-40 p-8 rounded-3xl 
-                            bg-gradient-to-br {
-                                project.logo_dark_mode === 'light-bg' ? 'dark:from-white/20 dark:to-white/10 from-white/95 to-white/75' :
-                                project.logo_light_mode === 'dark-bg' ? 'from-gray-900/90 to-gray-900/80 dark:from-gray-900 dark:to-gray-800' :
-                                'from-white/95 to-white/75 dark:from-gray-900 dark:to-gray-800'
-                            }
+                            bg-gradient-to-br from-white/95 to-white/75 dark:from-gray-900 dark:to-gray-800
                             border border-white/30 dark:border-white/10
                             shadow-[0_8px_32px_-8px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)]
                             group-hover:shadow-[0_16px_48px_-12px_rgba(139,92,246,0.3)] dark:group-hover:shadow-[0_16px_48px_-12px_rgba(139,92,246,0.3)]
@@ -51,7 +47,11 @@
                             transition-all duration-500 ease-out">
                             
                             <!-- Logo container -->
-                            <div class="relative w-full max-w-[280px] h-24">
+                            <div class="relative w-full max-w-[280px] h-28 rounded-2xl p-3 {
+                                project.logo_dark_mode === 'light-bg' ? 'dark:bg-white/20 dark:to-white/10 from-white/95 to-white/75' :
+                                project.logo_light_mode === 'dark-bg' ? 'bg-gray-900 dark:to-gray-800' :
+                                'bg-transparent'
+                            }">
                                 <img 
                                     src={project.logo} 
                                     alt={project.title} 

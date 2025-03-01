@@ -29,20 +29,22 @@
 						>
 							<div class="w-24 h-24 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors">
 								{#if project.logo}
-									<div class="w-full h-full p-2 flex items-center justify-center {
-										project.logo_dark_mode === 'light-bg' ? 'dark:bg-white/20' : 
-										project.logo_light_mode === 'dark-bg' ? 'bg-gray-800/50' :
-										'bg-transparent'
-									}">
-										<img
-											src={project.logo}
-											alt={project.title}
-											class="max-w-full max-h-full object-contain {
-												project.logo_dark_mode === 'invert' ? 'dark:invert dark:brightness-0' : 
-												project.logo_light_mode === 'invert' ? 'invert brightness-0 dark:invert-0 dark:brightness-100' :
-												''
-											} transition-all duration-300"
-										/>
+									<div class="w-full h-full flex items-center justify-center">
+										<div class="p-4 rounded-lg {
+											project.logo_dark_mode === 'light-bg' ? 'dark:bg-white/20' : 
+											project.logo_light_mode === 'dark-bg' ? 'bg-gray-800/50' :
+											'bg-transparent'
+										}">
+											<img
+												src={project.logo}
+												alt={project.title}
+												class="max-w-full max-h-full object-contain {
+													project.logo_dark_mode === 'invert' ? 'dark:invert dark:brightness-0' : 
+													project.logo_light_mode === 'invert' ? 'invert brightness-0 dark:invert-0 dark:brightness-100' :
+													''
+												} transition-all duration-300"
+											/>
+										</div>
 									</div>
 								{:else}
 									<span class="text-sm text-center text-gray-600 dark:text-gray-300">
