@@ -1546,27 +1546,30 @@
             <!-- Desktop Filters -->
             <div class="hidden md:grid grid-cols-{isLPToken(token) ? '4' : (token.type === 'native' ? '4' : '3')} gap-4">
                 <div class="space-y-2">
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">From Address</label>
+                    <label for="fromAddress" class="text-sm font-medium text-gray-700 dark:text-gray-300">From Address</label>
                     <input
                         type="text"
+                        id="fromAddress"
                         bind:value={fromAddress}
                         placeholder="Search from address"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                     />
                 </div>
                 <div class="space-y-2">
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">To Address</label>
+                    <label for="toAddress" class="text-sm font-medium text-gray-700 dark:text-gray-300">To Address</label>
                     <input
                         type="text"
+                        id="toAddress"
                         bind:value={toAddress}
                         placeholder="Search to address"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                     />
                 </div>
                 <div class="space-y-2">
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
+                    <label for="note" class="text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
                     <input
                         type="text"
+                        id="note"
                         bind:value={note}
                         placeholder="Search note"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
@@ -1574,7 +1577,7 @@
                 </div>
                 {#if token.type === 'native'}
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Show Fee Transactions</label>
+                        <label for="showFeeTransactions" class="text-sm font-medium text-gray-700 dark:text-gray-300">Show Fee Transactions</label>
                         <div class="flex items-center">
                             <button
                                 class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md w-full text-left flex justify-between items-center {showFeeTransactions ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : 'bg-gray-50 dark:bg-gray-700/50'}"
@@ -1587,7 +1590,7 @@
                     </div>
                 {:else if isLPToken(token)}
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Show LP Exchange Details</label>
+                        <label for="showLPExchangeDetails" class="text-sm font-medium text-gray-700 dark:text-gray-300">Show LP Exchange Details</label>
                         <div class="flex items-center">
                             <button
                                 class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md w-full text-left flex justify-between items-center {showLPExchangeDetails ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : 'bg-gray-50 dark:bg-gray-700/50'}"
