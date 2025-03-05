@@ -771,78 +771,109 @@
             let newTransfers: Transfer[] = [];
             
             if (token.type === 'native') {
-                // Fetch all transactions involving this address
-                const txns = await algodIndexer
-                    .searchForTransactions()
-                    .address(walletId)
-                    .limit(limit)
-                    .nextToken(append && nextToken ? nextToken : '')
-                    .do();
+                // Continue fetching until we have enough transfers or reach the end
+                let continueSearching = true;
+                let currentNextToken = append && nextToken ? nextToken : '';
+                let attempts = 0;
+                const maxAttempts = 5; // Limit the number of attempts to prevent infinite loops
+                
+                while (continueSearching && attempts < maxAttempts) {
+                    attempts++;
+                    
+                    // Fetch all transactions involving this address
+                    const txns = await algodIndexer
+                        .searchForTransactions()
+                        .address(walletId)
+                        .limit(limit)
+                        .nextToken(currentNextToken)
+                        .do();
 
-                // Store the next token for pagination
-                nextToken = txns['next-token'];
-                hasMore = !!nextToken;
+                    // Store the next token for pagination
+                    currentNextToken = txns['next-token'];
+                    
+                    // Process transactions from this batch
+                    const batchTransfers: Transfer[] = [];
+                    
+                    txns.transactions.forEach((tx: any) => {
+                        const transfers: Transfer[] = [];
 
-                // Process each transaction
-                txns.transactions.forEach((tx: any) => {
-                    const transfers: Transfer[] = [];
+                        // Handle different transaction types that affect VOI balance
+                        if (tx['tx-type'] === 'pay') {
+                            // Regular payment transaction
+                            transfers.push({
+                                from: tx.sender,
+                                to: tx['payment-transaction'].receiver,
+                                amount: (tx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
+                                round: tx['confirmed-round'],
+                                transactionid: tx.id,
+                                timestamp: tx['round-time'],
+                                note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+                                type: 'payment',
+                                fee: tx.fee
+                            });
+                        } else if (tx.sender === walletId && tx.fee > 0 && tx['tx-type'] !== 'pay') {
+                            // Only add standalone fee transfer if this is not a payment transaction
+                            transfers.push({
+                                from: tx.sender,
+                                to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
+                                amount: (tx.fee / Math.pow(10, token.decimals)).toString(),
+                                round: tx['confirmed-round'],
+                                transactionid: tx.id,
+                                timestamp: tx['round-time'],
+                                note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+                                type: 'fee'
+                            });
+                        }
 
-                    // Handle different transaction types that affect VOI balance
-                    if (tx['tx-type'] === 'pay') {
-                        // Regular payment transaction
-                        transfers.push({
-                            from: tx.sender,
-                            to: tx['payment-transaction'].receiver,
-                            amount: (tx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
-                            round: tx['confirmed-round'],
-                            transactionid: tx.id,
-                            timestamp: tx['round-time'],
-                            note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
-                            type: 'payment',
-                            fee: tx.fee
-                        });
-                    } else if (tx.sender === walletId && tx.fee > 0 && tx['tx-type'] !== 'pay') {
-                        // Only add standalone fee transfer if this is not a payment transaction
-                        transfers.push({
-                            from: tx.sender,
-                            to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
-                            amount: (tx.fee / Math.pow(10, token.decimals)).toString(),
-                            round: tx['confirmed-round'],
-                            transactionid: tx.id,
-                            timestamp: tx['round-time'],
-                            note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
-                            type: 'fee'
-                        });
+                        // Handle inner transactions for all transaction types
+                        if (tx['inner-txns']) {
+                            tx['inner-txns'].forEach((innerTx: any) => {
+                                if (innerTx['tx-type'] === 'pay') {
+                                    transfers.push({
+                                        from: innerTx.sender,
+                                        to: innerTx['payment-transaction'].receiver,
+                                        amount: (innerTx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
+                                        round: tx['confirmed-round'],
+                                        transactionid: innerTx.id,
+                                        timestamp: tx['round-time'],
+                                        note: innerTx.note ? Buffer.from(innerTx.note, 'base64').toString() : undefined,
+                                        type: 'inner-payment',
+                                        parentTxId: tx.id,
+                                        fee: 0
+                                    });
+                                }
+                            });
+                        }
+
+                        batchTransfers.push(...transfers.filter(t => 
+                            t.from === walletId || t.to === walletId
+                        ));
+                    });
+                    
+                    // Add batch transfers to our result set
+                    newTransfers.push(...batchTransfers);
+                    
+                    // Determine if we should continue searching
+                    if (!currentNextToken) {
+                        // No more data available
+                        continueSearching = false;
+                        hasMore = false;
+                    } else if (newTransfers.length >= limit) {
+                        // We have enough transfers to display
+                        continueSearching = false;
+                        hasMore = true;
+                        nextToken = currentNextToken;
                     }
-
-                    // Handle inner transactions for all transaction types
-                    if (tx['inner-txns']) {
-                        tx['inner-txns'].forEach((innerTx: any) => {
-                            if (innerTx['tx-type'] === 'pay') {
-                                transfers.push({
-                                    from: innerTx.sender,
-                                    to: innerTx['payment-transaction'].receiver,
-                                    amount: (innerTx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
-                                    round: tx['confirmed-round'],
-                                    transactionid: innerTx.id,
-                                    timestamp: tx['round-time'],
-                                    note: innerTx.note ? Buffer.from(innerTx.note, 'base64').toString() : undefined,
-                                    type: 'inner-payment',
-                                    parentTxId: tx.id,
-                                    fee: 0
-                                });
-                            }
-                        });
-                    }
-
-                    // Only add transfers that involve our wallet address
-                    newTransfers.push(...transfers.filter(t => 
-                        t.from === walletId || t.to === walletId
-                    ));
-                });
-
+                }
+                
                 // Sort by timestamp descending (most recent first)
                 newTransfers.sort((a, b) => b.timestamp - a.timestamp);
+                
+                // If we hit max attempts but still have more data
+                if (attempts >= maxAttempts && currentNextToken) {
+                    hasMore = true;
+                    nextToken = currentNextToken;
+                }
             } else if (token.type === 'arc200') {
                 // Check if this is an LP token
                 const isLp = isLPToken(token);
