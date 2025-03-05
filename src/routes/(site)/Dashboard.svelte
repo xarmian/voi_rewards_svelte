@@ -6,7 +6,7 @@
 	import RewardsTable from './RewardsTable.svelte';
 	import MiniStakeChart from '$lib/components/MiniStakeChart.svelte';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
-	import NFTGamesAd from '$lib/component/NFTGamesAd.svelte';
+	import GotVoiAd from '$lib/component/GotVoiAd.svelte';
 	import { goto } from '$app/navigation';
 	import { getSupplyInfo, onlineStakeStore } from '$lib/stores/accounts';
 	import type { SupplyInfo } from '$lib/stores/accounts';
@@ -204,11 +204,6 @@
 				</div>
 			</div>
 		</div>
-	</div>
-
-	<!-- NFT Games Ad Banner -->
-	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-		<NFTGamesAd />
 	</div>
 
 	{#if isLoading}
@@ -410,6 +405,10 @@
 			</div>
 		</div>
 
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+			<GotVoiAd />
+		</div>
+	
 		<!-- Rewards Section -->
 		<div id="rewards-section" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-12 relative z-10">
 			<div class="flex flex-col sm:flex-row items-center justify-between mb-6">
@@ -453,7 +452,7 @@
 </Modal>
 {/if}
 
-<style>
+<style lang="postcss">
 	:global(.rewards-table) {
 		@apply rounded-lg overflow-hidden;
 	}
