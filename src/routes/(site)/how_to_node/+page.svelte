@@ -63,7 +63,7 @@
             },
             {
                 text: 'VOI Discord',
-                url: 'https://discord.gg/voi-network',
+                url: 'https://discord.gg/vnFbrJrHeW',
             },
             {
                 text: '@Voi_Net Twitter',

@@ -58,7 +58,7 @@ If you encounter issues:
 
 - For Voi Swarm: Check the [Voi Swarm Issues](https://github.com/VoiNetwork/voi-swarm/issues) page
 - For Aust's One-Click Node: Refer to the [A1CN Issues](https://github.com/AustP/austs-one-click-node/issues) page
-- For general help: Join the [Voi Discord](https://discord.gg/voi-network) and ask in the #node-runners channel
+- For general help: Join the [Voi Discord](https://discord.gg/vnFbrJrHeW) and ask in the #node-runners channel
 
 ### 6. Advanced Topics
 
@@ -71,5 +71,5 @@ If you encounter issues:
 
 Remember, running a node is an ongoing process. Stay updated with the latest Voi Network news and updates through the [official website](https://voi.network), [Twitter](https://twitter.com/Voi_Net), and [Reddit](https://www.reddit.com/r/Voi_Net/).
 
-For any additional questions or support, the Voi community is always ready to help in the [Discord server](https://discord.gg/voi-network).
+For any additional questions or support, the Voi community is always ready to help in the [Discord server](https://discord.gg/vnFbrJrHeW).
 

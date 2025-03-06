@@ -155,6 +155,10 @@
         <i class="fas fa-key text-xs"></i>
             <span>{accountInfo?.status === 'Online' ? 'Update' : 'Register'} Participation Key</span>
         </button>
+    {:else}
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+            To manage participation keys, connect {parentWalletId && parentWalletId !== walletId ? 'to the parent account' : 'your wallet'} using the button in the top right.
+        </p>
     {/if}
 </div>
 <div class='grid grid-cols-1 md:grid-cols-2 gap-6 w-full'>
@@ -269,7 +273,7 @@
             <div class="p-6">
                 <div class="space-y-3">
                     <p class="text-gray-600 dark:text-gray-400">
-                        NOTE: This account is not currently participating in the consensus. Register a participation key to begin participating.
+                        NOTE: This account is not currently participating in consensus. Register a participation key to begin participating.
                     </p>
                 </div>
             </div>

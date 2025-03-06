@@ -4,7 +4,7 @@
 
     const resources = [
         { icon: GlobeOutline, text: 'VOI Website', url: 'https://voi.network' },
-        { icon: DiscordSolid, text: 'VOI Discord', url: 'https://discord.gg/voi-network' },
+        { icon: DiscordSolid, text: 'VOI Discord', url: 'https://discord.gg/vnFbrJrHeW' },
         { icon: TwitterSolid, text: '@Voi_Net Twitter', url: 'https://twitter.com/Voi_Net' },
         { icon: LinkOutline, text: 'Voi Subreddit', url: 'https://www.reddit.com/r/Voi_Net/' },
     ];
