@@ -1,6 +1,8 @@
 <script lang="ts">
     import { algodClient } from '$lib/utils/algod';
     import * as algosdk from 'algosdk';
+    import WithdrawModal from './WithdrawModal.svelte';
+    import type { ContractDetails } from '$lib/types';
 
     export let childAccounts: {
         contractId: number;
@@ -9,42 +11,11 @@
         balance: number;
     }[];
 
-    interface ContractDetails {
-        contractId: number;
-        contractAddress: string;
-        owner: string;
-        balance: number;
-        isParticipating: boolean;
-        lockupPeriod: number;
-        vestingPeriod: number;
-        totalAmount: string;
-        fundingTime: number | null;
-        nextVestingDate: Date | null;
-        lockedBalance: number;
-        availableForWithdrawal: number;
-        isFullyVested: boolean;
-        nextVestingAmount: number;
-        remainingVestingAmount: number;
-        distributionCount: number;
-        distributionSeconds: number;
-        lockupDelay: number;
-        vestingDelay: number;
-        periodSeconds: number;
-        period: number;
-        global_funding?: string;
-        global_lockup_delay?: number;
-        global_period?: number;
-        global_period_seconds?: number;
-        global_vesting_delay?: number;
-        global_total?: string;
-        global_distribution_count?: number;
-        global_distribution_seconds?: number;
-        global_owner?: string;
-    }
-
     let contracts: ContractDetails[] = [];
     let isLoading = true;
     let error: string | null = null;
+    let selectedContract: ContractDetails | null = null;
+    let showWithdrawModal = false;
 
     function decodeState(state: any, address: string): ContractDetails {
         const result: any = {
@@ -273,6 +244,18 @@
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     }
 
+    function handleWithdrawClick(contract: ContractDetails) {
+        selectedContract = contract;
+        showWithdrawModal = true;
+    }
+
+    async function handleWithdrawSuccess(forceRefresh = false) {
+        if (forceRefresh) {
+            await loadContractDetails();
+        }
+        selectedContract = null;
+    }
+
     $: {
         if (childAccounts && childAccounts.length > 0) {
             loadContractDetails();
@@ -385,6 +368,15 @@
                                     <span class="text-gray-600 dark:text-gray-300">Available for Withdrawal</span>
                                     <span class="font-medium text-gray-900 dark:text-white">{formatNumber(contract.availableForWithdrawal)} VOI</span>
                                 </div>
+                                {#if contract.availableForWithdrawal > 0}
+                                    <button
+                                        on:click={() => handleWithdrawClick(contract)}
+                                        class="mt-2 w-full inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                                    >
+                                        <i class="fas fa-wallet mr-2"></i>
+                                        Withdraw Available Balance
+                                    </button>
+                                {/if}
                             </div>
                         </div>
 
@@ -433,3 +425,11 @@
         </div>
     {/if}
 </div>
+
+{#if selectedContract && showWithdrawModal}
+    <WithdrawModal
+        contract={selectedContract}
+        bind:show={showWithdrawModal}
+        onSuccess={handleWithdrawSuccess}
+    />
+{/if}
