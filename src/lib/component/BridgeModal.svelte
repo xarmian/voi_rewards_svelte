@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Modal } from 'flowbite-svelte';
   import { createEventDispatcher, onDestroy } from 'svelte';
-  import { selectedWallet, signTransactions } from 'avm-wallet-svelte';
+  import { selectedWallet, signTransactions, connectedWallets } from 'avm-wallet-svelte';
   import QRCode from 'qrcode';
   import algosdk from 'algosdk';
   import { onMount } from 'svelte';
@@ -9,6 +9,7 @@
   import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
   import { algodClient } from '$lib/utils/algod';
   import BridgeAnimation from './BridgeAnimation.svelte';
+  import confetti from 'canvas-confetti';
 
   type BridgeStatus = 'idle' | 'signing' | 'submitting' | 'bridging' | 'completed' | 'error';
   type BridgeDetails = {
@@ -71,6 +72,8 @@
   let selectedSearchIndex = -1;
   let searchInputRef: HTMLInputElement;
   let searchDropdownRef: HTMLDivElement;
+  let showConnectedWallets = false;
+  let uniqueConnectedWallets: string[] = [];
 
   let algorandSourceAddress = '';
   let algorandSourceBalance: number | null = null;
@@ -104,8 +107,16 @@
     }
   });
 
+  // Subscribe to connectedWallets store and maintain unique addresses
+  const unsubConnectedWallets = connectedWallets.subscribe((wallets) => {
+    // Create a Set to automatically handle uniqueness
+    const uniqueAddresses = new Set(wallets.map(w => w.address));
+    uniqueConnectedWallets = Array.from(uniqueAddresses);
+  });
+
   onDestroy(() => {
     unsub();
+    unsubConnectedWallets();
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
@@ -228,7 +239,7 @@
         destinationToken: AVOI_TOKEN_ID,
         feeAmount,
         destinationAmount,
-        note: "aramid",
+        note: "voirewards",
         sourceAmount: destinationAmount
       };
       
@@ -307,7 +318,7 @@
         destinationToken: VOI_TOKEN_ID,
         feeAmount,
         destinationAmount,
-        note: "aramid",
+        note: "voirewards",
         sourceAmount: destinationAmount
       };
       
@@ -379,6 +390,10 @@
                 destinationTxId: tx.id
               };
               clearInterval(bridgeMonitorInterval);
+              
+              // Trigger celebratory confetti
+              triggerCelebration();
+              
               return;
             }
           } catch (e) {
@@ -393,6 +408,55 @@
     // Check immediately and then every 5 seconds
     await checkDestinationTx();
     bridgeMonitorInterval = window.setInterval(checkDestinationTx, 5000);
+  }
+
+  function triggerCelebration() {
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+
+    // Create a confetti cannon on each side
+    const leftCannon = confetti.create(undefined, { 
+      resize: true,
+      useWorker: true 
+    });
+    const rightCannon = confetti.create(undefined, { 
+      resize: true,
+      useWorker: true 
+    });
+
+    const colors = ['#22c55e', '#3b82f6']; // emerald-500 and blue-500
+
+    const shootConfetti = () => {
+      const timeLeft = animationEnd - Date.now();
+      
+      if (timeLeft <= 0) {
+        leftCannon.reset();
+        rightCannon.reset();
+        return;
+      }
+
+      // Left cannon
+      leftCannon({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        colors: colors,
+      });
+
+      // Right cannon
+      rightCannon({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        colors: colors,
+      });
+
+      requestAnimationFrame(shootConfetti);
+    };
+
+    shootConfetti();
   }
 
   // Clean up interval on component destroy
@@ -491,31 +555,60 @@
     if (searchDropdownRef && !searchDropdownRef.contains(event.target as Node) && 
         searchInputRef && !searchInputRef.contains(event.target as Node)) {
       showSearchResults = false;
+      showConnectedWallets = false;
       selectedSearchIndex = -1;
     }
   }
 
   // Handle keyboard navigation
   function handleKeydown(event: KeyboardEvent) {
-    if (!showSearchResults || searchResults.length === 0) return;
+    if (!showSearchResults && !showConnectedWallets) return;
+    if (showConnectedWallets && uniqueConnectedWallets.length === 0) return;
+    if (showSearchResults && searchResults.length === 0) return;
 
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        selectedSearchIndex = (selectedSearchIndex + 1) % searchResults.length;
+        if (showConnectedWallets) {
+          selectedSearchIndex = (selectedSearchIndex + 1) % uniqueConnectedWallets.length;
+        } else {
+          selectedSearchIndex = (selectedSearchIndex + 1) % searchResults.length;
+        }
         break;
       case 'ArrowUp':
         event.preventDefault();
-        selectedSearchIndex = selectedSearchIndex <= 0 ? searchResults.length - 1 : selectedSearchIndex - 1;
+        if (showConnectedWallets) {
+          selectedSearchIndex = selectedSearchIndex <= 0 ? uniqueConnectedWallets.length - 1 : selectedSearchIndex - 1;
+        } else {
+          selectedSearchIndex = selectedSearchIndex <= 0 ? searchResults.length - 1 : selectedSearchIndex - 1;
+        }
         break;
       case 'Enter':
         event.preventDefault();
         if (selectedSearchIndex >= 0) {
-          selectSearchResult(searchResults[selectedSearchIndex]);
+          if (showConnectedWallets) {
+            const address = uniqueConnectedWallets[selectedSearchIndex];
+            voiDestinationAddress = address;
+            isValidDestination = true;
+            showConnectedWallets = false;
+            // Try to resolve Envoi name
+            getEnvoiNames([address]).then(results => {
+              if (results.length > 0) {
+                resolvedName = {
+                  name: results[0].name,
+                  address: results[0].address,
+                  avatar: results[0].metadata.avatar || undefined
+                };
+              }
+            });
+          } else {
+            selectSearchResult(searchResults[selectedSearchIndex]);
+          }
         }
         break;
       case 'Escape':
         showSearchResults = false;
+        showConnectedWallets = false;
         selectedSearchIndex = -1;
         break;
     }
@@ -862,7 +955,7 @@
                 <label for="sourceAddress" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Source <span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span> Address
                 </label>
-                <span class="text-xs text-gray-500">(Optional)</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">(Optional)</span>
               </div>
               <div class="relative">
                 <div class="relative">
@@ -1004,22 +1097,28 @@
                 <div class="relative">
                   <input
                     type="text"
-                    bind:value={destinationAddress}
+                    bind:value={voiDestinationAddress}
                     bind:this={searchInputRef}
                     on:input={(e) => handleInput(e.currentTarget.value)}
                     on:keydown={handleKeydown}
+                    on:focus={() => {
+                      if (!voiDestinationAddress) {
+                        showConnectedWallets = true;
+                        showSearchResults = false;
+                      }
+                    }}
                     class="w-full pr-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-                    placeholder="Enter address or search NFDomains..."
+                    placeholder="Enter address or search Envoi names..."
                     class:border-green-500={isValidDestination}
                     class:border-red-500={destinationAddress && !isValidDestination}
                   />
-                  {#if destinationAddress}
+                  {#if voiDestinationAddress}
                     <button
                       type="button"
                       class="absolute inset-y-0 right-0 pr-3 flex items-center"
                       aria-label="Clear input"
                       on:click={() => {
-                        destinationAddress = '';
+                        voiDestinationAddress = '';
                         resolvedName = null;
                         isValidDestination = false;
                         showSearchResults = false;
@@ -1143,25 +1242,32 @@
                 <div class="relative">
                   <input
                     type="text"
-                    bind:value={destinationAddress}
+                    bind:value={voiDestinationAddress}
                     bind:this={searchInputRef}
                     on:input={(e) => handleInput(e.currentTarget.value)}
                     on:keydown={handleKeydown}
+                    on:focus={() => {
+                      if (!voiDestinationAddress) {
+                        showConnectedWallets = true;
+                        showSearchResults = false;
+                      }
+                    }}
                     class="w-full pr-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
                     placeholder="Enter address or search Envoi names..."
                     class:border-green-500={isValidDestination}
                     class:border-red-500={destinationAddress && !isValidDestination}
                   />
-                  {#if destinationAddress}
+                  {#if voiDestinationAddress}
                     <button
                       type="button"
                       class="absolute inset-y-0 right-0 pr-3 flex items-center"
                       aria-label="Clear input"
                       on:click={() => {
-                        destinationAddress = '';
+                        voiDestinationAddress = '';
                         resolvedName = null;
                         isValidDestination = false;
                         showSearchResults = false;
+                        showConnectedWallets = true;
                       }}
                     >
                       <svg class="w-4 h-4 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1170,6 +1276,49 @@
                     </button>
                   {/if}
                 </div>
+
+                {#if showConnectedWallets && uniqueConnectedWallets.length > 0 && !voiDestinationAddress}
+                  <div 
+                    bind:this={searchDropdownRef}
+                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+                  >
+                    <ul class="max-h-48 overflow-auto py-1">
+                      {#each uniqueConnectedWallets as address, i}
+                        <li>
+                          <button
+                            class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
+                            on:click={() => {
+                              voiDestinationAddress = address;
+                              isValidDestination = true;
+                              showConnectedWallets = false;
+                              // Try to resolve Envoi name
+                              getEnvoiNames([address]).then(results => {
+                                if (results.length > 0) {
+                                  resolvedName = {
+                                    name: results[0].name,
+                                    address: results[0].address,
+                                    avatar: results[0].metadata.avatar || undefined
+                                  };
+                                }
+                              });
+                            }}
+                          >
+                            <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900">
+                              <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                              <div class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                {address}
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
 
                 {#if showSearchResults && searchResults.length > 0}
                   <div 
