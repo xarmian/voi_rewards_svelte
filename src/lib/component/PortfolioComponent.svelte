@@ -1084,6 +1084,7 @@
                                 class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
                                 disabled={!canSignTransactions}
                             >
+                                <i class="fas fa-paper-plane"></i>
                                 Send
                             </button>
                             <button
@@ -1091,6 +1092,7 @@
                                 class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800"
                                 disabled={!canSignTransactions}
                             >
+                                <i class="fas fa-bridge"></i>
                                 Bridge
                             </button>
                         </div>
