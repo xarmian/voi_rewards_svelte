@@ -89,3 +89,54 @@ export async function getNFD(addresses: string[]): Promise<NFDomainResult[]> {
     await Promise.all(allFetches);
     return aggregatedNFDs;
 }
+
+interface NFDSearchResult {
+    appID: number;
+    name: string;
+    owner: string;
+    depositAccount: string;
+    properties: {
+        verified?: {
+            avatar?: string;
+            avatarAsaId?: number;
+        };
+        userDefined?: {
+            avatar?: string;
+        };
+    };
+    state: string;
+}
+
+interface NFDSearchResponse {
+    nfds: NFDSearchResult[];
+    total: number;
+}
+
+export async function searchNFDomains(query: string): Promise<NFDSearchResult[]> {
+    if (!query || query.length < 1) {
+        return [];
+    }
+
+    const url = new URL('https://api.nf.domains/nfd/v2/search');
+    const params = new URLSearchParams({
+        prefix: query,
+        view: 'thumbnail',
+        limit: '10',
+        sort: 'nameAsc'
+    });
+
+    try {
+        const response = await fetch(`${url}?${params}`);
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch NFD search results');
+        }
+
+        const data: NFDSearchResponse = await response.json();
+        return data.nfds;
+    } catch (error) {
+        console.error('Error searching NFDomains:', error);
+        return [];
+    }
+}

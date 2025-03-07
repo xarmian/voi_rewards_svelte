@@ -2130,7 +2130,7 @@
                                                             <div class="text-gray-600 dark:text-gray-300 text-sm">
                                                                 {#if expandedRows.has(transfer.transactionid + '-note')}
                                                                     <!-- Show full note when expanded -->
-                                                                    <div class="whitespace-pre-wrap break-words">
+                                                                    <div class="whitespace-pre-wrap break-words break-all">
                                                                         {transfer.note}
                                                                     </div>
                                                                     <button 
@@ -2141,7 +2141,7 @@
                                                                     </button>
                                                                 {:else}
                                                                     <!-- Show truncated text when collapsed -->
-                                                                    <div class="break-words">
+                                                                    <div class="break-words break-all">
                                                                         {transfer.note.length > 100 ? transfer.note.substring(0, 100) : transfer.note}
                                                                         {#if transfer.note.length > 100}
                                                                             <span class="text-gray-400 dark:text-gray-500">...</span>
@@ -2159,7 +2159,7 @@
                                                             </div>
                                                         {:else}
                                                             <!-- For non-LP tokens, show full note as before -->
-                                                            <div class="text-gray-600 dark:text-gray-300 text-sm whitespace-pre-wrap break-words">
+                                                            <div class="text-gray-600 dark:text-gray-300 text-sm whitespace-pre-wrap break-words break-all">
                                                                 {transfer.note}
                                                             </div>
                                                         {/if}

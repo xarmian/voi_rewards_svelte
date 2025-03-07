@@ -20,6 +20,7 @@
     import ConsensusDetails from './ConsensusDetails.svelte';
     import TokenTransfersModal from './TokenTransfersModal.svelte';
 	import StakingComponent from './ui/StakingComponent.svelte';
+    import BridgeModal from './BridgeModal.svelte';
 
     export let parentWalletAddress: string | null = null;
     export let walletAddress: string | undefined = undefined;
@@ -151,6 +152,8 @@
     let poolShare: number | null = null;
 
     let showVoiTransfersModal = false;
+
+    let showBridgeModal = false;
 
     interface NomadexPool {
         id: number;
@@ -1073,7 +1076,25 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <!-- Balance Section -->
                 <div class="space-y-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Balance Details</h4>
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Balance Details</h4>
+                        <div class="flex items-center gap-2">
+                            <button
+                                on:click={() => showSendVoiModal = true}
+                                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
+                                disabled={!canSignTransactions}
+                            >
+                                Send
+                            </button>
+                            <button
+                                on:click={() => showBridgeModal = true}
+                                class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800"
+                                disabled={!canSignTransactions}
+                            >
+                                Bridge
+                            </button>
+                        </div>
+                    </div>
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600 dark:text-gray-300">Available Balance</span>
@@ -1081,24 +1102,14 @@
                                 <span class="text-lg font-semibold text-gray-900 dark:text-white">
                                     {(accountBalance / 1e6).toLocaleString()} VOI
                                 </span>
-                                <div class="flex items-center gap-2">
-                                    <button
-                                        on:click={() => showSendVoiModal = true}
-                                        class="px-3 py-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
-                                        title={canSignTransactions ? 'Send VOI' : 'Connect wallet to send VOI'}
-                                    >
-                                        <i class="fas fa-paper-plane mr-1"></i>
-                                        Send
-                                    </button>
-                                    <button
-                                        on:click={() => showVoiTransfersModal = true}
-                                        class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
-                                        title="View VOI transaction history"
-                                    >
-                                        <i class="fas fa-clock-rotate-left"></i>
-                                        History
-                                    </button>
-                                </div>
+                                <button
+                                    on:click={() => showVoiTransfersModal = true}
+                                    class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
+                                    title="View VOI transaction history"
+                                >
+                                    <i class="fas fa-clock-rotate-left"></i>
+                                    History
+                                </button>
                             </div>
                         </div>
                         <div class="flex justify-between items-center">
@@ -1585,6 +1596,13 @@
                 value: accountBalance / 1e6
             }}
             walletId={walletAddress}
+        />
+    {/if}
+
+    <!-- Bridge Modal -->
+    {#if typeof walletAddress === 'string' && showBridgeModal}
+        <BridgeModal
+            bind:show={showBridgeModal}
         />
     {/if}
 </div> 
