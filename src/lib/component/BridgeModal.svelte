@@ -1403,7 +1403,7 @@
           <!-- Amount Input -->
           <div class="space-y-2">
             <label for="amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Amount <span class={isVoiToAlgorand ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"} font-semibold>
+              Amount <span class={isVoiToAlgorand ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-blue-600 dark:text-blue-400 font-semibold"}>
                 ({ isVoiToAlgorand ? 'VOI' : 'aVOI' })
               </span>
             </label>
@@ -1513,7 +1513,7 @@
             {:else if bridgeStatus === 'submitting'}
               <h4 class="text-lg font-medium text-gray-900 dark:text-white">Submitting Transaction</h4>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                Submitting to the <span class={isVoiToAlgorand ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"} font-medium>
+                Submitting to the <span class={isVoiToAlgorand ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-blue-600 dark:text-blue-400 font-medium"}>
                   {isVoiToAlgorand ? 'VOI Network' : 'Algorand'}
                 </span> network...
               </p>
