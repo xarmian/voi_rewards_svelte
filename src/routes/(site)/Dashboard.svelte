@@ -122,6 +122,9 @@
 	onMount(async () => {
 		isLoading = true;
 		try {
+			//@ts-ignore
+			//(adsbygoogle = window.adsbygoogle || []).push({});
+
 			// get online stake
 			supply = await getSupplyInfo();
 			await populateDateDropdown();
@@ -409,6 +412,13 @@
 			<GotVoiAd />
 		</div>
 	
+		<ins class="adsbygoogle"
+			style="display:block"
+			data-ad-client="ca-pub-0884252065241117"
+			data-ad-slot="7094546480"
+			data-ad-format="auto"
+			data-full-width-responsive="true"></ins>
+			
 		<!-- Rewards Section -->
 		<div id="rewards-section" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-12 relative z-10">
 			<div class="flex flex-col sm:flex-row items-center justify-between mb-6">
