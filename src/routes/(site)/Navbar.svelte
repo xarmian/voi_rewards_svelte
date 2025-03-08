@@ -49,7 +49,8 @@
     { href: '/faq', label: 'FAQ', icon: 'fas fa-question-circle' },
     { href: '/what_is_voi', label: 'What is Voi?', icon: 'fas fa-info-circle' },
     { href: '/how_to_node', label: 'Run a Node', icon: 'fas fa-server' },
-    { href: '/calculator', label: 'Rewards Calculator', icon: 'fas fa-calculator' }
+    { href: '/calculator', label: 'Rewards Calculator', icon: 'fas fa-calculator' },
+    { href: '/privacy', label: 'Privacy Policy', icon: 'fas fa-shield-alt' }
   ];
 
   const walletItems: WalletItem[] = [
