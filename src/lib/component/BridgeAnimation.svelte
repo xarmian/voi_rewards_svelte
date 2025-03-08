@@ -1,6 +1,8 @@
 <script lang="ts">
   export let direction: 'voi-to-algorand' | 'algorand-to-voi';
   export let status: 'bridging' | 'completed';
+  export let sourceToken: string;
+  export let destinationToken: string;
 
   $: isMovingRight = direction === 'voi-to-algorand';
   
@@ -70,8 +72,8 @@
   <div class="relative flex items-center justify-between">
     <!-- VOI Network -->
     <div class="flex flex-col items-center space-y-2">
-      <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center">
-        <span class="text-white font-bold text-xl">VOI</span>
+      <div class="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center">
+        <span class="text-white font-bold text-xl">{isMovingRight ? sourceToken : destinationToken}</span>
       </div>
       <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Voi Network</span>
     </div>
@@ -106,8 +108,8 @@
 
     <!-- Algorand Network -->
     <div class="flex flex-col items-center space-y-2">
-      <div class="w-16 h-16 rounded-full bg-black flex items-center justify-center">
-        <span class="text-white font-bold text-xl">aVOI</span>
+      <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center">
+        <span class="text-white font-bold text-xl">{isMovingRight ? destinationToken : sourceToken}</span>
       </div>
       <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Algorand</span>
     </div>

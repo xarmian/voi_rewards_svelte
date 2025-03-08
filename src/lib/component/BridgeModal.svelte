@@ -11,6 +11,31 @@
   import BridgeAnimation from './BridgeAnimation.svelte';
   import confetti from 'canvas-confetti';
 
+  interface BridgeToken {
+    name: string;
+    voiAssetId: string;
+    algorandAssetId: string;
+    symbol: string;
+    bridgedSymbol: string;
+  }
+
+  const BRIDGE_TOKENS: Record<string, BridgeToken> = {
+    'VOI': {
+      name: 'VOI',
+      voiAssetId: '0', // Network token
+      algorandAssetId: '2320775407',
+      symbol: 'VOI',      // Token symbol on VOI Network
+      bridgedSymbol: 'aVOI'  // Token symbol on Algorand
+    },
+    'USDC': {
+      name: 'USDC',
+      voiAssetId: '302190',
+      algorandAssetId: '31566704',
+      symbol: 'aUSDC',    // Token symbol on VOI Network
+      bridgedSymbol: 'USDC'  // Token symbol on Algorand
+    }
+  };
+
   type BridgeStatus = 'idle' | 'signing' | 'submitting' | 'bridging' | 'completed' | 'error';
   type BridgeDetails = {
     sourceTxId: string;
@@ -19,6 +44,9 @@
   };
 
   export let show = false;
+  export let tokenKey: keyof typeof BRIDGE_TOKENS = 'VOI';
+  
+  $: selectedToken = BRIDGE_TOKENS[tokenKey];
   
   const dispatch = createEventDispatcher();
   let selectedDirection: 'voi-to-algorand' | 'algorand-to-voi' = 'voi-to-algorand';
@@ -42,6 +70,7 @@
   let monitoringDots = '';
   let dotsInterval: number | undefined;
   let startMonitoringRound: number | null = null;
+  let remainingChecks = 3; // Add counter for remaining checks after modal closure
 
   interface NFDResult {
     name: string;
@@ -83,8 +112,6 @@
   let showSourceSearchResults = false;
   let sourceSearchResults: (NFDResult | ResolvedName)[] = [];
   let selectedSourceSearchIndex = -1;
-  let sourceSearchInputRef: HTMLInputElement;
-  let sourceSearchDropdownRef: HTMLDivElement;
   
   $: destinationAddress = isVoiToAlgorand ? algorandDestinationAddress : voiDestinationAddress;
   $: isVoiToAlgorand = selectedDirection === 'voi-to-algorand';
@@ -96,8 +123,6 @@
   $: displayDestinationAmount = destinationAmount / 1e6;
   
   const BRIDGE_ADDRESS = 'ARAMIDFJYV2TOFB5MRNZJIXBSAVZCVAUDAPFGKR5PNX4MTILGAZABBTXQQ';
-  const AVOI_TOKEN_ID = '2320775407';
-  const VOI_TOKEN_ID = '0';
 
   const unsub = selectedWallet.subscribe((wallet) => {
     if (wallet?.address) {
@@ -236,7 +261,7 @@
       const note = {
         destinationNetwork,
         destinationAddress,
-        destinationToken: AVOI_TOKEN_ID,
+        destinationToken: selectedToken.algorandAssetId,
         feeAmount,
         destinationAmount,
         note: "voirewards",
@@ -256,14 +281,28 @@
         // Get suggested params for the transaction
         const params = await algodClient.getTransactionParams().do();
         
-        // Create the payment transaction
-        const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-          from: $selectedWallet.address,
-          to: BRIDGE_ADDRESS,
-          amount: amountInAtomicUnits,
-          note: new TextEncoder().encode(noteString),
-          suggestedParams: params
-        });
+        // Create the transaction based on token type
+        let txn;
+        if (selectedToken.voiAssetId === '0') {
+          // Payment transaction for VOI
+          txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+            from: $selectedWallet.address,
+            to: BRIDGE_ADDRESS,
+            amount: amountInAtomicUnits,
+            note: new TextEncoder().encode(noteString),
+            suggestedParams: params
+          });
+        } else {
+          // ASA transfer for other tokens
+          txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+            from: $selectedWallet.address,
+            to: BRIDGE_ADDRESS,
+            amount: amountInAtomicUnits,
+            assetIndex: parseInt(selectedToken.voiAssetId),
+            note: new TextEncoder().encode(noteString),
+            suggestedParams: params
+          });
+        }
 
         // Sign transaction
         let signedTxns;
@@ -315,7 +354,7 @@
       const note = {
         destinationNetwork,
         destinationAddress: voiDestinationAddress,
-        destinationToken: VOI_TOKEN_ID,
+        destinationToken: selectedToken.voiAssetId,
         feeAmount,
         destinationAmount,
         note: "voirewards",
@@ -325,7 +364,7 @@
       const noteString = `aramid-transfer/v1:j${JSON.stringify(note)}`;
       
       // Construct Pera Wallet URL
-      const peraUrl = `perawallet://${BRIDGE_ADDRESS}?amount=${amountInAtomicUnits}&asset=${AVOI_TOKEN_ID}&xnote=${noteString}`;
+      const peraUrl = `perawallet://${BRIDGE_ADDRESS}?amount=${amountInAtomicUnits}&asset=${selectedToken.algorandAssetId}&xnote=${noteString}`;
       peraWalletUrl = peraUrl;
       
       try {
@@ -340,9 +379,14 @@
   }
 
   async function startBridgeMonitoring(sourceTxId: string) {
-    // Clear any existing interval
+    // Clear any existing intervals
     if (bridgeMonitorInterval) {
       clearInterval(bridgeMonitorInterval);
+      bridgeMonitorInterval = undefined;
+    }
+    if (dotsInterval) {
+      clearInterval(dotsInterval);
+      dotsInterval = undefined;
     }
 
     const checkDestinationTx = async () => {
@@ -389,7 +433,16 @@
                 ...bridgeDetails!,
                 destinationTxId: tx.id
               };
-              clearInterval(bridgeMonitorInterval);
+              
+              // Clear both intervals
+              if (bridgeMonitorInterval) {
+                clearInterval(bridgeMonitorInterval);
+                bridgeMonitorInterval = undefined;
+              }
+              if (dotsInterval) {
+                clearInterval(dotsInterval);
+                dotsInterval = undefined;
+              }
               
               // Trigger celebratory confetti
               triggerCelebration();
@@ -402,16 +455,29 @@
         }
       } catch (error) {
         console.error('Error checking destination transaction:', error);
+        // If there's an error, we might want to stop monitoring
+        if (error instanceof Error && error.message.includes('Failed to fetch')) {
+          if (bridgeMonitorInterval) {
+            clearInterval(bridgeMonitorInterval);
+            bridgeMonitorInterval = undefined;
+          }
+          if (dotsInterval) {
+            clearInterval(dotsInterval);
+            dotsInterval = undefined;
+          }
+        }
       }
     };
 
     // Check immediately and then every 5 seconds
     await checkDestinationTx();
-    bridgeMonitorInterval = window.setInterval(checkDestinationTx, 5000);
+    if (!bridgeMonitorInterval) { // Only set if not already set
+      bridgeMonitorInterval = window.setInterval(checkDestinationTx, 5000);
+    }
   }
 
   function triggerCelebration() {
-    const duration = 3 * 1000;
+    const duration = 8 * 1000;
     const animationEnd = Date.now() + duration;
 
     // Create a confetti cannon on each side
@@ -464,6 +530,9 @@
     if (bridgeMonitorInterval) {
       clearInterval(bridgeMonitorInterval);
     }
+    if (dotsInterval) {
+      clearInterval(dotsInterval);
+    }
   });
 
   function resetBridgeState() {
@@ -500,17 +569,25 @@
     dispatch('close');
   }
 
-  // Update destination address when direction changes
-  $: if (!isVoiToAlgorand) {
-    //destinationAddress = $selectedWallet?.address || '';
-  }
-
   async function checkOptIn(address: string) {
     if (!address || !algosdk.isValidAddress(address)) return;
     
     isCheckingOptIn = true;
     try {
-      const response = await fetch(`https://mainnet-api.4160.nodely.dev/v2/accounts/${address}/assets/${AVOI_TOKEN_ID}`);
+      // For VOI->Algorand, check Algorand address for aVOI opt-in
+      // For Algorand->VOI, check VOI address for aUSDC opt-in (if not VOI token)
+      const assetId = isVoiToAlgorand ? selectedToken.algorandAssetId : selectedToken.voiAssetId;
+      const endpoint = isVoiToAlgorand ? 
+        'https://mainnet-api.4160.nodely.dev' : 
+        'https://mainnet-api.voi.nodely.dev';
+
+      // Skip opt-in check if this is the VOI network token
+      if (!isVoiToAlgorand && selectedToken.voiAssetId === '0') {
+        isOptedIn = true;
+        return;
+      }
+
+      const response = await fetch(`${endpoint}/v2/accounts/${address}/assets/${assetId}`);
       isOptedIn = response.status === 200;
     } catch (error) {
       console.error('Error checking opt-in status:', error);
@@ -521,7 +598,8 @@
   }
 
   async function generateOptInQrCode() {
-    const optInUrl = `perawallet://?amount=0&asset=${AVOI_TOKEN_ID}`;
+    const assetId = isVoiToAlgorand ? selectedToken.algorandAssetId : selectedToken.voiAssetId;
+    const optInUrl = `perawallet://?amount=0&asset=${assetId}`;
     try {
       optInQrCodeDataUrl = await QRCode.toDataURL(optInUrl);
       showOptInQrCode = true;
@@ -541,9 +619,18 @@
     isLoadingBalance = true;
     try {
       const accountInfo = await algodClient.accountInformation(address).do();
-      voiBalance = accountInfo.amount / 1e6;
+      if (selectedToken.voiAssetId === '0') {
+        // For VOI token
+        voiBalance = accountInfo.amount / 1e6;
+      } else {
+        // For ASAs
+        const asset = accountInfo['assets']?.find(
+          (a: any) => a['asset-id'].toString() === selectedToken.voiAssetId
+        );
+        voiBalance = asset ? asset.amount / 1e6 : 0;
+      }
     } catch (error) {
-      console.error('Error fetching VOI balance:', error);
+      console.error('Error fetching balance:', error);
       voiBalance = null;
     } finally {
       isLoadingBalance = false;
@@ -717,7 +804,7 @@
     
     isLoadingAlgorandBalance = true;
     try {
-      const response = await fetch(`https://mainnet-api.4160.nodely.dev/v2/accounts/${address}/assets/${AVOI_TOKEN_ID}`);
+      const response = await fetch(`https://mainnet-api.4160.nodely.dev/v2/accounts/${address}/assets/${selectedToken.algorandAssetId}`);
       if (response.status === 200) {
         const data = await response.json();
         algorandSourceBalance = data['asset-holding'].amount / 1e6;
@@ -777,6 +864,12 @@
   async function monitorAlgorandTransactions() {
     if (!isVoiToAlgorand) {
       try {
+        // If modal is closed, decrement remaining checks
+        if (!showQrCode) {
+          remainingChecks--;
+          console.log(`Remaining checks: ${remainingChecks}`);
+        }
+
         // Get the initial round only once when monitoring starts
         if (startMonitoringRound === null) {
           const status = await fetch('https://mainnet-idx.4160.nodely.dev/health');
@@ -814,7 +907,7 @@
             const noteData = JSON.parse(noteString.replace(notePrefix, ''));
 
             // Check if this transaction matches our expected parameters
-            if (tx['asset-transfer-transaction']?.['asset-id'] === Number(AVOI_TOKEN_ID) &&
+            if (tx['asset-transfer-transaction']?.['asset-id'] === Number(selectedToken.algorandAssetId) &&
                 tx['asset-transfer-transaction'].receiver === BRIDGE_ADDRESS &&
                 tx['asset-transfer-transaction'].amount === amountInAtomicUnits &&
                 noteData.destinationAddress === voiDestinationAddress) {
@@ -861,11 +954,38 @@
   $: if (showQrCode && !isVoiToAlgorand) {
     isMonitoringAlgorand = true;
     startMonitoringRound = null; // Reset the starting round
+    remainingChecks = 3; // Reset remaining checks
     // Start dots animation
+    if (dotsInterval) {
+      clearInterval(dotsInterval);
+    }
     dotsInterval = window.setInterval(updateDots, 500);
     // Start monitoring Algorand transactions
+    if (bridgeMonitorInterval) {
+      clearInterval(bridgeMonitorInterval);
+    }
     bridgeMonitorInterval = window.setInterval(monitorAlgorandTransactions, 5000);
     monitorAlgorandTransactions(); // Check immediately
+  }
+
+  // Handle QR modal closure
+  $: if (!showQrCode && isMonitoringAlgorand) {
+    // If we're still monitoring but modal is closed, start countdown
+    if (remainingChecks > 0) {
+      console.log(`QR modal closed. Will check ${remainingChecks} more times.`);
+    } else {
+      // No more checks remaining, clean up
+      if (bridgeMonitorInterval) {
+        clearInterval(bridgeMonitorInterval);
+        bridgeMonitorInterval = undefined;
+      }
+      if (dotsInterval) {
+        clearInterval(dotsInterval);
+        dotsInterval = undefined;
+      }
+      isMonitoringAlgorand = false;
+      console.log('Monitoring stopped after final checks.');
+    }
   }
 
   onDestroy(() => {
@@ -883,14 +1003,101 @@
       checkOptIn(destinationAddress);
     }
   }
+
+  // Add token selector state
+  let showTokenSelector = false;
+  let tokenSelectorRef: HTMLDivElement;
+
+  // Handle click outside token selector
+  function handleTokenSelectorClickOutside(event: MouseEvent) {
+    if (tokenSelectorRef && !tokenSelectorRef.contains(event.target as Node)) {
+      showTokenSelector = false;
+    }
+  }
+
+  onMount(() => {
+    document.addEventListener('click', handleTokenSelectorClickOutside);
+    return () => {
+      document.removeEventListener('click', handleTokenSelectorClickOutside);
+    };
+  });
 </script>
 
-<Modal bind:open={show} size="md" autoclose={false} class="w-full max-h-[90vh]">
+<Modal bind:open={show} size="md" autoclose={false} class="w-full max-h-[90vh] overflow-visible" bodyClass="p-4 md:p-5 flex-1 overflow-y-auto overscroll-contain" backdropClass="!fixed inset-0 bg-gray-900/50 dark:bg-gray-900/80">
   <div class="flex flex-col h-full">
     <!-- Fixed Header -->
     <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-      <div class="flex flex-row space-x-2 items-end">
-        <h3 class="text-xl font-medium text-gray-900 dark:text-white">Bridge VOI Tokens</h3>
+      <div class="flex flex-row items-end justify-between">
+        <div class="flex items-center space-x-2">
+          <h3 class="text-xl font-medium text-gray-900 dark:text-white">Bridge</h3>
+          <div class="relative" bind:this={tokenSelectorRef}>
+            <button
+              type="button"
+              class="inline-flex items-center px-4 py-1.5 text-xl font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50 dark:disabled:hover:bg-blue-900/30 disabled:hover:border-blue-200 dark:disabled:hover:border-blue-800"
+              on:click={() => bridgeStatus === 'idle' && (showTokenSelector = !showTokenSelector)}
+              disabled={bridgeStatus !== 'idle'}
+            >
+              <div class="flex items-center space-x-2">
+                <span>{selectedToken.name}</span>
+                <svg class="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4 4 4-4" />
+                </svg>
+              </div>
+            </button>
+
+            {#if showTokenSelector}
+              <div class="absolute z-50 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-200 origin-top">
+                <ul class="py-1">
+                  {#each Object.entries(BRIDGE_TOKENS) as [key, token]}
+                    <li>
+                      <button
+                        class="w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center space-x-2 transition-colors duration-150"
+                        class:bg-blue-50={key === tokenKey}
+                        class:dark:bg-blue-900={key === tokenKey}
+                        class:text-blue-600={key === tokenKey}
+                        class:dark:text-blue-400={key === tokenKey}
+                        on:click={() => {
+                          tokenKey = key;
+                          showTokenSelector = false;
+                          // Reset form state when token changes
+                          amount = '';
+                          algorandDestinationAddress = '';
+                          voiDestinationAddress = '';
+                          resolvedName = null;
+                          isValidDestination = false;
+                          showSearchResults = false;
+                          searchResults = [];
+                          algorandSourceAddress = '';
+                          algorandSourceResolvedName = null;
+                          isValidSourceAddress = false;
+                          showSourceSearchResults = false;
+                          sourceSearchResults = [];
+                          algorandSourceBalance = null;
+                          if ($selectedWallet?.address) {
+                            fetchVoiBalance($selectedWallet.address);
+                          }
+                        }}
+                      >
+                        <div class="flex-1 font-medium">
+                          <span class="block text-base">{token.name}</span>
+                          <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {token.symbol} ↔ {token.bridgedSymbol}
+                          </span>
+                        </div>
+                        {#if key === tokenKey}
+                          <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        {/if}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+          </div>
+          <h3 class="text-xl font-medium text-gray-900 dark:text-white">Tokens</h3>
+        </div>
         <p class="text-sm text-gray-500 dark:text-gray-400">
           Powered by <a href="https://aramid.finance" target="_blank" class="text-blue-500 hover:underline">Aramid Bridge</a>
         </p>
@@ -919,7 +1126,7 @@
                 </div>
                 <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
                   <span class="mr-1">Receive</span>
-                  <span class="font-medium text-blue-600 dark:text-blue-400">aVOI</span>
+                  <span class="font-medium text-blue-600 dark:text-blue-400">{selectedToken.bridgedSymbol}</span>
                   <span class="ml-1">on Algorand</span>
                 </div>
               </div>
@@ -941,7 +1148,7 @@
                 </div>
                 <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
                   <span class="mr-1">Receive</span>
-                  <span class="font-medium text-emerald-600 dark:text-emerald-400">VOI</span>
+                  <span class="font-medium text-emerald-600 dark:text-emerald-400">{selectedToken.symbol}</span>
                   <span class="ml-1">on VOI Network</span>
                 </div>
               </div>
@@ -962,7 +1169,6 @@
                   <input
                     type="text"
                     bind:value={algorandSourceAddress}
-                    bind:this={sourceSearchInputRef}
                     on:input={(e) => handleSourceInput(e.currentTarget.value)}
                     on:keydown={handleSourceKeydown}
                     class="w-full pr-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
@@ -992,7 +1198,6 @@
 
                 {#if showSourceSearchResults && sourceSearchResults.length > 0}
                   <div 
-                    bind:this={sourceSearchDropdownRef}
                     class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
                   >
                     <ul class="max-h-60 overflow-auto py-1">
@@ -1076,7 +1281,7 @@
                         class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                         on:click={() => amount = algorandSourceBalance?.toString() || ''}
                       >
-                        Available balance: {algorandSourceBalance.toFixed(6)} aVOI
+                        Available balance: {algorandSourceBalance.toFixed(6)} {isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
                       </button>
                     {/if}
                   </div>
@@ -1214,7 +1419,7 @@
                     {:else if !isOptedIn}
                         <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
                         <p class="text-sm text-yellow-700 dark:text-yellow-200 mb-2">
-                            This address has not opted into aVOI. The recipient must opt in to asset {AVOI_TOKEN_ID} on Algorandbefore receiving tokens.
+                            This address has not opted into {selectedToken.bridgedSymbol}. The recipient must opt in to asset {selectedToken.algorandAssetId} before receiving tokens.
                         </p>
                         <div class="flex space-x-2">
                           <button
@@ -1404,7 +1609,7 @@
           <div class="space-y-2">
             <label for="amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Amount <span class={isVoiToAlgorand ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-blue-600 dark:text-blue-400 font-semibold"}>
-                ({ isVoiToAlgorand ? 'VOI' : 'aVOI' })
+                ({ isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol })
               </span>
             </label>
             {#if isVoiToAlgorand}
@@ -1413,7 +1618,7 @@
                   <p class="text-sm text-gray-500 dark:text-gray-400">Loading balance...</p>
                 {:else if voiBalance !== null}
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Available balance: {voiBalance.toFixed(6)} VOI
+                    Available balance: {voiBalance.toFixed(6)} {isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
                   </p>
                 {/if}
               </div>
@@ -1428,10 +1633,10 @@
             />
             <div class="space-y-1">
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                Bridge fee: {displayFeeAmount.toFixed(6)} {isVoiToAlgorand ? 'VOI' : 'aVOI'} (0.1%)
+                Bridge fee: {displayFeeAmount.toFixed(6)} {isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol} (0.1%)
               </p>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                You will receive: {displayDestinationAmount.toFixed(6)} {isVoiToAlgorand ? 'VOI' : 'aVOI'}
+                You will receive: {displayDestinationAmount.toFixed(6)} {isVoiToAlgorand ? selectedToken.bridgedSymbol : selectedToken.symbol}
               </p>
             </div>
           </div>
@@ -1484,7 +1689,7 @@
                     Scan this QR code with Pera Wallet or Defly Wallet to opt into aVOI
                   </p>
                   <a
-                    href={`perawallet://?amount=0&asset=${AVOI_TOKEN_ID}`}
+                    href={`perawallet://?amount=0&asset=${selectedToken.algorandAssetId}`}
                     class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
                   >
                     Open in Pera or Defly Wallet
@@ -1536,6 +1741,8 @@
             <BridgeAnimation 
               direction={selectedDirection}
               status={bridgeStatus === 'completed' ? 'completed' : 'bridging'}
+              sourceToken={isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
+              destinationToken={isVoiToAlgorand ? selectedToken.bridgedSymbol : selectedToken.symbol}
             />
           {/if}
 

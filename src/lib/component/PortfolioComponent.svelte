@@ -1605,6 +1605,7 @@
     {#if typeof walletAddress === 'string' && showBridgeModal}
         <BridgeModal
             bind:show={showBridgeModal}
+            tokenKey="VOI"
         />
     {/if}
 </div> 
