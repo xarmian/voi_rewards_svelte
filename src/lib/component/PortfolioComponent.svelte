@@ -1081,22 +1081,23 @@
                         <div class="flex items-center gap-2">
                             <button
                                 on:click={() => showSendVoiModal = true}
-                                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
+                                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-600"
                                 disabled={!canSignTransactions}
+                                title={!canSignTransactions ? "Connect wallet to send tokens" : "Send VOI"}
                             >
                                 <i class="fas fa-paper-plane"></i>
                                 Send
                             </button>
                             <button
                                 on:click={() => showBridgeModal = true}
-                                class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800"
+                                class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-600"
                                 disabled={!canSignTransactions}
+                                title={!canSignTransactions ? "Connect wallet to bridge tokens" : "Bridge VOI"}
                             >
                                 <i class="fas fa-bridge"></i>
                                 Bridge
                             </button>
-                        </div>
-                    </div>
+                        </div>                    </div>
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600 dark:text-gray-300">Available Balance</span>
