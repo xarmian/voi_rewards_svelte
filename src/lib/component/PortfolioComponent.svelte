@@ -1567,45 +1567,46 @@
         {/if}
     </div>
 
-    <!-- Send VOI Modal -->
-    {#if typeof walletAddress === 'string' && showSendVoiModal}
-        <SendTokenModal
-            bind:open={showSendVoiModal}
-            token={{
-                type: 'native',
-                symbol: 'VOI',
-                decimals: 6,
-                balance: accountBalance,
-                name: 'Voi'
-            }}
-            onTokenSent={handleTokenSent}
-        />
-    {/if}
-
-    <!-- VOI Transfers Modal -->
-    {#if typeof walletAddress === 'string' && showVoiTransfersModal}
-        <TokenTransfersModal
-            bind:open={showVoiTransfersModal}
-            token={{
-                id: '0',
-                type: 'native',
-                symbol: 'VOI',
-                decimals: 6,
-                balance: accountBalance,
-                name: 'Voi',
-                verified: true,
-                imageUrl: '/icons/voi_icon.png',
-                value: accountBalance / 1e6
-            }}
-            walletId={walletAddress}
-        />
-    {/if}
-
-    <!-- Bridge Modal -->
-    {#if typeof walletAddress === 'string' && showBridgeModal}
-        <BridgeModal
-            bind:show={showBridgeModal}
-            tokenKey="VOI"
-        />
-    {/if}
 </div> 
+
+<!-- Send VOI Modal -->
+{#if typeof walletAddress === 'string' && showSendVoiModal}
+    <SendTokenModal
+        bind:open={showSendVoiModal}
+        token={{
+            type: 'native',
+            symbol: 'VOI',
+            decimals: 6,
+            balance: accountBalance,
+            name: 'Voi'
+        }}
+        onTokenSent={handleTokenSent}
+    />
+{/if}
+
+<!-- VOI Transfers Modal -->
+{#if typeof walletAddress === 'string' && showVoiTransfersModal}
+    <TokenTransfersModal
+        bind:open={showVoiTransfersModal}
+        token={{
+            id: '0',
+            type: 'native',
+            symbol: 'VOI',
+            decimals: 6,
+            balance: accountBalance,
+            name: 'Voi',
+            verified: true,
+            imageUrl: '/icons/voi_icon.png',
+            value: accountBalance / 1e6
+        }}
+        walletId={walletAddress}
+    />
+{/if}
+
+<!-- Bridge Modal -->
+{#if typeof walletAddress === 'string' && showBridgeModal}
+    <BridgeModal
+        bind:show={showBridgeModal}
+        tokenKey="VOI"
+    />
+{/if}

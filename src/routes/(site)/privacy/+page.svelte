@@ -51,10 +51,9 @@
   </section>
 
   <section class="mb-8">
-    <h2 class="text-2xl font-semibold mb-4">Google Ads and Analytics</h2>
+    <h2 class="text-2xl font-semibold mb-4">Ads and Analytics</h2>
     <p>
-      We use Google Ads and Google Analytics to serve advertisements and analyze traffic. These services may use cookies and other tracking technologies to collect and track information about your browsing behavior. You can learn more about Google's privacy practices by visiting their 
-      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">Privacy Policy</a>.
+      We may use Ads and Analytics to serve advertisements and analyze traffic. These services may use cookies and other tracking technologies to collect and track information about your browsing behavior.
     </p>
   </section>
 
