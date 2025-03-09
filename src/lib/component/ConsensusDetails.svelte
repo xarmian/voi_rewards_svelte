@@ -69,6 +69,7 @@
     ];
 
     function updateConsensusHealth(timeSinceLastVote: number, balanceInVoi: number) {
+        console.log('timeSinceLastVote', timeSinceLastVote);
         if (balanceInVoi < 1_000 && timeSinceLastVote > 86400) {
             consensusHealth = 'unknown';
             return;
@@ -135,31 +136,16 @@
     }
 
     onMount(() => {
-        // Update time since last vote every second, but only update health if we have consensus details
+        // Update time since last vote every second, but only update health when expanded
         voteTimeInterval = setInterval(() => {
             if (lastVoteTimestamp !== undefined && consensusDetails) {
                 timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-                // Only update health if we have actual consensus details from an API call
-                if (accountStatus === 'Online') {
+                // Only update health if expanded or for a wallet address change
+                if (accountStatus === 'Online' && isConsensusDetailsExpanded) {
                     updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
                 }
             }
         }, 1000);
-
-        return () => {
-            if (voteTimeInterval) {
-                clearInterval(voteTimeInterval);
-                voteTimeInterval = null;
-            }
-            if (consensusUpdateInterval) {
-                clearInterval(consensusUpdateInterval);
-                consensusUpdateInterval = null;
-            }
-            if (initialUpdateTimeout) {
-                clearTimeout(initialUpdateTimeout);
-                initialUpdateTimeout = null;
-            }
-        };
     });
 
     onDestroy(() => {
