@@ -45,6 +45,7 @@
 
   export let show = false;
   export let tokenKey: keyof typeof BRIDGE_TOKENS = 'VOI';
+  export let canSignTransactions = false;
   
   $: selectedToken = BRIDGE_TOKENS[tokenKey];
   
@@ -1021,15 +1022,42 @@
       document.removeEventListener('click', handleTokenSelectorClickOutside);
     };
   });
+
+  // Update the selectedDirection reactive declaration to default to algorand-to-voi when canSignTransactions is false
+  $: {
+    if (!canSignTransactions && selectedDirection === 'voi-to-algorand') {
+      selectedDirection = 'algorand-to-voi';
+    }
+  }
 </script>
 
-<Modal bind:open={show} size="md" autoclose={false} class="w-full max-h-[90vh] overflow-visible" bodyClass="p-4 md:p-5 flex-1 overflow-y-auto overscroll-contain" backdropClass="!fixed inset-0 bg-gray-900/50 dark:bg-gray-900/80">
+<style>
+  /* Add touch-friendly tap targets */
+  @media (max-width: 640px) {
+    :global(.mobile-tap-target) {
+      min-height: 44px;
+    }
+    
+    :global(.mobile-select) {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+  }
+</style>
+
+<Modal 
+  bind:open={show} 
+  size="md" 
+  autoclose={false} 
+  class="w-full max-h-[95vh] md:max-h-[90vh] overflow-visible" 
+  bodyClass="p-2 md:p-4 flex-1 overflow-y-auto overscroll-contain"
+  backdropClass="!fixed inset-0 bg-gray-900/50 dark:bg-gray-900/80"
+>
   <div class="flex flex-col h-full">
     <!-- Fixed Header -->
-    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-      <div class="flex flex-row items-end justify-between">
+    <div class="px-3 py-3 md:px-6 md:py-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between space-y-2 md:space-y-0">
         <div class="flex items-center space-x-2">
-          <h3 class="text-xl font-medium text-gray-900 dark:text-white">Bridge</h3>
+          <h3 class="text-lg md:text-xl font-medium text-gray-900 dark:text-white">Bridge</h3>
           <div class="relative" bind:this={tokenSelectorRef}>
             <button
               type="button"
@@ -1098,7 +1126,7 @@
           </div>
           <h3 class="text-xl font-medium text-gray-900 dark:text-white">Tokens</h3>
         </div>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
+        <p class="text-xs md:text-sm text-gray-500 dark:text-gray-400">
           Powered by <a href="https://aramid.finance" target="_blank" class="text-blue-500 hover:underline">Aramid Bridge</a>
         </p>
       </div>
@@ -1109,50 +1137,69 @@
       {#if bridgeStatus === 'idle'}
         <div class="space-y-6">
           <!-- Bridge Direction Selection -->
-          <div class="flex flex-row space-x-4">
-            <button
-              class={`p-4 border-2 rounded-lg w-1/2 transition-all duration-200 ${
-                selectedDirection === 'voi-to-algorand'
-                  ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
-              }`}
-              on:click={() => selectedDirection = 'voi-to-algorand'}
-            >
-              <div class="flex flex-col items-center space-y-3">
-                <div class="font-medium text-lg">
-                  <span class="text-emerald-600 dark:text-emerald-400 font-semibold">VOI Network</span>
-                  <span class="mx-2">→</span>
-                  <span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
+          <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
+            <div class="relative w-full md:w-1/2 group">
+              <button
+                class={`w-full p-3 md:p-4 border-2 rounded-lg transition-all duration-200 ${
+                  selectedDirection === 'voi-to-algorand'
+                    ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+                } ${!canSignTransactions ? 'opacity-50 cursor-not-allowed' : ''}`}
+                on:click={() => {
+                  if (canSignTransactions) {
+                    selectedDirection = 'voi-to-algorand';
+                  }
+                }}
+                aria-describedby="voi-to-algo-tooltip"
+              >
+                <div class="flex flex-col items-center space-y-2 md:space-y-3">
+                  <div class="font-medium text-base md:text-lg">
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">VOI Network</span>
+                    <span class="mx-2">→</span>
+                    <span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
+                  </div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+                    <span class="mr-1">Receive</span>
+                    <span class="font-medium text-blue-600 dark:text-blue-400">{selectedToken.bridgedSymbol}</span>
+                    <span class="ml-1">on Algorand</span>
+                  </div>
                 </div>
-                <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                  <span class="mr-1">Receive</span>
-                  <span class="font-medium text-blue-600 dark:text-blue-400">{selectedToken.bridgedSymbol}</span>
-                  <span class="ml-1">on Algorand</span>
+              </button>
+              {#if !canSignTransactions}
+                <div
+                  id="voi-to-algo-tooltip"
+                  class="absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 px-3 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg shadow-sm dark:bg-gray-700 -bottom-12 left-1/2 transform -translate-x-1/2 w-max"
+                  role="tooltip"
+                >
+                  Please connect a VOI Network wallet<br/>to enable this option
+                  <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-8 border-transparent border-b-gray-900 dark:border-b-gray-700"></div>
                 </div>
-              </div>
-            </button>
+              {/if}
+            </div>
             
-            <button
-              class={`p-4 border-2 rounded-lg w-1/2 transition-all duration-200 ${
-                selectedDirection === 'algorand-to-voi'
-                  ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
-              }`}
-              on:click={() => selectedDirection = 'algorand-to-voi'}
-            >
-              <div class="flex flex-col items-center space-y-3">
-                <div class="font-medium text-lg">
-                  <span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
-                  <span class="mx-2">→</span>
-                  <span class="text-emerald-600 dark:text-emerald-400 font-semibold">VOI Network</span>
+            <div class="relative w-full md:w-1/2 group">
+              <button
+              class={`w-full p-3 md:p-4 border-2 rounded-lg transition-all duration-200 ${
+                  selectedDirection === 'algorand-to-voi'
+                    ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+                }`}
+                on:click={() => selectedDirection = 'algorand-to-voi'}
+              >
+                <div class="flex flex-col items-center space-y-3">
+                  <div class="font-medium text-lg">
+                    <span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
+                    <span class="mx-2">→</span>
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">VOI Network</span>
+                  </div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+                    <span class="mr-1">Receive</span>
+                    <span class="font-medium text-emerald-600 dark:text-emerald-400">{selectedToken.symbol}</span>
+                    <span class="ml-1">on VOI Network</span>
+                  </div>
                 </div>
-                <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                  <span class="mr-1">Receive</span>
-                  <span class="font-medium text-emerald-600 dark:text-emerald-400">{selectedToken.symbol}</span>
-                  <span class="ml-1">on VOI Network</span>
-                </div>
-              </div>
-            </button>
+              </button>
+            </div>
           </div>
 
           <!-- Source Address (only for Algorand to VOI) -->
@@ -1171,7 +1218,7 @@
                     bind:value={algorandSourceAddress}
                     on:input={(e) => handleSourceInput(e.currentTarget.value)}
                     on:keydown={handleSourceKeydown}
-                    class="w-full pr-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                    class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
                     placeholder="Enter address or search NFDomains..."
                     class:border-green-500={isValidSourceAddress}
                     class:border-red-500={algorandSourceAddress && !isValidSourceAddress}
@@ -1198,7 +1245,7 @@
 
                 {#if showSourceSearchResults && sourceSearchResults.length > 0}
                   <div 
-                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
                   >
                     <ul class="max-h-60 overflow-auto py-1">
                       {#each sourceSearchResults as result, i}
@@ -1312,7 +1359,7 @@
                         showSearchResults = false;
                       }
                     }}
-                    class="w-full pr-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                    class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
                     placeholder="Enter address or search Envoi names..."
                     class:border-green-500={isValidDestination}
                     class:border-red-500={destinationAddress && !isValidDestination}
@@ -1339,7 +1386,7 @@
                 {#if showSearchResults && searchResults.length > 0}
                   <div 
                     bind:this={searchDropdownRef}
-                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
                   >
                     <ul class="max-h-60 overflow-auto py-1">
                       {#each searchResults as result, i}
@@ -1457,7 +1504,7 @@
                         showSearchResults = false;
                       }
                     }}
-                    class="w-full pr-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                    class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
                     placeholder="Enter address or search Envoi names..."
                     class:border-green-500={isValidDestination}
                     class:border-red-500={destinationAddress && !isValidDestination}
@@ -1485,7 +1532,7 @@
                 {#if showConnectedWallets && uniqueConnectedWallets.length > 0 && !voiDestinationAddress}
                   <div 
                     bind:this={searchDropdownRef}
-                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
                   >
                     <ul class="max-h-48 overflow-auto py-1">
                       {#each uniqueConnectedWallets as address, i}
@@ -1528,7 +1575,7 @@
                 {#if showSearchResults && searchResults.length > 0}
                   <div 
                     bind:this={searchDropdownRef}
-                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+                    class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
                   >
                     <ul class="max-h-60 overflow-auto py-1">
                       {#each searchResults as result, i}
@@ -1648,13 +1695,13 @@
 
           <!-- QR Code Modal -->
           <Modal bind:open={showQrCode} size="sm" autoclose={false}>
-            <div class="p-4">
-              <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-medium text-gray-900 dark:text-white">Scan QR Code</h3>
+            <div class="p-3 md:p-4">
+              <div class="flex justify-between items-center mb-3 md:mb-4">
+                <h3 class="text-lg md:text-xl font-medium text-gray-900 dark:text-white">Scan QR Code</h3>
               </div>
               
-              <div class="flex flex-col items-center space-y-4">
-                <img src={qrCodeDataUrl} alt="Bridge QR Code" class="w-64 h-64" />
+              <div class="flex flex-col items-center space-y-3 md:space-y-4">
+                <img src={qrCodeDataUrl} alt="Bridge QR Code" class="w-56 h-56 md:w-64 md:h-64" />
                 <div class="flex flex-col items-center gap-2">
                   <p class="text-sm text-gray-600 dark:text-gray-400">
                     Scan this QR code with Pera Wallet or Defly Wallet
@@ -1787,12 +1834,12 @@
     </div>
 
     <!-- Fixed Footer -->
-    <div class="p-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+    <div class="p-3 md:p-6 pt-3 md:pt-4 border-t border-gray-200 dark:border-gray-700">
       {#if bridgeStatus === 'idle'}
-        <div class="flex justify-end space-x-4">
+        <div class="flex justify-end space-x-3 md:space-x-4">
           <button
             on:click={closeModal}
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
+            class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
           >
             Cancel
           </button>
@@ -1800,13 +1847,13 @@
             on:click={handleSubmit}
             disabled={submitButtonDisabled}
             title={submitButtonTooltip}
-            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isVoiToAlgorand ? 'Bridge to Algorand' : 'Generate QR Code'}
           </button>
         </div>
       {:else}
-        <div class="flex justify-end space-x-4">
+        <div class="flex justify-end space-x-3 md:space-x-4">
           {#if bridgeStatus === 'completed'}
             <button
               on:click={() => {
@@ -1826,27 +1873,27 @@
                 sourceSearchResults = [];
                 algorandSourceBalance = null;
               }}
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
+              class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
             >
               Bridge Again
             </button>
             <button
               on:click={closeModal}
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
+              class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
               Close
             </button>
           {:else if bridgeStatus === 'bridging'}
             <button
               on:click={closeModal}
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
+              class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
               Close
             </button>
           {:else}
             <button
               on:click={goBack}
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
+              class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
             >
               Back
             </button>

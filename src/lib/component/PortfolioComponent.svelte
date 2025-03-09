@@ -1091,7 +1091,6 @@
                             <button
                                 on:click={() => showBridgeModal = true}
                                 class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-600"
-                                disabled={!canSignTransactions}
                                 title={!canSignTransactions ? "Connect wallet to bridge tokens" : "Bridge VOI"}
                             >
                                 <i class="fas fa-bridge"></i>
@@ -1609,5 +1608,6 @@
     <BridgeModal
         bind:show={showBridgeModal}
         tokenKey="VOI"
+        {canSignTransactions}
     />
 {/if}
