@@ -98,10 +98,14 @@
             const updatedConsensus = await getConsensusInfo(walletAddress, true);
             if (updatedConsensus) {
                 consensusDetails = updatedConsensus;
+
                 if (updatedConsensus.last_vote_timestamp) {
                     lastVoteTimestamp = new Date(updatedConsensus.last_vote_timestamp).getTime();
                     timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
                     updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
+                }
+                else {
+                    consensusHealth = 'unknown';
                 }
             }
         } catch (error) {
@@ -131,11 +135,6 @@
     }
 
     onMount(() => {
-        /*// Initial single update on mount
-        if (accountStatus === 'Online' && walletAddress) {
-            updateConsensusDetails();
-        }*/
-
         // Update time since last vote every second, but only update health if we have consensus details
         voteTimeInterval = setInterval(() => {
             if (lastVoteTimestamp !== undefined && consensusDetails) {
@@ -214,7 +213,7 @@
     {/if}
 </div>
 
-{#if accountStatus === 'Online' && consensusDetails && isConsensusDetailsExpanded}
+{#if accountStatus === 'Online' && isConsensusDetailsExpanded}
     <div 
         class="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-left"
         transition:fade={{ duration: 150 }}
@@ -239,35 +238,39 @@
                     </div>
                 {/if}
             </div>
-            <div>
-                <h4 class="font-medium text-gray-900 dark:text-white mb-2">Voting Activity</h4>
-                <div class="space-y-1">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Total Votes</span>
-                        <span class="text-gray-900 dark:text-white">{consensusDetails.vote_count.toLocaleString()}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Total Blocks</span>
-                        <span class="text-gray-900 dark:text-white">{consensusDetails.total_blocks.toLocaleString()}</span>
-                    </div>
-                    {#if timeSinceLastVote !== undefined}
+            {#if consensusDetails && consensusDetails?.vote_count && consensusDetails?.total_blocks}
+                <div>
+                    <h4 class="font-medium text-gray-900 dark:text-white mb-2">Voting Activity</h4>
+                    <div class="space-y-1">
                         <div class="flex justify-between">
-                            <span class="text-gray-600 dark:text-gray-400">Last Vote</span>
-                            <span class="text-gray-900 dark:text-white">
-                                {#if timeSinceLastVote < 60}
-                                    {Math.floor(timeSinceLastVote)}s ago
-                                {:else if timeSinceLastVote < 3600}
-                                    {Math.floor(timeSinceLastVote / 60)}m {Math.floor(timeSinceLastVote % 60)}s ago
-                                {:else if timeSinceLastVote < 86400}
-                                    {Math.floor(timeSinceLastVote / 3600)}h {Math.floor((timeSinceLastVote % 3600) / 60)}m ago
-                                {:else}
-                                    {Math.floor(timeSinceLastVote / 86400)}d {Math.floor((timeSinceLastVote % 86400) / 3600)}h ago
-                                {/if}
-                            </span>
+                            <span class="text-gray-600 dark:text-gray-400">Total Votes</span>
+                            <span class="text-gray-900 dark:text-white">{consensusDetails.vote_count.toLocaleString()}</span>
                         </div>
-                    {/if}
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Total Blocks</span>
+                            <span class="text-gray-900 dark:text-white">{consensusDetails.total_blocks.toLocaleString()}</span>
+                        </div>
+                        {#if timeSinceLastVote !== undefined}
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Last Vote</span>
+                                <span class="text-gray-900 dark:text-white">
+                                    {#if timeSinceLastVote < 60}
+                                        {Math.floor(timeSinceLastVote)}s ago
+                                    {:else if timeSinceLastVote < 3600}
+                                        {Math.floor(timeSinceLastVote / 60)}m {Math.floor(timeSinceLastVote % 60)}s ago
+                                    {:else if timeSinceLastVote < 86400}
+                                        {Math.floor(timeSinceLastVote / 3600)}h {Math.floor((timeSinceLastVote % 3600) / 60)}m ago
+                                    {:else}
+                                        {Math.floor(timeSinceLastVote / 86400)}d {Math.floor((timeSinceLastVote % 86400) / 3600)}h ago
+                                    {/if}
+                                </span>
+                            </div>
+                        {/if}
+                    </div>
                 </div>
-            </div>
+            {:else}
+                <p class="text-gray-500 dark:text-gray-400">No voting activity data available</p>
+            {/if}
         </div>
         {#if consensusHealth === 'warning' || consensusHealth === 'error' || consensusHealth === 'unknown'}
             <div class="mt-3 p-2 rounded {consensusHealth === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/20' : 

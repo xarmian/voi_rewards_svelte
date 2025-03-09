@@ -166,7 +166,6 @@
             }
         }
 
-        console.log('Decoded state:', result);
         return result as StakingContract;
     }
 
