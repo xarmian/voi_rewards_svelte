@@ -51,7 +51,7 @@
     <!-- Contract Header -->
     <div class="px-4 lg:px-6 py-3 lg:py-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 lg:gap-4">
+            <div class="flex items-center gap-2 lg:gap-4 w-full justify-between">
                 <div class="space-y-1">
                     <div class="flex items-center gap-2">
                         <h3 class="text-lg lg:text-xl font-bold text-gray-900 dark:text-white">Lock Contract</h3>
@@ -61,6 +61,7 @@
                             class="text-blue-500 hover:text-blue-600 transition-colors"
                             aria-label="View Contract on Explorer"
                         >
+                            {contract.contractId}
                             <i class="fas fa-external-link-alt text-sm"></i>
                         </a>
                     </div>
