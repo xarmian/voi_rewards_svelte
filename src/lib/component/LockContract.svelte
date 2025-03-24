@@ -6,7 +6,7 @@
     export let onWithdrawClick: (contract: ContractDetails) => void;
     export let onRegisterVoteKeyClick: (contract: ContractDetails) => void;
 
-    let isWatchAccount = ($selectedWallet?.app || 'Watch') === 'Watch';
+    $: isWatchAccount = ($selectedWallet?.app || 'Watch') === 'Watch';
     let isExpanded = false;
 
     function formatNumber(num: number): string {
