@@ -272,7 +272,7 @@
             estimatedRewardsPerDay: childWeeklyReward / 7,
             estimatedRewardsPerWeek: childWeeklyReward,
             estimatedRewardsPerMonth: childMonthlyReward
-          }];
+          }].sort((a, b) => b.balance - a.balance);
         }));
 
       } catch (error) {

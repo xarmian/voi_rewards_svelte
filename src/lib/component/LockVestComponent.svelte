@@ -1,8 +1,13 @@
 <script lang="ts">
+  import LockContract from './LockContract.svelte';
+
     import { algodClient } from '$lib/utils/algod';
     import * as algosdk from 'algosdk';
     import WithdrawModal from './WithdrawModal.svelte';
+    import RegisterVoteKey from './RegisterVoteKey.svelte';
+    import { getConsensusInfo } from '$lib/stores/accounts';
     import type { ContractDetails } from '$lib/types';
+    import { selectedWallet } from 'avm-wallet-svelte';
 
     export let childAccounts: {
         contractId: number;
@@ -16,6 +21,8 @@
     let error: string | null = null;
     let selectedContract: ContractDetails | null = null;
     let showWithdrawModal = false;
+    let showRegisterVoteKey = false;
+    let consensusData: { [key: string]: any } = {};
 
     function decodeState(state: any, address: string): ContractDetails {
         const result: any = {
@@ -174,6 +181,10 @@
                         availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
                     }
 
+                    // Get consensus data
+                    const consensusInfo = await getConsensusInfo(account.address, true);
+                    consensusData[account.address] = consensusInfo;
+
                     return {
                         contractId: account.contractId,
                         contractAddress: account.address,
@@ -195,7 +206,9 @@
                         lockupDelay: Number(decodedState.global_lockup_delay ?? 0),
                         vestingDelay: Number(decodedState.global_vesting_delay ?? 0),
                         periodSeconds: Number(decodedState.global_period_seconds ?? 0),
-                        period: Number(decodedState.global_period ?? 0)
+                        period: Number(decodedState.global_period ?? 0),
+                        consensusDetails: consensusInfo,
+                        accountInfo: accountInfo
                     };
                 } catch (err) {
                     console.error('Error loading contract:', err);
@@ -205,7 +218,7 @@
 
             // Wait for all promises to resolve and filter out any null results
             const results = await Promise.all(contractPromises);
-            contracts = results.filter((contract): contract is ContractDetails => contract !== null);
+            contracts = results.filter(contract => contract !== null) as ContractDetails[];
             
         } catch (err) {
             console.error('Error loading contracts:', err);
@@ -222,28 +235,6 @@
         }).format(num / 1_000_000); // Convert from microVOI to VOI
     }
 
-    function formatDate(date: Date): string {
-        return new Intl.DateTimeFormat('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZoneName: 'short'
-        }).format(date);
-    }
-
-    function formatDuration(seconds: number): string {
-        // Convert to milliseconds and show in months, rounded
-        const ms = seconds * 1000;
-        const months = Math.round(ms / (30.44 * 24 * 60 * 60 * 1000));
-        return `${months} ${months === 1 ? 'month' : 'months'}`;
-    }
-
-    function truncateAddress(address: string): string {
-        return `${address.slice(0, 6)}...${address.slice(-4)}`;
-    }
-
     function handleWithdrawClick(contract: ContractDetails) {
         selectedContract = contract;
         showWithdrawModal = true;
@@ -254,6 +245,19 @@
             await loadContractDetails();
         }
         selectedContract = null;
+    }
+
+    function handleRegisterVoteKey(contract: ContractDetails) {
+        selectedContract = contract;
+        showRegisterVoteKey = true;
+    }
+
+    async function handleVoteKeySuccess(forceRefresh = false) {
+        if (forceRefresh) {
+            await loadContractDetails();
+        }
+        selectedContract = null;
+        showRegisterVoteKey = false;
     }
 
     $: {
@@ -312,115 +316,17 @@
             </div>
         </div>
 
+        <!-- If user's selected wallet is a watch account, show a message -->
+        {#if ($selectedWallet?.app || 'Watch') === 'Watch'}
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <p class="text-yellow-600 dark:text-yellow-400 text-center">The selected account is a Watch account. To withdraw or register node participation keys, please connect your wallet.</p>
+            </div>
+        {/if}
+
         <!-- Contract List -->
         <div class="space-y-6">
             {#each contracts as contract}
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                    <!-- Contract Header -->
-                    <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                    Contract <a href={`https://explorer.voi.network/explorer/application/${contract.contractId}`} target="_blank" class="text-blue-500 hover:text-blue-600">
-                                        {contract.contractId}
-                                    </a>
-                                </h3>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">
-                                    <a href={`https://explorer.voi.network/explorer/account/${contract.contractAddress}`} target="_blank" class="text-blue-500 hover:text-blue-600">
-                                        {truncateAddress(contract.contractAddress)}
-                                    </a>
-                                </p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    contract.isParticipating
-                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                                }`}>
-                                    {contract.isParticipating ? 'Online' : 'Offline'}
-                                </span>
-                                <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    contract.isFullyVested
-                                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
-                                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                                }`}>
-                                    {contract.isFullyVested ? 'Fully Vested' : 'Vesting'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Contract Details -->
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Balance Information -->
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Information</h4>
-                            <div class="space-y-2">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Current Balance</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{formatNumber(contract.balance)} VOI</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Locked Balance</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{formatNumber(contract.lockedBalance)} VOI</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Available for Withdrawal</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{formatNumber(contract.availableForWithdrawal)} VOI</span>
-                                </div>
-                                {#if contract.availableForWithdrawal > 0}
-                                    <button
-                                        on:click={() => handleWithdrawClick(contract)}
-                                        class="mt-2 w-full inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-                                    >
-                                        <i class="fas fa-wallet mr-2"></i>
-                                        Withdraw Available Balance
-                                    </button>
-                                {/if}
-                            </div>
-                        </div>
-
-                        <!-- Vesting Schedule -->
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Vesting Schedule</h4>
-                            <div class="space-y-2">
-                                {#if contract.nextVestingDate}
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600 dark:text-gray-300">Next Vesting</span>
-                                        <span class="font-medium text-gray-900 dark:text-white">{formatDate(contract.nextVestingDate)}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600 dark:text-gray-300">Next Amount</span>
-                                        <span class="font-medium text-gray-900 dark:text-white">{formatNumber(contract.nextVestingAmount)} VOI</span>
-                                    </div>
-                                {/if}
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Remaining to Vest</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{formatNumber(contract.remainingVestingAmount)} VOI</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Contract Terms -->
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Contract Terms</h4>
-                            <div class="space-y-2">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Lockup Period</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{formatDuration(contract.lockupPeriod)}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Vesting Period</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{formatDuration(contract.vestingPeriod)}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600 dark:text-gray-300">Distribution Count</span>
-                                    <span class="font-medium text-gray-900 dark:text-white">{contract.distributionCount}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <LockContract contract={contract} onWithdrawClick={handleWithdrawClick} onRegisterVoteKeyClick={handleRegisterVoteKey} />
             {/each}
         </div>
     {/if}
@@ -431,5 +337,16 @@
         contract={selectedContract}
         bind:show={showWithdrawModal}
         onSuccess={handleWithdrawSuccess}
+    />
+{/if}
+
+{#if selectedContract && showRegisterVoteKey}
+    <RegisterVoteKey
+        walletAddress={selectedContract.contractAddress}
+        parentWalletAddress={selectedContract.owner}
+        contractId={selectedContract.contractId}
+        isOnline={selectedContract.isParticipating}
+        bind:showModal={showRegisterVoteKey}
+        onSuccess={handleVoteKeySuccess}
     />
 {/if}

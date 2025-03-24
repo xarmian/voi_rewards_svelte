@@ -242,15 +242,15 @@
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600 dark:text-gray-400">Current Balance</span>
-                            <span class="font-medium text-gray-900 dark:text-white">{currentBalanceVOI.toFixed(2)} VOI</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{currentBalanceVOI.toLocaleString()} VOI</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600 dark:text-gray-400">Locked Balance</span>
-                            <span class="font-medium text-gray-900 dark:text-white">{lockedBalanceVOI.toFixed(2)} VOI</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{lockedBalanceVOI.toLocaleString()} VOI</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600 dark:text-gray-400">Available Balance</span>
-                            <span class="font-medium text-gray-900 dark:text-white">{availableBalanceVOI.toFixed(2)} VOI</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{availableBalanceVOI.toLocaleString()} VOI</span>
                         </div>
                     </div>
 

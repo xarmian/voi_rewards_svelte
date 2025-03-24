@@ -51,4 +51,40 @@ export interface ContractDetails {
     global_distribution_count?: number;
     global_distribution_seconds?: number;
     global_owner?: string;
+    consensusInfo?: {
+        'vote-first-valid': number;
+        'vote-last-valid': number;
+        'vote-key-dilution': number;
+        'selection-participation-key': string;
+        'vote-participation-key': string;
+        'state-proof-key': string;
+    };
+    consensusDetails?: {
+        first_block: number;
+        last_block: number;
+        last_vote_block: number;
+        last_vote_timestamp: string;
+        total_blocks: number;
+        vote_count: number;
+    };
+    participation?: {
+        'vote-first-valid': number;
+        'vote-last-valid': number;
+        'vote-key-dilution': number;
+        'selection-participation-key': string;
+        'vote-participation-key': string;
+        'state-proof-key': string;
+    };
+    accountInfo?: {
+        round: number;
+        status: string;
+        participation: {
+            'vote-first-valid': number;
+            'vote-last-valid': number;
+            'vote-key-dilution': number;
+            'selection-participation-key': string;
+            'vote-participation-key': string;
+            'state-proof-key': string;
+        };
+    };
 }
