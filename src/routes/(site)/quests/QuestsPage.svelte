@@ -113,13 +113,15 @@
                       <i class="fas fa-arrow-right flex-grow text-end"></i>
                     </a>
                   {:else}
-                    <a on:click|stopPropagation={() => selectedProjectId = project.id} class="flex h-14 w-full bg-white text-[#41137E] dark:bg-gray-700 dark:text-[#D4BFF6] rounded-md font-bold px-4 py-2 items-center space-x-2 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-500">
+                    <button on:click|stopPropagation={() => selectedProjectId = project.id} 
+                      class="flex h-14 w-full bg-white text-[#41137E] dark:bg-gray-700 dark:text-[#D4BFF6] rounded-md font-bold px-4 py-2 items-center space-x-2 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-500" 
+                      aria-label="Project Quests">
                       <div class="rounded-full bg-[#D4BFF6] h-6 w-6 flex items-center justify-center">
                         <i class="fa-regular fa-comment text-[#41137E] text-xs"></i>
                       </div>
                       <div>Project Quests</div>
                       <i class="fas fa-arrow-right flex-grow text-end"></i>
-                    </a>
+                    </button>
                   {/if}
                   {#if project.url}
                     <a href={project.url} target="_blank" class="flex h-14 w-full bg-white text-[#41137E] dark:bg-gray-700 dark:text-[#D4BFF6] rounded-md font-bold px-4 py-2 items-center space-x-2 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-500">

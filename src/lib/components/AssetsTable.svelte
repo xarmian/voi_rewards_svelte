@@ -222,6 +222,7 @@
                                         rel="noopener noreferrer"
                                         class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                         title="View on NFT Navigator"
+                                        aria-label="View on NFT Navigator"
                                     >
                                         <i class="fas fa-external-link-alt"></i>
                                     </a>
@@ -237,6 +238,7 @@
                                             rel="noopener noreferrer"
                                             class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                             title="View on Voiager"
+                                            aria-label="View on Voiager"
                                         >
                                             <i class="fas fa-chart-line"></i>
                                         </a>
@@ -247,6 +249,7 @@
                                                 rel="noopener noreferrer"
                                                 class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
                                                 title="Trade on Humble"
+                                                aria-label="Trade on Humble"
                                             >
                                                 <i class="fas fa-exchange-alt"></i>
                                             </a>
@@ -259,6 +262,7 @@
                                         rel="noopener noreferrer"
                                         class="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
                                         title="View on Explorer"
+                                        aria-label="View on Explorer"
                                     >
                                         <i class="fas fa-search"></i>
                                     </a>

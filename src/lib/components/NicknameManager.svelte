@@ -41,6 +41,7 @@
             on:click={handleSetNickname}
             class="text-green-500 hover:text-green-600"
             title="Save"
+            aria-label="Save nickname"
         >
             <i class="fas fa-check"></i>
         </button>
@@ -48,6 +49,7 @@
             on:click={() => showInput = false}
             class="text-red-500 hover:text-red-600"
             title="Cancel"
+            aria-label="Cancel nickname"
         >
             <i class="fas fa-times"></i>
         </button>
@@ -56,6 +58,7 @@
                 on:click={handleRemoveNickname}
                 class="text-gray-500 hover:text-gray-600"
                 title="Remove nickname"
+                aria-label="Remove nickname"
             >
                 <i class="fas fa-trash"></i>
             </button>

@@ -1,7 +1,6 @@
 <script lang="ts">
     import { Card } from 'flowbite-svelte';
 
-    export let mergedData: any[] = [];
     export let currentPage = 1;
     export let totalPages = 1;
     export let paginatedData: any[] = [];
