@@ -179,7 +179,9 @@
 	}
 
 	function handleWalletSearch(address: string) {
-		goto(`/wallet/${address}`);
+		if (address.length === 58) {
+			goto(`/wallet/${address}`);
+		}
 	}
 
 	function getEligibleOnlineStake() {

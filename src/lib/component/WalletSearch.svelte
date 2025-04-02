@@ -1,46 +1,27 @@
 <script lang="ts">
-	/*
-        A Svelte component containing an input field and submit button.
-
-        When text is entered into the input field, if the text contains a period, a search is performed to look for an NFDomain. If an NFDomain match is found, a listing of unverified addresses attached to that NFDomain is shown below the input box as an "autocomplete", and a user is able to select one of the addresses.
-
-        IF the user selects one of the addresses from the NFDomain, enters a full wallet address and presses enter, or clicks the submit button THEN open the page /wallet/[ADDRESS] where [ADDRESS] is the selected address in the input component.
-
-        Things to utilize:
-        Tailwind for styling
-
-        Requirements:
-        Both light and dark mode compatible
-    */
-
-	import { getEnvoiAddresses, searchEnvoi, type EnvoiSearchResult } from '$lib/utils/envoi';
+	import { getEnvoiAddresses, searchEnvoi, type EnvoiSearchResult, getEnvoiNames } from '$lib/utils/envoi';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onMount, onDestroy } from 'svelte';
     import { SearchOutline } from 'flowbite-svelte-icons';
-    //@ts-ignore
-    import Device from 'svelte-device-info';
-	import { get } from 'svelte/store';
+    import { debounce } from 'lodash-es';
+    import { connectedWallets } from 'avm-wallet-svelte';
 
 	export let searchText = '';
-	/**
-	 * @type {string | any[]}
-	 */
 	let addressList: EnvoiSearchResult[] = [];
 	let selectedAddressIndex = -1;
 	let windowDefined = false;
     let componentElement: any;
-    export let onSubmit: (addr: string) => void;
+    let dropdownList: HTMLUListElement;
+    let isInputFocused = false;
+    export let onSubmit: (address: string, index?: number) => void;
     export let loadPreviousValue: boolean = true;
-    export let storeAddress: boolean = false;
-    export let clearOnSubmit: boolean = false;
+    export let storeAddress: boolean = true;
+    export let clearOnSubmit: boolean = true;
     export let hideSubmitButton: boolean = false;
-    $: isMobile = false;
-
 
 	onMount(() => {
         windowDefined = typeof window !== 'undefined';
         if (windowDefined) {
-            window.addEventListener('keydown', handleKeydown);
             document.addEventListener('click', handleClickOutside);
 
             // Read searchText from local storage
@@ -51,32 +32,42 @@
                 }
             }
         }
-        isMobile = Device.isMobile;
-
 	});
 
 	onDestroy(() => {
 		if (windowDefined) {
-			window.removeEventListener('keydown', handleKeydown);
             document.removeEventListener('click', handleClickOutside);
 		}
 	});
 
+	// Create debounced search function
+	const debouncedSearch = debounce(async (query: string) => {
+		if (query.length === 0) {
+			addressList = [];
+			return;
+		}
+		const results = await searchEnvoi(query);
+		addressList = results;
+	}, 300);
+
 	// Function to handle text input changes
 	function handleInput() {
+		if (searchText.length === 58) {
+			handleSubmit();
+			return;
+		}
         if (searchText.length === 0) {
-            addressList = [];
+            onSubmit('');
+
+            if ($connectedWallets.length > 0 && isInputFocused) {
+                populateConnectedWallets();
+            } else {
+                addressList = [];
+            }
+            selectedAddressIndex = -1;
             return;
         }
-        else if (searchText.length == 58) {
-            handleSubmit();
-            return;
-        }
-        
-        // Search as user types
-        searchEnvoi(searchText).then((results) => {
-            addressList = results;
-        });
+		debouncedSearch(searchText);
 	}
 
 	// Function to handle address selection or submit
@@ -104,12 +95,12 @@
             searchText = result.name;
         }
 
-        onSubmit(addr);
+        onSubmit(addr, selectedAddressIndex);
         addressList = [];
         if (clearOnSubmit) {
             searchText = '';
         }
-	}
+    }
 
     function handleClickOutside(event: MouseEvent) {
         if (!componentElement.contains(event.target)) {
@@ -120,27 +111,71 @@
         }
     }
 
-  function handleKeydown(event: KeyboardEvent) {
-        if (event.key === 'Escape') {
-            addressList = [];
-            selectedAddressIndex = -1;
-        } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            if (searchText && addressList.length === 0) {
-                handleInput();
-            } else {
-                selectedAddressIndex = event.key === 'ArrowUp'
-                    ? Math.max(0, selectedAddressIndex - 1)
-                    : Math.min(addressList.length - 1, selectedAddressIndex + 1);
-            }
-            event.preventDefault();
-        } else if (event.key === 'Enter' && selectedAddressIndex >= 0) {
-            //searchText = addressList[selectedAddressIndex];
-            handleSubmit(addressList[selectedAddressIndex]);
+    function populateConnectedWallets() {
+        // Create a set of unique addresses from connected wallets
+        const wallets = [...new Set($connectedWallets.map(wallet => wallet.address))];
+        
+        // Initialize addressList with truncated addresses as fallback names
+        addressList = wallets.map((address) => ({
+            address,
+            name: $connectedWallets.find(w => w.address === address)?.envoiName || 
+                  address.slice(0, 8) + '...' + address.slice(-8),
+            metadata: {},
+            cached: true
+        })).sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Fetch and populate Envoi names and avatars
+        getEnvoiNames(wallets).then(names => {
+            addressList = addressList.map(item => {
+                const envoiData = names.find(name => name.address === item.address);
+                if (envoiData) {
+                    return {
+                        ...item,
+                        name: envoiData.name,
+                        metadata: envoiData.metadata
+                    };
+                }
+                return item;
+            });
+        });
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+        // Only prevent default for navigation keys
+        if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(event.key)) {
             event.preventDefault();
         }
-        else if (searchText.length == 58) {
-            handleSubmit();
+
+        if (event.key === 'ArrowDown' && addressList.length === 0 && searchText.length === 0 && $connectedWallets.length > 0) {
+            populateConnectedWallets();
+            selectedAddressIndex = 0;
+            return;
+        }
+
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            if (addressList.length > 0) {
+                if (selectedAddressIndex === -1) {
+                    selectedAddressIndex = event.key === 'ArrowUp' ? addressList.length - 1 : 0;
+                } else {
+                    selectedAddressIndex = event.key === 'ArrowUp'
+                        ? (selectedAddressIndex - 1 + addressList.length) % addressList.length
+                        : (selectedAddressIndex + 1) % addressList.length;
+                }
+            }
+        } else if (event.key === 'Enter') {
+            if (selectedAddressIndex >= 0 && addressList.length > 0) {
+                handleSubmit(addressList[selectedAddressIndex]);
+            } else if (addressList.length > 0) {
+                selectedAddressIndex = 0;
+                handleSubmit(addressList[selectedAddressIndex]);
+            } else {
+                handleSubmit();
+            }
+        } else if (event.key === 'Escape') {
+            addressList = [];
+            selectedAddressIndex = -1;
             event.preventDefault();
+            event.stopPropagation();
         }
     }
 
@@ -153,7 +188,15 @@
         addressList = [];
         localStorage.removeItem('searchText');
         selectedAddressIndex = -1;
+        onSubmit('');
         return;
+    }
+
+    $: if (selectedAddressIndex >= 0 && dropdownList) {
+        const selectedItem = dropdownList.children[selectedAddressIndex] as HTMLElement;
+        if (selectedItem) {
+            selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
     }
 </script>
 
@@ -164,8 +207,23 @@
             use:init
             bind:value={searchText}
             on:input={handleInput}
+            on:keydown={handleKeydown}
+            on:click={() => {
+                isInputFocused = true;
+                if (searchText.length === 0 && $connectedWallets.length > 0) {
+                    handleInput();
+                }
+            }}
+            on:blur={() => {
+                isInputFocused = false;
+            }}
             class="dark:bg-gray-700 bg-gray-100 flex-grow p-2 pr-8 text-black dark:text-white {hideSubmitButton ? 'rounded-lg' : 'rounded-l-lg'}"
             placeholder="Search by enVoi name or address"
+            autocomplete="off"
+            role="combobox"
+            aria-expanded={addressList.length > 0}
+            aria-controls="search-listbox"
+            aria-activedescendant={selectedAddressIndex >= 0 ? `option-${selectedAddressIndex}` : undefined}
         />
         {#if searchText}
             <button
@@ -180,24 +238,27 @@
         {/if}
         {#if !hideSubmitButton}
             <button on:click={() => handleSubmit()} class="bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg">
-            {#if !isMobile}
-                Submit
-            {:else}
-                <SearchOutline />
-            {/if}
+                <SearchOutline class="block sm:hidden" />
+                <span class="hidden sm:block">Submit</span>
             </button>
         {/if}
     </div>
 
-    {#if addressList.length > 0 && searchText.length > 0}
-    <div class="absolute z-50 mt-2 w-full">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-64 border border-gray-200 dark:border-gray-700">
-            <ul class="overflow-y-auto max-h-64 w-full">
+    {#if addressList.length > 0}
+    <div class="fixed z-50" style="top: {componentElement?.getBoundingClientRect().bottom + 8}px; left: {componentElement?.getBoundingClientRect().left}px; width: {componentElement?.getBoundingClientRect().width}px;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-64 border border-gray-200 dark:border-gray-700 w-full">
+            <ul id="search-listbox" 
+                role="listbox" 
+                class="overflow-y-auto max-h-64 w-full"
+                bind:this={dropdownList}>
                 {#each addressList as result, index}
                     <li>
-                        <button class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                            class:selected={index === selectedAddressIndex}
-                            on:click={() => handleSubmit(result)}>
+                        <button 
+                            class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white {index === selectedAddressIndex ? 'bg-purple-100 dark:bg-purple-900 ring-2 ring-[#6F2AE2] ring-opacity-50' : ''}"
+                            on:click={() => handleSubmit(result)}
+                            on:mouseenter={() => selectedAddressIndex = index}
+                            role="option"
+                            aria-selected={index === selectedAddressIndex}>
                             <div class="flex items-center gap-3">
                                 {#if result.metadata?.avatar}
                                     <img 
@@ -274,13 +335,5 @@
 
     :global(.dark) button {
         @apply text-white;
-    }
-
-    .selected {
-        @apply bg-gray-300;
-    }
-
-    :global(.dark) .selected {
-        @apply bg-gray-700;
     }
 </style>
