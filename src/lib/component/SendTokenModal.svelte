@@ -1,16 +1,23 @@
 <script lang="ts">
-    import { Modal, Button, Input, Label, Textarea } from 'flowbite-svelte';
-    import { signTransactions, selectedWallet, signAndSendTransactions } from 'avm-wallet-svelte';
+    import { Modal, Button, Input, Label } from 'flowbite-svelte';
+    import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import algosdk from 'algosdk';
     import type { FungibleTokenType } from '$lib/types/assets';
     import WalletSearch from './WalletSearch.svelte';
     import { arc200 as Contract } from 'ulujs';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
-
+    import ImportRecipientsModal from './ImportRecipientsModal.svelte';
+    
     // Click outside action
     function clickOutside(node: HTMLElement, callback: () => void) {
         const handleClick = (event: MouseEvent) => {
+            // Don't close if clicking inside the import modal
+            const importModal = document.querySelector('[data-modal-import]');
+            if (importModal && importModal.contains(event.target as Node)) {
+                return;
+            }
+
             if (node && !node.contains(event.target as Node) && !event.defaultPrevented) {
                 callback();
             }
@@ -59,18 +66,41 @@
     let success = false;
     let transactionId: string | null = null;
     let note: string = '';
-    let showAdvancedDetails = false;
     let currentTxnGroup = 0;
     let totalTxnGroups = 0;
     let transactionGroups: algosdk.Transaction[][] = [];
     let transactionIds: string[] = [];
     let showAmountMenu = false;
     let amountToDistribute = '';
-    let showDistributionOptions = false;
     let hasCompletedTransaction = false;
+    let showImportModal = false;
+    let pasteContent = '';
+    let showCombineOptions = false;
+    let failedRecipients: Recipient[] = [];
+    let showRetryButton = false;
 
-    $: maxAmount = token.balance / Math.pow(10, token.decimals);
-    $: totalAmount = recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    function enforceDecimals(value: string | number, decimals: number): string {
+        if (!value) return '';
+        
+        // Convert to string and remove any existing decimal places
+        const strValue = value.toString();
+        const [whole, fraction = ''] = strValue.split('.');
+        
+        // If no decimals, return the whole number
+        if (decimals === 0) return whole;
+        
+        // Truncate fraction to max decimals
+        const truncatedFraction = fraction.slice(0, decimals);
+        
+        // Return formatted number with correct decimals
+        return truncatedFraction ? `${whole}.${truncatedFraction}` : whole;
+    }
+
+    $: maxAmount = Number(enforceDecimals(token.balance / Math.pow(10, token.decimals), token.decimals));
+    $: totalAmount = Number(enforceDecimals(
+        recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+        token.decimals
+    ));
     $: isValidTotalAmount = totalAmount > 0 && totalAmount <= maxAmount;
     $: canSubmit = recipients.every(r => {
         // Basic validation for all token types
@@ -191,7 +221,7 @@
             }
         });
 
-        const resp = await contract.arc200_transfer(recipientAddress, BigInt(amount), true, false);
+        const resp = await contract.arc200_transfer(recipientAddress, BigInt(Math.floor(amount)), true, false);
 
         if (!resp.success) {
             throw new Error('Failed to build ARC-200 transaction');
@@ -254,8 +284,9 @@
                 // First pass: collect all transactions
                 for (const recipient of recipients) {
                     if (!recipient.address || !recipient.amount) continue;
-                    const amount = Number(recipient.amount) * Math.pow(10, token.decimals);
-                    const txns = await buildARC200Transaction(recipient.address, amount);
+                    // Convert amount to raw units with proper decimal precision
+                    const rawAmount = Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals));
+                    const txns = await buildARC200Transaction(recipient.address, rawAmount);
                     groupTransactions.push(...txns);
                 }
             } else {
@@ -264,13 +295,14 @@
                 
                 for (const recipient of recipients) {
                     if (!recipient.address || !recipient.amount) continue;
-                    const amount = Number(recipient.amount) * Math.pow(10, token.decimals);
+                    // Convert amount to raw units with proper decimal precision
+                    const rawAmount = Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals));
                     
                     let txn;
                     if (isNativeToken(token)) {
-                        txn = await buildVOITransaction(recipient.address, amount, suggestedParams);
+                        txn = await buildVOITransaction(recipient.address, rawAmount, suggestedParams);
                     } else {
-                        txn = await buildVSATransaction(recipient.address, amount, suggestedParams);
+                        txn = await buildVSATransaction(recipient.address, rawAmount, suggestedParams);
                     }
                     delete txn.group;
                     groupTransactions.push(txn);
@@ -300,17 +332,66 @@
 
             // Then send all transactions
             txState = 'sending';
-            for (let i = 0; i < allSignedGroups.length; i++) {
-                currentTxnGroup = i;
-                const response = await algodClient.sendRawTransaction(allSignedGroups[i]).do();
-                await algosdk.waitForConfirmation(algodClient, response.txId, 4);
-                transactionIds.push(response.txId);
-            }
+            try {
+                const sendPromises = allSignedGroups.map(async (signedGroup, index) => {
+                    try {
+                        currentTxnGroup = index;
+                        const response = await algodClient.sendRawTransaction(signedGroup).do();
+                        const confirmedTxn = await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+                        return {
+                            success: true,
+                            txId: response.txId,
+                            confirmedTxn
+                        };
+                    } catch (err) {
+                        return {
+                            success: false,
+                            txId: null,
+                            error: err instanceof Error ? err.message : 'Unknown error occurred',
+                            groupIndex: index
+                        };
+                    }
+                });
 
-            transactionId = transactionIds.join(',');
-            success = true;
-            hasCompletedTransaction = true;
-            txState = 'idle';
+                const results = await Promise.all(sendPromises);
+                
+                // Process results and collect successful/failed transactions
+                const successfulTxns = results.filter(r => r.success).map(r => r.txId!);
+                const failedTxns = results.filter(r => !r.success);
+
+                if (failedTxns.length > 0) {
+                    // Store failed recipients for potential retry
+                    failedRecipients = failedTxns.map(f => recipients[f.groupIndex ?? 0]);
+                    showRetryButton = true;
+                    
+                    // Some transactions failed
+                    if (successfulTxns.length > 0) {
+                        // Partial success - some txns went through
+                        transactionIds = successfulTxns;
+                        error = `${failedTxns.length} transaction group(s) failed. Group(s) ${failedTxns.map(f => (f.groupIndex ?? 0) + 1).join(', ')} failed with error: ${failedTxns[0].error}`;
+                        success = true; // Still show success screen but with error message
+                    } else {
+                        // All transactions failed
+                        throw new Error(`All transactions failed. First error: ${failedTxns[0].error}`);
+                    }
+                } else {
+                    // All transactions succeeded
+                    transactionIds = successfulTxns;
+                    success = true;
+                    showRetryButton = false;
+                    failedRecipients = [];
+                }
+
+                transactionId = transactionIds.join(',');
+                hasCompletedTransaction = true;
+                txState = 'idle';
+
+            } catch (err) {
+                console.error('Error sending tokens:', err);
+                error = err instanceof Error ? err.message : 'Failed to send tokens. Please try again.';
+                isSending = false;
+                txState = 'idle';
+            }
 
         } catch (err) {
             console.error('Error sending tokens:', err);
@@ -327,12 +408,13 @@
         isSending = false;
         transactionId = null;
         note = '';
-        showAdvancedDetails = false;
         currentTxnGroup = 0;
         totalTxnGroups = 0;
         transactionGroups = [];
         transactionIds = [];
         hasCompletedTransaction = false;
+        failedRecipients = [];
+        showRetryButton = false;
     }
 
     function clearAllRecipients() {
@@ -340,19 +422,40 @@
         error = null;
     }
 
-    function combineDuplicateRecipients() {
+    function hasDuplicateRecipients(): boolean {
+        const addresses = recipients
+            .filter(r => r.address)
+            .map(r => r.address);
+        return addresses.length !== new Set(addresses).size;
+    }
+
+    function combineRecipients(method: 'sum' | 'max' | 'min') {
         const combined = recipients.reduce((acc, curr) => {
             if (!curr.address || !curr.amount) return acc;
             
             const existing = acc.find(r => r.address === curr.address);
             if (existing) {
-                // Add amounts together
-                const newAmount = (Number(existing.amount) + Number(curr.amount)).toString();
-                existing.amount = newAmount;
+                const currentAmount = Number(curr.amount);
+                const existingAmount = Number(existing.amount);
+                
+                let newAmount: number;
+                switch (method) {
+                    case 'sum':
+                        newAmount = existingAmount + currentAmount;
+                        break;
+                    case 'max':
+                        newAmount = Math.max(existingAmount, currentAmount);
+                        break;
+                    case 'min':
+                        newAmount = Math.min(existingAmount, currentAmount);
+                        break;
+                }
+                
+                existing.amount = enforceDecimals(newAmount, token.decimals);
                 return acc;
             }
             
-            return [...acc, curr];
+            return [...acc, { ...curr, amount: enforceDecimals(curr.amount, token.decimals) }];
         }, [] as Recipient[]);
 
         // If we found and combined any duplicates, update the recipients
@@ -360,12 +463,13 @@
             recipients = combined;
             error = null;
         }
+        showCombineOptions = false;
     }
 
     function setAmountForAllRecipients(amount: string) {
         recipients = recipients.map(recipient => ({
             ...recipient,
-            amount: amount
+            amount: enforceDecimals(amount, token.decimals)
         }));
     }
 
@@ -376,10 +480,10 @@
         
         const amount = Number(amountToDistribute);
         if (type === 'even') {
-            const splitAmount = (amount / recipients.length).toFixed(6);
+            const splitAmount = enforceDecimals(amount / recipients.length, token.decimals);
             setAmountForAllRecipients(splitAmount);
         } else {
-            setAmountForAllRecipients(amountToDistribute);
+            setAmountForAllRecipients(enforceDecimals(amountToDistribute, token.decimals));
         }
         showAmountMenu = false;
         amountToDistribute = '';
@@ -393,84 +497,26 @@
         open = false;
     }
 
-    function detectDelimiter(content: string): string {
-        const lines = content.trim().split('\n');
-        if (lines.length === 0) return ',';
-
-        const firstLine = lines[0];
-        if (firstLine.includes('\t')) return '\t';
-        if (firstLine.includes(',')) return ',';
-        if (firstLine.includes(';')) return ';';
-        return ' ';
-    }
-
-    function parseAddressesAndAmounts(content: string) {
-        const delimiter = detectDelimiter(content);
-        const lines = content.trim().split('\n');
-        const newRecipients: Recipient[] = [];
-        
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            
-            const [address, amount] = line.split(delimiter).map(s => s.trim());
-            
-            if (!address || !algosdk.isValidAddress(address)) {
-                throw new Error(`Invalid address found: ${address}`);
-            }
-
-            newRecipients.push({
-                address,
-                amount: amount || '',
-                info: null,
-                isLoading: false,
-                isValid: false
-            });
+    function handlePasteModalConfirm(importedRecipients: Recipient[]) {
+        // If we already have one empty recipient, remove it
+        if (recipients.length === 1 && !recipients[0].address) {
+            recipients = importedRecipients;
+        } else {
+            // Otherwise append new recipients up to the maximum
+            const combinedRecipients = [...recipients, ...importedRecipients];
+            recipients = combinedRecipients;
         }
 
-        if (newRecipients.length === 0) {
-            throw new Error('No valid entries found');
-        }
+        // Fetch info for all new recipients
+        Promise.all(
+            importedRecipients.map((_, index) => {
+                const recipientIndex = recipients.length - importedRecipients.length + index;
+                return recipients[recipientIndex].address && 
+                       fetchRecipientInfo(recipients[recipientIndex].address!, recipientIndex);
+            })
+        );
 
-        if (newRecipients.length > 50) {
-            throw new Error('Maximum of 50 recipients allowed');
-        }
-
-        return newRecipients;
-    }
-
-    // Add paste handler function
-    async function handlePasteEvent(event: ClipboardEvent) {
-        const content = event.clipboardData?.getData('text');
-        if (!content) return;
-
-        try {
-            const newRecipients = parseAddressesAndAmounts(content);
-            
-            // If we already have one empty recipient, remove it
-            if (recipients.length === 1 && !recipients[0].address) {
-                recipients = newRecipients;
-            } else {
-                // Otherwise append new recipients up to the maximum
-                const combinedRecipients = [...recipients, ...newRecipients];
-                if (combinedRecipients.length > 50) {
-                    throw new Error('Maximum of 50 recipients allowed');
-                }
-                recipients = combinedRecipients;
-            }
-
-            // Fetch info for all new recipients
-            await Promise.all(
-                newRecipients.map((_, index) => {
-                    const recipientIndex = recipients.length - newRecipients.length + index;
-                    return recipients[recipientIndex].address && 
-                           fetchRecipientInfo(recipients[recipientIndex].address!, recipientIndex);
-                })
-            );
-
-            error = null;
-        } catch (err) {
-            error = err instanceof Error ? err.message : 'Failed to parse addresses';
-        }
+        error = null;
     }
 
     // Helper function to determine if token is native VOI
@@ -483,60 +529,19 @@
         return token.type === 'arc200';
     }
 
-    function handleKeydown(event: KeyboardEvent) {
-        // Only handle paste when not in an input field
-        if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
-            if (event.key === 'v' && (event.ctrlKey || event.metaKey)) {
-                navigator.clipboard.readText().then(text => {
-                    const mockEvent = new ClipboardEvent('paste', {
-                        clipboardData: new DataTransfer()
-                    });
-                    Object.defineProperty(mockEvent.clipboardData, 'getData', {
-                        value: () => text
-                    });
-                    handlePasteEvent(mockEvent);
-                });
-            }
-        }
-    }
-
-    // Add this function to handle paste events on input fields
-    async function handleInputPaste(event: ClipboardEvent, index: number) {
-        // Only process if there's a tab or newline, indicating a structured paste
-        const content = event.clipboardData?.getData('text');
-        if (!content || (!content.includes('\t') && !content.includes('\n'))) {
-            return; // Let the default paste behavior handle single values
-        }
-
-        event.preventDefault(); // Prevent default paste for structured data
-        
-        try {
-            const newRecipients = parseAddressesAndAmounts(content);
-            
-            // Replace current recipient and add the rest
-            recipients = [
-                ...recipients.slice(0, index),
-                ...newRecipients,
-                ...recipients.slice(index + 1)
-            ];
-
-            // Fetch info for all new recipients
-            await Promise.all(
-                newRecipients.map((recipient, i) => {
-                    const recipientIndex = index + i;
-                    return recipient.address && 
-                           fetchRecipientInfo(recipient.address, recipientIndex);
-                })
-            );
-
-            error = null;
-        } catch (err) {
-            error = err instanceof Error ? err.message : 'Failed to parse pasted data';
-        }
+    function handleRetryFailedTransactions() {
+        // Reset success state but keep the note
+        const currentNote = note;
+        resetState();
+        // Populate the recipients list with failed transactions
+        recipients = failedRecipients;
+        note = currentNote;
+        // Reset failed recipients list
+        failedRecipients = [];
+        showRetryButton = false;
+        success = false;
     }
 </script>
-
-<svelte:window on:keydown={handleKeydown}/>
 
 <Modal bind:open size="lg" on:close={handleClose} class="overflow-visible max-h-[calc(100vh-2rem)]">
     <div class="max-w-3xl mx-auto flex flex-col max-h-[calc(100vh-6rem)]">
@@ -555,15 +560,45 @@
                     <div class="flex justify-between items-center">
                         <h3 class="text-lg font-medium">Recipients</h3>
                         <div class="flex gap-2">
-                            <Button 
-                                size="xs" 
-                                color="light" 
-                                on:click={combineDuplicateRecipients}
-                                disabled={recipients.length <= 1}
-                            >
-                                <i class="fas fa-compress-alt mr-1"></i>
-                                Combine Duplicates
-                            </Button>
+                            <div class="relative" use:clickOutside={() => showCombineOptions = false}>
+                                <Button 
+                                    size="xs" 
+                                    color={hasDuplicateRecipients() ? "blue" : "light"}
+                                    on:click={() => showCombineOptions = !showCombineOptions}
+                                    disabled={recipients.length <= 1 || !hasDuplicateRecipients()}
+                                    class={hasDuplicateRecipients() ? "animate-pulse" : ""}
+                                >
+                                    <i class="fas fa-compress-alt mr-1"></i>
+                                    Combine Duplicates
+                                </Button>
+                                {#if showCombineOptions}
+                                    <div class="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                                        <div class="py-1">
+                                            <button
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                on:click={() => combineRecipients('sum')}
+                                            >
+                                                <i class="fas fa-plus-circle mr-2"></i>
+                                                Combine Amounts
+                                            </button>
+                                            <button
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                on:click={() => combineRecipients('max')}
+                                            >
+                                                <i class="fas fa-arrow-up mr-2"></i>
+                                                Use Highest Amount
+                                            </button>
+                                            <button
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                on:click={() => combineRecipients('min')}
+                                            >
+                                                <i class="fas fa-arrow-down mr-2"></i>
+                                                Use Lowest Amount
+                                            </button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
                             <Button 
                                 size="xs" 
                                 color="light" 
@@ -595,9 +630,13 @@
                                                     bind:value={amountToDistribute}
                                                     min="0"
                                                     max={maxAmount}
-                                                    step="any"
+                                                    step={`${1/Math.pow(10, token.decimals)}`}
                                                     placeholder={`Amount in ${token.symbol}`}
                                                     size="sm"
+                                                    on:input={(e: Event) => {
+                                                        const input = e.target as HTMLInputElement;
+                                                        amountToDistribute = enforceDecimals(input.value, token.decimals);
+                                                    }}
                                                 />
                                                 {#if amountToDistribute && Number(amountToDistribute) > maxAmount}
                                                     <p class="mt-1 text-xs text-red-500 dark:text-red-400">
@@ -658,27 +697,16 @@
                                     </div>
                                 {/if}
                             </div>
-                            <Button 
-                                size="xs" 
-                                color="light" 
-                                on:click={async () => {
-                                    try {
-                                        const text = await navigator.clipboard.readText();
-                                        const mockEvent = new ClipboardEvent('paste', {
-                                            clipboardData: new DataTransfer()
-                                        });
-                                        Object.defineProperty(mockEvent.clipboardData, 'getData', {
-                                            value: () => text
-                                        });
-                                        handlePasteEvent(mockEvent);
-                                    } catch (err) {
-                                        error = 'Failed to read clipboard. Please try again.';
-                                    }
-                                }}
-                            >
-                                <i class="fas fa-paste mr-1"></i>
-                                Paste
-                            </Button>
+                            <div class="relative" use:clickOutside={() => showImportModal = false}>
+                                <Button 
+                                    size="xs" 
+                                    color="light"
+                                    on:click={() => showImportModal = true}
+                                >
+                                    <i class="fas fa-file-import mr-1"></i>
+                                    Import
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -719,11 +747,6 @@
                                                 />
                                                 <div 
                                                     class="relative" 
-                                                    on:paste={(e) => {
-                                                        if (e instanceof ClipboardEvent) {
-                                                            handleInputPaste(e, index);
-                                                        }
-                                                    }}
                                                 >
                                                     {#if recipient.address}
                                                         {#if recipient.isLoading}
@@ -812,13 +835,12 @@
                                                         bind:value={recipient.amount}
                                                         min="0"
                                                         max={maxAmount}
-                                                        step="any"
+                                                        step={`${1/Math.pow(10, token.decimals)}`}
                                                         placeholder={`${token.symbol}`}
                                                         class="!pr-14"
-                                                        on:paste={(e) => {
-                                                            if (e instanceof ClipboardEvent) {
-                                                                handleInputPaste(e, index);
-                                                            }
+                                                        on:input={(e: Event) => {
+                                                            const input = e.target as HTMLInputElement;
+                                                            recipient.amount = enforceDecimals(input.value, token.decimals);
                                                         }}
                                                     />
                                                     {#if !recipient.amount || Number(recipient.amount) < maxAmount}
@@ -843,7 +865,6 @@
                                     size="sm" 
                                     color="light" 
                                     on:click={addRecipient} 
-                                    disabled={recipients.length >= 50}
                                     class="w-full"
                                 >
                                     <i class="fas fa-plus mr-1"></i>
@@ -997,6 +1018,12 @@
 
                 <div class="flex justify-center gap-3">
                     <Button color="alternative" on:click={handleClose}>Close</Button>
+                    {#if showRetryButton}
+                        <Button color="red" on:click={handleRetryFailedTransactions}>
+                            <i class="fas fa-redo mr-2"></i>
+                            Retry Failed Transactions
+                        </Button>
+                    {/if}
                     <a 
                         href={`https://explorer.voi.network/explorer/transaction/${transactionId}`}
                         target="_blank"
@@ -1012,6 +1039,19 @@
         {/if}
     </div>
 </Modal>
+
+{#if showImportModal}
+    <ImportRecipientsModal
+        bind:open={showImportModal}
+        onClose={() => {
+            showImportModal = false;
+        }}
+        onConfirm={(recipients) => {
+            handlePasteModalConfirm(recipients);
+            showImportModal = false;
+        }}
+    />
+{/if}
 
 <style>
     :global(.overflow-visible) {

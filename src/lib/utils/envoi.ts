@@ -63,8 +63,13 @@ interface EnvoiAddressResponse {
     results: EnvoiAddressResult[];
 }
 
-export async function getEnvoiAddresses(name: string): Promise<string[]> {
-    const url = `https://api.envoi.sh/api/address/${name.toLowerCase()}`;
+export async function getEnvoiAddresses(name: string | string[]): Promise<string[]> {
+    let url = `https://api.envoi.sh/api/address/`;
+    if (Array.isArray(name)) {
+        url += name.join(',');
+    } else {
+        url += name.toLowerCase();
+    }
 
     try {
         const response = await fetch(url);
