@@ -633,7 +633,7 @@
                         try {
                             parsedMetadata = JSON.parse(token.metadata);
                         } catch (e) {
-                            console.error('Error parsing metadata JSON:', e);
+                            // console.error('Error parsing metadata JSON:', e); // silent fail
                         }
                     }
 

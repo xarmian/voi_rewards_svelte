@@ -324,28 +324,6 @@
         });
     }
 
-    // Helper function to optimize ARC200 transaction groups by consolidating payment transactions
-    function optimizeARC200TransactionGroup(transactions: algosdk.Transaction[]): algosdk.Transaction[] {
-        // Find all payment transactions and non-payment transactions
-        const paymentTxns = transactions.filter(tx => tx.type === 'pay');
-        const nonPaymentTxns = transactions.filter(tx => tx.type !== 'pay');
-
-        // If no payment transactions or only one, return original array
-        if (paymentTxns.length <= 1) {
-            return transactions;
-        }
-
-        // Sum up all payment amounts
-        const totalPaymentAmount = paymentTxns.reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-        // Create a new consolidated payment transaction using the first payment transaction as template
-        const consolidatedPayment: algosdk.Transaction = paymentTxns[0];
-        consolidatedPayment.amount = totalPaymentAmount;
-
-        // Return array with consolidated payment first, followed by non-payment transactions
-        return [consolidatedPayment, ...nonPaymentTxns];
-    }
-
     // Helper function to create optimized transaction groups
     function createOptimizedGroups(allTransactions: algosdk.Transaction[][]): algosdk.Transaction[][] {
         // First, separate all transactions into payments and non-payments, maintaining the relationship
