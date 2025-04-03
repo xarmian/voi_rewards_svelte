@@ -677,7 +677,7 @@
     class="w-full h-full flex items-center" 
     data-modal-import
 >
-    <div class="w-full flex flex-col max-h-screen">
+    <div class="w-full flex flex-col max-h-[calc(100vh-4rem)]">
         <div class="flex-none">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-xl font-bold text-gray-900 dark:text-white">
@@ -754,7 +754,7 @@
         <div class="flex-1 min-h-0 overflow-auto">
             {#if importStep === 'initial'}
                 <div 
-                    class="place-self-center border-2 border-dashed rounded-lg p-8 sm:p-28 text-center flex items-center justify-center {isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700'}"
+                    class="h-96 border-2 border-dashed rounded-lg p-8 text-center flex items-center justify-center {isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700'}"
                     role="button"
                     tabindex="0"
                     on:dragover={handleDragOver}
@@ -994,8 +994,8 @@
                     </div>
                 </div>
             {:else}
-                <div class="h-full flex flex-col border dark:border-gray-700 rounded-lg overflow-hidden">
-                    <div class="flex-1 overflow-auto">
+                <div class="h-full border dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div class="h-full overflow-auto">
                         <table class="w-full text-sm text-left">
                             <thead class="text-xs uppercase bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                                 <tr>
