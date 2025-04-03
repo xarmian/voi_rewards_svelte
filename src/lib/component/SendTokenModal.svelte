@@ -1216,16 +1216,6 @@
                             Retry Failed Transactions
                         </Button>
                     {/if}
-                    <a 
-                        href={`https://explorer.voi.network/explorer/transaction/${transactionId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        <Button color="blue">
-                            <i class="fas fa-external-link-alt mr-2"></i>
-                            View in Explorer
-                        </Button>
-                    </a>
                 </div>
             </div>
         {/if}
