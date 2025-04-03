@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Modal, Button, Select } from 'flowbite-svelte';
+    import { Modal, Button, Select, Input, Label } from 'flowbite-svelte';
     import type { Recipient } from '$lib/types/recipients';
     import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
     import algosdk from 'algosdk';
@@ -8,6 +8,8 @@
     export let open = false;
     export let onClose = () => {};
     export let onConfirm = (recipients: Recipient[]) => {};
+
+    const zeroAddress = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ";
 
     let error: string | null = null;
     let parsedData: { 
@@ -21,9 +23,34 @@
     let selectedRows = new Set<number>();
     let allRowsSelected = false;
     let isDragging = false;
-    let importStep: 'initial' | 'preview' = 'initial';
+    let importStep: 'initial' | 'nft-collection' | 'preview' = 'initial';
     let rawContent = '';
     let showPasteArea = false;
+    let collectionId = '';
+    let tempCollectionId = '';
+    let isLoadingNFTHolders = false;
+    let amountType: 'none' | 'per-holder' | 'per-nft' = 'none';
+    let amountValue = '';
+    let roundNumber = '';
+    let tempRoundNumber = '';
+    let collectionName = '';
+    let collectionImageUrl = '';
+    let isLoadingCollectionInfo = false;
+    let totalTokens = 0;
+    let uniqueOwners = 0;
+    let currentRound = 0;
+
+    interface NFTToken {
+        contractId: number;
+        tokenId: string;
+        owner: string;
+        isBurned: boolean;
+        metadataURI: string | null;
+        metadata: string;
+        approved: string;
+        'mint-round': number;
+    }
+
     $: selectedRowsCount = selectedRows.size;
     $: validRowsCount = parsedData.filter(row => {
         const address = row.cells[addressColumnIndex];
@@ -454,6 +481,193 @@
         rawContent = '';
         onClose();
     }
+
+    async function fetchCollectionInfo(id: string, round?: string) {
+        isLoadingCollectionInfo = true;
+        collectionName = '';
+        collectionImageUrl = '';
+        totalTokens = 0;
+        uniqueOwners = 0;
+        currentRound = 0;
+        
+        try {
+            const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
+            url.searchParams.set('contractId', id);
+            url.searchParams.set('limit', '1000');
+            if (round && !isNaN(Number(round))) {
+                url.searchParams.set('round', round);
+            }
+
+            const response = await fetch(url.toString());
+            if (!response.ok) {
+                throw new Error('Failed to fetch collection info');
+            }
+
+            const data = await response.json();
+            if (!data.tokens || !Array.isArray(data.tokens) || data.tokens.length === 0) {
+                throw new Error('No tokens found for this collection');
+            }
+
+            currentRound = data.currentRound || 0;
+
+            // Get first token for collection info
+            const firstToken = data.tokens[0];
+            if (firstToken.metadataURI && firstToken.metadata) {
+                const metadata = JSON.parse(firstToken.metadata);
+                if (metadata.name) {
+                    // Extract base name by removing number/index
+                    collectionName = metadata.name.replace(/[#\d]+$/, '').trim();
+                }
+                if (metadata.image) {
+                    // Handle IPFS URLs
+                    collectionImageUrl = metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/');
+                }
+            }
+
+            // Calculate collection stats
+            const validTokens = data.tokens.filter((token: NFTToken) => !token.isBurned && token.owner !== zeroAddress);
+            totalTokens = validTokens.length;
+            
+            // Count unique owners
+            const owners = new Set(validTokens.map((token: NFTToken) => token.owner));
+            uniqueOwners = owners.size;
+
+        } catch (err) {
+            console.error('Failed to fetch collection info:', err);
+        } finally {
+            isLoadingCollectionInfo = false;
+        }
+    }
+
+    // Remove the reactive statement for collectionId
+    function handleCollectionIdChange(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const newId = input.value;
+        tempCollectionId = newId;
+    }
+
+    function handleCollectionIdBlur() {
+        if (tempCollectionId !== collectionId) {
+            collectionId = tempCollectionId;
+            const id = collectionId.includes('nftnavigator.xyz/collection/') 
+                ? collectionId.split('collection/')[1].split(/[^0-9]/)[0]
+                : collectionId;
+            
+            if (id && !isNaN(Number(id)) && id.length >= 6) {
+                fetchCollectionInfo(id, roundNumber);
+            } else {
+                collectionName = '';
+                collectionImageUrl = '';
+            }
+        }
+    }
+
+    function handleRoundNumberChange(event: Event) {
+        const input = event.target as HTMLInputElement;
+        tempRoundNumber = input.value;
+    }
+
+    function handleRoundNumberBlur() {
+        if (tempRoundNumber !== roundNumber) {
+            roundNumber = tempRoundNumber;
+            if (collectionId) {
+                const id = collectionId.includes('nftnavigator.xyz/collection/') 
+                    ? collectionId.split('collection/')[1].split(/[^0-9]/)[0]
+                    : collectionId;
+                
+                if (id && !isNaN(Number(id)) && id.length >= 6) {
+                    fetchCollectionInfo(id, roundNumber);
+                }
+            }
+        }
+    }
+
+    async function handleNFTCollectionImport() {
+        if (!collectionId) {
+            error = 'Please enter a collection ID';
+            return;
+        }
+
+        // Extract collection ID from URL if needed
+        const id = collectionId.includes('nftnavigator.xyz/collection/') 
+            ? collectionId.split('collection/')[1].split(/[^0-9]/)[0]
+            : collectionId;
+
+        if (!id || isNaN(Number(id))) {
+            error = 'Invalid collection ID';
+            return;
+        }
+
+        if (amountType !== 'none' && (!amountValue || isNaN(Number(amountValue)) || Number(amountValue) <= 0)) {
+            error = 'Please enter a valid amount';
+            return;
+        }
+
+        if (roundNumber && (isNaN(Number(roundNumber)) || Number(roundNumber) <= 0)) {
+            error = 'Please enter a valid round number';
+            return;
+        }
+
+        isLoadingNFTHolders = true;
+        error = null;
+
+        try {
+            const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
+            url.searchParams.set('contractId', id);
+            if (roundNumber) {
+                url.searchParams.set('round', roundNumber);
+            }
+
+            const response = await fetch(url.toString());
+            if (!response.ok) {
+                throw new Error('Failed to fetch NFT holders');
+            }
+
+            const data = await response.json();
+            if (!data.tokens || !Array.isArray(data.tokens)) {
+                throw new Error('Invalid response from NFT indexer');
+            }
+
+            // Create a map to count NFTs per holder
+            const holdersMap = new Map<string, number>();
+            data.tokens.forEach((token: NFTToken) => {
+                if (!token.isBurned && token.owner && token.owner !== zeroAddress) {
+                    holdersMap.set(token.owner, (holdersMap.get(token.owner) || 0) + 1);
+                }
+            });
+
+            // Convert to our data format with optional amount
+            parsedData = Array.from(holdersMap.entries()).map(([address, count]) => {
+                const cells = [address];
+                
+                // Add NFT count column
+                cells.push(count.toString());
+                
+                // Add amount column if specified
+                if (amountType !== 'none') {
+                    const amount = amountType === 'per-holder' 
+                        ? amountValue 
+                        : (Number(amountValue) * count).toString();
+                    cells.push(amount);
+                }
+                
+                return {
+                    cells,
+                    isValid: isValidAddressContent(address)
+                };
+            });
+
+            columnCount = amountType === 'none' ? 2 : 3; // Address, NFT count, and optionally amount
+            addressColumnIndex = 0;
+            amountColumnIndex = amountType === 'none' ? -1 : 2; // Set amount column if present
+            importStep = 'preview';
+        } catch (err) {
+            error = err instanceof Error ? err.message : 'Failed to fetch NFT holders';
+            parsedData = [];
+        } finally {
+            isLoadingNFTHolders = false;
+        }
+    }
 </script>
 
 <Modal bind:open size="xl" on:close={handleClose} class="w-full" data-modal-import>
@@ -532,10 +746,10 @@
                 {/if}
             </div>
 
-            <div class="flex-1 min-h-0">
+            <div class="flex-1 min-h-0 h-full content-center">
                 {#if importStep === 'initial'}
                     <div 
-                        class="h-full border-2 border-dashed rounded-lg p-8 text-center flex items-center justify-center {isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700'}"
+                        class="place-self-center border-2 border-dashed rounded-lg p-8 sm:p-28 text-center flex items-center justify-center {isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700'}"
                         role="button"
                         tabindex="0"
                         on:dragover={handleDragOver}
@@ -600,6 +814,17 @@
                                         <i class="fas fa-paste mr-2"></i>
                                         Paste from Clipboard
                                     </Button>
+                                    <Button 
+                                        color="light" 
+                                        class="w-full"
+                                        on:click={() => {
+                                            error = null;
+                                            importStep = 'nft-collection';
+                                        }}
+                                    >
+                                        <i class="fas fa-users mr-2"></i>
+                                        Import NFT Collection Holders
+                                    </Button>
                                 </div>
 
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -607,6 +832,161 @@
                                 </p>
                             </div>
                         {/if}
+                    </div>
+                {:else if importStep === 'nft-collection'}
+                    <div class="flex items-center justify-center place-self-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg px-8 py-8 sm:px-28 sm:py-16 text-center">
+                        <div class="w-full max-w-lg mx-auto space-y-6">
+                            <div class="text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-users text-4xl mb-4"></i>
+                                <p class="text-lg mb-2">Import NFT Collection Holders</p>
+                                <p class="text-sm">Enter a collection ID or paste an <a href="https://nftnavigator.xyz/" target="_blank" class="text-blue-500">NFT Navigator</a> collection URL</p>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <Label for="collection-id">Collection ID or URL</Label>
+                                    <div class="flex items-center gap-2">
+                                        <Input
+                                            id="collection-id"
+                                            type="text"
+                                            placeholder="398078 or https://nftnavigator.xyz/collection/398078"
+                                            value={tempCollectionId}
+                                            on:input={handleCollectionIdChange}
+                                            on:change={handleCollectionIdBlur}
+                                        />
+                                        {#if isLoadingCollectionInfo}
+                                            <div class="text-center py-4">
+                                                <i class="fas fa-spinner fa-spin text-gray-500"></i>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+
+                                {#if collectionName || collectionImageUrl}
+                                    <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                                        <div class="flex items-start gap-4">
+                                            {#if collectionImageUrl}
+                                                <img 
+                                                    src={collectionImageUrl} 
+                                                    alt="Collection Preview"
+                                                    class="w-16 h-16 rounded-lg object-cover"
+                                                />
+                                            {/if}
+                                            {#if collectionName}
+                                                <div class="flex-1">
+                                                    <h4 class="font-medium text-gray-900 dark:text-white">
+                                                        {collectionName}
+                                                    </h4>
+                                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                        Collection #{collectionId.includes('collection/') ? collectionId.split('collection/')[1].split(/[^0-9]/)[0] : collectionId}
+                                                    </p>
+                                                    <div class="flex gap-4 mt-2 text-sm justify-center">
+                                                        <div>
+                                                            <span class="font-medium text-gray-900 dark:text-white">{totalTokens}</span>
+                                                            <span class="text-gray-500 dark:text-gray-400"> tokens</span>
+                                                        </div>
+                                                        <div>
+                                                            <span class="font-medium text-gray-900 dark:text-white">{uniqueOwners}</span>
+                                                            <span class="text-gray-500 dark:text-gray-400"> unique owners</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                {/if}
+
+                                <div>
+                                    <Label for="round-number">Round Number (Optional)</Label>
+                                    <Input
+                                        id="round-number"
+                                        type="number"
+                                        placeholder="Leave empty for current round"
+                                        value={tempRoundNumber}
+                                        on:input={handleRoundNumberChange}
+                                        on:change={handleRoundNumberBlur}
+                                    />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {#if currentRound}
+                                            Current round is {currentRound.toLocaleString()}
+                                        {:else}
+                                            Specify a round number to get historical holder data
+                                        {/if}
+                                    </p>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label>Amount Distribution (Optional)</Label>
+                                    <div class="flex gap-2">
+                                        <Button 
+                                            color={amountType === 'none' ? 'blue' : 'light'}
+                                            size="sm"
+                                            on:click={() => {
+                                                amountType = 'none';
+                                                amountValue = '';
+                                            }}
+                                        >
+                                            No Amount
+                                        </Button>
+                                        <Button 
+                                            color={amountType === 'per-holder' ? 'blue' : 'light'}
+                                            size="sm"
+                                            on:click={() => amountType = 'per-holder'}
+                                        >
+                                            Per Holder
+                                        </Button>
+                                        <Button 
+                                            color={amountType === 'per-nft' ? 'blue' : 'light'}
+                                            size="sm"
+                                            on:click={() => amountType = 'per-nft'}
+                                        >
+                                            Per NFT
+                                        </Button>
+                                    </div>
+                                    {#if amountType !== 'none'}
+                                        <div class="mt-2">
+                                            <Input
+                                                type="number"
+                                                placeholder={amountType === 'per-holder' ? 'Amount per holder' : 'Amount per NFT'}
+                                                bind:value={amountValue}
+                                            />
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                {#if amountType === 'per-holder'}
+                                                    Each holder will receive this amount
+                                                {:else}
+                                                    Amount will be multiplied by the number of NFTs held
+                                                {/if}
+                                            </p>
+                                        </div>
+                                    {/if}
+                                </div>
+                                
+                                <div class="flex justify-end gap-3">
+                                    <Button 
+                                        color="alternative" 
+                                        on:click={() => {
+                                            importStep = 'initial';
+                                            collectionId = '';
+                                            error = null;
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button 
+                                        color="blue"
+                                        disabled={isLoadingNFTHolders}
+                                        on:click={handleNFTCollectionImport}
+                                    >
+                                        {#if isLoadingNFTHolders}
+                                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                                            Loading...
+                                        {:else}
+                                            Import Holders
+                                        {/if}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 {:else}
                     <div class="h-full flex flex-col border dark:border-gray-700 rounded-lg overflow-hidden">

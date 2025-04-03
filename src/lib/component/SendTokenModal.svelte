@@ -9,6 +9,10 @@
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import ImportRecipientsModal from './ImportRecipientsModal.svelte';
     
+    // Constants for Algorand transaction limits
+    const MAX_TXN_PER_GROUP = 16;
+    const MAX_GROUPS_PER_SIGNING = 16;
+
     // Click outside action
     function clickOutside(node: HTMLElement, callback: () => void) {
         const handleClick = (event: MouseEvent) => {
@@ -132,15 +136,23 @@
     async function fetchRecipientInfo(address: string, index: number) {
         recipients[index].isLoading = true;
         try {
-            const [account, block] = await Promise.all([
-                algodClient.accountInformation(address).do(),
-                algodIndexer.lookupAccountByID(address).do()
-                    .then(info => algodIndexer.lookupBlock(info.account['created-at-round']).do())
-            ]);
+            let accountInfo;
+            let block;
+            try {
+                [accountInfo, block] = await Promise.all([
+                    algodClient.accountInformation(address).do(),
+                    algodIndexer.lookupAccountByID(address).do()
+                        .then(info => algodIndexer.lookupBlock(info.account['created-at-round']).do())
+                ]);
+            } catch (err) {
+                // If account info fails, set defaults
+                accountInfo = { amount: 0, assets: [] };
+                block = { timestamp: Date.now() / 1000 };
+            }
 
             let assetBalance = 0;
             const hasOptedIn = isARC200Token(token) ? true : 
-                account.assets?.some((asset: any) => {
+                accountInfo.assets?.some((asset: any) => {
                     if (asset['asset-id'] === Number(token.id)) {
                         assetBalance = asset.amount;
                         return true;
@@ -150,18 +162,19 @@
 
             // For ARC-200 tokens, fetch balance using the contract
             if (isARC200Token(token)) {
-                const contract = new Contract(Number(token.id), algodClient, algodIndexer);
-                const balance = await contract.arc200_balanceOf(address);
-                if (balance.success) {
-                    assetBalance = Number(balance.returnValue);
-                }
-                else {
+                try {
+                    const contract = new Contract(Number(token.id), algodClient, algodIndexer);
+                    const balance = await contract.arc200_balanceOf(address);
+                    if (balance.success) {
+                        assetBalance = Number(balance.returnValue);
+                    }
+                } catch (err) {
                     assetBalance = 0;
                 }
             }
 
             recipients[index].info = {
-                balance: account.amount,
+                balance: accountInfo.amount,
                 createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
                 hasOptedIn,
                 assetBalance
@@ -199,17 +212,16 @@
         if (!$selectedWallet?.address) {
             throw new Error('Wallet not connected');
         }
-        return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+        return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
             from: $selectedWallet.address,
             to: recipientAddress,
-            assetIndex: Number(token.id),
             amount: Math.floor(amount),
             note: note ? new TextEncoder().encode(note) : undefined,
             suggestedParams
         });
     }
 
-    async function buildARC200Transaction(recipientAddress: string, amount: number, useGroupID: boolean = true): Promise<algosdk.Transaction[]> {
+    async function buildARC200Transaction(recipientAddress: string, amount: number, index: number): Promise<algosdk.Transaction[]> {
         if (!$selectedWallet?.address) {
             throw new Error('Wallet not connected');
         }
@@ -239,10 +251,64 @@
             const bytes = Buffer.from(txn, 'base64');
             const tx = algosdk.decodeUnsignedTransaction(bytes);
             delete tx.group;
+
+            // if the transaction is a payment, append the index of this transaction to the tx.txn field
+            if (tx.type === 'pay') {
+                const existingNote = tx.note ? new TextDecoder().decode(tx.note) : '';
+                tx.note = new TextEncoder().encode(`${existingNote}${existingNote ? ' ' : ''}${index}`);
+            }
+
             decodedTxns.push(tx);
         }
 
         return decodedTxns;
+    }
+
+    // Helper function to process items with rate limiting
+    async function processWithRateLimit<T, R>(
+        items: T[],
+        processor: (item: T, index: number) => Promise<R>,
+        rateLimit: number,
+        onProgress?: (completed: number, total: number) => void
+    ): Promise<R[]> {
+        const results: R[] = [];
+        const chunks: T[][] = [];
+        
+        // Split items into chunks based on rate limit
+        for (let i = 0; i < items.length; i += rateLimit) {
+            chunks.push(items.slice(i, i + rateLimit));
+        }
+
+        let completed = 0;
+        const total = items.length;
+
+        // Process each chunk with rate limiting
+        for (const chunk of chunks) {
+            // Process items in chunk concurrently
+            const chunkResults = await Promise.all(
+                chunk.map(async (item) => {
+                    try {
+                        const globalIndex = items.indexOf(item);
+                        const result = await processor(item, globalIndex);
+                        completed++;
+                        onProgress?.(completed, total);
+                        return result;
+                    } catch (error) {
+                        console.error('Error processing item:', error);
+                        throw error;
+                    }
+                })
+            );
+            
+            results.push(...chunkResults);
+            
+            // Wait 1 second before processing next chunk (5 per second = 200ms per item)
+            if (chunks.indexOf(chunk) < chunks.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        return results;
     }
 
     async function buildVOITransaction(recipientAddress: string, amount: number, suggestedParams: algosdk.SuggestedParams): Promise<algosdk.Transaction> {
@@ -256,6 +322,84 @@
             note: note ? new TextEncoder().encode(note) : undefined,
             suggestedParams
         });
+    }
+
+    // Helper function to optimize ARC200 transaction groups by consolidating payment transactions
+    function optimizeARC200TransactionGroup(transactions: algosdk.Transaction[]): algosdk.Transaction[] {
+        // Find all payment transactions and non-payment transactions
+        const paymentTxns = transactions.filter(tx => tx.type === 'pay');
+        const nonPaymentTxns = transactions.filter(tx => tx.type !== 'pay');
+
+        // If no payment transactions or only one, return original array
+        if (paymentTxns.length <= 1) {
+            return transactions;
+        }
+
+        // Sum up all payment amounts
+        const totalPaymentAmount = paymentTxns.reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+        // Create a new consolidated payment transaction using the first payment transaction as template
+        const consolidatedPayment: algosdk.Transaction = paymentTxns[0];
+        consolidatedPayment.amount = totalPaymentAmount;
+
+        // Return array with consolidated payment first, followed by non-payment transactions
+        return [consolidatedPayment, ...nonPaymentTxns];
+    }
+
+    // Helper function to create optimized transaction groups
+    function createOptimizedGroups(allTransactions: algosdk.Transaction[][]): algosdk.Transaction[][] {
+        // First, separate all transactions into payments and non-payments, maintaining the relationship
+        const txPairs: { payment: algosdk.Transaction | null; nonPayment: algosdk.Transaction }[] = [];
+        
+        allTransactions.forEach(txSet => {
+            const payment = txSet.find(tx => tx.type === 'pay') || null;
+            const nonPayment = txSet.find(tx => tx.type !== 'pay');
+            if (nonPayment) {
+                txPairs.push({ payment, nonPayment });
+            }
+        });
+
+        // Initialize result array for groups
+        const groups: algosdk.Transaction[][] = [];
+        
+        // Process transactions in groups of MAX_TXN_PER_GROUP - 1 (to leave room for payment)
+        for (let i = 0; i < txPairs.length; i += (MAX_TXN_PER_GROUP - 1)) {
+            // Get the current batch of pairs
+            const currentBatch = txPairs.slice(i, i + (MAX_TXN_PER_GROUP - 1));
+            
+            // Sum up all payment amounts in this batch
+            const totalPaymentAmount = currentBatch.reduce((sum, pair) => 
+                sum + (pair.payment ? Number(pair.payment.amount) : 0), 0);
+            
+            if (totalPaymentAmount > 0 && currentBatch[0].payment) {
+                // Create a new payment transaction with the combined amount
+                const firstPayment = currentBatch[0].payment;
+                const combinedPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+                    from: algosdk.encodeAddress(firstPayment.from.publicKey),
+                    to: algosdk.encodeAddress(firstPayment.to.publicKey),
+                    amount: totalPaymentAmount,
+                    note: firstPayment.note,
+                    suggestedParams: {
+                        fee: firstPayment.fee,
+                        firstRound: firstPayment.firstRound,
+                        lastRound: firstPayment.lastRound,
+                        genesisHash: Buffer.from(firstPayment.genesisHash).toString('base64'),
+                        genesisID: firstPayment.genesisID,
+                        flatFee: true
+                    }
+                });
+                
+                // Create the group with combined payment first, followed by non-payments
+                const group = [
+                    combinedPayment,
+                    ...currentBatch.map(pair => pair.nonPayment)
+                ];
+                
+                groups.push(algosdk.assignGroupID(group));
+            }
+        }
+
+        return groups;
     }
 
     async function handleSend() {
@@ -277,24 +421,42 @@
             transactionGroups = [];
             transactionIds = [];
             currentTxnGroup = 0;
-            const groupTransactions: algosdk.Transaction[] = [];
-            
-            // Handle ARC-200 tokens
+
             if (isARC200Token(token)) {
-                // First pass: collect all transactions
-                for (const recipient of recipients) {
-                    if (!recipient.address || !recipient.amount) continue;
-                    // Convert amount to raw units with proper decimal precision
-                    const rawAmount = Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals));
-                    const txns = await buildARC200Transaction(recipient.address, rawAmount);
-                    groupTransactions.push(...txns);
-                }
+                // Prepare transaction requests
+                const txRequests = recipients
+                    .filter(r => r.address && r.amount)
+                    .map(recipient => ({
+                        address: recipient.address!,
+                        amount: Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals))
+                    }));
+
+                // Build transactions in parallel with rate limiting
+                const txResults = await processWithRateLimit(
+                    txRequests,
+                    async (req, index) => {
+                        return buildARC200Transaction(req.address, req.amount, index);
+                    },
+                    5, // Process 5 at a time
+                    (completed, total) => {
+                        // Update UI with progress
+                        const percent = Math.round((completed / total) * 100);
+                        error = `Building transactions... ${completed}/${total} (${percent}%)`;
+                    }
+                );
+
+                // Create optimized groups from all transactions
+                const allGroups = createOptimizedGroups(txResults);
+                transactionGroups = allGroups;
+
             } else {
-                // Get fresh suggested params for non-ARC200 tokens
+                // Handle non-ARC200 tokens (native VOI and VSA)
                 const suggestedParams = await algodClient.getTransactionParams().do();
-                
+                let currentGroup: algosdk.Transaction[] = [];
+
                 for (const recipient of recipients) {
                     if (!recipient.address || !recipient.amount) continue;
+                    
                     // Convert amount to raw units with proper decimal precision
                     const rawAmount = Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals));
                     
@@ -305,93 +467,124 @@
                         txn = await buildVSATransaction(recipient.address, rawAmount, suggestedParams);
                     }
                     delete txn.group;
-                    groupTransactions.push(txn);
+
+                    if (currentGroup.length >= MAX_TXN_PER_GROUP) {
+                        transactionGroups.push(algosdk.assignGroupID(currentGroup));
+                        currentGroup = [];
+                    }
+                    currentGroup.push(txn);
+                }
+
+                // Add any remaining transactions as the final group
+                if (currentGroup.length > 0) {
+                    transactionGroups.push(algosdk.assignGroupID(currentGroup));
                 }
             }
 
-            // Split transactions into groups of 16
-            for (let i = 0; i < groupTransactions.length; i += 16) {
-                const group = groupTransactions.slice(i, i + 16);
-                transactionGroups.push(algosdk.assignGroupID(group));
+            // Split groups into batches of 16 groups each for signing
+            const signingBatches: algosdk.Transaction[][] = [];
+            for (let i = 0; i < transactionGroups.length; i += MAX_GROUPS_PER_SIGNING) {
+                const batchGroups = transactionGroups.slice(i, i + MAX_GROUPS_PER_SIGNING);
+                const batchTransactions = batchGroups.flat();
+                signingBatches.push(batchTransactions);
             }
 
-            totalTxnGroups = transactionGroups.length;
-            
-            // First collect all signatures
+            totalTxnGroups = signingBatches.length;
+            let currentBatch = 0;
+            const allSignedTransactions: Uint8Array[][] = [];
+
+            // Process each batch of groups
             txState = 'awaiting';
-            const allSignedGroups: Uint8Array[][] = [];
-            
-            for (let i = 0; i < transactionGroups.length; i++) {
-                currentTxnGroup = i;
-                const signedGroup = await signTransactions([transactionGroups[i]]);
-                if (!signedGroup) {
+            for (const batchTransactions of signingBatches) {
+                currentTxnGroup = currentBatch;
+                
+                // Sign all transactions in this batch (up to 16 groups) at once
+                const signedTransactions = await signTransactions([batchTransactions]);
+                if (!signedTransactions) {
                     throw new Error('User rejected transaction signing');
                 }
-                allSignedGroups.push(signedGroup);
+                allSignedTransactions.push(signedTransactions);
+                currentBatch++;
             }
 
             // Then send all transactions
             txState = 'sending';
-            try {
-                const sendPromises = allSignedGroups.map(async (signedGroup, index) => {
+            const sendPromises = allSignedTransactions.flatMap((signedBatch, batchIndex) => {
+                // Split the signed transactions back into their original groups
+                const groups: Uint8Array[][] = [];
+                let txIndex = 0;
+                const batchGroups = transactionGroups.slice(batchIndex * MAX_GROUPS_PER_SIGNING, (batchIndex + 1) * MAX_GROUPS_PER_SIGNING);
+                
+                for (const group of batchGroups) {
+                    const groupSize = group.length;
+                    groups.push(signedBatch.slice(txIndex, txIndex + groupSize));
+                    txIndex += groupSize;
+                }
+
+                // Create send promises for each group
+                return groups.map(async (signedGroup, groupIndex) => {
+                    const overallGroupIndex = batchIndex * MAX_GROUPS_PER_SIGNING + groupIndex;
                     try {
-                        currentTxnGroup = index;
                         const response = await algodClient.sendRawTransaction(signedGroup).do();
                         const confirmedTxn = await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+                        
+                        // Get all transaction IDs from the signing group
+                        const txIds = signedGroup.map(stxn => {
+                            const decoded = algosdk.decodeSignedTransaction(stxn);
+                            return decoded.txn.txID();
+                        });
+
                         return {
                             success: true,
-                            txId: response.txId,
-                            confirmedTxn
+                            txIds,
+                            confirmedTxn,
+                            batchIndex,
+                            groupIndex: overallGroupIndex
                         };
                     } catch (err) {
                         return {
                             success: false,
-                            txId: null,
+                            txIds: [],
                             error: err instanceof Error ? err.message : 'Unknown error occurred',
-                            groupIndex: index
+                            batchIndex,
+                            groupIndex: overallGroupIndex
                         };
                     }
                 });
+            });
 
-                const results = await Promise.all(sendPromises);
+            const results = await Promise.all(sendPromises);
+            
+            // Process results and collect successful/failed transactions
+            const successfulTxns = results.filter(r => r.success).flatMap(r => r.txIds);
+            const failedTxns = results.filter(r => !r.success);
+
+            if (failedTxns.length > 0) {
+                // Store failed recipients for potential retry
+                failedRecipients = failedTxns.map(f => recipients[f.groupIndex ?? 0]);
+                showRetryButton = true;
                 
-                // Process results and collect successful/failed transactions
-                const successfulTxns = results.filter(r => r.success).map(r => r.txId!);
-                const failedTxns = results.filter(r => !r.success);
-
-                if (failedTxns.length > 0) {
-                    // Store failed recipients for potential retry
-                    failedRecipients = failedTxns.map(f => recipients[f.groupIndex ?? 0]);
-                    showRetryButton = true;
-                    
-                    // Some transactions failed
-                    if (successfulTxns.length > 0) {
-                        // Partial success - some txns went through
-                        transactionIds = successfulTxns;
-                        error = `${failedTxns.length} transaction group(s) failed. Group(s) ${failedTxns.map(f => (f.groupIndex ?? 0) + 1).join(', ')} failed with error: ${failedTxns[0].error}`;
-                        success = true; // Still show success screen but with error message
-                    } else {
-                        // All transactions failed
-                        throw new Error(`All transactions failed. First error: ${failedTxns[0].error}`);
-                    }
-                } else {
-                    // All transactions succeeded
+                // Some transactions failed
+                if (successfulTxns.length > 0) {
+                    // Partial success - some txns went through
                     transactionIds = successfulTxns;
-                    success = true;
-                    showRetryButton = false;
-                    failedRecipients = [];
+                    error = `${failedTxns.length} transaction group(s) failed. Group(s) ${failedTxns.map(f => (f.groupIndex ?? 0) + 1).join(', ')} failed with error: ${failedTxns[0].error}`;
+                    success = true; // Still show success screen but with error message
+                } else {
+                    // All transactions failed
+                    throw new Error(`All transactions failed. First error: ${failedTxns[0].error}`);
                 }
-
-                transactionId = transactionIds.join(',');
-                hasCompletedTransaction = true;
-                txState = 'idle';
-
-            } catch (err) {
-                console.error('Error sending tokens:', err);
-                error = err instanceof Error ? err.message : 'Failed to send tokens. Please try again.';
-                isSending = false;
-                txState = 'idle';
+            } else {
+                // All transactions succeeded
+                transactionIds = successfulTxns;
+                success = true;
+                showRetryButton = false;
+                failedRecipients = [];
             }
+
+            transactionId = transactionIds.join(',');
+            hasCompletedTransaction = true;
+            txState = 'idle';
 
         } catch (err) {
             console.error('Error sending tokens:', err);
@@ -431,12 +624,12 @@
 
     function combineRecipients(method: 'sum' | 'max' | 'min') {
         const combined = recipients.reduce((acc, curr) => {
-            if (!curr.address || !curr.amount) return acc;
+            if (!curr.address) return acc;
             
             const existing = acc.find(r => r.address === curr.address);
             if (existing) {
-                const currentAmount = Number(curr.amount);
-                const existingAmount = Number(existing.amount);
+                const currentAmount = Number(curr.amount) || 0;
+                const existingAmount = Number(existing.amount) || 0;
                 
                 let newAmount: number;
                 switch (method) {
@@ -451,11 +644,11 @@
                         break;
                 }
                 
-                existing.amount = enforceDecimals(newAmount, token.decimals);
+                existing.amount = newAmount > 0 ? enforceDecimals(newAmount, token.decimals) : '';
                 return acc;
             }
             
-            return [...acc, { ...curr, amount: enforceDecimals(curr.amount, token.decimals) }];
+            return [...acc, { ...curr }];
         }, [] as Recipient[]);
 
         // If we found and combined any duplicates, update the recipients
@@ -899,9 +1092,11 @@
                             </p>
                         </div>
                     {/if}
-                    
+                </div>
+
+                <div class="flex-none pt-4">
                     {#if error}
-                        <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
+                        <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <i class="fas fa-exclamation-circle"></i>
@@ -919,9 +1114,6 @@
                             </div>
                         </div>
                     {/if}
-                </div>
-
-                <div class="flex-none pt-4">
                     <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                         <div class="flex items-center gap-4 text-sm">
                             <div>
@@ -951,13 +1143,13 @@
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                    Awaiting Signature {#if totalTxnGroups > 1}(Group {currentTxnGroup + 1} of {totalTxnGroups}){/if}
+                                    Awaiting Signature {#if totalTxnGroups > 1}(Batch {currentTxnGroup + 1} of {totalTxnGroups}){/if}
                                 {:else if txState === 'sending'}
                                     <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                    Sending {#if totalTxnGroups > 1}(Group {currentTxnGroup + 1} of {totalTxnGroups}){/if}
+                                    Sending {#if totalTxnGroups > 1}(Batch {currentTxnGroup + 1} of {totalTxnGroups}){/if}
                                 {:else}
                                     <i class="fas fa-paper-plane mr-2"></i>
                                     Send
@@ -993,13 +1185,13 @@
                         {/if}
                         <div class="text-sm">
                             <p class="text-gray-600 dark:text-gray-400 mb-2">Transaction ID{transactionIds.length > 1 ? 's' : ''}:</p>
-                            <div class="flex flex-col items-center">
+                            <div class="flex flex-col items-center max-h-48 overflow-y-auto space-y-2 p-2">
                                 {#each transactionIds as txId}
-                                    <div class="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-md font-mono">
+                                    <div class="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-md font-mono w-full">
                                         <a 
                                             href={`https://explorer.voi.network/explorer/transaction/${txId}`} 
                                             target="_blank" 
-                                            class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                            class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 truncate"
                                             title={txId}
                                         >
                                             {txId.slice(0, 8)}...{txId.slice(-8)}
@@ -1038,9 +1230,7 @@
             </div>
         {/if}
     </div>
-</Modal>
-
-{#if showImportModal}
+</Modal>{#if showImportModal}
     <ImportRecipientsModal
         bind:open={showImportModal}
         onClose={() => {
@@ -1080,3 +1270,4 @@
         appearance: textfield;
     }
 </style> 
+
