@@ -59,29 +59,53 @@
     let availableTokens: FungibleTokenType[] = [];
     let selectedToken = token;
     let tokenImages = new Map<string, string>();
+    let isInitialLoad = true;
 
-    // Create the native VOI token object
-    const nativeVoiToken: FungibleTokenType = {
+    // Create the native VOI token object with proper initialization
+    let nativeVoiToken: FungibleTokenType = {
         id: '0',
         name: 'Voi',
         symbol: 'VOI',
         decimals: 6,
-        balance: 0,
+        balance: isNativeToken(token) ? token.balance : 0,
         verified: true,
         imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
-        value: 0,
+        value: isNativeToken(token) ? token.balance / 1e6 : 0,
         type: 'native'
     };
+
+    // Fetch VOI balance only on initial modal open
+    $: if (open && $selectedWallet?.address && isInitialLoad) {
+        isInitialLoad = false;
+        algodClient.accountInformation($selectedWallet.address).do()
+            .then(info => {
+                nativeVoiToken = {
+                    ...nativeVoiToken,
+                    balance: info.amount,
+                    value: info.amount / 1e6
+                };
+                // If the selected token is native VOI, update it too
+                if (isNativeToken(selectedToken)) {
+                    selectedToken = {
+                        ...selectedToken,
+                        balance: info.amount
+                    };
+                }
+                // Force Svelte reactivity for available tokens
+                availableTokens = [nativeVoiToken, ...availableTokens.filter(t => t.id !== '0')];
+            })
+            .catch(console.error);
+    }
+
+    // Reset isInitialLoad when modal closes
+    $: if (!open) {
+        isInitialLoad = true;
+    }
 
     // Subscribe to the fungible tokens store and ensure VOI is always present
     fungibleTokensStore.subscribe((tokens) => {
         const filteredTokens = tokens.filter(t => !isLPToken(t));
-        // Update VOI balance if this is a native token
-        if (isNativeToken(selectedToken)) {
-            nativeVoiToken.balance = selectedToken.balance;
-            nativeVoiToken.value = selectedToken.balance / 1e6;
-        }
-        // Always include VOI at the top of the list
+        // Keep the current VOI token with its balance when updating the list
         availableTokens = [nativeVoiToken, ...filteredTokens];
     });
 
@@ -111,6 +135,12 @@
         availableTokens.forEach(token => {
             cacheTokenImage(token);
         });
+    }
+
+    // Initialize VOI image immediately
+    $: if (open) {
+        tokenImages.set('0', `https://asset-verification.nautilus.sh/icons/0.png`);
+        tokenImages = tokenImages;
     }
 
     // Update the selected token when the token prop changes
@@ -398,56 +428,74 @@
     // Helper function to create optimized transaction groups
     function createOptimizedGroups(allTransactions: algosdk.Transaction[][]): algosdk.Transaction[][] {
         // First, separate all transactions into payments and non-payments, maintaining the relationship
-        const txPairs: { payment: algosdk.Transaction | null; nonPayment: algosdk.Transaction }[] = [];
+        const txPairs: { payment: algosdk.Transaction | null; nonPayment: algosdk.Transaction | null }[] = [];
         
         allTransactions.forEach(txSet => {
             const payment = txSet.find(tx => tx.type === 'pay') || null;
-            const nonPayment = txSet.find(tx => tx.type !== 'pay');
-            if (nonPayment) {
-                txPairs.push({ payment, nonPayment });
-            }
+            const nonPayment = txSet.find(tx => tx.type !== 'pay') || null;
+            // Add pair regardless of transaction types
+            txPairs.push({ payment, nonPayment });
         });
+        console.log('All transactions:', allTransactions);
+        console.log('Transaction pairs:', txPairs);
 
         // Initialize result array for groups
         const groups: algosdk.Transaction[][] = [];
         
-        // Process transactions in groups of MAX_TXN_PER_GROUP - 1 (to leave room for payment)
-        for (let i = 0; i < txPairs.length; i += (MAX_TXN_PER_GROUP - 1)) {
+        // Process transactions in groups, leaving room for the combined payment transaction
+        const maxTransactionsPerBatch = MAX_TXN_PER_GROUP - 1;
+        for (let i = 0; i < txPairs.length; i += maxTransactionsPerBatch) {
             // Get the current batch of pairs
-            const currentBatch = txPairs.slice(i, i + (MAX_TXN_PER_GROUP - 1));
+            const currentBatch = txPairs.slice(i, i + maxTransactionsPerBatch);
             
-            // Sum up all payment amounts in this batch
-            const totalPaymentAmount = currentBatch.reduce((sum, pair) => 
-                sum + (pair.payment ? Number(pair.payment.amount) : 0), 0);
+            // Collect all valid transactions from the batch
+            const batchTransactions: algosdk.Transaction[] = [];
             
-            if (totalPaymentAmount > 0 && currentBatch[0].payment) {
-                // Create a new payment transaction with the combined amount
-                const firstPayment = currentBatch[0].payment;
-                const combinedPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-                    from: algosdk.encodeAddress(firstPayment.from.publicKey),
-                    to: algosdk.encodeAddress(firstPayment.to.publicKey),
-                    amount: totalPaymentAmount,
-                    note: firstPayment.note,
-                    suggestedParams: {
-                        fee: firstPayment.fee,
-                        firstRound: firstPayment.firstRound,
-                        lastRound: firstPayment.lastRound,
-                        genesisHash: Buffer.from(firstPayment.genesisHash).toString('base64'),
-                        genesisID: firstPayment.genesisID,
-                        flatFee: true
-                    }
-                });
+            // First, handle payments if they exist
+            const paymentsToProcess = currentBatch.filter(pair => pair.payment !== null);
+            if (paymentsToProcess.length > 0) {
+                const totalPaymentAmount = paymentsToProcess.reduce((sum, pair) => 
+                    sum + (pair.payment ? Number(pair.payment.amount) : 0), 0);
                 
-                // Create the group with combined payment first, followed by non-payments
-                const group = [
-                    combinedPayment,
-                    ...currentBatch.map(pair => pair.nonPayment)
-                ];
-                
-                groups.push(algosdk.assignGroupID(group));
+                if (totalPaymentAmount > 0) {
+                    const firstPayment = paymentsToProcess[0].payment!;
+                    const combinedPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+                        from: algosdk.encodeAddress(firstPayment.from.publicKey),
+                        to: algosdk.encodeAddress(firstPayment.to.publicKey),
+                        amount: totalPaymentAmount,
+                        note: firstPayment.note,
+                        suggestedParams: {
+                            fee: firstPayment.fee,
+                            firstRound: firstPayment.firstRound,
+                            lastRound: firstPayment.lastRound,
+                            genesisHash: Buffer.from(firstPayment.genesisHash).toString('base64'),
+                            genesisID: firstPayment.genesisID,
+                            flatFee: true
+                        }
+                    });
+                    batchTransactions.push(combinedPayment);
+                }
+            }
+            
+            // Then add all non-payment transactions
+            const nonPaymentTransactions = currentBatch
+                .filter(pair => pair.nonPayment)
+                .map(pair => pair.nonPayment!);
+            
+            // Make sure we don't exceed MAX_TXN_PER_GROUP
+            const remainingSlots = MAX_TXN_PER_GROUP - batchTransactions.length;
+            batchTransactions.push(...nonPaymentTransactions.slice(0, remainingSlots));
+            
+            // If we have any transactions in this batch, create a group
+            if (batchTransactions.length > 0) {
+                if (batchTransactions.length > MAX_TXN_PER_GROUP) {
+                    throw new Error(`${batchTransactions.length} transactions grouped together but max group size is ${MAX_TXN_PER_GROUP}`);
+                }
+                groups.push(algosdk.assignGroupID(batchTransactions));
             }
         }
 
+        console.log('Created transaction groups:', groups);
         return groups;
     }
 
@@ -498,6 +546,8 @@
                 const allGroups = createOptimizedGroups(txResults);
                 transactionGroups = allGroups;
 
+                console.log('Transaction groups:', transactionGroups);
+
             } else {
                 // Handle non-ARC200 tokens (native VOI and VSA)
                 const suggestedParams = await algodClient.getTransactionParams().do();
@@ -538,6 +588,8 @@
                 signingBatches.push(batchTransactions);
             }
 
+            console.log('Signing batches:', signingBatches);
+
             totalTxnGroups = signingBatches.length;
             let currentBatch = 0;
             const allSignedTransactions: Uint8Array[][] = [];
@@ -555,6 +607,8 @@
                 allSignedTransactions.push(signedTransactions);
                 currentBatch++;
             }
+
+            console.log('All signed transactions:', allSignedTransactions);
 
             // Then send all transactions
             txState = 'sending';
@@ -785,7 +839,18 @@
     }
 
     function handleTokenChange(newToken: FungibleTokenType) {
-        selectedToken = newToken;
+        // If selecting VOI, ensure we use the latest balance
+        if (isNativeToken(newToken)) {
+            selectedToken = {
+                type: 'native',
+                symbol: 'VOI',
+                decimals: 6,
+                balance: nativeVoiToken.balance,
+                name: 'Voi'
+            };
+        } else {
+            selectedToken = newToken;
+        }
         // Reset recipients when token changes
         recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
         error = null;
@@ -804,9 +869,9 @@
                             class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2"
                             on:click={() => showTokenSelect = !showTokenSelect}
                         >
-                            {#if selectedToken.id && tokenImages.has(selectedToken.id)}
+                            {#if (selectedToken.id && tokenImages.has(selectedToken.id)) || isNativeToken(selectedToken)}
                                 <img 
-                                    src={tokenImages.get(selectedToken.id)}
+                                    src={isNativeToken(selectedToken) ? "https://asset-verification.nautilus.sh/icons/0.png" : tokenImages.get(selectedToken.id ?? '')!}
                                     alt=""
                                     class="w-4 h-4 rounded-full bg-transparent"
                                 />
@@ -824,9 +889,9 @@
                                             showTokenSelect = false;
                                         }}
                                     >
-                                        {#if token.id && tokenImages.has(token.id)}
+                                        {#if (token.id && tokenImages.has(token.id)) || isNativeToken(token)}
                                             <img 
-                                                src={tokenImages.get(token.id)}
+                                                src={isNativeToken(token) ? "https://asset-verification.nautilus.sh/icons/0.png" : tokenImages.get(token.id)!}
                                                 alt=""
                                                 class="w-4 h-4 rounded-full bg-transparent"
                                             />
@@ -839,9 +904,9 @@
                     </div>
                 </div>
                 <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                    {#if selectedToken.id && tokenImages.has(selectedToken.id)}
+                    {#if (selectedToken.id && tokenImages.has(selectedToken.id)) || isNativeToken(selectedToken)}
                         <img 
-                            src={tokenImages.get(selectedToken.id)}
+                            src={isNativeToken(selectedToken) ? "https://asset-verification.nautilus.sh/icons/0.png" : tokenImages.get(selectedToken.id ?? '')!}
                             alt=""
                             class="h-12 rounded-full bg-transparent"
                         />
