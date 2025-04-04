@@ -436,8 +436,6 @@
             // Add pair regardless of transaction types
             txPairs.push({ payment, nonPayment });
         });
-        console.log('All transactions:', allTransactions);
-        console.log('Transaction pairs:', txPairs);
 
         // Initialize result array for groups
         const groups: algosdk.Transaction[][] = [];
@@ -495,7 +493,6 @@
             }
         }
 
-        console.log('Created transaction groups:', groups);
         return groups;
     }
 
@@ -545,9 +542,6 @@
                 // Create optimized groups from all transactions
                 const allGroups = createOptimizedGroups(txResults);
                 transactionGroups = allGroups;
-
-                console.log('Transaction groups:', transactionGroups);
-
             } else {
                 // Handle non-ARC200 tokens (native VOI and VSA)
                 const suggestedParams = await algodClient.getTransactionParams().do();
@@ -588,8 +582,6 @@
                 signingBatches.push(batchTransactions);
             }
 
-            console.log('Signing batches:', signingBatches);
-
             totalTxnGroups = signingBatches.length;
             let currentBatch = 0;
             const allSignedTransactions: Uint8Array[][] = [];
@@ -607,8 +599,6 @@
                 allSignedTransactions.push(signedTransactions);
                 currentBatch++;
             }
-
-            console.log('All signed transactions:', allSignedTransactions);
 
             // Then send all transactions
             txState = 'sending';
