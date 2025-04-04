@@ -21,6 +21,7 @@
     import TokenTransfersModal from './TokenTransfersModal.svelte';
 	import StakingComponent from './ui/StakingComponent.svelte';
     import BridgeModal from './BridgeModal.svelte';
+    import { fungibleTokens as fungibleTokensStore } from '$lib/stores/tokens';
 
     export let parentWalletAddress: string | null = null;
     export let walletAddress: string | undefined = undefined;
@@ -762,85 +763,97 @@
             await Promise.all(tokenPromises);
 
             // Call Nomadex endpoint with the user's wallet address
-            const response = await fetch(`https://voimain-analytics.nomadex.app/pools/${walletAddress}`);
-            if (!response.ok) {
-                console.error('Failed to fetch Nomadex LP tokens');
-                return;
-            }
-            const data = await response.json();
-            
-            // Map through each pool returned by Nomadex
-            const nomadexLPTokens = await Promise.all(data.map(async (pool: NomadexPool) => {
-                // get global state using algodClient
-                const ctc = await algodClient.getApplicationByID(pool.id).do();
-                const globalState = decodeGlobalState(ctc.params['global-state']);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timed out after 15 seconds')), 15000);
+            });
 
-                const decimals = Number(globalState.find((state: any) => state.key === 'decimals')?.value);
-                const name = globalState.find((state: any) => state.key === 'name')?.value;
-
-                const lpt = Number(pool.balance.lpt);
-                const issuedLpt = Number(pool.balance.issuedLpt);
+            try {
+                const response = await Promise.race([
+                    fetch(`https://voimain-analytics.nomadex.app/pools/${walletAddress}`),
+                    timeoutPromise
+                ]) as Response;
                 
-                // find pool in poolData
-                const poolInfo = poolData.find((p: any) => p.id === pool.id);
-                if (!poolInfo) {
-                    console.error(`Pool info not found for pool ${pool.id}`);
-                    return null;
+                if (!response.ok) {
+                    console.error('Failed to fetch Nomadex LP tokens');
+                    return;
                 }
-
-                let tvl = 0;
+                const data = await response.json();
                 
-                // Calculate TVL based on token prices
-                if (poolInfo.alphaId === 0) {
-                    tvl = poolInfo.balances[0] * 2;
-                } else if (poolInfo.betaId === 0) {
-                    tvl = poolInfo.balances[1] * 2;
-                } else {
-                    // For non-VOI pairs, we would need price data to calculate TVL accurately
-                    // For now, we'll leave it as 0
-                    tvl = 0;
-                }
+                // Map through each pool returned by Nomadex
+                const nomadexLPTokens = await Promise.all(data.map(async (pool: NomadexPool) => {
+                    // get global state using algodClient
+                    const ctc = await algodClient.getApplicationByID(pool.id).do();
+                    const globalState = decodeGlobalState(ctc.params['global-state']);
 
-                // Get token details for both tokens in the pool
-                const tokenA = tokenDetails.get(pool.alphaId) || { name: `Token ${pool.alphaId}`, symbol: `${pool.alphaId}`, decimals: 6 };
-                const tokenB = tokenDetails.get(pool.betaId) || { name: `Token ${pool.betaId}`, symbol: `${pool.betaId}`, decimals: 6 };
+                    const decimals = Number(globalState.find((state: any) => state.key === 'decimals')?.value);
+                    const name = globalState.find((state: any) => state.key === 'name')?.value;
 
-                return {
-                    name: name,
-                    symbol: `${tokenA.symbol}/${tokenB.symbol}`,
-                    balance: lpt,
-                    decimals: decimals,
-                    verified: true,
-                    imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
-                    id: pool.id,
-                    poolId: String(pool.id),
-                    value: lpt / issuedLpt * tvl / Math.pow(10, 6),
-                    type: 'arc200',
-                    poolInfo: {
-                        tokAId: pool.alphaId,
-                        tokBId: pool.betaId,
-                        tokASymbol: tokenA.symbol,
-                        tokBSymbol: tokenB.symbol,
-                        tokABalance: poolInfo.balances[0],
-                        tokBBalance: poolInfo.balances[1],
-                        tokAType: poolInfo.alphaType,
-                        tokBType: poolInfo.betaType,
-                        tokADecimals: tokenA.decimals,
-                        tokBDecimals: tokenB.decimals,
-                        totalSupply: issuedLpt,
-                        poolId: String(pool.id),
-                        apr: Math.round(poolInfo.apr * 100) / 100,
-                        tvl: tvl,
-                        provider: 'nomadex'
+                    const lpt = Number(pool.balance.lpt);
+                    const issuedLpt = Number(pool.balance.issuedLpt);
+                    
+                    // find pool in poolData
+                    const poolInfo = poolData.find((p: any) => p.id === pool.id);
+                    if (!poolInfo) {
+                        console.error(`Pool info not found for pool ${pool.id}`);
+                        return null;
                     }
-                }
-            }));
 
-            // Filter out null values and append the Nomadex LP tokens to our existing fungibleTokens array
-            fungibleTokens = [
-                ...fungibleTokens,
-                ...nomadexLPTokens.filter((token): token is NonNullable<typeof token> => token !== null)
-            ];
+                    let tvl = 0;
+                    
+                    // Calculate TVL based on token prices
+                    if (poolInfo.alphaId === 0) {
+                        tvl = poolInfo.balances[0] * 2;
+                    } else if (poolInfo.betaId === 0) {
+                        tvl = poolInfo.balances[1] * 2;
+                    } else {
+                        // For non-VOI pairs, we would need price data to calculate TVL accurately
+                        // For now, we'll leave it as 0
+                        tvl = 0;
+                    }
+
+                    // Get token details for both tokens in the pool
+                    const tokenA = tokenDetails.get(pool.alphaId) || { name: `Token ${pool.alphaId}`, symbol: `${pool.alphaId}`, decimals: 6 };
+                    const tokenB = tokenDetails.get(pool.betaId) || { name: `Token ${pool.betaId}`, symbol: `${pool.betaId}`, decimals: 6 };
+
+                    return {
+                        name: name,
+                        symbol: `${tokenA.symbol}/${tokenB.symbol}`,
+                        balance: lpt,
+                        decimals: decimals,
+                        verified: true,
+                        imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
+                        id: pool.id,
+                        poolId: String(pool.id),
+                        value: lpt / issuedLpt * tvl / Math.pow(10, 6),
+                        type: 'arc200',
+                        poolInfo: {
+                            tokAId: pool.alphaId,
+                            tokBId: pool.betaId,
+                            tokASymbol: tokenA.symbol,
+                            tokBSymbol: tokenB.symbol,
+                            tokABalance: poolInfo.balances[0],
+                            tokBBalance: poolInfo.balances[1],
+                            tokAType: poolInfo.alphaType,
+                            tokBType: poolInfo.betaType,
+                            tokADecimals: tokenA.decimals,
+                            tokBDecimals: tokenB.decimals,
+                            totalSupply: issuedLpt,
+                            poolId: String(pool.id),
+                            apr: Math.round(poolInfo.apr * 100) / 100,
+                            tvl: tvl,
+                            provider: 'nomadex'
+                        }
+                    }
+                }));
+
+                // Filter out null values and append the Nomadex LP tokens to our existing fungibleTokens array
+                fungibleTokens = [
+                    ...fungibleTokens,
+                    ...nomadexLPTokens.filter((token): token is NonNullable<typeof token> => token !== null)
+                ];
+            } catch (err) {
+                console.error('Error fetching Nomadex LP tokens:', err);
+            }
         } catch (err) {
             console.error('Error fetching Nomadex LP tokens:', err);
         }
@@ -949,6 +962,8 @@
 	function isLPToken(token: FungibleTokenType | LPToken) {
 		return 'poolInfo' in token && token.poolInfo !== undefined;
 	}
+
+    $: fungibleTokensStore.set(fungibleTokens);
 </script>
 
 <div class="space-y-6">

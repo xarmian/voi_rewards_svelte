@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { FungibleTokenType, LPToken } from '$lib/types/assets';
-    import { imageCache } from '$lib/stores/imageCache';
     import { createEventDispatcher } from 'svelte';
     import SendTokenModal from './SendTokenModal.svelte';
     import OptOutModal from './OptOutModal.svelte';
@@ -21,6 +20,68 @@
     let creatorEnvoiName: string | null = null;
     let totalSupply: number | null = null;
     let creator: string | null = null;
+    let tokenImages = new Map<string, string>();
+
+    async function cacheTokenImage(tokenId: string) {
+        if (!tokenId || tokenImages.has(tokenId)) return;
+        
+        try {
+            const response = await fetch(`https://asset-verification.nautilus.sh/icons/${tokenId}.png`);
+            if (!response.ok) return;
+            
+            const blob = await response.blob();
+            const img = new Image();
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Draw the image
+                ctx.drawImage(img, 0, 0);
+
+                // Get the image data
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+
+                // Convert white (or near-white) pixels to transparent
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Check if the pixel is white or very close to white
+                    if (r > 250 && g > 250 && b > 250) {
+                        // Make it transparent
+                        data[i + 3] = 0;
+                    }
+                }
+
+                // Put the modified image data back
+                ctx.putImageData(imageData, 0, 0);
+
+                // Convert to base64
+                const base64 = canvas.toDataURL('image/png');
+                tokenImages.set(tokenId, base64);
+                tokenImages = tokenImages; // Trigger Svelte reactivity
+            };
+
+            img.src = URL.createObjectURL(blob);
+        } catch (error) {
+            console.error('Error caching token image:', error);
+        }
+    }
+
+    // Cache images when token changes
+    $: if (token) {
+        if (isLPToken(token) && token.poolInfo) {
+            cacheTokenImage(token.poolInfo.tokAId);
+            cacheTokenImage(token.poolInfo.tokBId);
+        }
+        cacheTokenImage(token.id);
+    }
 
     async function fetchTokenDetails() {
         try {
@@ -55,29 +116,6 @@
         if (isExpanded) {
             await fetchTokenDetails();
         }
-    }
-
-    function getTokenImageUrl(tokenId: string): string {
-        if (tokenId === '390001') {
-            return "/icons/voi-token.png";
-        }
-        else if (tokenId === '302190') {
-            tokenId = '395614';
-        }
-        return `https://asset-verification.nautilus.sh/icons/${tokenId}.png`;
-    }
-
-    function getFallbackUrl(): string {
-        return "/icons/default-token-image.svg";
-    }
-
-    function handleImageError(imageUrl: string, event: Event) {
-        const img = event.target as HTMLImageElement;
-        if (!imageCache.hasFailed(imageUrl)) {
-            imageCache.markAsFailed(imageUrl);
-        }
-        // Always set fallback, even if already marked failed
-        img.src = getFallbackUrl();
     }
 
     function isLPToken(token: FungibleTokenType | LPToken): token is LPToken {
@@ -136,23 +174,6 @@
 
     // Calculate display value based on token type
     $: displayValue = token.value || 0;
-
-    // Add reactive statement to pre-cache images
-    $: if (token) {
-        (async () => {
-            try {
-                if (isLPToken(token) && token.poolInfo) {
-                    const tokAUrl = getTokenImageUrl(token.poolInfo.tokAId);
-                    const tokBUrl = getTokenImageUrl(token.poolInfo.tokBId);
-                    await imageCache.cacheImage(tokAUrl);
-                    await imageCache.cacheImage(tokBUrl);
-                } else {
-                    const imageUrl = getTokenImageUrl(token.id);
-                    await imageCache.cacheImage(imageUrl);
-                }
-            } catch {} // Errors are handled in the cache
-        })();
-    }
 </script>
 
 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
@@ -169,31 +190,31 @@
     <div class="flex items-start space-x-4 flex-col">
         <div class="flex flex-row items-center gap-4 justify-start">
         {#if isLPToken(token) && token.poolInfo}
-            {@const tokenAUrl = getTokenImageUrl(token.poolInfo.tokAId)}
-            {@const tokenBUrl = getTokenImageUrl(token.poolInfo.tokBId)}
             <div class="relative w-16 h-16">
-                <img 
-                    src={imageCache.getCachedUrl(tokenAUrl) || (imageCache.hasFailed(tokenAUrl) ? getFallbackUrl() : tokenAUrl)}
-                    alt={token.poolInfo.tokASymbol}
-                    class="absolute top-0 left-0 w-12 h-12 rounded-lg object-cover"
-                    on:error={(e) => handleImageError(tokenAUrl, e)}
-                />
-                <img 
-                    src={imageCache.getCachedUrl(tokenBUrl) || (imageCache.hasFailed(tokenBUrl) ? getFallbackUrl() : tokenBUrl)}
-                    alt={token.poolInfo.tokBSymbol}
-                    class="absolute bottom-0 right-0 w-12 h-12 rounded-lg object-cover"
-                    on:error={(e) => handleImageError(tokenBUrl, e)}
-                />
+                <div class="absolute top-0 left-0 w-12 h-12 rounded-lg backdrop-blur-sm">
+                    <img 
+                        src={tokenImages.get(token.poolInfo.tokAId) || (token.poolInfo.tokAId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.poolInfo.tokAId === '302190' ? '395614' : token.poolInfo.tokAId}.png`)}
+                        alt={token.poolInfo.tokASymbol}
+                        class="w-full h-full rounded-lg object-cover"
+                    />
+                </div>
+                <div class="absolute bottom-0 right-0 w-12 h-12 rounded-lg backdrop-blur-sm">
+                    <img 
+                        src={tokenImages.get(token.poolInfo.tokBId) || (token.poolInfo.tokBId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.poolInfo.tokBId === '302190' ? '395614' : token.poolInfo.tokBId}.png`)}
+                        alt={token.poolInfo.tokBSymbol}
+                        class="w-full h-full rounded-lg object-cover"
+                    />
+                </div>
             </div>
         {:else}
-            {@const imageUrl = getTokenImageUrl(token.id)}
             <div class="relative w-16 h-16">
-                <img 
-                    src={imageCache.getCachedUrl(imageUrl) || (imageCache.hasFailed(imageUrl) ? getFallbackUrl() : imageUrl)}
-                    alt={token.name} 
-                    class="w-16 h-16 rounded-lg object-cover"
-                    on:error={(e) => handleImageError(imageUrl, e)}
-                />
+                <div class="w-full h-full rounded-lg backdrop-blur-sm">
+                    <img 
+                        src={tokenImages.get(token.id) || (token.id === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.id === '302190' ? '395614' : token.id}.png`)}
+                        alt={token.name} 
+                        class="w-full h-full rounded-lg object-cover"
+                    />
+                </div>
             </div>
         {/if}
             <div class="flex-1">
@@ -398,11 +419,15 @@
         <div class="absolute bottom-3 left-3">
             {#if token.poolInfo.provider === 'humble'}
                 <a href="https://voi.humble.sh/#/swap?poolId=${token.poolId}" target="_blank" rel="noopener noreferrer">
-                    <img src="/icons/humble_icon.png" alt="Humble" class="w-6 h-6" />
+                    <div class="w-6 h-6 rounded backdrop-blur-sm">
+                        <img src="/icons/humble_icon.png" alt="Humble" class="w-full h-full rounded object-cover" />
+                    </div>
                 </a>
             {:else if token.poolInfo.provider === 'nomadex'}
                 <a href={`https://voi.nomadex.app/${token.poolInfo.tokAType}/${token.poolInfo.tokAId}/${token.poolInfo.tokBType}/${token.poolInfo.tokBId}`} target="_blank" rel="noopener noreferrer">
-                    <img src="/icons/nomadex_icon.ico" alt="Nomadex" class="w-6 h-6" />
+                    <div class="w-6 h-6 rounded backdrop-blur-sm">
+                        <img src="/icons/nomadex_icon.ico" alt="Nomadex" class="w-full h-full rounded object-cover" />
+                    </div>
                 </a>
             {/if}
         </div>

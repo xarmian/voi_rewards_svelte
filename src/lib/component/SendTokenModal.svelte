@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Modal, Button, Input, Label } from 'flowbite-svelte';
+    import { Modal, Button, Input, Label, Select } from 'flowbite-svelte';
     import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import algosdk from 'algosdk';
@@ -8,10 +8,16 @@
     import { arc200 as Contract } from 'ulujs';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import ImportRecipientsModal from './ImportRecipientsModal.svelte';
+    import { fungibleTokens as fungibleTokensStore } from '$lib/stores/tokens';
     
     // Constants for Algorand transaction limits
     const MAX_TXN_PER_GROUP = 16;
     const MAX_GROUPS_PER_SIGNING = 16;
+
+    // Helper function to check if a token is an LP token
+    function isLPToken(token: FungibleTokenType) {
+        return 'poolInfo' in token && token.poolInfo !== undefined;
+    }
 
     // Click outside action
     function clickOutside(node: HTMLElement, callback: () => void) {
@@ -50,6 +56,71 @@
     };
     export let onTokenSent: () => void;
 
+    let availableTokens: FungibleTokenType[] = [];
+    let selectedToken = token;
+    let tokenImages = new Map<string, string>();
+
+    // Create the native VOI token object
+    const nativeVoiToken: FungibleTokenType = {
+        id: '0',
+        name: 'Voi',
+        symbol: 'VOI',
+        decimals: 6,
+        balance: 0,
+        verified: true,
+        imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
+        value: 0,
+        type: 'native'
+    };
+
+    // Subscribe to the fungible tokens store and ensure VOI is always present
+    fungibleTokensStore.subscribe((tokens) => {
+        const filteredTokens = tokens.filter(t => !isLPToken(t));
+        // Update VOI balance if this is a native token
+        if (isNativeToken(selectedToken)) {
+            nativeVoiToken.balance = selectedToken.balance;
+            nativeVoiToken.value = selectedToken.balance / 1e6;
+        }
+        // Always include VOI at the top of the list
+        availableTokens = [nativeVoiToken, ...filteredTokens];
+    });
+
+    // Cache token images
+    async function cacheTokenImage(token: FungibleTokenType) {
+        const tokenId = token.id;
+        if (!tokenId || tokenImages.has(tokenId)) return;
+        
+        try {
+            const response = await fetch(`https://asset-verification.nautilus.sh/icons/${tokenId}.png`);
+            if (!response.ok) return;
+            
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                tokenImages.set(tokenId, reader.result as string);
+                tokenImages = tokenImages; // Trigger Svelte reactivity
+            };
+            reader.readAsDataURL(blob);
+        } catch (error) {
+            console.error('Error caching token image:', error);
+        }
+    }
+
+    // Cache images for all tokens
+    $: {
+        availableTokens.forEach(token => {
+            cacheTokenImage(token);
+        });
+    }
+
+    // Update the selected token when the token prop changes
+    $: if (token) {
+        selectedToken = token;
+    }
+
+    // Update maxAmount when selected token changes
+    $: maxAmount = Number(enforceDecimals(selectedToken.balance / Math.pow(10, selectedToken.decimals), selectedToken.decimals));
+
     interface Recipient {
         address: string | null;
         amount: string;
@@ -82,6 +153,7 @@
     let showCombineOptions = false;
     let failedRecipients: Recipient[] = [];
     let showRetryButton = false;
+    let showTokenSelect = false;
 
     function enforceDecimals(value: string | number, decimals: number): string {
         if (!value) return '';
@@ -100,10 +172,9 @@
         return truncatedFraction ? `${whole}.${truncatedFraction}` : whole;
     }
 
-    $: maxAmount = Number(enforceDecimals(token.balance / Math.pow(10, token.decimals), token.decimals));
     $: totalAmount = Number(enforceDecimals(
         recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
-        token.decimals
+        selectedToken.decimals
     ));
     $: isValidTotalAmount = totalAmount > 0 && totalAmount <= maxAmount;
     $: canSubmit = recipients.every(r => {
@@ -112,7 +183,7 @@
         if (!basicValidation) return false;
 
         // Additional validation for VSA (non-native, non-ARC200 tokens)
-        if (!isNativeToken(token) && !isARC200Token(token)) {
+        if (!isNativeToken(selectedToken) && !isARC200Token(selectedToken)) {
             // Check if recipient has opted in
             return r.info?.hasOptedIn === true;
         }
@@ -151,9 +222,9 @@
             }
 
             let assetBalance = 0;
-            const hasOptedIn = isARC200Token(token) ? true : 
+            const hasOptedIn = isARC200Token(selectedToken) ? true : 
                 accountInfo.assets?.some((asset: any) => {
-                    if (asset['asset-id'] === Number(token.id)) {
+                    if (asset['asset-id'] === Number(selectedToken.id)) {
                         assetBalance = asset.amount;
                         return true;
                     }
@@ -161,9 +232,9 @@
                 }) ?? false;
 
             // For ARC-200 tokens, fetch balance using the contract
-            if (isARC200Token(token)) {
+            if (isARC200Token(selectedToken)) {
                 try {
-                    const contract = new Contract(Number(token.id), algodClient, algodIndexer);
+                    const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer);
                     const balance = await contract.arc200_balanceOf(address);
                     if (balance.success) {
                         assetBalance = Number(balance.returnValue);
@@ -226,7 +297,7 @@
             throw new Error('Wallet not connected');
         }
 
-        const contract = new Contract(Number(token.id), algodClient, algodIndexer, {
+        const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer, {
             acc: {
                 addr: $selectedWallet.address,
                 sk: new Uint8Array()
@@ -400,13 +471,13 @@
             transactionIds = [];
             currentTxnGroup = 0;
 
-            if (isARC200Token(token)) {
+            if (isARC200Token(selectedToken)) {
                 // Prepare transaction requests
                 const txRequests = recipients
                     .filter(r => r.address && r.amount)
                     .map(recipient => ({
                         address: recipient.address!,
-                        amount: Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals))
+                        amount: Math.floor(Number(enforceDecimals(recipient.amount, selectedToken.decimals)) * Math.pow(10, selectedToken.decimals))
                     }));
 
                 // Build transactions in parallel with rate limiting
@@ -436,10 +507,10 @@
                     if (!recipient.address || !recipient.amount) continue;
                     
                     // Convert amount to raw units with proper decimal precision
-                    const rawAmount = Math.floor(Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals));
+                    const rawAmount = Math.floor(Number(enforceDecimals(recipient.amount, selectedToken.decimals)) * Math.pow(10, selectedToken.decimals));
                     
                     let txn;
-                    if (isNativeToken(token)) {
+                    if (isNativeToken(selectedToken)) {
                         txn = await buildVOITransaction(recipient.address, rawAmount, suggestedParams);
                     } else {
                         txn = await buildVSATransaction(recipient.address, rawAmount, suggestedParams);
@@ -622,7 +693,7 @@
                         break;
                 }
                 
-                existing.amount = newAmount > 0 ? enforceDecimals(newAmount, token.decimals) : '';
+                existing.amount = newAmount > 0 ? enforceDecimals(newAmount, selectedToken.decimals) : '';
                 return acc;
             }
             
@@ -640,7 +711,7 @@
     function setAmountForAllRecipients(amount: string) {
         recipients = recipients.map(recipient => ({
             ...recipient,
-            amount: enforceDecimals(amount, token.decimals)
+            amount: enforceDecimals(amount, selectedToken.decimals)
         }));
     }
 
@@ -651,10 +722,10 @@
         
         const amount = Number(amountToDistribute);
         if (type === 'even') {
-            const splitAmount = enforceDecimals(amount / recipients.length, token.decimals);
+            const splitAmount = enforceDecimals(amount / recipients.length, selectedToken.decimals);
             setAmountForAllRecipients(splitAmount);
         } else {
-            setAmountForAllRecipients(enforceDecimals(amountToDistribute, token.decimals));
+            setAmountForAllRecipients(enforceDecimals(amountToDistribute, selectedToken.decimals));
         }
         showAmountMenu = false;
         amountToDistribute = '';
@@ -712,15 +783,70 @@
         showRetryButton = false;
         success = false;
     }
+
+    function handleTokenChange(newToken: FungibleTokenType) {
+        selectedToken = newToken;
+        // Reset recipients when token changes
+        recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
+        error = null;
+    }
 </script>
 
 <Modal bind:open size="lg" on:close={handleClose} class="overflow-visible max-h-[calc(100vh-2rem)]">
     <div class="max-w-3xl mx-auto flex flex-col max-h-[calc(100vh-6rem)]">
         <div class="flex-none">
             <div class="flex items-center justify-between mb-6">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Send {token.symbol}</h3>
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                    Available: {maxAmount.toLocaleString()} {token.symbol}
+                <div class="flex items-center gap-4">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Send</h3>
+                    <div class="relative" use:clickOutside={() => showTokenSelect = false}>
+                        <button
+                            type="button"
+                            class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2"
+                            on:click={() => showTokenSelect = !showTokenSelect}
+                        >
+                            {#if selectedToken.id && tokenImages.has(selectedToken.id)}
+                                <img 
+                                    src={tokenImages.get(selectedToken.id)}
+                                    alt=""
+                                    class="w-4 h-4 rounded-full bg-transparent"
+                                />
+                            {/if}
+                            <span>{selectedToken.symbol} ({(selectedToken.balance / Math.pow(10, selectedToken.decimals)).toLocaleString()})</span>
+                            <i class="fas fa-chevron-down ml-auto"></i>
+                        </button>
+                        {#if showTokenSelect}
+                            <div class="absolute left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto">
+                                {#each availableTokens as token (token.id ?? '0')}
+                                    <button
+                                        class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        on:click={() => {
+                                            handleTokenChange(token);
+                                            showTokenSelect = false;
+                                        }}
+                                    >
+                                        {#if token.id && tokenImages.has(token.id)}
+                                            <img 
+                                                src={tokenImages.get(token.id)}
+                                                alt=""
+                                                class="w-4 h-4 rounded-full bg-transparent"
+                                            />
+                                        {/if}
+                                        {token.symbol} ({(token.balance / Math.pow(10, token.decimals)).toLocaleString()})
+                                    </button>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                    {#if selectedToken.id && tokenImages.has(selectedToken.id)}
+                        <img 
+                            src={tokenImages.get(selectedToken.id)}
+                            alt=""
+                            class="h-12 rounded-full bg-transparent"
+                        />
+                    {/if}
+                    <span>Available: {maxAmount.toLocaleString()} {selectedToken.symbol}</span>
                 </div>
             </div>
         </div>
@@ -801,12 +927,12 @@
                                                     bind:value={amountToDistribute}
                                                     min="0"
                                                     max={maxAmount}
-                                                    step={`${1/Math.pow(10, token.decimals)}`}
-                                                    placeholder={`Amount in ${token.symbol}`}
+                                                    step={`${1/Math.pow(10, selectedToken.decimals)}`}
+                                                    placeholder={`Amount in ${selectedToken.symbol}`}
                                                     size="sm"
                                                     on:input={(e: Event) => {
                                                         const input = e.target as HTMLInputElement;
-                                                        amountToDistribute = enforceDecimals(input.value, token.decimals);
+                                                        amountToDistribute = enforceDecimals(input.value, selectedToken.decimals);
                                                     }}
                                                 />
                                                 {#if amountToDistribute && Number(amountToDistribute) > maxAmount}
@@ -851,7 +977,7 @@
                                                         {amountToDistribute || '0'} each
                                                         {#if isValidAmount && !canMaxEach}
                                                             <span class="block text-xs text-red-500">
-                                                                Need {totalRequiredForMax} {token.symbol}
+                                                                Need {totalRequiredForMax} {selectedToken.symbol}
                                                             </span>
                                                         {/if}
                                                     </span>
@@ -967,16 +1093,16 @@
                                                                         </span>
                                                                     </div>
                                                                     
-                                                                    {#if !isNativeToken(token)}
+                                                                    {#if !isNativeToken(selectedToken)}
                                                                         <div class="flex items-center gap-2">
-                                                                            <span class="text-xs text-gray-500 dark:text-gray-400">{token.symbol}:</span>
+                                                                            <span class="text-xs text-gray-500 dark:text-gray-400">{selectedToken.symbol}:</span>
                                                                             <span class="text-sm text-gray-700 dark:text-gray-300">
-                                                                                {((recipient.info.assetBalance ?? 0) / Math.pow(10, token.decimals)).toLocaleString()}
+                                                                                {((recipient.info.assetBalance ?? 0) / Math.pow(10, selectedToken.decimals)).toLocaleString()}
                                                                             </span>
                                                                         </div>
                                                                     {/if}
 
-                                                                    {#if !isARC200Token(token) && !isNativeToken(token)}
+                                                                    {#if !isARC200Token(selectedToken) && !isNativeToken(selectedToken)}
                                                                         <div class="flex-shrink-0">
                                                                             {#if recipient.info.hasOptedIn}
                                                                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
@@ -1006,12 +1132,12 @@
                                                         bind:value={recipient.amount}
                                                         min="0"
                                                         max={maxAmount}
-                                                        step={`${1/Math.pow(10, token.decimals)}`}
-                                                        placeholder={`${token.symbol}`}
+                                                        step={`${1/Math.pow(10, selectedToken.decimals)}`}
+                                                        placeholder={`${selectedToken.symbol}`}
                                                         class="!pr-14"
                                                         on:input={(e: Event) => {
                                                             const input = e.target as HTMLInputElement;
-                                                            recipient.amount = enforceDecimals(input.value, token.decimals);
+                                                            recipient.amount = enforceDecimals(input.value, selectedToken.decimals);
                                                         }}
                                                     />
                                                     {#if !recipient.amount || Number(recipient.amount) < maxAmount}
@@ -1045,7 +1171,7 @@
                         </div>
                     </div>
 
-                    {#if !isARC200Token(token)}
+                    {#if !isARC200Token(selectedToken)}
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                             <Label for="note" class="mb-2">Note (Optional)</Label>
                             <div class="relative">
@@ -1096,7 +1222,7 @@
                         <div class="flex items-center gap-4 text-sm">
                             <div>
                                 <span class="text-gray-500 dark:text-gray-400">Total Amount:</span>
-                                <span class="ml-1 font-medium text-gray-900 dark:text-white">{totalAmount} {token.symbol}</span>
+                                <span class="ml-1 font-medium text-gray-900 dark:text-white">{totalAmount} {selectedToken.symbol}</span>
                             </div>
                             <div>
                                 <span class="text-gray-500 dark:text-gray-400">Recipients:</span>
@@ -1152,7 +1278,7 @@
                             Transaction Successful
                         </h4>
                         <p class="text-green-600 dark:text-green-400 mb-4">
-                            Successfully sent {totalAmount} {token.symbol}
+                            Successfully sent {totalAmount} {selectedToken.symbol}
                         </p>
                         {#if note}
                             <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-md">
