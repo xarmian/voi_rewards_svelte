@@ -29,7 +29,7 @@
     let collectionId = '';
     let tempCollectionId = '';
     let isLoadingNFTHolders = false;
-    let amountType: 'none' | 'per-holder' | 'per-nft' = 'none';
+    let amountType: 'none' | 'per-holder' | 'per-nft' | 'total-pool' = 'none';
     let amountValue = '';
     let roundNumber = '';
     let tempRoundNumber = '';
@@ -493,7 +493,6 @@
         try {
             const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
             url.searchParams.set('contractId', id);
-            url.searchParams.set('limit', '1000');
             if (round && !isNaN(Number(round))) {
                 url.searchParams.set('round', round);
             }
@@ -636,6 +635,20 @@
                 }
             });
 
+            // Calculate total NFTs for total-pool distribution if needed
+            let totalNFTCount = 0;
+            let amountPerNFT = 0;
+            
+            if (amountType === 'total-pool') {
+                // Count total NFTs (excluding burned and zero address)
+                totalNFTCount = Array.from(holdersMap.values()).reduce((sum, count) => sum + count, 0);
+                
+                // Calculate amount per NFT
+                if (totalNFTCount > 0) {
+                    amountPerNFT = Number(amountValue) / totalNFTCount;
+                }
+            }
+
             // Convert to our data format with optional amount
             parsedData = Array.from(holdersMap.entries()).map(([address, count]) => {
                 const cells = [address];
@@ -645,10 +658,19 @@
                 
                 // Add amount column if specified
                 if (amountType !== 'none') {
-                    const amount = amountType === 'per-holder' 
-                        ? amountValue 
-                        : (Number(amountValue) * count).toString();
-                    cells.push(amount);
+                    let amount;
+                    
+                    if (amountType === 'per-holder') {
+                        amount = amountValue;
+                    } else if (amountType === 'per-nft') {
+                        amount = (Number(amountValue) * count).toString();
+                    } else if (amountType === 'total-pool') {
+                        amount = (amountPerNFT * count).toFixed(8);
+                    }
+                    
+                    if (amount) {
+                        cells.push(amount);
+                    }
                 }
                 
                 return {
@@ -947,19 +969,34 @@
                                     >
                                         Per NFT
                                     </Button>
+                                    <Button 
+                                        color={amountType === 'total-pool' ? 'blue' : 'light'}
+                                        size="sm"
+                                        on:click={() => amountType = 'total-pool'}
+                                    >
+                                        Total Pool
+                                    </Button>
                                 </div>
                                 {#if amountType !== 'none'}
                                     <div class="mt-2">
                                         <Input
                                             type="number"
-                                            placeholder={amountType === 'per-holder' ? 'Amount per holder' : 'Amount per NFT'}
+                                            placeholder={
+                                                amountType === 'per-holder' 
+                                                ? 'Amount per holder' 
+                                                : amountType === 'per-nft'
+                                                  ? 'Amount per NFT'
+                                                  : 'Total amount to distribute'
+                                            }
                                             bind:value={amountValue}
                                         />
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                             {#if amountType === 'per-holder'}
                                                 Each holder will receive this amount
-                                            {:else}
+                                            {:else if amountType === 'per-nft'}
                                                 Amount will be multiplied by the number of NFTs held
+                                            {:else}
+                                                Total amount will be divided equally among all NFTs
                                             {/if}
                                         </p>
                                     </div>
