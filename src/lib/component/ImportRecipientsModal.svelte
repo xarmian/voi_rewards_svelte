@@ -39,6 +39,8 @@
     let totalTokens = 0;
     let uniqueOwners = 0;
     let currentRound = 0;
+    let isCollectionValid = false;
+    let collectionError: string | null = null;
 
     interface NFTToken {
         contractId: number;
@@ -475,10 +477,13 @@
 
     function handleClose() {
         error = null;
+        collectionError = null;
         selectedRows.clear();
         allRowsSelected = false;
         importStep = 'initial';
         rawContent = '';
+        collectionId = '';
+        isCollectionValid = false;
         onClose();
     }
 
@@ -489,6 +494,8 @@
         totalTokens = 0;
         uniqueOwners = 0;
         currentRound = 0;
+        isCollectionValid = false;
+        collectionError = null;
         
         try {
             const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
@@ -531,8 +538,13 @@
             const owners = new Set(validTokens.map((token: NFTToken) => token.owner));
             uniqueOwners = owners.size;
 
+            // Mark collection as valid if it has tokens and owners
+            isCollectionValid = totalTokens > 0 && uniqueOwners > 0;
+
         } catch (err) {
             console.error('Failed to fetch collection info:', err);
+            collectionError = err instanceof Error ? err.message : 'Failed to fetch collection info';
+            isCollectionValid = false;
         } finally {
             isLoadingCollectionInfo = false;
         }
@@ -557,6 +569,13 @@
             } else {
                 collectionName = '';
                 collectionImageUrl = '';
+                isCollectionValid = false;
+                
+                if (collectionId.trim()) {
+                    collectionError = 'Invalid collection ID format';
+                } else {
+                    collectionError = null;
+                }
             }
         }
     }
@@ -861,7 +880,7 @@
                     {/if}
                 </div>
             {:else if importStep === 'nft-collection'}
-                <div class="flex items-center justify-center place-self-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg px-8 py-8 sm:px-28 sm:py-16 text-center">
+                <div class="flex items-center justify-center place-self-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg px-8 py-8 sm:px-28 text-center">
                     <div class="w-full max-w-lg mx-auto space-y-6">
                         <div class="text-gray-500 dark:text-gray-400">
                             <i class="fas fa-users text-4xl mb-4"></i>
@@ -869,7 +888,7 @@
                             <p class="text-sm">Enter a collection ID or paste an <a href="https://nftnavigator.xyz/" target="_blank" class="text-blue-500">NFT Navigator</a> collection URL</p>
                         </div>
                         
-                        <div class="space-y-4">
+                        <div class="space-y-6">
                             <div>
                                 <Label for="collection-id">Collection ID or URL</Label>
                                 <div class="flex items-center gap-2">
@@ -889,9 +908,19 @@
                                 </div>
                             </div>
 
+                            {#if collectionError && collectionId.trim() && !isLoadingCollectionInfo}
+                                <div class="p-3 text-sm bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                        <span>{collectionError}</span>
+                                    </div>
+                                </div>
+                            {/if}
+
                             {#if collectionName || collectionImageUrl}
-                                <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                                    <div class="flex items-start gap-4">
+                                <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900/40 hover:outline hover:outline-gray-300 dark:hover:outline-gray-700">
+                                    <a href={`https://nftnavigator.xyz/collection/${collectionId.includes('collection/') ? collectionId.split('collection/')[1].split(/[^0-9]/)[0] : collectionId}`} target="_blank" class="flex items-start gap-4">
+                                        <div class="flex items-start gap-4">
                                         {#if collectionImageUrl}
                                             <img 
                                                 src={collectionImageUrl} 
@@ -920,6 +949,7 @@
                                             </div>
                                         {/if}
                                     </div>
+                                </a>
                                 </div>
                             {/if}
 
@@ -943,7 +973,7 @@
                             </div>
 
                             <div class="space-y-2">
-                                <Label>Amount Distribution (Optional)</Label>
+                                <Label>Distribution Amount (Optional)</Label>
                                 <div class="flex gap-2">
                                     <Button 
                                         color={amountType === 'none' ? 'blue' : 'light'}
@@ -1009,6 +1039,7 @@
                                     on:click={() => {
                                         importStep = 'initial';
                                         collectionId = '';
+                                        collectionError = null;
                                         error = null;
                                     }}
                                 >
@@ -1016,14 +1047,21 @@
                                 </Button>
                                 <Button 
                                     color="blue"
-                                    disabled={isLoadingNFTHolders}
+                                    disabled={isLoadingNFTHolders || !isCollectionValid}
                                     on:click={handleNFTCollectionImport}
+                                    class={!isCollectionValid && !isLoadingNFTHolders ? 'relative group' : ''}
                                 >
                                     {#if isLoadingNFTHolders}
                                         <i class="fas fa-spinner fa-spin mr-2"></i>
                                         Loading...
                                     {:else}
                                         Import Holders
+                                    {/if}
+                                    
+                                    {#if !isCollectionValid && !isLoadingNFTHolders && collectionId.trim()}
+                                        <div class="hidden group-hover:block absolute -top-10 left-1/2 transform -translate-x-1/2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg">
+                                            Please select a valid NFT collection first
+                                        </div>
                                     {/if}
                                 </Button>
                             </div>
@@ -1118,7 +1156,7 @@
 
         <div class="flex-none mt-6 pt-4 border-t dark:border-gray-700">
             <div class="flex justify-end gap-3">
-                <Button color="alternative" on:click={handleClose}>Cancel</Button>
+                <Button color="alternative" on:click={handleClose}>Cancel Import</Button>
                 {#if importStep === 'preview'}
                     <Button 
                         color="light"
