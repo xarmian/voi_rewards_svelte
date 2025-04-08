@@ -19,6 +19,7 @@
     }[] = [];
     let addressColumnIndex = 0;
     let amountColumnIndex = -1;
+    let noteColumnIndex = -1;
     let columnCount = 0;
     let selectedRows = new Set<number>();
     let allRowsSelected = false;
@@ -293,6 +294,7 @@
         // Reset indices
         addressColumnIndex = 0;
         amountColumnIndex = -1;
+        noteColumnIndex = -1;
         
         if (parsedData.length === 0) return;
         
@@ -320,6 +322,31 @@
             });
             if (hasNumericValue) {
                 amountColumnIndex = i;
+                break;
+            }
+        }
+
+        // Try to find note column (looking for text that contains "note" in column header)
+        for (let i = 0; i < columnCount; i++) {
+            if (i === addressColumnIndex || i === amountColumnIndex) continue;
+            
+            // First check the first row for a header with "note"
+            const firstRow = parsedData[0]?.cells[i]?.toLowerCase();
+            if (firstRow && (firstRow.includes('note') || firstRow.includes('message') || firstRow.includes('memo'))) {
+                noteColumnIndex = i;
+                // Skip first row for notes since it's a header
+                break;
+            }
+            
+            // If no header found, look for a column with string values
+            const hasStringValue = parsedData.some((row, index) => {
+                if (index === 0) return false; // Skip potential header row
+                const value = row.cells[i];
+                return value && typeof value === 'string' && value.length > 0 && isNaN(Number(value));
+            });
+            
+            if (hasStringValue) {
+                noteColumnIndex = i;
                 break;
             }
         }
@@ -437,6 +464,7 @@
 
                 const addressOrName = row.cells[addressColumnIndex];
                 const amount = amountColumnIndex >= 0 ? row.cells[amountColumnIndex] || '' : '';
+                const note = noteColumnIndex >= 0 ? row.cells[noteColumnIndex] || '' : '';
 
                 // Skip invalid rows
                 if (addressOrName.endsWith('.voi') && (!row.isValid || !row.resolvedAddress)) {
@@ -448,6 +476,7 @@
                     recipients.push({
                         address: row.resolvedAddress,
                         amount,
+                        note,
                         info: null,
                         isLoading: false,
                         isValid: true
@@ -456,6 +485,7 @@
                     recipients.push({
                         address: addressOrName,
                         amount,
+                        note,
                         info: null,
                         isLoading: false,
                         isValid: true
@@ -684,9 +714,11 @@
                     }
                 }
                 
+                // Add empty note field for consistency
                 recipients.push({
                     address,
                     amount,
+                    note: '',
                     info: null,
                     isLoading: false,
                     isValid: true
@@ -1088,6 +1120,8 @@
                                                     <span class="text-xs font-normal text-gray-500">(Address)</span>
                                                 {:else if i === amountColumnIndex}
                                                     <span class="text-xs font-normal text-gray-500">(Amount)</span>
+                                                {:else if i === noteColumnIndex}
+                                                    <span class="text-xs font-normal text-gray-500">(Note)</span>
                                                 {/if}
                                             </div>
                                         </th>

@@ -1,14 +1,15 @@
 <script lang="ts">
-    import { Modal, Button, Input, Label, Select } from 'flowbite-svelte';
+    import { Modal, Button, Input, Label } from 'flowbite-svelte';
     import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import algosdk from 'algosdk';
     import type { FungibleTokenType } from '$lib/types/assets';
-    import WalletSearch from './WalletSearch.svelte';
     import { arc200 as Contract } from 'ulujs';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import ImportRecipientsModal from './ImportRecipientsModal.svelte';
     import { fungibleTokens as fungibleTokensStore } from '$lib/stores/tokens';
+    import RecipientRow from './RecipientRow.svelte';
+    import type { Recipient } from '$lib/types/recipients';
     
     // Constants for Algorand transaction limits
     const MAX_TXN_PER_GROUP = 16;
@@ -152,26 +153,13 @@
     // Update maxAmount when selected token changes
     $: maxAmount = Number(enforceDecimals(selectedToken.balance / Math.pow(10, selectedToken.decimals), selectedToken.decimals));
 
-    interface Recipient {
-        address: string | null;
-        amount: string;
-        info: {
-            balance: number;
-            createdAt: string;
-            hasOptedIn: boolean;
-            assetBalance?: number;
-        } | null;
-        isLoading: boolean;
-        isValid: boolean;
-    }
 
-    let recipients: Recipient[] = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
+    let recipients: Recipient[] = [{ address: null, amount: '', note: '', info: null, isLoading: false, isValid: false }];
     let isSending = false;
     let txState: 'idle' | 'building' | 'awaiting' | 'sending' = 'idle';
     let error: string | null = null;
     let success = false;
     let transactionId: string | null = null;
-    let note: string = '';
     let currentTxnGroup = 0;
     let totalTxnGroups = 0;
     let transactionGroups: algosdk.Transaction[][] = [];
@@ -180,11 +168,12 @@
     let amountToDistribute = '';
     let hasCompletedTransaction = false;
     let showImportModal = false;
-    let pasteContent = '';
     let showCombineOptions = false;
     let failedRecipients: Recipient[] = [];
     let showRetryButton = false;
     let showTokenSelect = false;
+    let showNoteMenu = false;
+    let noteForAll = '';
 
     function enforceDecimals(value: string | number, decimals: number): string {
         if (!value) return '';
@@ -228,7 +217,7 @@
     $: totalRequiredForMax = isValidAmount ? Number(amountToDistribute) * recipients.length : 0;
 
     function addRecipient() {
-        recipients = [...recipients, { address: null, amount: '', info: null, isLoading: false, isValid: false }];
+        recipients = [...recipients, { address: null, amount: '', note: '', info: null, isLoading: false, isValid: false }];
     }
 
     function removeRecipient(index: number) {
@@ -292,6 +281,7 @@
             recipients[index].isValid = false;
         } finally {
             recipients[index].isLoading = false;
+            recipients = [...recipients]; // Force Svelte reactivity
         }
     }
 
@@ -312,7 +302,23 @@
         await fetchRecipientInfo(address, index);
     }
 
-    async function buildVSATransaction(recipientAddress: string, amount: number, suggestedParams: algosdk.SuggestedParams): Promise<algosdk.Transaction> {
+    function handleRecipientAmountChange(index: number, amount: string) {
+        recipients[index].amount = amount;
+        // Force Svelte reactivity
+        recipients = [...recipients];
+    }
+
+    function handleRecipientNoteChange(index: number, newNote: string) {
+        recipients[index].note = newNote;
+        // Force Svelte reactivity
+        recipients = [...recipients];
+    }
+
+    function handleRecipientError(errorMessage: string | null) {
+        error = errorMessage;
+    }
+
+    async function buildVSATransaction(recipientAddress: string, amount: number, suggestedParams: algosdk.SuggestedParams, noteText?: string): Promise<algosdk.Transaction> {
         if (!$selectedWallet?.address) {
             throw new Error('Wallet not connected');
         }
@@ -320,12 +326,12 @@
             from: $selectedWallet.address,
             to: recipientAddress,
             amount: Math.floor(amount),
-            note: note ? new TextEncoder().encode(note) : undefined,
+            note: noteText ? new TextEncoder().encode(noteText) : undefined,
             suggestedParams
         });
     }
 
-    async function buildARC200Transaction(recipientAddress: string, amount: number, index: number): Promise<algosdk.Transaction[]> {
+    async function buildARC200Transaction(recipientAddress: string, amount: number, index: number, noteText?: string): Promise<algosdk.Transaction[]> {
         if (!$selectedWallet?.address) {
             throw new Error('Wallet not connected');
         }
@@ -360,6 +366,11 @@
             if (tx.type === 'pay') {
                 const existingNote = tx.note ? new TextDecoder().decode(tx.note) : '';
                 tx.note = new TextEncoder().encode(`${existingNote}${existingNote ? ' ' : ''}${index}`);
+            }
+            else {
+                if (noteText) {
+                    tx.note = new TextEncoder().encode(noteText);
+                }
             }
 
             decodedTxns.push(tx);
@@ -415,7 +426,7 @@
         return results;
     }
 
-    async function buildVOITransaction(recipientAddress: string, amount: number, suggestedParams: algosdk.SuggestedParams): Promise<algosdk.Transaction> {
+    async function buildVOITransaction(recipientAddress: string, amount: number, suggestedParams: algosdk.SuggestedParams, noteText?: string): Promise<algosdk.Transaction> {
         if (!$selectedWallet?.address) {
             throw new Error('Wallet not connected');
         }
@@ -423,7 +434,7 @@
             from: $selectedWallet.address,
             to: recipientAddress,
             amount: Math.floor(amount),
-            note: note ? new TextEncoder().encode(note) : undefined,
+            note: noteText ? new TextEncoder().encode(noteText) : undefined,
             suggestedParams
         });
     }
@@ -526,14 +537,15 @@
                     .filter(r => r.address && r.amount)
                     .map(recipient => ({
                         address: recipient.address!,
-                        amount: Math.floor(Number(enforceDecimals(recipient.amount, selectedToken.decimals)) * Math.pow(10, selectedToken.decimals))
+                        amount: Math.floor(Number(enforceDecimals(recipient.amount, selectedToken.decimals)) * Math.pow(10, selectedToken.decimals)),
+                        note: recipient.note
                     }));
 
                 // Build transactions in parallel with rate limiting
                 const txResults = await processWithRateLimit(
                     txRequests,
                     async (req, index) => {
-                        return buildARC200Transaction(req.address, req.amount, index);
+                        return buildARC200Transaction(req.address, req.amount, index, req.note);
                     },
                     5, // Process 5 at a time
                     (completed, total) => {
@@ -559,9 +571,9 @@
                     
                     let txn;
                     if (isNativeToken(selectedToken)) {
-                        txn = await buildVOITransaction(recipient.address, rawAmount, suggestedParams);
+                        txn = await buildVOITransaction(recipient.address, rawAmount, suggestedParams, recipient.note);
                     } else {
-                        txn = await buildVSATransaction(recipient.address, rawAmount, suggestedParams);
+                        txn = await buildVSATransaction(recipient.address, rawAmount, suggestedParams, recipient.note);
                     }
                     delete txn.group;
 
@@ -692,13 +704,13 @@
     }
 
     function resetState() {
-        recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
+        recipients = [{ address: null, amount: '', note: '', info: null, isLoading: false, isValid: false }];
         error = null;
         notice = null;
         success = false;
         isSending = false;
         transactionId = null;
-        note = '';
+        noteForAll = '';
         currentTxnGroup = 0;
         totalTxnGroups = 0;
         transactionGroups = [];
@@ -709,7 +721,7 @@
     }
 
     function clearAllRecipients() {
-        recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
+        recipients = [{ address: null, amount: '', note: '', info: null, isLoading: false, isValid: false }];
         error = null;
         notice = null;
     }
@@ -800,14 +812,8 @@
             recipients = combinedRecipients;
         }
 
-        // Fetch info for all new recipients
-        Promise.all(
-            importedRecipients.map((_, index) => {
-                const recipientIndex = recipients.length - importedRecipients.length + index;
-                return recipients[recipientIndex].address && 
-                       fetchRecipientInfo(recipients[recipientIndex].address!, recipientIndex);
-            })
-        );
+        // Force Svelte reactivity
+        recipients = [...recipients];
 
         error = null;
         notice = null;
@@ -824,12 +830,9 @@
     }
 
     function handleRetryFailedTransactions() {
-        // Reset success state but keep the note
-        const currentNote = note;
         resetState();
         // Populate the recipients list with failed transactions
         recipients = failedRecipients;
-        note = currentNote;
         // Reset failed recipients list
         failedRecipients = [];
         showRetryButton = false;
@@ -851,6 +854,15 @@
         }
         error = null;
         notice = null;
+    }
+
+    function setNoteForAllRecipients(noteText: string) {
+        recipients = recipients.map(recipient => ({
+            ...recipient,
+            note: noteText
+        }));
+        noteForAll = '';
+        showNoteMenu = false;
     }
 </script>
 
@@ -1056,6 +1068,46 @@
                                     </div>
                                 {/if}
                             </div>
+                            <div class="relative">
+                                <Button 
+                                    size="xs" 
+                                    color="light"
+                                    on:click={() => showNoteMenu = !showNoteMenu}
+                                    data-set-notes-button
+                                >
+                                    <i class="fas fa-sticky-note mr-1"></i>
+                                    Set Notes
+                                </Button>
+                                {#if showNoteMenu}
+                                    <div class="absolute right-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[100]" data-set-notes-menu>
+                                        <div class="p-3 space-y-3">
+                                            <div>
+                                                <Label class="mb-2 text-sm">Note for all recipients:</Label>
+                                                <Input
+                                                    type="text"
+                                                    bind:value={noteForAll}
+                                                    maxlength={1000}
+                                                    placeholder="Enter a note for all recipients"
+                                                    size="sm"
+                                                />
+                                                <div class="text-xs text-right mt-1 text-gray-500 dark:text-gray-400">
+                                                    {noteForAll.length}/1000
+                                                </div>
+                                            </div>
+                                            <Button 
+                                                size="xs"
+                                                color="blue"
+                                                class="w-full"
+                                                on:click={() => setNoteForAllRecipients(noteForAll)}
+                                                disabled={!noteForAll}
+                                            >
+                                                <i class="fas fa-check mr-1"></i>
+                                                Apply to All Recipients
+                                            </Button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
                             <div class="relative" use:clickOutside={() => showImportModal = false}>
                                 <Button 
                                     size="xs" 
@@ -1082,141 +1134,17 @@
                             <!-- Recipients -->
                             <div class="divide-y divide-gray-200 dark:divide-gray-700 relative">
                                 {#each recipients as recipient, index}
-                                    <div class="p-3 relative">
-                                        {#if recipients.length > 1}
-                                            <button
-                                                class="absolute right-2 top-2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-150"
-                                                on:click={() => removeRecipient(index)}
-                                                title="Remove recipient"
-                                                aria-label="Remove recipient"
-                                            >
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        {/if}
-                                        <div class="flex-1 pr-8">
-                                            <div class="grid grid-cols-[minmax(200px,1fr),minmax(80px,120px)] sm:grid-cols-[minmax(280px,420px),120px] gap-4">
-                                                <!-- Recipient Column -->
-                                                <div class="space-y-2">
-                                                    <WalletSearch
-                                                        onSubmit={(addr) => handleRecipientSelected(addr, index)}
-                                                        loadPreviousValue={false}
-                                                        storeAddress={false}
-                                                        clearOnSubmit={false}
-                                                        hideSubmitButton={true}
-                                                        searchText={recipient.address || ''}
-                                                    />
-                                                    <div 
-                                                        class="relative" 
-                                                    >
-                                                        {#if recipient.address}
-                                                            {#if recipient.isLoading}
-                                                                <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                                                    <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                    </svg>
-                                                                    Loading account details...
-                                                                </div>
-                                                            {:else if recipient.info}
-                                                                <div class="space-y-2">
-                                                                    <!-- Address with copy and explorer links -->
-                                                                    <div class="flex items-center gap-1.5">
-                                                                        <span class="font-mono text-gray-900 dark:text-white">
-                                                                            {recipient.address.slice(0, 8)}...{recipient.address.slice(-8)}
-                                                                        </span>
-                                                                        <div class="flex items-center gap-1">
-                                                                            <button
-                                                                                type="button"
-                                                                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                                                                aria-label="Copy address"
-                                                                                on:click={() => {
-                                                                                    navigator.clipboard.writeText(recipient.address || '');
-                                                                                }}
-                                                                            >
-                                                                                <i class="fas fa-copy text-xs"></i>
-                                                                            </button>
-                                                                            <a
-                                                                                href={`https://explorer.voi.network/explorer/account/${recipient.address}`}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                                aria-label="View on explorer"
-                                                                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                                                            >
-                                                                                <i class="fas fa-external-link-alt text-xs"></i>
-                                                                            </a>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <!-- Balances and opt-in status -->
-                                                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                                        <div class="flex items-center gap-2">
-                                                                            <span class="text-xs text-gray-500 dark:text-gray-400">Balance:</span>
-                                                                            <span class="text-sm text-gray-700 dark:text-gray-300">
-                                                                                {(recipient.info.balance / 1e6).toLocaleString()} VOI
-                                                                            </span>
-                                                                        </div>
-                                                                        
-                                                                        {#if !isNativeToken(selectedToken)}
-                                                                            <div class="flex items-center gap-2">
-                                                                                <span class="text-xs text-gray-500 dark:text-gray-400">{selectedToken.symbol}:</span>
-                                                                                <span class="text-sm text-gray-700 dark:text-gray-300">
-                                                                                    {((recipient.info.assetBalance ?? 0) / Math.pow(10, selectedToken.decimals)).toLocaleString()}
-                                                                                </span>
-                                                                            </div>
-                                                                        {/if}
-
-                                                                        {#if !isARC200Token(selectedToken) && !isNativeToken(selectedToken)}
-                                                                            <div class="flex-shrink-0">
-                                                                                {#if recipient.info.hasOptedIn}
-                                                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                                                                        <i class="fas fa-check-circle mr-1"></i>
-                                                                                        Opted In
-                                                                                    </span>
-                                                                                {:else}
-                                                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                                                                                        <i class="fas fa-exclamation-circle mr-1"></i>
-                                                                                        Not Opted In
-                                                                                    </span>
-                                                                                {/if}
-                                                                            </div>
-                                                                        {/if}
-                                                                    </div>
-                                                                </div>
-                                                            {/if}
-                                                        {/if}
-                                                    </div>
-                                                </div>
-
-                                                <!-- Amount Column -->
-                                                <div>
-                                                    <div class="relative">
-                                                        <Input
-                                                            type="number"
-                                                            bind:value={recipient.amount}
-                                                            min="0"
-                                                            max={maxAmount}
-                                                            step={`${1/Math.pow(10, selectedToken.decimals)}`}
-                                                            placeholder={`${selectedToken.symbol}`}
-                                                            class="sm:!pr-14"
-                                                            on:input={(e: Event) => {
-                                                                const input = e.target as HTMLInputElement;
-                                                                recipient.amount = enforceDecimals(input.value, selectedToken.decimals);
-                                                            }}
-                                                        />
-                                                        {#if !recipient.amount || Number(recipient.amount) < maxAmount}
-                                                            <button
-                                                                type="button"
-                                                                class="hidden sm:absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded"
-                                                                on:click={() => recipient.amount = maxAmount.toString()}
-                                                            >
-                                                                MAX
-                                                            </button>
-                                                        {/if}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <RecipientRow 
+                                        bind:recipient={recipients[index]}
+                                        {index}
+                                        isLastRecipient={recipients.length === 1}
+                                        {selectedToken}
+                                        {maxAmount}
+                                        onRemove={removeRecipient}
+                                        onAmountChange={handleRecipientAmountChange}
+                                        onNoteChange={handleRecipientNoteChange}
+                                        onError={handleRecipientError}
+                                    />
                                 {/each}
 
                                 <!-- Add Recipient Button -->
@@ -1233,32 +1161,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        {#if !isARC200Token(selectedToken)}
-                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                                <Label for="note" class="mb-2">Note (Optional)</Label>
-                                <div class="relative">
-                                    <Input
-                                        id="note"
-                                        type="text"
-                                        bind:value={note}
-                                        maxlength={1000}
-                                        placeholder="Add an optional note to this transaction"
-                                        class="pr-16"
-                                    />
-                                    {#if note}
-                                        <div class="absolute right-2 top-1/2 -translate-y-1/2">
-                                            <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                {note.length}/1000
-                                            </span>
-                                        </div>
-                                    {/if}
-                                </div>
-                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    This note will be publicly visible on the blockchain
-                                </p>
-                            </div>
-                        {/if}
                     </div>
                 </div>
 
@@ -1363,14 +1265,7 @@
                         </h4>
                         <p class="text-green-600 dark:text-green-400 mb-4">
                             Successfully sent {totalAmount} {selectedToken.symbol}
-                        </p>
-                        {#if note}
-                            <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-md">
-                                <p class="text-sm text-gray-600 dark:text-gray-400">
-                                    Note: {note}
-                                </p>
-                            </div>
-                        {/if}
+                        </p>                        
                         <div class="text-sm">
                             <p class="text-gray-600 dark:text-gray-400 mb-2">Transaction ID{transactionIds.length > 1 ? 's' : ''}:</p>
                             <div class="flex flex-col items-center max-h-48 overflow-y-auto space-y-2 p-2">
@@ -1469,4 +1364,16 @@
         }
     }
 </style> 
+
+<svelte:window on:click={(e) => {
+    const setNotesButton = document.querySelector('[data-set-notes-button]');
+    const setNotesMenu = document.querySelector('[data-set-notes-menu]');
+    
+    if (setNotesButton && setNotesMenu && 
+        !setNotesButton.contains(e.target as Node) && 
+        !setNotesMenu.contains(e.target as Node) &&
+        showNoteMenu) {
+        showNoteMenu = false;
+    }
+}} /> 
 

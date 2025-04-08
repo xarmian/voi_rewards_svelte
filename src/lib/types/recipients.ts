@@ -1,6 +1,7 @@
 export interface Recipient {
-    address: string;
+    address: string | null;
     amount: string;
+    note?: string;
     info: {
         balance: number;
         createdAt: string;
@@ -9,4 +10,4 @@ export interface Recipient {
     } | null;
     isLoading: boolean;
     isValid: boolean;
-} 
+}

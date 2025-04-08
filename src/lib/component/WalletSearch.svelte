@@ -227,11 +227,11 @@
         />
         {#if searchText}
             <button
-                class="absolute inset-y-0 {hideSubmitButton ? 'right-0' : 'right-16'} pl-2 pr-0 flex items-center cursor-pointer"
+                class="absolute inset-y-0 {hideSubmitButton ? 'right-2' : 'right-16'} pr-0 flex items-center cursor-pointer"
                 on:click={clearSearchText}
                 aria-label="Clear search"
             >
-                <svg class="h-5 w-5 text-gray-500 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg class="h-5 w-5 text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
