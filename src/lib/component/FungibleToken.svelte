@@ -21,23 +21,48 @@
     let totalSupply: number | null = null;
     let creator: string | null = null;
     let tokenImages = new Map<string, string>();
+    let failedTokenImages = new Set<string>();
+
+    function onImageError(event: Event) {
+        const img = event.target as HTMLImageElement;
+        if (!img) return;
+        
+        const tokenId = img.dataset.tokenId;
+        if (!tokenId) return;
+        
+        // Add to failed set
+        failedTokenImages.add(tokenId);
+        
+        // Immediately set the fallback image
+        img.src = '/icons/default-token-image.svg';
+    }
 
     async function cacheTokenImage(tokenId: string) {
-        if (!tokenId || tokenImages.has(tokenId)) return;
+        if (!tokenId || tokenImages.has(tokenId) || failedTokenImages.has(tokenId)) return;
         
         try {
             const response = await fetch(`https://asset-verification.nautilus.sh/icons/${tokenId}.png`);
-            if (!response.ok) return;
+            if (!response.ok) {
+                failedTokenImages.add(tokenId);
+                return;
+            }
             
             const blob = await response.blob();
             const img = new Image();
+            
+            img.onerror = () => {
+                failedTokenImages.add(tokenId);
+            };
             
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
                 canvas.height = img.height;
                 const ctx = canvas.getContext('2d');
-                if (!ctx) return;
+                if (!ctx) {
+                    failedTokenImages.add(tokenId);
+                    return;
+                }
 
                 // Draw the image
                 ctx.drawImage(img, 0, 0);
@@ -71,6 +96,7 @@
             img.src = URL.createObjectURL(blob);
         } catch (error) {
             console.error('Error caching token image:', error);
+            failedTokenImages.add(tokenId);
         }
     }
 
@@ -80,7 +106,9 @@
             cacheTokenImage(token.poolInfo.tokAId);
             cacheTokenImage(token.poolInfo.tokBId);
         }
-        cacheTokenImage(token.id);
+        else {
+            cacheTokenImage(token.id);
+        }
     }
 
     async function fetchTokenDetails() {
@@ -89,7 +117,7 @@
             if (!creator || !totalSupply) {
                 if (typeof token === 'object' && 'type' in token && token.type === 'arc200') {
                     // https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?contractId=390001
-                    const response = await fetch(`https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/tokens?contractId=${token.id}`);
+                    const response = await fetch(`https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens?contractId=${token.id}`);
                     const data = await response.json();
                     creator = data.tokens[0].creator;
                     totalSupply = data.tokens[0].totalSupply;
@@ -196,6 +224,8 @@
                         src={tokenImages.get(token.poolInfo.tokAId) || (token.poolInfo.tokAId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.poolInfo.tokAId === '302190' ? '395614' : token.poolInfo.tokAId}.png`)}
                         alt={token.poolInfo.tokASymbol}
                         class="w-full h-full rounded-lg object-cover"
+                        data-token-id={token.poolInfo.tokAId}
+                        on:error={onImageError}
                     />
                 </div>
                 <div class="absolute bottom-0 right-0 w-12 h-12 rounded-lg backdrop-blur-sm">
@@ -203,6 +233,8 @@
                         src={tokenImages.get(token.poolInfo.tokBId) || (token.poolInfo.tokBId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.poolInfo.tokBId === '302190' ? '395614' : token.poolInfo.tokBId}.png`)}
                         alt={token.poolInfo.tokBSymbol}
                         class="w-full h-full rounded-lg object-cover"
+                        data-token-id={token.poolInfo.tokBId}
+                        on:error={onImageError}
                     />
                 </div>
             </div>
@@ -213,6 +245,8 @@
                         src={tokenImages.get(token.id) || (token.id === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.id === '302190' ? '395614' : token.id}.png`)}
                         alt={token.name} 
                         class="w-full h-full rounded-lg object-cover"
+                        data-token-id={token.id}
+                        on:error={onImageError}
                     />
                 </div>
             </div>

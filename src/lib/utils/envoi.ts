@@ -1,4 +1,5 @@
 interface EnvoiNameResult {
+    token_id?: string;
     address: string;
     name: string;
     metadata: {
@@ -114,6 +115,37 @@ export async function searchEnvoi(pattern: string): Promise<EnvoiSearchResult[]>
         return data.results;
     } catch (error) {
         console.error(`Error: ${(error as Error).message}`);
+        return [];
+    }
+}
+
+export async function resolveEnvoiToken(tokenIds: string[]): Promise<EnvoiNameResult[]> {
+    const chunkSize = 10;
+    const chunks = [];
+    
+    // Split tokenIds into chunks of 10
+    for (let i = 0; i < tokenIds.length; i += chunkSize) {
+        chunks.push(tokenIds.slice(i, i + chunkSize));
+    }
+
+    try {
+        // Make parallel requests for each chunk
+        const results = await Promise.all(
+            chunks.map(async (chunk) => {
+                const url = `https://api.envoi.sh/api/token/${chunk.join(',')}?avatar=small`;
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch token data');
+                }
+                const data: EnvoiNameResponse = await response.json();
+                return data.results;
+            })
+        );
+
+        // Flatten the results array
+        return results.flat();
+    } catch (error) {
+        console.error(`Error resolving Envoi tokens: ${(error as Error).message}`);
         return [];
     }
 }

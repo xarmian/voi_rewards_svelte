@@ -139,7 +139,7 @@
 
 <Navbar fluid={true} class="bg-gradient-to-r from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 text-gray-700 dark:text-gray-100 border-b border-gray-200 dark:border-slate-700/50 shadow-sm">
   <NavBrand href="https://voirewards.com" class="float-left">
-    <img src="/android-chrome-192x192.png" class="ml-4 sm:ml-12 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
+    <img src="/android-chrome-192x192.png" class="ml-4 mt-2 mr-3 h-10 sm:h-14" alt="Logo" />
     <div class="nav-title whitespace-nowrap text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">Voi Rewards Auditor</div>
   </NavBrand>
   

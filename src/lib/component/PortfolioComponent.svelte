@@ -1,7 +1,7 @@
 <script lang="ts">
+    import PortfolioSectionNFT from './PortfolioSectionNFT.svelte';
     import FungibleToken from './FungibleToken.svelte';
     import type { FungibleTokenType, ASAToken, LPToken } from '$lib/types/assets';
-    import { onMount } from 'svelte';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import { getEnvoiNames } from '$lib/utils/envoi';
     import { dataTable } from '../../stores/dataTable';
@@ -10,8 +10,6 @@
     import { config } from '$lib/config';
     import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
-    import AssetsTable from '../components/AssetsTable.svelte';
-	import InfoButton from './ui/InfoButton.svelte';
     import SendTokenModal from './SendTokenModal.svelte';
     import { selectedWallet } from 'avm-wallet-svelte';
     import { goto } from '$app/navigation';
@@ -26,26 +24,6 @@
     export let parentWalletAddress: string | null = null;
     export let walletAddress: string | undefined = undefined;
 
-    type SortOption = {
-        id: string;
-        label: string;
-    };
-
-    const sortOptions: SortOption[] = [
-        { id: 'name', label: 'Name' },
-        { id: 'collection', label: 'Collection' }
-    ];
-
-    const voiEquivalentTokens: string[] = [
-        '390001',
-        '664258',
-        '770561',
-        '828295',
-        '913147'
-    ];
-
-    let selectedSort = sortOptions[0].id;
-    let sortDirection: 'asc' | 'desc' = 'asc';
     let accountBalance = 0;
     let accountCreationDate: string | null = null;
     let accountCreationDateDays: number | null = null;
@@ -67,31 +45,6 @@
         'CAGQDUFUPI6WAQCIQZHPHMX2Z7KACAKZWOMI4R72JV24U4AVAJTGCHA2BE'
     ];
 
-    interface NFTToken {
-        name: string;
-        floorPrice: number;
-        ceilingPrice: number;
-        lastSalePrice: number;
-        imageUrl: string;
-        tokenId: string;
-        contractId: string;
-        metadata?: {
-            name?: string;
-            image?: string;
-            description?: string;
-        };
-        isListed?: boolean;
-        listingPrice?: number;
-        lastSaleTimestamp?: number;
-        owner?: string;
-        metadataURI?: string;
-        collection?: {
-            name?: string;
-            totalSupply?: number;
-            creator?: string;
-        };
-    }
-
     interface Transaction {
         'payment-transaction'?: {
             amount: number;
@@ -100,15 +53,6 @@
         'confirmed-round': number;
     }
 
-    let nftTokens: NFTToken[] = [];
-    let isLoading = true;
-    let error: string | null = null;
-    let currentPage = 1;
-    let itemsPerPage = 12;
-    let allNftTokens: NFTToken[] = [];
-    let displayedNftTokens: NFTToken[] = [];
-    let totalPages = 0;
-    let collections: Map<string, any> = new Map();
     let poolData: Map<string, any> = new Map();
     let asaTokens: ASAToken[] = [];
 
@@ -136,25 +80,15 @@
     let tokenSearchQuery = '';
     let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
     let showSendVoiModal = false;
-    let refreshTrigger = 0;
-
     let lastInitializedWallet: string | undefined;
-
-    let epochsLinkClicked = false;
-
     let isLoadingPortfolio = false;
     let isLoadingLPTokens = false;
     let isLoadingTokens = false;
     let isLoadingNFTs = false;
     let nomadexError: string | null = null;
-
     let voteKeyExpiry: number | undefined;
     let voteKeyExpiryDate: Date | undefined;
-
-    let poolShare: number | null = null;
-
     let showVoiTransfersModal = false;
-
     let showBridgeModal = false;
 
     interface NomadexPool {
@@ -176,13 +110,6 @@
         betaType: string;
         apr: number;
     }
-
-    onMount(() => {
-        // Initial fetch
-        if (walletAddress) {
-            //initializePortfolio();
-        }
-    });
 
     const LoadingOverlay = ({height = 'h-full'}: {height?: string}) => `
         <div class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center ${height}">
@@ -231,7 +158,6 @@
             
             // Recalculate total value
             totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
-                        nftTokens.reduce((acc, nft) => acc + (nft.lastSalePrice || 0), 0) +
                         asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
                         (accountBalance / 1e6);
         } catch (error) {
@@ -258,17 +184,6 @@
         }
     }
 
-    async function refreshNFTs() {
-        isLoadingNFTs = true;
-        try {
-            await fetchNFTs();
-        } catch (error) {
-            console.error('Error refreshing NFTs:', error);
-        } finally {
-            isLoadingNFTs = false;
-        }
-    }
-
     async function initializePortfolio() {
         try {
             // First load essential account info
@@ -290,25 +205,12 @@
             isLoadingTokens = false;
             isLoadingLPTokens = false;
             
-            // Finally load NFTs (which are less critical for portfolio value)
-            isLoadingNFTs = true;
-            await fetchNFTs();
-            isLoadingNFTs = false;
-            
             // Calculate total value after all data is loaded
             totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
-                        nftTokens.reduce((acc, nft) => acc + (nft.lastSalePrice || 0), 0) +
                         asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
                         (accountBalance / 1e6);
         } catch (error) {
             console.error('Error initializing portfolio:', error);
-        }
-    }
-
-    function handleImageError(event: Event) {
-        const img = event.target as HTMLImageElement;
-        if (img) {
-            img.src = "https://placehold.co/100x100";
         }
     }
 
@@ -461,7 +363,6 @@
             }
         } catch (err) {
             console.error('Error fetching account details:', err);
-            error = 'Failed to load some account details';
         }
     }
 
@@ -480,20 +381,6 @@
             minimumFractionDigits: 2,
             maximumFractionDigits: decimals
         });
-    }
-
-    async function fetchCollectionInfo(contractId: string) {
-        try {
-            const response = await fetch(
-                `https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/collections?contractId=${contractId}`
-            );
-            if (!response.ok) return null;
-            const data = await response.json();
-            return data.collections?.[0] || null;
-        } catch (err) {
-            console.error('Error fetching collection:', err);
-            return null;
-        }
     }
 
     async function fetchPoolData() {
@@ -516,10 +403,6 @@
     }
 
     function calculateTokenValue(token: any, pool: any): number {
-        if (voiEquivalentTokens.includes(String(token.contractId))) {
-            return Number(token.balance / 1e6);
-        }
-
         if (!pool) return 0;
 
         try {
@@ -544,15 +427,13 @@
     async function fetchFungibleTokens() {
         if (!walletAddress) return;
         
-        isLoading = true;
-        error = null;
         try {
             // Ensure we have pool data first
             if (poolData.size === 0) {
                 await fetchPoolData();
             }
 
-            const url = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances');
+            const url = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/balances');
             url.searchParams.append('accountId', walletAddress);
             const response = await fetch(url.toString());
             if (!response.ok) throw new Error('Failed to fetch fungible tokens');
@@ -562,7 +443,7 @@
             const contractIds = data.balances.map((token: any) => token.contractId.toString());
             
             // Fetch token details for all tokens in one request
-            const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/tokens');
+            const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
             tokenDetailsUrl.searchParams.append('contractId', contractIds.join(','));
             const tokenDetailsResponse = await fetch(tokenDetailsUrl.toString());
             const tokenDetailsData = await tokenDetailsResponse.json();
@@ -628,7 +509,7 @@
                     decimals: token.decimals,
                     verified: token.verified,
                     imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
-                    value: calculateTokenValue(token, poolForToken),
+                    value: tokenDetails?.tokenId === '0' ? token.balance / 1e6 : calculateTokenValue(token, poolForToken),
                     id: tokenId,
                     poolId: poolForToken?.contractId?.toString(),
                     type: 'arc200',
@@ -642,132 +523,6 @@
             fungibleTokensStore.set(updatedTokens);
         } catch (err) {
             console.error('Error fetching fungible tokens:', err);
-        } finally {
-            isLoading = false;
-        }
-    }
-
-    async function fetchNFTs() {
-        if (!walletAddress) return;
-        
-        isLoading = true;
-        error = null;
-        try {
-            const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
-            url.searchParams.append('owner', walletAddress);
-
-            const response = await fetch(url.toString());
-            if (!response.ok) throw new Error('Failed to fetch NFTs');
-            const data = await response.json();
-            
-            // Get unique contract IDs that we haven't fetched yet
-            const uniqueContractIds = [...new Set(data.tokens.map((token: any) => token.contractId.toString()))] as string[];
-            const contractIdsToFetch = uniqueContractIds.filter(id => !collections.has(id));
-            
-            if (contractIdsToFetch.length > 0) {
-                // Fetch all new collections in parallel
-                const fetchedCollections = await Promise.all(
-                    contractIdsToFetch.map(contractId => fetchCollectionInfo(contractId))
-                );
-
-                // Update collections map with new results
-                contractIdsToFetch.forEach((contractId, index) => {
-                    const collection = fetchedCollections[index];
-                    if (collection) {
-                        collections.set(contractId, collection);
-                    }
-                });
-            }
-
-            allNftTokens = data.tokens.map((token: any) => {
-                try {
-                    let parsedMetadata = token.metadata;
-                    if (typeof token.metadata === 'string') {
-                        try {
-                            parsedMetadata = JSON.parse(token.metadata);
-                        } catch (e) {
-                            // console.error('Error parsing metadata JSON:', e); // silent fail
-                        }
-                    }
-
-                    const finalMetadata = parsedMetadata || {};
-                    const collection = collections.get(token.contractId.toString());
-
-                    return {
-                        name: finalMetadata.name || `NFT #${token.tokenId}`,
-                        tokenId: token.tokenId.toString(),
-                        contractId: token.contractId.toString(),
-                        owner: token.owner,
-                        metadataURI: token.metadataURI,
-                        floorPrice: 0,
-                        ceilingPrice: 0,
-                        lastSalePrice: 0,
-                        lastSaleTimestamp: 0,
-                        imageUrl: finalMetadata.image || "https://placehold.co/100x100",
-                        metadata: finalMetadata,
-                        isListed: false,
-                        listingPrice: 0,
-                        collection: collection ? {
-                            name: collection.name || `Collection #${token.contractId}`,
-                            totalSupply: collection.totalSupply,
-                            creator: collection.creator
-                        } : undefined
-                    };
-                } catch (err) {
-                    console.error('Error processing NFT:', err);
-                    return {
-                        name: `NFT #${token.tokenId}`,
-                        tokenId: token.tokenId.toString(),
-                        contractId: token.contractId.toString(),
-                        owner: token.owner,
-                        floorPrice: 0,
-                        ceilingPrice: 0,
-                        lastSalePrice: 0,
-                        imageUrl: "https://placehold.co/100x100"
-                    };
-                }
-            });
-
-            updateDisplayedNfts();
-        } catch (err) {
-            console.error('Error fetching NFTs:', err);
-            error = 'Failed to load NFTs. Please try again later.';
-        } finally {
-            isLoading = false;
-        }
-    }
-
-    function updateDisplayedNfts() {
-        // First sort all NFTs
-        const sortedNfts = sortNFTs(allNftTokens);
-        
-        // Calculate total pages
-        totalPages = Math.ceil(sortedNfts.length / itemsPerPage);
-        
-        // Get the slice of NFTs for the current page
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        displayedNftTokens = sortedNfts.slice(startIndex, endIndex);
-    }
-
-    function goToPreviousPage() {
-        if (currentPage > 1) {
-            currentPage--;
-            updateDisplayedNfts();
-        }
-    }
-
-    function goToNextPage() {
-        if (currentPage < totalPages) {
-            currentPage++;
-            updateDisplayedNfts();
-        }
-    }
-
-    // Update the displayed NFTs whenever sort options change
-    $: {
-        if (selectedSort || sortDirection) {
-            updateDisplayedNfts();
         }
     }
 
@@ -795,7 +550,7 @@
             // Use batch request for all tokens
             if (uniqueTokenIds.length > 0) {
                 try {
-                    const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/tokens');
+                    const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
                     tokenDetailsUrl.searchParams.append('contractId', uniqueTokenIds.join(','));
                     const response = await fetch(tokenDetailsUrl.toString());
                     
@@ -920,50 +675,6 @@
         } catch (err) {
             console.error('Error fetching Nomadex LP tokens:', err);
         }
-    }
-
-    function getOptimizedImageUrl(imageUrl: string, metadataURI: string | undefined, width = 200): string {
-        if (!imageUrl) return "https://placehold.co/100x100";
-        
-        // Check if it's a Highforge CDN URL
-        if (imageUrl.includes('highforge.io')) {
-            if (metadataURI) {
-                return `https://prod.cdn.highforge.io/i/${encodeURIComponent(metadataURI)}?w=${width}`;
-            }
-        }
-        else if (imageUrl && imageUrl.includes('ipfs://')) {
-            return imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
-        }
-        return imageUrl;
-    }
-
-    function getTokenUrl(contractId: string, tokenId: string): string {
-        return `https://nftnavigator.xyz/collection/${contractId}/token/${tokenId}`;
-    }
-
-    function sortNFTs(nfts: NFTToken[]): NFTToken[] {
-        return [...nfts].sort((a, b) => {
-            let comparison = 0;
-            switch (selectedSort) {
-                case 'name':
-                    comparison = (a.name || '').localeCompare(b.name || '');
-                    break;
-                case 'collection':
-                    const collectionA = a.collection?.name || '';
-                    const collectionB = b.collection?.name || '';
-                    comparison = collectionA.localeCompare(collectionB);
-                    if (comparison === 0) {
-                        // Secondary sort by token ID within the same collection
-                        comparison = parseInt(a.tokenId) - parseInt(b.tokenId);
-                    }
-                    break;
-            }
-            return sortDirection === 'asc' ? comparison : -comparison;
-        });
-    }
-
-    function toggleSortDirection() {
-        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     }
 
     function getTokenType(token: any): 'vsa' | 'arc200' {
@@ -1499,159 +1210,7 @@
                 {@html LoadingOverlay({})}
             </div>
         {/if}
-        <!-- NFT Tokens Section -->
-        <div class="flex flex-col space-y-4 mb-6">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">NFT Tokens</h3>
-                    <button
-                        on:click={refreshNFTs}
-                        class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                        disabled={isLoadingNFTs}
-                        title="Refresh NFTs"
-                    >
-                        <i class="fas fa-sync-alt {isLoadingNFTs ? 'animate-spin' : ''}"></i>
-                        <span class="sr-only">Refresh NFTs</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Marketplace Links -->
-            <div class="flex flex-col sm:flex-row gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div class="flex-1">
-                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">Looking for NFTs? Check out these marketplaces and resources:</p>
-                    <div class="flex gap-2">
-                        <a
-                            href="https://nautilus.sh"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                        >
-                            <img 
-                                src="https://nautilus.sh/favicon.ico" 
-                                alt="Nautilus" 
-                                class="w-4 h-4 mr-1.5"
-                                on:error={handleIconError}
-                            />
-                            Nautilus
-                        </a>
-                        <a
-                            href="https://highforge.io"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                        >
-                            <img 
-                                src="https://highforge.io/favicon.ico" 
-                                alt="Highforge" 
-                                class="w-4 h-4 mr-1.5"
-                                on:error={handleIconError}
-                            />
-                            Highforge
-                        </a>
-                        <a 
-                            href="https://nftnavigator.xyz"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                        >
-                            <img 
-                                src="https://nftnavigator.xyz/favicon.ico" 
-                                alt="NFT Navigator" 
-                                class="w-4 h-4 mr-1.5"
-                                on:error={handleIconError}
-                            />
-                            NFT Navigator
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {#if isLoading && !displayedNftTokens.length}
-            <div class="flex justify-center items-center h-32">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-            </div>
-        {:else if error && !displayedNftTokens.length}
-            <div class="text-red-500 dark:text-red-400 text-center py-4">
-                {error}
-            </div>
-        {:else if !displayedNftTokens.length}
-            <div class="text-gray-500 dark:text-gray-400 text-center py-4">
-                No NFTs found in this wallet.
-            </div>
-        {:else}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {#each displayedNftTokens as nft}
-                    <a 
-                        href={getTokenUrl(nft.contractId, nft.tokenId)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="block bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                    >
-                        <div class="flex items-center space-x-4">
-                            <img 
-                                src={getOptimizedImageUrl(nft.imageUrl, nft.metadataURI)}
-                                alt={nft.name} 
-                                class="w-16 h-16 rounded-lg object-cover"
-                                on:error={handleImageError}
-                            />
-                            <div class="flex-1 min-w-0">
-                                <h4 class="font-medium text-gray-900 dark:text-white truncate">{nft.name}</h4>
-                                {#if nft.collection?.name}
-                                    <p class="text-sm text-purple-600 dark:text-purple-400">{nft.collection.name}</p>
-                                {/if}
-                                <p class="text-sm text-gray-500 dark:text-gray-400">Token ID: {nft.tokenId.length > 6 ? nft.tokenId.slice(0, 6) + '...' : nft.tokenId}</p>
-                                {#if nft.metadata?.description}
-                                    <p class="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
-                                        {nft.metadata.description}
-                                    </p>
-                                {/if}
-                                <div class="mt-2 space-y-1 text-sm">
-                                    {#if nft.isListed}
-                                        <p class="text-green-600 dark:text-green-400">Listed: ${nft.listingPrice?.toLocaleString() ?? 0}</p>
-                                    {/if}
-                                    {#if nft.lastSalePrice}
-                                        <p class="text-gray-600 dark:text-gray-300">
-                                            Last Sale: ${nft.lastSalePrice.toLocaleString()}
-                                            {#if nft.lastSaleTimestamp}
-                                                <span class="text-xs">
-                                                    ({new Date(nft.lastSaleTimestamp * 1000).toLocaleDateString()})
-                                                </span>
-                                            {/if}
-                                        </p>
-                                    {/if}
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                {/each}
-            </div>
-
-            {#if totalPages > 1}
-                <div class="mt-6 flex justify-center items-center space-x-4">
-                    <button
-                        class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        on:click={goToPreviousPage}
-                        disabled={currentPage === 1}
-                        aria-label="Previous Page"
-                    >
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">
-                        Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                        class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        on:click={goToNextPage}
-                        disabled={currentPage === totalPages}
-                        aria-label="Next Page"
-                    >
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-            {/if}
-        {/if}
+        <PortfolioSectionNFT walletAddress={walletAddress} />
     </div>
 
 </div> 
