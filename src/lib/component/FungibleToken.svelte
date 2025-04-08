@@ -89,7 +89,7 @@
             if (!creator || !totalSupply) {
                 if (typeof token === 'object' && 'type' in token && token.type === 'arc200') {
                     // https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?contractId=390001
-                    const response = await fetch(`https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?contractId=${token.id}`);
+                    const response = await fetch(`https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/tokens?contractId=${token.id}`);
                     const data = await response.json();
                     creator = data.tokens[0].creator;
                     totalSupply = data.tokens[0].totalSupply;

@@ -146,6 +146,7 @@
     let isLoadingLPTokens = false;
     let isLoadingTokens = false;
     let isLoadingNFTs = false;
+    let nomadexError: string | null = null;
 
     let voteKeyExpiry: number | undefined;
     let voteKeyExpiryDate: Date | undefined;
@@ -270,11 +271,35 @@
 
     async function initializePortfolio() {
         try {
+            // First load essential account info
+            isLoadingPortfolio = true;
             await Promise.all([
-                refreshPortfolio(),
-                refreshTokens(),
-                refreshNFTs()
+                fetchAccountDetails(),
+                fetchVoiPrice(),
+                fetchPoolData() // Fetch pool data early as it's used by token fetching
             ]);
+            isLoadingPortfolio = false;
+            
+            // Then load tokens in parallel
+            isLoadingTokens = true;
+            isLoadingLPTokens = true;
+            await Promise.all([
+                fetchFungibleTokens(),
+                fetchNomadexLPTokens()
+            ]);
+            isLoadingTokens = false;
+            isLoadingLPTokens = false;
+            
+            // Finally load NFTs (which are less critical for portfolio value)
+            isLoadingNFTs = true;
+            await fetchNFTs();
+            isLoadingNFTs = false;
+            
+            // Calculate total value after all data is loaded
+            totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
+                        nftTokens.reduce((acc, nft) => acc + (nft.lastSalePrice || 0), 0) +
+                        asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
+                        (accountBalance / 1e6);
         } catch (error) {
             console.error('Error initializing portfolio:', error);
         }
@@ -527,14 +552,33 @@
                 await fetchPoolData();
             }
 
-            const url = new URL('https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/balances');
+            const url = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances');
             url.searchParams.append('accountId', walletAddress);
             const response = await fetch(url.toString());
             if (!response.ok) throw new Error('Failed to fetch fungible tokens');
             const data = await response.json();
             
-            fungibleTokens = data.balances.map((token: any) => {
+            // Extract all contractIds for batch fetching token details
+            const contractIds = data.balances.map((token: any) => token.contractId.toString());
+            
+            // Fetch token details for all tokens in one request
+            const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/tokens');
+            tokenDetailsUrl.searchParams.append('contractId', contractIds.join(','));
+            const tokenDetailsResponse = await fetch(tokenDetailsUrl.toString());
+            const tokenDetailsData = await tokenDetailsResponse.json();
+            
+            // Create a map of token details by contractId for easy lookup
+            const tokenDetailsMap = new Map();
+            if (tokenDetailsResponse.ok && tokenDetailsData.tokens) {
+                tokenDetailsData.tokens.forEach((token: any) => {
+                    tokenDetailsMap.set(token.contractId.toString(), token);
+                });
+            }
+            
+            const updatedTokens = data.balances.map((token: any) => {
                 const tokenId = token.contractId.toString();
+                const tokenDetails = tokenDetailsMap.get(tokenId);
+                
                 // Check if this token is a pool token by looking up its contractId in poolData
                 const pool = poolData.get(tokenId);
                 
@@ -551,6 +595,8 @@
                         poolId: pool.contractId.toString(),
                         value: Number(pool.tvl * (Number(token.balance / Math.pow(10, token.decimals)) / Number(pool.supply))),
                         type: 'arc200',
+                        creator: tokenDetails?.creator,
+                        totalSupply: tokenDetails?.totalSupply,
                         poolInfo: {
                             tokAId: pool.tokAId,
                             tokBId: pool.tokBId,
@@ -576,7 +622,7 @@
                 );
                 
                 return {
-                    name: token.symbol,
+                    name: tokenDetails?.name || token.symbol,
                     symbol: token.symbol,
                     balance: token.balance,
                     decimals: token.decimals,
@@ -585,9 +631,15 @@
                     value: calculateTokenValue(token, poolForToken),
                     id: tokenId,
                     poolId: poolForToken?.contractId?.toString(),
-                    type: 'arc200'
+                    type: 'arc200',
+                    creator: tokenDetails?.creator,
+                    totalSupply: tokenDetails?.totalSupply
                 };
             });
+            
+            // Update both the local variable and the store in one place
+            fungibleTokens = updatedTokens;
+            fungibleTokensStore.set(updatedTokens);
         } catch (err) {
             console.error('Error fetching fungible tokens:', err);
         } finally {
@@ -740,27 +792,29 @@
                 decimals: 6
             });
 
-            // Fetch token details for all unique tokens in parallel
-            const tokenPromises = uniqueTokenIds.map(async tokenId => {
+            // Use batch request for all tokens
+            if (uniqueTokenIds.length > 0) {
                 try {
-                    const response = await fetch(`https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?contractId=${tokenId}`);
-                    if (!response.ok) return null;
-                    const data = await response.json();
-                    const token = data.tokens[0];
-                    if (token) {
-                        tokenDetails.set(tokenId, {
-                            name: token.name,
-                            symbol: token.symbol,
-                            decimals: token.decimals
-                        });
+                    const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/tokens');
+                    tokenDetailsUrl.searchParams.append('contractId', uniqueTokenIds.join(','));
+                    const response = await fetch(tokenDetailsUrl.toString());
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.tokens) {
+                            data.tokens.forEach((token: any) => {
+                                tokenDetails.set(token.contractId, {
+                                    name: token.name,
+                                    symbol: token.symbol,
+                                    decimals: token.decimals
+                                });
+                            });
+                        }
                     }
                 } catch (err) {
-                    console.error(`Error fetching token details for ${tokenId}:`, err);
+                    console.error('Error fetching token details batch:', err);
                 }
-            });
-
-            // Wait for all token details to be fetched
-            await Promise.all(tokenPromises);
+            }
 
             // Call Nomadex endpoint with the user's wallet address
             const timeoutPromise = new Promise((_, reject) => {
@@ -774,10 +828,14 @@
                 ]) as Response;
                 
                 if (!response.ok) {
+                    nomadexError = 'Failed to fetch Nomadex LP tokens. Please try again later.';
                     console.error('Failed to fetch Nomadex LP tokens');
                     return;
                 }
                 const data = await response.json();
+                
+                // Reset error state if successful
+                nomadexError = null;
                 
                 // Map through each pool returned by Nomadex
                 const nomadexLPTokens = await Promise.all(data.map(async (pool: NomadexPool) => {
@@ -847,12 +905,17 @@
                 }));
 
                 // Filter out null values and append the Nomadex LP tokens to our existing fungibleTokens array
-                fungibleTokens = [
+                const updatedTokens = [
                     ...fungibleTokens,
                     ...nomadexLPTokens.filter((token): token is NonNullable<typeof token> => token !== null)
                 ];
+                
+                // Update both the local variable and the store
+                fungibleTokens = updatedTokens;
+                fungibleTokensStore.set(updatedTokens);
             } catch (err) {
                 console.error('Error fetching Nomadex LP tokens:', err);
+                nomadexError = 'Unable to load Nomadex LP data. Please try again later.';
             }
         } catch (err) {
             console.error('Error fetching Nomadex LP tokens:', err);
@@ -963,7 +1026,6 @@
 		return 'poolInfo' in token && token.poolInfo !== undefined;
 	}
 
-    $: fungibleTokensStore.set(fungibleTokens);
 </script>
 
 <div class="space-y-6">
@@ -1246,6 +1308,16 @@
                 {/if}
             {/if}
         </div>
+        
+        {#if nomadexError}
+            <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-yellow-700 dark:text-yellow-400">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <p>{nomadexError}</p>
+                </div>
+            </div>
+        {/if}
+        
     </div>
 
     <!-- Fungible Tokens Section -->

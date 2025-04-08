@@ -60,6 +60,7 @@
     let selectedToken = token;
     let tokenImages = new Map<string, string>();
     let isInitialLoad = true;
+    let notice: string | null = null;
 
     // Create the native VOI token object with proper initialization
     let nativeVoiToken: FungibleTokenType = {
@@ -283,6 +284,7 @@
 
             recipients[index].isValid = true;
             error = null;
+            notice = null;
         } catch (err) {
             console.error('Error fetching recipient info:', err);
             error = 'Failed to fetch recipient info. Please try again later.';
@@ -306,6 +308,7 @@
         }
         recipients[index].address = address;
         error = null;
+        notice = null;
         await fetchRecipientInfo(address, index);
     }
 
@@ -512,6 +515,7 @@
             isSending = true;
             txState = 'building';
             error = null;
+            notice = null;
             transactionGroups = [];
             transactionIds = [];
             currentTxnGroup = 0;
@@ -535,7 +539,7 @@
                     (completed, total) => {
                         // Update UI with progress
                         const percent = Math.round((completed / total) * 100);
-                        error = `Building transactions... ${completed}/${total} (${percent}%)`;
+                        notice = `Building transactions... ${completed}/${total} (${percent}%)`;
                     }
                 );
 
@@ -690,6 +694,7 @@
     function resetState() {
         recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
         error = null;
+        notice = null;
         success = false;
         isSending = false;
         transactionId = null;
@@ -706,6 +711,7 @@
     function clearAllRecipients() {
         recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
         error = null;
+        notice = null;
     }
 
     function hasDuplicateRecipients(): boolean {
@@ -748,6 +754,7 @@
         if (combined.length < recipients.length) {
             recipients = combined;
             error = null;
+            notice = null;
         }
         showCombineOptions = false;
     }
@@ -803,6 +810,7 @@
         );
 
         error = null;
+        notice = null;
     }
 
     // Helper function to determine if token is native VOI
@@ -841,19 +849,18 @@
         } else {
             selectedToken = newToken;
         }
-        // Reset recipients when token changes
-        recipients = [{ address: null, amount: '', info: null, isLoading: false, isValid: false }];
         error = null;
+        notice = null;
     }
 </script>
 
-<Modal bind:open size="lg" on:close={handleClose} class="overflow-visible max-h-[calc(100vh-2rem)]">
-    <div class="max-w-3xl mx-auto flex flex-col max-h-[calc(100vh-6rem)]">
+<Modal bind:open size="lg" on:close={handleClose} class="overflow-visible max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)]">
+    <div class="w-full sm:max-w-3xl mx-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-6rem)]">
         <div class="flex-none">
-            <div class="flex items-center justify-between mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div class="flex items-center gap-4">
                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">Send</h3>
-                    <div class="relative" use:clickOutside={() => showTokenSelect = false}>
+                    <div class="relative flex-1 sm:flex-none" use:clickOutside={() => showTokenSelect = false}>
                         <button
                             type="button"
                             class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2"
@@ -893,12 +900,12 @@
                         {/if}
                     </div>
                 </div>
-                <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto">
                     {#if (selectedToken.id && tokenImages.has(selectedToken.id)) || isNativeToken(selectedToken)}
                         <img 
                             src={isNativeToken(selectedToken) ? "https://asset-verification.nautilus.sh/icons/0.png" : tokenImages.get(selectedToken.id ?? '')!}
                             alt=""
-                            class="h-12 rounded-full bg-transparent"
+                            class="h-8 sm:h-12 rounded-full bg-transparent"
                         />
                     {/if}
                     <span>Available: {maxAmount.toLocaleString()} {selectedToken.symbol}</span>
@@ -908,10 +915,10 @@
         
         {#if !success}
             <div class="flex flex-col flex-1 min-h-0">
-                <div class="flex-none space-y-6">
-                    <div class="flex justify-between items-center">
+                <div class="flex-none">
+                    <div class="flex flex-wrap gap-2 items-center justify-between mb-6">
                         <h3 class="text-lg font-medium">Recipients</h3>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <div class="relative" use:clickOutside={() => showCombineOptions = false}>
                                 <Button 
                                     size="xs" 
@@ -921,10 +928,10 @@
                                     class={hasDuplicateRecipients() ? "animate-pulse" : ""}
                                 >
                                     <i class="fas fa-compress-alt mr-1"></i>
-                                    Combine Duplicates
+                                    Combine
                                 </Button>
                                 {#if showCombineOptions}
-                                    <div class="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                                    <div class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                                         <div class="py-1">
                                             <button
                                                 class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -938,14 +945,14 @@
                                                 on:click={() => combineRecipients('max')}
                                             >
                                                 <i class="fas fa-arrow-up mr-2"></i>
-                                                Use Highest Amount
+                                                Use Highest
                                             </button>
                                             <button
                                                 class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                 on:click={() => combineRecipients('min')}
                                             >
                                                 <i class="fas fa-arrow-down mr-2"></i>
-                                                Use Lowest Amount
+                                                Use Lowest
                                             </button>
                                         </div>
                                     </div>
@@ -958,7 +965,7 @@
                                 disabled={recipients.length <= 1 && !recipients[0].address}
                             >
                                 <i class="fas fa-trash-alt mr-1"></i>
-                                Clear All
+                                Clear
                             </Button>
                             <div class="relative" use:clickOutside={() => {
                                 showAmountMenu = false;
@@ -970,7 +977,7 @@
                                     on:click={() => showAmountMenu = !showAmountMenu}
                                 >
                                     <i class="fas fa-coins mr-1"></i>
-                                    Set All Amounts
+                                    Set All
                                 </Button>
                                 {#if showAmountMenu}
                                     <div class="absolute right-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
@@ -1063,197 +1070,199 @@
                     </div>
                 </div>
 
-                <div class="flex-1 min-h-0 space-y-6 overflow-y-auto py-4">
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                        <!-- Header -->
-                        <div class="grid grid-cols-[minmax(280px,420px),120px] gap-4 p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400">
-                            <div>Recipient</div>
-                            <div>Amount</div>
-                        </div>
+                <div class="flex-1 min-h-0 overflow-y-auto">
+                    <div class="space-y-6">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <!-- Header -->
+                            <div class="grid grid-cols-[minmax(200px,1fr),minmax(80px,120px)] sm:grid-cols-[minmax(280px,420px),120px] gap-4 p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400">
+                                <div>Recipient</div>
+                                <div>Amount</div>
+                            </div>
 
-                        <!-- Recipients -->
-                        <div class="divide-y divide-gray-200 dark:divide-gray-700 relative">
-                            {#each recipients as recipient, index}
-                                <div class="p-3 relative">
-                                    {#if recipients.length > 1}
-                                        <button
-                                            class="absolute right-2 top-2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-150"
-                                            on:click={() => removeRecipient(index)}
-                                            title="Remove recipient"
-                                            aria-label="Remove recipient"
-                                        >
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    {/if}
-                                    <div class="flex-1 pr-8">
-                                        <div class="grid grid-cols-[minmax(280px,420px),120px] gap-4">
-                                            <!-- Recipient Column -->
-                                            <div class="space-y-2">
-                                                <WalletSearch
-                                                    onSubmit={(addr) => handleRecipientSelected(addr, index)}
-                                                    loadPreviousValue={false}
-                                                    storeAddress={false}
-                                                    clearOnSubmit={false}
-                                                    hideSubmitButton={true}
-                                                    searchText={recipient.address || ''}
-                                                />
-                                                <div 
-                                                    class="relative" 
-                                                >
-                                                    {#if recipient.address}
-                                                        {#if recipient.isLoading}
-                                                            <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                                                <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                </svg>
-                                                                Loading account details...
-                                                            </div>
-                                                        {:else if recipient.info}
-                                                            <div class="space-y-2">
-                                                                <!-- Address with copy and explorer links -->
-                                                                <div class="flex items-center gap-1.5">
-                                                                    <span class="font-mono text-gray-900 dark:text-white">
-                                                                        {recipient.address.slice(0, 8)}...{recipient.address.slice(-8)}
-                                                                    </span>
-                                                                    <div class="flex items-center gap-1">
-                                                                        <button
-                                                                            type="button"
-                                                                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                                                            aria-label="Copy address"
-                                                                            on:click={() => {
-                                                                                navigator.clipboard.writeText(recipient.address || '');
-                                                                            }}
-                                                                        >
-                                                                            <i class="fas fa-copy text-xs"></i>
-                                                                        </button>
-                                                                        <a
-                                                                            href={`https://explorer.voi.network/explorer/account/${recipient.address}`}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            aria-label="View on explorer"
-                                                                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                                                        >
-                                                                            <i class="fas fa-external-link-alt text-xs"></i>
-                                                                        </a>
-                                                                    </div>
+                            <!-- Recipients -->
+                            <div class="divide-y divide-gray-200 dark:divide-gray-700 relative">
+                                {#each recipients as recipient, index}
+                                    <div class="p-3 relative">
+                                        {#if recipients.length > 1}
+                                            <button
+                                                class="absolute right-2 top-2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-150"
+                                                on:click={() => removeRecipient(index)}
+                                                title="Remove recipient"
+                                                aria-label="Remove recipient"
+                                            >
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        {/if}
+                                        <div class="flex-1 pr-8">
+                                            <div class="grid grid-cols-[minmax(200px,1fr),minmax(80px,120px)] sm:grid-cols-[minmax(280px,420px),120px] gap-4">
+                                                <!-- Recipient Column -->
+                                                <div class="space-y-2">
+                                                    <WalletSearch
+                                                        onSubmit={(addr) => handleRecipientSelected(addr, index)}
+                                                        loadPreviousValue={false}
+                                                        storeAddress={false}
+                                                        clearOnSubmit={false}
+                                                        hideSubmitButton={true}
+                                                        searchText={recipient.address || ''}
+                                                    />
+                                                    <div 
+                                                        class="relative" 
+                                                    >
+                                                        {#if recipient.address}
+                                                            {#if recipient.isLoading}
+                                                                <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                                                    <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                    </svg>
+                                                                    Loading account details...
                                                                 </div>
-
-                                                                <!-- Balances and opt-in status -->
-                                                                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                                    <div class="flex items-center gap-2">
-                                                                        <span class="text-xs text-gray-500 dark:text-gray-400">Balance:</span>
-                                                                        <span class="text-sm text-gray-700 dark:text-gray-300">
-                                                                            {(recipient.info.balance / 1e6).toLocaleString()} VOI
+                                                            {:else if recipient.info}
+                                                                <div class="space-y-2">
+                                                                    <!-- Address with copy and explorer links -->
+                                                                    <div class="flex items-center gap-1.5">
+                                                                        <span class="font-mono text-gray-900 dark:text-white">
+                                                                            {recipient.address.slice(0, 8)}...{recipient.address.slice(-8)}
                                                                         </span>
+                                                                        <div class="flex items-center gap-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                                                aria-label="Copy address"
+                                                                                on:click={() => {
+                                                                                    navigator.clipboard.writeText(recipient.address || '');
+                                                                                }}
+                                                                            >
+                                                                                <i class="fas fa-copy text-xs"></i>
+                                                                            </button>
+                                                                            <a
+                                                                                href={`https://explorer.voi.network/explorer/account/${recipient.address}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                aria-label="View on explorer"
+                                                                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                                            >
+                                                                                <i class="fas fa-external-link-alt text-xs"></i>
+                                                                            </a>
+                                                                        </div>
                                                                     </div>
-                                                                    
-                                                                    {#if !isNativeToken(selectedToken)}
+
+                                                                    <!-- Balances and opt-in status -->
+                                                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                                                                         <div class="flex items-center gap-2">
-                                                                            <span class="text-xs text-gray-500 dark:text-gray-400">{selectedToken.symbol}:</span>
+                                                                            <span class="text-xs text-gray-500 dark:text-gray-400">Balance:</span>
                                                                             <span class="text-sm text-gray-700 dark:text-gray-300">
-                                                                                {((recipient.info.assetBalance ?? 0) / Math.pow(10, selectedToken.decimals)).toLocaleString()}
+                                                                                {(recipient.info.balance / 1e6).toLocaleString()} VOI
                                                                             </span>
                                                                         </div>
-                                                                    {/if}
+                                                                        
+                                                                        {#if !isNativeToken(selectedToken)}
+                                                                            <div class="flex items-center gap-2">
+                                                                                <span class="text-xs text-gray-500 dark:text-gray-400">{selectedToken.symbol}:</span>
+                                                                                <span class="text-sm text-gray-700 dark:text-gray-300">
+                                                                                    {((recipient.info.assetBalance ?? 0) / Math.pow(10, selectedToken.decimals)).toLocaleString()}
+                                                                                </span>
+                                                                            </div>
+                                                                        {/if}
 
-                                                                    {#if !isARC200Token(selectedToken) && !isNativeToken(selectedToken)}
-                                                                        <div class="flex-shrink-0">
-                                                                            {#if recipient.info.hasOptedIn}
-                                                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                                                                    <i class="fas fa-check-circle mr-1"></i>
-                                                                                    Opted In
-                                                                                </span>
-                                                                            {:else}
-                                                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                                                                                    <i class="fas fa-exclamation-circle mr-1"></i>
-                                                                                    Not Opted In
-                                                                                </span>
-                                                                            {/if}
-                                                                        </div>
-                                                                    {/if}
+                                                                        {#if !isARC200Token(selectedToken) && !isNativeToken(selectedToken)}
+                                                                            <div class="flex-shrink-0">
+                                                                                {#if recipient.info.hasOptedIn}
+                                                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                                                        <i class="fas fa-check-circle mr-1"></i>
+                                                                                        Opted In
+                                                                                    </span>
+                                                                                {:else}
+                                                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                                                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                                                                        Not Opted In
+                                                                                    </span>
+                                                                                {/if}
+                                                                            </div>
+                                                                        {/if}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
+                                                            {/if}
                                                         {/if}
-                                                    {/if}
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <!-- Amount Column -->
-                                            <div>
-                                                <div class="relative">
-                                                    <Input
-                                                        type="number"
-                                                        bind:value={recipient.amount}
-                                                        min="0"
-                                                        max={maxAmount}
-                                                        step={`${1/Math.pow(10, selectedToken.decimals)}`}
-                                                        placeholder={`${selectedToken.symbol}`}
-                                                        class="!pr-14"
-                                                        on:input={(e: Event) => {
-                                                            const input = e.target as HTMLInputElement;
-                                                            recipient.amount = enforceDecimals(input.value, selectedToken.decimals);
-                                                        }}
-                                                    />
-                                                    {#if !recipient.amount || Number(recipient.amount) < maxAmount}
-                                                        <button
-                                                            type="button"
-                                                            class="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded"
-                                                            on:click={() => recipient.amount = maxAmount.toString()}
-                                                        >
-                                                            MAX
-                                                        </button>
-                                                    {/if}
+                                                <!-- Amount Column -->
+                                                <div>
+                                                    <div class="relative">
+                                                        <Input
+                                                            type="number"
+                                                            bind:value={recipient.amount}
+                                                            min="0"
+                                                            max={maxAmount}
+                                                            step={`${1/Math.pow(10, selectedToken.decimals)}`}
+                                                            placeholder={`${selectedToken.symbol}`}
+                                                            class="sm:!pr-14"
+                                                            on:input={(e: Event) => {
+                                                                const input = e.target as HTMLInputElement;
+                                                                recipient.amount = enforceDecimals(input.value, selectedToken.decimals);
+                                                            }}
+                                                        />
+                                                        {#if !recipient.amount || Number(recipient.amount) < maxAmount}
+                                                            <button
+                                                                type="button"
+                                                                class="hidden sm:absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded"
+                                                                on:click={() => recipient.amount = maxAmount.toString()}
+                                                            >
+                                                                MAX
+                                                            </button>
+                                                        {/if}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+                                {/each}
+
+                                <!-- Add Recipient Button -->
+                                <div class="p-3 bg-gray-50 dark:bg-gray-900/50">
+                                    <Button 
+                                        size="sm" 
+                                        color="light" 
+                                        on:click={addRecipient} 
+                                        class="w-full"
+                                    >
+                                        <i class="fas fa-plus mr-1"></i>
+                                        Add Another Recipient
+                                    </Button>
                                 </div>
-                            {/each}
-
-                            <!-- Add Recipient Button -->
-                            <div class="p-3 bg-gray-50 dark:bg-gray-900/50">
-                                <Button 
-                                    size="sm" 
-                                    color="light" 
-                                    on:click={addRecipient} 
-                                    class="w-full"
-                                >
-                                    <i class="fas fa-plus mr-1"></i>
-                                    Add Another Recipient
-                                </Button>
                             </div>
                         </div>
+
+                        {#if !isARC200Token(selectedToken)}
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                                <Label for="note" class="mb-2">Note (Optional)</Label>
+                                <div class="relative">
+                                    <Input
+                                        id="note"
+                                        type="text"
+                                        bind:value={note}
+                                        maxlength={1000}
+                                        placeholder="Add an optional note to this transaction"
+                                        class="pr-16"
+                                    />
+                                    {#if note}
+                                        <div class="absolute right-2 top-1/2 -translate-y-1/2">
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                {note.length}/1000
+                                            </span>
+                                        </div>
+                                    {/if}
+                                </div>
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    This note will be publicly visible on the blockchain
+                                </p>
+                            </div>
+                        {/if}
                     </div>
-
-                    {#if !isARC200Token(selectedToken)}
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                            <Label for="note" class="mb-2">Note (Optional)</Label>
-                            <div class="relative">
-                                <Input
-                                    id="note"
-                                    type="text"
-                                    bind:value={note}
-                                    maxlength={1000}
-                                    placeholder="Add an optional note to this transaction"
-                                    class="pr-16"
-                                />
-                                {#if note}
-                                    <div class="absolute right-2 top-1/2 -translate-y-1/2">
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                                            {note.length}/1000
-                                        </span>
-                                    </div>
-                                {/if}
-                            </div>
-                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                This note will be publicly visible on the blockchain
-                            </p>
-                        </div>
-                    {/if}
                 </div>
 
-                <div class="flex-none pt-4">
+                <div class="flex-none pt-4 mt-auto">
                     {#if error}
                         <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
                             <div class="flex items-center justify-between">
@@ -1273,21 +1282,41 @@
                             </div>
                         </div>
                     {/if}
-                    <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <div class="flex items-center gap-4 text-sm">
-                            <div>
+                    {#if notice}
+                        <div class="mb-4 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg text-sm">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-clock"></i>
+                                    <span>{notice}</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                                    on:click={() => notice = null}
+                                    title="Dismiss notice"
+                                    aria-label="Dismiss notice"
+                                >
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {/if}
+                    <div class="flex flex-col sm:flex-row gap-3 items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex flex-col sm:flex-row items-center gap-4 text-sm w-full sm:w-auto">
+                            <div class="text-center sm:text-left">
                                 <span class="text-gray-500 dark:text-gray-400">Total Amount:</span>
                                 <span class="ml-1 font-medium text-gray-900 dark:text-white">{totalAmount} {selectedToken.symbol}</span>
                             </div>
-                            <div>
+                            <div class="text-center sm:text-left">
                                 <span class="text-gray-500 dark:text-gray-400">Recipients:</span>
                                 <span class="ml-1 font-medium text-gray-900 dark:text-white">{recipients.filter(r => r.address && r.amount).length}</span>
                             </div>
                         </div>
-                        <div class="flex gap-3">
-                            <Button color="alternative" on:click={handleClose}>Cancel</Button>
+                        <div class="flex gap-3 w-full sm:w-auto">
+                            <Button color="alternative" class="flex-1 sm:flex-none" on:click={handleClose}>Cancel</Button>
                             <Button 
-                                color="blue" 
+                                color="blue"
+                                class="flex-1 sm:flex-none"
                                 on:click={handleSend}
                                 disabled={!canSubmit || txState !== 'idle'}
                             >
@@ -1379,19 +1408,17 @@
             </div>
         {/if}
     </div>
-</Modal>{#if showImportModal}
-    <ImportRecipientsModal
-        bind:open={showImportModal}
-        onClose={() => {
-            showImportModal = false;
-        }}
+</Modal>
+{#if showImportModal}
+    <ImportRecipientsModal 
+        bind:open={showImportModal} 
+        onClose={() => showImportModal = false} 
         onConfirm={(recipients) => {
             handlePasteModalConfirm(recipients);
             showImportModal = false;
         }}
     />
 {/if}
-
 <style>
     :global(.overflow-visible) {
         overflow: visible !important;
@@ -1403,10 +1430,13 @@
         overflow: visible !important;
     }
     :global(.modal) {
-        max-width: min(90vw, 48rem);
+        width: 100%;
+        max-width: min(100vw - 1rem, 48rem);
+        margin: 0.5rem;
     }
     :global(.modal > div) {
-        max-width: min(90vw, 48rem);
+        width: 100%;
+        max-width: min(100vw - 1rem, 48rem);
     }
     :global(input[type="number"]::-webkit-inner-spin-button),
     :global(input[type="number"]::-webkit-outer-spin-button) {
@@ -1417,6 +1447,26 @@
     :global(input[type="number"]) {
         -moz-appearance: textfield;
         appearance: textfield;
+    }
+
+    @media (max-width: 640px) {
+        :global(.modal) {
+            padding: 0.25rem;
+            margin: 0.25rem;
+        }
+        :global(.modal > div) {
+            padding: 0.75rem;
+        }
+        :global(.modal input[type="number"]) {
+            min-width: 0;
+            width: 100%;
+        }
+        :global(.modal button) {
+            white-space: nowrap;
+        }
+        :global(.flex-1.min-h-0.overflow-y-auto) {
+            margin-bottom: 1rem;
+        }
     }
 </style> 
 

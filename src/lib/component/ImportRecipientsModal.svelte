@@ -668,17 +668,13 @@
                 }
             }
 
-            // Convert to our data format with optional amount
-            parsedData = Array.from(holdersMap.entries()).map(([address, count]) => {
-                const cells = [address];
+            // Create recipients array directly instead of using parsedData
+            const recipients: Recipient[] = [];
+            
+            Array.from(holdersMap.entries()).forEach(([address, count]) => {
+                let amount = '';
                 
-                // Add NFT count column
-                cells.push(count.toString());
-                
-                // Add amount column if specified
                 if (amountType !== 'none') {
-                    let amount;
-                    
                     if (amountType === 'per-holder') {
                         amount = amountValue;
                     } else if (amountType === 'per-nft') {
@@ -686,25 +682,25 @@
                     } else if (amountType === 'total-pool') {
                         amount = (amountPerNFT * count).toFixed(8);
                     }
-                    
-                    if (amount) {
-                        cells.push(amount);
-                    }
                 }
                 
-                return {
-                    cells,
-                    isValid: isValidAddressContent(address)
-                };
+                recipients.push({
+                    address,
+                    amount,
+                    info: null,
+                    isLoading: false,
+                    isValid: true
+                });
             });
 
-            columnCount = amountType === 'none' ? 2 : 3; // Address, NFT count, and optionally amount
-            addressColumnIndex = 0;
-            amountColumnIndex = amountType === 'none' ? -1 : 2; // Set amount column if present
-            importStep = 'preview';
+            if (recipients.length === 0) {
+                throw new Error('No valid holders found for this collection');
+            }
+
+            onConfirm(recipients);
+            handleClose();
         } catch (err) {
             error = err instanceof Error ? err.message : 'Failed to fetch NFT holders';
-            parsedData = [];
         } finally {
             isLoadingNFTHolders = false;
         }
