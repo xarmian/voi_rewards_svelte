@@ -19,7 +19,8 @@
     import TokenTransfersModal from './TokenTransfersModal.svelte';
 	import StakingComponent from './ui/StakingComponent.svelte';
     import BridgeModal from './BridgeModal.svelte';
-    import { fungibleTokens as fungibleTokensStore } from '$lib/stores/tokens';
+    import { getLiquidityPools, type PoolInfo } from '$lib/services/lp';
+	import algosdk from 'algosdk';
 
     export let parentWalletAddress: string | null = null;
     export let walletAddress: string | undefined = undefined;
@@ -85,31 +86,10 @@
     let isLoadingLPTokens = false;
     let isLoadingTokens = false;
     let isLoadingNFTs = false;
-    let nomadexError: string | null = null;
     let voteKeyExpiry: number | undefined;
     let voteKeyExpiryDate: Date | undefined;
     let showVoiTransfersModal = false;
     let showBridgeModal = false;
-
-    interface NomadexPool {
-        id: number;
-        alphaId: number;
-        betaId: number;
-        balance: {
-            lpt: string | number;
-            issuedLpt: string | number;
-        };
-    }
-
-    interface NomadexPoolInfo {
-        id: number;
-        alphaId: number;
-        betaId: number;
-        balances: number[];
-        alphaType: string;
-        betaType: string;
-        apr: number;
-    }
 
     const LoadingOverlay = ({height = 'h-full'}: {height?: string}) => `
         <div class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center ${height}">
@@ -171,11 +151,7 @@
         isLoadingTokens = true;
         isLoadingLPTokens = true;
         try {
-            await fetchPoolData();
-            await Promise.all([
-                fetchFungibleTokens(),
-                fetchNomadexLPTokens()
-            ]);
+            await fetchFungibleTokens();
         } catch (error) {
             console.error('Error refreshing tokens:', error);
         } finally {
@@ -191,17 +167,14 @@
             await Promise.all([
                 fetchAccountDetails(),
                 fetchVoiPrice(),
-                fetchPoolData() // Fetch pool data early as it's used by token fetching
+                //fetchPoolData() // Fetch pool data early as it's used by token fetching
             ]);
             isLoadingPortfolio = false;
             
             // Then load tokens in parallel
             isLoadingTokens = true;
             isLoadingLPTokens = true;
-            await Promise.all([
-                fetchFungibleTokens(),
-                fetchNomadexLPTokens()
-            ]);
+            await fetchFungibleTokens();
             isLoadingTokens = false;
             isLoadingLPTokens = false;
             
@@ -428,26 +401,27 @@
         if (!walletAddress) return;
         
         try {
-            // Ensure we have pool data first
-            if (poolData.size === 0) {
-                await fetchPoolData();
-            }
-
             const url = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/balances');
             url.searchParams.append('accountId', walletAddress);
             const response = await fetch(url.toString());
             if (!response.ok) throw new Error('Failed to fetch fungible tokens');
             const data = await response.json();
             
-            // Extract all contractIds for batch fetching token details
-            const contractIds = data.balances.map((token: any) => token.contractId.toString());
+            // get liquidity pools
+            const liquidityPools = await getLiquidityPools();
+
+            // for each liquidity pool, get tokA and tokB and ensure it is in the contractIds array
+            const lpTokenIds = liquidityPools.map((p: PoolInfo) => p.tokAId).concat(liquidityPools.map((p: PoolInfo) => p.tokBId));
+
+            // create a set of contractIds based on the lpTokenIds and fungible tokens
+            const contractIds = new Set([...lpTokenIds, ...data.balances.map((token: any) => token.contractId.toString())]);
             
             // Fetch token details for all tokens in one request
             const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
-            tokenDetailsUrl.searchParams.append('contractId', contractIds.join(','));
+            tokenDetailsUrl.searchParams.append('contractId', Array.from(contractIds).join(','));
             const tokenDetailsResponse = await fetch(tokenDetailsUrl.toString());
             const tokenDetailsData = await tokenDetailsResponse.json();
-            
+
             // Create a map of token details by contractId for easy lookup
             const tokenDetailsMap = new Map();
             if (tokenDetailsResponse.ok && tokenDetailsData.tokens) {
@@ -455,45 +429,66 @@
                     tokenDetailsMap.set(token.contractId.toString(), token);
                 });
             }
-            
-            const updatedTokens = data.balances.map((token: any) => {
+
+            tokenDetailsMap.set('0', {
+                name: 'VOI',
+                symbol: 'VOI',
+                decimals: 6
+            });
+
+            const updatedTokens = await Promise.all(data.balances.map(async (token: any) => {
                 const tokenId = token.contractId.toString();
                 const tokenDetails = tokenDetailsMap.get(tokenId);
-                
-                // Check if this token is a pool token by looking up its contractId in poolData
-                const pool = poolData.get(tokenId);
-                
+                const pool = liquidityPools.find((p: PoolInfo) => p.poolId === tokenId);
+
                 if (pool) {
                     // This is an LP token
-                    return {
-                        name: `${pool.symbolA}/${pool.symbolB} LP`,
-                        symbol: `${pool.symbolA}/${pool.symbolB}`,
+                    const tokenA = tokenDetailsMap.get(pool.tokAId);
+                    const tokenB = tokenDetailsMap.get(pool.tokBId);
+
+                    let tvlBalance = 0;
+                    let poolName = `${tokenA?.name}/${tokenB?.name} LP`;
+
+                    if (pool.provider === 'nomadex') {
+                        const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
+                        const poolEscrowInfo = await algodClient.accountInformation(poolEscrowAddr).do();
+                        tvlBalance = poolEscrowInfo.amount * 2;
+                    } else {
+                        tvlBalance = pool.tvl;
+                        poolName = `${pool.symbolA}/${pool.symbolB} LP`;
+                    }
+
+                    const poolData = {
+                        name: poolName,
+                        symbol: `${tokenA?.symbol}/${tokenB?.symbol}`,
                         balance: token.balance,
                         decimals: token.decimals,
                         verified: token.verified,
                         imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
                         id: tokenId,
-                        poolId: pool.contractId.toString(),
-                        value: Number(pool.tvl * (Number(token.balance / Math.pow(10, token.decimals)) / Number(pool.supply))),
+                        poolId: pool.poolId,
+                        value: Number(tvlBalance * (Number(token.balance / Math.pow(10, token.decimals)) / Number(pool.supply))),
                         type: 'arc200',
                         creator: tokenDetails?.creator,
-                        totalSupply: tokenDetails?.totalSupply,
+                        totalSupply: pool.supply,
                         poolInfo: {
                             tokAId: pool.tokAId,
                             tokBId: pool.tokBId,
-                            tokASymbol: pool.symbolA,
-                            tokBSymbol: pool.symbolB,
+                            tokASymbol: tokenA?.symbol,
+                            tokBSymbol: tokenB?.symbol,
                             tokABalance: pool.poolBalA,
                             tokBBalance: pool.poolBalB,
-                            totalSupply: pool.supply * Math.pow(10, 6),
-                            poolId: pool.contractId.toString(),
-                            apr: pool.apr,
-                            tokADecimals: pool.tokADecimals,
-                            tokBDecimals: pool.tokBDecimals,
+                            totalSupply: Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
+                            poolId: pool.poolId,
+                            apr: pool.apr ?? 0,
+                            tokADecimals: tokenA?.decimals,
+                            tokBDecimals: tokenB?.decimals,
                             tvl: pool.tvl,
-                            provider: 'humble'
+                            provider: pool.provider
                         }
                     };
+
+                    return poolData;
                 }
 
                 // Regular fungible token
@@ -501,7 +496,7 @@
                 const poolForToken = Array.from(poolData.values()).find(p => 
                     p.tokAId === tokenId || p.tokBId === tokenId
                 );
-                
+
                 return {
                     name: tokenDetails?.name || token.symbol,
                     symbol: token.symbol,
@@ -516,164 +511,11 @@
                     creator: tokenDetails?.creator,
                     totalSupply: tokenDetails?.totalSupply
                 };
-            });
-            
-            // Update both the local variable and the store in one place
+            }));
+
             fungibleTokens = updatedTokens;
-            fungibleTokensStore.set(updatedTokens);
         } catch (err) {
             console.error('Error fetching fungible tokens:', err);
-        }
-    }
-
-    async function fetchNomadexLPTokens() {
-        if (!walletAddress) return;
-        
-        try {
-            // Get all Nomadex pools
-            const pools = await fetch(`https://api.voirewards.com/nomadex/index.php`);
-            const poolData = (await pools.json()) as NomadexPoolInfo[];
-
-            // Extract unique token IDs from pools (excluding 0 which is VOI)
-            const uniqueTokenIds = [...new Set(poolData.flatMap(pool => [pool.alphaId, pool.betaId]))].filter(id => id !== 0);
-
-            // Create a map to store token details
-            const tokenDetails = new Map();
-            
-            // Add VOI token details manually
-            tokenDetails.set(0, {
-                name: 'Voi',
-                symbol: 'VOI',
-                decimals: 6
-            });
-
-            // Use batch request for all tokens
-            if (uniqueTokenIds.length > 0) {
-                try {
-                    const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
-                    tokenDetailsUrl.searchParams.append('contractId', uniqueTokenIds.join(','));
-                    const response = await fetch(tokenDetailsUrl.toString());
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.tokens) {
-                            data.tokens.forEach((token: any) => {
-                                tokenDetails.set(token.contractId, {
-                                    name: token.name,
-                                    symbol: token.symbol,
-                                    decimals: token.decimals
-                                });
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error fetching token details batch:', err);
-                }
-            }
-
-            // Call Nomadex endpoint with the user's wallet address
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Request timed out after 15 seconds')), 15000);
-            });
-
-            try {
-                const response = await Promise.race([
-                    fetch(`https://voimain-analytics.nomadex.app/pools/${walletAddress}`),
-                    timeoutPromise
-                ]) as Response;
-                
-                if (!response.ok) {
-                    nomadexError = 'Failed to fetch Nomadex LP tokens. Please try again later.';
-                    console.error('Failed to fetch Nomadex LP tokens');
-                    return;
-                }
-                const data = await response.json();
-                
-                // Reset error state if successful
-                nomadexError = null;
-                
-                // Map through each pool returned by Nomadex
-                const nomadexLPTokens = await Promise.all(data.map(async (pool: NomadexPool) => {
-                    // get global state using algodClient
-                    const ctc = await algodClient.getApplicationByID(pool.id).do();
-                    const globalState = decodeGlobalState(ctc.params['global-state']);
-
-                    const decimals = Number(globalState.find((state: any) => state.key === 'decimals')?.value);
-                    const name = globalState.find((state: any) => state.key === 'name')?.value;
-
-                    const lpt = Number(pool.balance.lpt);
-                    const issuedLpt = Number(pool.balance.issuedLpt);
-                    
-                    // find pool in poolData
-                    const poolInfo = poolData.find((p: any) => p.id === pool.id);
-                    if (!poolInfo) {
-                        console.error(`Pool info not found for pool ${pool.id}`);
-                        return null;
-                    }
-
-                    let tvl = 0;
-                    
-                    // Calculate TVL based on token prices
-                    if (poolInfo.alphaId === 0) {
-                        tvl = poolInfo.balances[0] * 2;
-                    } else if (poolInfo.betaId === 0) {
-                        tvl = poolInfo.balances[1] * 2;
-                    } else {
-                        // For non-VOI pairs, we would need price data to calculate TVL accurately
-                        // For now, we'll leave it as 0
-                        tvl = 0;
-                    }
-
-                    // Get token details for both tokens in the pool
-                    const tokenA = tokenDetails.get(pool.alphaId) || { name: `Token ${pool.alphaId}`, symbol: `${pool.alphaId}`, decimals: 6 };
-                    const tokenB = tokenDetails.get(pool.betaId) || { name: `Token ${pool.betaId}`, symbol: `${pool.betaId}`, decimals: 6 };
-
-                    return {
-                        name: name,
-                        symbol: `${tokenA.symbol}/${tokenB.symbol}`,
-                        balance: lpt,
-                        decimals: decimals,
-                        verified: true,
-                        imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
-                        id: pool.id,
-                        poolId: String(pool.id),
-                        value: lpt / issuedLpt * tvl / Math.pow(10, 6),
-                        type: 'arc200',
-                        poolInfo: {
-                            tokAId: pool.alphaId,
-                            tokBId: pool.betaId,
-                            tokASymbol: tokenA.symbol,
-                            tokBSymbol: tokenB.symbol,
-                            tokABalance: poolInfo.balances[0],
-                            tokBBalance: poolInfo.balances[1],
-                            tokAType: poolInfo.alphaType,
-                            tokBType: poolInfo.betaType,
-                            tokADecimals: tokenA.decimals,
-                            tokBDecimals: tokenB.decimals,
-                            totalSupply: issuedLpt,
-                            poolId: String(pool.id),
-                            apr: Math.round(poolInfo.apr * 100) / 100,
-                            tvl: tvl,
-                            provider: 'nomadex'
-                        }
-                    }
-                }));
-
-                // Filter out null values and append the Nomadex LP tokens to our existing fungibleTokens array
-                const updatedTokens = [
-                    ...fungibleTokens,
-                    ...nomadexLPTokens.filter((token): token is NonNullable<typeof token> => token !== null)
-                ];
-                
-                // Update both the local variable and the store
-                fungibleTokens = updatedTokens;
-                fungibleTokensStore.set(updatedTokens);
-            } catch (err) {
-                console.error('Error fetching Nomadex LP tokens:', err);
-                nomadexError = 'Unable to load Nomadex LP data. Please try again later.';
-            }
-        } catch (err) {
-            console.error('Error fetching Nomadex LP tokens:', err);
         }
     }
 
@@ -994,7 +836,7 @@
             {:else}
                 {#each fungibleTokens.filter(token => {
                     // Only show tokens with balance if showZeroBalances is false
-                    if (!showZeroBalances && token.value <= 1) return false;
+                    //if (!showZeroBalances && token.value <= 1) return false;
                     // Must be an LP token
                     if (!isLPToken(token)) return false;
                     // Get unique identifier based on token ID and provider
@@ -1010,6 +852,7 @@
                         on:tokenSent={initializePortfolio}
                         canSignTransactions={canSignTransactions}
                         walletId={walletAddress}
+                        fungibleTokens={fungibleTokens}
                     />
                 {/each}
                 {#if fungibleTokens.filter(token => isLPToken(token) && (showZeroBalances || token.balance > 0)).length === 0}
@@ -1019,16 +862,6 @@
                 {/if}
             {/if}
         </div>
-        
-        {#if nomadexError}
-            <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-yellow-700 dark:text-yellow-400">
-                <div class="flex items-center">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    <p>{nomadexError}</p>
-                </div>
-            </div>
-        {/if}
-        
     </div>
 
     <!-- Fungible Tokens Section -->
@@ -1190,6 +1023,7 @@
                                 on:tokenSent={initializePortfolio}
                                 canSignTransactions={canSignTransactions}
                                 walletId={walletAddress}
+                                fungibleTokens={fungibleTokens}
                             />
                         </div>
                     {/if}
@@ -1226,6 +1060,7 @@
             balance: accountBalance,
             name: 'Voi'
         }}
+        tokens={fungibleTokens}
         onTokenSent={handleTokenSent}
     />
 {/if}

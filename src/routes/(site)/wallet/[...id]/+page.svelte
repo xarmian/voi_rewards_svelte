@@ -16,15 +16,11 @@
     import { getTokensByEpoch } from '$lib/utils';
     import { browser } from '$app/environment';
     import EpochComponent from '$lib/component/EpochComponent.svelte';
-    import { copy } from 'svelte-copy';
-    import { toast } from '@zerodevx/svelte-toast';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
     import NotificationsComponent from '$lib/component/NotificationsComponent.svelte';
-    import { voiPrice } from '$lib/stores/price';
-    import { slide } from 'svelte/transition';
-    import { quintOut } from 'svelte/easing';
     import WalletSearch from '$lib/component/WalletSearch.svelte';
+	import { FlowbiteSolid } from 'flowbite-svelte-icons';
     
     export let data: {
         walletId: string;
@@ -76,8 +72,10 @@
     }
 
     function handleSearchSubmit(address: string) {
-      goto(`/wallet/${address}`, { invalidateAll: true });
-      isSearchOpen = false;
+      if (address && address.length > 0) {
+        goto(`/wallet/${address}`, { invalidateAll: true });
+        isSearchOpen = false;
+      }
     }
 
     onMount(() => {
@@ -145,18 +143,6 @@
 
     let primaryAccountInfo: Account | null = null;
     let childAccounts: Account[] = [];
-
-    function calculateAverageBlockTime(estimatedBlocks: number) {
-        const epochBlocks = apiData.last_block - apiData.first_block;
-        const epochSeconds = epochBlocks * 2.8; // Assuming 2.8 seconds per block
-        return epochSeconds / estimatedBlocks;
-    }
-
-    function calculateExpectedBlocks(days: number, balance: number) {
-        const secondsPerDay = 24 * 60 * 60;
-        const blocksPerDay = secondsPerDay / 2.8; // Assuming 2.8 seconds per block
-        return (balance / supply['online-money']) * blocksPerDay * days;
-    }
 
     const updateAccountInfo = async (address: string) => {
       primaryAccountInfo = null;
@@ -369,7 +355,7 @@
         </div>
 
         {#if isSearchOpen}
-            <div class="mb-4" transition:slide|local={{ duration: 300, easing: quintOut }}>
+            <div class="mb-4">
                 <WalletSearch 
                     onSubmit={handleSearchSubmit}
                     hideSubmitButton={true}
@@ -544,7 +530,7 @@
           <!-- Left side: Search -->
           <div class="flex-1 flex items-center">
             {#if isSearchOpen}
-              <div class="w-96" transition:slide|local={{ duration: 300, easing: quintOut }}>
+              <div class="w-96">
                 <WalletSearch 
                   onSubmit={handleSearchSubmit}
                   hideSubmitButton={true}

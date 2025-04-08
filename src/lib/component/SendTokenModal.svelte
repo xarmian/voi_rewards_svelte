@@ -7,13 +7,16 @@
     import { arc200 as Contract } from 'ulujs';
     import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
     import ImportRecipientsModal from './ImportRecipientsModal.svelte';
-    import { fungibleTokens as fungibleTokensStore } from '$lib/stores/tokens';
     import RecipientRow from './RecipientRow.svelte';
     import type { Recipient } from '$lib/types/recipients';
     
     // Constants for Algorand transaction limits
     const MAX_TXN_PER_GROUP = 16;
     const MAX_GROUPS_PER_SIGNING = 16;
+
+    export let tokens: FungibleTokenType[];
+
+    $: availableTokens = tokens.filter(t => !isLPToken(t)) as FungibleTokenType[];
 
     // Helper function to check if a token is an LP token
     function isLPToken(token: FungibleTokenType) {
@@ -57,7 +60,6 @@
     };
     export let onTokenSent: () => void;
 
-    let availableTokens: FungibleTokenType[] = [];
     let selectedToken = token;
     let tokenImages = new Map<string, string>();
     let isInitialLoad = true;
@@ -103,13 +105,6 @@
     $: if (!open) {
         isInitialLoad = true;
     }
-
-    // Subscribe to the fungible tokens store and ensure VOI is always present
-    fungibleTokensStore.subscribe((tokens) => {
-        const filteredTokens = tokens.filter(t => !isLPToken(t));
-        // Keep the current VOI token with its balance when updating the list
-        availableTokens = [nativeVoiToken, ...filteredTokens];
-    });
 
     // Cache token images
     async function cacheTokenImage(token: FungibleTokenType) {

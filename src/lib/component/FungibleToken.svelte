@@ -13,6 +13,7 @@
     export let voiPrice: number;
     export let canSignTransactions = false;
     export let walletId: string | undefined;
+    export let fungibleTokens: FungibleTokenType[];
     let showOptOutModal = false;
     let showSendModal = false;
     let showTransfersModal = false;
@@ -218,22 +219,24 @@
     <div class="flex items-start space-x-4 flex-col">
         <div class="flex flex-row items-center gap-4 justify-start">
         {#if isLPToken(token) && token.poolInfo}
+            {@const tokAId = (token.poolInfo.tokBId === '390001' ? token.poolInfo.tokBId : token.poolInfo.tokAId)}
+            {@const tokBId = (token.poolInfo.tokBId === '390001' ? token.poolInfo.tokAId : token.poolInfo.tokBId)}
             <div class="relative w-16 h-16">
                 <div class="absolute top-0 left-0 w-12 h-12 rounded-lg backdrop-blur-sm">
                     <img 
-                        src={tokenImages.get(token.poolInfo.tokAId) || (token.poolInfo.tokAId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.poolInfo.tokAId === '302190' ? '395614' : token.poolInfo.tokAId}.png`)}
+                        src={tokenImages.get(tokAId) || (tokAId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${tokAId === '302190' ? '395614' : tokAId}.png`)}
                         alt={token.poolInfo.tokASymbol}
                         class="w-full h-full rounded-lg object-cover"
-                        data-token-id={token.poolInfo.tokAId}
+                        data-token-id={tokAId}
                         on:error={onImageError}
                     />
                 </div>
                 <div class="absolute bottom-0 right-0 w-12 h-12 rounded-lg backdrop-blur-sm">
                     <img 
-                        src={tokenImages.get(token.poolInfo.tokBId) || (token.poolInfo.tokBId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${token.poolInfo.tokBId === '302190' ? '395614' : token.poolInfo.tokBId}.png`)}
+                        src={tokenImages.get(tokBId) || (tokBId === '390001' ? '/icons/voi-token.png' : `https://asset-verification.nautilus.sh/icons/${tokBId === '302190' ? '395614' : tokBId}.png`)}
                         alt={token.poolInfo.tokBSymbol}
                         class="w-full h-full rounded-lg object-cover"
-                        data-token-id={token.poolInfo.tokBId}
+                        data-token-id={tokBId}
                         on:error={onImageError}
                     />
                 </div>
@@ -485,6 +488,7 @@
         onTokenSent={() => {
             dispatch('tokenSent');
         }}
+        tokens={fungibleTokens}
     />
 {/if}
 
