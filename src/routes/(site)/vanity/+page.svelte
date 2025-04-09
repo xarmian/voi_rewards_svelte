@@ -671,7 +671,6 @@
               <ul class="list-disc pl-5 space-y-1">
                 <li>You can now use this address from your main wallet.</li>
                 <li>The original seed phrase is no longer needed for signing transactions.</li>
-                <li>Keep the seed phrase as a backup, but it's much more secure now.</li>
               </ul>
             </div>
           {/if}
