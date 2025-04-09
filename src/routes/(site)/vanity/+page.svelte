@@ -1,5 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { Web3Wallet, signTransactions, selectedWallet } from 'avm-wallet-svelte';
+  import algosdk from 'algosdk';
+  import { algodClient, algodIndexer } from '$lib/utils/algod';
+  import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 
   // Worker instance - needs to be accessible outside generateVanityAddress
   let worker: Worker | null = null; 
@@ -20,6 +24,13 @@
   let updateInterval: ReturnType<typeof setInterval> | null = null;
   let lastAddressCheckedByWorker: string | null = null; // Track last checked address
 
+  // Wallet and rekey state
+  let isActivating = false;
+  let isRekeying = false;
+  let txnStatus: 'idle' | 'sending' | 'success' | 'error' = 'idle';
+  let rekeyTxnStatus: 'idle' | 'sending' | 'success' | 'error' = 'idle';
+  let txnError: string | null = null;
+  
   // Method to validate inputs
   function validateInputs(): boolean {
     error = null;
@@ -302,6 +313,96 @@
     }
   }
 
+  // Send 1 VOI to activate the vanity address
+  async function activateVanityAddress() {
+    if (!$selectedWallet?.address || $selectedWallet?.app === 'Watch' || !result) {
+      error = 'Please connect a wallet first';
+      return;
+    }
+
+    isActivating = true;
+    txnStatus = 'sending';
+    txnError = null;
+
+    try {
+      // Get parameters for the transaction
+      const params = await algodClient.getTransactionParams().do();
+      
+      // Create an unsigned transaction to send 1 VOI to the vanity address
+      // 1 VOI = 1,000,000 microVOI
+      const unsignedTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+        from: $selectedWallet.address,
+        to: result.address,
+        amount: 1000000, // 1 VOI in microVOI
+        suggestedParams: params
+      });
+
+      // Ask user to sign the transaction
+      const signedTxns = await signTransactions([[unsignedTxn]]);
+      
+      // Send the signed transaction to the network
+      const { txId } = await algodClient.sendRawTransaction(signedTxns).do();
+      
+      // Wait for confirmation
+      await algosdk.waitForConfirmation(algodClient, txId, 5);
+      
+      txnStatus = 'success';
+      
+      // After sending 1 VOI, we can now initiate the rekey transaction
+      await rekeyVanityAddress();
+      
+    } catch (err) {
+      console.error('Failed to activate address:', err);
+      txnStatus = 'error';
+      txnError = err instanceof Error ? err.message : String(err);
+    } finally {
+      isActivating = false;
+    }
+  }
+
+  // Rekey the vanity address
+  async function rekeyVanityAddress() {
+    if (!result || !$selectedWallet?.address) return;
+    
+    isRekeying = true;
+    rekeyTxnStatus = 'sending';
+    
+    try {
+      // Get parameters for the transaction
+      const params = await algodClient.getTransactionParams().do();
+      
+      // Convert the mnemonic to a keypair for signing
+      const vanityAccount = algosdk.mnemonicToSecretKey(result.mnemonic);
+      
+      // Create a rekey transaction to point to the user's connected wallet address
+      const rekeyTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+        from: result.address,
+        to: result.address, // Send to self
+        amount: 0, // Zero amount for rekey
+        suggestedParams: params,
+        rekeyTo: $selectedWallet.address // Rekey to connected wallet
+      });
+      
+      // Sign the transaction with the vanity address secret key
+      const signedRekeyTxn = rekeyTxn.signTxn(vanityAccount.sk);
+      
+      // Send the signed transaction to the network
+      const { txId } = await algodClient.sendRawTransaction(signedRekeyTxn).do();
+      
+      // Wait for confirmation
+      await algosdk.waitForConfirmation(algodClient, txId, 5);
+      
+      rekeyTxnStatus = 'success';
+      
+    } catch (err) {
+      console.error('Failed to rekey address:', err);
+      rekeyTxnStatus = 'error';
+      txnError = err instanceof Error ? err.message : String(err);
+    } finally {
+      isRekeying = false;
+    }
+  }
+
   // Clean up on unmount
   onMount(() => {
     // Import font awesome - consider adding this via a layout or app.html
@@ -483,6 +584,97 @@
         <div class="mt-6 bg-yellow-100 dark:bg-yellow-900/50 border-l-4 border-yellow-500 text-yellow-700 dark:text-yellow-200 p-4 rounded">
           <p class="font-bold flex items-center"><i class="fas fa-exclamation-triangle mr-2"></i>Important Security Notice</p>
           <p class="mt-1 text-sm">Save your mnemonic phrase securely offline. Never share it. Anyone with this phrase can access your funds.</p>
+        </div>
+
+        <!-- New section for wallet connection and rekey -->
+        <div class="mt-6 border-t border-gray-200 dark:border-gray-600 pt-6">
+          <h4 class="text-lg font-medium text-purple-800 dark:text-purple-300 mb-4">
+            Secure Your Vanity Address
+          </h4>
+          
+          <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
+            To use this address securely, you can rekey it to your primary wallet. This allows you to control the vanity address without exposing its private key.
+          </p>
+          
+          <!-- Step 1: Connect Wallet -->
+          <div class="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-2">Step 1: Connect Your Main Wallet</h5>
+            
+              <Web3Wallet 
+                availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet']}
+                walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+                allowWatchAccounts={false}
+                showAuthenticated={false}
+                modalType="dropdown"
+                showAuthButtons={false}
+                algodClient={algodClient}
+                indexerClient={algodIndexer}
+                wcProject={{
+                    projectId: wcProjectId,
+                    projectName: 'Voi Rewards Auditor',
+                    projectDescription: 'Voi Rewards Auditor',
+                    projectUrl: 'https://voirewards.com',
+                    projectIcons: ['https://voirewards.com/android-chrome-192x192.png'],
+                }}
+              />
+              {#if $selectedWallet?.address && $selectedWallet?.app !== 'Watch'}
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="text-green-600 dark:text-green-400 mr-2"><i class="fas fa-check-circle"></i></span>
+                    <span class="font-mono text-sm truncate">Connected: {$selectedWallet.address}</span>
+                  </div>
+                </div>
+              {/if}
+          </div>
+          
+          <!-- Step 2: Fund and Rekey -->
+          <div class="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-2">Step 2: Fund & Rekey Address</h5>
+            
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              This process will send 1 VOI to your vanity address, then rekey it to your connected wallet.
+            </p>
+            
+            {#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
+              <div class="bg-green-100 dark:bg-green-900/50 p-3 rounded-md text-green-800 dark:text-green-200 mb-3">
+                <i class="fas fa-check-circle mr-2"></i> 
+                Success! Your vanity address is now rekeyed to your connected wallet.
+              </div>
+            {:else}
+              <button
+                on:click={activateVanityAddress}
+                disabled={!($selectedWallet?.address && $selectedWallet?.app !== 'Watch') || isActivating || isRekeying || txnStatus === 'sending' || rekeyTxnStatus === 'sending'}
+                class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {#if isActivating || txnStatus === 'sending'}
+                  <i class="fas fa-spinner fa-spin mr-2"></i> Funding Address...
+                {:else if isRekeying || rekeyTxnStatus === 'sending'}
+                  <i class="fas fa-spinner fa-spin mr-2"></i> Rekeying Address...
+                {:else}
+                  Fund & Rekey Address
+                {/if}
+              </button>
+            {/if}
+            
+            {#if txnError}
+              <div class="mt-3 p-3 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 rounded-md text-sm">
+                <i class="fas fa-exclamation-circle mr-2"></i> {txnError}
+              </div>
+            {/if}
+          </div>
+          
+          <!-- What happens next explanation -->
+          {#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
+            <div class="p-4 bg-blue-50 dark:bg-blue-900/50 rounded-lg text-sm text-blue-800 dark:text-blue-200">
+              <h5 class="font-medium mb-2">What Now?</h5>
+              <p class="mb-2">Your vanity address is now fully set up:</p>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>You can now use this address from your main wallet.</li>
+                <li>The original seed phrase is no longer needed for signing transactions.</li>
+                <li>Keep the seed phrase as a backup, but it's much more secure now.</li>
+              </ul>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
