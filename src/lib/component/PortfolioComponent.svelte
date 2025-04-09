@@ -401,20 +401,77 @@
         if (!walletAddress) return;
         
         try {
-            const url = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/balances');
-            url.searchParams.append('accountId', walletAddress);
-            const response = await fetch(url.toString());
-            if (!response.ok) throw new Error('Failed to fetch fungible tokens');
-            const data = await response.json();
+            // Create URLs for both API endpoints
+            const balancesUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/balances');
+            balancesUrl.searchParams.append('accountId', walletAddress);
             
-            // get liquidity pools
-            const liquidityPools = await getLiquidityPools();
-
-            // for each liquidity pool, get tokA and tokB and ensure it is in the contractIds array
+            const approvalsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals');
+            approvalsUrl.searchParams.append('spender', walletAddress);
+            
+            const outgoingApprovalsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals');
+            outgoingApprovalsUrl.searchParams.append('owner', walletAddress);
+            
+            // Fetch liquidity pools and all API endpoints in parallel
+            const [liquidityPools, balancesResponse, approvalsResponse, outgoingApprovalsResponse] = await Promise.all([
+                getLiquidityPools(),
+                fetch(balancesUrl.toString()),
+                fetch(approvalsUrl.toString()),
+                fetch(outgoingApprovalsUrl.toString())
+            ]);
+            
+            if (!balancesResponse.ok) throw new Error('Failed to fetch fungible tokens');
+            const balancesData = await balancesResponse.json();
+            
+            // Process approvals data
+            const approvalsData = await approvalsResponse.json();
+            
+            // Process outgoing approvals data
+            const outgoingApprovalsData = await outgoingApprovalsResponse.json();
+            
+            // Create a map of approvals by contractId for easy lookup
+            const approvalsMap = new Map();
+            if (approvalsResponse.ok && approvalsData.approvals) {
+                approvalsData.approvals.forEach((approval: any) => {
+                    const contractId = approval.contractId.toString();
+                    if (!approvalsMap.has(contractId)) {
+                        approvalsMap.set(contractId, []);
+                    }
+                    approvalsMap.get(contractId).push(approval);
+                });
+            }
+            
+            // Create a map of outgoing approvals by contractId
+            const outgoingApprovalsMap = new Map();
+            if (outgoingApprovalsResponse.ok && outgoingApprovalsData.approvals) {
+                outgoingApprovalsData.approvals.forEach((approval: any) => {
+                    const contractId = approval.contractId.toString();
+                    if (!outgoingApprovalsMap.has(contractId)) {
+                        outgoingApprovalsMap.set(contractId, []);
+                    }
+                    outgoingApprovalsMap.get(contractId).push({
+                        spender: approval.spender,
+                        amount: approval.amount,
+                        timestamp: approval.timestamp,
+                        contractId: approval.contractId,
+                        transactionId: approval.transactionId
+                    });
+                });
+            }
+            
+            // for each liquidity pool, get tokA and tokB
             const lpTokenIds = liquidityPools.map((p: PoolInfo) => p.tokAId).concat(liquidityPools.map((p: PoolInfo) => p.tokBId));
-
-            // create a set of contractIds based on the lpTokenIds and fungible tokens
-            const contractIds = new Set([...lpTokenIds, ...data.balances.map((token: any) => token.contractId.toString())]);
+            
+            // Get balance token IDs
+            const balanceTokenIds = balancesData.balances.map((token: any) => token.contractId.toString());
+            
+            // Get approval token IDs
+            const approvalTokenIds = Array.from(approvalsMap.keys());
+            
+            // Get outgoing approval token IDs
+            const outgoingApprovalTokenIds = Array.from(outgoingApprovalsMap.keys());
+            
+            // Merge all token IDs into a unique set
+            const contractIds = new Set([...lpTokenIds, ...balanceTokenIds, ...approvalTokenIds, ...outgoingApprovalTokenIds]);
             
             // Fetch token details for all tokens in one request
             const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
@@ -436,7 +493,8 @@
                 decimals: 6
             });
 
-            const updatedTokens = await Promise.all(data.balances.map(async (token: any) => {
+            // Process regular tokens first
+            const tokenPromises = balancesData.balances.map(async (token: any) => {
                 const tokenId = token.contractId.toString();
                 const tokenDetails = tokenDetailsMap.get(tokenId);
                 const pool = liquidityPools.find((p: PoolInfo) => p.poolId === tokenId);
@@ -471,6 +529,8 @@
                         type: 'arc200',
                         creator: tokenDetails?.creator,
                         totalSupply: pool.supply,
+                        approvals: approvalsMap.get(tokenId) || [],
+                        outgoingApprovals: outgoingApprovalsMap.get(tokenId) || [],
                         poolInfo: {
                             tokAId: pool.tokAId,
                             tokBId: pool.tokBId,
@@ -509,11 +569,92 @@
                     poolId: poolForToken?.contractId?.toString(),
                     type: 'arc200',
                     creator: tokenDetails?.creator,
-                    totalSupply: tokenDetails?.totalSupply
+                    totalSupply: tokenDetails?.totalSupply,
+                    approvals: approvalsMap.get(tokenId) || [],
+                    outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
                 };
-            }));
+            });
+            
+            // Process tokens with approvals but no balance (not already in the balancesData)
+            const approvalOnlyPromises = [...approvalTokenIds, ...outgoingApprovalTokenIds]
+                .filter(id => !balanceTokenIds.includes(id)) // Only unique tokens not in balances
+                .map(async (tokenId) => {
+                    const tokenDetails = tokenDetailsMap.get(tokenId);
+                    if (!tokenDetails) return null; // Skip if no details
 
-            fungibleTokens = updatedTokens;
+                    const pool = liquidityPools.find((p: PoolInfo) => p.poolId === tokenId);
+                    if (pool) {
+                        // This is an LP token with approvals but no balance
+                        const tokenA = tokenDetailsMap.get(pool.tokAId);
+                        const tokenB = tokenDetailsMap.get(pool.tokBId);
+
+                        const poolName = pool.provider === 'nomadex' 
+                            ? `${tokenA?.name}/${tokenB?.name} LP`
+                            : `${pool.symbolA}/${pool.symbolB} LP`;
+
+                        return {
+                            name: poolName,
+                            symbol: `${tokenA?.symbol}/${tokenB?.symbol}`,
+                            balance: 0, // No balance
+                            decimals: tokenDetails.decimals || 0,
+                            verified: true,
+                            imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
+                            id: tokenId,
+                            poolId: pool.poolId,
+                            value: 0, // No value
+                            type: 'arc200',
+                            creator: tokenDetails.creator,
+                            totalSupply: pool.supply,
+                            approvals: approvalsMap.get(tokenId) || [],
+                            outgoingApprovals: outgoingApprovalsMap.get(tokenId) || [],
+                            poolInfo: {
+                                tokAId: pool.tokAId,
+                                tokBId: pool.tokBId,
+                                tokASymbol: tokenA?.symbol,
+                                tokBSymbol: tokenB?.symbol,
+                                tokABalance: pool.poolBalA,
+                                tokBBalance: pool.poolBalB,
+                                totalSupply: Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
+                                poolId: pool.poolId,
+                                apr: pool.apr ?? 0,
+                                tokADecimals: tokenA?.decimals,
+                                tokBDecimals: tokenB?.decimals,
+                                tvl: pool.tvl,
+                                provider: pool.provider
+                            }
+                        };
+                    }
+
+                    // Regular token with approvals but no balance
+                    const poolForToken = Array.from(poolData.values()).find(p => 
+                        p.tokAId === tokenId || p.tokBId === tokenId
+                    );
+
+                    return {
+                        name: tokenDetails.name || tokenDetails.symbol,
+                        symbol: tokenDetails.symbol,
+                        balance: 0, // No balance
+                        decimals: tokenDetails.decimals || 0,
+                        verified: true,
+                        imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
+                        value: 0, // No value
+                        id: tokenId,
+                        poolId: poolForToken?.contractId?.toString(),
+                        type: 'arc200',
+                        creator: tokenDetails.creator,
+                        totalSupply: tokenDetails.totalSupply,
+                        approvals: approvalsMap.get(tokenId) || [],
+                        outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
+                    };
+                });
+                
+            // Combine regular tokens and approval-only tokens
+            const allTokenPromises = [...tokenPromises, ...approvalOnlyPromises];
+            const allTokens = await Promise.all(allTokenPromises);
+            
+            // Filter out null values and update state
+            fungibleTokens = allTokens.filter(Boolean);
+            
         } catch (err) {
             console.error('Error fetching fungible tokens:', err);
         }
@@ -574,6 +715,19 @@
             return true;
         });
     }
+
+    $: showZeroBalancesCondition = (token: any) => {
+        if (showZeroBalances) return true;
+        
+        // For tokens with approvals (incoming or outgoing), always show them
+        if (token.approvals?.length > 0 || token.outgoingApprovals?.length > 0) return true;
+        
+        // For tokens with value, check if value exceeds threshold
+        const details = asaDetails.find(d => d.id === token.assetId);
+        return details 
+            ? (details?.value ? details?.value > 0.1 : details?.amount / Math.pow(10, details?.decimals || 0) > 0.01)
+            : (token?.value ? token?.value > 0.1 : token?.balance / Math.pow(10, token?.decimals || 0) > 0.01);
+    };
 
 	function isLPToken(token: FungibleTokenType | LPToken) {
 		return 'poolInfo' in token && token.poolInfo !== undefined;
@@ -726,7 +880,8 @@
                                 <i class="fas fa-bridge"></i>
                                 Bridge
                             </button>
-                        </div>                    </div>
+                        </div>
+                    </div>
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600 dark:text-gray-300">Available Balance</span>
@@ -855,7 +1010,7 @@
                         fungibleTokens={fungibleTokens}
                     />
                 {/each}
-                {#if fungibleTokens.filter(token => isLPToken(token) && (showZeroBalances || token.balance > 0)).length === 0}
+                {#if fungibleTokens.filter(token => isLPToken(token) && showZeroBalancesCondition(token)).length === 0}
                     <div class="text-gray-500 dark:text-gray-400 text-center py-4">
                         No LP tokens found in this account.
                     </div>
@@ -983,7 +1138,7 @@
                 {#each sortTokens(filterTokens([
                     ...asaTokens.map(t => ({ ...t, tokenType: 'vsa' as const })),
                     ...fungibleTokens
-                        .filter(t => !isLPToken(t) && t.balance > 0)
+                        .filter(t => !isLPToken(t) && (t.balance > 0 || t.approvals?.length || 0 > 0 || t.outgoingApprovals?.length || 0 > 0))
                         .map(t => ({ ...t, tokenType: 'arc200' as const }))
                 ].filter((t, i, arr) => {
                     // Get unique identifier based on token type and ID
@@ -1000,7 +1155,7 @@
                     return !arr.slice(0, i).some(item => getUniqueId(item) === currentUniqueId);
                 }))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId}` : `arc200-${token.id}`)}
                     {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
-                    {#if showZeroBalances || (details ? (details?.value ? details?.value > 0.1 : details?.amount / Math.pow(10, details?.decimals || 0) > 0.01) : (token?.value ? token?.value > 0.1 : token?.balance / Math.pow(10, token?.decimals || 0) > 0.01))}
+                    {#if showZeroBalancesCondition(token)}
                         <div class="relative min-w-80">
                             <span class="absolute z-10 top-2 right-2 px-2 py-0.5 text-xs font-medium {details ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
                                 {details ? 'VSA' : 'ARC-200'}

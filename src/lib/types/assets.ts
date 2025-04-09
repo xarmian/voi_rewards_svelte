@@ -16,6 +16,26 @@ export interface FungibleTokenType {
         tokBType?: string;
         tokBId?: string;
     };
+    approvals?: TokenApproval[];
+    outgoingApprovals?: OutgoingApproval[];
+}
+
+export interface TokenApproval {
+    owner: string;
+    round: number;
+    amount: string;
+    spender: string;
+    timestamp: number;
+    contractId: number;
+    transactionId: string;
+}
+
+export interface OutgoingApproval {
+    spender: string;
+    amount: string;
+    timestamp: number;
+    contractId: number;
+    transactionId: string;
 }
 
 export interface LPToken extends FungibleTokenType {

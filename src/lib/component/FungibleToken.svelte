@@ -1,11 +1,16 @@
 <script lang="ts">
-    import type { FungibleTokenType, LPToken } from '$lib/types/assets';
+    import type { FungibleTokenType, LPToken, TokenApproval, OutgoingApproval } from '$lib/types/assets';
     import { createEventDispatcher } from 'svelte';
     import SendTokenModal from './SendTokenModal.svelte';
     import OptOutModal from './OptOutModal.svelte';
     import TokenTransfersModal from './TokenTransfersModal.svelte';
+    import ManageApprovalsModal from './ManageApprovalsModal.svelte';
     import { getEnvoiNames } from '$lib/utils/envoi';
     import { algodClient } from '$lib/utils/algod';
+    import { selectedWallet } from 'avm-wallet-svelte';
+    import algosdk from 'algosdk';
+    import { arc200TransferFrom } from '$lib/utils/arc200';
+    import { signTransactions } from 'avm-wallet-svelte';
 
     const dispatch = createEventDispatcher();
 
@@ -17,12 +22,17 @@
     let showOptOutModal = false;
     let showSendModal = false;
     let showTransfersModal = false;
+    let showManageApprovalsModal = false;
     let isExpanded = false;
     let creatorEnvoiName: string | null = null;
     let totalSupply: number | null = null;
     let creator: string | null = null;
     let tokenImages = new Map<string, string>();
     let failedTokenImages = new Set<string>();
+    let claimingApproval: string | null = null;
+    let claimingError: string | null = null;
+    let claimSuccess: boolean = false;
+    let claimTxId: string | null = null;
 
     function onImageError(event: Event) {
         const img = event.target as HTMLImageElement;
@@ -203,6 +213,83 @@
 
     // Calculate display value based on token type
     $: displayValue = token.value || 0;
+
+    async function claimTokens(approval: TokenApproval) {
+        if (!canSignTransactions || !walletId || !$selectedWallet?.address) {
+            return;
+        }
+
+        try {
+            claimingApproval = approval.transactionId;
+            claimingError = null;
+            claimSuccess = false;
+            claimTxId = null;
+            
+            const appId = Number(token.id);
+            const from = approval.owner;
+            const to = walletId;
+            const amount = approval.amount;
+            
+            // Use the ARC-200 utility to execute the transferFrom
+            const result = await arc200TransferFrom(
+                appId,
+                from,
+                to,
+                amount,
+                walletId,
+                async (txnsToSign: algosdk.Transaction[]) => {
+                    const signedTxns = await signTransactions([txnsToSign]);
+                    if (!signedTxns) {
+                        throw new Error("User rejected transaction signing");
+                    }
+                    return signedTxns;
+                }
+            );
+            
+            if (!result.success) {
+                throw new Error(result.error || "Transfer failed");
+            }
+            
+            // Handle success
+            claimSuccess = true;
+            claimTxId = result.txId;
+            
+            // Notify parent component to refresh token data
+            dispatch('tokenSent');
+            
+            // Close expanded details temporarily to refresh the view
+            isExpanded = false;
+            setTimeout(() => {
+                isExpanded = true;
+            }, 500);
+            
+        } catch (error: any) {
+            console.error("Error claiming tokens:", error);
+            claimingError = error.message || "Failed to claim tokens";
+        } finally {
+            setTimeout(() => {
+                claimingApproval = null;
+            }, 3000); // Keep status visible briefly before resetting
+        }
+    }
+
+    // Check if token is an ARC-200 token
+    function isArc200Token(token: FungibleTokenType | LPToken): boolean {
+        return token.type === 'arc200';
+    }
+
+    // Function to handle opening the manage approvals modal
+    function openManageApprovalsModal() {
+        if (canSignTransactions && isArc200Token(token)) {
+            showManageApprovalsModal = true;
+        }
+    }
+
+    // Handle approval events
+    function handleApprovalEvent() {
+        // Also notify parent to refresh token data
+        dispatch('tokenSent');
+    }
 </script>
 
 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
@@ -256,11 +343,29 @@
         {/if}
             <div class="flex-1">
                 <div class="flex items-center justify-between">
-                    <h4 class="font-medium text-gray-900 dark:text-white">
+                    <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
                         {#if isLPToken(token) && token.poolInfo}
                             {token.name}
                         {:else}
                             {token.symbol}
+                        {/if}
+                        {#if token.approvals && token.approvals.filter(approval => approval.amount !== '0').length > 0}
+                            <span 
+                                class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300" 
+                                title="This token has approvals for spending by this wallet"
+                            >
+                                <i class="fas fa-key mr-1"></i>
+                                {token.approvals.filter(approval => approval.amount !== '0').length}
+                            </span>
+                        {/if}
+                        {#if token.outgoingApprovals && token.outgoingApprovals.filter(approval => approval.amount !== '0').length > 0}
+                            <span 
+                                class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" 
+                                title="You have approved this token for spending by other wallets"
+                            >
+                                <i class="fas fa-shield-alt mr-1"></i>
+                                {token.outgoingApprovals.filter(approval => approval.amount !== '0').length}
+                            </span>
                         {/if}
                     </h4>
                     {#if isLPToken(token) && apr !== null && apr !== 0}
@@ -353,6 +458,139 @@
                                         </div>
                                     {/if}
                                 </div>
+                                
+                                {#if token.approvals && token.approvals.filter(approval => approval.amount !== '0').length > 0}
+                                    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                                        <p class="text-gray-500 dark:text-gray-400 mb-2">
+                                            <i class="fas fa-key text-yellow-500 mr-1"></i>
+                                            Incoming Approvals ({token.approvals.filter(approval => approval.amount !== '0').length})
+                                        </p>
+                                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                                            {#each token.approvals.filter(approval => approval.amount !== '0') as approval}
+                                                <div class="bg-gray-100 dark:bg-gray-600 p-2 rounded-lg text-xs">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Owner:</span>
+                                                        <a 
+                                                            href={`https://voiager.xyz/account/${approval.owner}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-mono truncate max-w-[140px]"
+                                                        >
+                                                            {approval.owner.slice(0, 8)}...{approval.owner.slice(-8)}
+                                                        </a>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Amount:</span>
+                                                        <span class="text-gray-800 dark:text-gray-200">
+                                                            {formatNumber(Number(approval.amount) / Math.pow(10, token.decimals))} {token.symbol}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Date:</span>
+                                                        <span class="text-gray-800 dark:text-gray-200">
+                                                            {new Date(approval.timestamp * 1000).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between items-center mt-2">
+                                                        <a 
+                                                            href={`https://voiager.xyz/transaction/${approval.transactionId}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                                                        >
+                                                            <i class="fas fa-external-link-alt mr-1"></i>
+                                                            View Transaction
+                                                        </a>
+                                                        
+                                                        {#if canSignTransactions}
+                                                            <button
+                                                                on:click={() => claimTokens(approval)}
+                                                                class="px-2 py-1 text-xs font-medium text-white {claimSuccess && claimingApproval === approval.transactionId ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'} rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                disabled={claimingApproval !== null}
+                                                                title="Transfer these tokens to your wallet"
+                                                            >
+                                                                {#if claimingApproval === approval.transactionId}
+                                                                    {#if claimSuccess}
+                                                                        <i class="fas fa-check"></i>
+                                                                        Claimed
+                                                                    {:else}
+                                                                        <div class="w-3 h-3 border-t-2 border-r-2 border-white rounded-full animate-spin mr-1"></div>
+                                                                        Claiming...
+                                                                    {/if}
+                                                                {:else}
+                                                                    <i class="fas fa-hand-holding-dollar"></i>
+                                                                    Claim
+                                                                {/if}
+                                                            </button>
+                                                        {/if}
+                                                    </div>
+                                                    {#if claimingError && claimingApproval === approval.transactionId}
+                                                        <div class="mt-2 text-red-500 text-xs">
+                                                            {claimingError}
+                                                        </div>
+                                                    {/if}
+                                                    {#if claimSuccess && claimingApproval === approval.transactionId && claimTxId}
+                                                        <div class="mt-2 text-green-500 text-xs">
+                                                            Transaction successful! 
+                                                            <a 
+                                                                href={`https://voiager.xyz/transaction/${claimTxId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="underline hover:text-green-600"
+                                                            >
+                                                                View transaction
+                                                            </a>
+                                                        </div>
+                                                    {/if}
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
+
+                                <!-- Outgoing approvals section - new code -->
+                                {#if isArc200Token(token) && (token.outgoingApprovals && token.outgoingApprovals.filter(approval => approval.amount !== '0').length > 0)}
+                                    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <p class="text-gray-500 dark:text-gray-400">
+                                                <i class="fas fa-shield-alt text-blue-500 mr-1"></i>
+                                                Outgoing Approvals {token.outgoingApprovals && token.outgoingApprovals.filter(approval => approval.amount !== '0').length > 0 ? `(${token.outgoingApprovals.filter(approval => approval.amount !== '0').length})` : ''}
+                                            </p>
+                                            <button
+                                                on:click={openManageApprovalsModal}
+                                                class="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition-colors"
+                                                disabled={!canSignTransactions}
+                                                title={canSignTransactions ? "Manage token approvals" : "Connect wallet to manage approvals"}
+                                            >
+                                                <i class="fas fa-cog mr-1"></i>
+                                                Manage
+                                            </button>
+                                        </div>
+                                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                                            {#each token.outgoingApprovals.filter(approval => approval.amount !== '0') as approval}
+                                                <div class="bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg text-xs">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Spender:</span>
+                                                        <a 
+                                                            href={`https://voiager.xyz/account/${approval.spender}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-mono truncate max-w-[140px]"
+                                                        >
+                                                            {approval.spender.slice(0, 8)}...{approval.spender.slice(-8)}
+                                                        </a>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Amount:</span>
+                                                        <span class="text-gray-800 dark:text-gray-200">
+                                                            {(Number(approval.amount) / Math.pow(10, token.decimals)).toLocaleString()} {token.symbol}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
                         {:else}
                             <div class="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3 flex flex-col">
@@ -390,6 +628,95 @@
                                             <p class="text-gray-700 dark:text-gray-200 capitalize">
                                                 {token.poolInfo.provider}
                                             </p>
+                                        </div>
+                                    </div>
+                                {/if}
+                                
+                                {#if token.approvals && token.approvals.filter(approval => approval.amount !== '0').length > 0}
+                                    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                                        <p class="text-gray-500 dark:text-gray-400 mb-2">
+                                            <i class="fas fa-key text-yellow-500 mr-1"></i>
+                                            Approvals ({token.approvals.filter(approval => approval.amount !== '0').length})
+                                        </p>
+                                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                                            {#each token.approvals.filter(approval => approval.amount !== '0') as approval}
+                                                <div class="bg-gray-100 dark:bg-gray-600 p-2 rounded-lg text-xs">
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Owner:</span>
+                                                        <a 
+                                                            href={`https://voiager.xyz/account/${approval.owner}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-mono truncate max-w-[140px]"
+                                                        >
+                                                            {approval.owner.slice(0, 8)}...{approval.owner.slice(-8)}
+                                                        </a>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Amount:</span>
+                                                        <span class="text-gray-800 dark:text-gray-200">
+                                                            {formatNumber(Number(approval.amount) / Math.pow(10, token.decimals))} {token.symbol}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span class="text-gray-600 dark:text-gray-300">Date:</span>
+                                                        <span class="text-gray-800 dark:text-gray-200">
+                                                            {new Date(approval.timestamp * 1000).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex justify-between items-center mt-2">
+                                                        <a 
+                                                            href={`https://voiager.xyz/transaction/${approval.transactionId}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                                                        >
+                                                            <i class="fas fa-external-link-alt mr-1"></i>
+                                                            View Transaction
+                                                        </a>
+                                                        
+                                                        {#if canSignTransactions}
+                                                            <button
+                                                                on:click={() => claimTokens(approval)}
+                                                                class="px-2 py-1 text-xs font-medium text-white {claimSuccess && claimingApproval === approval.transactionId ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'} rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                disabled={claimingApproval !== null}
+                                                                title="Transfer these tokens to your wallet"
+                                                            >
+                                                                {#if claimingApproval === approval.transactionId}
+                                                                    {#if claimSuccess}
+                                                                        <i class="fas fa-check"></i>
+                                                                        Claimed
+                                                                    {:else}
+                                                                        <div class="w-3 h-3 border-t-2 border-r-2 border-white rounded-full animate-spin mr-1"></div>
+                                                                        Claiming...
+                                                                    {/if}
+                                                                {:else}
+                                                                    <i class="fas fa-hand-holding-dollar"></i>
+                                                                    Claim
+                                                                {/if}
+                                                            </button>
+                                                        {/if}
+                                                    </div>
+                                                    {#if claimingError && claimingApproval === approval.transactionId}
+                                                        <div class="mt-2 text-red-500 text-xs">
+                                                            {claimingError}
+                                                        </div>
+                                                    {/if}
+                                                    {#if claimSuccess && claimingApproval === approval.transactionId && claimTxId}
+                                                        <div class="mt-2 text-green-500 text-xs">
+                                                            Transaction successful! 
+                                                            <a 
+                                                                href={`https://voiager.xyz/transaction/${claimTxId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="underline hover:text-green-600"
+                                                            >
+                                                                View transaction
+                                                            </a>
+                                                        </div>
+                                                    {/if}
+                                                </div>
+                                            {/each}
                                         </div>
                                     </div>
                                 {/if}
@@ -441,6 +768,20 @@
                     <i class="fa-solid fa-paper-plane text-blue-500 group-hover:text-blue-600"></i>
                     <span class="text-blue-500 group-hover:text-blue-600">Send</span>
                 </button>
+
+                <!-- Add Manage Approvals button for ARC-200 tokens -->
+                {#if isArc200Token(token)}
+                    <span class="text-gray-400">|</span>
+                    <button
+                        class="flex flex-col items-center group {canSignTransactions ? '' : 'opacity-50 cursor-not-allowed'}"
+                        on:click={() => canSignTransactions ? openManageApprovalsModal() : null}
+                        aria-label="Manage approvals"
+                        title={canSignTransactions ? 'Manage token approvals' : 'Connect wallet to manage approvals'}
+                    >
+                        <i class="fa-solid fa-shield-alt text-blue-500 group-hover:text-blue-600"></i>
+                        <span class="text-blue-500 group-hover:text-blue-600">Approvals</span>
+                    </button>
+                {/if}
             {/if}
             <span class="text-gray-400">|</span>
             <button
@@ -501,6 +842,17 @@
             tokenA: calculateUserTokenShare(token, 'A'),
             tokenB: calculateUserTokenShare(token, 'B')
         } : null}
+    />
+{/if}
+
+<!-- Add the ManageApprovalsModal -->
+{#if showManageApprovalsModal}
+    <ManageApprovalsModal 
+        bind:open={showManageApprovalsModal}
+        {token}
+        {walletId}
+        on:approvalCreated={handleApprovalEvent}
+        on:approvalRevoked={handleApprovalEvent}
     />
 {/if}
 
