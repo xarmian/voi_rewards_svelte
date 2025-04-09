@@ -436,7 +436,7 @@
   
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
     <p class="text-gray-700 dark:text-gray-300 mb-6">
-      Generate a Voi address that starts (after the initial 'A') and/or ends with specific characters. Computation happens in your browser; keys are never sent anywhere.
+      Generate a Voi address that starts and/or ends with specific characters. Computation happens in your browser; keys are never sent anywhere.
     </p>
     
     <form on:submit|preventDefault={generateVanityAddress} class="space-y-6">
@@ -685,7 +685,7 @@
     
     <div class="space-y-4 text-gray-700 dark:text-gray-300 text-sm">
       <p>
-        Vanity addresses are standard Voi addresses with a personalized touch, containing specific characters at the beginning (after the initial 'A') or end. They function identically to regular addresses.
+        Vanity addresses are standard Voi addresses with a personalized touch, containing specific characters at the beginning or end. They function identically to regular addresses.
       </p>
       
       <p>
