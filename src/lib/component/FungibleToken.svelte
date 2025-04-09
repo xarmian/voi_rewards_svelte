@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { FungibleTokenType, LPToken, TokenApproval, OutgoingApproval } from '$lib/types/assets';
+    import type { FungibleTokenType, LPToken, TokenApproval } from '$lib/types/assets';
     import { createEventDispatcher } from 'svelte';
     import SendTokenModal from './SendTokenModal.svelte';
     import OptOutModal from './OptOutModal.svelte';

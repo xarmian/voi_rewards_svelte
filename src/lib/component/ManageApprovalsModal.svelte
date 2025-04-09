@@ -4,7 +4,6 @@
     import { arc200Approve, arc200RevokeApproval, fetchOutgoingApprovals } from '$lib/utils/arc200';
     import { selectedWallet } from 'avm-wallet-svelte';
     import { signTransactions } from 'avm-wallet-svelte';
-    import { onMount } from 'svelte';
     import algosdk from 'algosdk';
     import WalletSearch from './WalletSearch.svelte';
 
@@ -30,7 +29,6 @@
     
     $: canSignTransactions = $selectedWallet?.address === walletId && $selectedWallet?.app !== '' && $selectedWallet?.app !== 'Watch';
     $: isArc200 = token.type === 'arc200';
-    $: initialApprovals = token.outgoingApprovals || [];
     $: tokenName = token.name;
     $: tokenSymbol = token.symbol;
     $: tokenDecimals = token.decimals;

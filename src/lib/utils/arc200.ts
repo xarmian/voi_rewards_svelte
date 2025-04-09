@@ -162,7 +162,7 @@ export async function arc200RevokeApproval(
  * @param walletAddress The wallet address to check for approvals
  * @returns List of active approvals where the specified address is the owner
  */
-export async function fetchOutgoingApprovals(walletAddress: string): Promise<{ contractId: number; tokenName: string; symbol: string; spender: string; amount: string; timestamp: number; transactionId: string }[]> {
+export async function fetchOutgoingApprovals(walletAddress: string): Promise<TokenApproval[]> {
     try {
         const url = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals');
         url.searchParams.append('owner', walletAddress);
