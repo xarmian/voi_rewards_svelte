@@ -17,7 +17,31 @@ export interface FungibleTokenType {
         tokBId?: string;
     };
     approvals?: TokenApproval[];
-    outgoingApprovals?: OutgoingApproval[];
+    outgoingApprovals?: TokenApproval[];
+}
+
+export interface ARC200Token {
+    name: string;
+    symbol: string;
+    creator: string;
+    deleted: boolean;
+    tokenId: string;
+    decimals: number;
+    verified: number;
+    mintRound: number;
+    contractId: number;
+    globalState: Map<string, string>;
+    totalSupply: string;
+}
+
+export interface TokenBalance {
+    name: string;
+    symbol: string;
+    balance: number;
+    decimals: number;
+    verified: boolean;
+    accountId: string;
+    contractId: number;
 }
 
 export interface TokenApproval {
@@ -25,14 +49,6 @@ export interface TokenApproval {
     round: number;
     amount: string;
     spender: string;
-    timestamp: number;
-    contractId: number;
-    transactionId: string;
-}
-
-export interface OutgoingApproval {
-    spender: string;
-    amount: string;
     timestamp: number;
     contractId: number;
     transactionId: string;

@@ -1,7 +1,7 @@
 import algosdk from 'algosdk';
 import { algodClient, algodIndexer } from './algod';
 import { arc200 as Arc200Contract } from 'ulujs';
-
+import type { TokenApproval } from '$lib/types/assets';
 /**
  * Executes an ARC-200 transferFrom transaction
  * @param appId Application ID of the token contract
@@ -172,18 +172,8 @@ export async function fetchOutgoingApprovals(walletAddress: string): Promise<{ c
             throw new Error('Failed to fetch outgoing approvals');
         }
         
-        interface RawApproval {
-            contractId: number;
-            owner: string;
-            spender: string;
-            amount: string;
-            timestamp: number;
-            round: number;
-            transactionId: string;
-        }
-
         const data = await response.json();
-        return (data.approvals || []).map((approval: RawApproval) => ({
+        return (data.approvals || []).map((approval: TokenApproval) => ({
             contractId: approval.contractId,
             owner: approval.owner,
             spender: approval.spender,
@@ -191,7 +181,7 @@ export async function fetchOutgoingApprovals(walletAddress: string): Promise<{ c
             timestamp: approval.timestamp,
             round: approval.round,
             transactionId: approval.transactionId
-        })).filter((approval: RawApproval) => approval.amount !== '0');
+        })).filter((approval: TokenApproval) => approval.amount !== '0');
     } catch (error) {
         console.error('Error fetching outgoing approvals:', error);
         return [];

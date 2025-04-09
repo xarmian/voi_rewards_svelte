@@ -293,7 +293,7 @@
 </script>
 
 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
-    {#if canSignTransactions && token.balance === 0}
+    {#if canSignTransactions && token.balance === 0 && token.type !== 'arc200'}
         <button
             class="absolute top-7 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
             on:click={() => showOptOutModal = true}

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import type { FungibleTokenType, OutgoingApproval } from '$lib/types/assets';
+    import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
     import { arc200Approve, arc200RevokeApproval, fetchOutgoingApprovals } from '$lib/utils/arc200';
     import { selectedWallet } from 'avm-wallet-svelte';
     import { signTransactions } from 'avm-wallet-svelte';
@@ -24,7 +24,7 @@
     
     let spenderAddress = '';
     let approvalAmount = '';
-    let outgoingApprovals: OutgoingApproval[] = [];
+    let outgoingApprovals: TokenApproval[] = [];
     let refreshTrigger = 0; // Used to trigger re-fetches
     let hasChanges = false; // Track if any changes were made
     
@@ -150,7 +150,7 @@
         spenderAddress = address;
     }
     
-    async function handleRevokeApproval(approval: OutgoingApproval) {
+    async function handleRevokeApproval(approval: TokenApproval) {
         if (!walletId || !canSignTransactions) return;
         
         try {
