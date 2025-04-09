@@ -424,7 +424,7 @@
 </script>
 
 <svelte:head>
-  <title>Voi Vanity Address Generator | Voi</title>
+  <title>Vanity Address Generator | Voi</title>
   <meta name="description" content="Generate a Voi vanity address with custom prefix and suffix" />
   <script src="https://cdn.jsdelivr.net/npm/algosdk@2.9.0/dist/browser/algosdk.min.js" defer></script>
 </svelte:head>
