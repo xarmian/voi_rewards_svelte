@@ -1360,7 +1360,7 @@
                       }
                     }}
                     class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-                    placeholder="Enter address or search Envoi names..."
+                    placeholder={`Enter address or search ${isVoiToAlgorand ? 'NFDomains' : 'Envoi names'}...`}
                     class:border-green-500={isValidDestination}
                     class:border-red-500={destinationAddress && !isValidDestination}
                   />
@@ -1462,7 +1462,7 @@
                 {#if isVoiToAlgorand && isValidDestination}
                     <div class="mb-4">
                     {#if isCheckingOptIn}
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Checking if address is opted into aVOI...</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Checking if address is opted into {selectedToken.bridgedSymbol}...</p>
                     {:else if !isOptedIn}
                         <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
                         <p class="text-sm text-yellow-700 dark:text-yellow-200 mb-2">
@@ -1484,7 +1484,7 @@
                         </div>
                         </div>
                     {:else}
-                        <p class="text-sm text-green-600 dark:text-green-400">✓ Address is opted into aVOI</p>
+                        <p class="text-sm text-green-600 dark:text-green-400">✓ Address is opted into {selectedToken.bridgedSymbol}</p>
                     {/if}
                     </div>
                 {/if}

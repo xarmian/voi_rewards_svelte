@@ -736,16 +736,16 @@
                     target="_blank"
                     class="flex flex-col items-center group"
                     rel="noopener noreferrer">
-                    <i class="fa-solid fa-circle-plus text-purple-500 group-hover:text-purple-600"></i>
-                    <span class="text-purple-500 group-hover:text-purple-600">Liquidity</span>
+                    <i class="fa-solid fa-circle-plus text-green-500 group-hover:text-green-600"></i>
+                    <span class="text-green-500 group-hover:text-green-600">Liquidity</span>
                 </a>
                 <span class="text-gray-400">|</span>
                 <a href={token.poolInfo.provider === 'humble' ? `https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}` : `https://voi.nomadex.app/liquidity/${token.poolId}/remove`} 
                     target="_blank"
                     class="flex flex-col items-center group"
                     rel="noopener noreferrer">
-                    <i class="fa-solid fa-circle-minus text-purple-500 group-hover:text-purple-600"></i>
-                    <span class="text-purple-500 group-hover:text-purple-600">Liquidity</span>
+                    <i class="fa-solid fa-circle-minus text-red-500 group-hover:text-red-600"></i>
+                    <span class="text-red-500 group-hover:text-red-600">Liquidity</span>
                 </a>
             {:else if token.poolId}
                 <span class="text-gray-400">|</span>
