@@ -184,13 +184,13 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-600 dark:text-gray-300">Key Expires</span>
                                 <span class="font-medium text-gray-900 dark:text-white">
-                                    {formatDate(new Date((contract.accountInfo?.participation['vote-last-valid'] - contract.accountInfo?.round) * 3.3 * 1000 + Date.now()))}
+                                    {formatDate(new Date((contract.accountInfo?.participation['vote-last-valid'] - contract.accountInfo?.round) * 2.8 * 1000 + Date.now()))}
                                 </span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-600 dark:text-gray-300">Time Until Expiry</span>
                                 <span class="font-medium text-gray-900 dark:text-white">
-                                    {formatDuration((contract.accountInfo?.participation['vote-last-valid'] - contract.accountInfo?.round) * 3.3)}
+                                    {formatDuration((contract.accountInfo?.participation['vote-last-valid'] - contract.accountInfo?.round) * 2.8)}
                                 </span>
                             </div>
                         {/if}
