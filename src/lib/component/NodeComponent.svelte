@@ -138,11 +138,11 @@
                 <div class="cardContents">
                     <p>
                         <span class="label">Vote Key Expires:</span>
-                        <span>{accountInfo ? (formatTime((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)) : 'Loading...'}</span>
+                        <span>{accountInfo ? (formatTime((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*2.8)) : 'Loading...'}</span>
                     </p>
                     <p>
                         <span class="label"></span>
-                        <span>{accountInfo ? (dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*3.3)) : 'Loading...'}</span>
+                        <span>{accountInfo ? (dateFromSeconds((accountInfo['participation']['vote-last-valid'] - accountInfo['round'])*2.8)) : 'Loading...'}</span>
                     </p>
                     <p>
                         <span class="label"></span>
