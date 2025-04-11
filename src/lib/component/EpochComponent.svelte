@@ -8,7 +8,7 @@
     import { Tabs, TabItem } from 'flowbite-svelte';
     import EpochTable from '$lib/components/EpochTable.svelte';
     import EpochChart from '$lib/components/EpochChart.svelte';
-
+    
     export let walletAddress: string;
     const rewardsAddress: string[] = ['62TIVJSZOS4DRSSYYDDZELQAGFYQC5JWKCHRBPPYKTZN2OOOXTGLB5ZJ4E','CAGQDUFUPI6WAQCIQZHPHMX2Z7KACAKZWOMI4R72JV24U4AVAJTGCHA2BE'];
     
@@ -24,25 +24,22 @@
     let totalPages = 1;
     let paginatedData: typeof mergedData = [];
 
-    const filterTransactions = (address: string[], txns: any[]) => {
-        return txns.filter((tx: any) => address.includes(tx.sender));
-    };
-
     const loadTransactions = async () => {
         try {
-            const transfers = await algodIndexer
-                .searchForTransactions()
-                .address(walletAddress)
-                .addressRole('receiver')
-                .limit(100)
-                .do();
+            const url = new URL('/api/mimir', window.location.href);
+            url.searchParams.set('action', 'get_account_transactions_multi');
+            // Convert the array to a properly formatted PostgreSQL array string
+            url.searchParams.set('from_addresses', `{${rewardsAddress.join(',')}}`);
+            url.searchParams.set('to_address', walletAddress);
+            const response = await fetch(url);
 
-            return filterTransactions(rewardsAddress, transfers.transactions);
+            const data = await response.json();
+            return data.data || [];
         } catch (error) {
             console.error('Failed to fetch transactions:', error);
             return [];
         }
-    };
+    }
 
     const loadEpochData = async () => {
         try {
@@ -102,17 +99,19 @@
             rewardStartDate.setDate(rewardStartDate.getDate());
             rewardEndDate.setDate(rewardEndDate.getDate() + 7);
 
-            const rewardTx = transactions.find(tx => 
-                tx['round-time'] >= rewardStartDate.getTime()/1000 && 
-                tx['round-time'] <= rewardEndDate.getTime()/1000
-            );
+            // Find reward transaction with new data format
+            const rewardTx = transactions.find(tx => {
+                // Use tx_timestamp as the timestamp field
+                const txTime = new Date(tx.tx_timestamp);
+                return txTime >= rewardStartDate && txTime <= rewardEndDate;
+            });
 
             return {
                 ...epoch,
                 isEpochInProgress: now >= epoch.startDate && now <= epoch.endDate,
-                actualReward: rewardTx ? rewardTx['payment-transaction'].amount / 1e6 : null,
-                rewardDate: rewardTx ? new Date(rewardTx['round-time'] * 1000) : null,
-                rewardTxId: rewardTx ? rewardTx.id : null,
+                actualReward: rewardTx ? rewardTx.amount / 1e6 : null,
+                rewardDate: rewardTx ? new Date(rewardTx.tx_timestamp) : null,
+                rewardTxId: rewardTx ? rewardTx.txid : null,
                 status: now >= epoch.startDate && now <= epoch.endDate ? 'in-progress' : 
                        (now <= rewardEndDate ? 'pending' : 'no-reward')
             };
@@ -164,10 +163,9 @@
                     <span>Table View</span>
                 </div>
                 <EpochTable 
-                    {mergedData}
+                    paginatedData={paginatedData}
                     bind:currentPage
                     {totalPages}
-                    {paginatedData}
                     {dataLastUpdated}
                 />
             </TabItem>

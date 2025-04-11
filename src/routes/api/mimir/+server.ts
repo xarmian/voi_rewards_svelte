@@ -9,6 +9,7 @@ const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KE
 const ALLOWED_ACTIONS = [
     'get_online_account_count',
     'get_arc200_transfers',
+    'get_account_transactions_multi',
 ] as const;
 
 type AllowedAction = typeof ALLOWED_ACTIONS[number];
@@ -29,11 +30,20 @@ export async function GET({ url }: RequestEvent) {
         }
 
         // Add any additional parameters from the URL
-        const params: Record<string, string | number> = {};
+        const params: Record<string, string | number | string[]> = {};
         for (const [key, value] of url.searchParams.entries()) {
             if (key !== 'action') {
+                // Handle array parameters (format: {val1,val2,val3})
+                if (value.startsWith('{') && value.endsWith('}')) {
+                    // Parse PostgreSQL array format
+                    params[key] = value.slice(1, -1).split(',');
+                }
                 // Convert string numbers to actual numbers if possible
-                params[key] = !isNaN(Number(value)) ? Number(value) : value;
+                else if (!isNaN(Number(value))) {
+                    params[key] = Number(value);
+                } else {
+                    params[key] = value;
+                }
             }
         }
 
@@ -41,6 +51,7 @@ export async function GET({ url }: RequestEvent) {
 
         const { data, error } = await supabaseMimirClient
             .rpc(action, params);
+        console.log(data);
 
         if (error) {
             console.error('Error:', error);

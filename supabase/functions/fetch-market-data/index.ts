@@ -511,17 +511,16 @@ serve(async (req: Request) => {
 
   try {
     // Fetch data from all sources in parallel
-    const [mexcData, humbleData, nomadexData, tinymanData, pactfiData, uniswapData] = await Promise.all([
+    const [mexcData, humbleData, tinymanData, pactfiData, uniswapData] = await Promise.all([
       fetchMEXCData(),
       fetchHumbleData(),
-      fetchNomadexData(),
       fetchTinymanData(),
       fetchPactFiData(),
       fetchUniswapData()
     ]);
 
     // Filter out null results and prepare for insertion
-    const snapshots = [mexcData, humbleData, nomadexData, tinymanData, pactfiData, uniswapData]
+    const snapshots = [mexcData, humbleData, tinymanData, pactfiData, uniswapData]
       .filter((data): data is MarketSnapshot => data !== null);
 
     if (snapshots.length > 0) {
