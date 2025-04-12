@@ -134,7 +134,8 @@
         isLoading = true;
         error = null;
         try {
-            const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
+            //const url = new URL('https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/tokens');
+            const url = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/nft-indexer/v1/tokens');
             url.searchParams.append('owner', walletAddress);
 
             const response = await fetch(url.toString());
@@ -237,7 +238,7 @@
     async function fetchCollectionInfo(contractId: string) {
         try {
             const response = await fetch(
-                `https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/collections?contractId=${contractId}`
+                `https://voi-mainnet-mimirapi.nftnavigator.xyz/nft-indexer/v1/collections?contractId=${contractId}`
             );
             if (!response.ok) return null;
             const data = await response.json();

@@ -44,11 +44,9 @@
     });
 
     async function fetchNodeData(forceRefresh: boolean = false) {
-        console.log('fetchNodeData');
         loading = true;
         try {
             supply = await getSupplyInfo();
-            console.log('supply', supply);
             
             // Get latest epoch data
             const dates = await dataTable.fetchDateRanges();

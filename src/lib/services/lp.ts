@@ -94,11 +94,11 @@ export const getLiquidityPools = async () => {
             poolId: pool.id.toString(),
             tokAId: pool.alphaId.toString(),
             tokBId: pool.betaId.toString(),
-            poolBalA: pool.balance.alpha,
-            poolBalB: pool.balance.beta,
-            supply: pool.balance.issuedLpt,
+            poolBalA: pool.balance?.alpha || '0',
+            poolBalB: pool.balance?.beta || '0',
+            supply: pool.balance?.issuedLpt || '0',
             provider: 'nomadex',
-            tvl: pool.alphaId === 0 ? Number(pool.balance.alpha) * 2 : (pool.betaId === 0) ? Number(pool.balance.beta) * 2 : 0,
+            tvl: pool.alphaId === 0 ? Number(pool.balance?.alpha || '0') * 2 : (pool.betaId === 0) ? Number(pool.balance?.beta || '0') * 2 : 0,
             apr: pool.apr
         }));
 
