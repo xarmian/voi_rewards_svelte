@@ -274,8 +274,8 @@ function calculateTokenValue(token: any, pool: any): number {
 
     try {
         // Get pool balances based on whether VOI is token A or B
-        const voiBalance = pool.isVoiA ? pool.poolBalA : pool.poolBalB;
-        const tokenBalance = pool.isVoiA ? pool.poolBalB : pool.poolBalA;
+        const voiBalance = (pool.tokAId === '0' || pool.tokAId === '390001') ? pool.poolBalA : pool.poolBalB;
+        const tokenBalance = (pool.tokAId === '0' || pool.tokAId === '390001') ? pool.poolBalB : pool.poolBalA;
         
         if (tokenBalance === '0' || voiBalance === '0') return 0;
 
