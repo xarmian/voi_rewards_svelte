@@ -336,7 +336,7 @@
                 </button>
             </div>
             <Web3Wallet
-                availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'BiatecWallet', 'PeraWallet']}
+                availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'BiatecWallet', 'DeflyWallet']}
                 showAuthButtons={false}
                 {algodClient}
                 indexerClient={algodIndexer}
