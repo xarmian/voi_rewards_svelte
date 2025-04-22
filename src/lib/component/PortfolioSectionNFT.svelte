@@ -212,13 +212,17 @@
             });
 
             // if there are any envoi tokens, resolve them before updating the displayed NFTs
-            const envoiTokens = allNftTokens.filter(token => token.contractId === '797609');
+            const envoiTokens = allNftTokens.filter(token => token.contractId === '797609' || token.contractId === '876578');
             if (envoiTokens.length > 0) {
                 const tokenData = await resolveEnvoiToken(envoiTokens.map(token => token.tokenId));
+                console.log(tokenData);
                 tokenData.forEach(token => {
                     const matchingToken = allNftTokens.find(t => t.tokenId === token.token_id);
                     if (matchingToken) {
                         matchingToken.name = token.name;
+                        if (matchingToken.contractId === '876578') {
+                            matchingToken.name += ' (VSR)';
+                        }
                         if (token.metadata.avatar) {
                             matchingToken.imageUrl = token.metadata.avatar;
                         }
