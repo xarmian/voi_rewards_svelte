@@ -30,6 +30,15 @@ export const apps: AppInfo[] = [
     featured: true
   },
   {
+    id: 'voifountain',
+    name: 'Voi Fountain',
+    description: 'Get free tokens daily from the Fountain',
+    logoPath: 'https://fountain.voirewards.com/apple-touch-icon-167x167.png',
+    url: 'https://fountain.voirewards.com',
+    category: 'utility',
+    featured: true
+  },
+  {
     id: 'nomadex',
     name: 'Nomadex',
     description: 'DEX',
