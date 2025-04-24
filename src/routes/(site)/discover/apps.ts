@@ -21,6 +21,15 @@ export const apps: AppInfo[] = [
     featured: true
   },
   {
+    id: 'aramid',
+    name: 'Aramid Bridge',
+    description: 'Bridge assets between Voi, Algorand, and Base',
+    logoPath: '/logos/aramid.png',
+    url: 'https://aramid.finance',
+    category: 'defi',
+    featured: true
+  },
+  {
     id: 'humbleswap',
     name: 'HumbleSwap',
     description: 'DEX',
