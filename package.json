@@ -60,7 +60,7 @@
 		"@types/qrcode": "^1.5.5",
 		"@vercel/analytics": "^1.1.1",
 		"algosdk": "^2.9.0",
-		"avm-wallet-svelte": "^0.6.2",
+		"avm-wallet-svelte": "^0.8.1",
 		"canvas-confetti": "^1.9.3",
 		"compare-versions": "^6.1.0",
 		"d3-scale": "github:d3/d3-scale",
