@@ -38,6 +38,7 @@
     let asaDetails: any[] = [];
     let canSignTransactions = false;
     let totalValue: number = 0;
+    let totalUsdValue = 0;
 
     const rewardsAddress: string[] = [
         '62TIVJSZOS4DRSSYYDDZELQAGFYQC5JWKCHRBPPYKTZN2OOOXTGLB5ZJ4E',
@@ -138,6 +139,18 @@
             totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
                         asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
                         (accountBalance / 1e6);
+            
+            // Calculate total USD value separately
+            totalUsdValue = fungibleTokens.reduce((acc, token) => acc + (token.usdValue || 0), 0) +
+                           asaDetails.reduce((acc, asa) => {
+                               // For ASA tokens, calculate USD value if it's aUSDC
+                               if (asa.id === 302190) {
+                                   return acc + (asa.amount / Math.pow(10, asa.decimals || 6));
+                               }
+                               return acc;
+                           }, 0) +
+                           // Add VOI balance USD value if VOI price is available
+                           ($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
         } catch (error) {
             console.error('Error refreshing portfolio:', error);
         } finally {
@@ -149,7 +162,7 @@
         isLoadingTokens = true;
         isLoadingLPTokens = true;
         try {
-            fungibleTokens = await fetchFungibleTokens(walletAddress);
+            fungibleTokens = await fetchFungibleTokens(walletAddress, $voiPrice.price);
         } catch (error) {
             console.error('Error refreshing tokens:', error);
         } finally {
@@ -172,7 +185,7 @@
             // Then load tokens in parallel
             isLoadingTokens = true;
             isLoadingLPTokens = true;
-            fungibleTokens = await fetchFungibleTokens(walletAddress);
+            fungibleTokens = await fetchFungibleTokens(walletAddress, $voiPrice.price);
             isLoadingTokens = false;
             isLoadingLPTokens = false;
             
@@ -180,6 +193,18 @@
             totalValue = fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
                         asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
                         (accountBalance / 1e6);
+            
+            // Calculate total USD value separately
+            totalUsdValue = fungibleTokens.reduce((acc, token) => acc + (token.usdValue || 0), 0) +
+                           asaDetails.reduce((acc, asa) => {
+                               // For ASA tokens, calculate USD value if it's aUSDC
+                               if (asa.id === 302190) {
+                                   return acc + (asa.amount / Math.pow(10, asa.decimals || 6));
+                               }
+                               return acc;
+                           }, 0) +
+                           // Add VOI balance USD value if VOI price is available
+                           ($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
         } catch (error) {
             console.error('Error initializing portfolio:', error);
         }
@@ -238,7 +263,7 @@
             }
             
             // Fetch ASA tokens
-            asaTokens = (accountIndexerInfo.account.assets || []).map((asset: any) => ({
+            /*asaTokens = (accountIndexerInfo.account.assets || []).map((asset: any) => ({
                 assetId: asset['asset-id'],
                 amount: asset.amount,
                 creator: asset.creator,
@@ -262,7 +287,7 @@
                         amount: (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount)
                     };
                 })
-            );
+            );*/
 
             const block = await algodIndexer.lookupBlock(accountIndexerInfo.account['created-at-round']).do();
             accountCreationDate = new Date(block.timestamp * 1000).toLocaleDateString();
@@ -447,7 +472,7 @@
         <div class="text-right">
             <p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(totalValue)} VOI</p>
-            <p class="text-sm font-bold text-gray-900 dark:text-white">${formatNumber(totalValue * $voiPrice.price)} USD</p>
+            <p class="text-sm font-bold text-gray-900 dark:text-white">${formatNumber(totalUsdValue)} USD</p>
         </div>
     </div>
 
@@ -696,7 +721,7 @@
                         `${t.id}-${t.poolInfo?.provider}` === uniqueId
                     ) === fungibleTokens.indexOf(token);
                 }) as token (`lp-${token.id}-${token.poolInfo?.provider}`)}
-                    <FungibleToken {token} voiPrice={$voiPrice.price} 
+                    <FungibleToken {token}
                         on:tokenOptedOut={initializePortfolio}
                         on:tokenSent={initializePortfolio}
                         canSignTransactions={canSignTransactions}
@@ -833,7 +858,7 @@
                     ...asaTokens.map(t => ({ ...t, tokenType: 'vsa' as const })),
                     ...fungibleTokens
                         .filter(t => !isLPToken(t) && (t.balance > 0 || t.approvals?.length || 0 > 0 || t.outgoingApprovals?.length || 0 > 0))
-                        .map(t => ({ ...t, tokenType: 'arc200' as const }))
+                        .map(t => ({ ...t, tokenType: t.type === 'arc200' ? 'arc200' as const : 'vsa' as const }))
                 ].filter((t, i, arr) => {
                     // Get unique identifier based on token type and ID
                     const getUniqueId = (token: any) => {
@@ -851,8 +876,8 @@
                     {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
                     {#if showZeroBalancesCondition(token)}
                         <div class="relative min-w-80">
-                            <span class="absolute z-10 top-2 right-2 px-2 py-0.5 text-xs font-medium {details ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
-                                {details ? 'VSA' : 'ARC-200'}
+                            <span class="absolute z-10 top-2 right-2 px-2 py-0.5 text-xs font-medium {token.type === 'vsa' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
+                                {token.type === 'vsa' ? 'VSA' : 'ARC-200'}
                             </span>
                             <FungibleToken 
                                 token={details ? {
@@ -865,9 +890,8 @@
                                     imageUrl: `https://asset-verification.nautilus.sh/icons/${token.assetId}.png`,
                                     value: details.value || 0,
                                     poolId: details.poolId,
-                                    type: (details ? 'vsa' : 'arc200')
-                                } : token} 
-                                voiPrice={$voiPrice.price}
+                                    type: token.type
+                                } : token}
                                 on:tokenOptedOut={initializePortfolio}
                                 on:tokenSent={initializePortfolio}
                                 canSignTransactions={canSignTransactions}

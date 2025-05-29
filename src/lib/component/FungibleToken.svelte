@@ -15,7 +15,6 @@
     const dispatch = createEventDispatcher();
 
     export let token: FungibleTokenType | LPToken;
-    export let voiPrice: number;
     export let canSignTransactions = false;
     export let walletId: string | undefined;
     export let fungibleTokens: FungibleTokenType[];
@@ -391,7 +390,7 @@
                                 <p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Value</p>
                                 <p class="text-gray-700 dark:text-gray-200">{formatNumber(displayValue, 3)} VOI</p>
                                 <p class="text-gray-600 dark:text-gray-300 text-xs">
-                                    (${formatNumber(displayValue * voiPrice, 3)} USD)
+                                    ${formatNumber(token.usdValue || 0, 4)} USD
                                 </p>
                             </div>
                         </div>
@@ -400,7 +399,7 @@
                             Balance: {formatNumber(token.balance / Math.pow(10, token.decimals))} {token.symbol}
                         </p>
                         <p class="text-gray-600 dark:text-gray-300">
-                            Value: {formatNumber(displayValue, 3)} VOI / ${formatNumber(displayValue * voiPrice, 3)} USD
+                            Value: {formatNumber(displayValue, 3)} VOI / ${formatNumber(token.usdValue || 0, 4)} USD
                         </p>
                     {/if}
 

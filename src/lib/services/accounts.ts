@@ -1,277 +1,384 @@
 import { getLiquidityPools, type PoolInfo } from '$lib/services/lp';
-import type { FungibleTokenType, TokenApproval, TokenBalance, ARC200Token } from '$lib/types/assets';
+import type { FungibleTokenType, TokenApproval, ARC200Token } from '$lib/types/assets';
 import { algodClient } from '$lib/utils/algod';
 import algosdk from 'algosdk';
 
-export async function fetchFungibleTokens(walletAddress: string | undefined): Promise<FungibleTokenType[]> {
+// Type for the unified API response
+interface UnifiedAssetBalance {
+    name: string;
+    symbol: string;
+    balance: string;
+    decimals: number;
+    imageUrl: string;
+    usdValue: string | null;
+    verified: number;
+    accountId: string;
+    assetType: 'arc200' | 'asa';
+    contractId: number;
+}
+
+interface UnifiedAssetsResponse {
+    balances: UnifiedAssetBalance[];
+    'next-token': string | null;
+    'total-count': number;
+    'current-round': number;
+}
+
+export async function fetchFungibleTokens(walletAddress: string | undefined, voiPriceUSD: number = 0): Promise<FungibleTokenType[]> {
     if (!walletAddress) return [];
 
-    const poolData: Map<string, any> = await fetchPoolData();
-    
+    console.log(`fetchFungibleTokens: VOI price = $${voiPriceUSD}`);
+
     try {
-        // Create URLs for both API endpoints
-        const balancesUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/balances');
-        balancesUrl.searchParams.append('accountId', walletAddress);
-        
-        const approvalsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals');
-        approvalsUrl.searchParams.append('spender', walletAddress);
-        
-        const outgoingApprovalsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals');
-        outgoingApprovalsUrl.searchParams.append('owner', walletAddress);
-        
-        // Fetch liquidity pools and all API endpoints in parallel
-        const [liquidityPools, balancesResponse, approvalsResponse, outgoingApprovalsResponse] = await Promise.all([
+        // Fetch all data in parallel
+        const [liquidityPools, unifiedAssetsResponse, approvalsResponse, outgoingApprovalsResponse] = await Promise.all([
             getLiquidityPools(),
-            fetch(balancesUrl.toString()),
-            fetch(approvalsUrl.toString()),
-            fetch(outgoingApprovalsUrl.toString())
+            fetch(`https://voi-mainnet-mimirapi.nftnavigator.xyz/account/assets?accountId=${walletAddress}`),
+            fetch(`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?spender=${walletAddress}`),
+            fetch(`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?owner=${walletAddress}`)
         ]);
         
-        if (!balancesResponse.ok) throw new Error('Failed to fetch fungible tokens');
-        const balancesData = await balancesResponse.json();
+        if (!unifiedAssetsResponse.ok) throw new Error('Failed to fetch unified assets');
+        const unifiedAssetsData: UnifiedAssetsResponse = await unifiedAssetsResponse.json();
         
         // Process approvals data
-        const approvalsData = await approvalsResponse.json();
+        const approvalsData = approvalsResponse.ok ? await approvalsResponse.json() : { approvals: [] };
+        const outgoingApprovalsData = outgoingApprovalsResponse.ok ? await outgoingApprovalsResponse.json() : { approvals: [] };
         
-        // Process outgoing approvals data
-        const outgoingApprovalsData = await outgoingApprovalsResponse.json();
-        
-        // Create a map of approvals by contractId for easy lookup
-        const approvalsMap = new Map();
-        if (approvalsResponse.ok && approvalsData.approvals) {
-            approvalsData.approvals.filter((approval: TokenApproval) => approval.amount !== '0').forEach((approval: TokenApproval) => {
-                const contractId = approval.contractId.toString();
-                if (!approvalsMap.has(contractId)) {
-                    approvalsMap.set(contractId, []);
-                }
-                approvalsMap.get(contractId).push(approval);
-            });
-        }
-        
-        // Create a map of outgoing approvals by contractId
-        const outgoingApprovalsMap = new Map();
-        if (outgoingApprovalsResponse.ok && outgoingApprovalsData.approvals) {
-            outgoingApprovalsData.approvals.filter((approval: TokenApproval) => approval.amount !== '0').forEach((approval: TokenApproval) => {
-                const contractId = approval.contractId.toString();
-                if (!outgoingApprovalsMap.has(contractId)) {
-                    outgoingApprovalsMap.set(contractId, []);
-                }
-                outgoingApprovalsMap.get(contractId).push({
-                    spender: approval.spender,
-                    amount: approval.amount,
-                    timestamp: approval.timestamp,
-                    contractId: approval.contractId,
-                    transactionId: approval.transactionId
+        // Create maps for easy lookup
+        const approvalsMap = new Map<string, TokenApproval[]>();
+        if (approvalsData.approvals) {
+            approvalsData.approvals
+                .filter((approval: TokenApproval) => approval.amount !== '0')
+                .forEach((approval: TokenApproval) => {
+                    const contractId = approval.contractId.toString();
+                    if (!approvalsMap.has(contractId)) {
+                        approvalsMap.set(contractId, []);
+                    }
+                    approvalsMap.get(contractId)!.push(approval);
                 });
-            });
         }
         
-        // for each liquidity pool, get tokA and tokB
-        const lpTokenIds = liquidityPools.map((p: PoolInfo) => p.tokAId).concat(liquidityPools.map((p: PoolInfo) => p.tokBId));
-        
-        // Get balance token IDs
-        const balanceTokenIds = balancesData.balances.map((token: TokenBalance) => token.contractId.toString());
-        
-        // Get approval token IDs
-        const approvalTokenIds = Array.from(approvalsMap.keys());
-        
-        // Get outgoing approval token IDs
-        const outgoingApprovalTokenIds = Array.from(outgoingApprovalsMap.keys());
-        
-        // Merge all token IDs into a unique set
-        const contractIds = new Set([...lpTokenIds, ...balanceTokenIds, ...approvalTokenIds, ...outgoingApprovalTokenIds]);
-        
-        // Fetch token details for all tokens in one request
-        const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
-        tokenDetailsUrl.searchParams.append('contractId', Array.from(contractIds).join(','));
-        const tokenDetailsResponse = await fetch(tokenDetailsUrl.toString());
-        const tokenDetailsData = await tokenDetailsResponse.json();
-
-        // Create a map of token details by contractId for easy lookup
-        const tokenDetailsMap = new Map();
-        if (tokenDetailsResponse.ok && tokenDetailsData.tokens) {
-            tokenDetailsData.tokens.forEach((token: ARC200Token) => {
-                tokenDetailsMap.set(token.contractId.toString(), token);
-            });
+        const outgoingApprovalsMap = new Map<string, TokenApproval[]>();
+        if (outgoingApprovalsData.approvals) {
+            outgoingApprovalsData.approvals
+                .filter((approval: TokenApproval) => approval.amount !== '0')
+                .forEach((approval: TokenApproval) => {
+                    const contractId = approval.contractId.toString();
+                    if (!outgoingApprovalsMap.has(contractId)) {
+                        outgoingApprovalsMap.set(contractId, []);
+                    }
+                    outgoingApprovalsMap.get(contractId)!.push({
+                        spender: approval.spender,
+                        amount: approval.amount,
+                        timestamp: approval.timestamp,
+                        contractId: approval.contractId,
+                        transactionId: approval.transactionId,
+                        owner: approval.owner,
+                        round: approval.round
+                    });
+                });
         }
-
-        tokenDetailsMap.set('0', {
-            name: 'VOI',
-            symbol: 'VOI',
-            decimals: 6
+        
+        // Create a map of pools for easy lookup
+        const poolsMap = new Map<string, PoolInfo>();
+        liquidityPools.forEach(pool => {
+            poolsMap.set(pool.poolId, pool);
         });
-
-        // Process regular tokens first
-        const tokenPromises = balancesData.balances.map(async (token: any) => {
-            const tokenId = token.contractId.toString();
-            const tokenDetails = tokenDetailsMap.get(tokenId);
-            const pool = liquidityPools.find((p: PoolInfo) => p.poolId === tokenId);
-
-            if (pool) {
-                // This is an LP token
-                const tokenA = tokenDetailsMap.get(pool.tokAId);
-                const tokenB = tokenDetailsMap.get(pool.tokBId);
-
-                let tvlBalance = 0;
-                let poolName = `${tokenA?.name}/${tokenB?.name} LP`;
-
-                if (pool.provider === 'nomadex') {
-                    const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
-                    const poolEscrowInfo = await algodClient.accountInformation(poolEscrowAddr).do();
-                    tvlBalance = poolEscrowInfo.amount * 2;
+        
+        // Process tokens from unified API
+        const tokens: FungibleTokenType[] = [];
+        
+        for (const asset of unifiedAssetsData.balances) {
+            const tokenId = asset.contractId.toString();
+            const pool = poolsMap.get(tokenId);
+            
+            // Calculate value - prefer USD value from API, fallback to pool calculation
+            let tokenValue = 0;
+            let tokenUsdValue = 0;
+            
+            if (asset.usdValue && asset.usdValue !== 'null') {
+                const usdValuePerToken = parseFloat(asset.usdValue);
+                const userTokenBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
+                
+                // Calculate total USD value for user's holdings
+                tokenUsdValue = usdValuePerToken * userTokenBalance;
+                
+                if (voiPriceUSD > 0) {
+                    // Convert total USD value to VOI equivalent
+                    tokenValue = tokenUsdValue / voiPriceUSD;
+                    console.log(`Token ${asset.symbol}: ${userTokenBalance} tokens @ $${usdValuePerToken} each = $${tokenUsdValue} USD → ${tokenValue} VOI (price: $${voiPriceUSD})`);
                 } else {
+                    // No VOI price available - keep VOI value as 0
+                    tokenValue = 0;
+                    console.log(`Token ${asset.symbol}: ${userTokenBalance} tokens @ $${usdValuePerToken} each = $${tokenUsdValue} USD → 0 VOI (no price available)`);
+                }
+            } else if (pool && asset.assetType === 'arc200') {
+                // Calculate value from pool data for ARC200 tokens
+                tokenValue = calculateTokenValueFromPool(asset, pool);
+            } else if (asset.assetType === 'asa' && asset.contractId === 302190) {
+                // Special handling for aUSDC - 1:1 with USD
+                const usdcAmount = Number(asset.balance) / Math.pow(10, asset.decimals);
+                tokenUsdValue = usdcAmount; // 1 aUSDC = 1 USD
+                
+                if (voiPriceUSD > 0) {
+                    tokenValue = tokenUsdValue / voiPriceUSD;
+                } else {
+                    tokenValue = 0;
+                }
+            }
+            
+            if (pool) {
+                // This is an LP token - get more accurate token details
+                const tokenADetails = unifiedAssetsData.balances.find(b => b.contractId.toString() === pool.tokAId);
+                const tokenBDetails = unifiedAssetsData.balances.find(b => b.contractId.toString() === pool.tokBId);
+                
+                // Handle special cases for VOI (ID 0 or 390001)
+                const getTokenInfo = (tokenId: string, tokenDetails: UnifiedAssetBalance | undefined, fallbackSymbol?: string) => {
+                    if (tokenId === '0') {
+                        return {
+                            symbol: 'VOI',
+                            name: 'Voi',
+                            decimals: 6
+                        };
+                    } else if (tokenId === '390001') {
+                        return {
+                            symbol: 'wVOI',
+                            name: 'Wrapped Voi',
+                            decimals: 6
+                        };
+                    } else if (tokenDetails) {
+                        return {
+                            symbol: tokenDetails.symbol,
+                            name: tokenDetails.name,
+                            decimals: tokenDetails.decimals
+                        };
+                    } else {
+                        return {
+                            symbol: fallbackSymbol || 'Unknown',
+                            name: fallbackSymbol || 'Unknown',
+                            decimals: 6
+                        };
+                    }
+                };
+                
+                const tokenAInfo = getTokenInfo(pool.tokAId, tokenADetails, pool.symbolA);
+                const tokenBInfo = getTokenInfo(pool.tokBId, tokenBDetails, pool.symbolB);
+                
+                let tvlBalance = 0;
+                let poolName = '';
+                
+                if (pool.provider === 'nomadex') {
+                    poolName = `${tokenAInfo.name}/${tokenBInfo.name} LP`;
+                    const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
+                    try {
+                        const poolEscrowInfo = await algodClient.accountInformation(poolEscrowAddr).do();
+                        tvlBalance = poolEscrowInfo.amount * 2;
+                    } catch (err) {
+                        console.warn('Failed to fetch nomadex pool escrow info:', err);
+                        tvlBalance = pool.tvl;
+                    }
+                } else {
+                    // Humble pools
                     tvlBalance = pool.tvl;
                     poolName = `${pool.symbolA}/${pool.symbolB} LP`;
                 }
-
-                const poolData = {
+                
+                const lpToken: FungibleTokenType = {
                     name: poolName,
-                    symbol: `${tokenA?.symbol}/${tokenB?.symbol}`,
-                    balance: token.balance,
-                    decimals: token.decimals,
-                    verified: token.verified,
-                    imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
+                    symbol: `${tokenAInfo.symbol}/${tokenBInfo.symbol}`,
+                    balance: Number(asset.balance),
+                    decimals: asset.decimals,
+                    verified: Boolean(asset.verified),
+                    imageUrl: asset.imageUrl,
                     id: tokenId,
                     poolId: pool.poolId,
-                    value: Number(tvlBalance * (Number(token.balance / Math.pow(10, token.decimals)) / Number(pool.supply))),
-                    type: 'arc200',
-                    creator: tokenDetails?.creator,
-                    totalSupply: pool.supply,
+                    value: tokenValue > 0 ? tokenValue : Number(tvlBalance * (Number(asset.balance) / Math.pow(10, asset.decimals)) / Number(pool.supply)),
+                    usdValue: tokenUsdValue,
+                    type: asset.assetType === 'asa' ? 'vsa' : 'arc200',
                     approvals: approvalsMap.get(tokenId) || [],
                     outgoingApprovals: outgoingApprovalsMap.get(tokenId) || [],
                     poolInfo: {
                         tokAId: pool.tokAId,
                         tokBId: pool.tokBId,
-                        tokASymbol: tokenA?.symbol,
-                        tokBSymbol: tokenB?.symbol,
+                        tokASymbol: tokenAInfo.symbol,
+                        tokBSymbol: tokenBInfo.symbol,
                         tokABalance: pool.poolBalA,
                         tokBBalance: pool.poolBalB,
                         totalSupply: Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
                         poolId: pool.poolId,
                         apr: pool.apr ?? 0,
-                        tokADecimals: tokenA?.decimals,
-                        tokBDecimals: tokenB?.decimals,
+                        tokADecimals: tokenAInfo.decimals,
+                        tokBDecimals: tokenBInfo.decimals,
                         tvl: pool.tvl,
                         provider: pool.provider
                     }
                 };
-
-                return poolData;
-            }
-
-            // Find if this token is in any pool for trading
-            const poolForToken = Array.from(poolData.values()).find(p => 
-                p.tokAId === tokenId || p.tokBId === tokenId
-            );
-
-            return {
-                name: tokenDetails?.name || token.symbol,
-                symbol: token.symbol,
-                balance: token.balance,
-                decimals: token.decimals,
-                verified: token.verified,
-                imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
-                value: tokenDetails?.tokenId === '0' ? token.balance / 1e6 : calculateTokenValue(token, poolForToken),
-                id: tokenId,
-                poolId: poolForToken?.contractId?.toString(),
-                type: 'arc200',
-                creator: tokenDetails?.creator,
-                totalSupply: tokenDetails?.totalSupply,
-                approvals: approvalsMap.get(tokenId) || [],
-                outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
-            };
-        });
-        
-        // Process tokens with approvals but no balance (not already in the balancesData)
-        const approvalOnlyPromises = [...approvalTokenIds, ...outgoingApprovalTokenIds]
-            .filter(id => !balanceTokenIds.includes(id)) // Only unique tokens not in balances
-            .map(async (tokenId) => {
-                const tokenDetails = tokenDetailsMap.get(tokenId);
-                if (!tokenDetails) return null; // Skip if no details
-
-                const pool = liquidityPools.find((p: PoolInfo) => p.poolId === tokenId);
-                if (pool) {
-                    // This is an LP token with approvals but no balance
-                    const tokenA = tokenDetailsMap.get(pool.tokAId);
-                    const tokenB = tokenDetailsMap.get(pool.tokBId);
-
-                    const poolName = pool.provider === 'nomadex' 
-                        ? `${tokenA?.name}/${tokenB?.name} LP`
-                        : `${pool.symbolA}/${pool.symbolB} LP`;
-
-                    return {
-                        name: poolName,
-                        symbol: `${tokenA?.symbol}/${tokenB?.symbol}`,
-                        balance: 0, // No balance
-                        decimals: tokenDetails.decimals || 0,
-                        verified: true,
-                        imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
-                        id: tokenId,
-                        poolId: pool.poolId,
-                        value: 0, // No value
-                        type: 'arc200',
-                        creator: tokenDetails.creator,
-                        totalSupply: pool.supply,
-                        approvals: approvalsMap.get(tokenId) || [],
-                        outgoingApprovals: outgoingApprovalsMap.get(tokenId) || [],
-                        poolInfo: {
-                            tokAId: pool.tokAId,
-                            tokBId: pool.tokBId,
-                            tokASymbol: tokenA?.symbol,
-                            tokBSymbol: tokenB?.symbol,
-                            tokABalance: pool.poolBalA,
-                            tokBBalance: pool.poolBalB,
-                            totalSupply: Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
-                            poolId: pool.poolId,
-                            apr: pool.apr ?? 0,
-                            tokADecimals: tokenA?.decimals,
-                            tokBDecimals: tokenB?.decimals,
-                            tvl: pool.tvl,
-                            provider: pool.provider
-                        }
-                    };
-                }
-
-                // Find if this token is in any pool for trading
-                const poolForToken = Array.from(poolData.values()).find(p => 
-                    p.tokAId === tokenId || p.tokBId === tokenId
-                );
-
-                return {
-                    name: tokenDetails.name || tokenDetails.symbol,
-                    symbol: tokenDetails.symbol,
-                    balance: 0, // No balance
-                    decimals: tokenDetails.decimals || 0,
-                    verified: true,
-                    imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
-                    value: 0, // No value
+                
+                tokens.push(lpToken);
+            } else {
+                // Regular token (ARC200 or ASA)
+                const regularToken: FungibleTokenType = {
+                    name: asset.name,
+                    symbol: asset.symbol,
+                    balance: Number(asset.balance),
+                    decimals: asset.decimals,
+                    verified: Boolean(asset.verified),
+                    imageUrl: asset.imageUrl,
+                    value: tokenValue,
+                    usdValue: tokenUsdValue,
                     id: tokenId,
-                    poolId: poolForToken?.contractId?.toString(),
-                    type: 'arc200',
-                    creator: tokenDetails.creator,
-                    totalSupply: tokenDetails.totalSupply,
+                    type: asset.assetType === 'asa' ? 'vsa' : 'arc200',
                     approvals: approvalsMap.get(tokenId) || [],
                     outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
                 };
-            });
-            
-        // Combine regular tokens and approval-only tokens
-        const allTokenPromises = [...tokenPromises, ...approvalOnlyPromises];
-        const allTokens = await Promise.all(allTokenPromises);
+                
+                // Find if this token is tradeable in any pool
+                for (const pool of liquidityPools) {
+                    if (pool.tokAId === tokenId || pool.tokBId === tokenId) {
+                        regularToken.poolId = pool.poolId;
+                        break;
+                    }
+                }
+                
+                tokens.push(regularToken);
+            }
+        }
         
-        // Filter out null values and update state
-        return allTokens.filter(Boolean);
+        // Add tokens that only have approvals but no balance
+        const balanceTokenIds = new Set(unifiedAssetsData.balances.map(b => b.contractId.toString()));
+        const approvalOnlyTokenIds = new Set([
+            ...Array.from(approvalsMap.keys()),
+            ...Array.from(outgoingApprovalsMap.keys())
+        ].filter(id => !balanceTokenIds.has(id)));
+        
+        // For approval-only tokens, we need to fetch their details
+        if (approvalOnlyTokenIds.size > 0) {
+            try {
+                const tokenDetailsUrl = new URL('https://voi-mainnet-mimirapi.voirewards.com/arc200/tokens');
+                tokenDetailsUrl.searchParams.append('contractId', Array.from(approvalOnlyTokenIds).join(','));
+                const tokenDetailsResponse = await fetch(tokenDetailsUrl.toString());
+                
+                if (tokenDetailsResponse.ok) {
+                    const tokenDetailsData = await tokenDetailsResponse.json();
+                    const tokenDetailsMap = new Map<string, ARC200Token>();
+                    
+                    if (tokenDetailsData.tokens) {
+                        tokenDetailsData.tokens.forEach((token: ARC200Token) => {
+                            tokenDetailsMap.set(token.contractId.toString(), token);
+                        });
+                    }
+                    
+                    for (const tokenId of approvalOnlyTokenIds) {
+                        const tokenDetails = tokenDetailsMap.get(tokenId);
+                        if (!tokenDetails) continue;
+                        
+                        const pool = poolsMap.get(tokenId);
+                        
+                        if (pool) {
+                            // LP token with approvals but no balance
+                            const tokenADetails = unifiedAssetsData.balances.find(b => b.contractId.toString() === pool.tokAId);
+                            const tokenBDetails = unifiedAssetsData.balances.find(b => b.contractId.toString() === pool.tokBId);
+                            
+                            // Handle special cases for VOI (ID 0 or 390001)
+                            const getTokenInfo = (tokenId: string, tokenDetails: UnifiedAssetBalance | undefined, fallbackSymbol?: string) => {
+                                if (tokenId === '0') {
+                                    return {
+                                        symbol: 'VOI',
+                                        name: 'Voi',
+                                        decimals: 6
+                                    };
+                                } else if (tokenId === '390001') {
+                                    return {
+                                        symbol: 'wVOI',
+                                        name: 'Wrapped Voi',
+                                        decimals: 6
+                                    };
+                                } else if (tokenDetails) {
+                                    return {
+                                        symbol: tokenDetails.symbol,
+                                        name: tokenDetails.name,
+                                        decimals: tokenDetails.decimals
+                                    };
+                                } else {
+                                    return {
+                                        symbol: fallbackSymbol || 'Unknown',
+                                        name: fallbackSymbol || 'Unknown',
+                                        decimals: 6
+                                    };
+                                }
+                            };
+                            
+                            const tokenAInfo = getTokenInfo(pool.tokAId, tokenADetails, pool.symbolA);
+                            const tokenBInfo = getTokenInfo(pool.tokBId, tokenBDetails, pool.symbolB);
+                            
+                            const poolName = pool.provider === 'nomadex' 
+                                ? `${tokenAInfo.name}/${tokenBInfo.name} LP`
+                                : `${pool.symbolA}/${pool.symbolB} LP`;
+                            
+                            tokens.push({
+                                name: poolName,
+                                symbol: `${tokenAInfo.symbol}/${tokenBInfo.symbol}`,
+                                balance: 0,
+                                decimals: tokenDetails.decimals,
+                                verified: Boolean(tokenDetails.verified),
+                                imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
+                                id: tokenId,
+                                poolId: pool.poolId,
+                                value: 0,
+                                usdValue: 0,
+                                type: tokenDetails.type === 'arc200' ? 'arc200' : 'vsa',
+                                approvals: approvalsMap.get(tokenId) || [],
+                                outgoingApprovals: outgoingApprovalsMap.get(tokenId) || [],
+                                poolInfo: {
+                                    tokAId: pool.tokAId,
+                                    tokBId: pool.tokBId,
+                                    tokASymbol: tokenAInfo.symbol,
+                                    tokBSymbol: tokenBInfo.symbol,
+                                    tokABalance: pool.poolBalA,
+                                    tokBBalance: pool.poolBalB,
+                                    totalSupply: Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
+                                    poolId: pool.poolId,
+                                    apr: pool.apr ?? 0,
+                                    tokADecimals: tokenAInfo.decimals,
+                                    tokBDecimals: tokenBInfo.decimals,
+                                    tvl: pool.tvl,
+                                    provider: pool.provider
+                                }
+                            });
+                        } else {
+                            // Regular token with approvals but no balance
+                            tokens.push({
+                                name: tokenDetails.name,
+                                symbol: tokenDetails.symbol,
+                                balance: 0,
+                                decimals: tokenDetails.decimals,
+                                verified: Boolean(tokenDetails.verified),
+                                imageUrl: `https://asset-verification.nautilus.sh/icons/${tokenId}.png`,
+                                value: 0,
+                                usdValue: 0,
+                                id: tokenId,
+                                type: tokenDetails.type === 'arc200' ? 'arc200' : 'vsa',
+                                approvals: approvalsMap.get(tokenId) || [],
+                                outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to fetch details for approval-only tokens:', err);
+            }
+        }
+        
+        return tokens;
         
     } catch (err) {
         console.error('Error fetching fungible tokens:', err);
+        return [];
     }
-
-    return [];
 }
 
-function calculateTokenValue(token: any, pool: any): number {
-    if (!pool) return 0;
-
+function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo): number {
     try {
         // Get pool balances based on whether VOI is token A or B
         const voiBalance = (pool.tokAId === '0' || pool.tokAId === '390001') ? pool.poolBalA : pool.poolBalB;
@@ -283,33 +390,10 @@ function calculateTokenValue(token: any, pool: any): number {
         const priceInVoi = Number(voiBalance) / Number(tokenBalance);
         
         // Calculate value based on user's token balance and decimals
-        const userBalance = token.balance / (10 ** token.decimals);
+        const userBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
         return userBalance * priceInVoi;
     } catch (err) {
         console.error('Error calculating token value:', err);
         return 0;
     }
-}
-
-async function fetchPoolData(): Promise<Map<string, any>> {
-    const poolData: Map<string, any> = new Map();
-
-    try {
-        const response = await fetch('https://mainnet-idx.nautilus.sh/nft-indexer/v1/dex/pools?tokenId=390001');
-        if (!response.ok) throw new Error('Failed to fetch pool data');
-        const data = await response.json();
-        
-        // Store pool data by pool contractId
-        data.pools.forEach((pool: any) => {
-            // Skip deleted pools
-            if (pool.deleted) return;
-            
-            // Store pool by its contractId
-            poolData.set(pool.contractId.toString(), pool);
-        });
-    } catch (err) {
-        console.error('Error fetching pool data:', err);
-    }
-
-    return poolData;
 }

@@ -7,6 +7,7 @@ export interface FungibleTokenType {
     verified: boolean;
     imageUrl: string;
     value: number;
+    usdValue?: number;
     poolId?: string;
     type?: 'vsa' | 'arc200' | 'native';
     poolInfo?: {
@@ -15,6 +16,16 @@ export interface FungibleTokenType {
         tokAId?: string;
         tokBType?: string;
         tokBId?: string;
+        tokASymbol?: string;
+        tokBSymbol?: string;
+        tokABalance?: string;
+        tokBBalance?: string;
+        totalSupply?: number;
+        poolId?: string;
+        apr?: number;
+        tokADecimals?: number;
+        tokBDecimals?: number;
+        tvl?: number;
     };
     approvals?: TokenApproval[];
     outgoingApprovals?: TokenApproval[];
