@@ -27,8 +27,6 @@ interface UnifiedAssetsResponse {
 export async function fetchFungibleTokens(walletAddress: string | undefined, voiPriceUSD: number = 0): Promise<FungibleTokenType[]> {
     if (!walletAddress) return [];
 
-    console.log(`fetchFungibleTokens: VOI price = $${voiPriceUSD}`);
-
     try {
         // Fetch all data in parallel
         const [liquidityPools, unifiedAssetsResponse, approvalsResponse, outgoingApprovalsResponse] = await Promise.all([
@@ -107,11 +105,9 @@ export async function fetchFungibleTokens(walletAddress: string | undefined, voi
                 if (voiPriceUSD > 0) {
                     // Convert total USD value to VOI equivalent
                     tokenValue = tokenUsdValue / voiPriceUSD;
-                    console.log(`Token ${asset.symbol}: ${userTokenBalance} tokens @ $${usdValuePerToken} each = $${tokenUsdValue} USD → ${tokenValue} VOI (price: $${voiPriceUSD})`);
                 } else {
                     // No VOI price available - keep VOI value as 0
                     tokenValue = 0;
-                    console.log(`Token ${asset.symbol}: ${userTokenBalance} tokens @ $${usdValuePerToken} each = $${tokenUsdValue} USD → 0 VOI (no price available)`);
                 }
             } else if (pool && asset.assetType === 'arc200') {
                 // Calculate value from pool data for ARC200 tokens
