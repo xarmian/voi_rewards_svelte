@@ -24,7 +24,7 @@
     let selectedRows = new Set<number>();
     let allRowsSelected = false;
     let isDragging = false;
-    let importStep: 'initial' | 'nft-collection' | 'preview' = 'initial';
+    let importStep: 'initial' | 'nft-collection' | 'arc200-token' | 'preview' = 'initial';
     let rawContent = '';
     let showPasteArea = false;
     let collectionId = '';
@@ -42,6 +42,69 @@
     let currentRound = 0;
     let isCollectionValid = false;
     let collectionError: string | null = null;
+    
+    // ARC200 token import variables
+    let arc200TokenId = '';
+    let tempArc200TokenId = '';
+    let isLoadingArc200TokenInfo = false;
+    let isLoadingArc200Holders = false;
+    let arc200TokenName = '';
+    let arc200TokenSymbol = '';
+    let arc200TokenDecimals = 0;
+    let arc200TokenImageUrl = '';
+    let arc200TokenHolders = 0;
+    let arc200QualifiedHolders = 0;
+    let isArc200TokenValid = false;
+    let arc200TokenError: string | null = null;
+    let arc200DistributionType: 'equal' | 'proportional' | 'per-holder' = 'equal';
+    let arc200MinimumBalance = '';
+
+    // Track qualified holders when minimum balance changes
+    let arc200TokenData: any = null;
+    
+    function calculateQualifiedHolders() {
+        if (!arc200TokenData || !arc200TokenData.balances) {
+            arc200QualifiedHolders = 0;
+            return;
+        }
+        
+        const minimumBalance = arc200MinimumBalance ? parseFloat(arc200MinimumBalance) : 0;
+        
+        if (minimumBalance <= 0) {
+            // If no minimum balance, qualified holders equals total holders (excluding zero address and creator)
+            arc200QualifiedHolders = arc200TokenHolders;
+            return;
+        }
+        
+        try {
+            // Get the creator address to exclude
+            const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
+            
+            // Count holders with balance above minimum
+            const qualified = arc200TokenData.balances.filter((balance: any) => {
+                if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
+                    return false;
+                }
+                
+                if (balance.balance && balance.balance.startsWith('-')) {
+                    return false;
+                }
+                
+                const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
+                return tokenBalance >= minimumBalance;
+            }).length;
+            
+            arc200QualifiedHolders = qualified;
+        } catch (err) {
+            console.error('Error calculating qualified holders:', err);
+            arc200QualifiedHolders = 0;
+        }
+    }
+    
+    // Update qualified holders when minimum balance changes
+    $: if (arc200TokenData && arc200MinimumBalance !== undefined) {
+        calculateQualifiedHolders();
+    }
 
     interface NFTToken {
         contractId: number;
@@ -508,12 +571,17 @@
     function handleClose() {
         error = null;
         collectionError = null;
+        arc200TokenError = null;
         selectedRows.clear();
         allRowsSelected = false;
         importStep = 'initial';
         rawContent = '';
         collectionId = '';
+        arc200TokenId = '';
+        arc200MinimumBalance = '';
+        arc200TokenData = null;
         isCollectionValid = false;
+        isArc200TokenValid = false;
         onClose();
     }
 
@@ -627,6 +695,219 @@
                     fetchCollectionInfo(id, roundNumber);
                 }
             }
+        }
+    }
+
+    // ARC200 Token Holder functions
+    function handleArc200TokenIdChange(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const newId = input.value;
+        tempArc200TokenId = newId;
+    }
+
+    function handleArc200TokenIdBlur() {
+        if (tempArc200TokenId !== arc200TokenId) {
+            arc200TokenId = tempArc200TokenId;
+            
+            if (arc200TokenId && !isNaN(Number(arc200TokenId))) {
+                fetchArc200TokenInfo(arc200TokenId);
+            } else {
+                arc200TokenName = '';
+                arc200TokenSymbol = '';
+                arc200TokenImageUrl = '';
+                isArc200TokenValid = false;
+                
+                if (arc200TokenId.trim()) {
+                    arc200TokenError = 'Invalid token ID format';
+                } else {
+                    arc200TokenError = null;
+                }
+            }
+        }
+    }
+
+    async function fetchArc200TokenInfo(id: string) {
+        isLoadingArc200TokenInfo = true;
+        arc200TokenName = '';
+        arc200TokenSymbol = '';
+        arc200TokenDecimals = 0;
+        arc200TokenImageUrl = '';
+        arc200TokenHolders = 0;
+        arc200QualifiedHolders = 0;
+        isArc200TokenValid = false;
+        arc200TokenError = null;
+        arc200TokenData = null;
+        
+        try {
+            const url = `https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances?contractId=${id}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Failed to fetch token info');
+            }
+
+            const data = await response.json();
+            if (!data.balances || !Array.isArray(data.balances) || data.balances.length === 0) {
+                throw new Error('No token holders found');
+            }
+
+            // Store the raw token data for later filtering
+            arc200TokenData = data;
+
+            // Get token info from the first balance
+            const firstBalance = data.balances[0];
+            arc200TokenName = firstBalance.name || '';
+            arc200TokenSymbol = firstBalance.symbol || '';
+            arc200TokenDecimals = firstBalance.decimals || 0;
+            arc200TokenImageUrl = firstBalance.imageUrl || '';
+            
+            // Get creator address to exclude
+            const creatorAddress = algosdk.getApplicationAddress(parseInt(id));
+            
+            // Count valid holders (excluding zero address and creator)
+            arc200TokenHolders = data.balances.filter((balance: any) => 
+                balance.accountId !== zeroAddress && 
+                balance.accountId !== creatorAddress &&
+                balance.balance && 
+                !balance.balance.startsWith('-')
+            ).length;
+
+            // Initially, qualified holders equals total holders
+            arc200QualifiedHolders = arc200TokenHolders;
+
+            // Mark token as valid if it has holders
+            isArc200TokenValid = arc200TokenHolders > 0;
+            
+            // Calculate qualified holders based on current minimum balance
+            calculateQualifiedHolders();
+
+        } catch (err) {
+            console.error('Failed to fetch token info:', err);
+            arc200TokenError = err instanceof Error ? err.message : 'Failed to fetch token info';
+            isArc200TokenValid = false;
+            arc200TokenData = null;
+        } finally {
+            isLoadingArc200TokenInfo = false;
+        }
+    }
+
+    async function handleArc200TokenImport() {
+        if (!arc200TokenId) {
+            error = 'Please enter a token ID';
+            return;
+        }
+
+        if (!isArc200TokenValid) {
+            error = 'Invalid token ID or no holders found';
+            return;
+        }
+
+        if (arc200DistributionType === 'per-holder' && (!amountValue || isNaN(Number(amountValue)) || Number(amountValue) <= 0)) {
+            error = 'Please enter a valid amount';
+            return;
+        }
+
+        if (arc200DistributionType === 'proportional' && (!amountValue || isNaN(Number(amountValue)) || Number(amountValue) <= 0)) {
+            error = 'Please enter a valid total amount for the pool';
+            return;
+        }
+
+        // Parse minimum balance if specified
+        const minimumBalance = arc200MinimumBalance ? parseFloat(arc200MinimumBalance) : 0;
+        if (arc200MinimumBalance && (isNaN(minimumBalance) || minimumBalance < 0)) {
+            error = 'Please enter a valid minimum balance';
+            return;
+        }
+
+        isLoadingArc200Holders = true;
+        error = null;
+
+        try {
+            const url = `https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances?contractId=${arc200TokenId}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Failed to fetch token holders');
+            }
+
+            const data = await response.json();
+            if (!data.balances || !Array.isArray(data.balances)) {
+                throw new Error('Invalid response from API');
+            }
+
+            // Get the creator address to exclude it
+            const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
+            
+            // Filter out zero address, creator address, negative balances, and balances below minimum
+            const validHolders = data.balances.filter((balance: any) => {
+                // Skip zero address and creator address
+                if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
+                    return false;
+                }
+                
+                // Skip negative balances
+                if (balance.balance && balance.balance.startsWith('-')) {
+                    return false;
+                }
+                
+                // Apply minimum balance filter if specified
+                if (minimumBalance > 0) {
+                    const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
+                    return tokenBalance >= minimumBalance;
+                }
+                
+                return true;
+            });
+
+            if (validHolders.length === 0) {
+                throw new Error('No valid holders found for this token');
+            }
+
+            // Calculate total tokens for proportional distribution if needed
+            let totalTokenAmount = 0;
+            
+            if (arc200DistributionType === 'proportional') {
+                // Sum all balances for proportional distribution
+                totalTokenAmount = validHolders.reduce((sum: number, holder: any) => {
+                    const balance = Number(holder.balance) / Math.pow(10, holder.decimals);
+                    return sum + balance;
+                }, 0);
+            }
+
+            // Create recipients array
+            const recipients: Recipient[] = [];
+            
+            validHolders.forEach((holder: any) => {
+                let amount = '';
+                const holderBalance = Number(holder.balance) / Math.pow(10, holder.decimals);
+                
+                if (arc200DistributionType !== 'equal') {
+                    if (arc200DistributionType === 'per-holder') {
+                        amount = amountValue;
+                    } else if (arc200DistributionType === 'proportional' && totalTokenAmount > 0) {
+                        // Calculate proportional amount based on holder's percentage of total
+                        const percentage = holderBalance / totalTokenAmount;
+                        amount = (Number(amountValue) * percentage).toFixed(8);
+                    }
+                } else {
+                    // Equal distribution (amount will be calculated by the recipient table)
+                    amount = '';
+                }
+                
+                recipients.push({
+                    address: holder.accountId,
+                    amount,
+                    note: '',
+                    info: null,
+                    isLoading: false,
+                    isValid: true
+                });
+            });
+
+            onConfirm(recipients);
+            handleClose();
+        } catch (err) {
+            error = err instanceof Error ? err.message : 'Failed to fetch token holders';
+        } finally {
+            isLoadingArc200Holders = false;
         }
     }
 
@@ -899,6 +1180,17 @@
                                     <i class="fas fa-users mr-2"></i>
                                     Import NFT Collection Holders
                                 </Button>
+                                <Button 
+                                    color="light" 
+                                    class="w-full"
+                                    on:click={() => {
+                                        error = null;
+                                        importStep = 'arc200-token';
+                                    }}
+                                >
+                                    <i class="fas fa-coins mr-2"></i>
+                                    Import ARC200 Token Holders
+                                </Button>
                             </div>
 
                             <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -1089,6 +1381,192 @@
                                     {#if !isCollectionValid && !isLoadingNFTHolders && collectionId.trim()}
                                         <div class="hidden group-hover:block absolute -top-10 left-1/2 transform -translate-x-1/2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg">
                                             Please select a valid NFT collection first
+                                        </div>
+                                    {/if}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {:else if importStep === 'arc200-token'}
+                <div class="flex items-center justify-center place-self-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg px-8 py-8 sm:px-28 text-center">
+                    <div class="w-full max-w-lg mx-auto space-y-6">
+                        <div class="text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-coins text-4xl mb-4"></i>
+                            <p class="text-lg mb-2">Import ARC200 Token Holders</p>
+                            <p class="text-sm">Enter an ARC200 token ID</p>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <Label for="arc200-token-id">Token ID</Label>
+                                <div class="flex items-center gap-2">
+                                    <Input
+                                        id="arc200-token-id"
+                                        type="text"
+                                        placeholder="770561"
+                                        value={tempArc200TokenId}
+                                        on:input={handleArc200TokenIdChange}
+                                        on:change={handleArc200TokenIdBlur}
+                                    />
+                                    {#if isLoadingArc200TokenInfo}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-spinner fa-spin text-gray-500"></i>
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+
+                            {#if arc200TokenError && arc200TokenId.trim() && !isLoadingArc200TokenInfo}
+                                <div class="p-3 text-sm bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                        <span>{arc200TokenError}</span>
+                                    </div>
+                                </div>
+                            {/if}
+
+                            {#if arc200TokenName || arc200TokenSymbol}
+                                <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900/40 hover:outline hover:outline-gray-300 dark:hover:outline-gray-700">
+                                    <div class="flex items-start gap-4">
+                                        {#if arc200TokenImageUrl}
+                                            <img 
+                                                src={arc200TokenImageUrl} 
+                                                alt="Token Icon"
+                                                class="w-16 h-16 rounded-lg object-cover"
+                                            />
+                                        {/if}
+                                        <div class="flex-1">
+                                            <h4 class="font-medium text-gray-900 dark:text-white">
+                                                {arc200TokenName} {arc200TokenSymbol ? `(${arc200TokenSymbol})` : ''}
+                                            </h4>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                Token ID: {arc200TokenId}
+                                            </p>
+                                            <div class="flex gap-4 mt-2 text-sm justify-center">
+                                                <div>
+                                                    <span class="font-medium text-gray-900 dark:text-white">{arc200TokenHolders}</span>
+                                                    <span class="text-gray-500 dark:text-gray-400"> unique holders</span>
+                                                </div>
+                                                <div>
+                                                    <span class="font-medium text-gray-900 dark:text-white">{arc200TokenDecimals}</span>
+                                                    <span class="text-gray-500 dark:text-gray-400"> decimals</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+
+                            <div class="space-y-2">
+                                <Label>Distribution Amount (Optional)</Label>
+                                <div class="flex gap-2">
+                                    <Button 
+                                        color={arc200DistributionType === 'equal' ? 'blue' : 'light'}
+                                        size="sm"
+                                        on:click={() => {
+                                            arc200DistributionType = 'equal';
+                                            amountValue = '';
+                                        }}
+                                    >
+                                        No Amount
+                                    </Button>
+                                    <Button 
+                                        color={arc200DistributionType === 'per-holder' ? 'blue' : 'light'}
+                                        size="sm"
+                                        on:click={() => arc200DistributionType = 'per-holder'}
+                                    >
+                                        Per Holder
+                                    </Button>
+                                    <Button 
+                                        color={arc200DistributionType === 'proportional' ? 'blue' : 'light'}
+                                        size="sm"
+                                        on:click={() => arc200DistributionType = 'proportional'}
+                                    >
+                                        Proportional
+                                    </Button>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {#if arc200DistributionType === 'equal'}
+                                        All holders receive an equal distribution
+                                    {:else if arc200DistributionType === 'per-holder'}
+                                        Each holder receives the same amount
+                                    {:else if arc200DistributionType === 'proportional'}
+                                        Distribution based on percentage of holdings
+                                    {/if}
+                                </p>
+
+                                {#if arc200DistributionType !== 'equal'}
+                                    <div class="mt-2">
+                                        <Label for="arc200-amount-value">
+                                            {arc200DistributionType === 'per-holder' ? 'Amount per holder' : 'Total pool amount'}
+                                        </Label>
+                                        <Input
+                                            id="arc200-amount-value"
+                                            type="number"
+                                            placeholder={
+                                                arc200DistributionType === 'per-holder' 
+                                                ? 'Amount per holder' 
+                                                : 'Total amount to distribute'
+                                            }
+                                            bind:value={amountValue}
+                                        />
+                                    </div>
+                                {/if}
+                            </div>
+
+                            <div>
+                                <Label for="arc200-min-balance">Minimum Balance (Optional)</Label>
+                                <Input
+                                    id="arc200-min-balance"
+                                    type="number"
+                                    placeholder="Minimum token balance to include"
+                                    bind:value={arc200MinimumBalance}
+                                />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Only include holders with at least this many tokens
+                                    {#if arc200TokenData && arc200TokenHolders > 0}
+                                        {#if arc200MinimumBalance && parseFloat(arc200MinimumBalance) > 0}
+                                            <span class="ml-1 font-medium">
+                                                ({arc200QualifiedHolders} of {arc200TokenHolders} holders qualify)
+                                            </span>
+                                        {:else}
+                                            <span class="ml-1 font-medium">
+                                                ({arc200TokenHolders} holders)
+                                            </span>
+                                        {/if}
+                                    {/if}
+                                </p>
+                            </div>
+                            
+                            <div class="flex justify-end gap-3">
+                                <Button 
+                                    color="alternative" 
+                                    on:click={() => {
+                                        importStep = 'initial';
+                                        arc200TokenId = '';
+                                        arc200TokenError = null;
+                                        error = null;
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button 
+                                    color="blue"
+                                    disabled={isLoadingArc200Holders || !isArc200TokenValid}
+                                    on:click={handleArc200TokenImport}
+                                    class={!isArc200TokenValid && !isLoadingArc200Holders ? 'relative group' : ''}
+                                >
+                                    {#if isLoadingArc200Holders}
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                                        Loading...
+                                    {:else}
+                                        Import Holders
+                                    {/if}
+                                    
+                                    {#if !isArc200TokenValid && !isLoadingArc200Holders && arc200TokenId.trim()}
+                                        <div class="hidden group-hover:block absolute -top-10 left-1/2 transform -translate-x-1/2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg">
+                                            Please select a valid ARC200 token first
                                         </div>
                                     {/if}
                                 </Button>
