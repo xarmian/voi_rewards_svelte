@@ -739,22 +739,59 @@
         arc200TokenData = null;
         
         try {
-            const url = `https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances?contractId=${id}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error('Failed to fetch token info');
-            }
+            // Create a complete holders list with pagination support
+            const allBalances = [];
+            let nextToken = null;
+            let pageCount = 0;
+            const limit = 1000;
+            
+            do {
+                // Build URL with pagination parameters
+                const url = new URL(`https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances`);
+                url.searchParams.set('contractId', id);
+                url.searchParams.set('limit', limit.toString());
+                if (nextToken) {
+                    url.searchParams.set('next-token', nextToken);
+                }
+                
+                const response = await fetch(url.toString());
+                if (!response.ok) {
+                    throw new Error('Failed to fetch token info');
+                }
 
-            const data = await response.json();
-            if (!data.balances || !Array.isArray(data.balances) || data.balances.length === 0) {
+                const data = await response.json();
+                if (!data.balances || !Array.isArray(data.balances)) {
+                    throw new Error('Invalid response from API');
+                }
+                
+                // Add balances from this page to our collection
+                allBalances.push(...data.balances);
+                
+                // Get next token for pagination
+                nextToken = data['next-token'];
+                pageCount++;
+                
+                // Safety check to prevent infinite loops
+                if (pageCount > 10) {
+                    console.warn('Stopped pagination after 10 pages to prevent infinite loop');
+                    break;
+                }
+            } while (nextToken);
+            
+            // Create a complete data object with all balances
+            const completeData = {
+                balances: allBalances
+            };
+            
+            if (allBalances.length === 0) {
                 throw new Error('No token holders found');
             }
 
             // Store the raw token data for later filtering
-            arc200TokenData = data;
+            arc200TokenData = completeData;
 
             // Get token info from the first balance
-            const firstBalance = data.balances[0];
+            const firstBalance = allBalances[0];
             arc200TokenName = firstBalance.name || '';
             arc200TokenSymbol = firstBalance.symbol || '';
             arc200TokenDecimals = firstBalance.decimals || 0;
@@ -764,7 +801,7 @@
             const creatorAddress = algosdk.getApplicationAddress(parseInt(id));
             
             // Count valid holders (excluding zero address and creator)
-            arc200TokenHolders = data.balances.filter((balance: any) => 
+            arc200TokenHolders = allBalances.filter((balance: any) => 
                 balance.accountId !== zeroAddress && 
                 balance.accountId !== creatorAddress &&
                 balance.balance && 
@@ -822,40 +859,97 @@
         error = null;
 
         try {
-            const url = `https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances?contractId=${arc200TokenId}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error('Failed to fetch token holders');
-            }
-
-            const data = await response.json();
-            if (!data.balances || !Array.isArray(data.balances)) {
-                throw new Error('Invalid response from API');
-            }
-
-            // Get the creator address to exclude it
-            const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
+            // If we already have the token data, use it instead of fetching again
+            let validHolders = [];
             
-            // Filter out zero address, creator address, negative balances, and balances below minimum
-            const validHolders = data.balances.filter((balance: any) => {
-                // Skip zero address and creator address
-                if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
-                    return false;
-                }
+            if (arc200TokenData && arc200TokenData.balances) {
+                // Get the creator address to exclude it
+                const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
                 
-                // Skip negative balances
-                if (balance.balance && balance.balance.startsWith('-')) {
-                    return false;
-                }
+                // Filter out zero address, creator address, negative balances, and balances below minimum
+                validHolders = arc200TokenData.balances.filter((balance: any) => {
+                    // Skip zero address and creator address
+                    if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
+                        return false;
+                    }
+                    
+                    // Skip negative balances
+                    if (balance.balance && balance.balance.startsWith('-')) {
+                        return false;
+                    }
+                    
+                    // Apply minimum balance filter if specified
+                    if (minimumBalance > 0) {
+                        const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
+                        return tokenBalance >= minimumBalance;
+                    }
+                    
+                    return true;
+                });
+            } else {
+                // We need to fetch the data with pagination
+                const allBalances = [];
+                let nextToken = null;
+                let pageCount = 0;
+                const limit = 1000;
                 
-                // Apply minimum balance filter if specified
-                if (minimumBalance > 0) {
-                    const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
-                    return tokenBalance >= minimumBalance;
-                }
+                do {
+                    // Build URL with pagination parameters
+                    const url = new URL(`https://voi-mainnet-mimirapi.nftnavigator.xyz/arc200/balances`);
+                    url.searchParams.set('contractId', arc200TokenId);
+                    url.searchParams.set('limit', limit.toString());
+                    if (nextToken) {
+                        url.searchParams.set('next-token', nextToken);
+                    }
+                    
+                    const response = await fetch(url.toString());
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch token holders');
+                    }
+
+                    const data = await response.json();
+                    if (!data.balances || !Array.isArray(data.balances)) {
+                        throw new Error('Invalid response from API');
+                    }
+                    
+                    // Add balances from this page to our collection
+                    allBalances.push(...data.balances);
+                    
+                    // Get next token for pagination
+                    nextToken = data['next-token'];
+                    pageCount++;
+                    
+                    // Safety check to prevent infinite loops
+                    if (pageCount > 10) {
+                        console.warn('Stopped pagination after 10 pages to prevent infinite loop');
+                        break;
+                    }
+                } while (nextToken);
                 
-                return true;
-            });
+                // Get the creator address to exclude it
+                const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
+                
+                // Filter out zero address, creator address, negative balances, and balances below minimum
+                validHolders = allBalances.filter((balance: any) => {
+                    // Skip zero address and creator address
+                    if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
+                        return false;
+                    }
+                    
+                    // Skip negative balances
+                    if (balance.balance && balance.balance.startsWith('-')) {
+                        return false;
+                    }
+                    
+                    // Apply minimum balance filter if specified
+                    if (minimumBalance > 0) {
+                        const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
+                        return tokenBalance >= minimumBalance;
+                    }
+                    
+                    return true;
+                });
+            }
 
             if (validHolders.length === 0) {
                 throw new Error('No valid holders found for this token');
