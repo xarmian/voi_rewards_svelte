@@ -32,3 +32,5 @@ Visit the following applications to explore the Voi ecosystem:
 
 **Bridge**
 - [Aramid Bridge](https://app.aramid.finance/)
+
+For more options visit our [Ecosystem Directory](https://voirewards.com/directory)
