@@ -1,5 +1,5 @@
 <script lang="ts">
-    const buyVoiLink = "https://buyvoidotcom.com";
+    const buyVoiLink = "https://ibuyvoi.com";
     
   // Exchange links
   const links = {
@@ -48,9 +48,9 @@
         <div class="col-span-2 md:col-span-1 lg:col-span-2 bg-white/20 dark:bg-gray-800/30 rounded-lg p-2 md:p-4 hover:bg-white/30 dark:hover:bg-gray-800/40 transition-colors duration-200">
           <div class="flex items-center gap-2 mb-1 md:mb-2">
             <div class="w-6 h-6 md:w-10 md:h-10 rounded-full bg-white/90 dark:bg-gray-800/90 flex items-center justify-center">
-              <img src="https://buyvoidotcom.com/favicon-32x32.png" alt="BuyVoiDotCom" class="w-6 h-6 md:w-12 md:h-12" />
+              <img src="https://ibuyvoi.com/favicon-32x32.png" alt="iBuyVoi" class="w-6 h-6 md:w-12 md:h-12" />
             </div>
-            <h3 class="text-base md:text-xl font-bold text-white">Buy VOI Instantly, at BuyVoiDotCom.com</h3>
+            <h3 class="text-base md:text-xl font-bold text-white">Buy VOI Instantly, at iBuyVoi.com</h3>
             <div class="ml-auto">
               <span class="bg-green-500 dark:bg-green-600 text-white text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 rounded-full uppercase font-semibold">Recommended</span>
             </div>
