@@ -55,26 +55,7 @@ interface MarketSnapshot {
   price_change_percentage_24h?: number;
 }
 
-interface VestigePool {
-  id: number;
-  token_id: number;
-  application_id: number;
-  provider: string;
-  created_round: number;
-  asset_1_id: number;
-  asset_2_id: number;
-  volatility: number;
-  liquidity: number;
-  address: string;
-  price: number;
-  price1h: number;
-  price24h: number;
-  volume_1_24h: number;
-  volume_2_24h: number;
-  fee: number;
-  token_ratio: number;
-  last_traded: number;
-}
+
 
 interface SwapEvent {
   args: {
@@ -86,6 +67,76 @@ interface SwapEvent {
     liquidity: bigint;
     tick: number;
   };
+}
+
+interface PactPoolResponse {
+  id: number;
+  on_chain_id: string;
+  on_chain_address: string;
+  name: string;
+  version: number;
+  assets: Array<{
+    id: number;
+    on_chain_id: string;
+    name: string;
+    unit_name: string;
+    decimals: number;
+    is_liquidity_token: boolean;
+    is_verified: boolean;
+    tvl_usd: string;
+    price: string;
+    volume_24h_usd: string;
+    volume_7d_usd: string;
+    tvl_24h_change_pct: string;
+    price_24h_change_pct: string;
+    url: string | null;
+    collection: string | null;
+    author: string | null;
+    description: string | null;
+  }>;
+  fee_bps: number;
+  pool_type: string;
+  liquidity_asset: {
+    id: number;
+    on_chain_id: string;
+    name: string;
+    unit_name: string;
+    decimals: number;
+    is_liquidity_token: boolean;
+    is_verified: boolean;
+    tvl_usd: string;
+    price: string;
+    volume_24h_usd: string;
+    volume_7d_usd: string;
+    tvl_24h_change_pct: string;
+    price_24h_change_pct: string;
+    url: string | null;
+    collection: string | null;
+    author: string | null;
+    description: string | null;
+  };
+  is_verified: boolean;
+  auto_verified_100k: boolean;
+  auto_verified_1m: boolean;
+  balance: string;
+  tvl_usd: string;
+  rewards: unknown[];
+  volume_24h_usd: string;
+  volume_7d_usd: string;
+  fee_amount_24h: number;
+  is_eligible_for_governance: boolean;
+  fee_amount_7d: number;
+  fee_usd_24h: string;
+  fee_usd_7d: string;
+  apr_7d: string;
+  apr_7d_all: string;
+  apr_governance: string;
+  tvl_24h_change_pct: string;
+  volume_24h_change_pct: string;
+  fee_24h_change_pct: string;
+  pact_fee_bps: string;
+  is_deprecated: boolean;
+  is_eligible_for_consensus: boolean;
 }
 
 // Initialize Supabase client
@@ -322,41 +373,75 @@ async function fetchPactFiData(): Promise<MarketSnapshot | null> {
   try {
     // Fetch both pools in parallel
     const [pool1Response, pool2Response] = await Promise.all([
-      fetch('https://free-api.vestige.fi/pool/507607'),
-      fetch('https://free-api.vestige.fi/pool/560706')
+      fetch('https://api.pact.fi/api/internal/pools_details/2326213647'),
+      fetch('https://api.pact.fi/api/internal/pools_details/2674008580'),
     ]);
 
     if (!pool1Response.ok || !pool2Response.ok) {
       throw new Error('Failed to fetch one or both PactFi pool data');
     }
 
-    const pool1: VestigePool = await pool1Response.json();
-    const pool2: VestigePool = await pool2Response.json();
+    const [pool1Data, pool2Data]: [PactPoolResponse, PactPoolResponse] = await Promise.all([
+      pool1Response.json(),
+      pool2Response.json()
+    ]);
 
-    // Use the larger pool's price as the reference price
-    const pool1Weight = pool1.liquidity;
-    const pool2Weight = pool2.liquidity;
-    const totalLiquidity = pool1Weight + pool2Weight;
-
+    const pools = [pool1Data, pool2Data];
+    
+    // Calculate volume-weighted price
+    let totalVolume = 0;
+    let weightedPriceSum = 0;
+    let totalTvl = 0;
+    
+    for (const pool of pools) {
+      const volume = parseFloat(pool.volume_24h_usd);
+      totalVolume += volume;
+      
+      // Find VOI asset in the pool to get its price
+      const voiAsset = pool.assets.find(asset => 
+        asset.unit_name === 'aVoi' || asset.name.includes('VOI')
+      );
+      
+      if (voiAsset) {
+        const price = parseFloat(voiAsset.price);
+        weightedPriceSum += price * volume;
+      }
+      
+      // Add pool TVL
+      totalTvl += parseFloat(pool.tvl_usd);
+    }
+    
     // Calculate weighted average price
-    const price = (pool1.price * pool1Weight + pool2.price * pool2Weight) / totalLiquidity;
+    const price = totalVolume > 0 ? weightedPriceSum / totalVolume : 0;
+    
+    // If we couldn't calculate a weighted price, fall back to the largest pool
+    let finalPrice = price;
+    if (price === 0) {
+      const largestPool = pools.reduce((max, current) => {
+        return parseFloat(current.tvl_usd) > parseFloat(max.tvl_usd) ? current : max;
+      });
+      
+      const voiAsset = largestPool.assets.find(asset => 
+        asset.unit_name === 'aVoi' || asset.name.includes('VOI')
+      );
+      
+      if (voiAsset) {
+        finalPrice = parseFloat(voiAsset.price);
+      }
+    }
 
-    // Sum volumes and TVL from both pools
-    const volume24h = pool1.volume_2_24h + pool2.volume_2_24h;
-    const tvl = pool1.liquidity + pool2.liquidity;
-
-    // Calculate weighted average historical price
-    const price24h = (pool1.price24h * pool1Weight + pool2.price24h * pool2Weight) / totalLiquidity;
-
-    // Calculate price changes based on weighted averages
-    const priceChange24h = price - price24h;
-    const priceChangePercentage24h = ((price - price24h) / price24h) * 100;
+    // Fetch historical price and calculate price change
+    const historicalPrice = await fetchHistoricalPrice(5); // PactFi trading_pair_id = 5
+    const priceChange24h = historicalPrice !== null ? finalPrice - historicalPrice : undefined;
+    const priceChangePercentage24h = historicalPrice !== null && historicalPrice !== 0 
+      ? ((finalPrice - historicalPrice) / historicalPrice) * 100 
+      : undefined;
 
     return {
       trading_pair_id: 5, // PactFi VOI/USDC pair
-      price: price,
-      volume_24h: volume24h,
-      tvl: tvl,
+      price: finalPrice,
+      volume_24h: totalVolume,
+      tvl: totalTvl,
       high_24h: undefined,
       low_24h: undefined,
       price_change_24h: priceChange24h,
