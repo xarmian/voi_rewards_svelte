@@ -1,7 +1,8 @@
 <script lang="ts">
     import PortfolioSectionNFT from './PortfolioSectionNFT.svelte';
     import FungibleToken from './FungibleToken.svelte';
-    import type { FungibleTokenType, ASAToken, LPToken } from '$lib/types/assets';
+    import ClaimableTokenCard from './ClaimableTokenCard.svelte';
+    import type { FungibleTokenType, ASAToken, LPToken, TokenApproval } from '$lib/types/assets';
     import { algodClient, algodIndexer } from '$lib/utils/algod';
     import { getEnvoiNames } from '$lib/utils/envoi';
     import { dataTable } from '../../stores/dataTable';
@@ -20,6 +21,9 @@
 	import StakingComponent from './ui/StakingComponent.svelte';
     import BridgeModal from './BridgeModal.svelte';
     import { fetchFungibleTokens } from '$lib/services/accounts';
+    import { arc200TransferFrom } from '$lib/utils/arc200';
+    import { signTransactions } from 'avm-wallet-svelte';
+    import algosdk from 'algosdk';
     export let parentWalletAddress: string | null = null;
     export let walletAddress: string | undefined = undefined;
 
@@ -89,6 +93,16 @@
     let voteKeyExpiryDate: Date | undefined;
     let showVoiTransfersModal = false;
     let showBridgeModal = false;
+
+    // Claimable tokens summary variables
+    let claimableTokensSummary: Array<{
+        token: FungibleTokenType;
+        approvals: TokenApproval[];
+        totalAmount: number;
+        totalValue: number;
+    }> = [];
+    let isExpandingClaimableSection = false;
+    let showClaimableSection = false;
 
     const LoadingOverlay = ({height = 'h-full'}: {height?: string}) => `
         <div class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center ${height}">
@@ -452,13 +466,227 @@
 		return 'poolInfo' in token && token.poolInfo !== undefined;
 	}
 
+    // Calculate claimable tokens summary
+    function calculateClaimableTokensSummary() {
+        const claimableTokens: Array<{
+            token: FungibleTokenType;
+            approvals: TokenApproval[];
+            totalAmount: number;
+            totalValue: number;
+        }> = [];
+
+        // Process fungible tokens for claimable approvals
+        fungibleTokens.forEach(token => {
+            if (token.approvals && token.approvals.length > 0) {
+                const validApprovals = token.approvals.filter(approval => approval.amount !== '0');
+                if (validApprovals.length > 0) {
+                    const totalAmount = validApprovals.reduce((sum, approval) => 
+                        sum + Number(approval.amount) / Math.pow(10, token.decimals), 0
+                    );
+                    const totalValue = totalAmount * (token.value / (token.balance / Math.pow(10, token.decimals) || 1));
+                    
+                    claimableTokens.push({
+                        token,
+                        approvals: validApprovals,
+                        totalAmount,
+                        totalValue
+                    });
+                }
+            }
+        });
+        // Sort by total value (highest first)
+        claimableTokens.sort((a, b) => b.totalValue - a.totalValue);
+        
+        return claimableTokens;
+    }
+
+    // Reactive statement to update claimable tokens summary
+    $: {
+        if (fungibleTokens.length > 0) {
+            claimableTokensSummary = calculateClaimableTokensSummary();
+        }
+    }
+    
+    // Bulk claim functionality
+    let isBulkClaiming = false;
+    let bulkClaimProgress = 0;
+    let bulkClaimResults: Array<{success: boolean, tokenName: string, error?: string}> = [];
+
+    async function bulkClaimAllTokens() {
+        if (!canSignTransactions || isBulkClaiming || !walletAddress || !$selectedWallet?.address) {
+            return;
+        }
+        
+        isBulkClaiming = true;
+        bulkClaimProgress = 0;
+        bulkClaimResults = [];
+        
+        // Collect all ARC-200 approvals that can be claimed
+        const arc200Approvals: Array<{
+            token: FungibleTokenType;
+            approval: TokenApproval;
+        }> = [];
+        
+        claimableTokensSummary.forEach(claimableItem => {
+            if (claimableItem.token.type === 'arc200') {
+                claimableItem.approvals.forEach(approval => {
+                    arc200Approvals.push({
+                        token: claimableItem.token,
+                        approval
+                    });
+                });
+            }
+        });
+        
+        const totalApprovals = arc200Approvals.length;
+        let processedCount = 0;
+        
+        try {
+            // Process approvals in batches of 8
+            const batchSize = 8;
+            for (let i = 0; i < arc200Approvals.length; i += batchSize) {
+                const batch = arc200Approvals.slice(i, i + batchSize);
+                
+                try {
+                    
+                    // Step 1: Collect all unsigned transactions for this batch
+                    const allUnsignedTransactions: algosdk.Transaction[] = [];
+                    const batchTokens: Array<{ token: FungibleTokenType; approval: TokenApproval }> = [];
+                    
+                    for (const { token, approval } of batch) {
+                        try {
+                            const appId = Number(token.id);
+                            const from = approval.owner;
+                            const to = walletAddress;
+                            const amount = approval.amount;
+                            
+                            // Get the unsigned transactions from arc200TransferFrom without signing
+                            const ulujs = await import('ulujs');
+                            const Arc200Contract = ulujs.arc200;
+                            
+                            const contract = new Arc200Contract(appId, algodClient, algodIndexer, {
+                                acc: {
+                                    addr: walletAddress,
+                                    sk: new Uint8Array()
+                                }
+                            });
+                            
+                            const txn = await contract.arc200_transferFrom(
+                                from,
+                                to,
+                                BigInt(amount),
+                                true,
+                                false
+                            );
+
+                            if (txn.success) {
+                                // Decode the transactions
+                                const decodedTxns: algosdk.Transaction[] = txn.txns.map((txnData: string) => 
+                                    algosdk.decodeUnsignedTransaction(Buffer.from(txnData, 'base64'))
+                                );
+                                
+                                allUnsignedTransactions.push(...decodedTxns);
+                                batchTokens.push({ token, approval });
+                            }
+                        } catch (error) {
+                            console.error('Error creating transaction for', token.name, error);
+                        }
+                    }
+                    
+                    // Step 2: If we have transactions, sign and submit them as a group
+                    if (allUnsignedTransactions.length > 0) {
+                        // Sign all transactions at once
+                        const signedTxns = await signTransactions([allUnsignedTransactions]);
+                        if (!signedTxns) {
+                            throw new Error("User rejected transaction signing");
+                        }
+                        
+                        // Submit the signed transactions
+                        const response = await algodClient.sendRawTransaction(signedTxns).do();
+                        
+                        // Wait for confirmation
+                        await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+                        
+                        // Mark all in this batch as successful
+                        batchTokens.forEach(({ token }) => {
+                            bulkClaimResults.push({
+                                success: true,
+                                tokenName: token.name
+                            });
+                        });
+                    }
+                    
+                    processedCount += batch.length;
+                    bulkClaimProgress = (processedCount / totalApprovals) * 100;
+                    
+                } catch (error) {
+                    // If user cancels or batch fails, mark all in batch as failed
+                    batch.forEach(({ token }) => {
+                        bulkClaimResults.push({
+                            success: false,
+                            tokenName: token.name,
+                            error: error instanceof Error ? error.message : 'Batch failed'
+                        });
+                    });
+                    
+                    // If user cancelled, stop the entire process
+                    if (error instanceof Error && error.message.includes("rejected")) {
+                        console.log('User cancelled bulk claim process');
+                        break;
+                    }
+                    
+                    processedCount += batch.length;
+                    bulkClaimProgress = (processedCount / totalApprovals) * 100;
+                }
+            }
+            
+            // Refresh portfolio after bulk claim
+            await refreshPortfolio();
+            await refreshTokens();
+            
+        } catch (error) {
+            console.error('Bulk claim error:', error);
+        } finally {
+            isBulkClaiming = false;
+        }
+    }
+
+    function handleClaimableTokenViewDetails(event: CustomEvent) {
+        const { tokenId } = event.detail;
+        
+        // Find the token card and scroll to it
+        const tokenCard = document.querySelector(`[data-token-id="${tokenId}"]`);
+        if (tokenCard) {
+            tokenCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add a highlight effect
+            tokenCard.classList.add('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+            setTimeout(() => {
+                tokenCard.classList.remove('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+            }, 3000);
+        }
+    }
+
+    function handleTokenClaimed(event: CustomEvent) {
+        const { tokenId, success, error } = event.detail;
+        
+        if (success) {
+            // Refresh the portfolio to update the claimable tokens list
+            refreshPortfolio();
+            refreshTokens();
+        } else {
+            console.error('Token claim failed:', error);
+        }
+    }
+
 </script>
 
 <div class="space-y-6">
     <!-- Portfolio Overview with View Toggle -->
     <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Overview</h2>
+            <div class="flex items-center space-x-3">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Overview</h2>
+            </div>
             <button
                 on:click={refreshPortfolio}
                 class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
@@ -686,6 +914,130 @@
         </div>
     </div>
 
+    <!-- Claimable Tokens Summary Section -->
+    {#if claimableTokensSummary.length > 0}
+        <div class="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg shadow-lg p-4 md:p-6 relative overflow-hidden">
+            <!-- Background decoration -->
+            <div class="absolute inset-0 bg-gradient-to-br from-yellow-100/30 to-orange-100/30 dark:from-yellow-800/10 dark:to-orange-800/10"></div>
+            <div class="absolute top-0 right-0 w-32 h-32 bg-yellow-200/20 dark:bg-yellow-700/20 rounded-full -translate-y-16 translate-x-16"></div>
+            <div class="absolute bottom-0 left-0 w-24 h-24 bg-orange-200/20 dark:bg-orange-700/20 rounded-full translate-y-12 -translate-x-12"></div>
+            
+            <div class="relative z-10">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex items-center justify-center w-10 h-10 bg-yellow-500 dark:bg-yellow-600 rounded-full">
+                            <i class="fas fa-hand-holding-dollar text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                                Claimable Tokens
+                            </h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">
+                                You have {claimableTokensSummary.length} token{claimableTokensSummary.length !== 1 ? 's' : ''} ready to claim
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        {#if canSignTransactions && claimableTokensSummary.length > 0}
+                            <button
+                                on:click={bulkClaimAllTokens}
+                                disabled={isBulkClaiming}
+                                class="px-4 py-2 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400 rounded-lg transition-colors flex items-center gap-2 disabled:cursor-not-allowed"
+                                title="Claim all available tokens at once"
+                            >
+                                {#if isBulkClaiming}
+                                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    Claiming...
+                                {:else}
+                                    <i class="fas fa-hand-holding-dollar"></i>
+                                    Claim All
+                                {/if}
+                            </button>
+                        {/if}
+                        <button
+                            on:click={() => showClaimableSection = !showClaimableSection}
+                            class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-yellow-100 dark:hover:bg-yellow-800/30 rounded-full transition-colors"
+                            title={showClaimableSection ? "Hide claimable tokens" : "Show claimable tokens"}
+                        >
+                            <i class="fas {showClaimableSection ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+                        </button>
+                    </div>
+                </div>
+
+                {#if showClaimableSection}
+                    <div class="space-y-4">
+                        <!-- Summary Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {#each claimableTokensSummary.slice(0, 6) as claimableItem}
+                                <ClaimableTokenCard
+                                    token={claimableItem.token}
+                                    approvals={claimableItem.approvals}
+                                    totalAmount={claimableItem.totalAmount}
+                                    totalValue={claimableItem.totalValue}
+                                    {canSignTransactions}
+                                    walletId={walletAddress}
+                                    on:viewDetails={handleClaimableTokenViewDetails}
+                                    on:tokenClaimed={handleTokenClaimed}
+                                />
+                            {/each}
+                        </div>
+
+                        {#if claimableTokensSummary.length > 6}
+                            <div class="text-center">
+                                <button
+                                    on:click={() => isExpandingClaimableSection = !isExpandingClaimableSection}
+                                    class="px-4 py-2 text-sm font-medium text-yellow-800 dark:text-yellow-200 bg-yellow-100 dark:bg-yellow-800/30 hover:bg-yellow-200 dark:hover:bg-yellow-700/40 rounded-lg transition-colors"
+                                >
+                                    {isExpandingClaimableSection ? 'Show Less' : `Show ${claimableTokensSummary.length - 6} More`}
+                                </button>
+                            </div>
+
+                            {#if isExpandingClaimableSection}
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {#each claimableTokensSummary.slice(6) as claimableItem}
+                                        <ClaimableTokenCard
+                                            token={claimableItem.token}
+                                            approvals={claimableItem.approvals}
+                                            totalAmount={claimableItem.totalAmount}
+                                            totalValue={claimableItem.totalValue}
+                                            {canSignTransactions}
+                                            walletId={walletAddress}
+                                            on:viewDetails={handleClaimableTokenViewDetails}
+                                            on:tokenClaimed={handleTokenClaimed}
+                                        />
+                                    {/each}
+                                </div>
+                            {/if}
+                        {/if}
+
+                        <!-- Bulk Claim Progress -->
+                        {#if isBulkClaiming}
+                            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">Bulk Claim Progress</h4>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">{Math.round(bulkClaimProgress)}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                        <div 
+                                            class="bg-yellow-500 h-2 rounded-full transition-all duration-300"
+                                            style="width: {bulkClaimProgress}%"
+                                        ></div>
+                                    </div>
+                                    <div class="text-xs text-gray-600 dark:text-gray-400">
+                                        Processing {bulkClaimResults.length} of {claimableTokensSummary.reduce((sum, item) => sum + item.approvals.length, 0)} approvals...
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
+
+
+                    </div>
+                {/if}
+            </div>
+        </div>
+    {/if}
+
     <!-- LP Tokens Section -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-6 relative">
         <div class="flex items-center justify-between mb-4">
@@ -874,8 +1226,9 @@
                     return !arr.slice(0, i).some(item => getUniqueId(item) === currentUniqueId);
                 }))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId}` : `arc200-${token.id}`)}
                     {@const details = 'assetId' in token ? asaDetails.find(d => d.id === token.assetId) : null}
+                    {@const tokenId = details ? details.id.toString() : token.id}
                     {#if showZeroBalancesCondition(token)}
-                        <div class="relative min-w-80">
+                        <div class="relative min-w-80" data-token-id={tokenId}>
                             <span class="absolute z-10 top-2 right-2 px-2 py-0.5 text-xs font-medium {token.type === 'vsa' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'} rounded-full">
                                 {token.type === 'vsa' ? 'VSA' : 'ARC-200'}
                             </span>
