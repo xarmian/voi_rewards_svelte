@@ -19,16 +19,10 @@ interface NomadexPoolInfo {
     betaId: number;
     betaType: number;
     swapFee: string;
-    balances: number[]; // do not use, use balance.alpha and balance.beta instead
+    balances: string[]; // Array with [alpha_balance, beta_balance]
     volume: number[];
     apr: number;
     online: boolean;
-    balance: {
-        lpt: string;
-        issuedLpt: string;
-        alpha: string;
-        beta: string;
-    };
 }
 
 interface HumblePoolResponse {
@@ -94,11 +88,11 @@ export const getLiquidityPools = async () => {
             poolId: pool.id.toString(),
             tokAId: pool.alphaId.toString(),
             tokBId: pool.betaId.toString(),
-            poolBalA: pool.balance?.alpha || '0',
-            poolBalB: pool.balance?.beta || '0',
-            supply: pool.balance?.issuedLpt || '0',
+            poolBalA: pool.balances[0] || '0',
+            poolBalB: pool.balances[1] || '0',
+            supply: '100000000000000', // Nomadex pools have a total supply of 100,000,000,000,000 with 6 decimals
             provider: 'nomadex',
-            tvl: pool.alphaId === 0 ? Number(pool.balance?.alpha || '0') * 2 : (pool.betaId === 0) ? Number(pool.balance?.beta || '0') * 2 : 0,
+            tvl: pool.alphaId === 0 ? Number(pool.balances[0] || '0') * 2 : (pool.betaId === 0) ? Number(pool.balances[1] || '0') * 2 : 0,
             apr: pool.apr
         }));
 

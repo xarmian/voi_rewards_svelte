@@ -110,8 +110,37 @@ export async function fetchFungibleTokens(walletAddress: string | undefined, voi
                     tokenValue = 0;
                 }
             } else if (pool && asset.assetType === 'arc200') {
+                // For Nomadex pools, update the supply with escrow balance before calculation
+                if (pool.provider === 'nomadex') {
+                    const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
+                    try {
+                        const escrowArc200Response = await fetch(`https://voi-mainnet-mimirapi.voirewards.com/arc200/balances?contractId=${pool.poolId}&accountId=${poolEscrowAddr}`);
+                        if (escrowArc200Response.ok) {
+                            const escrowArc200Data = await escrowArc200Response.json();
+                            if (escrowArc200Data.balances && escrowArc200Data.balances.length > 0) {
+                                const escrowLpBalance = escrowArc200Data.balances[0].balance;
+                                // Circulating supply = max supply - escrow balance
+                                const circulatingSupply = Number(escrowLpBalance) * (-1);
+                                pool.supply = circulatingSupply.toString();
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('Failed to fetch nomadex pool escrow info for supply calculation:', err);
+                    }
+                }
+                
                 // Calculate value from pool data for ARC200 tokens
                 tokenValue = calculateTokenValueFromPool(asset, pool);
+                console.log('asset', asset);
+                console.log('pool', pool);
+                console.log('tokenValue', tokenValue);
+                
+                // Calculate USD value for LP tokens
+                if (voiPriceUSD > 0) {
+                    tokenUsdValue = tokenValue * voiPriceUSD;
+                } else {
+                    tokenUsdValue = 0;
+                }
             } else if (asset.assetType === 'asa' && asset.contractId === 302190) {
                 // Special handling for aUSDC - 1:1 with USD
                 const usdcAmount = Number(asset.balance) / Math.pow(10, asset.decimals);
@@ -169,7 +198,9 @@ export async function fetchFungibleTokens(walletAddress: string | undefined, voi
                     const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
                     try {
                         const poolEscrowInfo = await algodClient.accountInformation(poolEscrowAddr).do();
-                        tvlBalance = poolEscrowInfo.amount * 2;
+                        tvlBalance = poolEscrowInfo.amount * 2 / Math.pow(10, 6);
+                        
+                        // Supply calculation moved to before value calculation
                     } catch (err) {
                         console.warn('Failed to fetch nomadex pool escrow info:', err);
                         tvlBalance = pool.tvl;
@@ -189,7 +220,7 @@ export async function fetchFungibleTokens(walletAddress: string | undefined, voi
                     imageUrl: asset.imageUrl,
                     id: tokenId,
                     poolId: pool.poolId,
-                    value: tokenValue > 0 ? tokenValue : Number(tvlBalance * (Number(asset.balance) / Math.pow(10, asset.decimals)) / Number(pool.supply)),
+                    value: tokenValue,
                     usdValue: tokenUsdValue,
                     type: asset.assetType === 'asa' ? 'vsa' : 'arc200',
                     approvals: approvalsMap.get(tokenId) || [],
@@ -376,18 +407,27 @@ export async function fetchFungibleTokens(walletAddress: string | undefined, voi
 
 function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo): number {
     try {
-        // Get pool balances based on whether VOI is token A or B
-        const voiBalance = (pool.tokAId === '0' || pool.tokAId === '390001') ? pool.poolBalA : pool.poolBalB;
-        const tokenBalance = (pool.tokAId === '0' || pool.tokAId === '390001') ? pool.poolBalB : pool.poolBalA;
+        // For LP tokens, calculate value based on user's share of the pool
+        const userLpBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
+        const totalLpSupply = Number(pool.supply) / Math.pow(10, 6); // pool.supply needs to be converted from micro units
         
-        if (tokenBalance === '0' || voiBalance === '0') return 0;
-
-        // Calculate price in VOI
-        const priceInVoi = Number(voiBalance) / Number(tokenBalance);
+        if (totalLpSupply === 0) return 0;
         
-        // Calculate value based on user's token balance and decimals
-        const userBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
-        return userBalance * priceInVoi;
+        // Calculate user's share of the pool
+        const userShare = userLpBalance / totalLpSupply;
+        
+        // Calculate VOI value based on pool TVL and user's share
+        // For Nomadex pools, TVL might need to be adjusted for decimals
+        let tvl = pool.tvl;
+        if (pool.provider === 'nomadex') {
+            // For Nomadex pools, TVL might be in microVOI (6 decimals)
+            tvl = pool.tvl / Math.pow(10, 6);
+        }
+        
+        
+        const voiValue = tvl * userShare;
+        
+        return voiValue;
     } catch (err) {
         console.error('Error calculating token value:', err);
         return 0;

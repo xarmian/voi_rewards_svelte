@@ -867,7 +867,7 @@
             
             // For Humble pools, the totalSupply is already in decimal form
             if (token.poolInfo.provider === 'humble') {
-                totalSupply = Number(token.poolInfo.totalSupply / Math.pow(10, 6));
+                totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, 6);
             } else {
                 // For other providers, we need to divide by 10^decimals
                 totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, token.decimals);
