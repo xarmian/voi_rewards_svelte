@@ -542,86 +542,125 @@
         let processedCount = 0;
         
         try {
-            // Process approvals in batches of 8
-            const batchSize = 8;
-            for (let i = 0; i < arc200Approvals.length; i += batchSize) {
-                const batch = arc200Approvals.slice(i, i + batchSize);
-                
+            // Step 1: Generate all transaction groups first
+            const transactionGroups: Array<{
+                transactions: algosdk.Transaction[];
+                tokens: Array<{ token: FungibleTokenType; approval: TokenApproval }>;
+            }> = [];
+            
+            for (const { token, approval } of arc200Approvals) {
                 try {
+                    const appId = Number(token.id);
+                    const from = approval.owner;
+                    const to = walletAddress;
+                    const amount = approval.amount;
                     
-                    // Step 1: Collect all unsigned transactions for this batch
-                    const allUnsignedTransactions: algosdk.Transaction[] = [];
-                    const batchTokens: Array<{ token: FungibleTokenType; approval: TokenApproval }> = [];
+                    // Get the unsigned transactions from arc200TransferFrom without signing
+                    const ulujs = await import('ulujs');
+                    const Arc200Contract = ulujs.arc200;
                     
-                    for (const { token, approval } of batch) {
-                        try {
-                            const appId = Number(token.id);
-                            const from = approval.owner;
-                            const to = walletAddress;
-                            const amount = approval.amount;
-                            
-                            // Get the unsigned transactions from arc200TransferFrom without signing
-                            const ulujs = await import('ulujs');
-                            const Arc200Contract = ulujs.arc200;
-                            
-                            const contract = new Arc200Contract(appId, algodClient, algodIndexer, {
-                                acc: {
-                                    addr: walletAddress,
-                                    sk: new Uint8Array()
-                                }
-                            });
-                            
-                            const txn = await contract.arc200_transferFrom(
-                                from,
-                                to,
-                                BigInt(amount),
-                                true,
-                                false
-                            );
+                    const contract = new Arc200Contract(appId, algodClient, algodIndexer, {
+                        acc: {
+                            addr: walletAddress,
+                            sk: new Uint8Array()
+                        }
+                    });
+                    
+                    const txn = await contract.arc200_transferFrom(
+                        from,
+                        to,
+                        BigInt(amount),
+                        true,
+                        false
+                    );
 
-                            if (txn.success) {
-                                // Decode the transactions
-                                const decodedTxns: algosdk.Transaction[] = txn.txns.map((txnData: string) => 
-                                    algosdk.decodeUnsignedTransaction(Buffer.from(txnData, 'base64'))
-                                );
-                                
-                                allUnsignedTransactions.push(...decodedTxns);
-                                batchTokens.push({ token, approval });
-                            }
-                        } catch (error) {
-                            console.error('Error creating transaction for', token.name, error);
-                        }
-                    }
-                    
-                    // Step 2: If we have transactions, sign and submit them as a group
-                    if (allUnsignedTransactions.length > 0) {
-                        // Sign all transactions at once
-                        const signedTxns = await signTransactions([allUnsignedTransactions]);
-                        if (!signedTxns) {
-                            throw new Error("User rejected transaction signing");
-                        }
+                    if (txn.success) {
+                        // Decode the transactions
+                        const decodedTxns: algosdk.Transaction[] = txn.txns.map((txnData: string) => 
+                            algosdk.decodeUnsignedTransaction(Buffer.from(txnData, 'base64'))
+                        );
                         
-                        // Submit the signed transactions
-                        const response = await algodClient.sendRawTransaction(signedTxns).do();
-                        
-                        // Wait for confirmation
-                        await algosdk.waitForConfirmation(algodClient, response.txId, 4);
-                        
-                        // Mark all in this batch as successful
-                        batchTokens.forEach(({ token }) => {
-                            bulkClaimResults.push({
-                                success: true,
-                                tokenName: token.name
-                            });
+                        transactionGroups.push({
+                            transactions: decodedTxns,
+                            tokens: [{ token, approval }]
                         });
                     }
+                } catch (error) {
+                    console.error('Error creating transaction for', token.name, error);
+                }
+            }
+            
+            // Step 2: Create batches of up to 16 transactions while keeping transaction groups together
+            const transactionBatches: Array<{
+                transactions: algosdk.Transaction[];
+                tokens: Array<{ token: FungibleTokenType; approval: TokenApproval }>;
+            }> = [];
+            
+            let currentBatch = {
+                transactions: [] as algosdk.Transaction[],
+                tokens: [] as Array<{ token: FungibleTokenType; approval: TokenApproval }>
+            };
+            
+            for (const group of transactionGroups) {
+                // Check if adding this group would exceed 16 transactions
+                if (currentBatch.transactions.length + group.transactions.length > 16) {
+                    // If current batch has transactions, finalize it
+                    if (currentBatch.transactions.length > 0) {
+                        transactionBatches.push(currentBatch);
+                        currentBatch = {
+                            transactions: [],
+                            tokens: []
+                        };
+                    }
+                }
+                
+                // Add the group to current batch
+                currentBatch.transactions.push(...group.transactions);
+                currentBatch.tokens.push(...group.tokens);
+            }
+            
+            // Add the last batch if it has transactions
+            if (currentBatch.transactions.length > 0) {
+                transactionBatches.push(currentBatch);
+            }
+            
+            // Step 3: Process each batch
+            for (const batch of transactionBatches) {
+                try {
+                    // Remove group ID from all transactions
+                    batch.transactions.forEach(txn => {
+                        delete txn.group;
+                    });
                     
-                    processedCount += batch.length;
+                    // Assign a new group ID to all transactions in this batch
+                    algosdk.assignGroupID(batch.transactions);
+                    
+                    // Sign all transactions at once
+                    const signedTxns = await signTransactions([batch.transactions]);
+                    if (!signedTxns) {
+                        throw new Error("User rejected transaction signing");
+                    }
+                    
+                    // Submit the signed transactions
+                    const response = await algodClient.sendRawTransaction(signedTxns).do();
+                    
+                    // Wait for confirmation
+                    await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+                    
+                    // Mark all in this batch as successful
+                    batch.tokens.forEach(({ token }) => {
+                        bulkClaimResults.push({
+                            success: true,
+                            tokenName: token.name
+                        });
+                    });
+                    
+                    processedCount += batch.tokens.length;
                     bulkClaimProgress = (processedCount / totalApprovals) * 100;
                     
                 } catch (error) {
                     // If user cancels or batch fails, mark all in batch as failed
-                    batch.forEach(({ token }) => {
+                    batch.tokens.forEach(({ token }) => {
                         bulkClaimResults.push({
                             success: false,
                             tokenName: token.name,
@@ -635,7 +674,7 @@
                         break;
                     }
                     
-                    processedCount += batch.length;
+                    processedCount += batch.tokens.length;
                     bulkClaimProgress = (processedCount / totalApprovals) * 100;
                 }
             }
