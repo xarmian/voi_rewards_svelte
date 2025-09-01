@@ -87,3 +87,43 @@ export interface VrProject {
     status?: string | null; // text
     url?: string | null; // text
 }
+
+// OHLCV and trading related interfaces
+export interface PriceCandle {
+    base_token_id: number;
+    quote_token_id: number;
+    resolution: string;
+    bucket_start: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume_base: number;
+    volume_quote: number;
+    trades_count: number;
+}
+
+export interface PoolCatalog {
+    pool_id: number;
+    token_a_id: number;
+    token_a_type: string;
+    token_a_symbol: string;
+    token_a_decimals: number;
+    token_b_id: number;
+    token_b_type: string;
+    token_b_symbol: string;
+    token_b_decimals: number;
+    lp_asset_id: number;
+    escrow_hex: string;
+}
+
+export interface DexSwap {
+    id: number;
+    ts: string;
+    base_token_id: number;
+    quote_token_id: number;
+    price_quote: number;
+    volume_base: number;
+    volume_quote: number;
+    pool_id?: number;
+}
