@@ -75,16 +75,20 @@ export let quoteSymbol: string | null = null; // Effective quote symbol for disp
 			// Pool-specific metrics
 			const poolMarketData = marketData.find(m => m.trading_pair_id === selectedPool.poolId);
 			
-			// Get latest OHLCV data for additional metrics
+			// Get latest OHLCV data and derive a 24h window relative to the latest bar
 			const latestCandle = ohlcvData[ohlcvData.length - 1];
-			const firstCandle = ohlcvData[0];
-			const priceChange24h = latestCandle && firstCandle 
-				? ((latestCandle.close - firstCandle.open) / firstCandle.open) * 100 
+			const nowTs = latestCandle?.time ?? 0;
+			const windowStart = nowTs - 24 * 60 * 60; // last 24 hours
+			const last24h = ohlcvData.filter(c => c.time >= windowStart);
+			// Fallback to full data if filter yields nothing
+			const seriesForWindow = last24h.length > 0 ? last24h : ohlcvData;
+			const firstInWindow = seriesForWindow[0];
+			const priceChange24h = latestCandle && firstInWindow
+				? ((latestCandle.close - firstInWindow.open) / firstInWindow.open) * 100
 				: 0;
-			
-			// Calculate 24h high/low from OHLCV data
-			const high24h = ohlcvData.reduce((max, candle) => Math.max(max, candle.high), 0);
-			const low24h = ohlcvData.reduce((min, candle) => Math.min(min, candle.low), Infinity);
+			// Calculate 24h high/low only within the window
+			const high24h = seriesForWindow.reduce((max, candle) => Math.max(max, candle.high), 0);
+			const low24h = seriesForWindow.reduce((min, candle) => Math.min(min, candle.low), Infinity);
 
 			// Calculate fully diluted market cap if we have supply data
 			const currentPrice = latestCandle?.close || poolMarketData?.price || 0;
