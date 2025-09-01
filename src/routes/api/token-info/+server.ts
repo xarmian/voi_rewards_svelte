@@ -17,7 +17,7 @@ export const GET: RequestHandler = async ({ url }) => {
     // Query arc200 contracts for metadata (imageUrl, symbol, decimals)
     let query = supabaseMimirClient
       .from('arc200_contracts')
-      .select('contract_id, symbol, decimals, imageUrl')
+      .select('contract_id, symbol, decimals, image_url')
       .limit(1);
 
     if (tokenId) {
@@ -42,7 +42,7 @@ export const GET: RequestHandler = async ({ url }) => {
         tokenId: row.contract_id,
         symbol: row.symbol,
         decimals: row.decimals,
-        imageUrl: row.imageUrl || null
+        imageUrl: row.image_url || null
       }
     });
   } catch (error) {
