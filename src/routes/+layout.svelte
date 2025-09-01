@@ -36,13 +36,13 @@
 		return () => subscription.unsubscribe()
 	});
 
-	$: metadata = $page.data.pageMetaTags ?? {};
-	$: pageName = metadata.title ? metadata.title + ' | Voi Rewards Auditor' : 'Voi Rewards Auditor';
-	$: description = metadata.description ?? 'View real-time expected token rewards for block proposals and node health. Voi, the blockchain for You All.';
-	$: imageUrl = metadata.imageUrl ?? 'https://voirewards.com/android-chrome-192x192.png';
+	const metadata = $page.data.pageMetaTags ?? {};
+	const pageName = metadata.title ? metadata.title + ' | Voi Rewards Auditor' : 'Voi Rewards Auditor';
+	const description = metadata.description ?? 'View real-time expected token rewards for block proposals and node health. Voi, the blockchain for You All.';
+	const imageUrl = metadata.imageUrl ?? 'https://voirewards.com/android-chrome-192x192.png';
 	//const twitterHandle = metadata.twitterHandle;
-	$: siteName = metadata.siteName ?? ' Voi Rewards Auditor';
-	$: cardType = metadata.cardType ?? 'summary';
+	const siteName = metadata.siteName ?? ' Voi Rewards Auditor';
+	const cardType = metadata.cardType ?? 'summary';
 </script>
 
 <svelte:head>
