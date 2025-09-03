@@ -192,11 +192,13 @@
 
 			// Add resize observer for container size changes
 			const resizeObserver = new ResizeObserver(() => {
-				const newWidth = chartContainer.clientWidth;
-				chart.applyOptions({
-					width: newWidth
-				});
-				chart.timeScale().fitContent();
+				if (chartContainer && chart) {
+					const newWidth = chartContainer.clientWidth;
+					chart.applyOptions({
+						width: newWidth
+					});
+					chart.timeScale().fitContent();
+				}
 			});
 			resizeObserver.observe(chartContainer);
 

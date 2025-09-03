@@ -12,6 +12,7 @@ export interface UniqueToken {
 	decimals: number;
 	type: 'VOI' | 'ARC200' | 'ASA' | 'UNKNOWN';
 	poolCount: number;
+	imageUrl: string | null;
 }
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -40,6 +41,15 @@ export const GET: RequestHandler = async ({ url }) => {
 		// Extract unique tokens from both token_a and token_b, normalizing wVOI to VOI
 		const tokenMap = new Map<string, UniqueToken>(); // Use symbol as key for normalization
 
+		function getTokenImageUrl(id: number, symbol: string): string | null {
+			// VOI tokens use special icon
+			if (symbol.toUpperCase() === 'VOI' || symbol.toUpperCase() === 'WVOI') {
+				return '/icons/voi-token.png';
+			}
+			// For other tokens, use Nautilus Asset Verification Service
+			return `https://asset-verification.nautilus.sh/icons/${id}.png`;
+		}
+
 		function normalizeToken(
 			id: number,
 			symbol: string,
@@ -55,7 +65,8 @@ export const GET: RequestHandler = async ({ url }) => {
 				symbol: normalizedSymbol,
 				decimals: decimals,
 				type: normalizedType as 'VOI' | 'ARC200' | 'ASA' | 'UNKNOWN',
-				poolCount: 0
+				poolCount: 0,
+				imageUrl: getTokenImageUrl(id, normalizedSymbol)
 			};
 		}
 

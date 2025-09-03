@@ -101,6 +101,11 @@ export const load: PageLoad = async ({ fetch, url }) => {
 		priceHistory,
 		tokenPairs,
 		tokenAnalytics,
-		pageMetaTags
+		pageMetaTags,
+		// Return resolved token info for component initialization
+		resolvedToken: {
+			symbol: tokenSymbolResolved,
+			id: tokenIdResolved
+		}
 	};
 };

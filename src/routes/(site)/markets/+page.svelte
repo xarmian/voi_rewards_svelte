@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Card, Tooltip, Button, Spinner, Badge, Tabs, TabItem } from 'flowbite-svelte';
+	import { Card, Tooltip, Button, Spinner, Badge, Tabs, TabItem, Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { fade, slide } from 'svelte/transition';
 	import type { PageData } from './$types';
-	import { invalidateAll, goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import OHLCVChart from '$lib/components/OHLCVChart.svelte';
@@ -12,15 +12,9 @@
 	import PoolSelector from '$lib/components/PoolSelector.svelte';
 	import TokenMetricsBar from '$lib/components/TokenMetricsBar.svelte';
 	import PoolDetails from '$lib/components/PoolDetails.svelte';
-	// New enhanced components
+	// Enhanced components (keep only used ones for now)
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
-	import TokenHeatmap from '$lib/components/TokenHeatmap.svelte';
-	import TokenComparison from '$lib/components/TokenComparison.svelte';
-	import TokenGalaxy from '$lib/components/TokenGalaxy.svelte';
-
 	import WatchlistManager from '$lib/components/WatchlistManager.svelte';
-	import MobileTokenCard from '$lib/components/MobileTokenCard.svelte';
-	import MetricsRadar from '$lib/components/MetricsRadar.svelte';
 	import { TOKENS } from '$lib/utils/tokens';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type {
@@ -59,29 +53,47 @@
 	}
 
 	export let data: PageData;
-	$: ({ marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics } = data);
+	$: ({ marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } = data);
 	
-	// Debug: Let's see what we're actually getting (temporary)
-	$: {
-		if (browser && marketData) {
-			console.log('Page data received:', data);
-			console.log('marketData length:', marketData?.length);
-			console.log('first market:', marketData?.[0]); 
-			console.log('aggregates:', aggregates); 
-			console.log('circulatingSupply:', circulatingSupply);
-		}
-	}
+	// Debug logs removed to reduce noise - page data reactive statement still exists but is silent
 	
-	// Use the data we receive, but fall back to empty structures
-	$: realMarketData = Array.isArray(marketData) ? marketData : [];
-	$: fallbackPairs = Array.isArray(tokenPairs) ? tokenPairs : [];
-	$: realCirculatingSupply = circulatingSupply || { circulatingSupply: 0, percentDistributed: 0 };
-
-	// New token-based state
+	// Use page data as primary source - don't let reactive statements override
+	let realMarketData = Array.isArray(marketData) ? marketData : [];
+	let fallbackPairs = Array.isArray(tokenPairs) ? tokenPairs : [];
+	let realCirculatingSupply = circulatingSupply || { circulatingSupply: 0, percentDistributed: 0 };
+	
+	// Cache to prevent duplicate API requests
+	let voiPriceHistoryCache: any = null;
+	let voiPriceHistoryPromise: Promise<any> | null = null;
+	let lastFetchedToken: string | null = null;
+	let serverDataToken: string | null = null;
+	
+	// Debug: Log data changes
+	$: console.log('Data state:', { 
+		marketDataLength: realMarketData?.length || 0, 
+		aggregatesPrice: aggregates?.weightedAveragePrice,
+		selectedTokenSymbol: selectedToken?.symbol,
+		aggregatesVolume: aggregates?.totalVolume,
+		aggregatesTvl: aggregates?.totalTvl
+	});
+	
+	// Initialize selectedToken from page load data
 	let selectedToken: UniqueToken | null = null;
+	
+	// Initialize from resolved token data when available
+	$: if (resolvedToken && !selectedToken && !_userClearedToken) {
+		selectedToken = {
+			id: resolvedToken.id || 0,
+			symbol: resolvedToken.symbol || 'VOI',
+			decimals: resolvedToken.symbol === 'VOI' ? 6 : 0, // Will be updated by fetchTokenInfo
+			type: resolvedToken.symbol === 'VOI' ? 'VOI' : 'ARC200',
+			poolCount: 0 // Will be updated by fetchTokenInfo
+		};
+		// Track that this token's data was loaded from the server
+		serverDataToken = resolvedToken.symbol || 'VOI';
+	}
 	let selectedPool: TokenPair | null = null;
 	let poolsLoading = false;
-	let legacySelectedToken: string = 'VOI';
 
 	// Token overview and analytics state
 	let tokenInfo: any = null;
@@ -98,122 +110,13 @@
 	let isMobile = false;
     let showAdvancedFeatures = false;
 
-	// Real-time updates
-	let lastUpdateTime = new Date();
-	let updateInterval: NodeJS.Timeout;
 
 	// Simple search functionality
 	let searchQuery = '';
 	let filteredMarketData = realMarketData;
 
-	// Initialize selected token from URL (?token=ID) or default to VOI
-	let _initTokenOnce = false;
-	async function initSelectedTokenFromUrl() {
-		try {
-			const url = $page.url;
-			const tokenParam = url.searchParams.get('token');
-			const poolParam = url.searchParams.get('pool');
-
-			// If numeric ID, resolve token details from token-pairs
-			if (tokenParam && /^\d+$/.test(tokenParam)) {
-				const res = await fetch(`/api/token-pairs?tokenId=${tokenParam}&limit=50`);
-				const data = await res.json();
-				const id = parseInt(tokenParam, 10);
-				if (data?.pairs?.length) {
-					// Prefer a pair that explicitly includes our ID
-					const match =
-						data.pairs.find((p: any) => p.baseTokenId === id || p.quoteTokenId === id) ||
-						data.pairs[0];
-					const isBase = match.baseTokenId === id;
-					const rawSymbol = isBase ? match.baseSymbol : match.quoteSymbol;
-					const decimals = isBase ? match.baseDecimals : match.quoteDecimals;
-					const normSymbol =
-						(rawSymbol || '').toUpperCase() === 'WVOI' ? 'VOI' : rawSymbol || 'VOI';
-					selectedToken = {
-						id,
-						symbol: normSymbol,
-						decimals: typeof decimals === 'number' ? decimals : 6,
-						type: normSymbol.toUpperCase() === 'VOI' ? 'VOI' : 'UNKNOWN',
-						poolCount: 0
-					};
-					selectedTokens = [selectedToken]; // Initialize selectedTokens
-					// If a pool is specified, try to preselect it for this token
-					if (poolParam && /^\d+$/.test(poolParam)) {
-						try {
-							const pairsRes = await fetch(`/api/token-pairs?tokenId=${id}&limit=200`);
-							const pairsJson = await pairsRes.json();
-							const pid = parseInt(poolParam, 10);
-							const found = (pairsJson?.pairs || []).find((p: any) => p.poolId === pid);
-							if (found) {
-								selectedPool = found;
-								selectedTokenPair = found;
-								legacySelectedToken = selectedToken.symbol;
-								fetchUnifiedChartData(legacySelectedToken, chartSettings.resolution);
-							}
-						} catch (e) {
-							console.warn('Failed to init pool from URL:', e);
-						}
-					}
-					return;
-				}
-			} else if (tokenParam) {
-				// Symbol provided: resolve token info and set selectedToken
-				const symbol = tokenParam.toUpperCase();
-				try {
-					const res = await fetch(`/api/token-info?symbol=${encodeURIComponent(symbol)}`);
-					const infoJson = await res.json();
-					if (infoJson?.info) {
-						const info = infoJson.info;
-						const normSymbol = info.symbol?.toUpperCase() === 'WVOI' ? 'VOI' : info.symbol || symbol;
-						selectedToken = {
-							id: info.tokenId ?? 0,
-							symbol: normSymbol,
-							decimals: typeof info.decimals === 'number' ? info.decimals : 6,
-							type: (info.type || 'UNKNOWN') as 'VOI' | 'ARC200' | 'ASA' | 'UNKNOWN',
-							poolCount: 0
-						};
-						selectedTokens = [selectedToken];
-						// Try to preselect pool if provided
-						if (poolParam && /^\d+$/.test(poolParam)) {
-							try {
-								const pairsRes = await fetch(`/api/token-pairs?tokenSymbol=${encodeURIComponent(normSymbol)}&limit=200`);
-								const pairsJson = await pairsRes.json();
-								const pid = parseInt(poolParam, 10);
-								const found = (pairsJson?.pairs || []).find((p: any) => p.poolId === pid);
-								if (found) {
-									selectedPool = found;
-									selectedTokenPair = found;
-									legacySelectedToken = selectedToken.symbol;
-									fetchUnifiedChartData(legacySelectedToken, chartSettings.resolution);
-								}
-							} catch (e) {
-								console.warn('Failed to init pool from URL (symbol):', e);
-							}
-						}
-						return;
-					}
-				} catch (e) {
-					console.warn('Failed to init token from URL (symbol):', e);
-				}
-			}
-		} catch (e) {
-			console.warn('Failed to init token from URL:', e);
-		}
-		// Fallback: VOI default
-		selectedToken = {
-			id: 0,
-			symbol: 'VOI',
-			decimals: 6,
-			type: 'VOI',
-			poolCount: 0
-		};
-		selectedTokens = [selectedToken]; // Initialize selectedTokens
-	}
-
-	$: if (browser && !_initTokenOnce && !selectedToken) {
-		_initTokenOnce = true;
-		initSelectedTokenFromUrl();
-	}
+	// Track user-initiated token clearing to prevent URL re-initialization  
+	let _userClearedToken = false;
 
 	// Detect mobile device
 	$: if (browser) {
@@ -225,7 +128,6 @@
 
 	onMount(() => {
 		loadAllTokens();
-		setupRealTimeUpdates();
 		setupKeyboardShortcuts();
 		
 		// Responsive handling
@@ -236,7 +138,6 @@
 		
 		return () => {
 			window.removeEventListener('resize', handleResize);
-			if (updateInterval) clearInterval(updateInterval);
 		};
 	});
 
@@ -252,15 +153,6 @@
 		}
 	}
 
-	function setupRealTimeUpdates() {
-		updateInterval = setInterval(() => {
-			lastUpdateTime = new Date();
-			// Refresh data periodically
-			if (browser) {
-				invalidateAll();
-			}
-		}, 30000); // Update every 30 seconds
-	}
 
 	function setupKeyboardShortcuts() {
 		const handleKeydown = (event: KeyboardEvent) => {
@@ -341,22 +233,46 @@
 		viewMode = 'comparison';
 	}
 
-	// Keep legacy token string for VOI market data compatibility
+	// Fetch token info when token changes (but not for VOI)
 	$: if (selectedToken) {
-		legacySelectedToken = selectedToken.symbol;
-		fetchTokenInfo(selectedToken.id);
+		if (selectedToken.id === 0 || selectedToken.symbol === 'VOI') {
+			// Clear token info for VOI
+			tokenInfo = null;
+		} else {
+			fetchTokenInfo(selectedToken.id);
+		}
+	}
+	
+	// Fetch market data when token changes (including initialization)
+	$: if (browser && selectedToken && selectedToken.symbol) {
+		console.log('Triggering market data fetch for:', selectedToken.symbol);
+		fetchMarketDataForToken(selectedToken.symbol);
 	}
 
 	// Fetch token info when token changes
 	async function fetchTokenInfo(tokenId: number) {
+		// Skip if we already have token info from server data for the same token
+		if (selectedToken?.symbol === serverDataToken && tokenInfo) {
+			console.log('Skipping fetchTokenInfo - already have data from server for', selectedToken.symbol);
+			return;
+		}
+
 		tokenInfoLoading = true;
 		try {
 			const response = await fetch(`/api/token-info?tokenId=${tokenId}`);
 			const data = await response.json();
 			if (data.info) {
 				tokenInfo = data.info;
+				console.log('Token info fetched:', {
+					tokenId,
+					symbol: data.info.symbol,
+					totalSupply: data.info.totalSupply,
+					decimals: data.info.decimals,
+					imageUrl: data.info.imageUrl
+				});
 			} else {
 				tokenInfo = null;
+				console.log('No token info found for ID:', tokenId);
 			}
 		} catch (error) {
 			console.error('Failed to fetch token info:', error);
@@ -382,7 +298,7 @@
             const ana = tokenAnalytics?.volume?.volume24h ?? 0;
             
             // For VOI, use market data (includes cross-chain), for others prefer analytics
-            if (legacySelectedToken === 'VOI') {
+            if ((selectedToken?.symbol || 'VOI') === 'VOI') {
                 console.log('VOI Volume calculation - using market data instead of inflated analytics:', {
                     marketSum: sum,
                     analyticsSum: ana,
@@ -392,7 +308,7 @@
             } else {
                 // For non-VOI tokens, use market sum (analytics data is inflated)
                 console.log('Non-VOI Volume calculation - using market data instead of inflated analytics:', {
-                    token: legacySelectedToken,
+                    token: selectedToken?.symbol || 'VOI',
                     marketSum: sum,
                     analyticsSum: ana,
                     using: 'market data (correct)'
@@ -409,7 +325,7 @@
             const ana = tokenAnalytics?.tvl?.totalTvl ?? 0;
             
             // For VOI, use market data (includes cross-chain), for others prefer analytics
-            if (legacySelectedToken === 'VOI') {
+            if ((selectedToken?.symbol || 'VOI') === 'VOI') {
                 console.log('VOI TVL calculation:', {
                     marketSum: sum,
                     analyticsSum: ana,
@@ -419,7 +335,7 @@
             } else {
                 // For non-VOI tokens, use market sum (analytics data is inflated)
                 console.log('Non-VOI TVL calculation - using market data instead of inflated analytics:', {
-                    token: legacySelectedToken,
+                    token: selectedToken?.symbol || 'VOI',
                     marketSum: sum,
                     analyticsSum: ana,
                     using: 'market data (correct)'
@@ -433,10 +349,34 @@
 		? realMarketData.length
 		: (fallbackPairs?.length ?? (tokenAnalytics?.tvl?.poolCount ?? 0));
 
+	// Debug active markets count
+	$: console.log('Active markets calculation:', {
+		realMarketDataLength: realMarketData.length,
+		fallbackPairsLength: fallbackPairs?.length,
+		tokenAnalyticsPoolCount: tokenAnalytics?.tvl?.poolCount,
+		activeMarketsCount
+	});
+
 	let fetchingMarketData = false;
 	// Fetch market data for a specific token
 	async function fetchMarketDataForToken(tokenSymbol: string) {
+		console.log('fetchMarketDataForToken called for:', tokenSymbol);
+		
+		// Skip if we already have server data for this token and it's the same token
+		if (tokenSymbol === serverDataToken && tokenSymbol === lastFetchedToken) {
+			console.log('Skipping fetchMarketDataForToken - already have server data for', tokenSymbol);
+			return;
+		}
+		
+		// Skip if we just fetched the same token (avoid duplicates from reactive statements)
+		if (tokenSymbol === lastFetchedToken && fetchingMarketData) {
+			console.log('Skipping fetchMarketDataForToken - already fetching', tokenSymbol);
+			return;
+		}
+		
+		lastFetchedToken = tokenSymbol;
 		fetchingMarketData = true;
+		
 		try {
 			const response = await fetch(`/api/markets?token=${encodeURIComponent(tokenSymbol)}`);
 			const data = await response.json();
@@ -455,16 +395,21 @@
 				realCirculatingSupply = data.circulatingSupply;
 			}
 			
-			// For non-VOI tokens, also fetch token analytics
+			// For non-VOI tokens, also fetch token analytics (but only if not already from server)
 			if (tokenSymbol !== 'VOI' && selectedToken && selectedToken.id !== 0) {
-				try {
-					const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${selectedToken.id}`);
-					const analyticsData = await analyticsResponse.json();
-					if (analyticsData.analytics) {
-						tokenAnalytics = analyticsData.analytics;
+				// Skip analytics fetch if we already have it from server data
+				if (tokenSymbol !== serverDataToken || !tokenAnalytics) {
+					try {
+						const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${selectedToken.id}`);
+						const analyticsData = await analyticsResponse.json();
+						if (analyticsData.analytics) {
+							tokenAnalytics = analyticsData.analytics;
+						}
+					} catch (e) {
+						console.warn('Failed to fetch token analytics:', e);
 					}
-				} catch (e) {
-					console.warn('Failed to fetch token analytics:', e);
+				} else {
+					console.log('Skipping token-analytics fetch - already have server data');
 				}
 			} else {
 				// Clear analytics for VOI
@@ -472,10 +417,9 @@
 			}
 			
 			console.log(`Fetched market data for ${tokenSymbol}:`, {
-				marketDataLength: realMarketData.length,
+				realMarketData: realMarketData.length,
 				aggregates,
-				circulatingSupply: realCirculatingSupply,
-				tokenAnalytics
+				tokenAnalytics: !!tokenAnalytics
 			});
 		} catch (error) {
 			console.error('Failed to fetch market data:', error);
@@ -488,12 +432,18 @@
 	// Handle token selection
 	function handleTokenSelect(event: CustomEvent<UniqueToken>) {
 		selectedToken = event.detail;
+		// Reset server data tracking and cache when user manually selects a token
+		serverDataToken = null;
+		lastFetchedToken = null;
+		// Clear cache when switching tokens to ensure fresh data
+		voiPriceHistoryCache = null;
+		voiPriceHistoryPromise = null;
 		selectedTokens = [event.detail]; // Update selectedTokens array
 		selectedPool = null; // Reset pool selection when token changes
-		selectedTokenPair = null; // Clear token pair as well
 
 		// If switching to VOI, do exactly what the Reset button was doing
 		if (selectedToken.symbol.toUpperCase() === 'VOI') {
+			_userClearedToken = true; // Prevent URL re-initialization
 			selectedToken = {
 				id: 0,
 				symbol: 'VOI',
@@ -503,37 +453,44 @@
 			};
 			selectedTokens = [selectedToken]; // Update selectedTokens
 			selectedPool = null;
-			selectedTokenPair = null;
-			legacySelectedToken = 'VOI'; // Update legacySelectedToken
 			
 			if (browser) {
-				// Fetch fresh VOI market data
-				fetchMarketDataForToken('VOI');
+				// Start loading state immediately
+				fetchingMarketData = true;
+				
+				// Market data will be fetched by reactive statement
+				// Just fetch chart data here
 				fetchUnifiedChartData('VOI', chartSettings.resolution);
-				const url = new URL($page.url);
-				url.searchParams.set('token', 'VOI');
-				url.searchParams.delete('pool');
-				goto(url.toString(), { keepFocus: true, noScroll: true, replaceState: true });
+				
+				// Update URL without triggering data reload
+				if (browser) {
+					const url = new URL($page.url);
+					url.searchParams.set('token', 'VOI');
+					url.searchParams.delete('pool');
+					goto(url.toString(), { 
+						keepFocus: true, 
+						noScroll: true, 
+						replaceState: true,
+						invalidateAll: false 
+					});
+				}
 			}
 		} else {
-			// Update legacySelectedToken for non-VOI tokens
-			legacySelectedToken = selectedToken.symbol;
+			// Reset clear flag when selecting non-VOI tokens
+			_userClearedToken = false;
 			
 			if (browser) {
-				// Fetch market data for the selected token
-				fetchMarketDataForToken(selectedToken.symbol);
-				
-				// Fetch token chart data for the selected token
-				if (selectedToken.id !== 0) {
-					fetchTokenChartData(selectedToken.id, chartSettings.resolution);
-				}
-				
-				// Update URL to reflect token selection (use token symbol for better compatibility)
+				// Chart data will be fetched by reactive statement automatically
+				// Update URL without triggering data reload
 				const url = new URL($page.url);
 				url.searchParams.set('token', selectedToken.symbol);
-				// Clear pool when switching tokens
 				url.searchParams.delete('pool');
-				goto(url.toString(), { keepFocus: true, noScroll: true, replaceState: true });
+				goto(url.toString(), { 
+					keepFocus: true, 
+					noScroll: true, 
+					replaceState: true,
+					invalidateAll: false 
+				});
 			}
 		}
 	}
@@ -541,7 +498,6 @@
 	// Handle pool selection
 	function handlePoolSelect(event: CustomEvent<TokenPair | null>) {
 		selectedPool = event.detail;
-		selectedTokenPair = event.detail; // Keep compatibility with existing chart logic
 
 		// Fetch chart data for the selected pool, or default VOI data if null
 		if (selectedPool) {
@@ -550,9 +506,13 @@
 			if (browser) {
 				const url = new URL($page.url);
 				url.searchParams.set('pool', String(selectedPool.poolId));
-				// Ensure token param is present
-				if (selectedToken) url.searchParams.set('token', String(selectedToken.id));
-				goto(url.toString(), { keepFocus: true, noScroll: true, replaceState: true });
+				if (selectedToken) url.searchParams.set('token', selectedToken.symbol);
+				goto(url.toString(), { 
+					keepFocus: true, 
+					noScroll: true, 
+					replaceState: true,
+					invalidateAll: false 
+				});
 			}
 		} else if (selectedToken?.symbol.toUpperCase() === 'VOI') {
 			// Clear pool selection for VOI - show aggregated data
@@ -560,7 +520,12 @@
 			if (browser) {
 				const url = new URL($page.url);
 				url.searchParams.delete('pool');
-				goto(url.toString(), { keepFocus: true, noScroll: true, replaceState: true });
+				goto(url.toString(), { 
+					keepFocus: true, 
+					noScroll: true, 
+					replaceState: true,
+					invalidateAll: false 
+				});
 			}
 		}
 	}
@@ -630,7 +595,7 @@
 		let filteredMarkets = realMarketData.filter(m => m.price != null && m.price > 0);
 		
 		// For VOI only, filter out inflated prices
-		if (legacySelectedToken === 'VOI') {
+		if ((selectedToken?.symbol || 'VOI') === 'VOI') {
 			filteredMarkets = filteredMarkets.filter(m => m.price! < 0.01); // Allow up to 1 cent for VOI
 		}
 		
@@ -687,7 +652,7 @@
 
 	// Calculate market caps
 	// VOI: use circulating supply from server; Others: use totalSupply from tokenInfo (FDV)
-	$: circulatingMarketCap = legacySelectedToken === 'VOI'
+	$: circulatingMarketCap = (selectedToken?.symbol || 'VOI') === 'VOI'
 		? weightedAveragePrice * Number(circulatingSupply.circulatingSupply)
 		: 0;
 	$: tokenTotalSupplyAdjusted = tokenInfo?.totalSupply != null && tokenInfo?.decimals != null
@@ -695,7 +660,7 @@
 		: null;
 	$: fullyDilutedMarketCap = tokenTotalSupplyAdjusted
 		? weightedAveragePrice * tokenTotalSupplyAdjusted
-		: legacySelectedToken === 'VOI'
+		: (selectedToken?.symbol || 'VOI') === 'VOI'
 		? weightedAveragePrice * 10_000_000_000
 		: 0;
 
@@ -710,8 +675,8 @@
 			} else {
 				await fetchMarketDataForToken('VOI');
 			}
-			// Also invalidate all other data
-			await invalidateAll();
+			// Skip invalidateAll to prevent full page reload - we already fetched what we need
+			// await invalidateAll();
 		} finally {
 			isRefreshing = false;
 		}
@@ -723,7 +688,7 @@
 	async function handlePeriodChange(period: '24h' | '7d') {
 		selectedPeriod = period;
 		const response = await fetch(
-			`/api/price-history?period=${period}${selectedTradingPairId ? `&trading_pair_id=${selectedTradingPairId}` : ''}&token=${legacySelectedToken}`
+			`/api/price-history?period=${period}${selectedTradingPairId ? `&trading_pair_id=${selectedTradingPairId}` : ''}&token=${selectedToken?.symbol || 'VOI'}`
 		);
 		priceHistory = await response.json();
 	}
@@ -744,7 +709,7 @@
 			};
 		}
 		const response = await fetch(
-			`/api/price-history?trading_pair_id=${selectedTradingPairId}&period=${selectedPeriod}&token=${legacySelectedToken}`
+			`/api/price-history?trading_pair_id=${selectedTradingPairId}&period=${selectedPeriod}&token=${selectedToken?.symbol || 'VOI'}`
 		);
 		priceHistory = await response.json();
 	}
@@ -786,12 +751,13 @@
         const json = await res.json();
         let candles = json?.candles || [];
         const quoteSym = (market.pair.split('/')[1] || '').toUpperCase();
-        // If quote is VOI or WVOI, convert to USD using VOI reference series
+        // If quote is VOI or WVOI, convert to USD using VOI reference series (with caching)
         if (candles.length && (quoteSym === 'VOI' || quoteSym === 'WVOI')) {
             try {
-                const refRes = await fetch('/api/price-history?period=24h&token=VOI');
-                const refJson = await refRes.json();
-                candles = convertVoiQuotedCandlesToUsd(candles, refJson);
+                const refJson = await getVoiUsdReferenceData();
+                if (refJson) {
+                    candles = convertVoiQuotedCandlesToUsd(candles, refJson);
+                }
             } catch (e) {
                 console.warn('USD normalization failed; showing VOI quote');
             }
@@ -804,8 +770,7 @@
 		}
 	}
 
-	// Unified Chart State
-	let selectedTokenPair: TokenPair | null = null;
+	// Unified Chart State (using selectedPool instead of selectedTokenPair)
 	let unifiedChartData: OHLCVData[] = [];
 	let unifiedVolumeData: VolumeData[] = [];
 	let chartTokenPair: TokenPair | null = null;
@@ -814,8 +779,6 @@
 	let chartSettings: ChartSettings = {
 		chartType: 'line',
 		resolution: '1h',
-		autoRefresh: false,
-		refreshInterval: 5,
 		showVolume: false,
 		theme: 'light'
 	};
@@ -827,16 +790,46 @@
 	let tokenChartVolumes: VolumeData[] = [];
 	let tokenChartLoading = false;
 	let tokenChartError = '';
-	let currentQuoteCurrency: 'VOI' | 'USD' = 'VOI';
+	let currentQuoteCurrency: 'VOI' | 'USD' = 'USD';
 
 	// Initialize chart settings based on selected token
-	$: if (legacySelectedToken) {
-		chartSettings.chartType = getDefaultChartType(legacySelectedToken);
-		chartSettings.resolution = getDefaultResolution(legacySelectedToken);
+	$: if (selectedToken?.symbol) {
+		chartSettings.chartType = getDefaultChartType(selectedToken.symbol);
+		chartSettings.resolution = getDefaultResolution(selectedToken.symbol);
+	}
+
+	// Fetch VOI USD reference data with promise-based caching to prevent duplicate requests
+	async function getVoiUsdReferenceData() {
+		if (voiPriceHistoryCache) {
+			console.log('Using cached VOI USD reference data');
+			return voiPriceHistoryCache;
+		}
+		
+		if (voiPriceHistoryPromise) {
+			console.log('VOI USD request already in progress, waiting for result');
+			return await voiPriceHistoryPromise;
+		}
+		
+		console.log('Fetching VOI USD reference data (not cached)');
+		voiPriceHistoryPromise = fetch(`/api/price-history?period=24h&token=VOI`)
+			.then(response => response.json())
+			.then(voiUsdData => {
+				if (voiUsdData && Array.isArray(voiUsdData) && voiUsdData.length > 0) {
+					voiPriceHistoryCache = voiUsdData;
+					return voiUsdData;
+				}
+				return null;
+			})
+			.finally(() => {
+				// Clear the promise once complete so future calls can make new requests if needed
+				voiPriceHistoryPromise = null;
+			});
+		
+		return await voiPriceHistoryPromise;
 	}
 
 	// Fetch chart data for selected token paired with VOI or USD
-	async function fetchTokenChartData(tokenId: number, resolution: Resolution = '1h', quoteCurrency: 'VOI' | 'USD' = 'VOI') {
+	async function fetchTokenChartData(tokenId: number, resolution: Resolution = '1h', quoteCurrency: 'VOI' | 'USD' = 'USD') {
 		if (!tokenId || tokenId === 0) return; // Skip for native VOI
 		
 		tokenChartLoading = true;
@@ -853,9 +846,8 @@
 				const voiData = await voiResponse.json();
 				
 				if (voiData.candles && voiData.candles.length > 0) {
-					// Get VOI USD reference data for conversion
-					const voiUsdResponse = await fetch(`/api/price-history?period=24h&token=VOI`);
-					const voiUsdData = await voiUsdResponse.json();
+					// Get VOI USD reference data for conversion (with caching)
+					const voiUsdData = await getVoiUsdReferenceData();
 					
 					if (voiUsdData && Array.isArray(voiUsdData) && voiUsdData.length > 0) {
 						// Convert VOI prices to USD using the conversion utility
@@ -907,7 +899,7 @@
 
 	// Watch for token selection changes and fetch chart data
 	$: if (selectedToken && selectedToken.id !== 0) {
-		fetchTokenChartData(selectedToken.id, chartSettings.resolution);
+		fetchTokenChartData(selectedToken.id, chartSettings.resolution, currentQuoteCurrency);
 	} else if (selectedToken && selectedToken.id === 0) {
 		// For VOI, show aggregated data instead of chart
 		showTokenChart = false;
@@ -919,7 +911,7 @@
 	async function handleChartResolutionChange(resolution: Resolution) {
 		chartSettings.resolution = resolution;
 		if (selectedToken && selectedToken.id !== 0) {
-			await fetchTokenChartData(selectedToken.id, resolution);
+			await fetchTokenChartData(selectedToken.id, resolution, currentQuoteCurrency);
 		}
 	}
 
@@ -942,8 +934,8 @@
 
 		try {
 			// If a specific token pair or pool is selected, always fetch OHLCV from MIMIR
-			if (selectedTokenPair || selectedPool) {
-				const pair = selectedPool || selectedTokenPair;
+			if (selectedPool) {
+				const pair = selectedPool;
 				let localChartPair: TokenPair | null = null;
 				let localCandles: OHLCVData[] = [];
 				let localVolumes: VolumeData[] = [];
@@ -1074,42 +1066,33 @@
 	// Handle token changes once (avoid reacting on resolution changes)
 	// Only auto-fetch when token is VOI and no pair is selected. Do not clear state for non-VOI.
 	let prevToken: string | null = null;
-	$: if (browser && legacySelectedToken !== prevToken) {
-		prevToken = legacySelectedToken;
-		if (legacySelectedToken === 'VOI' && !selectedTokenPair && !selectedPool) {
+	$: if (browser && (selectedToken?.symbol || 'VOI') !== prevToken) {
+		prevToken = selectedToken?.symbol || 'VOI';
+		if ((selectedToken?.symbol || 'VOI') === 'VOI' && !selectedPool) {
 			fetchUnifiedChartData('VOI', chartSettings.resolution);
 		}
 	}
 
-	async function handleTokenPairSelect(event: CustomEvent<TokenPair>) {
-		selectedTokenPair = event.detail;
-		// Switch context to the selected pair's base token (normalize wVOI -> VOI for display)
-		const base = (event.detail.baseSymbol || '').toUpperCase();
-		const newToken = base === 'WVOI' ? 'VOI' : event.detail.baseSymbol || legacySelectedToken;
-		if (newToken !== legacySelectedToken) {
-			legacySelectedToken = newToken;
-		}
-		// Fetch OHLCV data for selected pair
-		fetchUnifiedChartData(legacySelectedToken, chartSettings.resolution);
-	}
+	// Token pair selection now handled via handlePoolSelect
 
 	function handleUnifiedRefresh(
 		event: CustomEvent<{ tokenPair: TokenPair; resolution: Resolution }>
 	) {
 		const { resolution } = event.detail;
-		if (shouldUseVOIData(legacySelectedToken)) {
-			fetchUnifiedChartData(legacySelectedToken, resolution, true, selectedTradingPairId);
+		if (shouldUseVOIData(selectedToken?.symbol || 'VOI')) {
+			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution, true, selectedTradingPairId);
 		} else {
-			fetchUnifiedChartData(legacySelectedToken, resolution, true);
+			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution, true);
 		}
 	}
 
 	function handleUnifiedResolutionChange(event: CustomEvent<Resolution>) {
 		chartSettings.resolution = event.detail;
-		if (shouldUseVOIData(legacySelectedToken)) {
-			fetchUnifiedChartData(legacySelectedToken, event.detail, false, selectedTradingPairId);
-		} else if (selectedTokenPair || selectedPool) {
-			fetchUnifiedChartData(legacySelectedToken, event.detail);
+		const tokenSymbol = selectedToken?.symbol || 'VOI';
+		if (shouldUseVOIData(tokenSymbol)) {
+			fetchUnifiedChartData(tokenSymbol, event.detail, false, selectedTradingPairId);
+		} else if (selectedPool) {
+			fetchUnifiedChartData(tokenSymbol, event.detail);
 		}
 	}
 
@@ -1121,9 +1104,9 @@
 	$: if (browser) {
 		// Trigger refetch when displayInUSD changes and we have a pool or VOI context
 		displayInUSD; // dependency for reactive statement
-		if (selectedPool || selectedTokenPair) {
-			fetchUnifiedChartData(legacySelectedToken, chartSettings.resolution);
-		} else if (shouldUseVOIData(legacySelectedToken) && legacySelectedToken === 'VOI') {
+		if (selectedPool) {
+			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', chartSettings.resolution);
+		} else if (shouldUseVOIData(selectedToken?.symbol || 'VOI') && (selectedToken?.symbol || 'VOI') === 'VOI') {
 			// VOI aggregated data remains in USD; no special handling needed
 		}
 	}
@@ -1131,6 +1114,24 @@
 
 <!-- Modern Token Analytics Interface -->
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+	<!-- Beta Disclaimer Banner -->
+	<div class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+			<Alert color="yellow" class="!bg-transparent !border-0 !p-0">
+				<div class="flex items-center gap-3">
+					<i class="fas fa-exclamation-triangle text-amber-600 dark:text-amber-400 text-lg"></i>
+					<div>
+						<span class="font-semibold text-amber-800 dark:text-amber-300">Beta Feature:</span>
+						<span class="text-amber-700 dark:text-amber-400">
+							Markets data is currently in beta and under active development. 
+							All information should be verified independently before making any trading decisions.
+						</span>
+					</div>
+				</div>
+			</Alert>
+		</div>
+	</div>
+	
 	<!-- Market Overview Header -->
 	<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -1143,10 +1144,39 @@
 						<!-- Token Info -->
 						<div class="flex items-center gap-4">
 							<!-- Token Image/Icon -->
-							{#if data.pageMetaTags?.imageUrl && data.pageMetaTags.imageUrl !== 'https://voirewards.com/android-chrome-192x192.png'}
+							{#if (selectedToken?.symbol || 'VOI') === 'VOI'}
+								<!-- VOI Logo -->
+								<img 
+									src="/icons/voi-token.png" 
+									alt="VOI logo"
+									class="w-16 h-16 rounded-2xl object-cover bg-white"
+									on:error={(e) => {
+										e.currentTarget.style.display = 'none';
+										e.currentTarget.nextElementSibling.style.display = 'flex';
+									}}
+								/>
+								<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center" style="display: none;">
+									<i class="fas fa-coins text-white text-2xl"></i>
+								</div>
+							{:else if tokenInfo?.imageUrl}
+								<!-- Token Image from tokenInfo -->
+								<img 
+									src={tokenInfo.imageUrl} 
+									alt="{selectedToken?.symbol || 'VOI'} logo"
+									class="w-16 h-16 rounded-2xl object-cover bg-white"
+									on:error={(e) => {
+										e.currentTarget.style.display = 'none';
+										e.currentTarget.nextElementSibling.style.display = 'flex';
+									}}
+								/>
+								<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center" style="display: none;">
+									<i class="fas fa-coins text-white text-2xl"></i>
+								</div>
+							{:else if data.pageMetaTags?.imageUrl && data.pageMetaTags.imageUrl !== 'https://voirewards.com/android-chrome-192x192.png'}
+								<!-- Fallback to page meta image -->
 								<img 
 									src={data.pageMetaTags.imageUrl} 
-									alt="{legacySelectedToken} logo"
+									alt="{selectedToken?.symbol || 'VOI'} logo"
 									class="w-16 h-16 rounded-2xl object-cover bg-white"
 									on:error={(e) => {
 										e.currentTarget.style.display = 'none';
@@ -1157,6 +1187,7 @@
 									<i class="fas fa-coins text-white text-2xl"></i>
 								</div>
 							{:else}
+								<!-- Default fallback icon -->
 								<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
 									<i class="fas fa-coins text-white text-2xl"></i>
 								</div>
@@ -1165,7 +1196,7 @@
 							<div>
 								<div class="flex items-center gap-3 mb-1">
 									<h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-										{legacySelectedToken || 'VOI'}
+										{selectedToken?.symbol || 'VOI' || 'VOI'}
 									</h1>
 									<Badge class="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
 										{realMarketData.length} Markets
@@ -1178,11 +1209,15 @@
 						</div>
 
 						<!-- Price Display -->
-						<div class="text-center lg:text-right">
+						<div class="text-center lg:text-right" transition:fade={{ duration: 300 }}>
 							<div class="flex items-center justify-center lg:justify-end gap-3">
-								<div class="text-4xl font-bold text-gray-900 dark:text-white">{formatPrice(displayPrice)}</div>
 								{#if fetchingMarketData}
+									<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-12 w-32"></div>
 									<Spinner size="6" />
+								{:else}
+									<div class="text-4xl font-bold text-gray-900 dark:text-white" transition:fade={{ duration: 400 }}>
+										{formatPrice(displayPrice)}
+									</div>
 								{/if}
 							</div>
 							<div class="text-sm text-gray-500 dark:text-gray-400">
@@ -1219,40 +1254,56 @@
 			<!-- Key Metrics -->
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
 				<!-- Total Volume -->
-				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4" transition:fade={{ duration: 300, delay: 200 }}>
 					<div class="flex items-center justify-between mb-2">
 						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">24h Volume</h3>
 						<i class="fas fa-chart-bar text-blue-500"></i>
 					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalVolume24h)}</div>
+					<div class="text-2xl font-bold text-gray-900 dark:text-white">
+						{#if fetchingMarketData}
+							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-20"></div>
+						{:else}
+							{formatCurrency(totalVolume24h)}
+						{/if}
+					</div>
 				</div>
 
 				<!-- Total TVL -->
-				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4" transition:fade={{ duration: 300, delay: 250 }}>
 					<div class="flex items-center justify-between mb-2">
 						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Total TVL</h3>
 						<i class="fas fa-lock text-green-500"></i>
 					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalTvlAll)}</div>
+					<div class="text-2xl font-bold text-gray-900 dark:text-white">
+						{#if fetchingMarketData}
+							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-24"></div>
+						{:else}
+							{formatCurrency(totalTvlAll)}
+						{/if}
+					</div>
 				</div>
 
 				<!-- Market Cap / FDV -->
-				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4" transition:fade={{ duration: 300, delay: 300 }}>
 					<div class="flex items-center justify-between mb-2">
 						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
-							{legacySelectedToken === 'VOI' ? 'Market Cap' : 'FDV'}
+							{(selectedToken?.symbol || 'VOI') === 'VOI' ? 'Market Cap' : 'FDV'}
 						</h3>
 						<i class="fas fa-coins text-purple-500"></i>
 					</div>
 					<div class="text-2xl font-bold text-gray-900 dark:text-white">
-						{legacySelectedToken === 'VOI' 
-							? formatCurrency(circulatingMarketCap)
-							: tokenTotalSupplyAdjusted != null 
-								? formatCurrency(fullyDilutedMarketCap) 
-								: '-'}
+						{#if fetchingMarketData}
+							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-28"></div>
+						{:else}
+							{(selectedToken?.symbol || 'VOI') === 'VOI' 
+								? formatCurrency(circulatingMarketCap)
+								: tokenTotalSupplyAdjusted != null 
+									? formatCurrency(fullyDilutedMarketCap) 
+									: '-'}
+						{/if}
 					</div>
 					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {#if legacySelectedToken === 'VOI'}
+                    {#if (selectedToken?.symbol || 'VOI') === 'VOI'}
                         Circulating: {formatNumber(realCirculatingSupply.circulatingSupply, 0)}
                     {:else}
                         Total Supply: {tokenTotalSupplyAdjusted != null ? formatNumber(tokenTotalSupplyAdjusted, 0) : '—'}
@@ -1261,14 +1312,24 @@
 				</div>
 
 				<!-- Active Markets -->
-				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+				<div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4" transition:fade={{ duration: 300, delay: 350 }}>
 					<div class="flex items-center justify-between mb-2">
 						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Markets</h3>
 						<i class="fas fa-exchange-alt text-orange-500"></i>
 					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">{activeMarketsCount}</div>
+					<div class="text-2xl font-bold text-gray-900 dark:text-white">
+						{#if fetchingMarketData}
+							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-12"></div>
+						{:else}
+							{activeMarketsCount}
+						{/if}
+					</div>
 					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-						Across {new Set(realMarketData.map(m => m.exchange)).size} exchanges
+						{#if fetchingMarketData}
+							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-3 w-20"></div>
+						{:else}
+							Across {new Set(realMarketData.map(m => m.exchange)).size} exchanges
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -1305,6 +1366,7 @@
                                 loading={false}
                                 height={400}
                                 settings={chartSettings}
+                                bind:quoteCurrency={currentQuoteCurrency}
                                 on:refreshData
                                 on:resolutionChange={handleChartResolutionChange}
                                 on:chartTypeChange={handleChartTypeChange}
@@ -1365,6 +1427,7 @@
                             <thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pair</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Exchange</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">TVL (USD)</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">24h Volume</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">24h Change</th>
@@ -1373,7 +1436,43 @@
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 {#each filteredMarketData.slice(0, 50) as market}
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" on:click={() => handleMarketRowClick(market)}>
-                                        <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{market.pair}</td>
+                                        <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                            {#if market.pool_url}
+                                                <a href={market.pool_url} 
+                                                   target="_blank" 
+                                                   rel="noopener noreferrer"
+                                                   class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                                                   on:click|stopPropagation>
+                                                    {market.pair}
+                                                    <i class="fas fa-external-link-alt text-xs opacity-50"></i>
+                                                </a>
+                                            {:else}
+                                                <span class="text-gray-900 dark:text-white">{market.pair}</span>
+                                            {/if}
+                                        </td>
+                                        <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {
+                                                market.exchange === 'humble'
+                                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                                    : market.exchange === 'nomadex'
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                    : market.exchange === 'Humble'
+                                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                                    : market.exchange === 'Nomadex'
+                                                    ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+                                                    : market.exchange === 'Tinyman'
+                                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                                                    : market.exchange === 'PactFi'
+                                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                                    : market.exchange === 'Uniswap'
+                                                    ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300'
+                                                    : market.exchange === 'MEXC'
+                                                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
+                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300'
+                                            }">
+                                                {market.exchange === 'humble' ? 'Humble' : market.exchange === 'nomadex' ? 'Nomadex' : market.exchange}
+                                            </span>
+                                        </td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatCurrency(market.tvl)}</td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatCurrency(market.volume_24h)}</td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
@@ -1478,7 +1577,7 @@
 									Token Markets
 								</h2>
 								<p class="text-sm text-gray-600 dark:text-gray-400">
-									{realMarketData.length} trading pairs • Updated {lastUpdateTime.toLocaleTimeString()}
+									{realMarketData.length} trading pairs • Updated {new Date().toLocaleTimeString()}
 								</p>
 							</div>
 							<Button
@@ -1495,15 +1594,18 @@
 
 					<!-- Table Content -->
 					<div class="overflow-x-auto">
-						{#if isRefreshing}
+						{#if isRefreshing || fetchingMarketData}
 							<div class="flex items-center justify-center py-12">
 								<div class="text-center">
 									<Spinner size="8" class="mb-3" />
-									<p class="text-gray-600 dark:text-gray-400 text-sm">Refreshing data...</p>
+									<p class="text-gray-600 dark:text-gray-400 text-sm">
+										{fetchingMarketData ? 'Loading market data...' : 'Refreshing data...'}
+									</p>
 								</div>
 							</div>
 						{:else if realMarketData.length > 0}
-							<table class="w-full">
+							<div transition:fade={{ duration: 300 }}>
+								<table class="w-full">
 								<thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
 									<tr>
 										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('pair')}>
@@ -1558,8 +1660,19 @@
 														</div>
 													</div>
 													<div>
-														<div class="font-medium text-gray-900 dark:text-white">
-															{market.pair}
+														<div class="font-medium">
+															{#if market.pool_url}
+																<a href={market.pool_url} 
+																   target="_blank" 
+																   rel="noopener noreferrer"
+																   class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+																   on:click|stopPropagation>
+																	{market.pair}
+																	<i class="fas fa-external-link-alt text-xs opacity-50"></i>
+																</a>
+															{:else}
+																<span class="text-gray-900 dark:text-white">{market.pair}</span>
+															{/if}
 														</div>
 														<div class="text-sm text-gray-500 dark:text-gray-400">
 															{market.network} • {market.exchange}
@@ -1606,11 +1719,25 @@
 											<td class="px-6 py-4 whitespace-nowrap">
 												<div class="flex items-center">
 													<Badge class="text-xs {
-														market.type === 'CEX'
+														market.exchange === 'humble'
 															? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-															: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+															: market.exchange === 'nomadex'
+															? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+															: market.exchange === 'Humble'
+															? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+															: market.exchange === 'Nomadex'
+															? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+															: market.exchange === 'Tinyman'
+															? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+															: market.exchange === 'PactFi'
+															? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+															: market.exchange === 'Uniswap'
+															? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300'
+															: market.exchange === 'MEXC'
+															? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
+															: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300'
 													}">
-														{market.exchange}
+														{market.exchange === 'humble' ? 'Humble' : market.exchange === 'nomadex' ? 'Nomadex' : market.exchange}
 													</Badge>
 												</div>
 											</td>
@@ -1655,6 +1782,7 @@
 									{/each}
 								</tbody>
 							</table>
+							</div>
 						{:else if fallbackPairs.length > 0}
 							<!-- Fallback pairs listing when markets API returns none -->
 							<table class="w-full">

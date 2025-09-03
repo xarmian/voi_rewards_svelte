@@ -38,6 +38,7 @@
 		showVolume: true,
 		theme: 'light'
 	};
+	export let quoteCurrency: 'VOI' | 'USD' = 'USD';
 
 	let chartContainer: HTMLElement;
 	let chart: IChartApi;
@@ -55,8 +56,8 @@
 		volume?: number;
 	} | null = null;
 	
-	// Quote currency state (VOI or USD)
-	let quoteCurrency: 'VOI' | 'USD' = 'VOI';
+	// Debug reactive statement to track quoteCurrency changes
+	$: console.log('quoteCurrency reactive update:', quoteCurrency);
 
 	function formatTimeByResolution(ts: number, resolution: Resolution): string {
 		const d = new Date(ts * 1000);
@@ -646,7 +647,16 @@
 				<div class="relative">
 					<div class="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
 						<button
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 {quoteCurrency === 'VOI' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200"
+							class:bg-white={quoteCurrency === 'VOI'}
+							class:dark:bg-gray-800={quoteCurrency === 'VOI'}
+							class:text-gray-900={quoteCurrency === 'VOI'}
+							class:dark:text-white={quoteCurrency === 'VOI'}
+							class:shadow-sm={quoteCurrency === 'VOI'}
+							class:text-gray-600={quoteCurrency !== 'VOI'}
+							class:dark:text-gray-400={quoteCurrency !== 'VOI'}
+							class:hover:text-gray-900={quoteCurrency !== 'VOI'}
+							class:dark:hover:text-white={quoteCurrency !== 'VOI'}
 							on:click={() => {
 								if (quoteCurrency !== 'VOI') {
 									console.log('Setting quoteCurrency to VOI');
@@ -658,7 +668,16 @@
 							VOI
 						</button>
 						<button
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 {quoteCurrency === 'USD' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200"
+							class:bg-white={quoteCurrency === 'USD'}
+							class:dark:bg-gray-800={quoteCurrency === 'USD'}
+							class:text-gray-900={quoteCurrency === 'USD'}
+							class:dark:text-white={quoteCurrency === 'USD'}
+							class:shadow-sm={quoteCurrency === 'USD'}
+							class:text-gray-600={quoteCurrency !== 'USD'}
+							class:dark:text-gray-400={quoteCurrency !== 'USD'}
+							class:hover:text-gray-900={quoteCurrency !== 'USD'}
+							class:dark:hover:text-white={quoteCurrency !== 'USD'}
 							on:click={() => {
 								if (quoteCurrency !== 'USD') {
 									console.log('Setting quoteCurrency to USD');

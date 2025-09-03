@@ -69,9 +69,6 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			percentDistributed = supplyData.percentDistributed;
 		} catch (error) {
 			console.error('Failed to fetch circulating supply:', error);
-			// Use fallback values
-			circulatingSupply = '4000000000'; // Approximate fallback
-			percentDistributed = '40';
 		}
 
         // If a token is provided, build markets using both MIMIR data and cross-chain snapshots
@@ -83,7 +80,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
             // 1) Find pools containing this token
             const poolsRes = await supabaseMimirClient
                 .from('pool_catalog')
-                .select('*')
+                .select('*, exchange, token_a_type, token_b_type')
                 .or(`token_a_symbol.ilike.${tokenSym},token_b_symbol.ilike.${tokenSym}`);
             if (poolsRes.error) throw poolsRes.error;
             const pools = poolsRes.data || [];
@@ -120,12 +117,15 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                     ...baseSide,
                     ...quoteSide,
                     poolId: pool.pool_id,
+                    exchange: pool.exchange || 'DEX',
                     tokenAId: pool.token_a_id,
                     tokenASymbol: normalizeSymbol(pool.token_a_symbol),
                     tokenADecimals: pool.token_a_decimals,
+                    tokenAType: pool.token_a_type,
                     tokenBId: pool.token_b_id,
                     tokenBSymbol: normalizeSymbol(pool.token_b_symbol),
-                    tokenBDecimals: pool.token_b_decimals
+                    tokenBDecimals: pool.token_b_decimals,
+                    tokenBType: pool.token_b_type
                 };
             });
 
@@ -158,59 +158,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                 console.warn('Failed to fetch VOI price from price-history API:', e);
             }
             
-            // Fallback to a reasonable VOI price estimate if we can't get good data
-            if (!voiUsd || voiUsd <= 0) {
-                voiUsd = 0.0007; // Conservative estimate
-                console.log('Using fallback VOI price:', voiUsd);
-            }
-            
             console.log('VOI USD price for conversion:', voiUsd);
-            const isUsdLike = (sym: string) => ['USDC', 'AUSDC', 'USDT', 'AUSDT'].includes(sym.toUpperCase());
-
-            // Build USD map for symbols using VOI reference where needed
-            const symbols = new Set<string>();
-            pairs.forEach((p) => {
-                symbols.add((p.baseSymbol || '').toUpperCase());
-                symbols.add((p.quoteSymbol || '').toUpperCase());
-            });
-            const symbolUsd = new Map<string, number>();
-            symbolUsd.set('VOI', voiUsd);
-            symbolUsd.set('USDC', 1);
-            symbolUsd.set('AUSDC', 1);
-            symbolUsd.set('USDT', 1);
-            symbolUsd.set('AUSDT', 1);
-
-            for (const s of symbols) {
-                if (symbolUsd.has(s)) continue;
-                // Try to find a VOI pool for symbol s
-                const { data: pricePools } = await supabaseMimirClient
-                    .from('pool_catalog')
-                    .select('pool_id, token_a_symbol, token_b_symbol')
-                    .or(`and(token_a_symbol.ilike.${s},token_b_symbol.ilike.VOI),and(token_a_symbol.ilike.VOI,token_b_symbol.ilike.${s})`)
-                    .limit(1);
-                if (!pricePools || pricePools.length === 0) {
-                    symbolUsd.set(s, 0);
-                    continue;
-                }
-                const poolIdForPrice = pricePools[0].pool_id;
-                const { data: latestForSym } = await supabaseMimirClient
-                    .from('dex_swaps_materialized')
-                    .select('price_quote, ts')
-                    .eq('pool_id', poolIdForPrice)
-                    .order('ts', { ascending: false })
-                    .limit(1);
-                let priceInVoi = 0;
-                if (latestForSym && latestForSym.length > 0) {
-                    const pq = Number(latestForSym[0].price_quote || 0);
-                    const aSym = (pricePools[0].token_a_symbol || '').toUpperCase();
-                    const bSym = (pricePools[0].token_b_symbol || '').toUpperCase();
-                    if (aSym === s && bSym === 'VOI') priceInVoi = pq;
-                    else if (aSym === 'VOI' && bSym === s && pq > 0) priceInVoi = 1 / pq;
-                }
-                const usd = priceInVoi > 0 && voiUsd > 0 ? priceInVoi * voiUsd : 0;
-                symbolUsd.set(s, usd);
-            }
-
             const poolIds = pairs.map((p) => p.poolId);
 
             // 2) Latest swap for price + reserves
@@ -223,6 +171,124 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
             const latestByPool = new Map<number, any>();
             for (const row of latestRes.data || []) {
                 if (!latestByPool.has(row.pool_id)) latestByPool.set(row.pool_id, row);
+            }
+
+            // Build comprehensive price map using multi-hop resolution through VOI
+            const symbols = new Set<string>();
+            pairs.forEach((p) => {
+                symbols.add((p.baseSymbol || '').toUpperCase());
+                symbols.add((p.quoteSymbol || '').toUpperCase());
+            });
+
+            // Step 1: Build price-in-VOI map starting with known values
+            const priceInVoi = new Map<string, number>();
+            priceInVoi.set('VOI', 1);
+            priceInVoi.set('WVOI', 1);
+
+            // Step 2: Get all pool prices for path finding
+            const poolPrices = new Map<string, { price: number, tokenA: string, tokenB: string }>();
+            
+            // Fetch latest prices for all pools we're interested in
+            for (const pair of pairs) {
+                const latest = latestByPool.get(pair.poolId);
+                if (latest) {
+                    const p = Number(latest.price_quote || 0);
+                    if (p > 0) {
+                        // Store price as tokenA per tokenB (based on what's in the swap data)
+                        const keyAB = `${pair.tokenASymbol}_${pair.tokenBSymbol}`;
+                        const keyBA = `${pair.tokenBSymbol}_${pair.tokenASymbol}`;
+                        
+                        // Debug for UNIT/SHELLY specifically
+                        const isUnitShelly = (pair.tokenASymbol === 'UNIT' && pair.tokenBSymbol === 'SHELLY') || 
+                                           (pair.tokenASymbol === 'SHELLY' && pair.tokenBSymbol === 'UNIT');
+                        
+                        // Price_quote represents base_token per quote_token
+                        if (latest.base_token_id === pair.tokenAId && latest.quote_token_id === pair.tokenBId) {
+                            poolPrices.set(keyAB, { price: p, tokenA: pair.tokenASymbol, tokenB: pair.tokenBSymbol });
+                            poolPrices.set(keyBA, { price: 1/p, tokenA: pair.tokenBSymbol, tokenB: pair.tokenASymbol });
+                            if (isUnitShelly) {
+                                console.log(`🔍 UNIT/SHELLY Pool ${pair.poolId}: raw data shows base_token_id=${latest.base_token_id} (${pair.tokenASymbol}), quote_token_id=${latest.quote_token_id} (${pair.tokenBSymbol})`);
+                                console.log(`🔍 Raw price_quote=${p} means 1 ${pair.tokenASymbol} = ${p} ${pair.tokenBSymbol}`);
+                                console.log(`🔍 Setting ${keyAB} = ${p}, ${keyBA} = ${1/p}`);
+                            }
+                        } else if (latest.base_token_id === pair.tokenBId && latest.quote_token_id === pair.tokenAId) {
+                            poolPrices.set(keyBA, { price: p, tokenA: pair.tokenBSymbol, tokenB: pair.tokenASymbol });
+                            poolPrices.set(keyAB, { price: 1/p, tokenA: pair.tokenASymbol, tokenB: pair.tokenBSymbol });
+                            if (isUnitShelly) {
+                                console.log(`🔍 UNIT/SHELLY Pool ${pair.poolId}: raw data shows base_token_id=${latest.base_token_id} (${pair.tokenBSymbol}), quote_token_id=${latest.quote_token_id} (${pair.tokenASymbol})`);
+                                console.log(`🔍 Raw price_quote=${p} means 1 ${pair.tokenBSymbol} = ${p} ${pair.tokenASymbol}`);
+                                console.log(`🔍 Setting ${keyBA} = ${p}, ${keyAB} = ${1/p}`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Step 3: First pass - direct VOI pairs
+            for (const [key, priceInfo] of poolPrices) {
+                if (priceInfo.tokenB === 'VOI' && !priceInVoi.has(priceInfo.tokenA)) {
+                    priceInVoi.set(priceInfo.tokenA, priceInfo.price);
+                    console.log(`Direct VOI price: ${priceInfo.tokenA} = ${priceInfo.price} VOI`);
+                }
+            }
+
+            // Step 4: Multi-hop resolution - keep iterating until no new prices found
+            let foundNew = true;
+            let iterations = 0;
+            const maxIterations = 10; // Prevent infinite loops
+            
+            while (foundNew && iterations < maxIterations) {
+                foundNew = false;
+                iterations++;
+                
+                for (const [key, priceInfo] of poolPrices) {
+                    const { tokenA, tokenB, price } = priceInfo;
+                    
+                    // If we know tokenB price but not tokenA, calculate tokenA price
+                    if (priceInVoi.has(tokenB) && !priceInVoi.has(tokenA)) {
+                        const tokenBVoiPrice = priceInVoi.get(tokenB)!;
+                        // IMPORTANT: price represents "tokenA per tokenB"
+                        // If we know tokenB price in VOI, then tokenA price = tokenB price * (tokenA per tokenB)
+                        const newPrice = tokenBVoiPrice * price; // tokenA per VOI = (tokenB per VOI) * (tokenA per tokenB)
+                        priceInVoi.set(tokenA, newPrice);
+                        console.log(`Multi-hop price (iteration ${iterations}): ${tokenA} = ${newPrice} VOI (${tokenBVoiPrice} VOI per ${tokenB} × ${price} ${tokenA} per ${tokenB})`);
+                        
+                        // Special debug for UNIT/SHELLY
+                        if ((tokenA === 'UNIT' && tokenB === 'SHELLY') || (tokenA === 'SHELLY' && tokenB === 'UNIT')) {
+                            console.log(`🔍 UNIT/SHELLY multi-hop: calculating ${tokenA} price`);
+                            console.log(`🔍 ${tokenB} price in VOI: ${tokenBVoiPrice}`);
+                            console.log(`🔍 ${tokenA} per ${tokenB}: ${price}`);
+                            console.log(`🔍 ${tokenA} price in VOI: ${tokenBVoiPrice} × ${price} = ${newPrice}`);
+                        }
+                        
+                        foundNew = true;
+                    }
+                }
+            }
+
+            // Step 5: Build final USD price map
+            const symbolUsd = new Map<string, number>();
+            symbolUsd.set('VOI', voiUsd);
+            symbolUsd.set('USDC', 1);
+            symbolUsd.set('AUSDC', 1);
+            symbolUsd.set('USDT', 1);
+            symbolUsd.set('AUSDT', 1);
+
+            // Convert VOI prices to USD prices
+            for (const [symbol, voiPrice] of priceInVoi) {
+                if (!symbolUsd.has(symbol)) {
+                    const usdPrice = voiPrice * voiUsd;
+                    symbolUsd.set(symbol, usdPrice);
+                    console.log(`Final USD price: ${symbol} = $${usdPrice.toFixed(8)} (${voiPrice} VOI * $${voiUsd})`);
+                }
+            }
+
+            // Add zeros for symbols we couldn't price
+            for (const s of symbols) {
+                if (!symbolUsd.has(s)) {
+                    symbolUsd.set(s, 0);
+                    console.warn(`No price path found for token: ${s}`);
+                }
             }
 
             // 3) 24h window for volume & change
@@ -304,6 +370,30 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                 }
             }
 
+            // Helper function to generate pool URLs based on exchange
+            function getPoolUrl(exchange: string, poolId: number, tokenAId: number, tokenAType: string, tokenBId: number, tokenBType: string): string | null {
+                if (exchange === 'humble') {
+                    return `https://voi.humble.sh/#/swap?poolId=${poolId}`;
+                } else if (exchange === 'nomadex') {
+                    // Map token types to Nomadex URL format
+                    const getTokenTypeCode = (type: string) => {
+                        switch(type?.toUpperCase()) {
+                            case 'VOI': return 0;
+                            case 'ASA': return 1;
+                            case 'ARC200': return 2;
+                            default: return 2; // Default to ARC200 if unknown
+                        }
+                    };
+                    
+                    const typeA = getTokenTypeCode(tokenAType);
+                    const typeB = getTokenTypeCode(tokenBType);
+                    
+                    // Use actual token IDs as-is
+                    return `https://voi.nomadex.app/${typeA}/${tokenAId}/${typeB}/${tokenBId}`;
+                }
+                return null;
+            }
+
             // 5) Compose market rows from MIMIR DEX data
             const voiDexMarkets = pairs.map((pair) => {
                 const latest = latestByPool.get(pair.poolId);
@@ -357,71 +447,90 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                     if (orientedPrice > 0) lastPrice = orientedPrice;
                 }
 
-            // USD conversion with cross-token support via VOI pools
-            function getQuoteUsd(sym: string): number {
-                const s = (sym || '').toUpperCase();
-                if (s === 'VOI' || s === 'WVOI') return voiUsd;
-                if (['USDC', 'AUSDC', 'USDT', 'AUSDT'].includes(s)) return 1;
-                // Attempt cross price via VOI pools computed earlier in symbolUsd
-                const crossPrice = symbolUsd?.get(s) || 0;
-                if (crossPrice === 0) {
-                    console.warn(`No USD price found for symbol: ${s}`);
-                }
-                return crossPrice;
+            // USD conversion using comprehensive price resolution
+            const qUsd = symbolUsd.get(pair.quoteSymbol) || 0;
+            const baseUsd = symbolUsd.get(pair.baseSymbol) || 0;
+            
+            // Calculate price in USD: (quote tokens per base token) * (USD per quote token)
+            let priceUsd = 0;
+            if (qUsd > 0 && price > 0) {
+                priceUsd = price * qUsd;
+            } else if (baseUsd > 0 && price > 0) {
+                // Fallback: if we don't have quote USD but have base USD, calculate differently
+                // This shouldn't normally happen with our comprehensive pricing, but as backup
+                priceUsd = baseUsd / price;
             }
-            const qUsd = getQuoteUsd(pair.quoteSymbol);
-            const priceUsd = qUsd > 0 ? price * qUsd : 0;
-            // Volume calculation 
+            
+            // Volume calculation using quote token USD value
             const volume24h = qUsd > 0 && volQuoteSum > 0 ? volQuoteSum * qUsd : 0;
 
-            // Debug logging for VOI pairs
-            if (pair.baseSymbol.toUpperCase() === 'VOI' || pair.quoteSymbol.toUpperCase() === 'VOI') {
-                console.log(`VOI pair ${pair.baseSymbol}/${pair.quoteSymbol}:`, {
-                    voiUsd,
-                    price,
-                    qUsd,
-                    priceUsd,
-                    volume24h
-                });
-            }
+            // Enhanced debug logging for all pairs
+            console.log(`Price calculation for ${pair.baseSymbol}/${pair.quoteSymbol}:`, {
+                rawPrice: price,
+                baseUsd: baseUsd,
+                qUsd: qUsd,
+                priceUsd: priceUsd,
+                volume24h: volume24h,
+                volQuoteSum: volQuoteSum
+            });
 
-            // TVL calculation - handle cases where tokens don't have direct USD prices
+            // TVL calculation using comprehensive price resolution
             let tvl = 0;
-            const tokenAUsd = getQuoteUsd(pair.tokenASymbol);
-            const tokenBUsd = getQuoteUsd(pair.tokenBSymbol);
+            const tokenAUsd = symbolUsd.get(pair.tokenASymbol) || 0;
+            const tokenBUsd = symbolUsd.get(pair.tokenBSymbol) || 0;
+            const tokenAVoi = priceInVoi.get(pair.tokenASymbol) || 0;
+            const tokenBVoi = priceInVoi.get(pair.tokenBSymbol) || 0;
             
             if (tokenAUsd > 0 && tokenBUsd > 0) {
-                // Both tokens have USD prices
+                // Both tokens have USD prices - use actual values
                 tvl = reserveTokenA * tokenAUsd + reserveTokenB * tokenBUsd;
-            } else if (tokenAUsd > 0) {
-                // Only token A has USD price - use it for both sides
-                tvl = 2 * (reserveTokenA * tokenAUsd);
-            } else if (tokenBUsd > 0) {
-                // Only token B has USD price - use it for both sides
-                tvl = 2 * (reserveTokenB * tokenBUsd);
+                console.log(`TVL (both USD): ${pair.tokenASymbol}(${reserveTokenA} * $${tokenAUsd}) + ${pair.tokenBSymbol}(${reserveTokenB} * $${tokenBUsd}) = $${tvl}`);
+            } else if (tokenAVoi > 0 && tokenBVoi > 0) {
+                // Both tokens have VOI prices - calculate total VOI value then convert to USD
+                const totalVoi = reserveTokenA * tokenAVoi + reserveTokenB * tokenBVoi;
+                tvl = totalVoi * voiUsd;
+                console.log(`TVL (both VOI): ${pair.tokenASymbol}(${reserveTokenA} * ${tokenAVoi} VOI) + ${pair.tokenBSymbol}(${reserveTokenB} * ${tokenBVoi} VOI) = ${totalVoi} VOI = $${tvl}`);
+            } else if (tokenAVoi > 0 || tokenBVoi > 0) {
+                // Only one token has price - assume balanced pool and double the known side
+                const knownSideVoi = tokenAVoi > 0 
+                    ? reserveTokenA * tokenAVoi 
+                    : reserveTokenB * tokenBVoi;
+                tvl = knownSideVoi * 2 * voiUsd;
+                console.log(`TVL (one side): Using ${tokenAVoi > 0 ? pair.tokenASymbol : pair.tokenBSymbol} side (${knownSideVoi} VOI) * 2 = $${tvl}`);
             } else {
-                // Neither token has USD price - TVL is 0
+                // No price information available
                 tvl = 0;
+                console.log(`TVL: No price information for ${pair.tokenASymbol}/${pair.tokenBSymbol}`);
             }
             
-            console.log(`TVL calculation for ${pair.tokenASymbol}/${pair.tokenBSymbol}:`, {
+            console.log(`Final TVL for ${pair.tokenASymbol}/${pair.tokenBSymbol}:`, {
                 reserveA: reserveTokenA,
-                reserveB: reserveTokenB, 
-                tokenAUsd,
-                tokenBUsd,
-                tvl
+                reserveB: reserveTokenB,
+                tokenAUsd: tokenAUsd,
+                tokenBUsd: tokenBUsd,
+                tokenAVoi: tokenAVoi,
+                tokenBVoi: tokenBVoi,
+                voiUsd: voiUsd,
+                finalTvl: tvl
             });
                 const priceChangePct =
                     firstPrice && lastPrice && firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : null;
 
                 const result = {
                     trading_pair_id: pair.poolId,
-                    exchange: 'DEX',
+                    exchange: pair.exchange || 'DEX',
                     pair: `${pair.baseSymbol}/${pair.quoteSymbol}`,
                     type: 'DEX',
                     network: 'Voi',
                     url: null,
-                    pool_url: null,
+                    pool_url: getPoolUrl(
+                        pair.exchange, 
+                        pair.poolId,
+                        pair.tokenAId,
+                        pair.tokenAType,
+                        pair.tokenBId,
+                        pair.tokenBType
+                    ),
                     base_token_id: pair.baseTokenId,
                     quote_token_id: pair.quoteTokenId,
                     base_decimals: pair.baseDecimals,
@@ -441,14 +550,20 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                     lastUpdated: new Date().toISOString()
                 } as any;
                 
-                // Debug logging for all pairs to identify the issue
-                console.log(`Market pair ${pair.baseSymbol}/${pair.quoteSymbol}:`, {
+                // Comprehensive debug logging for market pair
+                console.log(`Final market data for ${pair.baseSymbol}/${pair.quoteSymbol}:`, {
                     poolId: pair.poolId,
                     rawPrice: price,
                     priceUsd: priceUsd,
+                    volume24h: volume24h,
+                    tvl: tvl,
+                    baseSymbol: pair.baseSymbol,
+                    quoteSymbol: pair.quoteSymbol,
+                    baseUsd: baseUsd,
                     qUsd: qUsd,
-                    voiUsd: voiUsd,
-                    volume24h: volume24h
+                    reserveA: reserveTokenA,
+                    reserveB: reserveTokenB,
+                    voiUsd: voiUsd
                 });
                 
                 return result;

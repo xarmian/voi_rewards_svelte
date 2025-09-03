@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher, onMount } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { Input, Badge } from 'flowbite-svelte';
 	import type { UniqueToken } from '../../routes/api/tokens/+server';
 
@@ -13,7 +14,7 @@
 
 	let searchQuery = '';
 	let dropdownOpen = false;
-	let searchInput: any;
+	let searchInput: HTMLInputElement;
 
 	// Filter tokens based on search query
 	$: filteredTokens = searchQuery.trim() 
@@ -28,7 +29,9 @@
 		dispatch('tokenSelect', token);
 		searchQuery = '';
 		dropdownOpen = false;
-		if (searchInput) searchInput.blur();
+		if (searchInput && typeof searchInput.blur === 'function') {
+			searchInput.blur();
+		}
 	}
 
 	// Reset to VOI
@@ -43,7 +46,9 @@
 		dispatch('tokenSelect', voiToken);
 		searchQuery = '';
 		dropdownOpen = false;
-		if (searchInput) searchInput.blur();
+		if (searchInput && typeof searchInput.blur === 'function') {
+			searchInput.blur();
+		}
 	}
 
 	// Handle input focus/blur
@@ -127,7 +132,8 @@
 
 	<!-- Dropdown -->
 	{#if dropdownOpen && !disabled}
-		<div class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+		<div class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+		     transition:slide={{ duration: 200, axis: 'y' }}>
 			{#if filteredTokens.length > 0}
 				<!-- Header -->
 				<div class="px-4 py-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50">
@@ -140,14 +146,32 @@
 				{#each filteredTokens as token}
 					<button
 						type="button"
-						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none transition-all duration-200 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:shadow-sm hover:scale-[1.01]"
 						on:click={() => selectToken(token)}
 					>
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">
 								<!-- Token Icon -->
-								<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white text-sm font-bold">
-									{token.symbol.slice(0, 2)}
+								<div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-purple-400 to-blue-500">
+									{#if token.imageUrl}
+										<img
+											src={token.imageUrl}
+											alt={token.symbol}
+											class="w-full h-full object-cover"
+											on:error={(e) => {
+												// Fallback to gradient with symbol if image fails to load
+												e.target.style.display = 'none';
+												e.target.nextElementSibling.style.display = 'flex';
+											}}
+										/>
+										<div class="w-full h-full items-center justify-center text-white text-sm font-bold hidden">
+											{token.symbol.slice(0, 2)}
+										</div>
+									{:else}
+										<div class="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+											{token.symbol.slice(0, 2)}
+										</div>
+									{/if}
 								</div>
 								
 								<!-- Token Info -->
