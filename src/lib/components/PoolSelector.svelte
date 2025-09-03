@@ -5,7 +5,7 @@
 	import type { UniqueToken } from '../../routes/api/tokens/+server';
 
 	const dispatch = createEventDispatcher<{
-		select: TokenPair;
+		select: TokenPair | null;
 	}>();
 
 	export let selectedToken: UniqueToken | null = null;
@@ -112,6 +112,17 @@
 		dispatch('select', pool);
 	}
 
+	function clearSelection() {
+		selectedPool = null;
+		searchQuery = selectedToken?.symbol.toUpperCase() === 'VOI' ? '' : `${selectedToken?.symbol}/...`;
+		searchResults = [];
+		dropdownOpen = false;
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+		dispatch('select', null);
+	}
+
 	function handleInputFocus() {
 		if (selectedToken) {
 			dropdownOpen = true;
@@ -159,9 +170,19 @@
 			}
 			{disabled}
 			readonly={!selectedToken}
-			class="pr-10"
+			class="{selectedPool ? 'pr-16' : 'pr-10'}"
 		/>
 		<div class="absolute inset-y-0 right-0 flex items-center pr-3">
+			{#if selectedPool}
+				<button
+					type="button"
+					class="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mr-2 cursor-pointer"
+					on:click={clearSelection}
+					title="Clear pool selection"
+				>
+					<i class="fas fa-times text-sm"></i>
+				</button>
+			{/if}
 			{#if loading}
 				<i class="fas fa-spinner fa-spin text-gray-400"></i>
 			{:else}

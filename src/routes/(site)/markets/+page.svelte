@@ -121,12 +121,35 @@
     function handleTokenSelect(event: CustomEvent<UniqueToken>) {
         selectedToken = event.detail;
         selectedPool = null; // Reset pool selection when token changes
+        selectedTokenPair = null; // Clear token pair as well
         
-        // Update URL to reflect token selection (use token ID)
-        if (browser) {
-            const url = new URL(window.location.toString());
-            url.searchParams.set('token', String(selectedToken.id));
-            window.history.pushState({}, '', url);
+        // If switching to VOI, do exactly what the Reset button was doing
+        if (selectedToken.symbol.toUpperCase() === 'VOI') {
+            selectedToken = {
+                id: 0,
+                symbol: 'VOI',
+                decimals: 6,
+                type: 'VOI',
+                poolCount: 0
+            };
+            selectedPool = null;
+            selectedTokenPair = null;
+            if (browser) {
+                fetchUnifiedChartData('VOI', chartSettings.resolution);
+                const url = new URL(window.location.toString());
+                url.searchParams.set('token', '0');
+                url.searchParams.delete('pool');
+                window.history.pushState({}, '', url);
+            }
+        } else {
+            // Update URL to reflect token selection (use token ID)
+            if (browser) {
+                const url = new URL(window.location.toString());
+                url.searchParams.set('token', String(selectedToken.id));
+                // Clear pool when switching tokens
+                url.searchParams.delete('pool');
+                window.history.pushState({}, '', url);
+            }
         }
     }
 
@@ -537,30 +560,6 @@
                 >VOI</button>
               </div>
             </div>
-            <button
-              type="button"
-              class="text-sm text-purple-600 hover:text-purple-700 hover:underline dark:text-purple-400 dark:hover:text-purple-300 whitespace-nowrap"
-              on:click={() => {
-                selectedToken = {
-                  id: 0,
-                  symbol: 'VOI',
-                  decimals: 6,
-                  type: 'VOI',
-                  poolCount: 0
-                };
-                selectedPool = null;
-                selectedTokenPair = null;
-                if (browser) {
-                  fetchUnifiedChartData('VOI', chartSettings.resolution);
-                  const url = new URL(window.location.toString());
-                  url.searchParams.set('token', '0');
-                  url.searchParams.delete('pool');
-                  window.history.pushState({}, '', url);
-                }
-              }}
-            >
-              Reset to VOI
-            </button>
           </div>
         </div>
       </header>

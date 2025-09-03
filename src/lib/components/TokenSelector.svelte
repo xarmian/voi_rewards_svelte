@@ -24,6 +24,9 @@
 		lastToken = selectedToken;
 		if (!selectedToken) {
 			searchQuery = '';
+		} else if (selectedToken.symbol.toUpperCase() === 'VOI') {
+			// Keep input blank for VOI to allow easy searching
+			searchQuery = '';
 		} else {
 			searchQuery = selectedToken.symbol;
 		}
@@ -91,6 +94,26 @@
 		dispatch('select', token);
 	}
 
+	function clearSelection() {
+		// Reset to VOI token
+		const voiToken = {
+			id: 0,
+			symbol: 'VOI',
+			decimals: 6,
+			type: 'VOI' as const,
+			poolCount: 0
+		};
+		selectedToken = voiToken;
+		searchQuery = ''; // Keep input blank for VOI
+		searchResults = [];
+		dropdownOpen = false;
+		// blur input to clearly end selection
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+		dispatch('select', voiToken);
+	}
+
 	function handleInputFocus() {
 		dropdownOpen = true;
 		if (!searchQuery && popularTokens.length > 0) {
@@ -129,9 +152,19 @@
 			on:blur={handleInputBlur}
 			placeholder="Search for a token (e.g. USDC, ALGO)"
 			{disabled}
-			class="pr-10"
+			class="{selectedToken ? 'pr-16' : 'pr-10'}"
 		/>
 		<div class="absolute inset-y-0 right-0 flex items-center pr-3">
+			{#if selectedToken && selectedToken.symbol.toUpperCase() !== 'VOI'}
+				<button
+					type="button"
+					class="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mr-2 cursor-pointer"
+					on:click={clearSelection}
+					title="Reset to VOI"
+				>
+					<i class="fas fa-times text-sm"></i>
+				</button>
+			{/if}
 			{#if loading}
 				<i class="fas fa-spinner fa-spin text-gray-400"></i>
 			{:else}
