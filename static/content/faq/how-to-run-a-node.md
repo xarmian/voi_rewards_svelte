@@ -11,14 +11,17 @@ Running a node on the Voi Network is an excellent way to participate in the netw
 There are several ways to set up a Voi node:
 
 - **Voi Swarm (Recommended for Linux Server users)**: A streamlined setup process for Linux.
+
   - [Voi Swarm Guide](https://voinetwork.github.io/voi-swarm)
   - For troubleshooting: [Voi Swarm Issues](https://github.com/VoiNetwork/voi-swarm/issues)
 
 - **FUNC (Recommended for Linux, Windows, and MacOS)**: Funk's Ultimate Node Controller (FUNC)
+
   - [FUNC Guide](https://github.com/GalaxyPay/func)
   - [FUNC Release Notes](https://github.com/GalaxyPay/func/releases)
 
 - **Aust's One-Click Node (Recommended for Windows users)**: Easy setup for Windows.
+
   - [Aust's One-Click Node Guide](https://github.com/AustP/austs-one-click-node)
   - For troubleshooting: [A1CN Issues](https://github.com/AustP/austs-one-click-node/issues)
 
@@ -68,8 +71,6 @@ If you encounter issues:
 
 - [Video Guide: Installing and Managing a Node with PixelNode](https://www.youtube.com/watch?v=BbuViDosZbE)
 
-
 Remember, running a node is an ongoing process. Stay updated with the latest Voi Network news and updates through the [official website](https://voi.network), [Twitter](https://twitter.com/Voi_Net), and [Reddit](https://www.reddit.com/r/Voi_Net/).
 
 For any additional questions or support, the Voi community is always ready to help in the [Discord server](https://discord.gg/vnFbrJrHeW).
-

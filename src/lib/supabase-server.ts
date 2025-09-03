@@ -9,4 +9,3 @@ const supabaseRoleKey = PRIVATE_SUPABASE_ROLE_KEY;
 
 export const supabasePublicClient = createClient(supabaseUrl!, supabaseAnonKey!);
 export const supabasePrivateClient = createClient(supabaseUrl!, supabaseRoleKey!);
-

@@ -2,197 +2,197 @@ import { writable, derived, get } from 'svelte/store';
 import { config } from '$lib/config';
 
 interface RewardParams {
-  block_reward_pool: number;
-  total_blocks: number;
-  reward_per_block: number;
-  total_blocks_projected: number;
+	block_reward_pool: number;
+	total_blocks: number;
+	reward_per_block: number;
+	total_blocks_projected: number;
 }
 
 export const rewardParams = writable<RewardParams>({
-  block_reward_pool: 0,
-  total_blocks: 0,
-  reward_per_block: 0,
-  total_blocks_projected: 0
+	block_reward_pool: 0,
+	total_blocks: 0,
+	reward_per_block: 0,
+	total_blocks_projected: 0
 });
 
 export interface DateRange {
-  id: string;
-  desc: string;
-  epoch: number;
+	id: string;
+	desc: string;
+	epoch: number;
 }
 
 interface DataTableState {
-  data: Record<string, unknown>;  // Cache data by date range
-  dateRanges: DateRange[] | null;
-  dateRangesLastUpdated: Date | null;
-  currentRange: string | null;
-  loading: boolean;
-  error: string | null;
-  lastUpdated: Record<string, Date>;
+	data: Record<string, unknown>; // Cache data by date range
+	dateRanges: DateRange[] | null;
+	dateRangesLastUpdated: Date | null;
+	currentRange: string | null;
+	loading: boolean;
+	error: string | null;
+	lastUpdated: Record<string, Date>;
 }
 
 function createDataTable() {
-  const { subscribe, update } = writable<DataTableState>({
-    data: {},
-    dateRanges: null,
-    dateRangesLastUpdated: null,
-    currentRange: null,
-    loading: false,
-    error: null,
-    lastUpdated: {}
-  });
+	const { subscribe, update } = writable<DataTableState>({
+		data: {},
+		dateRanges: null,
+		dateRangesLastUpdated: null,
+		currentRange: null,
+		loading: false,
+		error: null,
+		lastUpdated: {}
+	});
 
-  // Cache expiration time (5 minutes)
-  const CACHE_EXPIRATION = 5 * 60 * 1000;
+	// Cache expiration time (5 minutes)
+	const CACHE_EXPIRATION = 5 * 60 * 1000;
 
-  async function fetchDateRanges(forceRefresh = false) {
-    const store = get({ subscribe });
-    
-    // Return cached date ranges if they exist and aren't expired
-    if (!forceRefresh && 
-        store.dateRanges && 
-        store.dateRangesLastUpdated && 
-        (Date.now() - store.dateRangesLastUpdated.getTime() < CACHE_EXPIRATION)) {
-      return store.dateRanges;
-    }
+	async function fetchDateRanges(forceRefresh = false) {
+		const store = get({ subscribe });
 
-    try {
-      const response = await fetch(`${config.proposalApiBaseUrl}`, { cache: 'no-store' });
-      const data = await response.json();
-      
-      const minTimestamp = new Date('2024-10-30T00:00:00Z');
-      const maxTimestamp = new Date(data.max_timestamp);
-      
-      const dates: DateRange[] = [];
-      const currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
-      let epoch = 1;
+		// Return cached date ranges if they exist and aren't expired
+		if (
+			!forceRefresh &&
+			store.dateRanges &&
+			store.dateRangesLastUpdated &&
+			Date.now() - store.dateRangesLastUpdated.getTime() < CACHE_EXPIRATION
+		) {
+			return store.dateRanges;
+		}
 
-      while (currentDate <= maxTimestamp) {
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3);
+		try {
+			const response = await fetch(`${config.proposalApiBaseUrl}`, { cache: 'no-store' });
+			const data = await response.json();
 
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
+			const minTimestamp = new Date('2024-10-30T00:00:00Z');
+			const maxTimestamp = new Date(data.max_timestamp);
 
-        const dateStr = `${startOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
-        dates.push({
-          id: dateStr,
-          desc: dateStr.replace(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/, '$1-$2-$3 to $4-$5-$6'),
-          epoch
-        });
+			const dates: DateRange[] = [];
+			const currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
+			let epoch = 1;
 
-        currentDate.setUTCDate(currentDate.getUTCDate() + 7);
-        epoch++;
-      }
+			while (currentDate <= maxTimestamp) {
+				const startOfWeek = new Date(currentDate);
+				startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3);
 
-      // Update the store with new date ranges
-      update(state => ({
-        ...state,
-        dateRanges: dates,
-        dateRangesLastUpdated: new Date()
-      }));
+				const endOfWeek = new Date(startOfWeek);
+				endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
 
-      return dates;
-    } catch (error) {
-      console.error('Error fetching date ranges:', error);
-      throw error;
-    }
-  }
+				const dateStr = `${startOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
+				dates.push({
+					id: dateStr,
+					desc: dateStr.replace(
+						/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
+						'$1-$2-$3 to $4-$5-$6'
+					),
+					epoch
+				});
 
-  async function getCurrentEpoch() {
-    const dates = await fetchDateRanges();
-    return dates[dates.length - 1].id;
-  }
+				currentDate.setUTCDate(currentDate.getUTCDate() + 7);
+				epoch++;
+			}
 
-  async function fetchData(dateRange?: string) {
-    let store = get({ subscribe });
-    
-    if (store.loading) {
-      // Wait up to 5 seconds for store to load
-      const startTime = Date.now();
-      while (store.loading && Date.now() - startTime < 5000) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        store = get({ subscribe });
-      }
-      if (store.loading) return; // Still loading after 5s, return
-    }
+			// Update the store with new date ranges
+			update((state) => ({
+				...state,
+				dateRanges: dates,
+				dateRangesLastUpdated: new Date()
+			}));
 
-    try {
-      update(state => ({ ...state, loading: true, error: null }));
+			return dates;
+		} catch (error) {
+			console.error('Error fetching date ranges:', error);
+			throw error;
+		}
+	}
 
-      // If no date range provided, get current epoch
-      const targetRange = dateRange || await getCurrentEpoch();
+	async function getCurrentEpoch() {
+		const dates = await fetchDateRanges();
+		return dates[dates.length - 1].id;
+	}
 
-      // Check if we have cached data that isn't expired
-      const cachedData = store.data[targetRange];
-      const lastUpdate = store.lastUpdated[targetRange];
-      if (cachedData && lastUpdate && (Date.now() - lastUpdate.getTime() < CACHE_EXPIRATION)) {
-        update(state => ({
-          ...state,
-          currentRange: targetRange,
-          loading: false
-        }));
-        return cachedData;
-      }
+	async function fetchData(dateRange?: string) {
+		let store = get({ subscribe });
 
-      // Parse date range and fetch data
-      const [start, end] = targetRange.split('-');
-      const startDate = `${start.substring(0, 4)}-${start.substring(4, 6)}-${start.substring(6, 8)}`;
-      const endDate = `${end.substring(0, 4)}-${end.substring(4, 6)}-${end.substring(6, 8)}`;
-      
-      const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
-      const response = await fetch(url, { cache: 'no-store' });
-      const data = await response.json();
+		if (store.loading) {
+			// Wait up to 5 seconds for store to load
+			const startTime = Date.now();
+			while (store.loading && Date.now() - startTime < 5000) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				store = get({ subscribe });
+			}
+			if (store.loading) return; // Still loading after 5s, return
+		}
 
-      update(state => ({
-        ...state,
-        data: { ...state.data, [targetRange]: data },
-        currentRange: targetRange,
-        loading: false,
-        lastUpdated: { ...state.lastUpdated, [targetRange]: new Date() }
-      }));
+		try {
+			update((state) => ({ ...state, loading: true, error: null }));
 
-      return data;
+			// If no date range provided, get current epoch
+			const targetRange = dateRange || (await getCurrentEpoch());
 
-    } catch (error) {
-      update(state => ({
-        ...state,
-        loading: false,
-        error: error instanceof Error ? error.message : 'An error occurred'
-      }));
-      throw error;
-    }
-  }
+			// Check if we have cached data that isn't expired
+			const cachedData = store.data[targetRange];
+			const lastUpdate = store.lastUpdated[targetRange];
+			if (cachedData && lastUpdate && Date.now() - lastUpdate.getTime() < CACHE_EXPIRATION) {
+				update((state) => ({
+					...state,
+					currentRange: targetRange,
+					loading: false
+				}));
+				return cachedData;
+			}
 
-  function clearCache() {
-    update(state => ({
-      ...state,
-      data: {},
-      dateRanges: null,
-      dateRangesLastUpdated: null,
-      lastUpdated: {}
-    }));
-  }
+			// Parse date range and fetch data
+			const [start, end] = targetRange.split('-');
+			const startDate = `${start.substring(0, 4)}-${start.substring(4, 6)}-${start.substring(6, 8)}`;
+			const endDate = `${end.substring(0, 4)}-${end.substring(4, 6)}-${end.substring(6, 8)}`;
 
-  return {
-    subscribe,
-    fetchData,
-    clearCache,
-    fetchDateRanges
-  };
+			const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
+			const response = await fetch(url, { cache: 'no-store' });
+			const data = await response.json();
+
+			update((state) => ({
+				...state,
+				data: { ...state.data, [targetRange]: data },
+				currentRange: targetRange,
+				loading: false,
+				lastUpdated: { ...state.lastUpdated, [targetRange]: new Date() }
+			}));
+
+			return data;
+		} catch (error) {
+			update((state) => ({
+				...state,
+				loading: false,
+				error: error instanceof Error ? error.message : 'An error occurred'
+			}));
+			throw error;
+		}
+	}
+
+	function clearCache() {
+		update((state) => ({
+			...state,
+			data: {},
+			dateRanges: null,
+			dateRangesLastUpdated: null,
+			lastUpdated: {}
+		}));
+	}
+
+	return {
+		subscribe,
+		fetchData,
+		clearCache,
+		fetchDateRanges
+	};
 }
 
 export const dataTable = createDataTable();
 
 // Derived stores
-export const currentData = derived(
-  dataTable,
-  $dataTable => $dataTable.currentRange ? $dataTable.data[$dataTable.currentRange] : null
+export const currentData = derived(dataTable, ($dataTable) =>
+	$dataTable.currentRange ? $dataTable.data[$dataTable.currentRange] : null
 );
 
-export const dateRanges = derived(
-  dataTable,
-  $dataTable => $dataTable.dateRanges
-);
+export const dateRanges = derived(dataTable, ($dataTable) => $dataTable.dateRanges);
 
 // Path: src/stores/dataTable.ts

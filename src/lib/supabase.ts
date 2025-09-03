@@ -8,122 +8,122 @@ const supabaseAnonKey = PUBLIC_SUPABASE_ANON_KEY;
 export const supabasePublicClient = createClient(supabaseUrl!, supabaseAnonKey!);
 
 export interface PLeaderboard {
-    wallet: string;
-    last_modified: Date;
-    total: number;
-    network: number;
-    nftnavigator: number;
-    nautilus: number;
-    humble: number;
-    kibisis: number;
-    nomadex: number;
-    highforge: number;
-    algoleagues: number;
-    mechaswap: number;
-    row_number?: number;
-    points? : number;
+	wallet: string;
+	last_modified: Date;
+	total: number;
+	network: number;
+	nftnavigator: number;
+	nautilus: number;
+	humble: number;
+	kibisis: number;
+	nomadex: number;
+	highforge: number;
+	algoleagues: number;
+	mechaswap: number;
+	row_number?: number;
+	points?: number;
 }
 
 export interface VRPhase2 {
-    id: bigint; // Primary key
-    user_id: string | null; // UUID of the user (foreign key referencing users(id))
-    address: string; // text
-    quest_data: object | null; // jsonb
-    airdrop_amount: number; // numeric
-    points_tokens: number; // numeric
-    discord_roles: string[]; // text[]
-    discord_member: boolean; // boolean
-    last_modified: string; // timestamp with time zone
-    discord_linked: boolean; // boolean
-    join_discord_server: string | null; // timestamp with time zone
-    created_discord_account: string | null; // timestamp with time zone
-    total_quest_points: number | null; // numeric
-    blacklisted: boolean; // boolean
-    row_number?: number;
+	id: bigint; // Primary key
+	user_id: string | null; // UUID of the user (foreign key referencing users(id))
+	address: string; // text
+	quest_data: object | null; // jsonb
+	airdrop_amount: number; // numeric
+	points_tokens: number; // numeric
+	discord_roles: string[]; // text[]
+	discord_member: boolean; // boolean
+	last_modified: string; // timestamp with time zone
+	discord_linked: boolean; // boolean
+	join_discord_server: string | null; // timestamp with time zone
+	created_discord_account: string | null; // timestamp with time zone
+	total_quest_points: number | null; // numeric
+	blacklisted: boolean; // boolean
+	row_number?: number;
 }
 
 export interface VrPhase2 {
-        id: number; // bigint
-        user_id?: string | null; // uuid
-        address: string; // text
-        quest_data?: object | null; // jsonb
-        airdrop_amount: number; // numeric
-        points_tokens: number; // numeric
-        discord_roles: string[]; // text[]
-        discord_member: boolean; // boolean
-        last_modified: string; // timestamp with time zone
-        discord_linked: boolean; // boolean
-        join_discord_server: string | null; // timestamp with time zone
-        created_discord_account: string | null; // timestamp with time zone
-        total_quest_points: number | null; // numeric
-        blacklisted: boolean; // boolean
+	id: number; // bigint
+	user_id?: string | null; // uuid
+	address: string; // text
+	quest_data?: object | null; // jsonb
+	airdrop_amount: number; // numeric
+	points_tokens: number; // numeric
+	discord_roles: string[]; // text[]
+	discord_member: boolean; // boolean
+	last_modified: string; // timestamp with time zone
+	discord_linked: boolean; // boolean
+	join_discord_server: string | null; // timestamp with time zone
+	created_discord_account: string | null; // timestamp with time zone
+	total_quest_points: number | null; // numeric
+	blacklisted: boolean; // boolean
 }
 
 export interface VrQuest {
-    id: number; // bigint
-    created_at: string; // timestamp with time zone
-    title?: string | null; // text
-    name?: string | null; // text
-    description?: string | null; // text
-    guide?: string | null; // text
-    frequency?: string | null; // text
-    reward?: number | null; // integer
-    status?: string | null; // text
-    project?: number | null; // bigint
+	id: number; // bigint
+	created_at: string; // timestamp with time zone
+	title?: string | null; // text
+	name?: string | null; // text
+	description?: string | null; // text
+	guide?: string | null; // text
+	frequency?: string | null; // text
+	reward?: number | null; // integer
+	status?: string | null; // text
+	project?: number | null; // bigint
 }
 
 export interface VrProject {
-    id: number; // bigint
-    created_at: string; // timestamp with time zone
-    title?: string | null; // text
-    type?: string | null; // text
-    category?: string | null; // text
-    column?: string | null; // text
-    description?: string | null; // text
-    logo?: string | null; // text
-    guide?: string | null; // text
-    twitter?: string | null; // text
-    galxe?: string | null; // text
-    status?: string | null; // text
-    url?: string | null; // text
+	id: number; // bigint
+	created_at: string; // timestamp with time zone
+	title?: string | null; // text
+	type?: string | null; // text
+	category?: string | null; // text
+	column?: string | null; // text
+	description?: string | null; // text
+	logo?: string | null; // text
+	guide?: string | null; // text
+	twitter?: string | null; // text
+	galxe?: string | null; // text
+	status?: string | null; // text
+	url?: string | null; // text
 }
 
 // OHLCV and trading related interfaces
 export interface PriceCandle {
-    base_token_id: number;
-    quote_token_id: number;
-    resolution: string;
-    bucket_start: string;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume_base: number;
-    volume_quote: number;
-    trades_count: number;
+	base_token_id: number;
+	quote_token_id: number;
+	resolution: string;
+	bucket_start: string;
+	open: number;
+	high: number;
+	low: number;
+	close: number;
+	volume_base: number;
+	volume_quote: number;
+	trades_count: number;
 }
 
 export interface PoolCatalog {
-    pool_id: number;
-    token_a_id: number;
-    token_a_type: string;
-    token_a_symbol: string;
-    token_a_decimals: number;
-    token_b_id: number;
-    token_b_type: string;
-    token_b_symbol: string;
-    token_b_decimals: number;
-    lp_asset_id: number;
-    escrow_hex: string;
+	pool_id: number;
+	token_a_id: number;
+	token_a_type: string;
+	token_a_symbol: string;
+	token_a_decimals: number;
+	token_b_id: number;
+	token_b_type: string;
+	token_b_symbol: string;
+	token_b_decimals: number;
+	lp_asset_id: number;
+	escrow_hex: string;
 }
 
 export interface DexSwap {
-    id: number;
-    ts: string;
-    base_token_id: number;
-    quote_token_id: number;
-    price_quote: number;
-    volume_base: number;
-    volume_quote: number;
-    pool_id?: number;
+	id: number;
+	ts: string;
+	base_token_id: number;
+	quote_token_id: number;
+	price_quote: number;
+	volume_base: number;
+	volume_quote: number;
+	pool_id?: number;
 }

@@ -25,7 +25,7 @@
 	async function fetchPoolsForToken(token: UniqueToken) {
 		loading = true;
 		error = '';
-		
+
 		try {
 			const response = await fetch(`/api/token-pairs?tokenId=${token.id}&limit=100`);
 			const data = await response.json();
@@ -33,11 +33,12 @@
 			if (data.error) throw new Error(data.error);
 
 			pools = data.pairs || [];
-			
+
 			// Auto-select the TOKEN/VOI pool if it exists and no pool is selected
 			if (!selectedPool && pools.length > 0) {
-				const voiPool = pools.find(pool => {
-					const normalizedQuote = pool.quoteSymbol.toUpperCase() === 'WVOI' ? 'VOI' : pool.quoteSymbol.toUpperCase();
+				const voiPool = pools.find((pool) => {
+					const normalizedQuote =
+						pool.quoteSymbol.toUpperCase() === 'WVOI' ? 'VOI' : pool.quoteSymbol.toUpperCase();
 					return normalizedQuote === 'VOI';
 				});
 				if (voiPool) {
@@ -62,7 +63,7 @@
 	}
 
 	function formatPairDisplay(pair: TokenPair): string {
-		const normalizeSymbol = (symbol: string) => symbol.toUpperCase() === 'WVOI' ? 'VOI' : symbol;
+		const normalizeSymbol = (symbol: string) => (symbol.toUpperCase() === 'WVOI' ? 'VOI' : symbol);
 		return `${normalizeSymbol(pair.baseSymbol)}/${normalizeSymbol(pair.quoteSymbol)}`;
 	}
 
@@ -113,11 +114,10 @@
 				{#each pools as pool}
 					<button
 						type="button"
-						class="w-full p-3 text-left rounded-lg border transition-all duration-200 {
-							selectedPool?.poolId === pool.poolId
-								? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-400'
-								: 'border-gray-200 dark:border-gray-600 hover:border-purple-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:border-purple-500'
-						}"
+						class="w-full p-3 text-left rounded-lg border transition-all duration-200 {selectedPool?.poolId ===
+						pool.poolId
+							? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-400'
+							: 'border-gray-200 dark:border-gray-600 hover:border-purple-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:border-purple-500'}"
 						on:click={() => selectPool(pool)}
 					>
 						<div class="flex items-center justify-between">
@@ -125,8 +125,10 @@
 								<span class="font-medium text-gray-900 dark:text-white text-lg">
 									{formatPairDisplay(pool)}
 								</span>
-								{#if (pool.quoteSymbol.toUpperCase() === 'VOI' || pool.quoteSymbol.toUpperCase() === 'WVOI')}
-									<Badge class="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+								{#if pool.quoteSymbol.toUpperCase() === 'VOI' || pool.quoteSymbol.toUpperCase() === 'WVOI'}
+									<Badge
+										class="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+									>
 										Primary
 									</Badge>
 								{/if}
@@ -154,9 +156,7 @@
 	<Card class="bg-gray-50 dark:bg-gray-700">
 		<div class="text-center py-12 text-gray-500 dark:text-gray-400">
 			<i class="fas fa-coins text-4xl mb-4"></i>
-			<h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-				Select a Token
-			</h4>
+			<h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Select a Token</h4>
 			<p>Choose a token above to view its available trading pools</p>
 		</div>
 	</Card>

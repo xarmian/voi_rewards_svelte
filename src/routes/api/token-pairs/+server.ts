@@ -19,10 +19,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Fetch token pairs from MIMIR pool_catalog
-		let poolQuery = supabaseMimirClient
-			.from('pool_catalog')
-			.select('*')
-			.limit(limit);
+		let poolQuery = supabaseMimirClient.from('pool_catalog').select('*').limit(limit);
 
 		// If tokenId or tokenSymbol is provided, get all pools containing that token
 		if (tokenId) {
@@ -30,9 +27,13 @@ export const GET: RequestHandler = async ({ url }) => {
 		} else if (tokenSymbol) {
 			// Special handling for VOI: include both VOI and wVOI pools
 			if (tokenSymbol.toUpperCase() === 'VOI') {
-				poolQuery = poolQuery.or(`token_a_symbol.ilike.VOI,token_b_symbol.ilike.VOI,token_a_symbol.ilike.wVOI,token_b_symbol.ilike.wVOI`);
+				poolQuery = poolQuery.or(
+					`token_a_symbol.ilike.VOI,token_b_symbol.ilike.VOI,token_a_symbol.ilike.wVOI,token_b_symbol.ilike.wVOI`
+				);
 			} else {
-				poolQuery = poolQuery.or(`token_a_symbol.ilike.${tokenSymbol},token_b_symbol.ilike.${tokenSymbol}`);
+				poolQuery = poolQuery.or(
+					`token_a_symbol.ilike.${tokenSymbol},token_b_symbol.ilike.${tokenSymbol}`
+				);
 			}
 		} else if (query) {
 			// Search by symbol
@@ -53,12 +54,13 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Convert to TokenPair format, normalizing wVOI to VOI for display
-		const tokenPairs: TokenPair[] = (data as PoolCatalog[]).map(pool => {
-			const normalizeSymbol = (symbol: string) => symbol.toUpperCase() === 'WVOI' ? 'VOI' : symbol;
-			
+		const tokenPairs: TokenPair[] = (data as PoolCatalog[]).map((pool) => {
+			const normalizeSymbol = (symbol: string) =>
+				symbol.toUpperCase() === 'WVOI' ? 'VOI' : symbol;
+
 			return {
 				baseTokenId: pool.token_b_id,
-				quoteTokenId: pool.token_a_id, 
+				quoteTokenId: pool.token_a_id,
 				baseSymbol: normalizeSymbol(pool.token_b_symbol),
 				quoteSymbol: normalizeSymbol(pool.token_a_symbol),
 				baseDecimals: pool.token_b_decimals,
@@ -72,12 +74,12 @@ export const GET: RequestHandler = async ({ url }) => {
 		if (tokenId || tokenSymbol) {
 			const targetId = tokenId ? parseInt(tokenId) : null;
 			const targetSymbol = tokenSymbol?.toUpperCase();
-			
-			normalizedPairs = tokenPairs.map(pair => {
-				const shouldSwap = targetId 
-					? pair.quoteTokenId === targetId 
+
+			normalizedPairs = tokenPairs.map((pair) => {
+				const shouldSwap = targetId
+					? pair.quoteTokenId === targetId
 					: pair.quoteSymbol.toUpperCase() === targetSymbol;
-					
+
 				if (shouldSwap) {
 					return {
 						baseTokenId: pair.quoteTokenId,
@@ -94,12 +96,14 @@ export const GET: RequestHandler = async ({ url }) => {
 
 			// Sort with TOKEN/VOI pairs first
 			normalizedPairs.sort((a, b) => {
-				const aIsVOI = a.quoteSymbol.toUpperCase() === 'VOI' || a.quoteSymbol.toUpperCase() === 'WVOI';
-				const bIsVOI = b.quoteSymbol.toUpperCase() === 'VOI' || b.quoteSymbol.toUpperCase() === 'WVOI';
-				
+				const aIsVOI =
+					a.quoteSymbol.toUpperCase() === 'VOI' || a.quoteSymbol.toUpperCase() === 'WVOI';
+				const bIsVOI =
+					b.quoteSymbol.toUpperCase() === 'VOI' || b.quoteSymbol.toUpperCase() === 'WVOI';
+
 				if (aIsVOI && !bIsVOI) return -1;
 				if (!aIsVOI && bIsVOI) return 1;
-				
+
 				return a.quoteSymbol.localeCompare(b.quoteSymbol);
 			});
 		}
@@ -165,7 +169,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		const { data, error } = await supabaseMimirClient
 			.from('pool_catalog')
 			.select('*')
-			.or(`and(token_a_id.eq.${baseTokenId},token_b_id.eq.${quoteTokenId}),and(token_a_id.eq.${quoteTokenId},token_b_id.eq.${baseTokenId})`)
+			.or(
+				`and(token_a_id.eq.${baseTokenId},token_b_id.eq.${quoteTokenId}),and(token_a_id.eq.${quoteTokenId},token_b_id.eq.${baseTokenId})`
+			)
 			.limit(1);
 
 		if (error) {
@@ -177,25 +183,28 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		const pool = data[0] as PoolCatalog;
-		
+
 		// Ensure we return the pair in the requested order (swapping to correct base/quote)
-		const tokenPair: TokenPair = baseTokenId === pool.token_b_id ? {
-			baseTokenId: pool.token_b_id,
-			quoteTokenId: pool.token_a_id,
-			baseSymbol: pool.token_b_symbol,
-			quoteSymbol: pool.token_a_symbol,
-			baseDecimals: pool.token_b_decimals,
-			quoteDecimals: pool.token_a_decimals,
-			poolId: pool.pool_id
-		} : {
-			baseTokenId: pool.token_a_id,
-			quoteTokenId: pool.token_b_id,
-			baseSymbol: pool.token_a_symbol,
-			quoteSymbol: pool.token_b_symbol,
-			baseDecimals: pool.token_a_decimals,
-			quoteDecimals: pool.token_b_decimals,
-			poolId: pool.pool_id
-		};
+		const tokenPair: TokenPair =
+			baseTokenId === pool.token_b_id
+				? {
+						baseTokenId: pool.token_b_id,
+						quoteTokenId: pool.token_a_id,
+						baseSymbol: pool.token_b_symbol,
+						quoteSymbol: pool.token_a_symbol,
+						baseDecimals: pool.token_b_decimals,
+						quoteDecimals: pool.token_a_decimals,
+						poolId: pool.pool_id
+					}
+				: {
+						baseTokenId: pool.token_a_id,
+						quoteTokenId: pool.token_b_id,
+						baseSymbol: pool.token_a_symbol,
+						quoteSymbol: pool.token_b_symbol,
+						baseDecimals: pool.token_a_decimals,
+						quoteDecimals: pool.token_b_decimals,
+						poolId: pool.pool_id
+					};
 
 		return json({ tokenPair });
 	} catch (error) {

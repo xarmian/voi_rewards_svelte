@@ -5,7 +5,7 @@ import { config } from '$lib/config';
 
 export const load = (async ({ params, fetch, depends }) => {
 	depends('wallet:id');
-	
+
 	let parentWalletId: string | null = null;
 	if (params.id) {
 		const response = await fetch(`${config.lockvestApiBaseUrl}?contractAddress=${params.id}`);
@@ -16,7 +16,7 @@ export const load = (async ({ params, fetch, depends }) => {
 			}
 		}
 	}
-	
+
 	const walletId = params.id || get(selectedWallet)?.address || null;
 
 	return {

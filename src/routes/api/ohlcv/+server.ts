@@ -1,7 +1,13 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
-import type { Resolution, OHLCVRequest, OHLCVData, VolumeData, PriceCandle } from '$lib/types/ohlcv.types';
+import type {
+	Resolution,
+	OHLCVRequest,
+	OHLCVData,
+	VolumeData,
+	PriceCandle
+} from '$lib/types/ohlcv.types';
 
 // Create MIMIR client for OHLCV data
 const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
@@ -52,7 +58,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			} else {
 				start = new Date(startParam);
 			}
-			
+
 			if (isNaN(start.getTime())) {
 				return json({ error: 'Invalid start date format' }, { status: 400 });
 			}
@@ -64,7 +70,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			} else {
 				end = new Date(endParam);
 			}
-			
+
 			if (isNaN(end.getTime())) {
 				return json({ error: 'Invalid end date format' }, { status: 400 });
 			}
@@ -73,36 +79,43 @@ export const GET: RequestHandler = async ({ url }) => {
 		// Set default time range if not provided
 		const endTime = end || now;
 		const limit = limitParam ? parseInt(limitParam) : 500;
-		
+
 		// Default time ranges by resolution
 		const intervalMs = {
 			'1m': 24 * 60 * 60 * 1000, // 1 day
-			'5m': 7 * 24 * 60 * 60 * 1000, // 1 week  
+			'5m': 7 * 24 * 60 * 60 * 1000, // 1 week
 			'15m': 7 * 24 * 60 * 60 * 1000, // 1 week
 			'1h': 30 * 24 * 60 * 60 * 1000, // 1 month
 			'4h': 90 * 24 * 60 * 60 * 1000, // 3 months
 			'1d': 365 * 24 * 60 * 60 * 1000 // 1 year
 		};
-		
-		const startTime = start || new Date(endTime.getTime() - intervalMs[resolution as keyof typeof intervalMs]);
+
+		const startTime =
+			start || new Date(endTime.getTime() - intervalMs[resolution as keyof typeof intervalMs]);
 
 		// Validate resolution
 		const validResolutions = ['1m', '5m', '15m', '1h', '4h', '1d'];
 		if (!validResolutions.includes(resolution)) {
-			return json({ 
-				error: `Invalid resolution. Must be one of: ${validResolutions.join(', ')}` 
-			}, { status: 400 });
+			return json(
+				{
+					error: `Invalid resolution. Must be one of: ${validResolutions.join(', ')}`
+				},
+				{ status: 400 }
+			);
 		}
 
 		// Refresh candles if requested
 		if (refresh) {
-			const { data: refreshData, error: refreshError } = await supabaseMimirClient.rpc('refresh_price_candles', {
-				p_base_token_id: baseTokenId,
-				p_quote_token_id: finalQuoteTokenId,
-				p_resolution: resolution,
-				p_start: startTime.toISOString(),
-				p_end: endTime.toISOString()
-			});
+			const { data: refreshData, error: refreshError } = await supabaseMimirClient.rpc(
+				'refresh_price_candles',
+				{
+					p_base_token_id: baseTokenId,
+					p_quote_token_id: finalQuoteTokenId,
+					p_resolution: resolution,
+					p_start: startTime.toISOString(),
+					p_end: endTime.toISOString()
+				}
+			);
 
 			console.log('Refresh data:', refreshData);
 
@@ -128,16 +141,16 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Convert to chart format. Use quote volume so bars reflect the quote token.
-		const candles: OHLCVData[] = (data as PriceCandle[]).map(candle => ({
+		const candles: OHLCVData[] = (data as PriceCandle[]).map((candle) => ({
 			time: Math.floor(new Date(candle.bucket_start).getTime() / 1000),
 			open: Number(candle.open),
-			high: Number(candle.high), 
+			high: Number(candle.high),
 			low: Number(candle.low),
 			close: Number(candle.close),
 			volume: Number(candle.volume_quote)
 		}));
 
-		const volumes: VolumeData[] = candles.map(candle => ({
+		const volumes: VolumeData[] = candles.map((candle) => ({
 			time: candle.time,
 			value: candle.volume,
 			color: candle.close >= candle.open ? '#22c55e' : '#ef4444'

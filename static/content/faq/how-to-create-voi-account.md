@@ -3,6 +3,7 @@ question: How do I create a Voi Account?
 category: Wallets
 sort: 6
 ---
+
 To create your first Voi Account, you will first need to choose a Voi Wallet. There are multiple wallet options available, including:
 
 - [Kibisis](https://kibis.is/) (browser extension)

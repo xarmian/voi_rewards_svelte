@@ -26,12 +26,12 @@
 		const now = new Date();
 		const nowTimestamp = now.getTime();
 		const diff = startTimestamp - nowTimestamp;
-		
+
 		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 		const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 		const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 		const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-		
+
 		countdown = { days, hours, minutes, seconds };
 	}
 
@@ -49,13 +49,13 @@
 	});
 </script>
 
-<a 
+<a
 	href="https://nftnavigator.xyz/nftgames"
 	class="block w-full overflow-hidden bg-gradient-to-r from-blue-900 via-purple-900 to-blue-900 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-200 my-4"
 >
 	<div class="relative px-6 py-4 text-white">
 		<div class="absolute inset-0 opacity-10"></div>
-		
+
 		<div class="relative flex flex-col sm:flex-row items-center justify-between gap-4">
 			<div class="flex-1">
 				<div in:fade={{ duration: 300 }} class="text-2xl sm:text-3xl font-bold mb-1">
@@ -91,17 +91,15 @@
 					</div>
 				</div>
 			{:else if isGameActive}
-				<div class="text-yellow-300 font-bold text-lg animate-pulse">
-					🔥 Games are LIVE!
-				</div>
+				<div class="text-yellow-300 font-bold text-lg animate-pulse">🔥 Games are LIVE!</div>
 			{:else}
-				<div class="text-red-300 font-bold">
-					Games have ended
-				</div>
+				<div class="text-red-300 font-bold">Games have ended</div>
 			{/if}
 
 			<div class="hidden sm:block">
-				<div class="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transform hover:scale-105 transition-all duration-200">
+				<div
+					class="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transform hover:scale-105 transition-all duration-200"
+				>
 					{#if isGamePending}
 						Learn More
 					{:else if isGameActive}
@@ -117,11 +115,16 @@
 
 <style>
 	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.7; }
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.7;
+		}
 	}
 
 	.animate-pulse {
 		animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	}
-</style> 
+</style>

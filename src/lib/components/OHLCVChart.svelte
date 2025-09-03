@@ -22,6 +22,7 @@
 		refreshData: { tokenPair: TokenPair; resolution: Resolution };
 		resolutionChange: Resolution;
 		chartTypeChange: 'candlestick' | 'line';
+		quoteChange: 'VOI' | 'USD';
 	}>();
 
 	export let tokenPair: TokenPair;
@@ -41,11 +42,21 @@
 	let chartContainer: HTMLElement;
 	let chart: IChartApi;
 	let mainSeries: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'>;
-let volumeSeries: ISeriesApi<'Histogram'>;
-let isDarkMode = false;
-let prevPairKey: string | null = null;
-let isInitializing = false;
-let hovered: { time?: number; open?: number; high?: number; low?: number; close?: number; volume?: number } | null = null;
+	let volumeSeries: ISeriesApi<'Histogram'>;
+	let isDarkMode = false;
+	let prevPairKey: string | null = null;
+	let isInitializing = false;
+	let hovered: {
+		time?: number;
+		open?: number;
+		high?: number;
+		low?: number;
+		close?: number;
+		volume?: number;
+	} | null = null;
+	
+	// Quote currency state (VOI or USD)
+	let quoteCurrency: 'VOI' | 'USD' = 'VOI';
 
 	function formatTimeByResolution(ts: number, resolution: Resolution): string {
 		const d = new Date(ts * 1000);
@@ -135,16 +146,16 @@ let hovered: { time?: number; open?: number; high?: number; low?: number; close?
 		});
 	}
 
-function initializeChart() {
-	if (!chartContainer) {
-		console.error('Chart container not found');
-		return;
-	}
+	function initializeChart() {
+		if (!chartContainer) {
+			console.error('Chart container not found');
+			return;
+		}
 
-	if (isInitializing || chart) {
-		return;
-	}
-	isInitializing = true;
+		if (isInitializing || chart) {
+			return;
+		}
+		isInitializing = true;
 
 		console.log('Initializing chart with container:', chartContainer);
 		console.log('Container dimensions:', { width: chartContainer.clientWidth, height: height });
@@ -155,7 +166,7 @@ function initializeChart() {
 			return;
 		}
 
-	chart = createChart(chartContainer, {
+		chart = createChart(chartContainer, {
 			height,
 			width: chartContainer.clientWidth,
 			layout: {
@@ -197,11 +208,11 @@ function initializeChart() {
 		mainSeries = undefined as any;
 		volumeSeries = undefined as any;
 
-	// Reset any previous series handles from old chart instances
-	mainSeries = undefined as any;
-	volumeSeries = undefined as any;
+		// Reset any previous series handles from old chart instances
+		mainSeries = undefined as any;
+		volumeSeries = undefined as any;
 
-	createMainSeries();
+		createMainSeries();
 
 		if (settings.showVolume) {
 			createVolumeSeries();
@@ -217,10 +228,24 @@ function initializeChart() {
 					hovered = null;
 					return;
 				}
-				const seriesData = param.seriesData?.get?.(mainSeries as any) || param.seriesPrices?.get?.(mainSeries as any);
+				const seriesData =
+					param.seriesData?.get?.(mainSeries as any) ||
+					param.seriesPrices?.get?.(mainSeries as any);
 				if (seriesData && typeof seriesData === 'object') {
 					// For candlesticks we get {open,high,low,close}; for line we get {value}
-					const t = param.time ? (typeof param.time === 'number' ? param.time : (param.time?.year ? Math.floor(new Date(param.time.year, (param.time.month||1)-1, param.time.day||1).getTime()/1000) : 0)) : undefined;
+					const t = param.time
+						? typeof param.time === 'number'
+							? param.time
+							: param.time?.year
+								? Math.floor(
+										new Date(
+											param.time.year,
+											(param.time.month || 1) - 1,
+											param.time.day || 1
+										).getTime() / 1000
+									)
+								: 0
+						: undefined;
 					// Try to lookup a volume value at the same time
 					let vol: number | undefined = undefined;
 					if (t && Array.isArray(volumes) && volumes.length) {
@@ -228,9 +253,23 @@ function initializeChart() {
 						if (match) vol = match.value;
 					}
 					if ('open' in seriesData) {
-						hovered = { time: t, open: seriesData.open, high: seriesData.high, low: seriesData.low, close: seriesData.close, volume: vol };
+						hovered = {
+							time: t,
+							open: seriesData.open,
+							high: seriesData.high,
+							low: seriesData.low,
+							close: seriesData.close,
+							volume: vol
+						};
 					} else if ('value' in seriesData) {
-						hovered = { time: t, open: seriesData.value, high: seriesData.value, low: seriesData.value, close: seriesData.value, volume: vol };
+						hovered = {
+							time: t,
+							open: seriesData.value,
+							high: seriesData.value,
+							low: seriesData.value,
+							close: seriesData.value,
+							volume: vol
+						};
 					}
 				} else {
 					hovered = null;
@@ -245,8 +284,8 @@ function initializeChart() {
 			updateChartData();
 		}
 
-	console.log('Chart initialization complete');
-	isInitializing = false;
+		console.log('Chart initialization complete');
+		isInitializing = false;
 
 		// Set up resize observer
 		const resizeObserver = new ResizeObserver(() => {
@@ -282,17 +321,17 @@ function initializeChart() {
 		};
 	}
 
-function createMainSeries() {
-	if (!chart) return;
+	function createMainSeries() {
+		if (!chart) return;
 
-	// Remove existing main series (guard against stale handles)
-	try {
-		if (mainSeries) {
-			chart.removeSeries(mainSeries);
+		// Remove existing main series (guard against stale handles)
+		try {
+			if (mainSeries) {
+				chart.removeSeries(mainSeries);
+			}
+		} catch (e) {
+			console.warn('Failed to remove existing series (likely stale handle), recreating:', e);
 		}
-	} catch (e) {
-		console.warn('Failed to remove existing series (likely stale handle), recreating:', e);
-	}
 
 		if (settings.chartType === 'candlestick') {
 			mainSeries = chart.addCandlestickSeries({
@@ -358,8 +397,12 @@ function createMainSeries() {
 	}
 
 	function updateChartData() {
-		console.log('updateChartData called', { mainSeries: !!mainSeries, dataLength: data.length, chartType: settings.chartType });
-		
+		console.log('updateChartData called', {
+			mainSeries: !!mainSeries,
+			dataLength: data.length,
+			chartType: settings.chartType
+		});
+
 		if (!mainSeries || !data.length) {
 			console.log('updateChartData: Missing mainSeries or data');
 			return;
@@ -369,7 +412,10 @@ function createMainSeries() {
 
 		// Sort data by time to ensure proper ordering
 		const sortedData = [...data].sort((a, b) => a.time - b.time);
-		console.log('Data time range:', { start: sortedData[0]?.time, end: sortedData[sortedData.length - 1]?.time });
+		console.log('Data time range:', {
+			start: sortedData[0]?.time,
+			end: sortedData[sortedData.length - 1]?.time
+		});
 
 		// Dynamically adjust price precision based on value range
 		try {
@@ -411,7 +457,6 @@ function createMainSeries() {
 			(mainSeries as ISeriesApi<'Line'>).setData(lineData);
 		}
 
-
 		// Handle volume series presence and bottom whitespace
 		if (settings.showVolume) {
 			if (volumes.length > 0) {
@@ -444,7 +489,7 @@ function createMainSeries() {
 		if (chart) {
 			chart.timeScale().fitContent();
 		}
-		
+
 		console.log('Chart data updated, fitting content');
 	}
 
@@ -484,6 +529,14 @@ function createMainSeries() {
 			}
 		});
 	}
+	
+	function toggleQuoteCurrency() {
+		console.log('toggleQuoteCurrency called, current:', quoteCurrency);
+		quoteCurrency = quoteCurrency === 'VOI' ? 'USD' : 'VOI';
+		console.log('quoteCurrency updated to:', quoteCurrency);
+		dispatch('quoteChange', quoteCurrency);
+		console.log('quoteChange event dispatched');
+	}
 
 	onMount(() => {
 		// Delay initialization to ensure DOM is ready
@@ -511,27 +564,27 @@ function createMainSeries() {
 		const sig = `${data?.length || 0}:${firstTs}-${lastTs}:${firstClose}:${lastClose}:${settings.resolution}:${settings.chartType}`;
 		if (sig !== prevSig) {
 			prevSig = sig;
-		if (chart && mainSeries) {
-			if (data && data.length > 0) {
-				updateChartData();
-			} else {
-				// Clear series when no data and reset scales/volume
-				if (settings.chartType === 'candlestick') {
-					(mainSeries as ISeriesApi<'Candlestick'>).setData([]);
+			if (chart && mainSeries) {
+				if (data && data.length > 0) {
+					updateChartData();
 				} else {
-					(mainSeries as ISeriesApi<'Line'>).setData([]);
+					// Clear series when no data and reset scales/volume
+					if (settings.chartType === 'candlestick') {
+						(mainSeries as ISeriesApi<'Candlestick'>).setData([]);
+					} else {
+						(mainSeries as ISeriesApi<'Line'>).setData([]);
+					}
+					if (volumeSeries) {
+						chart.removeSeries(volumeSeries);
+						volumeSeries = undefined as any;
+					}
+					chart.priceScale('right').applyOptions({
+						scaleMargins: { top: 0.1, bottom: 0.1 }
+					});
 				}
-				if (volumeSeries) {
-					chart.removeSeries(volumeSeries);
-					volumeSeries = undefined as any;
-				}
-				chart.priceScale('right').applyOptions({
-					scaleMargins: { top: 0.1, bottom: 0.1 }
-				});
 			}
 		}
 	}
-}
 
 	// Recreate series when token pair changes (ids or symbols affect price formatting)
 	let prevPairSymbols = '';
@@ -548,7 +601,7 @@ function createMainSeries() {
 		}
 	}
 
-// Note: chart initializes once on mount; do not reinitialize reactively
+	// Note: chart initializes once on mount; do not reinitialize reactively
 
 	let prevChartType: 'candlestick' | 'line' = settings.chartType;
 	let prevResolution = settings.resolution;
@@ -572,21 +625,56 @@ function createMainSeries() {
 >
 	<!-- Chart Header -->
 	<div
-		class="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-gray-200 dark:border-gray-700"
+		class="flex flex-col gap-4 p-4 border-b border-gray-200 dark:border-gray-700"
 	>
-		<div>
-			<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-				{(tokenPair.baseSymbol || '').toUpperCase() === 'WVOI' ? 'VOI' : tokenPair.baseSymbol}/{(tokenPair.quoteSymbol || '').toUpperCase() === 'WVOI' ? 'VOI' : tokenPair.quoteSymbol}
-				{#if loading}
-					<Spinner size="4" class="ml-2" />
-				{/if}
-			</h3>
-			<p class="text-sm text-gray-500 dark:text-gray-400">
-				Pool ID: {tokenPair.poolId || 'N/A'}
-			</p>
+		<div class="flex items-center justify-between w-full">
+			<div>
+				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+					{(tokenPair.baseSymbol || '').toUpperCase() === 'WVOI' ? 'VOI' : tokenPair.baseSymbol}/VOI
+					{#if loading}
+						<Spinner size="4" class="ml-2" />
+					{/if}
+				</h3>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					Pool ID: {tokenPair.poolId || 'N/A'}
+				</p>
+			</div>
+			
+			<!-- Quote Currency Slider -->
+			<div class="flex items-center gap-3">
+				<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Quote:</span>
+				<div class="relative">
+					<div class="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+						<button
+							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 {quoteCurrency === 'VOI' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+							on:click={() => {
+								if (quoteCurrency !== 'VOI') {
+									console.log('Setting quoteCurrency to VOI');
+									quoteCurrency = 'VOI';
+									dispatch('quoteChange', quoteCurrency);
+								}
+							}}
+						>
+							VOI
+						</button>
+						<button
+							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 {quoteCurrency === 'USD' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+							on:click={() => {
+								if (quoteCurrency !== 'USD') {
+									console.log('Setting quoteCurrency to USD');
+									quoteCurrency = 'USD';
+									dispatch('quoteChange', quoteCurrency);
+								}
+							}}
+						>
+							USD
+						</button>
+					</div>
+				</div>
+			</div>
 		</div>
 
-		<div class="flex flex-wrap items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2 justify-between">
 			<!-- Chart Type Toggle -->
 			<ButtonGroup>
 				<Button
@@ -672,42 +760,61 @@ function createMainSeries() {
 				{#if hovered}
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Open:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1">{hovered.open?.toFixed(6) ?? '—'}</span>
+						<span class="font-medium text-gray-900 dark:text-white ml-1"
+							>{hovered.open?.toFixed(6) ?? '—'}</span
+						>
 					</div>
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">High:</span>
-						<span class="font-medium text-green-600 dark:text-green-400 ml-1">{hovered.high?.toFixed(6) ?? '—'}</span>
+						<span class="font-medium text-green-600 dark:text-green-400 ml-1"
+							>{hovered.high?.toFixed(6) ?? '—'}</span
+						>
 					</div>
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Low:</span>
-						<span class="font-medium text-red-600 dark:text-red-400 ml-1">{hovered.low?.toFixed(6) ?? '—'}</span>
+						<span class="font-medium text-red-600 dark:text-red-400 ml-1"
+							>{hovered.low?.toFixed(6) ?? '—'}</span
+						>
 					</div>
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Close:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1">{hovered.close?.toFixed(6) ?? '—'}</span>
+						<span class="font-medium text-gray-900 dark:text-white ml-1"
+							>{hovered.close?.toFixed(6) ?? '—'}</span
+						>
 					</div>
 				{:else}
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Open:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1">{data[0]?.open.toFixed(6) || '—'}</span>
+						<span class="font-medium text-gray-900 dark:text-white ml-1"
+							>{data[0]?.open.toFixed(6) || '—'}</span
+						>
 					</div>
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">High:</span>
-						<span class="font-medium text-green-600 dark:text-green-400 ml-1">{Math.max(...data.map((d) => d.high)).toFixed(6)}</span>
+						<span class="font-medium text-green-600 dark:text-green-400 ml-1"
+							>{Math.max(...data.map((d) => d.high)).toFixed(6)}</span
+						>
 					</div>
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Low:</span>
-						<span class="font-medium text-red-600 dark:text-red-400 ml-1">{Math.min(...data.map((d) => d.low)).toFixed(6)}</span>
+						<span class="font-medium text-red-600 dark:text-red-400 ml-1"
+							>{Math.min(...data.map((d) => d.low)).toFixed(6)}</span
+						>
 					</div>
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Close:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1">{data[data.length - 1]?.close.toFixed(6) || '—'}</span>
+						<span class="font-medium text-gray-900 dark:text-white ml-1"
+							>{data[data.length - 1]?.close.toFixed(6) || '—'}</span
+						>
 					</div>
 				{/if}
 				{#if settings.showVolume}
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Volume:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1">{hovered?.volume ?? volumes.reduce((sum, v) => sum + v.value, 0).toLocaleString()}</span>
+						<span class="font-medium text-gray-900 dark:text-white ml-1"
+							>{hovered?.volume ??
+								volumes.reduce((sum, v) => sum + v.value, 0).toLocaleString()}</span
+						>
 					</div>
 				{/if}
 			</div>

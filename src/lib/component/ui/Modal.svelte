@@ -31,12 +31,16 @@
 	bind:this={dialog}
 	on:close={() => (showModal = false)}
 	on:click|self={closeModal}
-	class="bg-white dark:bg-gray-800 rounded-lg shadow-xl border-0 p-0 {sizeClasses[size]} w-full mx-auto overflow-hidden"
+	class="bg-white dark:bg-gray-800 rounded-lg shadow-xl border-0 p-0 {sizeClasses[
+		size
+	]} w-full mx-auto overflow-hidden"
 >
 	<!-- svelte-ignore a11y-no-static-element-interactions -->
-	<div 
-		on:click|stopPropagation 
-		class="relative flex flex-col max-h-[90vh] {isClosing ? 'animate-modal-out' : 'animate-modal-in'}"
+	<div
+		on:click|stopPropagation
+		class="relative flex flex-col max-h-[90vh] {isClosing
+			? 'animate-modal-out'
+			: 'animate-modal-in'}"
 	>
 		{#if $$slots.header}
 			<div class="flex-none px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -80,7 +84,7 @@
 	}
 
 	:global(.animate-modal-out) {
-		animation: modal-out 0.2s cubic-bezier(0.34, 0.0, 0.64, 1);
+		animation: modal-out 0.2s cubic-bezier(0.34, 0, 0.64, 1);
 	}
 
 	@keyframes modal-in {

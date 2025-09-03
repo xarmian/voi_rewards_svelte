@@ -1,23 +1,23 @@
 <script lang="ts">
-    import Dashboard from './Dashboard.svelte';
-    import Quests from './quests/QuestsPage.svelte';
-    import { onMount } from 'svelte';
+	import Dashboard from './Dashboard.svelte';
+	import Quests from './quests/QuestsPage.svelte';
+	import { onMount } from 'svelte';
 
-    let page: null | string = null;
+	let page: null | string = null;
 
-    onMount(async () => {
-        const url = window.location.href;
+	onMount(async () => {
+		const url = window.location.href;
 
-        if (url.includes('quests.voirewards.com')) {
-            page = 'quests';
-        }
-        else {
-            page = 'dashboard';
-        }
-    });
+		if (url.includes('quests.voirewards.com')) {
+			page = 'quests';
+		} else {
+			page = 'dashboard';
+		}
+	});
 </script>
+
 {#if page === 'quests'}
-    <Quests />
+	<Quests />
 {:else if page === 'dashboard'}
-    <Dashboard />
+	<Dashboard />
 {/if}

@@ -3,6 +3,7 @@ question: What are ARC-200 and ARC-72 tokens on the Voi Network?
 category: Development
 sort: 31
 ---
+
 ARC-200 and ARC-72 are the standard token formats adopted by Voi Network. These "Smart Assets" offer enhanced functionality compared to traditional blockchain assets:
 
 1. **ARC-200**: This standard is used for fungible tokens, similar to ERC-20 (Ethereum) or ASAs (Algorand). These tokens can represent various fungible assets like cryptocurrencies or tokenized commodities.

@@ -14,8 +14,12 @@ export interface TokenSupply {
 
 export const GET: RequestHandler = async ({ url }) => {
 	try {
-		const tokenIds = url.searchParams.get('tokenIds')?.split(',').map(id => parseInt(id)) || [];
-		
+		const tokenIds =
+			url.searchParams
+				.get('tokenIds')
+				?.split(',')
+				.map((id) => parseInt(id)) || [];
+
 		if (tokenIds.length === 0) {
 			return json({ error: 'tokenIds parameter is required' }, { status: 400 });
 		}
@@ -27,20 +31,30 @@ export const GET: RequestHandler = async ({ url }) => {
 			.in('contract_id', tokenIds);
 
 		if (error) {
-			return json({ error: `Failed to fetch token supply data: ${error.message}` }, { status: 500 });
+			return json(
+				{ error: `Failed to fetch token supply data: ${error.message}` },
+				{ status: 500 }
+			);
 		}
 
 		if (!data || data.length === 0) {
-			return json({ error: 'No token supply data found for the requested token IDs' }, { status: 404 });
+			return json(
+				{ error: 'No token supply data found for the requested token IDs' },
+				{ status: 404 }
+			);
 		}
 
 		// Transform the response to our format
-		const tokenSupplies: TokenSupply[] = data.map(token => ({
-			tokenId: token.contract_id,
-			symbol: token.symbol,
-			totalSupply: token.total_supply ? parseFloat(token.total_supply) / Math.pow(10, token.decimals) : 0,
-			decimals: token.decimals
-		})).filter(token => token.tokenId && token.totalSupply > 0);
+		const tokenSupplies: TokenSupply[] = data
+			.map((token) => ({
+				tokenId: token.contract_id,
+				symbol: token.symbol,
+				totalSupply: token.total_supply
+					? parseFloat(token.total_supply) / Math.pow(10, token.decimals)
+					: 0,
+				decimals: token.decimals
+			}))
+			.filter((token) => token.tokenId && token.totalSupply > 0);
 
 		console.log('Requested token IDs:', tokenIds);
 		console.log('Found matching tokens:', tokenSupplies);

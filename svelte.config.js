@@ -9,10 +9,10 @@ const config = {
 
 	onwarn: (warning, handler) => {
 		if (warning.code.startsWith('a11y-')) {
-		  return;
+			return;
 		}
 		handler(warning);
-	  },
+	},
 
 	kit: {
 		// adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
@@ -28,7 +28,6 @@ const config = {
 			include: ['svelte-range-slider-pips']
 		}
 	}
-
 };
 
 export default config;

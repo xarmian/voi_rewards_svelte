@@ -12,7 +12,7 @@
 	import type { SupplyInfo } from '$lib/stores/accounts';
 	import { getTokensByEpoch, extrapolateRewardPerBlock, formatNumber } from '$lib/utils';
 	import { dataTable } from '../..//stores/dataTable';
-	
+
 	interface DataArrayItem {
 		proposer: string;
 		block_count: number;
@@ -41,7 +41,7 @@
 	$: selectedDate = '';
 	$: dataArrays = [] as DataArrayItem[];
 	$: dataIncomplete = false;
-	let dates: { id: string; desc: string; epoch: number; }[] = [];
+	let dates: { id: string; desc: string; epoch: number }[] = [];
 	let supply: SupplyInfo | null = null;
 	let ballasts: string[] = [];
 	let showEnlargedStakeChart = false;
@@ -69,7 +69,7 @@
 				dataTable.fetchData(selectedDate),
 				fetch('/api/markets?token=VOI')
 			]);
-			
+
 			const marketsData = await marketsResponse.json();
 			if (marketsData.aggregates) {
 				currentPrice = marketsData.aggregates.weightedAveragePrice;
@@ -79,7 +79,9 @@
 				}
 			}
 
-			const { data: onlineAccountCount, error: onlineAccountCountError } = await fetch('/api/mimir?action=get_online_account_count').then(res => res.json());
+			const { data: onlineAccountCount, error: onlineAccountCountError } = await fetch(
+				'/api/mimir?action=get_online_account_count'
+			).then((res) => res.json());
 			if (onlineAccountCountError) {
 				console.error('Error fetching online account count:', onlineAccountCountError);
 			} else {
@@ -99,14 +101,14 @@
 				endOfDay.setUTCHours(23, 59, 59, 999);
 
 				dataIncomplete = endOfDay > new Date(data.max_timestamp);
-				
+
 				// Update local state - ensure reactivity by creating a new array
 				dataArrays = [...data.data];
 				ballasts = [...data.blacklist];
 				//totalWallets = data.num_proposers;
 				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
-				
+
 				await updateRewardParams();
 				eligibleOnlineStake = getEligibleOnlineStake();
 			}
@@ -125,7 +127,7 @@
 			// get online stake
 			supply = await getSupplyInfo();
 			await populateDateDropdown();
-			
+
 			// If selectedDate was set by populateDateDropdown, it will trigger loadDashboardData
 			// If not, we need to load it explicitly
 			if (!selectedDate && dates.length > 0) {
@@ -144,9 +146,9 @@
 	}
 
 	const updateRewardParams = async () => {
-		const currentEpoch = dates.find(date => date.id === selectedDate)?.epoch || 1;
+		const currentEpoch = dates.find((date) => date.id === selectedDate)?.epoch || 1;
 		const tokens = await getTokensByEpoch(currentEpoch);
-		
+
 		// Calculate projections using the utility function
 		const { projectedTotalBlocks, projectedRewardPerBlock } = extrapolateRewardPerBlock(
 			totalBlocks,
@@ -160,7 +162,7 @@
 			block_reward_pool: tokens,
 			total_blocks: totalBlocks,
 			reward_per_block: projectedRewardPerBlock,
-			total_blocks_projected: projectedTotalBlocks,
+			total_blocks_projected: projectedTotalBlocks
 		}));
 	};
 
@@ -186,273 +188,335 @@
 
 	function getEligibleOnlineStake() {
 		const commonBalance = (supply?.['online-money'] ?? 0) - (supply?.['blacklisted-money'] ?? 0);
-		return Math.round((commonBalance + Math.min(supply?.['blacklisted-money'] ?? 0, commonBalance/3))/Math.pow(10,6));
+		return Math.round(
+			(commonBalance + Math.min(supply?.['blacklisted-money'] ?? 0, commonBalance / 3)) /
+				Math.pow(10, 6)
+		);
 	}
-
 </script>
 
-	<!-- Hero Section -->
-	<div class="relative">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:pt-20">
-			<div class="text-center">
-				<h1 class="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-					Welcome to Voi Network
-				</h1>
-				<p class="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-					Explore the ecosystem, track rewards, and participate in the future of decentralized consensus.
-				</p>
-				<div class="max-w-xl mx-auto relative z-20">
-					<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
-				</div>
+<!-- Hero Section -->
+<div class="relative">
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:pt-20">
+		<div class="text-center">
+			<h1 class="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+				Welcome to Voi Network
+			</h1>
+			<p class="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+				Explore the ecosystem, track rewards, and participate in the future of decentralized
+				consensus.
+			</p>
+			<div class="max-w-xl mx-auto relative z-20">
+				<WalletSearch onSubmit={handleWalletSearch} loadPreviousValue={false} />
 			</div>
 		</div>
 	</div>
+</div>
 
-	{#if isLoading}
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-			<!-- Loading animation for stats cards -->
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-				{#each Array(4) as _, i}
+{#if isLoading}
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+		<!-- Loading animation for stats cards -->
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+			{#each Array(4) as _, i}
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative overflow-hidden">
+					<!-- Animated gradient overlay -->
+					<div
+						class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+					></div>
+
+					<!-- Card content skeleton -->
+					<div class="flex flex-col gap-3">
+						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 animate-pulse"></div>
+						<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-2/3 animate-pulse"></div>
+						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+
+						<!-- Animated icon placeholder -->
+						<div class="absolute top-2 right-2">
+							<div
+								class="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 animate-spin-slow"
+							></div>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Loading animation for quick links -->
+		<div class="mt-12">
+			<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-6 animate-pulse"></div>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+				{#each Array(4) as _}
 					<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative overflow-hidden">
-						<!-- Animated gradient overlay -->
-						<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
-						
-						<!-- Card content skeleton -->
-						<div class="flex flex-col gap-3">
-							<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 animate-pulse"></div>
-							<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-2/3 animate-pulse"></div>
-							<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
-							
-							<!-- Animated icon placeholder -->
-							<div class="absolute top-2 right-2">
-								<div class="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 animate-spin-slow"></div>
+						<div
+							class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+						></div>
+						<div class="flex items-center">
+							<div
+								class="w-12 h-12 rounded-lg bg-purple-100/50 dark:bg-purple-900/50 animate-pulse"
+							></div>
+							<div class="ml-4 flex-1">
+								<div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2 animate-pulse"></div>
+								<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
 							</div>
 						</div>
 					</div>
 				{/each}
 			</div>
-
-			<!-- Loading animation for quick links -->
-			<div class="mt-12">
-				<div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-6 animate-pulse"></div>
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-					{#each Array(4) as _}
-						<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative overflow-hidden">
-							<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
-							<div class="flex items-center">
-								<div class="w-12 h-12 rounded-lg bg-purple-100/50 dark:bg-purple-900/50 animate-pulse"></div>
-								<div class="ml-4 flex-1">
-									<div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2 animate-pulse"></div>
-									<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-								</div>
-							</div>
+		</div>
+	</div>
+{:else if error}
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+		<div
+			class="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-100 px-4 py-3 rounded-lg relative"
+			role="alert"
+		>
+			<strong class="font-bold">Error!</strong>
+			<span class="block sm:inline ml-2">{error}</span>
+		</div>
+	</div>
+{:else}
+	<!-- Network Stats Section -->
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+		<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Network Overview</h2>
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+			<!-- Price Card -->
+			<a
+				href="/markets"
+				class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex flex-col">
+					<div class="absolute top-2 right-2">
+						<div
+							class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+						>
+							<i class="fas fa-chart-line text-gray-600 dark:text-gray-300 text-sm"></i>
 						</div>
-					{/each}
+					</div>
+					<p class="text-sm text-gray-500 dark:text-gray-400">Current Price</p>
+					<p class="text-2xl font-bold text-gray-900 dark:text-white">
+						${currentPrice ? formatNumber(currentPrice, 6) : '-.--'}
+						{#if priceChange24h}
+							<span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
+								{priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
+							</span>
+						{/if}
+					</p>
 				</div>
-			</div>
+				<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Markets →</p>
+			</a>
+
+			<!-- Online Stake Card -->
+			<button
+				on:click={handleStakeChartClick}
+				class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex flex-col">
+					<div class="absolute top-2 right-2">
+						<div
+							class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+						>
+							<i class="fas fa-chart-area text-gray-600 dark:text-gray-300 text-sm"></i>
+						</div>
+					</div>
+					<p class="text-sm text-gray-500 dark:text-gray-400">Online Stake</p>
+					<p class="text-2xl font-bold text-gray-900 dark:text-white">
+						{supply
+							? Math.round((supply?.['online-money'] ?? 0) / Math.pow(10, 6)).toLocaleString() +
+								' VOI'
+							: '-'}
+					</p>
+					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+						Eligible: {eligibleOnlineStake > 0
+							? eligibleOnlineStake.toLocaleString() + ' VOI'
+							: '-'}
+					</p>
+				</div>
+				<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Chart →</p>
+			</button>
+
+			<!-- Rewards Card -->
+			<button
+				on:click={() => {
+					document.querySelector('#rewards-section')?.scrollIntoView({ behavior: 'smooth' });
+				}}
+				class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex flex-col">
+					<div class="absolute top-2 right-2">
+						<div
+							class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+						>
+							<i class="fas fa-gift text-gray-600 dark:text-gray-300 text-sm"></i>
+						</div>
+					</div>
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						{'Rewards for Epoch ' + (dates.find((date) => date.id === selectedDate)?.epoch || '-')}
+					</p>
+					<p class="text-2xl font-bold text-gray-900 dark:text-white">
+						{$rewardParams.block_reward_pool > 0
+							? `${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI`
+							: '-'}
+					</p>
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						{eligibleOnlineStake > 0
+							? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR`
+							: ''}
+					</p>
+				</div>
+				<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Details →</p>
+			</button>
+
+			<!-- Participation Card -->
+			<a
+				href="/analytics"
+				class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex flex-col">
+					<div class="absolute top-2 right-2">
+						<div
+							class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
+						>
+							<i class="fas fa-users text-gray-600 dark:text-gray-300 text-sm"></i>
+						</div>
+					</div>
+					<p class="text-sm text-gray-500 dark:text-gray-400">Network Participation</p>
+					<p class="text-2xl font-bold text-gray-900 dark:text-white">
+						{totalWallets > 0 ? totalWallets.toLocaleString() : '-'}
+					</p>
+					<p class="text-sm text-gray-500 dark:text-gray-400">Online Accounts</p>
+				</div>
+				<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Analytics →</p>
+			</a>
 		</div>
-	{:else if error}
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-			<div class="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-100 px-4 py-3 rounded-lg relative" role="alert">
-				<strong class="font-bold">Error!</strong>
-				<span class="block sm:inline ml-2">{error}</span>
-			</div>
+	</div>
+
+	<!-- Quick Links Section -->
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+		<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Links</h2>
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+			<!-- Run a Node Card -->
+			<a
+				href="/how_to_node"
+				class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex items-center mb-4">
+					<div
+						class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center"
+					>
+						<i class="fas fa-server text-2xl text-purple-600 dark:text-purple-400"></i>
+					</div>
+					<div class="ml-4">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Run a Node</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Start participating in consensus</p>
+					</div>
+				</div>
+			</a>
+
+			<!-- Calculator Card -->
+			<a
+				href="/calculator"
+				class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex items-center mb-4">
+					<div
+						class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center"
+					>
+						<i class="fas fa-calculator text-2xl text-purple-600 dark:text-purple-400"></i>
+					</div>
+					<div class="ml-4">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Calculator</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Calculate potential rewards</p>
+					</div>
+				</div>
+			</a>
+
+			<!-- Directory Card -->
+			<a
+				href="/directory"
+				class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex items-center mb-4">
+					<div
+						class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center"
+					>
+						<i class="fas fa-book text-2xl text-blue-600 dark:text-blue-400"></i>
+					</div>
+					<div class="ml-4">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Directory</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Explore the ecosystem</p>
+					</div>
+				</div>
+			</a>
+
+			<!-- FAQ Card -->
+			<a
+				href="/faq"
+				class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
+			>
+				<div class="flex items-center mb-4">
+					<div
+						class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center"
+					>
+						<i class="fas fa-question-circle text-2xl text-green-600 dark:text-green-400"></i>
+					</div>
+					<div class="ml-4">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">FAQ</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400">Get your questions answered</p>
+					</div>
+				</div>
+			</a>
 		</div>
-	{:else}
-		<!-- Network Stats Section -->
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Network Overview</h2>
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-				<!-- Price Card -->
-				<a href="/markets" class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
-					<div class="flex flex-col">
-						<div class="absolute top-2 right-2">
-							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-								<i class="fas fa-chart-line text-gray-600 dark:text-gray-300 text-sm"></i>
-							</div>
-						</div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">Current Price</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">
-							${currentPrice ? formatNumber(currentPrice, 6) : '-.--'}
-							{#if priceChange24h}
-								<span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
-									{priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
-								</span>
-							{/if}
-						</p>
-					</div>
-					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Markets →</p>
-				</a>
+	</div>
 
-				<!-- Online Stake Card -->
-				<button
-					on:click={handleStakeChartClick}
-					class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
-				>
-					<div class="flex flex-col">
-						<div class="absolute top-2 right-2">
-							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-								<i class="fas fa-chart-area text-gray-600 dark:text-gray-300 text-sm"></i>
-							</div>
-						</div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">Online Stake</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">
-							{supply ? Math.round((supply?.['online-money']??0)/Math.pow(10,6)).toLocaleString() + ' VOI' : '-'}
-						</p>
-						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-							Eligible: {eligibleOnlineStake > 0 ? eligibleOnlineStake.toLocaleString() + ' VOI' : '-'}
-						</p>
-					</div>
-					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Chart →</p>
-				</button>
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+		<GotVoiAd />
+	</div>
 
-				<!-- Rewards Card -->
-				<button
-					on:click={() => {
-						document.querySelector('#rewards-section')?.scrollIntoView({ behavior: 'smooth' });
-					}}
-					class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group text-left hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200"
-				>
-					<div class="flex flex-col">
-						<div class="absolute top-2 right-2">
-							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-								<i class="fas fa-gift text-gray-600 dark:text-gray-300 text-sm"></i>
-							</div>
-						</div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">{"Rewards for Epoch " + (dates.find(date => date.id === selectedDate)?.epoch || '-')}</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">
-							{$rewardParams.block_reward_pool > 0 ? `${Math.round($rewardParams.block_reward_pool).toLocaleString()} VOI` : '-'}
-						</p>
-						<p class="text-sm text-gray-500 dark:text-gray-400">
-							{eligibleOnlineStake > 0 ? `~${(($rewardParams.block_reward_pool / eligibleOnlineStake) * 52 * 100).toFixed(2)}% APR` : ''}
-						</p>
-					</div>
-					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Details →</p>
-				</button>
-
-				<!-- Participation Card -->
-				<a href="/analytics" class="flex flex-col justify-between bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative group hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
-					<div class="flex flex-col">
-						<div class="absolute top-2 right-2">
-							<div class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200">
-								<i class="fas fa-users text-gray-600 dark:text-gray-300 text-sm"></i>
-							</div>
-						</div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">Network Participation</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">
-							{totalWallets > 0 ? totalWallets.toLocaleString() : '-'}
-						</p>
-						<p class="text-sm text-gray-500 dark:text-gray-400">Online Accounts</p>
-					</div>
-					<p class="text-sm text-purple-600 dark:text-purple-400 mt-2">View Analytics →</p>
-				</a>
-			</div>
-		</div>
-
-		<!-- Quick Links Section -->
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-			<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Links</h2>
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-				<!-- Run a Node Card -->
-				<a href="/how_to_node" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
-					<div class="flex items-center mb-4">
-						<div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-							<i class="fas fa-server text-2xl text-purple-600 dark:text-purple-400"></i>
-						</div>
-						<div class="ml-4">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Run a Node</h3>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Start participating in consensus</p>
-						</div>
-					</div>
-				</a>
-
-				<!-- Calculator Card -->
-				<a href="/calculator" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
-					<div class="flex items-center mb-4">
-						<div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-							<i class="fas fa-calculator text-2xl text-purple-600 dark:text-purple-400"></i>
-						</div>
-						<div class="ml-4">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Calculator</h3>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Calculate potential rewards</p>
-						</div>
-					</div>
-				</a>
-
-				<!-- Directory Card -->
-				<a href="/directory" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
-					<div class="flex items-center mb-4">
-						<div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-							<i class="fas fa-book text-2xl text-blue-600 dark:text-blue-400"></i>
-						</div>
-						<div class="ml-4">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Directory</h3>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Explore the ecosystem</p>
-						</div>
-					</div>
-				</a>
-
-				<!-- FAQ Card -->
-				<a href="/faq" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:ring-2 hover:ring-purple-500 dark:hover:ring-purple-400 transition-all duration-200">
-					<div class="flex items-center mb-4">
-						<div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-							<i class="fas fa-question-circle text-2xl text-green-600 dark:text-green-400"></i>
-						</div>
-						<div class="ml-4">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">FAQ</h3>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Get your questions answered</p>
-						</div>
-					</div>
-				</a>
-			</div>
-		</div>
-
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
-			<GotVoiAd />
-		</div>
-				
-		<!-- Rewards Section -->
-		<div id="rewards-section" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-12 relative z-10">
-			<div class="flex flex-col sm:flex-row items-center justify-between mb-6">
-				<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Epoch Reward Estimates</h2>
-				<div class="flex items-center gap-4 mt-4 sm:mt-0">
-					<select
-						id="epoch-selector"
-						bind:value={selectedDate}
-						class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
+	<!-- Rewards Section -->
+	<div id="rewards-section" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-12 relative z-10">
+		<div class="flex flex-col sm:flex-row items-center justify-between mb-6">
+			<h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+				Current Epoch Reward Estimates
+			</h2>
+			<div class="flex items-center gap-4 mt-4 sm:mt-0">
+				<select
+					id="epoch-selector"
+					bind:value={selectedDate}
+					class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600
 							rounded-lg px-4 py-2
 							focus:ring-2 focus:ring-purple-500 focus:border-purple-500
 							dark:text-gray-300 dark:focus:ring-purple-400
 							transition-colors duration-200"
-					>
-						{#each dates as date, index}
-							<option value={date.id}>
-								Epoch {index + 1}: {date.desc}
-							</option>
-						{/each}
-					</select>
-				</div>
+				>
+					{#each dates as date, index}
+						<option value={date.id}>
+							Epoch {index + 1}: {date.desc}
+						</option>
+					{/each}
+				</select>
 			</div>
-
-			{#if dataArrays.length > 0}
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden p-4">
-					<RewardsTable items={dataArrays} refreshData={refreshDashboardData} {isRefreshing} />
-				</div>
-			{/if}
 		</div>
-	{/if}
+
+		{#if dataArrays.length > 0}
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden p-4">
+				<RewardsTable items={dataArrays} refreshData={refreshDashboardData} {isRefreshing} />
+			</div>
+		{/if}
+	</div>
+{/if}
 
 <!-- Modals -->
 {#if showEnlargedStakeChart}
-<Modal bind:open={showEnlargedStakeChart} size="xl">
-	<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
-	{#if onlineStakeHistory.length > 0}
-		<MiniStakeChart chartData={onlineStakeHistory} />
-	{:else}
-		<p>Loading chart data...</p>
-	{/if}
-</Modal>
+	<Modal bind:open={showEnlargedStakeChart} size="xl">
+		<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
+		{#if onlineStakeHistory.length > 0}
+			<MiniStakeChart chartData={onlineStakeHistory} />
+		{:else}
+			<p>Loading chart data...</p>
+		{/if}
+	</Modal>
 {/if}
+
 <style lang="postcss">
 	:global(.rewards-table) {
 		@apply rounded-lg overflow-hidden;

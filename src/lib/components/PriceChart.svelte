@@ -1,260 +1,260 @@
 <!-- PriceChart.svelte -->
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
-    import { createChart, type IChartApi, type ISeriesApi, type LineData } from 'lightweight-charts';
+	import { onMount, onDestroy } from 'svelte';
+	import { createChart, type IChartApi, type ISeriesApi, type LineData } from 'lightweight-charts';
 
-    export let data: LineData[] = [];
-    export let height = 400;
-    export let selectedMarket: {
-        exchange: string;
-        pair: string;
-        trading_pair_id: number;
-    } | null = null;
+	export let data: LineData[] = [];
+	export let height = 400;
+	export let selectedMarket: {
+		exchange: string;
+		pair: string;
+		trading_pair_id: number;
+	} | null = null;
 
-    let chartContainer: HTMLElement;
-    let chart: IChartApi;
-    let series: ISeriesApi<'Line'>;
-    let isDarkMode = false;
+	let chartContainer: HTMLElement;
+	let chart: IChartApi;
+	let series: ISeriesApi<'Line'>;
+	let isDarkMode = false;
 
-    // Time period selection
-    export let selectedPeriod: '24h' | '7d';
-    export let onPeriodChange: (period: '24h' | '7d') => void;
+	// Time period selection
+	export let selectedPeriod: '24h' | '7d';
+	export let onPeriodChange: (period: '24h' | '7d') => void;
 
-    const periods = [
-        { value: '24h', label: '24H' },
-        { value: '7d', label: '7D' },
-    ];
+	const periods = [
+		{ value: '24h', label: '24H' },
+		{ value: '7d', label: '7D' }
+	];
 
-    function formatTimeByPeriod(timestamp: number, period: '24h' | '7d'): string {
-        const date = new Date(timestamp * 1000);
-        const now = new Date();
-        const hoursDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+	function formatTimeByPeriod(timestamp: number, period: '24h' | '7d'): string {
+		const date = new Date(timestamp * 1000);
+		const now = new Date();
+		const hoursDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-        if (period === '24h') {
-            // For 24h view, show HH:MM
-            return date.toLocaleTimeString(undefined, { 
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-            });
-        } else {
-            // For 7d view, show MMM DD HH:MM
-            if (hoursDiff < 24) {
-                return date.toLocaleTimeString(undefined, {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                });
-            } else {
-                return date.toLocaleString(undefined, {
-                    month: 'short',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                });
-            }
-        }
-    }
+		if (period === '24h') {
+			// For 24h view, show HH:MM
+			return date.toLocaleTimeString(undefined, {
+				hour: '2-digit',
+				minute: '2-digit',
+				hour12: false
+			});
+		} else {
+			// For 7d view, show MMM DD HH:MM
+			if (hoursDiff < 24) {
+				return date.toLocaleTimeString(undefined, {
+					hour: '2-digit',
+					minute: '2-digit',
+					hour12: false
+				});
+			} else {
+				return date.toLocaleString(undefined, {
+					month: 'short',
+					day: '2-digit',
+					hour: '2-digit',
+					minute: '2-digit',
+					hour12: false
+				});
+			}
+		}
+	}
 
-    // Watch for theme changes
-    function updateChartTheme() {
-        if (!chart) return;
-        
-        isDarkMode = document.documentElement.classList.contains('dark');
-        const gridColor = isDarkMode ? '#2D3748' : '#E5E7EB';
-        const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
-        
-        chart.applyOptions({
-            layout: {
-                background: { color: 'transparent' },
-                textColor: textColor,
-            },
-            grid: {
-                vertLines: { color: gridColor },
-                horzLines: { color: gridColor },
-            },
-            rightPriceScale: {
-                borderColor: gridColor,
-                scaleMargins: {
-                    top: 0.2,
-                    bottom: 0.2,
-                },
-                mode: 1,
-            },
-            timeScale: {
-                borderColor: gridColor,
-                timeVisible: true,
-                secondsVisible: false,
-                tickMarkFormatter: (time: number) => {
-                    return formatTimeByPeriod(time, selectedPeriod);
-                },
-            },
-        });
-    }
+	// Watch for theme changes
+	function updateChartTheme() {
+		if (!chart) return;
 
-    function handleResize() {
-        if (chartContainer && chart) {
-            const newWidth = chartContainer.clientWidth;
-            const newHeight = height;
-            chart.resize(newWidth, newHeight);
-        }
-    }
+		isDarkMode = document.documentElement.classList.contains('dark');
+		const gridColor = isDarkMode ? '#2D3748' : '#E5E7EB';
+		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
 
-    onMount(() => {
-        // Wait for next tick to ensure container is rendered
-        setTimeout(() => {
-            chart = createChart(chartContainer, {
-                height,
-                width: chartContainer.clientWidth,
-                layout: {
-                    background: { color: 'transparent' },
-                    textColor: '#4B5563',
-                },
-                grid: {
-                    vertLines: { color: '#E5E7EB' },
-                    horzLines: { color: '#E5E7EB' },
-                },
-                rightPriceScale: {
-                    borderColor: '#E5E7EB',
-                    scaleMargins: {
-                        top: 0.2,
-                        bottom: 0.2,
-                    },
-                    mode: 1,
-                },
-                timeScale: {
-                    borderColor: '#E5E7EB',
-                    timeVisible: true,
-                    secondsVisible: false,
-                    tickMarkFormatter: (time: number) => {
-                        return formatTimeByPeriod(time, selectedPeriod);
-                    },
-                },
-                localization: {
-                    timeFormatter: (time: number) => {
-                        const date = new Date(time * 1000);
-                        return date.toLocaleString();
-                    },
-                },
-                crosshair: {
-                    mode: 1,
-                    vertLine: {
-                        labelVisible: true,
-                    },
-                    horzLine: {
-                        labelVisible: true,
-                    },
-                },
-            });
+		chart.applyOptions({
+			layout: {
+				background: { color: 'transparent' },
+				textColor: textColor
+			},
+			grid: {
+				vertLines: { color: gridColor },
+				horzLines: { color: gridColor }
+			},
+			rightPriceScale: {
+				borderColor: gridColor,
+				scaleMargins: {
+					top: 0.2,
+					bottom: 0.2
+				},
+				mode: 1
+			},
+			timeScale: {
+				borderColor: gridColor,
+				timeVisible: true,
+				secondsVisible: false,
+				tickMarkFormatter: (time: number) => {
+					return formatTimeByPeriod(time, selectedPeriod);
+				}
+			}
+		});
+	}
 
-            series = chart.addLineSeries({
-                color: '#8B5CF6',
-                lineWidth: 2,
-                crosshairMarkerVisible: true,
-                lastValueVisible: true,
-                priceLineVisible: true,
-            });
+	function handleResize() {
+		if (chartContainer && chart) {
+			const newWidth = chartContainer.clientWidth;
+			const newHeight = height;
+			chart.resize(newWidth, newHeight);
+		}
+	}
 
-            series.applyOptions({
-                priceFormat: {
-                    type: 'price',
-                    precision: 6,
-                    minMove: 0.000001,
-                },
-            });
+	onMount(() => {
+		// Wait for next tick to ensure container is rendered
+		setTimeout(() => {
+			chart = createChart(chartContainer, {
+				height,
+				width: chartContainer.clientWidth,
+				layout: {
+					background: { color: 'transparent' },
+					textColor: '#4B5563'
+				},
+				grid: {
+					vertLines: { color: '#E5E7EB' },
+					horzLines: { color: '#E5E7EB' }
+				},
+				rightPriceScale: {
+					borderColor: '#E5E7EB',
+					scaleMargins: {
+						top: 0.2,
+						bottom: 0.2
+					},
+					mode: 1
+				},
+				timeScale: {
+					borderColor: '#E5E7EB',
+					timeVisible: true,
+					secondsVisible: false,
+					tickMarkFormatter: (time: number) => {
+						return formatTimeByPeriod(time, selectedPeriod);
+					}
+				},
+				localization: {
+					timeFormatter: (time: number) => {
+						const date = new Date(time * 1000);
+						return date.toLocaleString();
+					}
+				},
+				crosshair: {
+					mode: 1,
+					vertLine: {
+						labelVisible: true
+					},
+					horzLine: {
+						labelVisible: true
+					}
+				}
+			});
 
-            if (data.length > 0) {
-                series.setData(data);
-                // Fit content after setting data
-                chart.timeScale().fitContent();
-            }
+			series = chart.addLineSeries({
+				color: '#8B5CF6',
+				lineWidth: 2,
+				crosshairMarkerVisible: true,
+				lastValueVisible: true,
+				priceLineVisible: true
+			});
 
-            // Set up theme observer
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.attributeName === 'class') {
-                        updateChartTheme();
-                    }
-                });
-            });
+			series.applyOptions({
+				priceFormat: {
+					type: 'price',
+					precision: 6,
+					minMove: 0.000001
+				}
+			});
 
-            observer.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['class']
-            });
+			if (data.length > 0) {
+				series.setData(data);
+				// Fit content after setting data
+				chart.timeScale().fitContent();
+			}
 
-            // Initial theme setup
-            updateChartTheme();
+			// Set up theme observer
+			const observer = new MutationObserver((mutations) => {
+				mutations.forEach((mutation) => {
+					if (mutation.attributeName === 'class') {
+						updateChartTheme();
+					}
+				});
+			});
 
-            // Initial resize
-            handleResize();
-            
-            // Add resize observer for container size changes
-            const resizeObserver = new ResizeObserver(() => {
-                const newWidth = chartContainer.clientWidth;
-                chart.applyOptions({
-                    width: newWidth,
-                });
-                chart.timeScale().fitContent();
-            });
-            resizeObserver.observe(chartContainer);
+			observer.observe(document.documentElement, {
+				attributes: true,
+				attributeFilter: ['class']
+			});
 
-            // Add window resize listener
-            window.addEventListener('resize', handleResize);
+			// Initial theme setup
+			updateChartTheme();
 
-            return () => {
-                resizeObserver.disconnect();
-                window.removeEventListener('resize', handleResize);
-                observer.disconnect();
-                if (chart) {
-                    chart.remove();
-                }
-            };
-        }, 0);
-    });
+			// Initial resize
+			handleResize();
 
-    onDestroy(() => {
-        if (chart) {
-            chart.remove();
-        }
-    });
+			// Add resize observer for container size changes
+			const resizeObserver = new ResizeObserver(() => {
+				const newWidth = chartContainer.clientWidth;
+				chart.applyOptions({
+					width: newWidth
+				});
+				chart.timeScale().fitContent();
+			});
+			resizeObserver.observe(chartContainer);
 
-    $: if (series && data) {
-        series.setData(data);
-        if (chart) {
-            chart.timeScale().fitContent();
-        }
-    }
+			// Add window resize listener
+			window.addEventListener('resize', handleResize);
+
+			return () => {
+				resizeObserver.disconnect();
+				window.removeEventListener('resize', handleResize);
+				observer.disconnect();
+				if (chart) {
+					chart.remove();
+				}
+			};
+		}, 0);
+	});
+
+	onDestroy(() => {
+		if (chart) {
+			chart.remove();
+		}
+	});
+
+	$: if (series && data) {
+		series.setData(data);
+		if (chart) {
+			chart.timeScale().fitContent();
+		}
+	}
 </script>
 
 <div class="flex flex-col gap-4 w-full">
-    <div class="flex justify-between items-center">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-            Price Chart 
-            {#if selectedMarket}
-                - {selectedMarket.exchange} {selectedMarket.pair}
-            {:else}
-                - All Markets Aggregated
-            {/if}
-        </h3>
-        <div class="flex gap-2">
-            {#each periods as period}
-                <button
-                    class="px-3 py-1 text-sm rounded-lg transition-colors
+	<div class="flex justify-between items-center">
+		<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+			Price Chart
+			{#if selectedMarket}
+				- {selectedMarket.exchange} {selectedMarket.pair}
+			{:else}
+				- All Markets Aggregated
+			{/if}
+		</h3>
+		<div class="flex gap-2">
+			{#each periods as period}
+				<button
+					class="px-3 py-1 text-sm rounded-lg transition-colors
                         {selectedPeriod === period.value
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}"
-                    on:click={() => onPeriodChange(period.value as '24h' | '7d')}
-                >
-                    {period.label}
-                </button>
-            {/each}
-        </div>
-    </div>
-    <div class="w-full h-[400px]" bind:this={chartContainer}></div>
+						? 'bg-purple-600 text-white'
+						: 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}"
+					on:click={() => onPeriodChange(period.value as '24h' | '7d')}
+				>
+					{period.label}
+				</button>
+			{/each}
+		</div>
+	</div>
+	<div class="w-full h-[400px]" bind:this={chartContainer}></div>
 </div>
 
 <style>
-    /* Chart styles */
-</style> 
+	/* Chart styles */
+</style>

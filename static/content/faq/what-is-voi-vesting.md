@@ -3,6 +3,7 @@ question: What does **Vesting** mean?
 category: Staking
 sort: 12
 ---
+
 Vesting is the process of gradually releasing tokens from a locked account over a specified period of time. This is a common practice in blockchain projects to ensure a smooth transition from the initial token distribution phase to the mainnet launch.
 
 Tokens typically vest over a period of 12 months, with an equal portion of the tokens being released each month.
