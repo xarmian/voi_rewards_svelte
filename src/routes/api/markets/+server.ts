@@ -5,6 +5,7 @@ import { fetchCirculatingSupply } from '$lib/utils/voi';
 import { TOKENS } from '$lib/utils/tokens';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
 
 interface MarketSnapshot {
 	price: number;
@@ -569,12 +570,43 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                 return result;
             });
             
-            // 6) Combine VOI DEX markets with cross-chain snapshots
-            marketData = [...voiDexMarkets, ...crossChainSnapshots];
+            // 6) Fetch Vestige (Algorand) markets if token has algo_asset_id
+            let vestigeMarkets: any[] = [];
+            try {
+                // Check if the selected token has an algo_asset_id
+                const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
+                const { data: tokenData, error: tokenError } = await supabaseMimirClient
+                    .from('arc200_contracts')
+                    .select('algo_asset_id')
+                    .ilike('symbol', tokenSym)
+                    .single();
+
+                if (!tokenError && tokenData && tokenData.algo_asset_id) {
+                    console.log(`Token ${tokenSym} has algo_asset_id: ${tokenData.algo_asset_id}, fetching Vestige markets`);
+                    // Create a price map from our symbol USD prices for TVL calculation
+                    const priceMapForVestige = new Map<string, number>();
+                    for (const [symbol, usdPrice] of symbolUsd) {
+                        if (usdPrice > 0) {
+                            priceMapForVestige.set(symbol, usdPrice);
+                        }
+                    }
+                    vestigeMarkets = await fetchVestigeMarketsForAsset(tokenData.algo_asset_id, priceMapForVestige);
+                    console.log(`Fetched ${vestigeMarkets.length} Vestige markets for ${tokenSym}`);
+                } else {
+                    console.log(`Token ${tokenSym} has no algo_asset_id, skipping Vestige markets`);
+                }
+            } catch (error) {
+                console.error('Error fetching Vestige markets:', error);
+                // Continue without Vestige data
+            }
+
+            // 7) Combine VOI DEX markets with cross-chain snapshots and Vestige markets
+            marketData = [...voiDexMarkets, ...crossChainSnapshots, ...vestigeMarkets];
             
             console.log(`Market data summary for ${tokenSym}:`, {
                 voiDexMarkets: voiDexMarkets.length,
                 crossChainSnapshots: crossChainSnapshots.length,
+                vestigeMarkets: vestigeMarkets.length,
                 totalMarkets: marketData.length,
                 totalTVL: marketData.reduce((sum, m) => sum + (m.tvl || 0), 0),
                 individualTVLs: voiDexMarkets.map(m => ({ pair: m.pair, tvl: m.tvl })),

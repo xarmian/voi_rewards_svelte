@@ -282,12 +282,18 @@
 		}
 	}
 
-	// Use the real market data from server and apply search filter
+	// Use the real market data from server, filter by search query, and exclude zero TVL markets
 	$: {
+		let baseData = realMarketData.filter(market => (market.tvl || 0) > 0); // Exclude zero TVL markets
 		if (searchQuery.trim()) {
-			filterMarkets(searchQuery);
+			const searchTerm = searchQuery.toLowerCase();
+			filteredMarketData = baseData.filter(market => 
+				market.pair.toLowerCase().includes(searchTerm) ||
+				market.exchange.toLowerCase().includes(searchTerm) ||
+				market.network.toLowerCase().includes(searchTerm)
+			);
 		} else {
-			filteredMarketData = realMarketData;
+			filteredMarketData = baseData;
 		}
 	}
 
@@ -530,7 +536,7 @@
 		}
 	}
 
-	// Sorting state
+	// Sorting state - default to TVL descending (largest first)
 	let sortColumn = 'tvl';
 	let sortDirection: 'asc' | 'desc' = 'desc';
 
@@ -544,8 +550,8 @@
 		}
 	};
 
-	// Reactive sorted data
-	$: sortedMarketData = [...realMarketData].sort((a, b) => {
+	// Reactive sorted data - sort filtered data by TVL descending
+	$: sortedMarketData = [...filteredMarketData].sort((a, b) => {
 		const aValue = a[sortColumn as keyof typeof a];
 		const bValue = b[sortColumn as keyof typeof b];
 
@@ -1336,63 +1342,67 @@
 
 			<!-- Chart + Markets side-by-side -->
             <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div class="lg:col-span-2 {showTokenChart && selectedToken && selectedToken.id !== 0 ? 'p-0' : 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4'}">
+                <div class="lg:col-span-2 {showTokenChart && selectedToken && selectedToken.id !== 0 ? 'p-0' : 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4'} overflow-hidden flex flex-col" style="height: 640px;">
                     {#if showTokenChart && selectedToken && selectedToken.id !== 0}
                         {#if tokenChartLoading}
-                            <div class="flex items-center justify-center h-64 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                            <div class="flex items-center justify-center h-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                                 <Spinner size="8" />
                                 <span class="ml-2 text-gray-600 dark:text-gray-400">Loading chart...</span>
                             </div>
                         {:else if tokenChartError}
-                            <div class="flex items-center justify-center h-64 text-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                            <div class="flex items-center justify-center h-full text-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                                 <div>
                                     <i class="fas fa-exclamation-triangle text-2xl text-yellow-500 mb-2"></i>
                                     <p class="text-gray-600 dark:text-gray-400">{tokenChartError}</p>
                                 </div>
                             </div>
                         {:else if tokenChartData.length > 0}
-                            <OHLCVChart 
-                                tokenPair={{
-                                    baseTokenId: selectedToken.id,
-                                    quoteTokenId: 390001, // wVOI
-                                    baseSymbol: selectedToken.symbol,
-                                    quoteSymbol: 'VOI',
-                                    baseDecimals: selectedToken.decimals,
-                                    quoteDecimals: 6,
-                                    poolId: undefined
-                                }}
-                                data={tokenChartData}
-                                volumes={tokenChartVolumes}
-                                loading={false}
-                                height={400}
-                                settings={chartSettings}
-                                bind:quoteCurrency={currentQuoteCurrency}
-                                on:refreshData
-                                on:resolutionChange={handleChartResolutionChange}
-                                on:chartTypeChange={handleChartTypeChange}
-                                on:quoteChange={(e) => {
-									console.log('quoteChange event received in markets page:', e.detail);
-									currentQuoteCurrency = e.detail;
-									console.log('currentQuoteCurrency updated to:', currentQuoteCurrency);
-									fetchTokenChartData(selectedToken.id, chartSettings.resolution, currentQuoteCurrency);
-								}}
-                            />
+                            <div class="flex-1 min-h-0">
+                                <OHLCVChart 
+                                    tokenPair={{
+                                        baseTokenId: selectedToken.id,
+                                        quoteTokenId: 390001, // wVOI
+                                        baseSymbol: selectedToken.symbol,
+                                        quoteSymbol: 'VOI',
+                                        baseDecimals: selectedToken.decimals,
+                                        quoteDecimals: 6,
+                                        poolId: undefined
+                                    }}
+                                    data={tokenChartData}
+                                    volumes={tokenChartVolumes}
+                                    loading={false}
+                                    height={400}
+                                    settings={chartSettings}
+                                    bind:quoteCurrency={currentQuoteCurrency}
+                                    on:refreshData
+                                    on:resolutionChange={handleChartResolutionChange}
+                                    on:chartTypeChange={handleChartTypeChange}
+                                    on:quoteChange={(e) => {
+                                        console.log('quoteChange event received in markets page:', e.detail);
+                                        currentQuoteCurrency = e.detail;
+                                        console.log('currentQuoteCurrency updated to:', currentQuoteCurrency);
+                                        fetchTokenChartData(selectedToken.id, chartSettings.resolution, currentQuoteCurrency);
+                                    }}
+                                />
+                            </div>
                         {/if}
                     {:else}
                         <!-- Default Price Chart for VOI or when no token selected -->
-                        <PriceChart 
-                            data={priceHistory}
-                            selectedPeriod={selectedPeriod}
-                            onPeriodChange={handlePeriodChange}
-                            selectedMarket={selectedMarket}
-                        />
+                        <div class="flex-1 min-h-0">
+                            <PriceChart 
+                                data={priceHistory}
+                                selectedPeriod={selectedPeriod}
+                                onPeriodChange={handlePeriodChange}
+                                selectedMarket={selectedMarket}
+                            />
+                        </div>
                     {/if}
                 </div>
-                <div class="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                <div class="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col" style="height: 640px;">
+                    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600 flex-shrink-0">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Token Markets</h2>
-                            <span class="text-sm text-gray-600 dark:text-gray-400">{filteredMarketData.length} active</span>
+                            <span class="text-sm text-gray-600 dark:text-gray-400">{sortedMarketData.length} active</span>
                         </div>
                         
                         <!-- Search Bar -->
@@ -1422,19 +1432,29 @@
                             {/if}
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
+                    <div class="flex-1 overflow-auto min-h-0">
                         <table class="w-full">
-                            <thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                            <thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 sticky top-0 z-10">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pair</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Exchange</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">TVL (USD)</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">24h Volume</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('tvl')}>
+                                        TVL (USD)
+                                        {#if sortColumn === 'tvl'}
+                                            <i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
+                                        {/if}
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('volume_24h')}>
+                                        24h Volume
+                                        {#if sortColumn === 'volume_24h'}
+                                            <i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
+                                        {/if}
+                                    </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">24h Change</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                {#each filteredMarketData.slice(0, 50) as market}
+                                {#each sortedMarketData as market}
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" on:click={() => handleMarketRowClick(market)}>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
                                             {#if market.pool_url}
@@ -1460,7 +1480,7 @@
                                                     ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                                                     : market.exchange === 'Nomadex'
                                                     ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-                                                    : market.exchange === 'Tinyman'
+                                                    : market.exchange === 'Tinyman' || market.exchange.startsWith('Tinyman')
                                                     ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
                                                     : market.exchange === 'PactFi'
                                                     ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
@@ -1474,7 +1494,7 @@
                                             </span>
                                         </td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatCurrency(market.tvl)}</td>
-                                        <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatCurrency(market.volume_24h)}</td>
+                                        <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{market.volume_24h ? formatCurrency(market.volume_24h) : '-'}</td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
                                             <span class="{(market.price_change_percentage_24h ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : (market.price_change_percentage_24h ?? 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}">
                                                 {formatPercentage(market.price_change_percentage_24h)}
@@ -1727,7 +1747,7 @@
 															? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
 															: market.exchange === 'Nomadex'
 															? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-															: market.exchange === 'Tinyman'
+															: market.exchange === 'Tinyman' || market.exchange.startsWith('Tinyman')
 															? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
 															: market.exchange === 'PactFi'
 															? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
