@@ -202,26 +202,6 @@ export async function convertVestigePoolToMarket(
 	// Price = quote amount / base amount (how many quote tokens per 1 base token)
 	let price = baseAmount > 0 && quoteAmount > 0 ? quoteAmount / baseAmount : 0;
 	
-	// Filter out unrealistic prices (likely due to low liquidity or stale pools)
-	// If price is extremely high or low, set to 0 to exclude from display
-	const MAX_REASONABLE_PRICE = 100000; // 100k tokens per 1 base token (still very high)
-	const MIN_REASONABLE_PRICE = 0.000001; // 1 millionth of a token per 1 base token
-	
-	if (price > MAX_REASONABLE_PRICE || (price > 0 && price < MIN_REASONABLE_PRICE)) {
-		console.log(`Filtering out unrealistic price for ${baseAsset.ticker}/${quoteAsset.ticker}: ${price}`);
-		price = 0;
-	}
-	
-	console.log(`Price calculation for ${baseAsset.ticker}/${quoteAsset.ticker}:`, {
-		baseSupply: baseSupply,
-		quoteSupply: quoteSupply,
-		baseDecimals: baseAsset.decimals,
-		quoteDecimals: quoteAsset.decimals,
-		baseAmount: baseAmount,
-		quoteAmount: quoteAmount,
-		calculatedPrice: price
-	});
-
 	// Get protocol information
 	const exchangeName = await getProtocolName(pool.protocol_id);
 	const protocolUrl = await getProtocolUrl(pool.protocol_id);
@@ -257,14 +237,6 @@ export async function convertVestigePoolToMarket(
 		}
 	}
 	
-	console.log(`TVL calculation for ${baseAsset.ticker}/${quoteAsset.ticker}:`, {
-		baseUsdPrice: baseUsdPrice,
-		quoteUsdPrice: quoteUsdPrice,
-		baseAmount: baseAmount,
-		quoteAmount: quoteAmount,
-		calculatedTVL: tvl
-	});
-
 	// Volume is not provided by Vestige API, so we set to 0
 	const volume24h = 0;
 
@@ -308,11 +280,9 @@ export async function convertVestigePoolToMarket(
  */
 export async function fetchVestigeMarketsForAsset(assetId: number, priceMap?: Map<string, number>): Promise<any[]> {
 	try {
-		console.log(`Fetching Vestige markets for asset ID: ${assetId}`);
 		
 		// Fetch pools for this asset
 		const pools = await fetchVestigePoolsByAsset(assetId);
-		console.log(`Found ${pools.length} Vestige pools for asset ${assetId}`);
 		
 		if (pools.length === 0) {
 			return [];
@@ -327,7 +297,6 @@ export async function fetchVestigeMarketsForAsset(assetId: number, priceMap?: Ma
 
 		// Fetch asset details
 		const assets = await fetchVestigeAssets(Array.from(allAssetIds));
-		console.log(`Fetched ${assets.length} asset details from Vestige`);
 
 		// Convert pools to market format
 		const markets = await Promise.all(
@@ -336,7 +305,6 @@ export async function fetchVestigeMarketsForAsset(assetId: number, priceMap?: Ma
 
 		// Filter out null results and markets with zero/unrealistic prices
 		const validMarkets = markets.filter(market => market !== null && market.price > 0);
-		console.log(`Successfully converted ${validMarkets.length} Vestige pools to market format (filtered out ${markets.length - validMarkets.length} pools with invalid prices)`);
 
 		return validMarkets;
 	} catch (error) {

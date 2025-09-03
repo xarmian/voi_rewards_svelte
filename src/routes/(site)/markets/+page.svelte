@@ -68,15 +68,6 @@
 	let lastFetchedToken: string | null = null;
 	let serverDataToken: string | null = null;
 	
-	// Debug: Log data changes
-	$: console.log('Data state:', { 
-		marketDataLength: realMarketData?.length || 0, 
-		aggregatesPrice: aggregates?.weightedAveragePrice,
-		selectedTokenSymbol: selectedToken?.symbol,
-		aggregatesVolume: aggregates?.totalVolume,
-		aggregatesTvl: aggregates?.totalTvl
-	});
-	
 	// Initialize selectedToken from page load data
 	let selectedToken: UniqueToken | null = null;
 	
@@ -798,10 +789,15 @@
 	let tokenChartError = '';
 	let currentQuoteCurrency: 'VOI' | 'USD' = 'USD';
 
-	// Initialize chart settings based on selected token
-	$: if (selectedToken?.symbol) {
-		chartSettings.chartType = getDefaultChartType(selectedToken.symbol);
-		chartSettings.resolution = getDefaultResolution(selectedToken.symbol);
+	// Initialize chart settings when token symbol actually changes
+	let chartSettingsInitToken: string | null = null;
+	$: if (selectedToken?.symbol && selectedToken.symbol !== chartSettingsInitToken) {
+		chartSettings = {
+			...chartSettings,
+			chartType: getDefaultChartType(selectedToken.symbol),
+			resolution: getDefaultResolution(selectedToken.symbol)
+		};
+		chartSettingsInitToken = selectedToken.symbol;
 	}
 
 	// Fetch VOI USD reference data with promise-based caching to prevent duplicate requests
@@ -915,7 +911,7 @@
 
 	// Handle chart resolution changes
 	async function handleChartResolutionChange(resolution: Resolution) {
-		chartSettings.resolution = resolution;
+		chartSettings = { ...chartSettings, resolution };
 		if (selectedToken && selectedToken.id !== 0) {
 			await fetchTokenChartData(selectedToken.id, resolution, currentQuoteCurrency);
 		}
@@ -923,7 +919,7 @@
 
 	// Handle chart type changes
 	function handleChartTypeChange(chartType: 'candlestick' | 'line') {
-		chartSettings.chartType = chartType;
+		chartSettings = { ...chartSettings, chartType };
 	}
 
 	// Unified Chart Functions
@@ -1093,7 +1089,7 @@
 	}
 
 	function handleUnifiedResolutionChange(event: CustomEvent<Resolution>) {
-		chartSettings.resolution = event.detail;
+		chartSettings = { ...chartSettings, resolution: event.detail };
 		const tokenSymbol = selectedToken?.symbol || 'VOI';
 		if (shouldUseVOIData(tokenSymbol)) {
 			fetchUnifiedChartData(tokenSymbol, event.detail, false, selectedTradingPairId);
@@ -1103,7 +1099,7 @@
 	}
 
 	function handleUnifiedChartTypeChange(event: CustomEvent<'candlestick' | 'line'>) {
-		chartSettings.chartType = event.detail;
+		chartSettings = { ...chartSettings, chartType: event.detail };
 	}
 
 	// React to USD/VOI toggle by refetching chart with current resolution
@@ -1375,8 +1371,8 @@
                                     settings={chartSettings}
                                     bind:quoteCurrency={currentQuoteCurrency}
                                     on:refreshData
-                                    on:resolutionChange={handleChartResolutionChange}
-                                    on:chartTypeChange={handleChartTypeChange}
+                                    on:resolutionChange={(e) => handleChartResolutionChange(e.detail)}
+                                    on:chartTypeChange={(e) => handleChartTypeChange(e.detail)}
                                     on:quoteChange={(e) => {
                                         console.log('quoteChange event received in markets page:', e.detail);
                                         currentQuoteCurrency = e.detail;

@@ -56,6 +56,15 @@
 		volume?: number;
 	} | null = null;
 	
+	// Local chart type state to avoid mutating parent prop object
+	let chartType: 'candlestick' | 'line' = settings.chartType;
+	let chartTypeInitialized = false;
+	// Initialize local chartType once from incoming settings on first run
+	$: if (!chartTypeInitialized && settings?.chartType) {
+		chartType = settings.chartType;
+		chartTypeInitialized = true;
+	}
+
 	// Debug reactive statement to track quoteCurrency changes
 	$: console.log('quoteCurrency reactive update:', quoteCurrency);
 
@@ -334,7 +343,7 @@
 			console.warn('Failed to remove existing series (likely stale handle), recreating:', e);
 		}
 
-		if (settings.chartType === 'candlestick') {
+		if (chartType === 'candlestick') {
 			mainSeries = chart.addCandlestickSeries({
 				priceScaleId: 'right',
 				upColor: '#22c55e',
@@ -401,7 +410,7 @@
 		console.log('updateChartData called', {
 			mainSeries: !!mainSeries,
 			dataLength: data.length,
-			chartType: settings.chartType
+			chartType
 		});
 
 		if (!mainSeries || !data.length) {
@@ -439,7 +448,7 @@
 			console.warn('Failed to set dynamic precision:', e);
 		}
 
-		if (settings.chartType === 'candlestick') {
+		if (chartType === 'candlestick') {
 			const candlestickData: CandlestickData[] = sortedData.map((item) => ({
 				time: item.time,
 				open: item.open,
@@ -500,11 +509,12 @@
 		dispatch('resolutionChange', resolution);
 	}
 
-	function handleChartTypeChange(chartType: 'candlestick' | 'line') {
-		settings.chartType = chartType;
+	function handleChartTypeChange(nextType: 'candlestick' | 'line') {
+		// Update local state (do not mutate parent settings object directly)
+		chartType = nextType;
 		createMainSeries();
 		updateChartData();
-		dispatch('chartTypeChange', chartType);
+		dispatch('chartTypeChange', nextType);
 	}
 
 	function handleRefresh() {
@@ -562,7 +572,7 @@
 		const lastTs = data?.[data.length - 1]?.time ?? 0;
 		const firstClose = data?.[0]?.close ?? 0;
 		const lastClose = data?.[data.length - 1]?.close ?? 0;
-		const sig = `${data?.length || 0}:${firstTs}-${lastTs}:${firstClose}:${lastClose}:${settings.resolution}:${settings.chartType}`;
+		const sig = `${data?.length || 0}:${firstTs}-${lastTs}:${firstClose}:${lastClose}:${settings.resolution}:${chartType}`;
 		if (sig !== prevSig) {
 			prevSig = sig;
 			if (chart && mainSeries) {
@@ -570,7 +580,7 @@
 					updateChartData();
 				} else {
 					// Clear series when no data and reset scales/volume
-					if (settings.chartType === 'candlestick') {
+					if (chartType === 'candlestick') {
 						(mainSeries as ISeriesApi<'Candlestick'>).setData([]);
 					} else {
 						(mainSeries as ISeriesApi<'Line'>).setData([]);
@@ -595,6 +605,10 @@
 		if (prevPairKey !== pairKey || prevPairSymbols !== symbolKey) {
 			prevPairKey = pairKey;
 			prevPairSymbols = symbolKey;
+			// When the token pair changes, adopt parent's desired chartType
+			if (settings?.chartType && settings.chartType !== chartType) {
+				chartType = settings.chartType;
+			}
 			createMainSeries();
 			if (data.length > 0) {
 				updateChartData();
@@ -604,16 +618,21 @@
 
 	// Note: chart initializes once on mount; do not reinitialize reactively
 
-	let prevChartType: 'candlestick' | 'line' = settings.chartType;
+	let prevChartType: 'candlestick' | 'line' = chartType;
 	let prevResolution = settings.resolution;
-	$: if (chart && settings.chartType !== prevChartType) {
-		prevChartType = settings.chartType;
+	$: if (chart && chartType !== prevChartType) {
+		prevChartType = chartType;
 		console.log('Chart type actually changed, recreating series');
 		createMainSeries();
 		if (data.length > 0) {
 			updateChartData();
 		}
 	}
+
+	// Note: We intentionally avoid syncing chartType from settings.chartType here
+	// because parent mutates nested properties without reassigning the object,
+	// which would cause this component to override user toggles. The parent can
+	// still listen to chartTypeChange and update its own state if needed.
 
 	$: if (chart && settings.resolution !== prevResolution) {
 		prevResolution = settings.resolution;
@@ -698,7 +717,7 @@
 			<ButtonGroup>
 				<Button
 					size="sm"
-					color={settings.chartType === 'candlestick' ? 'primary' : 'alternative'}
+					color={chartType === 'candlestick' ? 'primary' : 'alternative'}
 					on:click={() => handleChartTypeChange('candlestick')}
 				>
 					<i class="fas fa-chart-bar mr-1"></i>
@@ -706,7 +725,7 @@
 				</Button>
 				<Button
 					size="sm"
-					color={settings.chartType === 'line' ? 'primary' : 'alternative'}
+					color={chartType === 'line' ? 'primary' : 'alternative'}
 					on:click={() => handleChartTypeChange('line')}
 				>
 					<i class="fas fa-chart-line mr-1"></i>
