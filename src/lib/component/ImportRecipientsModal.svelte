@@ -268,6 +268,23 @@
 					return { cells, isValid };
 				});
 			}
+
+			// Support JSON object with balances: [{ accountId, contractId, balance }]
+			if (
+				jsonData &&
+				typeof jsonData === 'object' &&
+				Array.isArray(jsonData.balances)
+			) {
+				return jsonData.balances
+					.filter((b: any) => b && (b.accountId || b.address))
+					.map((b: any) => {
+						const address = String(b.accountId || b.address);
+						const balance = b.balance !== undefined && b.balance !== null ? String(b.balance) : '';
+						const cells = [address, balance];
+						const isValid = isValidAddressContent(address);
+						return { cells, isValid };
+					});
+			}
 		} catch {
 			// If JSON parsing fails, continue with other formats
 		}
