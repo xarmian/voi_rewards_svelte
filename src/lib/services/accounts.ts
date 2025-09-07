@@ -143,9 +143,6 @@ export async function fetchFungibleTokens(
 
 				// Calculate value from pool data for ARC200 tokens
 				tokenValue = calculateTokenValueFromPool(asset, pool);
-				console.log('asset', asset);
-				console.log('pool', pool);
-				console.log('tokenValue', tokenValue);
 
 				// Calculate USD value for LP tokens
 				if (voiPriceUSD > 0) {
