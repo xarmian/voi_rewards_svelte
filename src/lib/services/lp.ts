@@ -62,7 +62,7 @@ export const getLiquidityPools = async () => {
 	const pools: PoolInfo[] = [];
 
 	await Promise.all([
-		fetch('https://mainnet-idx.nautilus.sh/nft-indexer/v1/dex/pools?tokenId=390001'),
+		fetch('https://voi-mainnet-mimirapi.voirewards.com/dex/pools?tokenId=390001'),
 		fetch('https://api.voirewards.com/nomadex/index.php')
 	]).then(async ([nautilusResponse, nomadexResponse]) => {
 		const humbleData: HumblePoolResponse = await nautilusResponse.json();
@@ -70,7 +70,7 @@ export const getLiquidityPools = async () => {
 
 		// convert humbleData to PoolInfo
 		const humblePools: PoolInfo[] = humbleData.pools.map((pool) => ({
-			poolId: pool.contractId.toString(),
+			poolId: pool.poolId.toString(),
 			tokAId: pool.tokAId,
 			tokBId: pool.tokBId,
 			poolBalA: pool.poolBalA,

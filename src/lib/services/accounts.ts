@@ -389,7 +389,7 @@ export async function fetchFungibleTokens(
 								poolId: pool.poolId,
 								value: 0,
 								usdValue: 0,
-								type: tokenDetails.type === 'arc200' ? 'arc200' : 'vsa',
+								type: 'arc200',
 								approvals: approvalsMap.get(tokenId) || [],
 								outgoingApprovals: outgoingApprovalsMap.get(tokenId) || [],
 								poolInfo: {
@@ -421,7 +421,7 @@ export async function fetchFungibleTokens(
 								value: 0,
 								usdValue: 0,
 								id: tokenId,
-								type: tokenDetails.type === 'arc200' ? 'arc200' : 'vsa',
+								type: 'arc200',
 								approvals: approvalsMap.get(tokenId) || [],
 								outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
 							});
