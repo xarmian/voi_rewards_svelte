@@ -50,11 +50,62 @@
 			(a, b) => new Date(a.bucket_start).getTime() - new Date(b.bucket_start).getTime()
 		);
 
+		// Add estimation for incomplete current period
+		const processedData = [...sortedData];
+		if (sortedData.length > 0) {
+			const lastEntry = sortedData[sortedData.length - 1];
+			const lastDate = new Date(lastEntry.bucket_start);
+			const now = new Date();
+			
+			// Check if the last entry is the current incomplete period
+			let shouldEstimate = false;
+			let completionRatio = 1;
+			
+			if (period === 'day') {
+				// Check if it's today
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+				lastDate.setHours(0, 0, 0, 0);
+				
+				if (lastDate.getTime() === today.getTime()) {
+					shouldEstimate = true;
+					const hoursElapsed = now.getHours() + (now.getMinutes() / 60);
+					completionRatio = hoursElapsed / 24;
+				}
+			} else if (period === 'week') {
+				// Check if it's current week
+				const startOfWeek = new Date(now);
+				startOfWeek.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+				startOfWeek.setHours(0, 0, 0, 0);
+				
+				if (lastDate >= startOfWeek) {
+					shouldEstimate = true;
+					const daysElapsed = Math.floor((now.getTime() - startOfWeek.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+					completionRatio = daysElapsed / 7;
+				}
+			}
+			
+			if (shouldEstimate && completionRatio > 0 && completionRatio < 1) {
+				// Create estimated entry
+				const estimatedCount = Math.round(lastEntry.tx_count / completionRatio);
+				processedData[processedData.length - 1] = {
+					...lastEntry,
+					tx_count: estimatedCount,
+					is_estimated: true,
+					actual_count: lastEntry.tx_count,
+					completion_ratio: completionRatio
+				};
+			}
+		}
+
 		// Prepare chart data
-		const chartData = sortedData.map((d) => ({
+		const chartData = processedData.map((d) => ({
 			date: formatDate(d.bucket_start, period),
 			value: d.tx_count,
-			timestamp: d.bucket_start
+			timestamp: d.bucket_start,
+			isEstimated: d.is_estimated || false,
+			actualCount: d.actual_count,
+			completionRatio: d.completion_ratio
 		}));
 
 		const options: EChartsOption = {
@@ -73,19 +124,26 @@
 					if (!Array.isArray(params) || params.length === 0) return '';
 					
 					const dataIndex = params[0].dataIndex;
-					const actualData = sortedData[dataIndex];
-					const fullDate = new Date(actualData.bucket_start).toLocaleDateString(undefined, {
+					const chartDataPoint = chartData[dataIndex];
+					const fullDate = new Date(chartDataPoint.timestamp).toLocaleDateString(undefined, {
 						weekday: 'long',
 						year: 'numeric',
 						month: 'long',
 						day: 'numeric'
 					});
 					
-					const label = period === 'week' ? 'Transactions' : 'Transactions';
-					return `
-                        <div class="font-bold">${fullDate}</div>
-                        <div>${label}: <span class="font-semibold">${params[0].value.toLocaleString()}</span></div>
-                    `;
+					let tooltip = `<div class="font-bold">${fullDate}</div>`;
+					
+					if (chartDataPoint.isEstimated) {
+						const periodLabel = period === 'day' ? 'day' : 'week';
+						const progressPercent = Math.round(chartDataPoint.completionRatio * 100);
+						tooltip += `<div>Actual (${progressPercent}% of ${periodLabel}): <span class="font-semibold">${chartDataPoint.actualCount.toLocaleString()}</span></div>`;
+						tooltip += `<div>Estimated Full ${periodLabel}: <span class="font-semibold" style="color: orange;">${params[0].value.toLocaleString()}</span></div>`;
+					} else {
+						tooltip += `<div>Transactions: <span class="font-semibold">${params[0].value.toLocaleString()}</span></div>`;
+					}
+					
+					return tooltip;
 				}
 			},
 			grid: {
@@ -130,7 +188,17 @@
 					smooth: true,
 					symbol: 'circle',
 					symbolSize: 6,
-					data: chartData.map((d) => d.value),
+					data: chartData.map((d, index) => ({
+						value: d.value,
+						itemStyle: d.isEstimated ? {
+							color: isDarkMode ? '#F59E0B' : '#D97706',
+							borderColor: isDarkMode ? '#1F2937' : 'white',
+							borderWidth: 2,
+							borderType: 'dashed'
+						} : {
+							color: isDarkMode ? '#10B981' : '#059669'
+						}
+					})),
 					lineStyle: {
 						width: 3,
 						color: isDarkMode ? '#10B981' : '#059669'
@@ -146,9 +214,6 @@
 								color: isDarkMode ? 'rgba(16, 185, 129, 0)' : 'rgba(5, 150, 105, 0)'
 							}
 						])
-					},
-					itemStyle: {
-						color: isDarkMode ? '#10B981' : '#059669'
 					}
 				}
 			]
