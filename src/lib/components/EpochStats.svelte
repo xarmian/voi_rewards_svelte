@@ -3,6 +3,7 @@
 	import { formatNumber } from '$lib/utils';
 	import * as echarts from 'echarts';
 	import type { EChartsOption } from 'echarts';
+	import TransactionCountsChart from './TransactionCountsChart.svelte';
 
 	interface EpochData {
 		epoch_number: number;
@@ -32,17 +33,39 @@
 	let error: string | null = null;
 	let aprChartDiv: HTMLElement;
 	let stakeChartDiv: HTMLElement;
-	let walletsChartDiv: HTMLElement;
 	let priceChartDiv: HTMLElement;
 	let aprChart: echarts.ECharts | null = null;
 	let stakeChart: echarts.ECharts | null = null;
-	let walletsChart: echarts.ECharts | null = null;
 	let priceChart: echarts.ECharts | null = null;
 	let mounted = false;
 	let currentPrice: number | null = null;
 	let priceChange24h: number | null = null;
 	let priceHistory: PriceData[] = [];
 	let onlineAccountCount: number | null = null;
+	let transactionData: Array<{ bucket_start: string; tx_count: number }> = [];
+	let txPeriod: 'day' | 'week' = 'day';
+	let txLoading = false;
+
+	async function fetchTransactionCounts(selectedPeriod: 'day' | 'week') {
+		txLoading = true;
+		try {
+			const count = selectedPeriod === 'day' ? 30 : 15;
+			const response = await fetch(`/api/mimir?action=get_tx_counts&p_period=${selectedPeriod}&p_n=${count}`);
+			const result = await response.json();
+			if (result.data) {
+				transactionData = result.data;
+			}
+		} catch (error) {
+			console.error('Failed to fetch transaction counts:', error);
+		} finally {
+			txLoading = false;
+		}
+	}
+
+	function handleTxPeriodChange(newPeriod: 'day' | 'week') {
+		txPeriod = newPeriod;
+		fetchTransactionCounts(newPeriod);
+	}
 
 	onMount(() => {
 		mounted = true;
@@ -89,11 +112,11 @@
 		};
 
 		fetchData();
+		fetchTransactionCounts(txPeriod);
 
 		const handleResize = () => {
 			aprChart?.resize();
 			stakeChart?.resize();
-			walletsChart?.resize();
 			priceChart?.resize();
 		};
 
@@ -108,10 +131,6 @@
 			if (stakeChart) {
 				stakeChart.dispose();
 				stakeChart = null;
-			}
-			if (walletsChart) {
-				walletsChart.dispose();
-				walletsChart = null;
 			}
 			if (priceChart) {
 				priceChart.dispose();
@@ -163,14 +182,14 @@
 	}
 
 	function initCharts() {
-		if (!aprChartDiv || !stakeChartDiv || !walletsChartDiv || !priceChartDiv) return;
+		if (!aprChartDiv || !stakeChartDiv || !priceChartDiv) return;
 
 		const isDarkMode = document.documentElement.classList.contains('dark');
 		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
 		const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
 		const backgroundColor = isDarkMode ? 'transparent' : 'transparent';
 
-		// APR Line Chart
+		// Combined APR and Rewarded Accounts Chart
 		const aprOptions: EChartsOption = {
 			backgroundColor,
 			tooltip: {
@@ -181,17 +200,37 @@
 					color: textColor
 				},
 				formatter: (params: any) => {
-					const data = Array.isArray(params) ? params[0] : params;
-					const epoch = epochs[data.dataIndex];
+					if (!Array.isArray(params) || params.length === 0) return '';
+					
+					const dataIndex = params[0].dataIndex;
+					const epoch = epochs[dataIndex];
 					const dateLabel = formatDateLabel(epoch.epoch_end);
-					return `Epoch ${epoch.epoch_number} (${dateLabel})<br/>APR: ${data.value.toFixed(2)}%`;
+					
+					let tooltip = `<div class="font-bold">Epoch ${epoch.epoch_number} (${dateLabel})</div>`;
+					
+					params.forEach((param: any) => {
+						if (param.seriesName === 'Block Reward APR') {
+							tooltip += `<div>APR: <span class="font-semibold">${param.value.toFixed(2)}%</span></div>`;
+						} else if (param.seriesName === 'Rewarded Accounts') {
+							tooltip += `<div>Accounts: <span class="font-semibold">${formatNumber(param.value)}</span></div>`;
+						}
+					});
+					
+					return tooltip;
 				}
+			},
+			legend: {
+				data: ['Block Reward APR', 'Rewarded Accounts'],
+				textStyle: {
+					color: textColor
+				},
+				top: 0
 			},
 			grid: {
 				left: '3%',
 				right: '4%',
 				bottom: '3%',
-				top: '3%',
+				top: '40px',
 				containLabel: true
 			},
 			xAxis: {
@@ -202,29 +241,52 @@
 				},
 				axisLabel: {
 					color: textColor,
-					rotate: 45
+					rotate: 45,
+					interval: 'auto'
 				}
 			},
-			yAxis: {
-				type: 'value',
-				axisLine: {
-					lineStyle: { color: gridColor }
+			yAxis: [
+				{
+					type: 'value',
+					name: 'APR (%)',
+					position: 'left',
+					axisLine: {
+						lineStyle: { color: gridColor }
+					},
+					splitLine: {
+						lineStyle: { color: gridColor }
+					},
+					axisLabel: {
+						color: textColor,
+						formatter: '{value}%'
+					}
 				},
-				splitLine: {
-					lineStyle: { color: gridColor }
-				},
-				axisLabel: {
-					color: textColor,
-					formatter: '{value}%'
+				{
+					type: 'value',
+					name: 'Accounts',
+					position: 'right',
+					axisLine: {
+						lineStyle: { color: gridColor }
+					},
+					splitLine: {
+						show: false
+					},
+					axisLabel: {
+						color: textColor,
+						formatter: (value: number) => formatNumber(value)
+					}
 				}
-			},
+			],
 			series: [
 				{
+					name: 'Block Reward APR',
 					data: epochs.map((e) => e.apr),
 					type: 'line',
+					yAxisIndex: 0,
 					smooth: true,
 					symbol: 'circle',
 					symbolSize: 8,
+					sampling: 'lttb',
 					lineStyle: {
 						color: isDarkMode ? '#34D399' : '#10B981',
 						width: 3
@@ -238,13 +300,32 @@
 						color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
 							{
 								offset: 0,
-								color: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : 'rgba(16, 185, 129, 0.3)'
+								color: isDarkMode ? 'rgba(52, 211, 153, 0.2)' : 'rgba(16, 185, 129, 0.2)'
 							},
 							{
 								offset: 1,
 								color: isDarkMode ? 'rgba(52, 211, 153, 0.0)' : 'rgba(16, 185, 129, 0.0)'
 							}
 						])
+					}
+				},
+				{
+					name: 'Rewarded Accounts',
+					data: epochs.map((e) => e.participating_wallets),
+					type: 'line',
+					yAxisIndex: 1,
+					smooth: true,
+					symbol: 'circle',
+					symbolSize: 8,
+					sampling: 'lttb',
+					lineStyle: {
+						color: isDarkMode ? '#F59E0B' : '#D97706',
+						width: 3
+					},
+					itemStyle: {
+						color: isDarkMode ? '#F59E0B' : '#D97706',
+						borderColor: isDarkMode ? '#1F2937' : 'white',
+						borderWidth: 2
 					}
 				}
 			]
@@ -375,85 +456,6 @@
 			]
 		};
 
-		// Participating Wallets Chart
-		const walletsOptions: EChartsOption = {
-			backgroundColor,
-			tooltip: {
-				trigger: 'axis',
-				backgroundColor: isDarkMode ? '#1F2937' : 'white',
-				borderColor: isDarkMode ? '#374151' : '#E5E7EB',
-				textStyle: {
-					color: textColor
-				},
-				formatter: (params: any) => {
-					const data = Array.isArray(params) ? params[0] : params;
-					const epoch = epochs[data.dataIndex];
-					const dateLabel = formatDateLabel(epoch.epoch_end);
-					return `Epoch ${epoch.epoch_number} (${dateLabel})<br/>Accounts: ${formatNumber(data.value)}`;
-				}
-			},
-			grid: {
-				left: '3%',
-				right: '4%',
-				bottom: '3%',
-				top: '3%',
-				containLabel: true
-			},
-			xAxis: {
-				type: 'category',
-				data: epochs.map((e) => formatDateLabel(e.epoch_end)),
-				axisLine: {
-					lineStyle: { color: gridColor }
-				},
-				axisLabel: {
-					color: textColor,
-					rotate: 45
-				}
-			},
-			yAxis: {
-				type: 'value',
-				axisLine: {
-					lineStyle: { color: gridColor }
-				},
-				splitLine: {
-					lineStyle: { color: gridColor }
-				},
-				axisLabel: {
-					color: textColor,
-					formatter: (value: number) => formatNumber(value)
-				}
-			},
-			series: [
-				{
-					data: epochs.map((e) => e.participating_wallets),
-					type: 'line',
-					smooth: true,
-					symbol: 'circle',
-					symbolSize: 8,
-					lineStyle: {
-						color: isDarkMode ? '#F59E0B' : '#D97706',
-						width: 3
-					},
-					itemStyle: {
-						color: isDarkMode ? '#F59E0B' : '#D97706',
-						borderColor: isDarkMode ? '#1F2937' : 'white',
-						borderWidth: 2
-					},
-					areaStyle: {
-						color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-							{
-								offset: 0,
-								color: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(217, 119, 6, 0.3)'
-							},
-							{
-								offset: 1,
-								color: isDarkMode ? 'rgba(245, 158, 11, 0.0)' : 'rgba(217, 119, 6, 0.0)'
-							}
-						])
-					}
-				}
-			]
-		};
 
 		// Calculate daily averages for price data
 		const dailyPrices = calculateDailyAverages(priceHistory);
@@ -544,9 +546,6 @@
 			if (stakeChart) {
 				stakeChart.dispose();
 			}
-			if (walletsChart) {
-				walletsChart.dispose();
-			}
 			if (priceChart) {
 				priceChart.dispose();
 			}
@@ -554,13 +553,11 @@
 			// Initialize new charts
 			aprChart = echarts.init(aprChartDiv);
 			stakeChart = echarts.init(stakeChartDiv);
-			walletsChart = echarts.init(walletsChartDiv);
 			priceChart = echarts.init(priceChartDiv);
 
 			// Set options
 			aprChart.setOption(aprOptions);
 			stakeChart.setOption(stakeOptions);
-			walletsChart.setOption(walletsOptions);
 			priceChart.setOption(priceOptions);
 		} catch (e) {
 			console.error('Failed to initialize charts:', e);
@@ -801,12 +798,18 @@
 				{/if}
 			</div>
 
-			<!-- APR Chart -->
+			<!-- Transaction Activity Chart -->
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
 				<h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-					Block Reward APR Trend
+					Network Transaction Activity
 				</h2>
-				<div class="h-[300px] w-full" bind:this={aprChartDiv}></div>
+				{#if txLoading}
+					<div class="flex justify-center items-center h-[360px]">
+						<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+					</div>
+				{:else}
+					<TransactionCountsChart data={transactionData} period={txPeriod} onPeriodChange={handleTxPeriodChange} />
+				{/if}
 			</div>
 
 			<!-- Price Chart -->
@@ -835,10 +838,10 @@
 				<div class="h-[300px] w-full" bind:this={priceChartDiv}></div>
 			</div>
 
-			<!-- Participating Wallets Chart -->
+			<!-- Combined APR and Rewarded Accounts Chart -->
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
 				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Rewarded Accounts Trend</h2>
+					<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Block Reward APR & Rewarded Accounts Trend</h2>
 					<a
 						href="/"
 						class="flex items-center text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
@@ -858,7 +861,7 @@
 						</svg>
 					</a>
 				</div>
-				<div class="h-[300px] w-full" bind:this={walletsChartDiv}></div>
+				<div class="h-[300px] w-full" bind:this={aprChartDiv}></div>
 			</div>
 
 			<!-- Stake Distribution Chart -->

@@ -10,7 +10,8 @@ const ALLOWED_ACTIONS = [
 	'get_online_account_count',
 	'get_arc200_transfers',
 	'get_account_transactions_multi',
-	'refresh_price_candles'
+	'refresh_price_candles',
+	'get_tx_counts'
 ] as const;
 
 type AllowedAction = (typeof ALLOWED_ACTIONS)[number];
