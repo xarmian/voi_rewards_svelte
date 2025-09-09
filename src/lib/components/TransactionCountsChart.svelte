@@ -55,33 +55,37 @@
 		if (sortedData.length > 0) {
 			const lastEntry = sortedData[sortedData.length - 1];
 			const lastDate = new Date(lastEntry.bucket_start);
-			const now = new Date();
+			const nowUTC = new Date();
 			
 			// Check if the last entry is the current incomplete period
 			let shouldEstimate = false;
 			let completionRatio = 1;
 			
 			if (period === 'day') {
-				// Check if it's today
-				const today = new Date();
-				today.setHours(0, 0, 0, 0);
-				lastDate.setHours(0, 0, 0, 0);
+				// Check if it's today (UTC)
+				const todayUTC = new Date(nowUTC);
+				todayUTC.setUTCHours(0, 0, 0, 0);
+				const lastDateUTC = new Date(lastDate);
+				lastDateUTC.setUTCHours(0, 0, 0, 0);
 				
-				if (lastDate.getTime() === today.getTime()) {
+				if (lastDateUTC.getTime() === todayUTC.getTime()) {
 					shouldEstimate = true;
-					const hoursElapsed = now.getHours() + (now.getMinutes() / 60);
+					const hoursElapsed = nowUTC.getUTCHours() + (nowUTC.getUTCMinutes() / 60);
 					completionRatio = hoursElapsed / 24;
 				}
 			} else if (period === 'week') {
-				// Check if it's current week
-				const startOfWeek = new Date(now);
-				startOfWeek.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
-				startOfWeek.setHours(0, 0, 0, 0);
+				// Check if it's current week (starting Monday UTC)
+				const startOfWeekUTC = new Date(nowUTC);
+				const dayOfWeek = nowUTC.getUTCDay(); // 0=Sunday, 1=Monday, etc.
+				const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday=0
+				startOfWeekUTC.setUTCDate(nowUTC.getUTCDate() - daysFromMonday);
+				startOfWeekUTC.setUTCHours(0, 0, 0, 0);
 				
-				if (lastDate >= startOfWeek) {
+				if (lastDate >= startOfWeekUTC) {
 					shouldEstimate = true;
-					const daysElapsed = Math.floor((now.getTime() - startOfWeek.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-					completionRatio = daysElapsed / 7;
+					const msElapsed = nowUTC.getTime() - startOfWeekUTC.getTime();
+					const hoursElapsed = msElapsed / (1000 * 60 * 60);
+					completionRatio = hoursElapsed / (7 * 24); // 7 days * 24 hours
 				}
 			}
 			
