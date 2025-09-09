@@ -163,7 +163,7 @@
 				axisLabel: {
 					color: textColor,
 					rotate: 45,
-					interval: 0
+					interval: 2
 				},
 				axisLine: {
 					lineStyle: { color: gridColor }
