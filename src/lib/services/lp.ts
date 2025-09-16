@@ -71,16 +71,16 @@ export const getLiquidityPools = async () => {
 		// convert humbleData to PoolInfo
 		const humblePools: PoolInfo[] = humbleData.pools.map((pool) => ({
 			poolId: pool.poolId.toString(),
-			tokAId: pool.tokAId,
-			tokBId: pool.tokBId,
-			poolBalA: pool.poolBalA,
-			poolBalB: pool.poolBalB,
-			supply: pool.supply,
-			provider: 'humble',
-			tvl: pool.tvl,
+			tokAId: (pool.tokenA.id === 390001) ? 0 : pool.tokenA.id,
+			tokBId: (pool.tokenB.id === 390001) ? 0 : pool.tokenB.id,
+			poolBalA: pool.tokenA.balance,
+			poolBalB: pool.tokenB.balance,
+			supply: pool.outstandingLpAmount,
+			provider: pool.exchange,
+			tvl: 0,
 			apr: Number(pool.apr),
-			symbolA: pool.symbolA,
-			symbolB: pool.symbolB
+			symbolA: (pool.tokenA.id === 390001) ? 'VOI' : pool.tokenA.symbol,
+			symbolB: (pool.tokenB.id === 390001) ? 'VOI' : pool.tokenB.symbol,
 		}));
 
 		// convert nomadexData to PoolInfo
