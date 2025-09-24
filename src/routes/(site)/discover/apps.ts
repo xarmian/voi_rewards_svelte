@@ -21,6 +21,24 @@ export const apps: AppInfo[] = [
 		featured: true
 	},
 	{
+		id: 'hov',
+		name: 'House of Voi',
+		description: 'Experience the thrill of blockchain gaming',
+		logoPath: 'https://demo.houseofvoi.com/house_of_voi.jpg',
+		url: 'https://demo.houseofvoi.com',
+		category: 'games',
+		featured: true
+	},
+	{
+		id: 'voifountain',
+		name: 'Voi Fountain',
+		description: 'Get free tokens daily from the Fountain',
+		logoPath: 'https://fountain.voirewards.com/apple-touch-icon-167x167.png',
+		url: 'https://fountain.voirewards.com',
+		category: 'utility',
+		featured: true
+	},
+	{
 		id: 'aramid',
 		name: 'Aramid Bridge',
 		description: 'Bridge assets between Voi, Algorand, and Base',
@@ -36,15 +54,6 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/humble.png',
 		url: 'https://voi.humble.sh',
 		category: 'defi',
-		featured: true
-	},
-	{
-		id: 'voifountain',
-		name: 'Voi Fountain',
-		description: 'Get free tokens daily from the Fountain',
-		logoPath: 'https://fountain.voirewards.com/apple-touch-icon-167x167.png',
-		url: 'https://fountain.voirewards.com',
-		category: 'utility',
 		featured: true
 	},
 	{
@@ -118,7 +127,7 @@ export const apps: AppInfo[] = [
 		description: 'Pixels Galaxy',
 		logoPath: '/logos/pixels.jpeg',
 		url: 'https://pixelsgalaxy.space/',
-		category: 'nft',
+		category: 'games',
 		featured: true
 	}
 ];
