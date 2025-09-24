@@ -20,7 +20,7 @@ export const apps: AppInfo[] = [
 		category: 'utility',
 		featured: true
 	},
-	{
+	/*{
 		id: 'hov',
 		name: 'House of Voi',
 		description: 'Experience the thrill of blockchain gaming',
@@ -28,7 +28,7 @@ export const apps: AppInfo[] = [
 		url: 'https://demo.houseofvoi.com',
 		category: 'games',
 		featured: true
-	},
+	},*/
 	{
 		id: 'voifountain',
 		name: 'Voi Fountain',
