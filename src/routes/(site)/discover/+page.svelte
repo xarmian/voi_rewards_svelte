@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AppGrid from './AppGrid.svelte';
 	import MarketData from './MarketData.svelte';
-	import { apps, getAppsByCategory } from './apps';
+	import { apps, getAppsByCategory, getIOSCompatibleApps } from './apps';
 	import { writable, derived } from 'svelte/store';
 	import { onMount, onDestroy } from 'svelte';
 	import type { PageData } from './$types';
@@ -12,13 +12,16 @@
 	const currentCategory = writable<string | undefined>(undefined);
 	const searchQuery = writable('');
 
-	// Array of available categories (extracted from apps data)
-	const categories = [...new Set(apps.map((app) => app.category))].filter(Boolean) as string[];
+	// Get the appropriate app list based on iOS compatibility
+	$: availableApps = data.isIOS ? getIOSCompatibleApps() : apps;
+
+	// Array of available categories (extracted from available apps data)
+	$: categories = [...new Set(availableApps.map((app) => app.category))].filter(Boolean) as string[];
 
 	// Filtered apps based on the current category and search query
 	$: filteredApps = derived([currentCategory, searchQuery], ([$currentCategory, $searchQuery]) => {
-		// First filter by category
-		let filtered = $currentCategory ? getAppsByCategory($currentCategory) : apps;
+		// First filter by category, taking iOS compatibility into account
+		let filtered = $currentCategory ? getAppsByCategory($currentCategory, data.isIOS) : availableApps;
 
 		// Then filter by search query if it exists
 		if ($searchQuery.trim()) {

@@ -8,6 +8,7 @@ export interface AppInfo {
 	featured?: boolean;
 	invert_logo_dark?: boolean;
 	invert_logo_light?: boolean;
+	hide_on_ios?: boolean;
 }
 
 export const apps: AppInfo[] = [
@@ -45,7 +46,8 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/aramid.png',
 		url: 'https://aramid.finance',
 		category: 'defi',
-		featured: true
+		featured: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'humbleswap',
@@ -54,7 +56,8 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/humble.png',
 		url: 'https://voi.humble.sh',
 		category: 'defi',
-		featured: true
+		featured: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'nomadex',
@@ -63,7 +66,8 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/nomadex.png',
 		url: 'https://voi.nomadex.app',
 		category: 'defi',
-		featured: true
+		featured: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'highforge',
@@ -73,7 +77,8 @@ export const apps: AppInfo[] = [
 		url: 'https://highforge.io',
 		category: 'nft',
 		featured: true,
-		invert_logo_dark: true
+		invert_logo_dark: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'nftnavigator',
@@ -83,7 +88,8 @@ export const apps: AppInfo[] = [
 		url: 'https://nftnavigator.xyz',
 		category: 'nft',
 		featured: true,
-		invert_logo_dark: true
+		invert_logo_dark: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'nautilus',
@@ -92,7 +98,8 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/nautilus.png',
 		url: 'https://nautilus.sh',
 		category: 'nft',
-		featured: true
+		featured: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'envoi',
@@ -119,7 +126,8 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/communitychest.svg',
 		url: 'https://nautilus.sh/#/community-chest?contract=664258',
 		category: 'defi',
-		featured: true
+		featured: true,
+		hide_on_ios: true
 	},
 	{
 		id: 'pixels',
@@ -128,17 +136,30 @@ export const apps: AppInfo[] = [
 		logoPath: '/logos/pixels.jpeg',
 		url: 'https://pixelsgalaxy.space/',
 		category: 'games',
-		featured: true
+		featured: true,
+		hide_on_ios: true
 	}
 ];
 
 // Helper function to get apps by category
-export const getAppsByCategory = (category?: string) => {
-	if (!category) return apps;
-	return apps.filter((app) => app.category === category);
+export const getAppsByCategory = (category?: string, isIOS: boolean = false) => {
+	let filtered = category ? apps.filter((app) => app.category === category) : apps;
+	if (isIOS) {
+		filtered = filtered.filter((app) => !app.hide_on_ios);
+	}
+	return filtered;
 };
 
 // Helper function to get featured apps
-export const getFeaturedApps = () => {
-	return apps.filter((app) => app.featured);
+export const getFeaturedApps = (isIOS: boolean = false) => {
+	let filtered = apps.filter((app) => app.featured);
+	if (isIOS) {
+		filtered = filtered.filter((app) => !app.hide_on_ios);
+	}
+	return filtered;
+};
+
+// Helper function to get iOS-compatible apps
+export const getIOSCompatibleApps = () => {
+	return apps.filter((app) => !app.hide_on_ios);
 };
