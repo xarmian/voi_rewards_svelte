@@ -11,10 +11,6 @@
 	<body class="bg-white dark:bg-gray-800">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
-	<script async src="https://www.googletagmanager.com/gtag/js?id=G-NDX21XVC4G"></script>
-	<!--<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0884252065241117"
-     crossorigin="anonymous"></script>-->
-	<!--<script>(function(d,z,s){s.src='https://'+d+'/400/'+z;try{(document.body||document.documentElement).appendChild(s)}catch(e){}})('vemtoutcheeg.com',9053093,document.createElement('script'))</script>-->
 	<script>
 		// Check for dark mode preference
 		if (
@@ -26,14 +22,6 @@
 		} else {
 			document.documentElement.classList.remove('dark');
 		}
-
-		window.dataLayer = window.dataLayer || [];
-		function gtag() {
-			dataLayer.push(arguments);
-		}
-		gtag('js', new Date());
-
-		gtag('config', 'G-NDX21XVC4G');
 
 		function onRecaptchaLoad() {
 			grecaptcha.render('g-recaptcha');

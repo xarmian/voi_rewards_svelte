@@ -12,6 +12,7 @@
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
 	import { startLoading, stopLoading } from '$lib/stores/loadingStore';
 	import { navigating } from '$app/stores';
+	import { onDestroy } from 'svelte';
 
 	$: if ($navigating) {
 		startLoading();
@@ -25,6 +26,26 @@
 	$: ({ supabase, session } = data);
 
 	onMount(() => {
+		// Conditionally inject Google Analytics except on /discover
+		try {
+			const pathname = $page.url.pathname;
+			const isDiscover = pathname.startsWith('/discover');
+			if (typeof window !== 'undefined' && !isDiscover) {
+				if (!document.getElementById('ga-script')) {
+					const ga = document.createElement('script');
+					ga.id = 'ga-script';
+					ga.async = true;
+					ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-NDX21XVC4G';
+					document.head.appendChild(ga);
+				}
+				if (!document.getElementById('ga-inline')) {
+					const inline = document.createElement('script');
+					inline.id = 'ga-inline';
+					inline.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NDX21XVC4G');`;
+					document.head.appendChild(inline);
+				}
+			}
+		} catch {}
 		const {
 			data: { subscription }
 		} = supabase.auth.onAuthStateChange((event, _session) => {
