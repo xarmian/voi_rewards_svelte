@@ -1,4 +1,4 @@
-<script context="module">
+<script context="module" lang="ts">
 	// Helper function to calculate user's share of a token in the pool
 	function calculateUserTokenShare(token: LPToken, tokenType: 'A' | 'B'): number {
 		try {
