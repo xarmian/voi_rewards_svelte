@@ -40,6 +40,16 @@ export const apps: AppInfo[] = [
 		featured: true
 	},
 	{
+		id: 'dorkfi',
+		name: 'DorkFi',
+		description: 'The Future of Finance on Voi Network',
+		logoPath: 'https://app.dork.fi/lovable-uploads/dork_fi_logo_edit1_light.png',
+		url: 'https://app.dork.fi/',
+		category: 'defi',
+		featured: true,
+		hide_on_ios: false,
+	},
+	{
 		id: 'aramid',
 		name: 'Aramid Bridge',
 		description: 'Bridge assets between Voi, Algorand, and Base',
