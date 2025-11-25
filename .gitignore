@@ -12,3 +12,5 @@ vite.config.ts.timestamp-*
 .cursorrules
 /cli
 faqData.json
+AGENTS.md
+CLAUDE.md

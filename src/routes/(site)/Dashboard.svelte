@@ -27,6 +27,7 @@
 	const latestBlock = writable({ block: 0, timestamp: '' });
 	let currentPrice: number | null = null;
 	let priceChange24h: number | null = null;
+	let marketDataUnavailable = false;
 
 	function handleLatestBlock(event: CustomEvent) {
 		latestBlock.set(event.detail);
@@ -64,19 +65,34 @@
 		//isLoading = true;
 		isRefreshing = true;
 		error = null; // Reset error state
+		marketDataUnavailable = false;
 		try {
-			const [data, marketsResponse] = await Promise.all([
-				dataTable.fetchData(selectedDate),
-				fetch('/api/markets?token=VOI')
-			]);
+			// Fetch critical dashboard data
+			const data = await dataTable.fetchData(selectedDate);
 
-			const marketsData = await marketsResponse.json();
-			if (marketsData.aggregates) {
-				currentPrice = marketsData.aggregates.weightedAveragePrice;
-				const firstMarket = marketsData.marketData[0];
-				if (firstMarket) {
-					priceChange24h = firstMarket.price_change_percentage_24h;
+			// Fetch markets data separately with timeout (non-blocking)
+			try {
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+				const marketsResponse = await fetch('/api/markets?token=VOI', {
+					signal: controller.signal
+				});
+				clearTimeout(timeoutId);
+
+				const marketsData = await marketsResponse.json();
+				if (marketsData.aggregates) {
+					currentPrice = marketsData.aggregates.weightedAveragePrice;
+					const firstMarket = marketsData.marketData[0];
+					if (firstMarket) {
+						priceChange24h = firstMarket.price_change_percentage_24h;
+					}
 				}
+			} catch (marketError) {
+				console.warn('Failed to fetch market data:', marketError);
+				marketDataUnavailable = true;
+				currentPrice = null;
+				priceChange24h = null;
 			}
 
 			const { data: onlineAccountCount, error: onlineAccountCountError } = await fetch(
@@ -298,6 +314,11 @@
 						{#if priceChange24h}
 							<span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
 								{priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
+							</span>
+						{/if}
+						{#if marketDataUnavailable}
+							<span class="text-xs ml-2 text-gray-400" title="Market data temporarily unavailable">
+								(unavailable)
 							</span>
 						{/if}
 					</p>
