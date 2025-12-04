@@ -1313,12 +1313,12 @@
 				</div>
 			{:else}
 				{#each sortTokens(filterTokens([...asaTokens.map( (t) => ({ ...t, tokenType: 'vsa' as const }) ), ...fungibleTokens
-								.filter((t) => !isLPToken(t) && (t.balance > 0 || t.approvals?.length || 0 > 0 || t.outgoingApprovals?.length || 0 > 0))
+								.filter((t) => !isLPToken(t) && (showZeroBalances || t.balance > 0 || (t.approvals?.length ?? 0) > 0 || (t.outgoingApprovals?.length ?? 0) > 0))
 								.map( (t) => ({ ...t, tokenType: t.type === 'arc200' ? ('arc200' as const) : ('vsa' as const) }) )].filter( (t, i, arr) => {
 								// Get unique identifier based on token type and ID
 								const getUniqueId = (token: any) => {
 									if (token.tokenType === 'vsa') {
-										return `vsa-${token.assetId}`;
+										return `vsa-${token.assetId || token.id}`;
 									} else {
 										// For ARC-200 tokens, use their contract ID
 										return `arc200-${token.id}`;
@@ -1327,7 +1327,7 @@
 								const currentUniqueId = getUniqueId(t);
 								// Check if this unique ID appears earlier in the array
 								return !arr.slice(0, i).some((item) => getUniqueId(item) === currentUniqueId);
-							} ))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId}` : `arc200-${token.id}`)}
+							} ))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId || token.id}` : `arc200-${token.id}`)}
 					{@const details =
 						'assetId' in token ? asaDetails.find((d) => d.id === token.assetId) : null}
 					{@const tokenId = details ? details.id.toString() : token.id}
