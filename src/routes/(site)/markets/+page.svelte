@@ -65,7 +65,6 @@
 	// Cache to prevent duplicate API requests
 	let voiPriceHistoryCache: any = null;
 	let voiPriceHistoryPromise: Promise<any> | null = null;
-	let lastFetchedToken: string | null = null;
 	let serverDataToken: string | null = null;
 	
 	// Initialize selectedToken from page load data
@@ -235,9 +234,9 @@
 	}
 	
 	// Fetch market data when token changes (including initialization)
-	$: if (browser && selectedToken && selectedToken.symbol) {
-		console.log('Triggering market data fetch for:', selectedToken.symbol);
-		fetchMarketDataForToken(selectedToken.symbol);
+	$: if (browser && selectedToken && selectedToken.id !== undefined) {
+		console.log('Triggering market data fetch for tokenId:', selectedToken.id);
+		fetchMarketDataForToken(selectedToken.id);
 	}
 
 	// Fetch token info when token changes
@@ -355,33 +354,35 @@
 	});
 
 	let fetchingMarketData = false;
-	// Fetch market data for a specific token
-	async function fetchMarketDataForToken(tokenSymbol: string) {
-		console.log('fetchMarketDataForToken called for:', tokenSymbol);
-		
-		// Skip if we already have server data for this token and it's the same token
-		if (tokenSymbol === serverDataToken && tokenSymbol === lastFetchedToken) {
-			console.log('Skipping fetchMarketDataForToken - already have server data for', tokenSymbol);
-			return;
+	let lastFetchedTokenId: number | null = null;
+	// Fetch market data for a specific token by ID
+	async function fetchMarketDataForToken(tokenId: number) {
+		console.log('fetchMarketDataForToken called for tokenId:', tokenId);
+
+		// Skip if we're already fetching or just fetched the same token
+		if (tokenId === lastFetchedTokenId) {
+			if (fetchingMarketData) {
+				console.log('Skipping fetchMarketDataForToken - already fetching', tokenId);
+				return;
+			}
+			// Also skip if we already have data for this token (avoid duplicate on page load + reactive)
+			if (realMarketData.length > 0) {
+				console.log('Skipping fetchMarketDataForToken - already have data for', tokenId);
+				return;
+			}
 		}
-		
-		// Skip if we just fetched the same token (avoid duplicates from reactive statements)
-		if (tokenSymbol === lastFetchedToken && fetchingMarketData) {
-			console.log('Skipping fetchMarketDataForToken - already fetching', tokenSymbol);
-			return;
-		}
-		
-		lastFetchedToken = tokenSymbol;
+
+		lastFetchedTokenId = tokenId;
 		fetchingMarketData = true;
-		
+
 		try {
-			const response = await fetch(`/api/markets?token=${encodeURIComponent(tokenSymbol)}`);
+			const response = await fetch(`/api/markets?tokenId=${tokenId}`);
 			const data = await response.json();
-			
+
 			if (data.error) {
 				throw new Error(data.error);
 			}
-			
+
 			if (data.marketData) {
 				realMarketData = Array.isArray(data.marketData) ? data.marketData : [];
 			}
@@ -391,13 +392,13 @@
 			if (data.circulatingSupply) {
 				realCirculatingSupply = data.circulatingSupply;
 			}
-			
-			// For non-VOI tokens, also fetch token analytics (but only if not already from server)
-			if (tokenSymbol !== 'VOI' && selectedToken && selectedToken.id !== 0) {
-				// Skip analytics fetch if we already have it from server data
-				if (tokenSymbol !== serverDataToken || !tokenAnalytics) {
+
+			// For non-VOI tokens, token analytics is fetched by +page.ts on initial load
+			// Only fetch here if we don't have it (client-side token switch without page reload)
+			if (tokenId !== 0) {
+				if (!tokenAnalytics || tokenAnalytics.tokenId !== tokenId) {
 					try {
-						const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${selectedToken.id}`);
+						const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${tokenId}`);
 						const analyticsData = await analyticsResponse.json();
 						if (analyticsData.analytics) {
 							tokenAnalytics = analyticsData.analytics;
@@ -406,14 +407,14 @@
 						console.warn('Failed to fetch token analytics:', e);
 					}
 				} else {
-					console.log('Skipping token-analytics fetch - already have server data');
+					console.log('Skipping token-analytics fetch - already have data for tokenId', tokenId);
 				}
 			} else {
 				// Clear analytics for VOI
 				tokenAnalytics = null;
 			}
 			
-			console.log(`Fetched market data for ${tokenSymbol}:`, {
+			console.log(`Fetched market data for tokenId ${tokenId}:`, {
 				realMarketData: realMarketData.length,
 				aggregates,
 				tokenAnalytics: !!tokenAnalytics
@@ -431,7 +432,7 @@
 		selectedToken = event.detail;
 		// Reset server data tracking and cache when user manually selects a token
 		serverDataToken = null;
-		lastFetchedToken = null;
+		lastFetchedTokenId = null;
 		// Clear cache when switching tokens to ensure fresh data
 		voiPriceHistoryCache = null;
 		voiPriceHistoryPromise = null;
@@ -454,40 +455,29 @@
 			if (browser) {
 				// Start loading state immediately
 				fetchingMarketData = true;
-				
+
 				// Market data will be fetched by reactive statement
 				// Just fetch chart data here
 				fetchUnifiedChartData('VOI', chartSettings.resolution);
-				
-				// Update URL without triggering data reload
-				if (browser) {
-					const url = new URL($page.url);
-					url.searchParams.set('token', 'VOI');
-					url.searchParams.delete('pool');
-					goto(url.toString(), { 
-						keepFocus: true, 
-						noScroll: true, 
-						replaceState: true,
-						invalidateAll: false 
-					});
-				}
+
+				// Update URL with token ID (0 for VOI) without triggering page load
+				const url = new URL($page.url);
+				url.searchParams.set('token', '0');
+				url.searchParams.delete('pool');
+				history.replaceState(history.state, '', url.toString());
 			}
 		} else {
 			// Reset clear flag when selecting non-VOI tokens
 			_userClearedToken = false;
-			
+
 			if (browser) {
 				// Chart data will be fetched by reactive statement automatically
-				// Update URL without triggering data reload
+				// Update URL with token ID to avoid symbol lookup on page reload
 				const url = new URL($page.url);
-				url.searchParams.set('token', selectedToken.symbol);
+				url.searchParams.set('token', String(selectedToken.id));
 				url.searchParams.delete('pool');
-				goto(url.toString(), { 
-					keepFocus: true, 
-					noScroll: true, 
-					replaceState: true,
-					invalidateAll: false 
-				});
+				// Use replaceState to update URL without triggering page load
+				history.replaceState(history.state, '', url.toString());
 			}
 		}
 	}
@@ -563,10 +553,25 @@
 		});
 	};
 
-	// Format currency with $ symbol and 4 decimal places
+	// Format price with 5 decimal places
 	const formatPrice = (num: number | null | undefined): string => {
-		if (num === null || num === undefined) return '-';
-		return `$${formatNumber(num, 6)}`;
+		if (num === null || num === undefined || num === 0) return '-';
+		return `$${formatNumber(num, 5)}`;
+	};
+
+	// Normalize token symbol - remove lowercase 'w' prefix (e.g., wVOI -> VOI, wUNIT -> UNIT)
+	const normalizeSymbol = (symbol: string): string => {
+		if (symbol && symbol.length > 1 && symbol.startsWith('w') && symbol[1] === symbol[1].toUpperCase()) {
+			return symbol.slice(1);
+		}
+		return symbol;
+	};
+
+	// Normalize pair name (e.g., "wUNIT/wVOI" -> "UNIT/VOI")
+	const normalizePair = (pair: string): string => {
+		if (!pair) return pair;
+		const [base, quote] = pair.split('/');
+		return `${normalizeSymbol(base)}/${normalizeSymbol(quote)}`;
 	};
 
 	// Format currency with $ symbol and 2 decimal places (for volume/TVL)
@@ -667,11 +672,8 @@
 		isRefreshing = true;
 		try {
 			// Refresh market data for the currently selected token
-			if (selectedToken && selectedToken.symbol) {
-				await fetchMarketDataForToken(selectedToken.symbol);
-			} else {
-				await fetchMarketDataForToken('VOI');
-			}
+			const tokenIdToFetch = selectedToken?.id ?? 0;
+			await fetchMarketDataForToken(tokenIdToFetch);
 			// Skip invalidateAll to prevent full page reload - we already fetched what we need
 			// await invalidateAll();
 		} finally {
@@ -1434,6 +1436,12 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pair</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Exchange</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('price')}>
+                                        Price
+                                        {#if sortColumn === 'price'}
+                                            <i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
+                                        {/if}
+                                    </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" on:click={() => sortData('tvl')}>
                                         TVL (USD)
                                         {#if sortColumn === 'tvl'}
@@ -1459,11 +1467,11 @@
                                                    rel="noopener noreferrer"
                                                    class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
                                                    on:click|stopPropagation>
-                                                    {market.pair}
+                                                    {normalizePair(market.pair)}
                                                     <i class="fas fa-external-link-alt text-xs opacity-50"></i>
                                                 </a>
                                             {:else}
-                                                <span class="text-gray-900 dark:text-white">{market.pair}</span>
+                                                <span class="text-gray-900 dark:text-white">{normalizePair(market.pair)}</span>
                                             {/if}
                                         </td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
@@ -1489,6 +1497,7 @@
                                                 {market.exchange === 'humble' ? 'Humble' : market.exchange === 'nomadex' ? 'Nomadex' : market.exchange}
                                             </span>
                                         </td>
+                                        <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatPrice(market.price)}</td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{formatCurrency(market.tvl)}</td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{market.volume_24h ? formatCurrency(market.volume_24h) : '-'}</td>
                                         <td class="px-6 py-3 whitespace-nowrap text-sm">
@@ -1668,26 +1677,26 @@
 													<div class="flex items-center -space-x-2 mr-3">
 														<!-- First token icon -->
 														<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white dark:border-gray-800">
-															{market.pair.split('/')[0].slice(0, 2)}
+															{normalizeSymbol(market.pair.split('/')[0]).slice(0, 2)}
 														</div>
 														<!-- Second token icon -->
 														<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-green-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white dark:border-gray-800">
-															{market.pair.split('/')[1].slice(0, 2)}
+															{normalizeSymbol(market.pair.split('/')[1]).slice(0, 2)}
 														</div>
 													</div>
 													<div>
 														<div class="font-medium">
 															{#if market.pool_url}
-																<a href={market.pool_url} 
-																   target="_blank" 
+																<a href={market.pool_url}
+																   target="_blank"
 																   rel="noopener noreferrer"
 																   class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
 																   on:click|stopPropagation>
-																	{market.pair}
+																	{normalizePair(market.pair)}
 																	<i class="fas fa-external-link-alt text-xs opacity-50"></i>
 																</a>
 															{:else}
-																<span class="text-gray-900 dark:text-white">{market.pair}</span>
+																<span class="text-gray-900 dark:text-white">{normalizePair(market.pair)}</span>
 															{/if}
 														</div>
 														<div class="text-sm text-gray-500 dark:text-gray-400">
@@ -1779,7 +1788,7 @@
 															e.stopPropagation();
 															const token = {
 																id: market.trading_pair_id,
-																symbol: market.pair.split('/')[0],
+																symbol: normalizeSymbol(market.pair.split('/')[0]),
 																type: 'UNKNOWN',
 																decimals: 6,
 																poolCount: 1

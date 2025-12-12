@@ -2,10 +2,36 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/supabase-server';
 import { fetchCirculatingSupply } from '$lib/utils/voi';
-import { TOKENS } from '$lib/utils/tokens';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
+
+// Get all equivalent token IDs for a given token (handles wrapped/native mappings)
+async function getTokenEquivalentIds(
+	tokenId: number,
+	supabaseMimirClient: ReturnType<typeof createClient>
+): Promise<number[]> {
+	const ids = new Set<number>([tokenId]);
+
+	// Query arc200_contracts for mappings in both directions
+	const { data } = await supabaseMimirClient
+		.from('arc200_contracts')
+		.select('contract_id, token_id')
+		.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
+
+	if (data) {
+		for (const row of data) {
+			ids.add(row.contract_id);
+			// Only add token_id if it's a single number (not a pool's comma-separated pair)
+			if (row.token_id && !row.token_id.includes(',')) {
+				const parsed = parseInt(row.token_id, 10);
+				if (!isNaN(parsed)) ids.add(parsed);
+			}
+		}
+	}
+
+	return Array.from(ids);
+}
 
 interface MarketSnapshot {
 	price: number;
@@ -39,31 +65,22 @@ interface RawTradingPair {
 
 export const GET: RequestHandler = async ({ url, fetch }) => {
 	try {
-		// Get token parameter from URL
-		const token = url.searchParams.get('token');
+		// Get tokenId parameter from URL (numeric token ID)
+		const tokenIdParam = url.searchParams.get('tokenId');
 
-		// Get token variants if a token is specified
-		let tokenVariants: string[] | null = null;
-		if (token) {
-			const normalized = token.toUpperCase();
-			const tokenInfo = Object.values(TOKENS).find((t) => t.symbol === normalized);
-			if (tokenInfo) {
-				// include defined equivalents
-				tokenVariants = [...tokenInfo.equivalents];
-				// normalize VOI to also include WVOI pools
-				if (!tokenVariants.includes('WVOI') && normalized === 'VOI') {
-					tokenVariants.push('WVOI');
-				}
-			} else {
-				// Fallback: exact symbol filter (include WVOI when VOI requested)
-				tokenVariants = [normalized, ...(normalized === 'VOI' ? ['WVOI'] : [])];
+		// Validate tokenId if provided
+		let tokenId: number | null = null;
+		if (tokenIdParam !== null) {
+			tokenId = parseInt(tokenIdParam, 10);
+			if (isNaN(tokenId)) {
+				return json({ error: 'tokenId must be a valid number' }, { status: 400 });
 			}
 		}
 
 		// Fetch the circulating supply data with error handling
 		let circulatingSupply = '0';
 		let percentDistributed = '0';
-		
+
 		try {
 			const supplyData = await fetchCirculatingSupply();
 			circulatingSupply = supplyData.circulatingSupply;
@@ -72,63 +89,75 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			console.error('Failed to fetch circulating supply:', error);
 		}
 
-        // If a token is provided, build markets using both MIMIR data and cross-chain snapshots
-        let marketData: any[] = [];
-        if (token) {
-            const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
-            const tokenSym = token.toUpperCase();
+		// If a tokenId is provided, build markets using both MIMIR data and cross-chain snapshots
+		let marketData: any[] = [];
+		if (tokenId !== null) {
+			const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
-            // 1) Find pools containing this token
-            const poolsRes = await supabaseMimirClient
-                .from('pool_catalog')
-                .select('*, exchange, token_a_type, token_b_type')
-                .or(`token_a_symbol.ilike.${tokenSym},token_b_symbol.ilike.${tokenSym}`);
-            if (poolsRes.error) throw poolsRes.error;
-            const pools = poolsRes.data || [];
+			// Get all equivalent token IDs (handles wrapped/native mappings)
+			const equivalentIds = await getTokenEquivalentIds(tokenId, supabaseMimirClient);
 
-            // Normalize pairs with selected token as base
-            const normalizeSymbol = (s: string) => (s?.toUpperCase() === 'WVOI' ? 'VOI' : s);
-            const pairs = pools.map((pool: any) => {
-                const isTokenBBase = pool.token_b_symbol?.toUpperCase() === tokenSym;
-                const baseSide = isTokenBBase
-                    ? {
-                          baseTokenId: pool.token_b_id,
-                          baseSymbol: normalizeSymbol(pool.token_b_symbol),
-                          baseDecimals: pool.token_b_decimals
-                      }
-                    : {
-                          baseTokenId: pool.token_a_id,
-                          baseSymbol: normalizeSymbol(pool.token_a_symbol),
-                          baseDecimals: pool.token_a_decimals
-                      };
-                const quoteSide = isTokenBBase
-                    ? {
-                          quoteTokenId: pool.token_a_id,
-                          quoteSymbol: normalizeSymbol(pool.token_a_symbol),
-                          quoteDecimals: pool.token_a_decimals
-                      }
-                    : {
-                          quoteTokenId: pool.token_b_id,
-                          quoteSymbol: normalizeSymbol(pool.token_b_symbol),
-                          quoteDecimals: pool.token_b_decimals
-                      };
+			// 1) Find pools containing any of the equivalent token IDs
+			const orConditions = equivalentIds
+				.flatMap((id) => [`token_a_id.eq.${id}`, `token_b_id.eq.${id}`])
+				.join(',');
+			const poolsRes = await supabaseMimirClient
+				.from('pool_catalog')
+				.select('*')
+				.or(orConditions);
+			if (poolsRes.error) throw poolsRes.error;
 
-                // Always carry original pool token_a/token_b metadata for accurate TVL math
-                return {
-                    ...baseSide,
-                    ...quoteSide,
-                    poolId: pool.pool_id,
-                    exchange: pool.exchange || 'DEX',
-                    tokenAId: pool.token_a_id,
-                    tokenASymbol: normalizeSymbol(pool.token_a_symbol),
-                    tokenADecimals: pool.token_a_decimals,
-                    tokenAType: pool.token_a_type,
-                    tokenBId: pool.token_b_id,
-                    tokenBSymbol: normalizeSymbol(pool.token_b_symbol),
-                    tokenBDecimals: pool.token_b_decimals,
-                    tokenBType: pool.token_b_type
-                };
-            });
+			// Deduplicate pools by pool_id (same pool might match multiple equivalent token IDs)
+			const seenPoolIds = new Set<number>();
+			const pools = (poolsRes.data || []).filter((pool: any) => {
+				if (seenPoolIds.has(pool.pool_id)) return false;
+				seenPoolIds.add(pool.pool_id);
+				return true;
+			});
+
+			// Normalize pairs with selected token as base
+			const pairs = pools.map((pool: any) => {
+				// Check if token_b is one of our equivalent IDs (meaning it should be the base)
+				const isTokenBBase = equivalentIds.includes(pool.token_b_id);
+				const baseSide = isTokenBBase
+					? {
+							baseTokenId: pool.token_b_id,
+							baseSymbol: pool.token_b_symbol,
+							baseDecimals: pool.token_b_decimals
+					  }
+					: {
+							baseTokenId: pool.token_a_id,
+							baseSymbol: pool.token_a_symbol,
+							baseDecimals: pool.token_a_decimals
+					  };
+				const quoteSide = isTokenBBase
+					? {
+							quoteTokenId: pool.token_a_id,
+							quoteSymbol: pool.token_a_symbol,
+							quoteDecimals: pool.token_a_decimals
+					  }
+					: {
+							quoteTokenId: pool.token_b_id,
+							quoteSymbol: pool.token_b_symbol,
+							quoteDecimals: pool.token_b_decimals
+					  };
+
+				// Always carry original pool token_a/token_b metadata for accurate TVL math
+				return {
+					...baseSide,
+					...quoteSide,
+					poolId: pool.pool_id,
+					exchange: pool.exchange || 'DEX',
+					tokenAId: pool.token_a_id,
+					tokenASymbol: pool.token_a_symbol,
+					tokenADecimals: pool.token_a_decimals,
+					tokenAType: pool.token_a_type,
+					tokenBId: pool.token_b_id,
+					tokenBSymbol: pool.token_b_symbol,
+					tokenBDecimals: pool.token_b_decimals,
+					tokenBType: pool.token_b_type
+				};
+			});
 
             if (pairs.length === 0) {
                 return json({
@@ -186,9 +215,12 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
             priceInVoi.set('VOI', 1);
             priceInVoi.set('WVOI', 1);
 
+            // Helper to normalize symbols for consistent map lookups
+            const norm = (s: string) => (s || '').toUpperCase();
+
             // Step 2: Get all pool prices for path finding
             const poolPrices = new Map<string, { price: number, tokenA: string, tokenB: string }>();
-            
+
             // Fetch latest prices for all pools we're interested in
             for (const pair of pairs) {
                 const latest = latestByPool.get(pair.poolId);
@@ -196,20 +228,18 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                     const p = Number(latest.price_quote || 0);
                     if (p > 0) {
                         // Store price as tokenA per tokenB (based on what's in the swap data)
-                        const keyAB = `${pair.tokenASymbol}_${pair.tokenBSymbol}`;
-                        const keyBA = `${pair.tokenBSymbol}_${pair.tokenASymbol}`;
-                        
-                        // Debug for UNIT/SHELLY specifically
-                        const isUnitShelly = (pair.tokenASymbol === 'UNIT' && pair.tokenBSymbol === 'SHELLY') || 
-                                           (pair.tokenASymbol === 'SHELLY' && pair.tokenBSymbol === 'UNIT');
-                        
+                        const symA = norm(pair.tokenASymbol);
+                        const symB = norm(pair.tokenBSymbol);
+                        const keyAB = `${symA}_${symB}`;
+                        const keyBA = `${symB}_${symA}`;
+
                         // Price_quote represents base_token per quote_token
                         if (latest.base_token_id === pair.tokenAId && latest.quote_token_id === pair.tokenBId) {
-                            poolPrices.set(keyAB, { price: p, tokenA: pair.tokenASymbol, tokenB: pair.tokenBSymbol });
-                            poolPrices.set(keyBA, { price: 1/p, tokenA: pair.tokenBSymbol, tokenB: pair.tokenASymbol });
+                            poolPrices.set(keyAB, { price: p, tokenA: symA, tokenB: symB });
+                            poolPrices.set(keyBA, { price: 1/p, tokenA: symB, tokenB: symA });
                         } else if (latest.base_token_id === pair.tokenBId && latest.quote_token_id === pair.tokenAId) {
-                            poolPrices.set(keyBA, { price: p, tokenA: pair.tokenBSymbol, tokenB: pair.tokenASymbol });
-                            poolPrices.set(keyAB, { price: 1/p, tokenA: pair.tokenASymbol, tokenB: pair.tokenBSymbol });
+                            poolPrices.set(keyBA, { price: p, tokenA: symB, tokenB: symA });
+                            poolPrices.set(keyAB, { price: 1/p, tokenA: symA, tokenB: symB });
                         }
                     }
                 }
@@ -288,9 +318,11 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                 windowByPool.set(row.pool_id, arr);
             }
 
-            // 4) Get cross-chain market snapshots ONLY for VOI
-            let crossChainSnapshots: any[] = [];
-            if (tokenSym === 'VOI' || tokenSym === 'WVOI') {
+			// 4) Get cross-chain market snapshots ONLY for VOI
+			let crossChainSnapshots: any[] = [];
+			// Check if any equivalent is VOI (0) or wVOI (390001)
+			const voiIds = [0, 390001];
+			if (equivalentIds.some((id) => voiIds.includes(id))) {
                 try {
                     // Get latest snapshots from cross-chain exchanges (Tinyman, PactFi, Uniswap, etc.)
                     const { data: snapshots, error: snapshotsError } = await supabasePrivateClient
@@ -326,25 +358,28 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                             }
                         });
                         
-                        crossChainSnapshots = Array.from(latestSnapshots.values()).map(snapshot => ({
-                            trading_pair_id: snapshot.trading_pair_id,
-                            exchange: snapshot.trading_pairs.exchange.name,
-                            pair: `${snapshot.trading_pairs.quote_token}/${snapshot.trading_pairs.base_token}`,
-                            type: snapshot.trading_pairs.exchange.type,
-                            network: snapshot.trading_pairs.exchange.network,
-                            url: null,
-                            pool_url: null,
-                            base_token_id: 0, // VOI
-                            quote_token_id: null,
-                            price: snapshot.price,
-                            volume_24h: snapshot.volume_24h,
-                            tvl: snapshot.tvl,
-                            high_24h: snapshot.high_24h,
-                            low_24h: snapshot.low_24h,
-                            price_change_24h: snapshot.price_change_24h,
-                            price_change_percentage_24h: snapshot.price_change_percentage_24h,
-                            lastUpdated: snapshot.timestamp
-                        }));
+                        // Filter out Voi network exchanges (Humble, Nomadex) since we get those from MIMIR
+                        crossChainSnapshots = Array.from(latestSnapshots.values())
+                            .filter(snapshot => snapshot.trading_pairs.exchange.network !== 'Voi')
+                            .map(snapshot => ({
+                                trading_pair_id: snapshot.trading_pair_id,
+                                exchange: snapshot.trading_pairs.exchange.name,
+                                pair: `${snapshot.trading_pairs.quote_token}/${snapshot.trading_pairs.base_token}`,
+                                type: snapshot.trading_pairs.exchange.type,
+                                network: snapshot.trading_pairs.exchange.network,
+                                url: null,
+                                pool_url: null,
+                                base_token_id: 0, // VOI
+                                quote_token_id: null,
+                                price: snapshot.price,
+                                volume_24h: snapshot.volume_24h,
+                                tvl: snapshot.tvl,
+                                high_24h: snapshot.high_24h,
+                                low_24h: snapshot.low_24h,
+                                price_change_24h: snapshot.price_change_24h,
+                                price_change_percentage_24h: snapshot.price_change_percentage_24h,
+                                lastUpdated: snapshot.timestamp
+                            }));
                     }
                 } catch (e) {
                     console.warn('Failed to fetch cross-chain snapshots:', e);
@@ -423,43 +458,54 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                     if (orientedPrice > 0) lastPrice = orientedPrice;
                 }
 
-            // USD conversion using comprehensive price resolution
-            const qUsd = symbolUsd.get(pair.quoteSymbol) || 0;
-            const baseUsd = symbolUsd.get(pair.baseSymbol) || 0;
-            
-            // Calculate price in USD: (quote tokens per base token) * (USD per quote token)
-            let priceUsd = 0;
-            if (qUsd > 0 && price > 0) {
-                priceUsd = price * qUsd;
-            } else if (baseUsd > 0 && price > 0) {
-                // Fallback: if we don't have quote USD but have base USD, calculate differently
-                // This shouldn't normally happen with our comprehensive pricing, but as backup
-                priceUsd = baseUsd / price;
-            }
-            
+            // USD conversion using comprehensive price resolution (normalize symbols for lookup)
+            const qUsd = symbolUsd.get(norm(pair.quoteSymbol)) || 0;
+            const baseUsd = symbolUsd.get(norm(pair.baseSymbol)) || 0;
+
+            // Calculate USD price: price (quote per base) * quote USD price
+            // This gives us the USD value of 1 base token according to this pool
+            // Falls back to base USD price if quote price is unavailable
+            const priceUsd = qUsd > 0 && price > 0 ? price * qUsd : baseUsd;
+
             // Volume calculation using quote token USD value
             const volume24h = qUsd > 0 && volQuoteSum > 0 ? volQuoteSum * qUsd : 0;
 
-            // TVL calculation using comprehensive price resolution
+            // TVL calculation using comprehensive price resolution (normalize symbols for lookup)
             let tvl = 0;
-            const tokenAUsd = symbolUsd.get(pair.tokenASymbol) || 0;
-            const tokenBUsd = symbolUsd.get(pair.tokenBSymbol) || 0;
-            const tokenAVoi = priceInVoi.get(pair.tokenASymbol) || 0;
-            const tokenBVoi = priceInVoi.get(pair.tokenBSymbol) || 0;
-            
+            let tokenAUsd = symbolUsd.get(norm(pair.tokenASymbol)) || 0;
+            let tokenBUsd = symbolUsd.get(norm(pair.tokenBSymbol)) || 0;
+
+            // Debug for INDEX/SHELLY
+            if (norm(pair.tokenASymbol) === 'INDEX' || norm(pair.tokenBSymbol) === 'INDEX') {
+                console.log('INDEX pool TVL debug:', {
+                    tokenASymbol: pair.tokenASymbol,
+                    tokenBSymbol: pair.tokenBSymbol,
+                    tokenAUsd,
+                    tokenBUsd,
+                    reserveTokenA,
+                    reserveTokenB
+                });
+            }
+
+            // If we only have one token's price, derive the other from the pool's reserves
+            // In a balanced AMM pool, value of tokenA side ≈ value of tokenB side
+            // So: reserveA * priceA ≈ reserveB * priceB
+            // Therefore: priceB = (reserveA * priceA) / reserveB
+            if (tokenAUsd > 0 && tokenBUsd === 0 && reserveTokenA > 0 && reserveTokenB > 0) {
+                tokenBUsd = (reserveTokenA * tokenAUsd) / reserveTokenB;
+            } else if (tokenBUsd > 0 && tokenAUsd === 0 && reserveTokenA > 0 && reserveTokenB > 0) {
+                tokenAUsd = (reserveTokenB * tokenBUsd) / reserveTokenA;
+            }
+
             if (tokenAUsd > 0 && tokenBUsd > 0) {
                 // Both tokens have USD prices - use actual values
                 tvl = reserveTokenA * tokenAUsd + reserveTokenB * tokenBUsd;
-            } else if (tokenAVoi > 0 && tokenBVoi > 0) {
-                // Both tokens have VOI prices - calculate total VOI value then convert to USD
-                const totalVoi = reserveTokenA * tokenAVoi + reserveTokenB * tokenBVoi;
-                tvl = totalVoi * voiUsd;
-            } else if (tokenAVoi > 0 || tokenBVoi > 0) {
-                // Only one token has price - assume balanced pool and double the known side
-                const knownSideVoi = tokenAVoi > 0 
-                    ? reserveTokenA * tokenAVoi 
-                    : reserveTokenB * tokenBVoi;
-                tvl = knownSideVoi * 2 * voiUsd;
+            } else if (tokenAUsd > 0) {
+                // Only tokenA has price - assume balanced pool and double
+                tvl = reserveTokenA * tokenAUsd * 2;
+            } else if (tokenBUsd > 0) {
+                // Only tokenB has price - assume balanced pool and double
+                tvl = reserveTokenB * tokenBUsd * 2;
             } else {
                 // No price information available
                 tvl = 0;
@@ -505,33 +551,35 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                 return result;
             });
             
-            // 6) Fetch Vestige (Algorand) markets if token has algo_asset_id
-            let vestigeMarkets: any[] = [];
-            try {
-                // Check if the selected token has an algo_asset_id
-                const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
-                const { data: tokenData, error: tokenError } = await supabaseMimirClient
-                    .from('arc200_contracts')
-                    .select('algo_asset_id')
-                    .ilike('symbol', tokenSym)
-                    .single();
+			// 6) Fetch Vestige (Algorand) markets if token has algo_asset_id
+			let vestigeMarkets: any[] = [];
+			try {
+				// Check if the selected token has an algo_asset_id
+				const { data: tokenData, error: tokenError } = await supabaseMimirClient
+					.from('arc200_contracts')
+					.select('algo_asset_id')
+					.eq('contract_id', tokenId)
+					.single();
 
-                if (!tokenError && tokenData && tokenData.algo_asset_id) {
-                    // Create a price map from our symbol USD prices for TVL calculation
-                    const priceMapForVestige = new Map<string, number>();
-                    for (const [symbol, usdPrice] of symbolUsd) {
-                        if (usdPrice > 0) {
-                            priceMapForVestige.set(symbol, usdPrice);
-                        }
-                    }
-                    vestigeMarkets = await fetchVestigeMarketsForAsset(tokenData.algo_asset_id, priceMapForVestige);
-                } else {
-                    console.log(`Token ${tokenSym} has no algo_asset_id, skipping Vestige markets`);
-                }
-            } catch (error) {
-                console.error('Error fetching Vestige markets:', error);
-                // Continue without Vestige data
-            }
+				if (!tokenError && tokenData && tokenData.algo_asset_id) {
+					// Create a price map from our symbol USD prices for TVL calculation
+					const priceMapForVestige = new Map<string, number>();
+					for (const [symbol, usdPrice] of symbolUsd) {
+						if (usdPrice > 0) {
+							priceMapForVestige.set(symbol, usdPrice);
+						}
+					}
+					vestigeMarkets = await fetchVestigeMarketsForAsset(
+						tokenData.algo_asset_id,
+						priceMapForVestige
+					);
+				} else {
+					console.log(`Token ${tokenId} has no algo_asset_id, skipping Vestige markets`);
+				}
+			} catch (error) {
+				console.error('Error fetching Vestige markets:', error);
+				// Continue without Vestige data
+			}
 
             // 7) Combine VOI DEX markets with cross-chain snapshots and Vestige markets
             marketData = [...voiDexMarkets, ...crossChainSnapshots, ...vestigeMarkets];
@@ -576,7 +624,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 
 		// Process market data and sort by volume
 		let processedMarketData: any[] = [];
-		if (token) {
+		if (tokenId !== null) {
 			processedMarketData = (marketData || [])
 				.map((m: any) => m)
 				.sort((a: any, b: any) => (b.volume_24h || 0) - (a.volume_24h || 0));

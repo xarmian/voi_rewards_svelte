@@ -200,19 +200,16 @@ export async function convertVestigePoolToMarket(
 	const quoteAmount = quoteSupply / Math.pow(10, quoteAsset.decimals);
 	
 	// Price = quote amount / base amount (how many quote tokens per 1 base token)
-	let price = baseAmount > 0 && quoteAmount > 0 ? quoteAmount / baseAmount : 0;
-	
+	const exchangeRate = baseAmount > 0 && quoteAmount > 0 ? quoteAmount / baseAmount : 0;
+
 	// Get protocol information
 	const exchangeName = await getProtocolName(pool.protocol_id);
 	const protocolUrl = await getProtocolUrl(pool.protocol_id);
 
 	// Calculate TVL (Total Value Locked)
 	let tvl = 0;
-	
+
 	// Try to get USD prices from the provided price map first
-	const baseUsdPrice = priceMap?.get(baseAsset.ticker) || 0;
-	const quoteUsdPrice = priceMap?.get(quoteAsset.ticker) || 0;
-	
 	if (baseUsdPrice > 0 && quoteUsdPrice > 0) {
 		// Both assets have USD prices - calculate exact TVL
 		tvl = (baseAmount * baseUsdPrice) + (quoteAmount * quoteUsdPrice);
@@ -227,7 +224,7 @@ export async function convertVestigePoolToMarket(
 		const stablecoins = ['USDC', 'USDT', 'aUSDC', 'aUSDT'];
 		const baseIsStable = stablecoins.includes(baseAsset.ticker);
 		const quoteIsStable = stablecoins.includes(quoteAsset.ticker);
-		
+
 		if (baseIsStable) {
 			// Base asset is stable, so use base amount * 2 for TVL
 			tvl = baseAmount * 2;
@@ -246,6 +243,16 @@ export async function convertVestigePoolToMarket(
 		poolUrl = `https://app.tinyman.org/#/swap?asset_in=${pool.asset_1_id}&asset_out=${pool.asset_2_id}`;
 	}
 
+	// Calculate USD price: prefer base USD price for consistency
+	// Only use quote-based calculation for reliable quote tokens (stablecoins, VOI, ALGO)
+	const reliableQuoteTokens = ['USDC', 'USDT', 'AUSDC', 'AUSDT', 'VOI', 'WVOI', 'ALGO'];
+	const quoteIsReliable = reliableQuoteTokens.includes(quoteAsset.ticker.toUpperCase());
+
+	let priceUsd = baseUsdPrice;
+	if (quoteIsReliable && quoteUsdPrice > 0 && exchangeRate > 0) {
+		priceUsd = exchangeRate * quoteUsdPrice;
+	}
+
 	return {
 		trading_pair_id: pool.id,
 		exchange: exchangeName,
@@ -258,7 +265,7 @@ export async function convertVestigePoolToMarket(
 		quote_token_id: isAsset1Target ? pool.asset_2_id : pool.asset_1_id,
 		base_decimals: baseAsset.decimals,
 		quote_decimals: quoteAsset.decimals,
-		price: price,
+		price: priceUsd,
 		volume_24h: volume24h,
 		tvl: tvl,
 		high_24h: null,
