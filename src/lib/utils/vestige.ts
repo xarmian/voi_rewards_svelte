@@ -206,6 +206,10 @@ export async function convertVestigePoolToMarket(
 	const exchangeName = await getProtocolName(pool.protocol_id);
 	const protocolUrl = await getProtocolUrl(pool.protocol_id);
 
+	// Get USD prices from the provided price map
+	const baseUsdPrice = priceMap?.get(baseAsset.ticker) || 0;
+	const quoteUsdPrice = priceMap?.get(quoteAsset.ticker) || 0;
+
 	// Calculate TVL (Total Value Locked)
 	let tvl = 0;
 

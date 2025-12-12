@@ -224,7 +224,7 @@
 	}
 
 	// Fetch token info when token changes (but not for VOI)
-	$: if (selectedToken) {
+	$: if (browser && selectedToken) {
 		if (selectedToken.id === 0 || selectedToken.symbol === 'VOI') {
 			// Clear token info for VOI
 			tokenInfo = null;
@@ -902,9 +902,9 @@
 	}
 
 	// Watch for token selection changes and fetch chart data
-	$: if (selectedToken && selectedToken.id !== 0) {
+	$: if (browser && selectedToken && selectedToken.id !== 0) {
 		fetchTokenChartData(selectedToken.id, chartSettings.resolution, currentQuoteCurrency);
-	} else if (selectedToken && selectedToken.id === 0) {
+	} else if (browser && selectedToken && selectedToken.id === 0) {
 		// For VOI, show aggregated data instead of chart
 		showTokenChart = false;
 		tokenChartData = [];
