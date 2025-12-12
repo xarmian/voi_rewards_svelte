@@ -359,8 +359,12 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                         });
                         
                         // Filter out Voi network exchanges (Humble, Nomadex) since we get those from MIMIR
+                        // Also exclude MEXC (trading_pair_id = 1) which is no longer active
                         crossChainSnapshots = Array.from(latestSnapshots.values())
-                            .filter(snapshot => snapshot.trading_pairs.exchange.network !== 'Voi')
+                            .filter(snapshot =>
+                                snapshot.trading_pairs.exchange.network !== 'Voi' &&
+                                snapshot.trading_pair_id !== 1
+                            )
                             .map(snapshot => ({
                                 trading_pair_id: snapshot.trading_pair_id,
                                 exchange: snapshot.trading_pairs.exchange.name,
@@ -573,6 +577,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
             marketData = [...voiDexMarkets, ...crossChainSnapshots, ...vestigeMarkets];
         } else {
             // Legacy: general list using platform snapshots
+            // Exclude MEXC (id = 1) which is no longer active
             const query = supabasePrivateClient
                 .from('trading_pairs')
                 .select(
@@ -602,6 +607,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
                 )
             `
                 )
+                .neq('id', 1)
                 .order('timestamp', { foreignTable: 'market_snapshots', ascending: false })
                 .limit(1, { foreignTable: 'market_snapshots' });
 

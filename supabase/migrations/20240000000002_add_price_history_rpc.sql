@@ -54,8 +54,9 @@ BEGIN
             SUM(price * volume_24h)::double precision AS price_volume,
             SUM(volume_24h)::double precision AS total_volume
         FROM market_snapshots ms
-        WHERE 
+        WHERE
             ms.timestamp >= start_date
+            AND ms.trading_pair_id != 1  -- Exclude inactive MEXC market
             AND (p_trading_pair_id IS NULL OR ms.trading_pair_id = p_trading_pair_id)
         GROUP BY bucket
         ORDER BY bucket
