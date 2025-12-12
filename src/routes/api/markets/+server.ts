@@ -475,18 +475,6 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
             let tokenAUsd = symbolUsd.get(norm(pair.tokenASymbol)) || 0;
             let tokenBUsd = symbolUsd.get(norm(pair.tokenBSymbol)) || 0;
 
-            // Debug for INDEX/SHELLY
-            if (norm(pair.tokenASymbol) === 'INDEX' || norm(pair.tokenBSymbol) === 'INDEX') {
-                console.log('INDEX pool TVL debug:', {
-                    tokenASymbol: pair.tokenASymbol,
-                    tokenBSymbol: pair.tokenBSymbol,
-                    tokenAUsd,
-                    tokenBUsd,
-                    reserveTokenA,
-                    reserveTokenB
-                });
-            }
-
             // If we only have one token's price, derive the other from the pool's reserves
             // In a balanced AMM pool, value of tokenA side ≈ value of tokenB side
             // So: reserveA * priceA ≈ reserveB * priceB
