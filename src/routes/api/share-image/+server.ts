@@ -3,7 +3,6 @@ import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import { readFileSync } from 'fs';
-import { join } from 'path';
 
 // Load Arial Bold font - we'll use a fallback if not available
 let fontData: ArrayBuffer;
@@ -29,7 +28,7 @@ async function loadFont(): Promise<ArrayBuffer> {
 	return fontData;
 }
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	try {
 		// Get query parameters
 		const tokenName = url.searchParams.get('tokenName') || 'TOKEN';
@@ -265,9 +264,11 @@ export const GET: RequestHandler = async ({ url }) => {
 		});
 		const overlayPng = resvg.render().asPng();
 
-		// Load the background template
-		const backgroundPath = join(process.cwd(), 'static', 'share_image_chub_blank.png');
-		const background = sharp(backgroundPath);
+		// Load the background template via fetch (works on both localhost and Vercel)
+		const backgroundUrl = new URL('/share_image_chub_blank.png', url.origin).toString();
+		const bgResponse = await svelteKitFetch(backgroundUrl);
+		const bgBuffer = Buffer.from(await bgResponse.arrayBuffer());
+		const background = sharp(bgBuffer);
 
 		// Composite the overlay onto the background
 		const finalImage = await background
