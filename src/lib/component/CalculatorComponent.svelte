@@ -475,6 +475,58 @@
 			calculateRewards();
 		}
 	}
+
+	let isDownloadingCSV = false;
+
+	async function downloadEpochScheduleCSV() {
+		isDownloadingCSV = true;
+		try {
+			const TOTAL_EPOCHS = 20 * 52; // 20 years × 52 weeks
+			const csvRows: string[] = ['startDate,endDate,nodeAamount,relayAmount'];
+
+			// Generate all epochs from epoch 0 to epoch 1039
+			for (let epoch = 0; epoch < TOTAL_EPOCHS; epoch++) {
+				// Calculate start date: EPOCH_START_DATE + (epoch * 7 days)
+				const epochStartDate = new Date(EPOCH_START_DATE);
+				epochStartDate.setDate(EPOCH_START_DATE.getDate() + epoch * 7);
+
+				// Calculate end date: startDate + 6 days (7-day epoch, endDate inclusive)
+				const epochEndDate = new Date(epochStartDate);
+				epochEndDate.setDate(epochStartDate.getDate() + 6);
+
+				// Fetch amount using getTokensByEpoch(epoch + 1)
+				// Since epoch 1 = 3M tokens in the formula
+				const amount = await getTokensByEpoch(epoch + 1);
+
+				// Format dates as ISO strings (YYYY-MM-DD)
+				const startDateStr = epochStartDate.toISOString().split('T')[0];
+				const endDateStr = epochEndDate.toISOString().split('T')[0];
+
+				// Add row to CSV
+				csvRows.push(`${startDateStr},${endDateStr},${Math.round(amount)},${Math.round(amount / 10)}`);
+			}
+
+			// Create CSV content
+			const csvContent = csvRows.join('\n');
+
+			// Create blob and trigger download
+			const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+			const link = document.createElement('a');
+			const url = URL.createObjectURL(blob);
+			link.setAttribute('href', url);
+			link.setAttribute('download', `epoch-schedule-${EPOCH_START_DATE.toISOString().split('T')[0]}.csv`);
+			link.style.visibility = 'hidden';
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('Error generating CSV:', error);
+			alert('Failed to generate CSV. Please try again.');
+		} finally {
+			isDownloadingCSV = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -1388,29 +1440,74 @@
 
 		<!-- Reward Schedule -->
 		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-			<button
-				class="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700"
-				on:click={() => (isRewardScheduleVisible = !isRewardScheduleVisible)}
-			>
-				<span class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-					View Reward Schedule
-				</span>
-				<svg
-					class="w-5 h-5 transform transition-transform duration-200 {isRewardScheduleVisible
-						? 'rotate-180'
-						: ''}"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
+			<div class="flex items-center justify-between px-6 py-4">
+				<button
+					class="flex-1 text-left flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700 -mx-6 px-6 py-4"
+					on:click={() => (isRewardScheduleVisible = !isRewardScheduleVisible)}
 				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M19 9l-7 7-7-7"
-					/>
-				</svg>
-			</button>
+					<span class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+						View Reward Schedule
+					</span>
+					<svg
+						class="w-5 h-5 transform transition-transform duration-200 {isRewardScheduleVisible
+							? 'rotate-180'
+							: ''}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M19 9l-7 7-7-7"
+						/>
+					</svg>
+				</button>
+				<button
+					class="ml-4 px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+					on:click={downloadEpochScheduleCSV}
+					disabled={isDownloadingCSV}
+				>
+					{#if isDownloadingCSV}
+						<svg
+							class="animate-spin h-4 w-4"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
+						</svg>
+						<span>Generating...</span>
+					{:else}
+						<svg
+							class="w-4 h-4"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+							/>
+						</svg>
+						<span>Download CSV</span>
+					{/if}
+				</button>
+			</div>
 
 			{#if isRewardScheduleVisible}
 				<div class="overflow-x-auto">
