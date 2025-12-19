@@ -12,6 +12,21 @@ import type {
 // Create MIMIR client for OHLCV data
 const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
+// VOI native token can be represented by either token ID 0 or 390001 (wVOI)
+const VOI_TOKEN_IDS = [0, 390001];
+// aUSDC can be represented by either token ID 302190 or 395614
+const AUSDC_TOKEN_IDS = [302190, 395614];
+
+const getEquivalentTokenIds = (tokenId: number): number[] => {
+	if (VOI_TOKEN_IDS.includes(tokenId)) return VOI_TOKEN_IDS;
+	if (AUSDC_TOKEN_IDS.includes(tokenId)) return AUSDC_TOKEN_IDS;
+	return [tokenId];
+};
+
+const hasEquivalents = (tokenId: number): boolean => {
+	return VOI_TOKEN_IDS.includes(tokenId) || AUSDC_TOKEN_IDS.includes(tokenId);
+};
+
 export const GET: RequestHandler = async ({ url }) => {
 	try {
 		// Parse query parameters
@@ -106,30 +121,48 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		// Refresh candles if requested
 		if (refresh) {
-			const { data: refreshData, error: refreshError } = await supabaseMimirClient.rpc(
-				'refresh_price_candles',
-				{
-					p_base_token_id: baseTokenId,
-					p_quote_token_id: finalQuoteTokenId,
-					p_resolution: resolution,
-					p_start: startTime.toISOString(),
-					p_end: endTime.toISOString()
+			const baseIds = getEquivalentTokenIds(baseTokenId);
+			const quoteIds = getEquivalentTokenIds(finalQuoteTokenId);
+
+			// Refresh all combinations of base/quote token equivalents
+			for (const bId of baseIds) {
+				for (const qId of quoteIds) {
+					const { error: refreshError } = await supabaseMimirClient.rpc(
+						'refresh_price_candles',
+						{
+							p_base_token_id: bId,
+							p_quote_token_id: qId,
+							p_resolution: resolution,
+							p_start: startTime.toISOString(),
+							p_end: endTime.toISOString()
+						}
+					);
+
+					if (refreshError) {
+						console.warn('Failed to refresh price candles:', refreshError);
+					}
 				}
-			);
-
-			console.log('Refresh data:', refreshData);
-
-			if (refreshError) {
-				console.warn('Failed to refresh price candles:', refreshError);
 			}
 		}
 
 		// Fetch candles from MIMIR database
-		const { data, error } = await supabaseMimirClient
-			.from('price_candles')
-			.select('*')
-			.eq('base_token_id', baseTokenId)
-			.eq('quote_token_id', finalQuoteTokenId)
+		let query = supabaseMimirClient.from('price_candles').select('*');
+
+		// Handle base token - use .in() for equivalent tokens (VOI, aUSDC)
+		if (hasEquivalents(baseTokenId)) {
+			query = query.in('base_token_id', getEquivalentTokenIds(baseTokenId));
+		} else {
+			query = query.eq('base_token_id', baseTokenId);
+		}
+
+		// Handle quote token - use .in() for equivalent tokens (VOI, aUSDC)
+		if (hasEquivalents(finalQuoteTokenId)) {
+			query = query.in('quote_token_id', getEquivalentTokenIds(finalQuoteTokenId));
+		} else {
+			query = query.eq('quote_token_id', finalQuoteTokenId);
+		}
+
+		const { data, error } = await query
 			.eq('resolution', resolution)
 			.gte('bucket_start', startTime.toISOString())
 			.lt('bucket_start', endTime.toISOString())
