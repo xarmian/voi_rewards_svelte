@@ -45,7 +45,9 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	let tokenAnalytics: any = null;
 	if (!marketData?.marketData || marketData.marketData.length === 0) {
 		try {
-			const pairsRes = await fetch(`/api/token-pairs?tokenSymbol=${encodeURIComponent(tokenSymbolResolved)}&limit=50`);
+			const pairsRes = await fetch(
+				`/api/token-pairs?tokenSymbol=${encodeURIComponent(tokenSymbolResolved)}&limit=50`
+			);
 			const pairsJson = await pairsRes.json();
 			tokenPairs = pairsJson?.pairs || [];
 		} catch {}

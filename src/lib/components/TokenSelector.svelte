@@ -17,11 +17,14 @@
 	let searchInput: HTMLInputElement;
 
 	// Filter tokens based on search query
-	$: filteredTokens = searchQuery.trim() 
-		? allTokens.filter(token => 
-			token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			token.id.toString().includes(searchQuery)
-		).slice(0, 20)
+	$: filteredTokens = searchQuery.trim()
+		? allTokens
+				.filter(
+					(token) =>
+						token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+						token.id.toString().includes(searchQuery)
+				)
+				.slice(0, 20)
 		: allTokens.slice(0, 10); // Show first 10 tokens when no search
 
 	// Handle token selection
@@ -101,7 +104,7 @@
 			{disabled}
 			class="pr-20"
 		/>
-		
+
 		<!-- Right side icons -->
 		<div class="absolute inset-y-0 right-0 flex items-center pr-3 gap-2">
 			{#if searchQuery}
@@ -114,7 +117,7 @@
 					<i class="fas fa-times text-sm"></i>
 				</button>
 			{/if}
-			
+
 			{#if selectedToken && selectedToken.symbol !== 'VOI'}
 				<button
 					type="button"
@@ -125,19 +128,25 @@
 					<i class="fas fa-undo text-sm"></i>
 				</button>
 			{/if}
-			
+
 			<i class="fas fa-search text-gray-400"></i>
 		</div>
 	</div>
 
 	<!-- Dropdown -->
 	{#if dropdownOpen && !disabled}
-		<div class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-96 overflow-y-auto"
-		     transition:slide={{ duration: 200, axis: 'y' }}>
+		<div
+			class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+			transition:slide={{ duration: 200, axis: 'y' }}
+		>
 			{#if filteredTokens.length > 0}
 				<!-- Header -->
-				<div class="px-4 py-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50">
-					<div class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+				<div
+					class="px-4 py-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50"
+				>
+					<div
+						class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider"
+					>
 						{searchQuery ? `Search Results (${filteredTokens.length})` : 'Popular Tokens'}
 					</div>
 				</div>
@@ -152,7 +161,9 @@
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">
 								<!-- Token Icon -->
-								<div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-purple-400 to-blue-500">
+								<div
+									class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-purple-400 to-blue-500"
+								>
 									{#if token.imageUrl}
 										<img
 											src={token.imageUrl}
@@ -164,16 +175,20 @@
 												e.target.nextElementSibling.style.display = 'flex';
 											}}
 										/>
-										<div class="w-full h-full items-center justify-center text-white text-sm font-bold hidden">
+										<div
+											class="w-full h-full items-center justify-center text-white text-sm font-bold hidden"
+										>
 											{token.symbol.slice(0, 2)}
 										</div>
 									{:else}
-										<div class="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+										<div
+											class="w-full h-full flex items-center justify-center text-white text-sm font-bold"
+										>
 											{token.symbol.slice(0, 2)}
 										</div>
 									{/if}
 								</div>
-								
+
 								<!-- Token Info -->
 								<div class="text-left">
 									<div class="font-medium text-gray-900 dark:text-white">
@@ -184,7 +199,7 @@
 									</div>
 								</div>
 							</div>
-							
+
 							<!-- Right side info -->
 							<div class="flex flex-col items-end gap-1">
 								<Badge class="text-xs px-2 py-0.5 {getTokenTypeColor(token.type)}">

@@ -7,7 +7,7 @@
 		<h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
 			VOI Network and Block Rewards Analytics
 		</h1>
-		
+
 		<EpochStats />
 	</div>
 </div>

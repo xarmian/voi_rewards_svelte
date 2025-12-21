@@ -50,7 +50,9 @@
 		txLoading = true;
 		try {
 			const count = selectedPeriod === 'day' ? 30 : 15;
-			const response = await fetch(`/api/mimir?action=get_tx_counts&p_period=${selectedPeriod}&p_n=${count}`);
+			const response = await fetch(
+				`/api/mimir?action=get_tx_counts&p_period=${selectedPeriod}&p_n=${count}`
+			);
 			const result = await response.json();
 			if (result.data) {
 				transactionData = result.data;
@@ -201,13 +203,13 @@
 				},
 				formatter: (params: any) => {
 					if (!Array.isArray(params) || params.length === 0) return '';
-					
+
 					const dataIndex = params[0].dataIndex;
 					const epoch = epochs[dataIndex];
 					const dateLabel = formatDateLabel(epoch.epoch_end);
-					
+
 					let tooltip = `<div class="font-bold">Epoch ${epoch.epoch_number} (${dateLabel})</div>`;
-					
+
 					params.forEach((param: any) => {
 						if (param.seriesName === 'Block Reward APR') {
 							tooltip += `<div>APR: <span class="font-semibold">${param.value.toFixed(2)}%</span></div>`;
@@ -215,7 +217,7 @@
 							tooltip += `<div>Accounts: <span class="font-semibold">${formatNumber(param.value)}</span></div>`;
 						}
 					});
-					
+
 					return tooltip;
 				}
 			},
@@ -455,7 +457,6 @@
 				}
 			]
 		};
-
 
 		// Calculate daily averages for price data
 		const dailyPrices = calculateDailyAverages(priceHistory);
@@ -808,7 +809,11 @@
 						<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
 					</div>
 				{:else}
-					<TransactionCountsChart data={transactionData} period={txPeriod} onPeriodChange={handleTxPeriodChange} />
+					<TransactionCountsChart
+						data={transactionData}
+						period={txPeriod}
+						onPeriodChange={handleTxPeriodChange}
+					/>
 				{/if}
 			</div>
 
@@ -841,7 +846,9 @@
 			<!-- Combined APR and Rewarded Accounts Chart -->
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
 				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Block Reward APR & Rewarded Accounts Trend</h2>
+					<h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+						Block Reward APR & Rewarded Accounts Trend
+					</h2>
 					<a
 						href="/"
 						class="flex items-center text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"

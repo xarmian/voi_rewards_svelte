@@ -13,7 +13,7 @@ interface TokenInfo {
 	type: 'VOI' | 'ARC200' | 'ASA' | 'UNKNOWN';
 	equivalents: number[];
 	totalSupply: number | null;
-  algoAssetId: number | null;
+	algoAssetId: number | null;
 }
 
 // Get token equivalents from arc200_contracts table
@@ -139,7 +139,7 @@ export const GET: RequestHandler = async ({ url }) => {
 						symbol: arc200Data.symbol || 'UNKNOWN',
 						decimals: arc200Data.decimals || 0,
 						imageUrl: arc200Data.image_url || null,
-            algoAssetId: arc200Data.algo_asset_id || null,
+						algoAssetId: arc200Data.algo_asset_id || null,
 						type: 'ARC200',
 						equivalents,
 						totalSupply

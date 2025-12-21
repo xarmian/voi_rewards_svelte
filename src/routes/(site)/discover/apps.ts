@@ -47,7 +47,7 @@ export const apps: AppInfo[] = [
 		url: 'https://app.dork.fi/',
 		category: 'defi',
 		featured: true,
-		hide_on_ios: false,
+		hide_on_ios: false
 	},
 	{
 		id: 'aramid',

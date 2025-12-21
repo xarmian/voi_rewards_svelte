@@ -89,8 +89,11 @@
 	let customPrice: number | null = null;
 	let useCustomPrice = false;
 
-	let maxSliderValue = 1000000; // 1M VOI
-	let sliderValue = 0;
+	let maxSliderValueUSD = 1000; // $1000 USD max
+	let sliderValue = 10; // Default $10
+
+	let inputMode: 'usd' | 'voi' = 'usd'; // Default to USD mode
+	let calculationAmountUSD = 10; // Default $10
 
 	let tooltipVisible = {
 		totalStake: false,
@@ -114,17 +117,64 @@
 
 	function handleSliderChange(event: Event) {
 		const value = Number((event.target as HTMLInputElement).value);
-		calculationAmount = value;
+		// Slider always controls USD value
+		calculationAmountUSD = Math.round(value * 100) / 100;
 		sliderValue = value;
+		if (effectivePrice > 0) {
+			calculationAmount = value / effectivePrice;
+		}
 		calculateRewards();
 	}
 
 	function handleInputChange() {
-		sliderValue = calculationAmount;
+		// VOI input changed - update USD and slider
+		if (effectivePrice > 0) {
+			calculationAmountUSD = Math.round(calculationAmount * effectivePrice * 100) / 100;
+			sliderValue = calculationAmountUSD;
+		}
+		calculateRewards();
+	}
+
+	function handleUSDInputChange() {
+		calculationAmountUSD = Math.round(calculationAmountUSD * 100) / 100;
+		sliderValue = calculationAmountUSD;
+		if (effectivePrice > 0) {
+			calculationAmount = calculationAmountUSD / effectivePrice;
+		}
+		calculateRewards();
+	}
+
+	function setUSDAmount(usdAmount: number) {
+		calculationAmountUSD = usdAmount;
+		sliderValue = usdAmount;
+		if (effectivePrice > 0) {
+			calculationAmount = usdAmount / effectivePrice;
+		}
 		calculateRewards();
 	}
 
 	$: effectivePrice = useCustomPrice && customPrice !== null ? customPrice : $voiPrice.price;
+
+	// Force VOI mode when price is unavailable
+	$: if (effectivePrice <= 0) {
+		inputMode = 'voi';
+	}
+
+	// Initialize stake amount when price first becomes available
+	let priceInitialized = false;
+	$: if (effectivePrice > 0 && !priceInitialized) {
+		// If wallet is connected, use wallet balance; otherwise use default $10
+		if (walletBalance > 0) {
+			calculationAmount = walletBalance;
+			calculationAmountUSD = Math.round(walletBalance * effectivePrice * 100) / 100;
+			sliderValue = calculationAmountUSD;
+		} else {
+			calculationAmount = calculationAmountUSD / effectivePrice;
+		}
+		priceInitialized = true;
+		// Use tick to avoid reactive cycle
+		setTimeout(() => calculateRewards(), 0);
+	}
 
 	function toggleCustomPrice() {
 		if (!useCustomPrice) {
@@ -142,13 +192,17 @@
 				if (newBalance !== walletBalance) {
 					walletBalance = newBalance;
 					calculationAmount = walletBalance;
-					sliderValue = calculationAmount;
+					if (effectivePrice > 0) {
+						calculationAmountUSD = Math.round(walletBalance * effectivePrice * 100) / 100;
+						sliderValue = calculationAmountUSD;
+					}
 					calculateRewards();
 				}
 			} catch (error) {
 				console.error('Error updating wallet balance:', error);
 				walletBalance = 0;
 				calculationAmount = 0;
+				calculationAmountUSD = 0;
 				sliderValue = 0;
 				calculateRewards();
 			}
@@ -157,16 +211,28 @@
 
 	function setCalculationAmount(multiplier: number) {
 		calculationAmount = walletBalance * multiplier;
+		if (effectivePrice > 0) {
+			calculationAmountUSD = Math.round(calculationAmount * effectivePrice * 100) / 100;
+			sliderValue = calculationAmountUSD;
+		}
 		calculateRewards();
 	}
 
 	function setFixedAmount(amount: number) {
 		calculationAmount = amount;
+		if (effectivePrice > 0) {
+			calculationAmountUSD = Math.round(amount * effectivePrice * 100) / 100;
+			sliderValue = calculationAmountUSD;
+		}
 		calculateRewards();
 	}
 
 	function resetToWalletBalance() {
 		calculationAmount = walletBalance;
+		if (effectivePrice > 0) {
+			calculationAmountUSD = Math.round(walletBalance * effectivePrice * 100) / 100;
+			sliderValue = calculationAmountUSD;
+		}
 		calculateRewards();
 	}
 
@@ -503,7 +569,9 @@
 				const endDateStr = epochEndDate.toISOString().split('T')[0];
 
 				// Add row to CSV
-				csvRows.push(`${startDateStr},${endDateStr},${Math.round(amount)},${Math.round(amount / 10)}`);
+				csvRows.push(
+					`${startDateStr},${endDateStr},${Math.round(amount)},${Math.round(amount / 10)}`
+				);
 			}
 
 			// Create CSV content
@@ -514,7 +582,10 @@
 			const link = document.createElement('a');
 			const url = URL.createObjectURL(blob);
 			link.setAttribute('href', url);
-			link.setAttribute('download', `epoch-schedule-${EPOCH_START_DATE.toISOString().split('T')[0]}.csv`);
+			link.setAttribute(
+				'download',
+				`epoch-schedule-${EPOCH_START_DATE.toISOString().split('T')[0]}.csv`
+			);
 			link.style.visibility = 'hidden';
 			document.body.appendChild(link);
 			link.click();
@@ -540,902 +611,394 @@
 		<!-- Input Section -->
 		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
 			<div class="space-y-4">
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<label
-							for="calculationAmount"
-							class="block text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2"
+				<div class="flex items-center justify-between mb-2">
+					<label
+						for="calculationAmount"
+						class="block text-lg font-semibold text-gray-900 dark:text-gray-100"
+					>
+						Stake Amount
+					</label>
+					{#if effectivePrice > 0}
+						<div
+							class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-800"
 						>
-							Stake Amount
-						</label>
-						<div class="space-y-4">
-							<div class="flex items-center space-x-4">
-								<div class="flex-1">
-									<div class="relative">
-										<input
-											type="number"
-											id="calculationAmount"
-											bind:value={calculationAmount}
-											min="0"
-											step="1"
-											class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-2xl font-bold pl-4 pr-12"
-											on:change={handleInputChange}
-										/>
-										<span
-											class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-medium"
-										>
-											VOI
-										</span>
-									</div>
-									{#if calculationAmount > 0 && effectivePrice > 0}
-										<p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-											Value: {formatUSD(calculationAmount * effectivePrice)}
-										</p>
-									{/if}
-								</div>
-							</div>
-
-							<div class="space-y-2">
-								<input
-									type="range"
-									bind:value={sliderValue}
-									min="0"
-									max={maxSliderValue}
-									step="100"
-									class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-purple-500"
-									on:input={handleSliderChange}
-								/>
-								<div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-									<span>0 VOI</span>
-									<span>{(maxSliderValue / 2).toLocaleString()} VOI</span>
-									<span>{maxSliderValue.toLocaleString()} VOI</span>
-								</div>
-							</div>
+							<button
+								class="px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 {inputMode ===
+								'usd'
+									? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm'
+									: 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+								on:click={() => (inputMode = 'usd')}
+							>
+								USD
+							</button>
+							<button
+								class="px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 {inputMode ===
+								'voi'
+									? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm'
+									: 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+								on:click={() => (inputMode = 'voi')}
+							>
+								VOI
+							</button>
 						</div>
-
-						<!-- Quick Select Buttons -->
-						<div class="mt-6">
-							<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Select</p>
-							<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-								{#if walletBalance > 0}
-									<button
-										class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
-                                        {calculationAmount === walletBalance
-											? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-											: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'} 
-                                        transition-all duration-200 group"
-										on:click={resetToWalletBalance}
+					{/if}
+				</div>
+				<div class="space-y-4">
+					<div class="flex items-center space-x-4">
+						<div class="flex-1">
+							{#if inputMode === 'usd' && effectivePrice > 0}
+								<div class="relative">
+									<span
+										class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-medium text-2xl"
 									>
-										<div class="flex flex-col items-center">
-											<i
-												class="fas fa-wallet mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-											></i>
-											<span
-												class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-												>Current Balance</span
-											>
-											<span>{walletBalance.toLocaleString()} VOI</span>
-										</div>
-									</button>
-									<button
-										class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
-                                        {calculationAmount === walletBalance * 2
-											? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-											: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'} 
-                                        transition-all duration-200 group"
-										on:click={() => setCalculationAmount(2)}
+										$
+									</span>
+									<input
+										type="number"
+										id="calculationAmountUSD"
+										bind:value={calculationAmountUSD}
+										min="0"
+										step="0.01"
+										class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-2xl font-bold pl-8 pr-4"
+										on:change={handleUSDInputChange}
+									/>
+								</div>
+								<p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+									{Math.round(calculationAmount).toLocaleString()} VOI
+								</p>
+							{:else}
+								<div class="relative">
+									<input
+										type="number"
+										id="calculationAmount"
+										bind:value={calculationAmount}
+										min="0"
+										step="1"
+										class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-2xl font-bold pl-4 pr-12"
+										on:change={handleInputChange}
+									/>
+									<span
+										class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-medium"
 									>
-										<div class="flex flex-col items-center">
-											<i
-												class="fas fa-chart-line mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-											></i>
-											<span
-												class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-												>2x Balance</span
-											>
-											<span>{(walletBalance * 2).toLocaleString()} VOI</span>
-										</div>
-									</button>
-									{#if childAccounts.length > 0}
-										<button
-											class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
-                                            {calculationAmount ===
-											Math.round(
-												primaryAccountInfo?.balance +
-													childAccounts.reduce((acc, account) => acc + account.balance, 0) * 1e6
-											) /
-												1e6
-												? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-												: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'} 
-                                            transition-all duration-200 group"
-											on:click={() =>
-												setFixedAmount(
-													Math.round(
-														(primaryAccountInfo?.balance +
-															childAccounts.reduce((acc, account) => acc + account.balance, 0)) *
-															1e6
-													) / 1e6
-												)}
-										>
-											<div class="flex flex-col items-center">
-												<i
-													class="fas fa-users mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-												></i>
-												<span
-													class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-													>All Accounts</span
-												>
-												<span
-													>{(
-														primaryAccountInfo?.balance +
-														childAccounts.reduce((acc, account) => acc + account.balance, 0)
-													).toLocaleString()} VOI</span
-												>
-											</div>
-										</button>
-									{:else}
-										<button
-											class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
-                                            {calculationAmount === walletBalance * 10
-												? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-												: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'} 
-                                            transition-all duration-200 group"
-											on:click={() => setCalculationAmount(10)}
-										>
-											<div class="flex flex-col items-center">
-												<i
-													class="fas fa-rocket mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-												></i>
-												<span
-													class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-													>10x Balance</span
-												>
-												<span>{(walletBalance * 10).toLocaleString()} VOI</span>
-											</div>
-										</button>
-									{/if}
+										VOI
+									</span>
+								</div>
+								{#if calculationAmount > 0 && effectivePrice > 0}
+									<p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+										Value: {formatUSD(calculationAmount * effectivePrice)}
+									</p>
 								{/if}
-								<button
-									class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
-                                    {calculationAmount === profitabilityThreshold
-										? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-										: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'} 
-                                    transition-all duration-200 group"
-									on:click={() => setFixedAmount(profitabilityThreshold)}
-								>
-									<div class="flex flex-col items-center">
-										<i
-											class="fas fa-balance-scale mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-										></i>
-										<span
-											class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-											>Break Even</span
-										>
-										<span>{profitabilityThreshold.toLocaleString()} VOI</span>
-									</div>
-								</button>
-							</div>
+							{/if}
 						</div>
 					</div>
 
-					<!-- VOI Price Card -->
-					<div class="flex justify-center items-center">
-						<div
-							class="flex flex-col items-center p-6 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/50"
-						>
-							<div class="flex justify-between mb-2 space-x-10">
-								<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-									Current VOI Price (USD)
-								</h3>
+					<div class="space-y-2">
+						<input
+							type="range"
+							bind:value={sliderValue}
+							min="0"
+							max={maxSliderValueUSD}
+							step="1"
+							class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-purple-500"
+							on:input={handleSliderChange}
+						/>
+						<div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+							{#if inputMode === 'voi' && effectivePrice > 0}
+								<span>0 VOI</span>
+								<span>{Math.round((maxSliderValueUSD / 2) / effectivePrice).toLocaleString()} VOI</span>
+								<span>{Math.round(maxSliderValueUSD / effectivePrice).toLocaleString()} VOI</span>
+							{:else}
+								<span>$0</span>
+								<span>${maxSliderValueUSD / 2}</span>
+								<span>${maxSliderValueUSD}</span>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				<!-- Quick Select Buttons -->
+				<div class="mt-6">
+					<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Select</p>
+					<div class="flex flex-wrap gap-2">
+						{#if walletBalance > 0}
+							<button
+								class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
+                                        {calculationAmount === walletBalance
+									? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+									: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'}
+                                        transition-all duration-200 group"
+								on:click={resetToWalletBalance}
+							>
+								<div class="flex flex-col items-center">
+									<i
+										class="fas fa-wallet mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
+									></i>
+									<span
+										class="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
+										>Wallet</span
+									>
+									{#if effectivePrice > 0}
+										<span class="font-bold">{formatUSD(walletBalance * effectivePrice)}</span>
+									{:else}
+										<span class="font-bold">{walletBalance.toLocaleString()} VOI</span>
+									{/if}
+								</div>
+							</button>
+						{/if}
+						<!-- USD Quick Select Buttons -->
+						{#if effectivePrice > 0}
+							{#each [10, 100, 1000] as usdAmount}
 								<button
-									class="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-									on:click={toggleCustomPrice}
+									class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border-2
+                                            {calculationAmountUSD === usdAmount
+										? 'border-purple-500 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+										: 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700'}
+                                            transition-all duration-200 group"
+									on:click={() => setUSDAmount(usdAmount)}
 								>
-									{useCustomPrice ? 'Use Market Price' : 'Custom Price'}
-								</button>
-							</div>
-							{#if useCustomPrice}
-								<div class="space-y-3">
-									<div class="relative">
-										<span
-											class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-gray-400"
+									<div class="flex flex-col items-center">
+										<i
+											class="fas fa-dollar-sign mb-1 text-lg text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
+										></i>
+										<span class="font-bold text-sm">${usdAmount}</span>
+										<span class="text-xs text-gray-400"
+											>{Math.round(usdAmount / effectivePrice).toLocaleString()} VOI</span
 										>
-											$
-										</span>
-										<input
-											type="number"
-											bind:value={customPrice}
-											min="0"
-											step="0.00000001"
-											class="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-2xl font-bold text-center"
-											on:change={() => calculateRewards()}
-										/>
 									</div>
-									<div class="grid grid-cols-4 gap-2">
+								</button>
+							{/each}
+						{/if}
+					</div>
+					<!-- VOI Price Inline -->
+					<div
+						class="mt-4 flex flex-wrap items-center justify-between gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+					>
+						<div class="flex items-center gap-3">
+							<span class="text-sm text-gray-500 dark:text-gray-400">VOI Price:</span>
+							{#if useCustomPrice}
+								<div class="flex items-center gap-2">
+									<span class="text-gray-400">$</span>
+									<input
+										type="number"
+										bind:value={customPrice}
+										min="0"
+										step="0.00000001"
+										class="w-28 px-2 py-1 rounded border-gray-300 dark:bg-gray-600 dark:border-gray-500 dark:text-white text-sm font-bold"
+										on:change={() => calculateRewards()}
+									/>
+									<div class="flex gap-1">
 										<button
-											class="px-2 py-1 text-sm font-medium rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-											on:click={() => adjustCustomPrice(-0.1)}
-										>
-											-10%
-										</button>
-										<button
-											class="px-2 py-1 text-sm font-medium rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+											class="px-1.5 py-0.5 text-xs rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
 											on:click={() => adjustCustomPrice(-0.05)}
 										>
 											-5%
 										</button>
 										<button
-											class="px-2 py-1 text-sm font-medium rounded border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
+											class="px-1.5 py-0.5 text-xs rounded border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
 											on:click={() => adjustCustomPrice(0.05)}
 										>
 											+5%
 										</button>
-										<button
-											class="px-2 py-1 text-sm font-medium rounded border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
-											on:click={() => adjustCustomPrice(0.1)}
-										>
-											+10%
-										</button>
 									</div>
 								</div>
 							{:else}
-								<p class="text-3xl font-bold text-purple-600 dark:text-purple-400 text-center">
-									{$voiPrice.price > 0 ? formatUSD($voiPrice.price, 8) : 'Loading...'}
-								</p>
+								<span class="font-bold text-purple-600 dark:text-purple-400">
+									{$voiPrice.price > 0 ? formatUSD($voiPrice.price, 6) : 'Loading...'}
+								</span>
+								<button
+									class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
+									on:click={() => fetchVoiPrice(true)}
+									aria-label="Refresh price"
+								>
+									<svg
+										class="w-3.5 h-3.5 text-gray-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+										/>
+									</svg>
+								</button>
 							{/if}
-							<p
-								class="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center flex items-center justify-center space-x-2"
+							<button
+								class="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+								on:click={toggleCustomPrice}
 							>
-								{#if useCustomPrice}
-									<span>Custom price for calculations</span>
-								{:else}
-									<span
-										>Last updated: {$voiPrice.lastUpdated
-											? $voiPrice.lastUpdated.toLocaleTimeString()
-											: 'Loading...'}</span
-									>
-									<button
-										class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
-										on:click={() => fetchVoiPrice(true)}
-										aria-label="Refresh price"
-									>
-										<svg
-											class="w-4 h-4 text-gray-500 dark:text-gray-400"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-											/>
-										</svg>
-									</button>
-								{/if}
-							</p>
+								{useCustomPrice ? 'Use market' : 'Custom'}
+							</button>
 						</div>
+						{#if effectivePrice > 0}
+							<p class="text-xs text-gray-400 italic">USD estimates based on current rate</p>
+						{/if}
 					</div>
 				</div>
 			</div>
 		</div>
 
-		<!-- Results Grid -->
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-			<!-- Investment Overview -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-				<h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100 flex items-center">
-					<svg
-						class="w-6 h-6 mr-2 text-purple-500"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-						></path>
-					</svg>
-					Investment Overview
-				</h3>
-				<div class="space-y-6">
-					<div>
-						<div class="flex items-center mb-2">
-							<svg
-								class="w-5 h-5 text-purple-500 mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Stake</p>
-							<div class="relative inline-block">
-								<button
-									class="ml-1.5 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
-									on:mouseenter={() => showTooltip('totalStake')}
-									on:mouseleave={() => hideTooltip('totalStake')}
-									aria-label="Total Stake"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										></path>
-									</svg>
-								</button>
-								{#if tooltipVisible.totalStake}
-									<div
-										class="absolute left-0 transform -translate-x-1/2 translate-y-2 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm"
-									>
-										<div
-											class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"
-										></div>
-										<p class="text-gray-600 dark:text-gray-300">
-											The stake amount used in our calculation to estimate rewards and profitability
-										</p>
-									</div>
-								{/if}
-							</div>
-						</div>
-						<p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
-							{totalBalance.toFixed(2)} VOI
-						</p>
-						{#if effectivePrice > 0}
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
-								{formatUSD(totalBalance * effectivePrice)}
-							</p>
-						{/if}
-					</div>
+		<!-- Reward Hero Section -->
+		<div
+			class="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-purple-900/20 rounded-2xl shadow-lg p-6 border border-purple-200 dark:border-purple-800"
+		>
+			<h3
+				class="text-center text-xl font-bold mb-6 text-gray-900 dark:text-gray-100 flex items-center justify-center"
+			>
+				<svg
+					class="w-6 h-6 mr-2 text-purple-500"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
+					></path>
+				</svg>
+				Your Estimated Rewards
+			</h3>
 
-					<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-						<div class="flex items-center mb-2">
-							<svg
-								class="w-5 h-5 text-purple-500 mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M9 7h6m0 10v4m-3-3l3 3m0 0l3-3m-3 3V4"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Break Even Stake</p>
-							<div class="relative inline-block">
-								<button
-									class="ml-1.5 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
-									on:mouseenter={() => showTooltip('breakEven')}
-									on:mouseleave={() => hideTooltip('breakEven')}
-									aria-label="Break Even Stake"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										></path>
-									</svg>
-								</button>
-								{#if tooltipVisible.breakEven}
-									<div
-										class="absolute left-0 transform -translate-x-1/2 translate-y-2 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm"
-									>
-										<div
-											class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"
-										></div>
-										<p class="text-gray-600 dark:text-gray-300">
-											The stake required based on the current estimated block rewards, token price,
-											and node running cost to break even
-										</p>
-									</div>
-								{/if}
-							</div>
-						</div>
-						<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-							{profitabilityThreshold.toLocaleString()} VOI
-						</p>
-						{#if effectivePrice > 0}
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
-								{formatUSD(profitabilityThreshold * effectivePrice)}
-							</p>
-						{/if}
-					</div>
-
-					<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-						<div class="flex items-center mb-2">
-							<svg
-								class="w-5 h-5 text-purple-500 mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Annual Returns</p>
-							<div class="relative inline-block">
-								<button
-									class="ml-1.5 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
-									on:mouseenter={() => showTooltip('annualReturns')}
-									on:mouseleave={() => hideTooltip('annualReturns')}
-									aria-label="Annual Returns"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										></path>
-									</svg>
-								</button>
-								{#if tooltipVisible.annualReturns}
-									<div
-										class="absolute left-0 transform -translate-x-1/2 translate-y-2 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm"
-									>
-										<div
-											class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"
-										></div>
-										<p class="text-gray-600 dark:text-gray-300">
-											The calculated annual percentage rate and yield based on the current online
-											stake and weekly block rewards, assuming these values remain unchanged
-										</p>
-									</div>
-								{/if}
-							</div>
-						</div>
-						<div class="grid grid-cols-2 gap-4">
-							<div>
-								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">APR</p>
-								<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-									{apr.toFixed(2)}%
-								</p>
-							</div>
-							<div>
-								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">APY</p>
-								<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-									{apy.toFixed(2)}%
-								</p>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<!-- Rewards Card -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-				<h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100 flex items-center">
-					<svg
-						class="w-6 h-6 mr-2 text-purple-500"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
-						></path>
-					</svg>
-					Estimated Rewards
-				</h3>
-				<div class="space-y-6">
-					<div>
-						<div class="flex items-center mb-2">
-							<svg
-								class="w-5 h-5 text-purple-500 mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly</p>
-						</div>
-						<div class="flex items-baseline space-x-2">
-							<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-								{weeklyReward.toFixed(2)} VOI
-							</p>
-							{#if effectivePrice > 0}
-								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">
-									({formatUSD(weeklyRewardUSD)})
-								</p>
-							{/if}
-						</div>
-						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-							Expected participation: {expectedWeeklyBlocks.toLocaleString(undefined, {
-								maximumFractionDigits: 1
-							})} blocks
-						</p>
-					</div>
-
-					<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-						<div class="flex items-center mb-2">
-							<svg
-								class="w-5 h-5 text-purple-500 mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly</p>
-						</div>
-						<div class="flex items-baseline space-x-2">
-							<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-								{monthlyReward.toFixed(2)} VOI
-							</p>
-							{#if effectivePrice > 0}
-								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">
-									({formatUSD(monthlyRewardUSD)})
-								</p>
-							{/if}
-						</div>
-						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-							Expected participation: {expectedMonthlyBlocks.toLocaleString(undefined, {
-								maximumFractionDigits: 1
-							})} blocks
-						</p>
-					</div>
-
-					<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-						<div class="flex items-center mb-2">
-							<svg
-								class="w-5 h-5 text-purple-500 mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Yearly</p>
-						</div>
-						<div class="flex items-baseline space-x-2">
-							<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-								{yearlyReward.toFixed(2)} VOI
-							</p>
-							{#if effectivePrice > 0}
-								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">
-									({formatUSD(yearlyRewardUSD)})
-								</p>
-							{/if}
-						</div>
-						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-							Expected participation: {expectedYearlyBlocks.toLocaleString(undefined, {
-								maximumFractionDigits: 1
-							})} blocks
-						</p>
-					</div>
-				</div>
-			</div>
-
-			<!-- Profitability Analysis -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-				<h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100 flex items-center">
-					<svg
-						class="w-6 h-6 mr-2 text-purple-500"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-						></path>
-					</svg>
-					Profitability Analysis
-				</h3>
-
-				<!-- Node Cost Input -->
-				<div class="mb-3">
-					<div class="flex items-center mb-2">
-						<svg
-							class="w-5 h-5 text-purple-500 mr-2"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-							></path>
-						</svg>
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Node Cost</p>
-					</div>
-
-					<!-- Cost Type Toggle -->
-					<div class="flex items-center space-x-2 mb-3">
-						<div
-							class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800"
-						>
-							<button
-								class="relative px-2 pr-6 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none min-w-[120px] {!isPercentageBased
-									? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm'
-									: 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
-								on:click={() => {
-									isPercentageBased = false;
-									calculateRewards();
-								}}
-							>
-								Fixed Amount
-								<span
-									class="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help"
-									on:mouseenter={() => showTooltip('fixedAmount')}
-									on:mouseleave={() => hideTooltip('fixedAmount')}
-									role="tooltip"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										></path>
-									</svg>
-								</span>
-								{#if tooltipVisible.fixedAmount}
-									<div
-										class="absolute left-0 transform translate-y-3 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm"
-									>
-										<div
-											class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"
-										></div>
-										<p class="text-gray-600 dark:text-gray-300">
-											Running a node on a cloud provider generally costs about $10-$20 per month.
-										</p>
-									</div>
-								{/if}
-							</button>
-							<button
-								class="relative px-2 pr-6 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none min-w-[120px] {isPercentageBased
-									? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm'
-									: 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
-								on:click={() => {
-									isPercentageBased = true;
-									calculateRewards();
-								}}
-							>
-								Percentage
-								<span
-									class="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help"
-									on:mouseenter={() => showTooltip('percentage')}
-									on:mouseleave={() => hideTooltip('percentage')}
-									role="tooltip"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										></path>
-									</svg>
-								</span>
-								{#if tooltipVisible.percentage}
-									<div
-										class="absolute left-0 transform translate-y-3 z-10 w-72 rounded-lg bg-white dark:bg-gray-700 p-4 shadow-lg border border-gray-200 dark:border-gray-600 text-sm"
-									>
-										<div
-											class="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rotate-45 bg-white dark:bg-gray-700 border-l border-t border-gray-200 dark:border-gray-600"
-										></div>
-										<p class="text-gray-600 dark:text-gray-300">
-											Nautilus charges a rate of 10% of rewards for their Node as a Service
-											offering.
-										</p>
-									</div>
-								{/if}
-							</button>
-						</div>
-					</div>
-
-					{#if isPercentageBased}
-						<div class="relative">
-							<input
-								type="number"
-								bind:value={costPercentage}
-								min="0"
-								max="100"
-								step="0.1"
-								class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pr-12"
-								on:change={() => calculateRewards()}
-							/>
-							<span
-								class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400"
-							>
-								%
-							</span>
-						</div>
-						{#if monthlyRewardUSD > 0}
-							<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-								≈ {formatUSD(monthlyRewardUSD * (costPercentage / 100))} per month
-							</p>
-						{/if}
-					{:else}
-						<div class="relative">
-							<span
-								class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-gray-400"
-							>
-								$
-							</span>
-							<input
-								type="number"
-								bind:value={nodeCost}
-								min="0"
-								step="1"
-								class="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-								on:change={() => calculateRewards()}
-							/>
-						</div>
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+				<!-- Weekly (smaller) -->
+				<div class="text-center p-4 bg-white/50 dark:bg-gray-700/50 rounded-xl">
+					<p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Weekly</p>
+					<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+						{weeklyReward.toFixed(0)} VOI
+					</p>
+					{#if effectivePrice > 0}
+						<p class="text-sm text-gray-400">{formatUSD(weeklyRewardUSD)}</p>
 					{/if}
 				</div>
 
-				{#if !isPercentageBased && monthlyProfit < 0}
-					<div
-						class="mb-3 text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg"
-					>
-						<p>
-							Not Profitable? Consider using Node as a Service through
-							<a
-								href="https://nautilus.sh/#/staking"
-								target="_blank"
-								rel="noopener noreferrer"
-								class="text-blue-600 dark:text-blue-400 hover:underline"
-							>
-								Nautilus Staking
-							</a>
-							for a more cost-effective solution. Use Percentage option above for estimate.
-						</p>
-					</div>
-				{/if}
-
-				<!-- Monthly Profit -->
+				<!-- Monthly (HERO - emphasized) -->
 				<div
-					class="p-4 rounded-lg mb-4 {monthlyProfit >= 0
-						? 'bg-green-50 dark:bg-green-900/20'
-						: 'bg-red-50 dark:bg-red-900/20'}"
+					class="text-center p-6 bg-white dark:bg-gray-700 rounded-xl shadow-lg md:transform md:scale-105 border-2 border-purple-300 dark:border-purple-600"
 				>
-					<div class="flex items-center justify-between mb-2">
-						<div class="flex items-center">
-							<svg
-								class="w-5 h-5 {monthlyProfit >= 0 ? 'text-green-500' : 'text-red-500'} mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-700 dark:text-gray-300">Monthly Profit</p>
-						</div>
-						<p
-							class="text-2xl font-bold {monthlyProfit >= 0
-								? 'text-green-600 dark:text-green-400'
-								: 'text-red-600 dark:text-red-400'}"
-						>
-							{formatUSD(monthlyProfit)}
-						</p>
-					</div>
-					<div class="flex justify-between text-sm">
-						<p class="text-gray-500 dark:text-gray-400">Revenue</p>
-						<p class="font-medium text-gray-700 dark:text-gray-300">
+					<p class="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">Monthly</p>
+					<p class="text-4xl font-bold text-purple-600 dark:text-purple-400">
+						{monthlyReward.toFixed(0)} VOI
+					</p>
+					{#if effectivePrice > 0}
+						<p class="text-lg text-purple-400 dark:text-purple-300">
 							{formatUSD(monthlyRewardUSD)}
 						</p>
-					</div>
-					<div class="flex justify-between text-sm">
-						<p class="text-gray-500 dark:text-gray-400">Cost</p>
-						<p class="font-medium text-gray-700 dark:text-gray-300">
-							{isPercentageBased
-								? formatUSD(monthlyRewardUSD * (costPercentage / 100))
-								: formatUSD(nodeCost)}
-						</p>
-					</div>
-					<div class="mt-2 text-xs text-right">
-						<span
-							class={monthlyProfit >= 0
-								? 'text-green-600 dark:text-green-400'
-								: 'text-red-600 dark:text-red-400'}
-						>
-							ROI: {monthlyProfitPercentage.toFixed(2)}%
-						</span>
-					</div>
+					{/if}
 				</div>
 
-				<!-- Yearly Profit -->
-				<div
-					class="p-4 rounded-lg {yearlyProfit >= 0
-						? 'bg-green-50 dark:bg-green-900/20'
-						: 'bg-red-50 dark:bg-red-900/20'}"
-				>
-					<div class="flex items-center justify-between mb-2">
-						<div class="flex items-center">
-							<svg
-								class="w-5 h-5 {yearlyProfit >= 0 ? 'text-green-500' : 'text-red-500'} mr-2"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-								></path>
-							</svg>
-							<p class="text-sm font-medium text-gray-700 dark:text-gray-300">Yearly Profit</p>
-						</div>
-						<p
-							class="text-2xl font-bold {yearlyProfit >= 0
-								? 'text-green-600 dark:text-green-400'
-								: 'text-red-600 dark:text-red-400'}"
-						>
-							{formatUSD(yearlyProfit)}
-						</p>
-					</div>
-					<div class="flex justify-between text-sm">
-						<p class="text-gray-500 dark:text-gray-400">Revenue</p>
-						<p class="font-medium text-gray-700 dark:text-gray-300">{formatUSD(yearlyRewardUSD)}</p>
-					</div>
-					<div class="flex justify-between text-sm">
-						<p class="text-gray-500 dark:text-gray-400">Cost</p>
-						<p class="font-medium text-gray-700 dark:text-gray-300">
-							{isPercentageBased
-								? formatUSD(yearlyRewardUSD * (costPercentage / 100))
-								: formatUSD(nodeCost * 12)}
-						</p>
-					</div>
-					<div class="mt-2 text-xs text-right">
-						<span
-							class={yearlyProfit >= 0
-								? 'text-green-600 dark:text-green-400'
-								: 'text-red-600 dark:text-red-400'}
-						>
-							ROI: {yearlyProfitPercentage.toFixed(2)}%
-						</span>
-					</div>
+				<!-- Yearly (smaller) -->
+				<div class="text-center p-4 bg-white/50 dark:bg-gray-700/50 rounded-xl">
+					<p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Yearly</p>
+					<p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+						{yearlyReward.toFixed(0)} VOI
+					</p>
+					{#if effectivePrice > 0}
+						<p class="text-sm text-gray-400">{formatUSD(yearlyRewardUSD)}</p>
+					{/if}
 				</div>
 			</div>
+
+			<!-- APY/APR footer -->
+			<div
+				class="flex flex-wrap justify-center gap-4 md:gap-6 mt-6 text-sm text-gray-600 dark:text-gray-400"
+			>
+				<span
+					>APY: <strong class="text-green-600 dark:text-green-400">{apy.toFixed(2)}%</strong></span
+				>
+				<span>APR: <strong>{apr.toFixed(2)}%</strong></span>
+			</div>
+		</div>
+
+		<!-- Profitability Analysis -->
+		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-5">
+			<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">
+				Profitability Analysis
+			</h3>
+
+			<!-- Cost Input -->
+			<div class="mb-5">
+				<div class="flex items-end justify-center gap-3">
+					<div class="flex flex-col items-center">
+						<label class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+							Monthly node cost
+						</label>
+						<div class="flex items-center gap-2">
+							<button
+								class="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xl font-bold transition-colors"
+								on:click={() => {
+									nodeCost = Math.max(0, nodeCost - 1);
+									calculateRewards();
+								}}
+							>
+								−
+							</button>
+							<div class="relative">
+								<span
+									class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-lg"
+									>$</span
+								>
+								<input
+									type="number"
+									bind:value={nodeCost}
+									min="0"
+									step="1"
+									class="w-24 pl-7 pr-3 py-2 text-lg font-medium rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-center"
+									on:change={() => calculateRewards()}
+								/>
+							</div>
+							<button
+								class="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xl font-bold transition-colors"
+								on:click={() => {
+									nodeCost = nodeCost + 1;
+									calculateRewards();
+								}}
+							>
+								+
+							</button>
+						</div>
+					</div>
+					<span class="text-sm text-gray-500 dark:text-gray-400 pb-3">per month</span>
+				</div>
+			</div>
+
+			<!-- Break-even Display -->
+			<div
+				class="flex items-center justify-between py-3 px-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+			>
+				<span class="text-sm text-gray-600 dark:text-gray-400">Break-even stake</span>
+				<button
+					class="text-base font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+					on:click={() => setFixedAmount(profitabilityThreshold)}
+					title="Set stake to break-even amount"
+				>
+					{profitabilityThreshold.toLocaleString()} VOI
+					{#if effectivePrice > 0}
+						<span class="text-sm text-gray-400 font-normal ml-1">
+							({formatUSD(profitabilityThreshold * effectivePrice)})
+						</span>
+					{/if}
+				</button>
+			</div>
+
+			<!-- Nautilus suggestion -->
+			{#if monthlyProfit < 0}
+				<p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+					Not profitable at this stake? Consider
+					<a
+						href="https://nautilus.sh/#/staking"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-blue-600 dark:text-blue-400 hover:underline"
+					>
+						Nautilus Staking
+					</a>
+					for a lower-cost option.
+				</p>
+			{/if}
 		</div>
 
 		<!-- Reward Schedule -->
@@ -1470,11 +1033,7 @@
 					disabled={isDownloadingCSV}
 				>
 					{#if isDownloadingCSV}
-						<svg
-							class="animate-spin h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
+						<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
 							<circle
 								class="opacity-25"
 								cx="12"
@@ -1491,12 +1050,7 @@
 						</svg>
 						<span>Generating...</span>
 					{:else}
-						<svg
-							class="w-4 h-4"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path
 								stroke-linecap="round"
 								stroke-linejoin="round"

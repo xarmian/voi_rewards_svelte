@@ -39,7 +39,7 @@
 	let heatmapTokens: HeatmapToken[] = [];
 	let hoveredToken: HeatmapToken | null = null;
 	let containerRef: HTMLDivElement;
-	let colorScale: { min: number; max: number; } = { min: 0, max: 100 };
+	let colorScale: { min: number; max: number } = { min: 0, max: 100 };
 
 	// Metric configurations
 	const metricConfigs = {
@@ -104,8 +104,8 @@
 
 		heatmapTokens = tokenAnalytics
 			.filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-			.map(result => result.value)
-			.map(token => ({
+			.map((result) => result.value)
+			.map((token) => ({
 				id: token.id,
 				symbol: token.symbol,
 				type: token.type,
@@ -138,7 +138,7 @@
 	function updateColorScale() {
 		if (heatmapTokens.length === 0) return;
 
-		const values = heatmapTokens.map(token => token.metrics[metric]).filter(v => v != null);
+		const values = heatmapTokens.map((token) => token.metrics[metric]).filter((v) => v != null);
 		colorScale = {
 			min: Math.min(...values),
 			max: Math.max(...values)
@@ -148,12 +148,14 @@
 	function getTokenSize(token: HeatmapToken): string {
 		// Size based on TVL or market cap
 		const sizeMetric = token.metrics.tvl || token.metrics.marketCap || 0;
-		const maxSize = Math.max(...heatmapTokens.map(t => t.metrics.tvl || t.metrics.marketCap || 0));
-		
+		const maxSize = Math.max(
+			...heatmapTokens.map((t) => t.metrics.tvl || t.metrics.marketCap || 0)
+		);
+
 		if (maxSize === 0) return 'w-20 h-20';
-		
+
 		const ratio = sizeMetric / maxSize;
-		
+
 		if (ratio > 0.8) return 'w-24 h-24';
 		if (ratio > 0.6) return 'w-20 h-20';
 		if (ratio > 0.4) return 'w-16 h-16';
@@ -164,11 +166,11 @@
 	function getTokenColor(token: HeatmapToken): string {
 		const value = token.metrics[metric];
 		const { min, max } = colorScale;
-		
+
 		if (max === min) return 'bg-gray-400';
-		
+
 		const ratio = (value - min) / (max - min);
-		
+
 		// Color based on metric type
 		if (metric === 'priceChange24h') {
 			if (ratio > 0.8) return 'bg-green-500';
@@ -189,9 +191,9 @@
 	function getTokenOpacity(token: HeatmapToken): string {
 		const value = token.metrics[metric];
 		const { min, max } = colorScale;
-		
+
 		if (max === min) return 'opacity-50';
-		
+
 		const ratio = (value - min) / (max - min);
 		return `opacity-${Math.max(Math.floor(ratio * 100), 30)}`;
 	}
@@ -205,7 +207,7 @@
 			poolCount: token.poolCount
 		};
 
-		if (selectedTokens.find(t => t.id === token.id)) {
+		if (selectedTokens.find((t) => t.id === token.id)) {
 			// If already selected and we have multiple, start comparison
 			if (selectedTokens.length > 1) {
 				dispatch('compare', selectedTokens);
@@ -217,17 +219,22 @@
 
 	function handleTokenHover(token: HeatmapToken | null) {
 		hoveredToken = token;
-		dispatch('tokenHover', token ? {
-			id: token.id,
-			symbol: token.symbol,
-			type: token.type as any,
-			decimals: token.decimals,
-			poolCount: token.poolCount
-		} : null);
+		dispatch(
+			'tokenHover',
+			token
+				? {
+						id: token.id,
+						symbol: token.symbol,
+						type: token.type as any,
+						decimals: token.decimals,
+						poolCount: token.poolCount
+					}
+				: null
+		);
 	}
 
 	function isSelected(token: HeatmapToken): boolean {
-		return selectedTokens.some(t => t.id === token.id);
+		return selectedTokens.some((t) => t.id === token.id);
 	}
 
 	function formatNumber(num: number): string {
@@ -239,19 +246,27 @@
 
 	function getTypeIcon(type: string): string {
 		switch (type?.toUpperCase()) {
-			case 'ARC200': return 'fas fa-layer-group';
-			case 'ASA': return 'fas fa-cube';
-			case 'VOI': return 'fas fa-star';
-			default: return 'fas fa-coins';
+			case 'ARC200':
+				return 'fas fa-layer-group';
+			case 'ASA':
+				return 'fas fa-cube';
+			case 'VOI':
+				return 'fas fa-star';
+			default:
+				return 'fas fa-coins';
 		}
 	}
 
 	function getTypeColor(type: string): string {
 		switch (type?.toUpperCase()) {
-			case 'ARC200': return 'text-blue-600';
-			case 'ASA': return 'text-green-600';
-			case 'VOI': return 'text-purple-600';
-			default: return 'text-gray-600';
+			case 'ARC200':
+				return 'text-blue-600';
+			case 'ASA':
+				return 'text-green-600';
+			case 'VOI':
+				return 'text-purple-600';
+			default:
+				return 'text-gray-600';
 		}
 	}
 </script>
@@ -276,14 +291,12 @@
 					{#each Object.entries(metricConfigs) as [key, config]}
 						<button
 							type="button"
-							class="px-3 py-1 text-xs font-medium rounded-md transition-colors {
-								metric === key 
-									? `bg-${config.color}-500 text-white` 
-									: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-							}"
-							on:click={() => { 
-								metric = key as any; 
-								updateColorScale(); 
+							class="px-3 py-1 text-xs font-medium rounded-md transition-colors {metric === key
+								? `bg-${config.color}-500 text-white`
+								: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+							on:click={() => {
+								metric = key as any;
+								updateColorScale();
 							}}
 						>
 							<i class="{config.icon} mr-1"></i>
@@ -303,8 +316,8 @@
 				<p class="text-gray-600 dark:text-gray-400">Loading token data...</p>
 			</div>
 		</div>
-	
-	<!-- Heatmap grid -->
+
+		<!-- Heatmap grid -->
 	{:else if heatmapTokens.length > 0}
 		<div class="relative">
 			<!-- Color scale legend -->
@@ -321,21 +334,25 @@
 					<span>High</span>
 				</div>
 				<div class="text-right">
-					<span>{currentConfig.format(colorScale.min)} - {currentConfig.format(colorScale.max)}</span>
+					<span
+						>{currentConfig.format(colorScale.min)} - {currentConfig.format(colorScale.max)}</span
+					>
 				</div>
 			</div>
 
 			<!-- Heatmap grid -->
-			<div 
+			<div
 				bind:this={containerRef}
 				class="flex flex-wrap gap-2 justify-center max-h-96 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
 			>
 				{#each heatmapTokens as token (token.id)}
 					<button
 						type="button"
-						class="relative flex flex-col items-center justify-center rounded-lg transition-all duration-200 hover:scale-110 hover:z-10 focus:outline-none focus:ring-2 focus:ring-purple-500 {getTokenSize(token)} {getTokenColor(token)} {getTokenOpacity(token)} {
-							isSelected(token) ? 'ring-2 ring-purple-500 ring-offset-2' : ''
-						}"
+						class="relative flex flex-col items-center justify-center rounded-lg transition-all duration-200 hover:scale-110 hover:z-10 focus:outline-none focus:ring-2 focus:ring-purple-500 {getTokenSize(
+							token
+						)} {getTokenColor(token)} {getTokenOpacity(token)} {isSelected(token)
+							? 'ring-2 ring-purple-500 ring-offset-2'
+							: ''}"
 						on:click={() => handleTokenClick(token)}
 						on:mouseenter={() => handleTokenHover(token)}
 						on:mouseleave={() => handleTokenHover(null)}
@@ -344,14 +361,18 @@
 						<!-- Token icon/image -->
 						<div class="mb-1">
 							{#if token.imageUrl}
-								<img 
-									src={token.imageUrl} 
+								<img
+									src={token.imageUrl}
 									alt="{token.symbol} logo"
 									class="w-6 h-6 rounded-full"
 									on:error={(e) => (e.currentTarget.style.display = 'none')}
 								/>
 							{:else}
-								<i class="{getTypeIcon(token.type)} {getTypeColor(token.type)} text-white text-lg drop-shadow-sm"></i>
+								<i
+									class="{getTypeIcon(token.type)} {getTypeColor(
+										token.type
+									)} text-white text-lg drop-shadow-sm"
+								></i>
 							{/if}
 						</div>
 
@@ -367,7 +388,9 @@
 
 						<!-- Selection indicator -->
 						{#if isSelected(token)}
-							<div class="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+							<div
+								class="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center"
+							>
 								<i class="fas fa-check text-white text-xs"></i>
 							</div>
 						{/if}
@@ -382,20 +405,22 @@
 
 			<!-- Hover tooltip -->
 			{#if hoveredToken}
-				<div 
+				<div
 					class="fixed z-50 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl pointer-events-none"
 					style="left: 50%; top: 50%; transform: translate(-50%, -50%);"
 					transition:fade={{ duration: 150 }}
 				>
 					<div class="flex items-start gap-3">
 						{#if hoveredToken.imageUrl}
-							<img 
-								src={hoveredToken.imageUrl} 
+							<img
+								src={hoveredToken.imageUrl}
 								alt="{hoveredToken.symbol} logo"
 								class="w-10 h-10 rounded-full"
 							/>
 						{:else}
-							<div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center">
+							<div
+								class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center"
+							>
 								<i class="{getTypeIcon(hoveredToken.type)} text-white"></i>
 							</div>
 						{/if}
@@ -405,7 +430,9 @@
 								<h4 class="font-bold text-gray-900 dark:text-white">
 									{hoveredToken.symbol}
 								</h4>
-								<Badge class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+								<Badge
+									class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+								>
 									{hoveredToken.type}
 								</Badge>
 							</div>
@@ -425,10 +452,14 @@
 								</div>
 								<div>
 									<span class="text-gray-500 dark:text-gray-400">24h Change:</span>
-									<p class="font-medium {
-										hoveredToken.metrics.priceChange24h > 0 ? 'text-green-600' : 'text-red-600'
-									}">
-										{hoveredToken.metrics.priceChange24h > 0 ? '+' : ''}{hoveredToken.metrics.priceChange24h.toFixed(2)}%
+									<p
+										class="font-medium {hoveredToken.metrics.priceChange24h > 0
+											? 'text-green-600'
+											: 'text-red-600'}"
+									>
+										{hoveredToken.metrics.priceChange24h > 0
+											? '+'
+											: ''}{hoveredToken.metrics.priceChange24h.toFixed(2)}%
 									</p>
 								</div>
 								<div>
@@ -440,8 +471,11 @@
 							</div>
 
 							{#if hoveredToken.metrics.uniqueTraders24h}
-								<div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
-									{hoveredToken.metrics.uniqueTraders24h} traders • {hoveredToken.metrics.swapCount24h} swaps (24h)
+								<div
+									class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400"
+								>
+									{hoveredToken.metrics.uniqueTraders24h} traders • {hoveredToken.metrics
+										.swapCount24h} swaps (24h)
 								</div>
 							{/if}
 						</div>
@@ -450,7 +484,7 @@
 			{/if}
 		</div>
 
-	<!-- Empty state -->
+		<!-- Empty state -->
 	{:else}
 		<div class="text-center py-16" transition:fade>
 			<i class="fas fa-chart-area text-4xl text-gray-400 mb-4"></i>
@@ -465,8 +499,16 @@
 </Card>
 
 <style>
-	.opacity-30 { opacity: 0.3; }
-	.opacity-50 { opacity: 0.5; }
-	.opacity-70 { opacity: 0.7; }
-	.opacity-90 { opacity: 0.9; }
+	.opacity-30 {
+		opacity: 0.3;
+	}
+	.opacity-50 {
+		opacity: 0.5;
+	}
+	.opacity-70 {
+		opacity: 0.7;
+	}
+	.opacity-90 {
+		opacity: 0.9;
+	}
 </style>

@@ -134,5 +134,5 @@ export function getDefaultChartType(token: string): 'candlestick' | 'line' {
  * Gets the appropriate resolution for a token
  */
 export function getDefaultResolution(token: string): Resolution {
-    return token === 'VOI' ? '15m' : '1d';
+	return token === 'VOI' ? '15m' : '1d';
 }

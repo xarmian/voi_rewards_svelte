@@ -29,7 +29,7 @@ export const GET: RequestHandler = async () => {
 			const latestPrice = data[data.length - 1];
 			cachedPrice = Number(latestPrice.value || 0);
 			lastFetched = new Date();
-			
+
 			console.log('VOI price from price history:', cachedPrice);
 
 			return json({

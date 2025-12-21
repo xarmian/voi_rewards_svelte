@@ -56,21 +56,21 @@
 			const lastEntry = sortedData[sortedData.length - 1];
 			const lastDate = new Date(lastEntry.bucket_start);
 			const nowUTC = new Date();
-			
+
 			// Check if the last entry is the current incomplete period
 			let shouldEstimate = false;
 			let completionRatio = 1;
-			
+
 			if (period === 'day') {
 				// Check if it's today (UTC)
 				const todayUTC = new Date(nowUTC);
 				todayUTC.setUTCHours(0, 0, 0, 0);
 				const lastDateUTC = new Date(lastDate);
 				lastDateUTC.setUTCHours(0, 0, 0, 0);
-				
+
 				if (lastDateUTC.getTime() === todayUTC.getTime()) {
 					shouldEstimate = true;
-					const hoursElapsed = nowUTC.getUTCHours() + (nowUTC.getUTCMinutes() / 60);
+					const hoursElapsed = nowUTC.getUTCHours() + nowUTC.getUTCMinutes() / 60;
 					completionRatio = hoursElapsed / 24;
 				}
 			} else if (period === 'week') {
@@ -80,7 +80,7 @@
 				const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday=0
 				startOfWeekUTC.setUTCDate(nowUTC.getUTCDate() - daysFromMonday);
 				startOfWeekUTC.setUTCHours(0, 0, 0, 0);
-				
+
 				if (lastDate >= startOfWeekUTC) {
 					shouldEstimate = true;
 					const msElapsed = nowUTC.getTime() - startOfWeekUTC.getTime();
@@ -88,7 +88,7 @@
 					completionRatio = hoursElapsed / (7 * 24); // 7 days * 24 hours
 				}
 			}
-			
+
 			if (shouldEstimate && completionRatio > 0 && completionRatio < 1) {
 				// Create estimated entry
 				const estimatedCount = Math.round(lastEntry.tx_count / completionRatio);
@@ -126,7 +126,7 @@
 				},
 				formatter: (params: any) => {
 					if (!Array.isArray(params) || params.length === 0) return '';
-					
+
 					const dataIndex = params[0].dataIndex;
 					const chartDataPoint = chartData[dataIndex];
 					const fullDate = new Date(chartDataPoint.timestamp).toLocaleDateString(undefined, {
@@ -135,9 +135,9 @@
 						month: 'long',
 						day: 'numeric'
 					});
-					
+
 					let tooltip = `<div class="font-bold">${fullDate}</div>`;
-					
+
 					if (chartDataPoint.isEstimated) {
 						const periodLabel = period === 'day' ? 'day' : 'week';
 						const progressPercent = Math.round(chartDataPoint.completionRatio * 100);
@@ -146,7 +146,7 @@
 					} else {
 						tooltip += `<div>Transactions: <span class="font-semibold">${params[0].value.toLocaleString()}</span></div>`;
 					}
-					
+
 					return tooltip;
 				}
 			},
@@ -194,14 +194,16 @@
 					symbolSize: 6,
 					data: chartData.map((d, index) => ({
 						value: d.value,
-						itemStyle: d.isEstimated ? {
-							color: isDarkMode ? '#F59E0B' : '#D97706',
-							borderColor: isDarkMode ? '#1F2937' : 'white',
-							borderWidth: 2,
-							borderType: 'dashed'
-						} : {
-							color: isDarkMode ? '#10B981' : '#059669'
-						}
+						itemStyle: d.isEstimated
+							? {
+									color: isDarkMode ? '#F59E0B' : '#D97706',
+									borderColor: isDarkMode ? '#1F2937' : 'white',
+									borderWidth: 2,
+									borderType: 'dashed'
+								}
+							: {
+									color: isDarkMode ? '#10B981' : '#059669'
+								}
 					})),
 					lineStyle: {
 						width: 3,

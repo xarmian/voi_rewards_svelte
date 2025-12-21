@@ -43,7 +43,8 @@
 </script>
 
 <a
-	href={app.url} target="_blank"
+	href={app.url}
+	target="_blank"
 	class="group flex flex-col items-center p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-300 hover:translate-y-[-3px] hover:scale-[1.02] h-full relative overflow-hidden"
 >
 	<!-- Category pill -->

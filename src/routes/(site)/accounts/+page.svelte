@@ -315,7 +315,13 @@
 				{/if}
 				<div class="mt-4 place-self-center">
 					<Web3Wallet
-						availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet', 'VoiWallet']}
+						availableWallets={[
+							'WalletConnect',
+							'Kibisis',
+							'LuteWallet',
+							'Biatec Wallet',
+							'VoiWallet'
+						]}
 						connectButtonType="static"
 						modalType="modal"
 						showAuthButtons={true}

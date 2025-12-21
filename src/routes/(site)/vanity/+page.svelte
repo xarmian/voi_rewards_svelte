@@ -634,7 +634,13 @@
 						</h5>
 
 						<Web3Wallet
-							availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'Biatec Wallet', 'VoiWallet']}
+							availableWallets={[
+								'WalletConnect',
+								'Kibisis',
+								'LuteWallet',
+								'Biatec Wallet',
+								'VoiWallet'
+							]}
 							walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
 							allowWatchAccounts={false}
 							showAuthenticated={false}

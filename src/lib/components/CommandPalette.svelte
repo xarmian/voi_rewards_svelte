@@ -115,17 +115,13 @@
 
 	async function updateCommands() {
 		commands = [];
-		
+
 		// If empty query, show recent searches and trending
 		if (!searchQuery.trim()) {
-			commands = [
-				...getRecentCommands(),
-				...getTrendingCommands(),
-				...getQuickActions()
-			];
+			commands = [...getRecentCommands(), ...getTrendingCommands(), ...getQuickActions()];
 		} else {
 			isLoading = true;
-			
+
 			// Check for natural language patterns
 			const nlResult = processNaturalLanguage(searchQuery);
 			if (nlResult) {
@@ -139,7 +135,7 @@
 
 			// Add action commands based on query
 			commands = [...commands, ...getActionCommands(searchQuery)];
-			
+
 			isLoading = false;
 		}
 
@@ -180,7 +176,7 @@
 		try {
 			const response = await fetch(`/api/tokens?q=${encodeURIComponent(query)}&limit=10`);
 			const data = await response.json();
-			
+
 			if (data.tokens) {
 				return data.tokens.map((token: UniqueToken, index: number) => ({
 					id: `token-${token.id}-${Date.now()}-${index}`,
@@ -204,10 +200,14 @@
 
 	function getTokenIcon(type: string): string {
 		switch (type?.toUpperCase()) {
-			case 'ARC200': return 'fas fa-layer-group';
-			case 'ASA': return 'fas fa-cube';
-			case 'VOI': return 'fas fa-star';
-			default: return 'fas fa-coins';
+			case 'ARC200':
+				return 'fas fa-layer-group';
+			case 'ASA':
+				return 'fas fa-cube';
+			case 'VOI':
+				return 'fas fa-star';
+			default:
+				return 'fas fa-coins';
 		}
 	}
 
@@ -342,7 +342,7 @@
 	}
 
 	function addToRecentSearches(search: string) {
-		recentSearches = [search, ...recentSearches.filter(s => s !== search)].slice(0, 10);
+		recentSearches = [search, ...recentSearches.filter((s) => s !== search)].slice(0, 10);
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('commandPaletteRecents', JSON.stringify(recentSearches));
 		}
@@ -414,34 +414,38 @@
 						{searchQuery ? 'No results found' : 'Start typing to search'}
 					</p>
 					<p class="text-sm">
-						{searchQuery 
-							? 'Try different keywords or check spelling' 
-							: 'Try "high volume tokens" or "compare VOI and USDC"'
-						}
+						{searchQuery
+							? 'Try different keywords or check spelling'
+							: 'Try "high volume tokens" or "compare VOI and USDC"'}
 					</p>
 				</div>
 			{:else}
 				{#each filteredCommands as command, index (command.id)}
 					<button
 						type="button"
-						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none transition-colors duration-150 {
-							selectedIndex === index ? 'bg-purple-50 dark:bg-purple-900/30 border-r-2 border-purple-500' : ''
-						}"
+						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none transition-colors duration-150 {selectedIndex ===
+						index
+							? 'bg-purple-50 dark:bg-purple-900/30 border-r-2 border-purple-500'
+							: ''}"
 						on:click={() => executeCommand(command)}
 						transition:fade={{ duration: 150 }}
 					>
 						<div class="flex items-center gap-3">
-							<div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+							<div
+								class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center"
+							>
 								<i class="{command.icon} {getCategoryInfo(command.category).color}"></i>
 							</div>
-							
+
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center gap-2">
 									<p class="font-medium text-gray-900 dark:text-white truncate">
 										{command.title}
 									</p>
 									{#if command.shortcut}
-										<Badge class="text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400">
+										<Badge
+											class="text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400"
+										>
 											{command.shortcut}
 										</Badge>
 									{/if}
@@ -452,12 +456,15 @@
 							</div>
 
 							<div class="flex-shrink-0">
-								<Badge class="text-xs px-2 py-1 {
-									command.category === 'token' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-									command.category === 'action' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-									command.category === 'filter' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-									'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-								}">
+								<Badge
+									class="text-xs px-2 py-1 {command.category === 'token'
+										? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+										: command.category === 'action'
+											? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+											: command.category === 'filter'
+												? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+												: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'}"
+								>
 									{getCategoryInfo(command.category).label}
 								</Badge>
 							</div>
@@ -468,19 +475,30 @@
 		</div>
 
 		<!-- Footer with shortcuts -->
-		<div class="px-4 py-3 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+		<div
+			class="px-4 py-3 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
+		>
 			<div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
 				<div class="flex items-center gap-4">
 					<div class="flex items-center gap-1">
-						<kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">↵</kbd>
+						<kbd
+							class="px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded"
+							>↵</kbd
+						>
 						<span>Select</span>
 					</div>
 					<div class="flex items-center gap-1">
-						<kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">↑↓</kbd>
+						<kbd
+							class="px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded"
+							>↑↓</kbd
+						>
 						<span>Navigate</span>
 					</div>
 					<div class="flex items-center gap-1">
-						<kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Esc</kbd>
+						<kbd
+							class="px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded"
+							>Esc</kbd
+						>
 						<span>Close</span>
 					</div>
 				</div>
@@ -509,7 +527,8 @@
 	}
 
 	kbd {
-		font-family: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Consolas, 'Liberation Mono',
+			'Courier New', monospace;
 		font-size: 0.75rem;
 		font-weight: 500;
 	}

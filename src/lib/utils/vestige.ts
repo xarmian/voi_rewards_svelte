@@ -73,7 +73,7 @@ export async function fetchVestigeProtocols(): Promise<VestigeProtocol[]> {
 		if (!response.ok) {
 			throw new Error(`Vestige protocols API error: ${response.status}`);
 		}
-		
+
 		const protocols: VestigeProtocolsResponse = await response.json();
 		protocolsCache = protocols;
 		return protocols;
@@ -89,8 +89,12 @@ export async function fetchVestigeProtocols(): Promise<VestigeProtocol[]> {
 export async function fetchVestigePoolsByAsset(assetId: number): Promise<VestigePool[]> {
 	try {
 		const [pools1Response, pools2Response] = await Promise.allSettled([
-			fetch(`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_1_id=${assetId}&limit=50&offset=0&order_dir=desc`),
-			fetch(`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_2_id=${assetId}&limit=50&offset=0&order_dir=desc`)
+			fetch(
+				`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_1_id=${assetId}&limit=50&offset=0&order_dir=desc`
+			),
+			fetch(
+				`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_2_id=${assetId}&limit=50&offset=0&order_dir=desc`
+			)
 		]);
 
 		const pools: VestigePool[] = [];
@@ -108,8 +112,8 @@ export async function fetchVestigePoolsByAsset(assetId: number): Promise<Vestige
 		}
 
 		// Remove duplicates (in case a pool appears in both responses)
-		const uniquePools = pools.filter((pool, index, self) => 
-			index === self.findIndex(p => p.id === pool.id)
+		const uniquePools = pools.filter(
+			(pool, index, self) => index === self.findIndex((p) => p.id === pool.id)
 		);
 
 		return uniquePools;
@@ -127,8 +131,10 @@ export async function fetchVestigeAssets(assetIds: number[]): Promise<VestigeAss
 
 	try {
 		const idsParam = assetIds.join(',');
-		const response = await fetch(`${VESTIGE_API_BASE}/assets?asset_ids=${idsParam}&network_id=${NETWORK_ID}`);
-		
+		const response = await fetch(
+			`${VESTIGE_API_BASE}/assets?asset_ids=${idsParam}&network_id=${NETWORK_ID}`
+		);
+
 		if (!response.ok) {
 			throw new Error(`Vestige assets API error: ${response.status}`);
 		}
@@ -146,8 +152,8 @@ export async function fetchVestigeAssets(assetIds: number[]): Promise<VestigeAss
  */
 export async function getProtocolName(protocolId: number): Promise<string> {
 	const protocols = await fetchVestigeProtocols();
-	const protocol = protocols.find(p => p.id === protocolId);
-	
+	const protocol = protocols.find((p) => p.id === protocolId);
+
 	if (!protocol) {
 		return `Unknown Protocol ${protocolId}`;
 	}
@@ -165,7 +171,7 @@ export async function getProtocolName(protocolId: number): Promise<string> {
  */
 export async function getProtocolUrl(protocolId: number): Promise<string | null> {
 	const protocols = await fetchVestigeProtocols();
-	const protocol = protocols.find(p => p.id === protocolId);
+	const protocol = protocols.find((p) => p.id === protocolId);
 	return protocol?.url || null;
 }
 
@@ -179,9 +185,9 @@ export async function convertVestigePoolToMarket(
 	priceMap?: Map<string, number> // Optional USD prices for assets
 ): Promise<any> {
 	// Get asset information
-	const asset1 = assets.find(a => a.id === pool.asset_1_id);
-	const asset2 = assets.find(a => a.id === pool.asset_2_id);
-	
+	const asset1 = assets.find((a) => a.id === pool.asset_1_id);
+	const asset2 = assets.find((a) => a.id === pool.asset_2_id);
+
 	if (!asset1 || !asset2) {
 		console.warn(`Missing asset info for pool ${pool.id}:`, { asset1: !!asset1, asset2: !!asset2 });
 		return null;
@@ -198,7 +204,7 @@ export async function convertVestigePoolToMarket(
 	// Convert supplies to actual token amounts by dividing by 10^decimals
 	const baseAmount = baseSupply / Math.pow(10, baseAsset.decimals);
 	const quoteAmount = quoteSupply / Math.pow(10, quoteAsset.decimals);
-	
+
 	// Price = quote amount / base amount (how many quote tokens per 1 base token)
 	const exchangeRate = baseAmount > 0 && quoteAmount > 0 ? quoteAmount / baseAmount : 0;
 
@@ -216,7 +222,7 @@ export async function convertVestigePoolToMarket(
 	// Try to get USD prices from the provided price map first
 	if (baseUsdPrice > 0 && quoteUsdPrice > 0) {
 		// Both assets have USD prices - calculate exact TVL
-		tvl = (baseAmount * baseUsdPrice) + (quoteAmount * quoteUsdPrice);
+		tvl = baseAmount * baseUsdPrice + quoteAmount * quoteUsdPrice;
 	} else if (baseUsdPrice > 0) {
 		// Only base asset has USD price - assume balanced pool and double the base value
 		tvl = baseAmount * baseUsdPrice * 2;
@@ -237,13 +243,14 @@ export async function convertVestigePoolToMarket(
 			tvl = quoteAmount * 2;
 		}
 	}
-	
+
 	// Volume is not provided by Vestige API, so we set to 0
 	const volume24h = 0;
 
 	// Generate pool URL based on protocol
 	let poolUrl: string | null = null;
-	if (pool.protocol_id === 0 || pool.protocol_id === 1) { // Tinyman
+	if (pool.protocol_id === 0 || pool.protocol_id === 1) {
+		// Tinyman
 		poolUrl = `https://app.tinyman.org/#/swap?asset_in=${pool.asset_1_id}&asset_out=${pool.asset_2_id}`;
 	}
 
@@ -289,19 +296,21 @@ export async function convertVestigePoolToMarket(
 /**
  * Fetch and convert all pools for a given asset to market data format
  */
-export async function fetchVestigeMarketsForAsset(assetId: number, priceMap?: Map<string, number>): Promise<any[]> {
+export async function fetchVestigeMarketsForAsset(
+	assetId: number,
+	priceMap?: Map<string, number>
+): Promise<any[]> {
 	try {
-		
 		// Fetch pools for this asset
 		const pools = await fetchVestigePoolsByAsset(assetId);
-		
+
 		if (pools.length === 0) {
 			return [];
 		}
 
 		// Get all unique asset IDs from the pools
 		const allAssetIds = new Set<number>();
-		pools.forEach(pool => {
+		pools.forEach((pool) => {
 			allAssetIds.add(pool.asset_1_id);
 			allAssetIds.add(pool.asset_2_id);
 		});
@@ -311,11 +320,11 @@ export async function fetchVestigeMarketsForAsset(assetId: number, priceMap?: Ma
 
 		// Convert pools to market format
 		const markets = await Promise.all(
-			pools.map(pool => convertVestigePoolToMarket(pool, assetId, assets, priceMap))
+			pools.map((pool) => convertVestigePoolToMarket(pool, assetId, assets, priceMap))
 		);
 
 		// Filter out null results and markets with zero/unrealistic prices
-		const validMarkets = markets.filter(market => market !== null && market.price > 0);
+		const validMarkets = markets.filter((market) => market !== null && market.price > 0);
 
 		return validMarkets;
 	} catch (error) {

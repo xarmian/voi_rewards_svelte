@@ -137,93 +137,103 @@
 		'high-volume': {
 			name: 'High Volume Tokens',
 			description: 'Tokens with 24h volume > $100K',
-			groups: [{
-				id: generateId(),
-				operator: 'AND' as const,
-				active: true,
-				conditions: [{
+			groups: [
+				{
 					id: generateId(),
-					field: 'volume24h',
-					operator: '>',
-					value: 100000,
-					active: true
-				}]
-			}]
+					operator: 'AND' as const,
+					active: true,
+					conditions: [
+						{
+							id: generateId(),
+							field: 'volume24h',
+							operator: '>',
+							value: 100000,
+							active: true
+						}
+					]
+				}
+			]
 		},
 		'defi-giants': {
 			name: 'DeFi Giants',
 			description: 'High TVL tokens with multiple pools',
-			groups: [{
-				id: generateId(),
-				operator: 'AND' as const,
-				active: true,
-				conditions: [
-					{
-						id: generateId(),
-						field: 'tvl',
-						operator: '>',
-						value: 1000000,
-						active: true
-					},
-					{
-						id: generateId(),
-						field: 'poolCount',
-						operator: '>=',
-						value: 5,
-						active: true
-					}
-				]
-			}]
+			groups: [
+				{
+					id: generateId(),
+					operator: 'AND' as const,
+					active: true,
+					conditions: [
+						{
+							id: generateId(),
+							field: 'tvl',
+							operator: '>',
+							value: 1000000,
+							active: true
+						},
+						{
+							id: generateId(),
+							field: 'poolCount',
+							operator: '>=',
+							value: 5,
+							active: true
+						}
+					]
+				}
+			]
 		},
-		'trending': {
+		trending: {
 			name: 'Trending Tokens',
 			description: 'High activity and positive price movement',
-			groups: [{
-				id: generateId(),
-				operator: 'AND' as const,
-				active: true,
-				conditions: [
-					{
-						id: generateId(),
-						field: 'priceChange24h',
-						operator: '>',
-						value: 5,
-						active: true
-					},
-					{
-						id: generateId(),
-						field: 'uniqueTraders24h',
-						operator: '>',
-						value: 100,
-						active: true
-					}
-				]
-			}]
+			groups: [
+				{
+					id: generateId(),
+					operator: 'AND' as const,
+					active: true,
+					conditions: [
+						{
+							id: generateId(),
+							field: 'priceChange24h',
+							operator: '>',
+							value: 5,
+							active: true
+						},
+						{
+							id: generateId(),
+							field: 'uniqueTraders24h',
+							operator: '>',
+							value: 100,
+							active: true
+						}
+					]
+				}
+			]
 		},
 		'micro-caps': {
 			name: 'Micro Caps',
 			description: 'Small market cap tokens with potential',
-			groups: [{
-				id: generateId(),
-				operator: 'AND' as const,
-				active: true,
-				conditions: [
-					{
-						id: generateId(),
-						field: 'marketCap',
-						operator: '<',
-						value: 100000,
-						active: true
-					},
-					{
-						id: generateId(),
-						field: 'volume24h',
-						operator: '>',
-						value: 10000,
-						active: true
-					}
-				]
-			}]
+			groups: [
+				{
+					id: generateId(),
+					operator: 'AND' as const,
+					active: true,
+					conditions: [
+						{
+							id: generateId(),
+							field: 'marketCap',
+							operator: '<',
+							value: 100000,
+							active: true
+						},
+						{
+							id: generateId(),
+							field: 'volume24h',
+							operator: '>',
+							value: 10000,
+							active: true
+						}
+					]
+				}
+			]
 		}
 	};
 
@@ -256,7 +266,7 @@
 	}
 
 	function removeGroup(groupId: string) {
-		filterGroups = filterGroups.filter(g => g.id !== groupId);
+		filterGroups = filterGroups.filter((g) => g.id !== groupId);
 		if (filterGroups.length === 0) {
 			filterGroups = [createNewGroup()];
 		}
@@ -264,8 +274,8 @@
 	}
 
 	function addCondition(groupId: string) {
-		filterGroups = filterGroups.map(group => 
-			group.id === groupId 
+		filterGroups = filterGroups.map((group) =>
+			group.id === groupId
 				? { ...group, conditions: [...group.conditions, createNewCondition()] }
 				: group
 		);
@@ -273,9 +283,9 @@
 	}
 
 	function removeCondition(groupId: string, conditionId: string) {
-		filterGroups = filterGroups.map(group => {
+		filterGroups = filterGroups.map((group) => {
 			if (group.id === groupId) {
-				const newConditions = group.conditions.filter(c => c.id !== conditionId);
+				const newConditions = group.conditions.filter((c) => c.id !== conditionId);
 				return {
 					...group,
 					conditions: newConditions.length > 0 ? newConditions : [createNewCondition()]
@@ -286,24 +296,26 @@
 		emitFilterChange();
 	}
 
-	function updateCondition(groupId: string, conditionId: string, updates: Partial<FilterCondition>) {
-		filterGroups = filterGroups.map(group => 
-			group.id === groupId 
+	function updateCondition(
+		groupId: string,
+		conditionId: string,
+		updates: Partial<FilterCondition>
+	) {
+		filterGroups = filterGroups.map((group) =>
+			group.id === groupId
 				? {
-					...group,
-					conditions: group.conditions.map(condition =>
-						condition.id === conditionId
-							? { ...condition, ...updates }
-							: condition
-					)
-				}
+						...group,
+						conditions: group.conditions.map((condition) =>
+							condition.id === conditionId ? { ...condition, ...updates } : condition
+						)
+					}
 				: group
 		);
 		emitFilterChange();
 	}
 
 	function updateGroup(groupId: string, updates: Partial<FilterGroup>) {
-		filterGroups = filterGroups.map(group => 
+		filterGroups = filterGroups.map((group) =>
 			group.id === groupId ? { ...group, ...updates } : group
 		);
 		emitFilterChange();
@@ -333,24 +345,24 @@
 
 	function saveFilter() {
 		if (!filterName.trim()) return;
-		
+
 		const savedFilter = {
 			name: filterName.trim(),
 			filters: filterGroups[0] // For now, save just the first group
 		};
-		
+
 		savedFilters = [...savedFilters, savedFilter];
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('tokenFiltersSaved', JSON.stringify(savedFilters));
 		}
-		
+
 		dispatch('save', savedFilter);
 		filterName = '';
 		showSaveDialog = false;
 	}
 
 	function loadSavedFilter(filterName: string) {
-		const filter = savedFilters.find(f => f.name === filterName);
+		const filter = savedFilters.find((f) => f.name === filterName);
 		if (filter) {
 			filterGroups = [filter.filters];
 			emitFilterChange();
@@ -359,7 +371,7 @@
 	}
 
 	function deleteSavedFilter(filterName: string) {
-		savedFilters = savedFilters.filter(f => f.name !== filterName);
+		savedFilters = savedFilters.filter((f) => f.name !== filterName);
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('tokenFiltersSaved', JSON.stringify(savedFilters));
 		}
@@ -371,16 +383,15 @@
 
 	function getConditionSummary(condition: FilterCondition): string {
 		const field = filterFields[condition.field as keyof typeof filterFields];
-		const value = field?.format ? 
-			`${field.format}${condition.value}` : 
-			condition.value.toString();
-		
+		const value = field?.format ? `${field.format}${condition.value}` : condition.value.toString();
+
 		return `${field?.label || condition.field} ${condition.operator} ${value}`;
 	}
 
 	function getActiveConditionsCount(): number {
-		return filterGroups.reduce((total, group) => 
-			total + group.conditions.filter(c => c.active && c.value !== '').length, 0
+		return filterGroups.reduce(
+			(total, group) => total + group.conditions.filter((c) => c.active && c.value !== '').length,
+			0
 		);
 	}
 
@@ -398,21 +409,24 @@
 </script>
 
 {#if open}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" transition:fade>
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+		transition:fade
+	>
 		<Card class="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
 			<!-- Header -->
-			<div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-600">
+			<div
+				class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-600"
+			>
 				<div>
-					<h2 class="text-xl font-bold text-gray-900 dark:text-white">
-						Advanced Filter Builder
-					</h2>
+					<h2 class="text-xl font-bold text-gray-900 dark:text-white">Advanced Filter Builder</h2>
 					<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
 						{getActiveConditionsCount()} active filter{getActiveConditionsCount() !== 1 ? 's' : ''}
 					</p>
 				</div>
 
 				<div class="flex items-center gap-2">
-					<Button size="sm" color="alternative" on:click={() => showSaveDialog = true}>
+					<Button size="sm" color="alternative" on:click={() => (showSaveDialog = true)}>
 						<i class="fas fa-save mr-2"></i>
 						Save
 					</Button>
@@ -420,7 +434,7 @@
 						<i class="fas fa-download mr-2"></i>
 						Export
 					</Button>
-					<Button size="sm" color="light" on:click={() => open = false}>
+					<Button size="sm" color="light" on:click={() => (open = false)}>
 						<i class="fas fa-times"></i>
 					</Button>
 				</div>
@@ -432,8 +446,8 @@
 					<h3 class="font-semibold text-gray-900 dark:text-white mb-3">Quick Presets</h3>
 					<div class="flex flex-wrap gap-2">
 						{#each Object.entries(presetFilters) as [key, preset]}
-							<Button 
-								size="sm" 
+							<Button
+								size="sm"
 								color="alternative"
 								class="text-xs"
 								on:click={() => applyPreset(key)}
@@ -442,13 +456,7 @@
 								{preset.name}
 							</Button>
 						{/each}
-						<Button 
-							size="sm" 
-							color="red" 
-							outline
-							class="text-xs"
-							on:click={clearAllFilters}
-						>
+						<Button size="sm" color="red" outline class="text-xs" on:click={clearAllFilters}>
 							<i class="fas fa-trash-alt mr-1"></i>
 							Clear All
 						</Button>
@@ -462,11 +470,11 @@
 							<!-- Group header -->
 							<div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800">
 								<div class="flex items-center gap-3">
-									<Toggle 
+									<Toggle
 										bind:checked={group.active}
 										on:change={() => updateGroup(group.id, { active: group.active })}
 									/>
-									
+
 									<span class="font-medium text-gray-900 dark:text-white">
 										Filter Group {groupIndex + 1}
 									</span>
@@ -484,27 +492,18 @@
 									{/if}
 
 									<Badge class="text-xs">
-										{group.conditions.filter(c => c.active && c.value !== '').length} conditions
+										{group.conditions.filter((c) => c.active && c.value !== '').length} conditions
 									</Badge>
 								</div>
 
 								<div class="flex items-center gap-2">
-									<Button 
-										size="xs" 
-										color="alternative"
-										on:click={() => addCondition(group.id)}
-									>
+									<Button size="xs" color="alternative" on:click={() => addCondition(group.id)}>
 										<i class="fas fa-plus mr-1"></i>
 										Add Condition
 									</Button>
-									
+
 									{#if filterGroups.length > 1}
-										<Button 
-											size="xs" 
-											color="red" 
-											outline
-											on:click={() => removeGroup(group.id)}
-										>
+										<Button size="xs" color="red" outline on:click={() => removeGroup(group.id)}>
 											<i class="fas fa-trash-alt"></i>
 										</Button>
 									{/if}
@@ -514,21 +513,24 @@
 							<!-- Conditions -->
 							<div class="p-4 space-y-3">
 								{#each group.conditions as condition, conditionIndex (condition.id)}
-									<div 
+									<div
 										class="flex items-center gap-3 p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg"
-										animate:flip={{duration: 200}}
-										transition:slide|local={{duration: 200}}
+										animate:flip={{ duration: 200 }}
+										transition:slide|local={{ duration: 200 }}
 									>
 										<!-- Active toggle -->
-										<Toggle 
+										<Toggle
 											bind:checked={condition.active}
-											on:change={() => updateCondition(group.id, condition.id, { active: condition.active })}
+											on:change={() =>
+												updateCondition(group.id, condition.id, { active: condition.active })}
 											size="sm"
 										/>
 
 										<!-- Condition indicator -->
 										{#if conditionIndex > 0}
-											<span class="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-600 rounded">
+											<span
+												class="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-600 rounded"
+											>
 												{group.operator}
 											</span>
 										{/if}
@@ -537,11 +539,14 @@
 										<div class="flex-1">
 											<Select
 												bind:value={condition.field}
-												on:change={() => updateCondition(group.id, condition.id, { 
-													field: condition.field,
-													operator: filterFields[condition.field as keyof typeof filterFields]?.operators[0] || '=',
-													value: ''
-												})}
+												on:change={() =>
+													updateCondition(group.id, condition.id, {
+														field: condition.field,
+														operator:
+															filterFields[condition.field as keyof typeof filterFields]
+																?.operators[0] || '=',
+														value: ''
+													})}
 												size="sm"
 											>
 												{#each Object.entries(filterFields) as [key, field]}
@@ -556,7 +561,8 @@
 										<div class="w-20">
 											<Select
 												bind:value={condition.operator}
-												on:change={() => updateCondition(group.id, condition.id, { operator: condition.operator })}
+												on:change={() =>
+													updateCondition(group.id, condition.id, { operator: condition.operator })}
 												size="sm"
 											>
 												{#each filterFields[condition.field as keyof typeof filterFields]?.operators || ['='] as operator}
@@ -571,7 +577,8 @@
 												{@const field = filterFields[condition.field as keyof typeof filterFields]}
 												<Select
 													bind:value={condition.value}
-													on:change={() => updateCondition(group.id, condition.id, { value: condition.value })}
+													on:change={() =>
+														updateCondition(group.id, condition.id, { value: condition.value })}
 													size="sm"
 												>
 													{#each field.options || [] as option}
@@ -583,7 +590,8 @@
 												<Input
 													type="number"
 													bind:value={condition.value}
-													on:input={() => updateCondition(group.id, condition.id, { value: condition.value })}
+													on:input={() =>
+														updateCondition(group.id, condition.id, { value: condition.value })}
 													placeholder={field?.placeholder}
 													size="sm"
 												/>
@@ -592,7 +600,8 @@
 												<Input
 													type={field?.type || 'text'}
 													bind:value={condition.value}
-													on:input={() => updateCondition(group.id, condition.id, { value: condition.value })}
+													on:input={() =>
+														updateCondition(group.id, condition.id, { value: condition.value })}
 													placeholder={field?.placeholder || 'Enter value...'}
 													size="sm"
 												/>
@@ -601,9 +610,9 @@
 
 										<!-- Remove condition -->
 										{#if group.conditions.length > 1}
-											<Button 
-												size="xs" 
-												color="red" 
+											<Button
+												size="xs"
+												color="red"
 												outline
 												on:click={() => removeCondition(group.id, condition.id)}
 											>
@@ -631,26 +640,28 @@
 						<h3 class="font-semibold text-gray-900 dark:text-white mb-3">Saved Filters</h3>
 						<div class="space-y-2">
 							{#each savedFilters as savedFilter}
-								<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<div
+									class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+								>
 									<div>
 										<span class="font-medium text-gray-900 dark:text-white">
 											{savedFilter.name}
 										</span>
 										<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-											{savedFilter.filters.conditions?.filter(c => c.active).length || 0} conditions
+											{savedFilter.filters.conditions?.filter((c) => c.active).length || 0} conditions
 										</p>
 									</div>
 									<div class="flex gap-2">
-										<Button 
-											size="xs" 
+										<Button
+											size="xs"
 											color="alternative"
 											on:click={() => loadSavedFilter(savedFilter.name)}
 										>
 											Load
 										</Button>
-										<Button 
-											size="xs" 
-											color="red" 
+										<Button
+											size="xs"
+											color="red"
 											outline
 											on:click={() => deleteSavedFilter(savedFilter.name)}
 										>
@@ -664,24 +675,25 @@
 				{/if}
 
 				<!-- Filter summary -->
-				<div class="p-6 bg-blue-50 dark:bg-blue-900/20 border-t border-gray-200 dark:border-gray-600">
+				<div
+					class="p-6 bg-blue-50 dark:bg-blue-900/20 border-t border-gray-200 dark:border-gray-600"
+				>
 					<h4 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">
 						<i class="fas fa-filter mr-2"></i>
 						Active Filters Summary
 					</h4>
 					<div class="space-y-1 text-sm">
-						{#each filterGroups.filter(g => g.active) as group, groupIndex}
-							{#each group.conditions.filter(c => c.active && c.value !== '') as condition}
+						{#each filterGroups.filter((g) => g.active) as group, groupIndex}
+							{#each group.conditions.filter((c) => c.active && c.value !== '') as condition}
 								<div class="text-blue-800 dark:text-blue-200">
-									{groupIndex > 0 ? 'OR' : ''} {getConditionSummary(condition)}
+									{groupIndex > 0 ? 'OR' : ''}
+									{getConditionSummary(condition)}
 								</div>
 							{/each}
 						{/each}
-						
+
 						{#if getActiveConditionsCount() === 0}
-							<div class="text-gray-500 dark:text-gray-400 italic">
-								No active filters
-							</div>
+							<div class="text-gray-500 dark:text-gray-400 italic">No active filters</div>
 						{/if}
 					</div>
 				</div>
@@ -693,9 +705,7 @@
 			<div class="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50">
 				<Card class="w-full max-w-md">
 					<div class="p-6">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-							Save Filter
-						</h3>
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Save Filter</h3>
 						<Input
 							bind:value={filterName}
 							placeholder="Enter filter name..."
@@ -703,9 +713,7 @@
 							on:keydown={(e) => e.key === 'Enter' && saveFilter()}
 						/>
 						<div class="flex justify-end gap-2">
-							<Button color="alternative" on:click={() => showSaveDialog = false}>
-								Cancel
-							</Button>
+							<Button color="alternative" on:click={() => (showSaveDialog = false)}>Cancel</Button>
 							<Button color="purple" on:click={saveFilter} disabled={!filterName.trim()}>
 								Save Filter
 							</Button>

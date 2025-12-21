@@ -44,9 +44,11 @@ interface PoolAnalytics {
 // Get pool data using the get_arc200_pools function
 async function getPoolData(poolId: number): Promise<any> {
 	try {
-		const { data, error } = await supabaseMimirClient.rpc('get_arc200_pools', { params: {
-			poolId: poolId
-		}});
+		const { data, error } = await supabaseMimirClient.rpc('get_arc200_pools', {
+			params: {
+				poolId: poolId
+			}
+		});
 
 		if (error) {
 			console.error('Error calling get_arc200_pools:', error);

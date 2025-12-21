@@ -270,11 +270,7 @@
 			}
 
 			// Support JSON object with balances: [{ accountId, contractId, balance }]
-			if (
-				jsonData &&
-				typeof jsonData === 'object' &&
-				Array.isArray(jsonData.balances)
-			) {
+			if (jsonData && typeof jsonData === 'object' && Array.isArray(jsonData.balances)) {
 				return jsonData.balances
 					.filter((b: any) => b && (b.accountId || b.address))
 					.map((b: any) => {

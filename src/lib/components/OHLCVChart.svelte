@@ -55,7 +55,7 @@
 		close?: number;
 		volume?: number;
 	} | null = null;
-	
+
 	// Local chart type state to avoid mutating parent prop object
 	let chartType: 'candlestick' | 'line' = settings.chartType;
 	let chartTypeInitialized = false;
@@ -540,7 +540,7 @@
 			}
 		});
 	}
-	
+
 	function toggleQuoteCurrency() {
 		console.log('toggleQuoteCurrency called, current:', quoteCurrency);
 		quoteCurrency = quoteCurrency === 'VOI' ? 'USD' : 'VOI';
@@ -644,9 +644,7 @@
 	class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
 >
 	<!-- Chart Header -->
-	<div
-		class="flex flex-col gap-4 p-4 border-b border-gray-200 dark:border-gray-700"
-	>
+	<div class="flex flex-col gap-4 p-4 border-b border-gray-200 dark:border-gray-700">
 		<div class="flex items-center justify-between w-full">
 			<div>
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -659,7 +657,7 @@
 					Pool ID: {tokenPair.poolId || 'N/A'}
 				</p>
 			</div>
-			
+
 			<!-- Quote Currency Slider -->
 			<div class="flex items-center gap-3">
 				<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Quote:</span>

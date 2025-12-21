@@ -343,12 +343,12 @@
 		if (!$selectedWallet?.address) {
 			throw new Error('Wallet not connected');
 		}
-		
+
 		// VSA assets require asset transfer transaction
 		if (!selectedToken.id || selectedToken.id === '0') {
 			throw new Error('Invalid asset ID for VSA transaction');
 		}
-		
+
 		return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
 			from: $selectedWallet.address,
 			to: recipientAddress,

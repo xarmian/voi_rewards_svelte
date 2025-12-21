@@ -137,9 +137,10 @@
 				const volume7d = tokenAnalytics?.volume?.volume7d || 0;
 				const volatility = calculateVolatility(chartData);
 				const momentum = volume24h > 0 && volume7d > 0 ? volume24h / (volume7d / 7) : 0;
-				const efficiency = tokenAnalytics?.volume?.swapCount24h > 0 
-					? volume24h / tokenAnalytics.volume.swapCount24h 
-					: 0;
+				const efficiency =
+					tokenAnalytics?.volume?.swapCount24h > 0
+						? volume24h / tokenAnalytics.volume.swapCount24h
+						: 0;
 
 				return {
 					tokenId: token.id,
@@ -184,7 +185,7 @@
 		// Calculate correlation between tokens based on price movements
 		// This is a simplified implementation - in production you'd use actual price data
 		const correlations: { [key: string]: number } = {};
-		
+
 		for (let i = 0; i < analytics.length; i++) {
 			for (let j = i + 1; j < analytics.length; j++) {
 				const token1 = analytics[i];
@@ -194,44 +195,49 @@
 				correlations[key] = (Math.random() * 2 - 1).toFixed(3) as any;
 			}
 		}
-		
+
 		correlationData = correlations;
 	}
 
 	function getBestPerformer(metricKey: string): TokenAnalytics | null {
 		if (analytics.length === 0) return null;
-		
+
 		return analytics.reduce((best, current) => {
 			const currentValue = current.metrics[metricKey as keyof typeof current.metrics] as number;
 			const bestValue = best.metrics[metricKey as keyof typeof best.metrics] as number;
-			
+
 			return currentValue > bestValue ? current : best;
 		});
 	}
 
 	function getWorstPerformer(metricKey: string): TokenAnalytics | null {
 		if (analytics.length === 0) return null;
-		
+
 		return analytics.reduce((worst, current) => {
 			const currentValue = current.metrics[metricKey as keyof typeof current.metrics] as number;
 			const worstValue = worst.metrics[metricKey as keyof typeof worst.metrics] as number;
-			
+
 			return currentValue < worstValue ? current : worst;
 		});
 	}
 
-	function getRelativePerformance(tokenAnalytics: TokenAnalytics, metricKey: string): {
+	function getRelativePerformance(
+		tokenAnalytics: TokenAnalytics,
+		metricKey: string
+	): {
 		percentage: number;
 		rank: number;
 		total: number;
 	} {
-		const values = analytics.map(a => a.metrics[metricKey as keyof typeof a.metrics] as number);
+		const values = analytics.map((a) => a.metrics[metricKey as keyof typeof a.metrics] as number);
 		const maxValue = Math.max(...values);
-		const currentValue = tokenAnalytics.metrics[metricKey as keyof typeof tokenAnalytics.metrics] as number;
-		
+		const currentValue = tokenAnalytics.metrics[
+			metricKey as keyof typeof tokenAnalytics.metrics
+		] as number;
+
 		const sortedValues = [...values].sort((a, b) => b - a);
-		const rank = sortedValues.findIndex(v => v === currentValue) + 1;
-		
+		const rank = sortedValues.findIndex((v) => v === currentValue) + 1;
+
 		return {
 			percentage: maxValue > 0 ? (currentValue / maxValue) * 100 : 0,
 			rank,
@@ -256,7 +262,7 @@
 
 	function getColorForValue(value: number, isPositive: boolean = true): string {
 		if (!isPositive) value = -value;
-		
+
 		if (value > 10) return 'text-green-600 dark:text-green-400';
 		if (value > 5) return 'text-green-500 dark:text-green-300';
 		if (value > 0) return 'text-yellow-600 dark:text-yellow-400';
@@ -274,9 +280,7 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-600">
 		<div>
-			<h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-				Token Comparison
-			</h2>
+			<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Token Comparison</h2>
 			<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
 				Comparing {tokens.length} token{tokens.length !== 1 ? 's' : ''}
 			</p>
@@ -289,7 +293,7 @@
 					Add Token
 				</Button>
 			{/if}
-			
+
 			<Button size="sm" color="alternative" on:click={() => exportComparison('png')}>
 				<i class="fas fa-download mr-2"></i>
 				Export
@@ -310,20 +314,25 @@
 			</div>
 		</div>
 
-	<!-- Comparison content -->
+		<!-- Comparison content -->
 	{:else if analytics.length > 0}
 		<div class="p-6">
 			<Tabs style="underline" bind:activeTabValue={selectedView}>
 				<TabItem value="overview" title="Overview">
 					<!-- Token cards grid -->
-					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-{Math.min(analytics.length, 4)} gap-4 mb-6">
+					<div
+						class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-{Math.min(
+							analytics.length,
+							4
+						)} gap-4 mb-6"
+					>
 						{#each analytics as token (token.tokenId)}
 							<Card class="relative">
 								<!-- Remove button -->
 								<button
 									type="button"
 									class="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs z-10"
-									on:click={() => removeToken(tokens.find(t => t.id === token.tokenId))}
+									on:click={() => removeToken(tokens.find((t) => t.id === token.tokenId))}
 								>
 									<i class="fas fa-times"></i>
 								</button>
@@ -331,13 +340,19 @@
 								<!-- Token header -->
 								<div class="flex items-center gap-3 mb-4">
 									{#if token.imageUrl}
-										<img src={token.imageUrl} alt="{token.symbol} logo" class="w-10 h-10 rounded-full" />
+										<img
+											src={token.imageUrl}
+											alt="{token.symbol} logo"
+											class="w-10 h-10 rounded-full"
+										/>
 									{:else}
-										<div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white font-bold">
+										<div
+											class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white font-bold"
+										>
 											{token.symbol.slice(0, 2)}
 										</div>
 									{/if}
-									
+
 									<div>
 										<h3 class="font-bold text-gray-900 dark:text-white">{token.symbol}</h3>
 										<Badge class="text-xs">{token.type}</Badge>
@@ -363,7 +378,9 @@
 									<div class="flex justify-between items-center">
 										<span class="text-sm text-gray-600 dark:text-gray-400">24h Change</span>
 										<span class="font-medium {getColorForValue(token.metrics.priceChange24h)}">
-											{token.metrics.priceChange24h > 0 ? '+' : ''}{token.metrics.priceChange24h.toFixed(2)}%
+											{token.metrics.priceChange24h > 0
+												? '+'
+												: ''}{token.metrics.priceChange24h.toFixed(2)}%
 										</span>
 									</div>
 
@@ -419,15 +436,21 @@
 									{#each analytics as token (token.tokenId)}
 										{@const performance = getRelativePerformance(token, metric.key)}
 										{@const value = token.metrics[metric.key]}
-										{@const maxValue = Math.max(...analytics.map(a => a.metrics[metric.key]))}
-										
+										{@const maxValue = Math.max(...analytics.map((a) => a.metrics[metric.key]))}
+
 										<div class="flex items-center gap-4">
 											<!-- Token info -->
 											<div class="flex items-center gap-2 w-24 flex-shrink-0">
 												{#if token.imageUrl}
-													<img src={token.imageUrl} alt="{token.symbol} logo" class="w-6 h-6 rounded-full" />
+													<img
+														src={token.imageUrl}
+														alt="{token.symbol} logo"
+														class="w-6 h-6 rounded-full"
+													/>
 												{:else}
-													<div class="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-xs font-bold">
+													<div
+														class="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-xs font-bold"
+													>
 														{token.symbol.slice(0, 2)}
 													</div>
 												{/if}
@@ -438,7 +461,7 @@
 
 											<!-- Progress bar -->
 											<div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4 relative">
-												<div 
+												<div
 													class="h-4 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-end pr-2"
 													style="width: {getProgressBarWidth(value, maxValue)}"
 												>
@@ -452,7 +475,11 @@
 
 											<!-- Value -->
 											<div class="w-20 text-right">
-												<span class="font-medium {metric.colorCoded ? getColorForValue(value, metric.higherIsBetter) : 'text-gray-900 dark:text-white'}">
+												<span
+													class="font-medium {metric.colorCoded
+														? getColorForValue(value, metric.higherIsBetter)
+														: 'text-gray-900 dark:text-white'}"
+												>
 													{metric.format(value)}
 												</span>
 											</div>
@@ -473,20 +500,37 @@
 					{#if Object.keys(correlationData).length > 0}
 						<div class="space-y-4">
 							<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-								Correlation coefficients between token price movements (-1 = perfect negative correlation, +1 = perfect positive correlation)
+								Correlation coefficients between token price movements (-1 = perfect negative
+								correlation, +1 = perfect positive correlation)
 							</p>
 
 							{#each Object.entries(correlationData) as [pair, correlation]}
-								<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-									<span class="font-medium text-gray-900 dark:text-white">{pair.replace('-', ' vs ')}</span>
+								<div
+									class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+								>
+									<span class="font-medium text-gray-900 dark:text-white"
+										>{pair.replace('-', ' vs ')}</span
+									>
 									<div class="flex items-center gap-3">
 										<div class="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-											<div 
-												class="h-full {correlation > 0.3 ? 'bg-green-500' : correlation < -0.3 ? 'bg-red-500' : 'bg-yellow-500'}"
-												style="width: {Math.abs(correlation) * 100}%; margin-left: {correlation < 0 ? (1 - Math.abs(correlation)) * 100 : 0}%"
+											<div
+												class="h-full {correlation > 0.3
+													? 'bg-green-500'
+													: correlation < -0.3
+														? 'bg-red-500'
+														: 'bg-yellow-500'}"
+												style="width: {Math.abs(correlation) * 100}%; margin-left: {correlation < 0
+													? (1 - Math.abs(correlation)) * 100
+													: 0}%"
 											></div>
 										</div>
-										<span class="font-mono text-sm {correlation > 0.3 ? 'text-green-600' : correlation < -0.3 ? 'text-red-600' : 'text-yellow-600'}">
+										<span
+											class="font-mono text-sm {correlation > 0.3
+												? 'text-green-600'
+												: correlation < -0.3
+													? 'text-red-600'
+													: 'text-yellow-600'}"
+										>
 											{correlation > 0 ? '+' : ''}{correlation}
 										</span>
 									</div>
@@ -496,20 +540,20 @@
 					{:else}
 						<div class="text-center py-8">
 							<i class="fas fa-chart-line text-4xl text-gray-400 mb-3"></i>
-							<p class="text-gray-600 dark:text-gray-400">Need at least 2 tokens to show correlations</p>
+							<p class="text-gray-600 dark:text-gray-400">
+								Need at least 2 tokens to show correlations
+							</p>
 						</div>
 					{/if}
 				</TabItem>
 			</Tabs>
 		</div>
 
-	<!-- Empty state -->
+		<!-- Empty state -->
 	{:else}
 		<div class="text-center py-16">
 			<i class="fas fa-balance-scale text-4xl text-gray-400 mb-4"></i>
-			<h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-				No Tokens Selected
-			</h3>
+			<h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No Tokens Selected</h3>
 			<p class="text-gray-600 dark:text-gray-400 mb-4">
 				Add some tokens to start comparing their performance
 			</p>

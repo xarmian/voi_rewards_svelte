@@ -127,16 +127,13 @@ export const GET: RequestHandler = async ({ url }) => {
 			// Refresh all combinations of base/quote token equivalents
 			for (const bId of baseIds) {
 				for (const qId of quoteIds) {
-					const { error: refreshError } = await supabaseMimirClient.rpc(
-						'refresh_price_candles',
-						{
-							p_base_token_id: bId,
-							p_quote_token_id: qId,
-							p_resolution: resolution,
-							p_start: startTime.toISOString(),
-							p_end: endTime.toISOString()
-						}
-					);
+					const { error: refreshError } = await supabaseMimirClient.rpc('refresh_price_candles', {
+						p_base_token_id: bId,
+						p_quote_token_id: qId,
+						p_resolution: resolution,
+						p_start: startTime.toISOString(),
+						p_end: endTime.toISOString()
+					});
 
 					if (refreshError) {
 						console.warn('Failed to refresh price candles:', refreshError);

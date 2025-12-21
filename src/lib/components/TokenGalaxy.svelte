@@ -33,11 +33,11 @@
 	let animationId: number;
 	let isWebGLSupported = false;
 	let hoveredToken: Token3D | null = null;
-	let cameraControls = { 
-		x: 0, 
-		y: 0, 
-		z: 500, 
-		rotationX: 0, 
+	let cameraControls = {
+		x: 0,
+		y: 0,
+		z: 500,
+		rotationX: 0,
 		rotationY: 0,
 		zoom: 1
 	};
@@ -131,15 +131,18 @@
 	});
 
 	function initWebGL() {
-		gl = canvasRef.getContext('webgl2', { 
-			alpha: true, 
+		gl = canvasRef.getContext('webgl2', {
+			alpha: true,
 			antialias: true,
-			premultipliedAlpha: false 
+			premultipliedAlpha: false
 		});
-		
+
 		if (!gl) {
 			console.warn('WebGL2 not supported, falling back to WebGL');
-			gl = canvasRef.getContext('webgl', { alpha: true, antialias: true }) as WebGL2RenderingContext;
+			gl = canvasRef.getContext('webgl', {
+				alpha: true,
+				antialias: true
+			}) as WebGL2RenderingContext;
 			if (!gl) {
 				console.error('WebGL not supported');
 				isWebGLSupported = false;
@@ -152,7 +155,7 @@
 		// Create shader program
 		const vertexShader = createShader(gl!, gl!.VERTEX_SHADER, vertexShaderSource);
 		const fragmentShader = createShader(gl!, gl!.FRAGMENT_SHADER, fragmentShaderSource);
-		
+
 		if (!vertexShader || !fragmentShader) {
 			console.error('Failed to create shaders');
 			return;
@@ -165,11 +168,11 @@
 		}
 
 		gl!.useProgram(shaderProgram);
-		
+
 		// Enable blending for alpha transparency
 		gl!.enable(gl!.BLEND);
 		gl!.blendFunc(gl!.SRC_ALPHA, gl!.ONE_MINUS_SRC_ALPHA);
-		
+
 		// Enable depth testing
 		gl!.enable(gl!.DEPTH_TEST);
 		gl!.depthFunc(gl!.LEQUAL);
@@ -177,7 +180,11 @@
 		resizeCanvas();
 	}
 
-	function createShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader | null {
+	function createShader(
+		gl: WebGL2RenderingContext,
+		type: number,
+		source: string
+	): WebGLShader | null {
 		const shader = gl.createShader(type);
 		if (!shader) return null;
 
@@ -193,7 +200,11 @@
 		return shader;
 	}
 
-	function createProgram(gl: WebGL2RenderingContext, vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
+	function createProgram(
+		gl: WebGL2RenderingContext,
+		vertexShader: WebGLShader,
+		fragmentShader: WebGLShader
+	): WebGLProgram | null {
 		const program = gl.createProgram();
 		if (!program) return null;
 
@@ -290,10 +301,10 @@
 		switch (colorMode) {
 			case 'type':
 				const typeColors = {
-					'VOI': '#8b5cf6',
-					'ARC200': '#3b82f6',
-					'ASA': '#10b981',
-					'default': '#6b7280'
+					VOI: '#8b5cf6',
+					ARC200: '#3b82f6',
+					ASA: '#10b981',
+					default: '#6b7280'
 				};
 				return typeColors[token.type as keyof typeof typeColors] || typeColors.default;
 
@@ -336,16 +347,16 @@
 	function generateConnections(index: number, total: number): number[] {
 		const connectionCount = Math.min(3, Math.floor(Math.random() * 5));
 		const connections: number[] = [];
-		
+
 		for (let i = 0; i < connectionCount; i++) {
 			let targetIndex;
 			do {
 				targetIndex = Math.floor(Math.random() * total);
 			} while (targetIndex === index || connections.includes(targetIndex));
-			
+
 			connections.push(targetIndex);
 		}
-		
+
 		return connections;
 	}
 
@@ -362,7 +373,7 @@
 
 		// Create matrices
 		const projectionMatrix = createPerspectiveMatrix(
-			45 * Math.PI / 180,
+			(45 * Math.PI) / 180,
 			canvasRef.width / canvasRef.height,
 			0.1,
 			2000
@@ -397,25 +408,54 @@
 		// Add mouse interaction effects here
 	}
 
-	function createPerspectiveMatrix(fovy: number, aspect: number, near: number, far: number): Float32Array {
+	function createPerspectiveMatrix(
+		fovy: number,
+		aspect: number,
+		near: number,
+		far: number
+	): Float32Array {
 		const f = 1.0 / Math.tan(fovy / 2);
 		const nf = 1 / (near - far);
 
 		return new Float32Array([
-			f / aspect, 0, 0, 0,
-			0, f, 0, 0,
-			0, 0, (far + near) * nf, -1,
-			0, 0, (2 * far * near) * nf, 0
+			f / aspect,
+			0,
+			0,
+			0,
+			0,
+			f,
+			0,
+			0,
+			0,
+			0,
+			(far + near) * nf,
+			-1,
+			0,
+			0,
+			2 * far * near * nf,
+			0
 		]);
 	}
 
 	function createModelViewMatrix(): Float32Array {
 		// Simple translation matrix for now
 		return new Float32Array([
-			1, 0, 0, 0,
-			0, 1, 0, 0,
-			0, 0, 1, 0,
-			-cameraControls.x, -cameraControls.y, -cameraControls.z, 1
+			1,
+			0,
+			0,
+			0,
+			0,
+			1,
+			0,
+			0,
+			0,
+			0,
+			1,
+			0,
+			-cameraControls.x,
+			-cameraControls.y,
+			-cameraControls.z,
+			1
 		]);
 	}
 
@@ -483,11 +523,13 @@
 
 	function hexToRgb(hex: string): { r: number; g: number; b: number } {
 		const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-		return result ? {
-			r: parseInt(result[1], 16),
-			g: parseInt(result[2], 16),
-			b: parseInt(result[3], 16)
-		} : { r: 0, g: 0, b: 0 };
+		return result
+			? {
+					r: parseInt(result[1], 16),
+					g: parseInt(result[2], 16),
+					b: parseInt(result[3], 16)
+				}
+			: { r: 0, g: 0, b: 0 };
 	}
 
 	function setupEventListeners() {
@@ -498,7 +540,7 @@
 		canvasRef.addEventListener('mouseup', handleMouseUp);
 		canvasRef.addEventListener('wheel', handleWheel);
 		canvasRef.addEventListener('click', handleClick);
-		
+
 		window.addEventListener('resize', resizeCanvas);
 	}
 
@@ -541,10 +583,10 @@
 		let closestToken = null;
 		let closestDistance = Infinity;
 
-		tokens3D.forEach(token => {
+		tokens3D.forEach((token) => {
 			const screenPos = projectToScreen(token.position);
 			const distance = Math.sqrt((screenPos.x - x) ** 2 + (screenPos.y - y) ** 2);
-			
+
 			if (distance < closestDistance && distance < 0.1) {
 				closestDistance = distance;
 				closestToken = token;
@@ -556,9 +598,14 @@
 		}
 	}
 
-	function projectToScreen(position: { x: number; y: number; z: number }): { x: number; y: number } {
+	function projectToScreen(position: { x: number; y: number; z: number }): {
+		x: number;
+		y: number;
+	} {
 		// Simple projection - implement proper matrix math for accuracy
-		const distance = Math.sqrt(position.x ** 2 + position.y ** 2 + (position.z + cameraControls.z) ** 2);
+		const distance = Math.sqrt(
+			position.x ** 2 + position.y ** 2 + (position.z + cameraControls.z) ** 2
+		);
 		return {
 			x: position.x / distance,
 			y: position.y / distance
@@ -567,7 +614,7 @@
 
 	function resizeCanvas() {
 		if (!canvasRef || !containerRef || typeof window === 'undefined') return;
-		
+
 		const rect = containerRef.getBoundingClientRect();
 		canvasRef.width = rect.width * window.devicePixelRatio;
 		canvasRef.height = rect.height * window.devicePixelRatio;
@@ -591,9 +638,7 @@
 	<!-- Controls -->
 	<div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-600">
 		<div>
-			<h3 class="text-lg font-bold text-gray-900 dark:text-white">
-				Token Galaxy
-			</h3>
+			<h3 class="text-lg font-bold text-gray-900 dark:text-white">Token Galaxy</h3>
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				3D exploration of {tokens3D.length} tokens
 			</p>
@@ -632,13 +677,15 @@
 	<!-- Galaxy container -->
 	<div class="relative flex-1" bind:this={containerRef}>
 		{#if loading}
-			<div class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800" transition:fade>
+			<div
+				class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800"
+				transition:fade
+			>
 				<div class="text-center">
 					<i class="fas fa-spinner fa-spin text-3xl text-gray-400 mb-3"></i>
 					<p class="text-gray-600 dark:text-gray-400">Loading token galaxy...</p>
 				</div>
 			</div>
-
 		{:else if !isWebGLSupported}
 			<div class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
 				<div class="text-center">
@@ -651,7 +698,6 @@
 					</p>
 				</div>
 			</div>
-
 		{:else}
 			<canvas
 				bind:this={canvasRef}
@@ -660,7 +706,9 @@
 			></canvas>
 
 			<!-- Instructions overlay -->
-			<div class="absolute bottom-4 left-4 bg-black/70 text-white text-sm p-3 rounded-lg backdrop-blur-sm">
+			<div
+				class="absolute bottom-4 left-4 bg-black/70 text-white text-sm p-3 rounded-lg backdrop-blur-sm"
+			>
 				<div class="space-y-1">
 					<div><i class="fas fa-mouse mr-2"></i>Click and drag to rotate</div>
 					<div><i class="fas fa-scroll mr-2"></i>Scroll to zoom</div>
@@ -669,7 +717,9 @@
 			</div>
 
 			<!-- Color legend -->
-			<div class="absolute top-4 right-4 bg-black/70 text-white text-sm p-3 rounded-lg backdrop-blur-sm">
+			<div
+				class="absolute top-4 right-4 bg-black/70 text-white text-sm p-3 rounded-lg backdrop-blur-sm"
+			>
 				<h5 class="font-semibold mb-2">Color Legend</h5>
 				{#if colorMode === 'performance'}
 					<div class="space-y-1">
@@ -712,10 +762,15 @@
 
 	<!-- Token info panel -->
 	{#if selectedToken}
-		<div class="p-4 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800" transition:slide>
+		<div
+			class="p-4 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
+			transition:slide
+		>
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
+					<div
+						class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white font-bold text-sm"
+					>
 						{selectedToken.symbol.slice(0, 2)}
 					</div>
 					<div>
@@ -727,7 +782,11 @@
 						</p>
 					</div>
 				</div>
-				<Button size="sm" color="alternative" on:click={() => dispatch('tokenSelect', selectedToken)}>
+				<Button
+					size="sm"
+					color="alternative"
+					on:click={() => dispatch('tokenSelect', selectedToken)}
+				>
 					<i class="fas fa-external-link-alt mr-2"></i>
 					View Details
 				</Button>

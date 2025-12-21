@@ -16,12 +16,16 @@
 	$: availableApps = data.isIOS ? getIOSCompatibleApps() : apps;
 
 	// Array of available categories (extracted from available apps data)
-	$: categories = [...new Set(availableApps.map((app) => app.category))].filter(Boolean) as string[];
+	$: categories = [...new Set(availableApps.map((app) => app.category))].filter(
+		Boolean
+	) as string[];
 
 	// Filtered apps based on the current category and search query
 	$: filteredApps = derived([currentCategory, searchQuery], ([$currentCategory, $searchQuery]) => {
 		// First filter by category, taking iOS compatibility into account
-		let filtered = $currentCategory ? getAppsByCategory($currentCategory, data.isIOS) : availableApps;
+		let filtered = $currentCategory
+			? getAppsByCategory($currentCategory, data.isIOS)
+			: availableApps;
 
 		// Then filter by search query if it exists
 		if ($searchQuery.trim()) {
@@ -56,7 +60,7 @@
 			// Store current theme state
 			originalTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 			hasAppliedThemeOverride = true;
-			
+
 			// Apply the theme override
 			if (data.theme === 'dark') {
 				document.documentElement.classList.add('dark');
@@ -170,9 +174,12 @@
 			</button>
 		</div>
 	{/if}
-	<div class="rounded-xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 text-sm">
+	<div
+		class="rounded-xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 text-sm"
+	>
 		<strong class="font-semibold">Note:</strong>
-		Apps listed on this page are maintained by third parties and may be subject to their own privacy policies, cookies, and tracking practices that are unaffiliated with Voi Wallet.
+		Apps listed on this page are maintained by third parties and may be subject to their own privacy
+		policies, cookies, and tracking practices that are unaffiliated with Voi Wallet.
 	</div>
 </div>
 
