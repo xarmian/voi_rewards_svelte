@@ -932,21 +932,94 @@
 		}
 	}
 
+	// Fetch OHLCV chart data for VOI (using VOI/aUSDC pool from MIMIR)
+	async function fetchVOIChartData(
+		resolution: Resolution = '1h',
+		quoteCurrency: 'VOI' | 'USD' = 'USD'
+	) {
+		tokenChartLoading = true;
+		tokenChartError = '';
+
+		try {
+			// Fetch VOI/aUSDC OHLCV data from MIMIR
+			const voiPair = createVOITokenPair();
+			const params = new URLSearchParams({
+				baseTokenId: voiPair.baseTokenId.toString(),
+				quoteTokenId: voiPair.quoteTokenId.toString(),
+				resolution,
+				limit: '240'
+			});
+
+			const response = await fetch(`/api/ohlcv?${params}`);
+			const data = await response.json();
+
+			if (data.error) {
+				throw new Error(data.error);
+			}
+
+			if (data.candles && data.candles.length > 0) {
+				// aUSDC is pegged to USD, so VOI/aUSDC price ≈ VOI/USD
+				tokenChartData = data.candles;
+				tokenChartVolumes = data.volumes || [];
+				showTokenChart = true;
+			} else {
+				// Fallback: try to get price-history data if no OHLCV available
+				const period = resolution === '1d' || resolution === '4h' ? '7d' : '24h';
+				const fallbackResponse = await fetch(`/api/price-history?period=${period}&token=VOI`);
+				const fallbackData = await fallbackResponse.json();
+
+				if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+					// Convert to pseudo-OHLCV format
+					tokenChartData = fallbackData.map((point: any) => {
+						const t = point.time;
+						const time =
+							typeof t === 'number'
+								? t
+								: typeof t === 'string' && /^\d+$/.test(t)
+									? parseInt(t, 10)
+									: Math.floor(new Date(t).getTime() / 1000);
+						return {
+							time,
+							open: point.value,
+							high: point.value,
+							low: point.value,
+							close: point.value,
+							volume: 0
+						};
+					});
+					tokenChartVolumes = [];
+					showTokenChart = true;
+				} else {
+					tokenChartError = 'No chart data available for VOI';
+					showTokenChart = false;
+				}
+			}
+		} catch (error) {
+			console.error('Error fetching VOI chart data:', error);
+			tokenChartError = 'Failed to load VOI chart data';
+			showTokenChart = false;
+		} finally {
+			tokenChartLoading = false;
+		}
+	}
+
 	// Watch for token selection changes and fetch chart data
 	$: if (browser && selectedToken && selectedToken.id !== 0) {
 		fetchTokenChartData(selectedToken.id, chartSettings.resolution, currentQuoteCurrency);
 	} else if (browser && selectedToken && selectedToken.id === 0) {
-		// For VOI, show aggregated data instead of chart
-		showTokenChart = false;
-		tokenChartData = [];
-		tokenChartVolumes = [];
+		// For VOI, fetch OHLCV from VOI/aUSDC pool
+		fetchVOIChartData(chartSettings.resolution, currentQuoteCurrency);
 	}
 
 	// Handle chart resolution changes
 	async function handleChartResolutionChange(resolution: Resolution) {
 		chartSettings = { ...chartSettings, resolution };
-		if (selectedToken && selectedToken.id !== 0) {
-			await fetchTokenChartData(selectedToken.id, resolution, currentQuoteCurrency);
+		if (selectedToken) {
+			if (selectedToken.id === 0) {
+				await fetchVOIChartData(resolution, currentQuoteCurrency);
+			} else {
+				await fetchTokenChartData(selectedToken.id, resolution, currentQuoteCurrency);
+			}
 		}
 	}
 
@@ -1048,40 +1121,76 @@
 					unifiedVolumeData = localVolumes;
 					chartTokenPair = localChartPair;
 				}
-			} else if (shouldUseVOIData(token)) {
-				// Use VOI data as simple line chart data - don't convert to OHLCV
-				const period = resolution === '1h' ? '7d' : '24h';
-				const response = await fetch(
-					`/api/price-history?period=${period}${tradingPairId ? `&trading_pair_id=${tradingPairId}` : ''}&token=${token}`
-				);
-				const voiPriceHistory = await response.json();
-
-				if (voiPriceHistory.error) {
-					throw new Error(voiPriceHistory.error);
-				}
-
-				const voiCandles = voiPriceHistory.map((point: any) => {
-					const t = point.time;
-					const time =
-						typeof t === 'number'
-							? t
-							: typeof t === 'string' && /^\d+$/.test(t)
-								? parseInt(t, 10)
-								: Math.floor(new Date(t).getTime() / 1000);
-					return {
-						time,
-						open: point.value,
-						high: point.value,
-						low: point.value,
-						close: point.value,
-						volume: 0
-					};
+			} else if (token === 'VOI' || token.toUpperCase() === 'VOI') {
+				// Fetch VOI OHLCV data from VOI/aUSDC pool in MIMIR
+				const voiPair = createVOITokenPair();
+				const params = new URLSearchParams({
+					baseTokenId: voiPair.baseTokenId.toString(),
+					quoteTokenId: voiPair.quoteTokenId.toString(),
+					resolution,
+					refresh: refresh.toString(),
+					limit: '500'
 				});
 
+				const response = await fetch(`/api/ohlcv?${params}`);
+				const data = await response.json();
+
+				let localCandles: OHLCVData[] = [];
+				let localVolumes: VolumeData[] = [];
+				let localChartPair = { ...voiPair };
+
+				if (data.error) {
+					throw new Error(data.error);
+				}
+
+				if (data.candles && data.candles.length > 0) {
+					localCandles = data.candles;
+					localVolumes = data.volumes || [];
+
+					// Convert to USD display if needed (aUSDC ≈ USD)
+					if (displayInUSD) {
+						localChartPair = { ...localChartPair, quoteSymbol: 'USD', quoteDecimals: 2 };
+					}
+				} else {
+					// Fallback: try to get price-history data if no OHLCV available
+					const period = resolution === '1d' || resolution === '4h' ? '7d' : '24h';
+					const fallbackResponse = await fetch(
+						`/api/price-history?period=${period}${tradingPairId ? `&trading_pair_id=${tradingPairId}` : ''}&token=${token}`
+					);
+					const voiPriceHistory = await fallbackResponse.json();
+
+					if (voiPriceHistory.error) {
+						throw new Error(voiPriceHistory.error);
+					}
+
+					if (Array.isArray(voiPriceHistory) && voiPriceHistory.length > 0) {
+						localCandles = voiPriceHistory.map((point: any) => {
+							const t = point.time;
+							const time =
+								typeof t === 'number'
+									? t
+									: typeof t === 'string' && /^\d+$/.test(t)
+										? parseInt(t, 10)
+										: Math.floor(new Date(t).getTime() / 1000);
+							return {
+								time,
+								open: point.value,
+								high: point.value,
+								low: point.value,
+								close: point.value,
+								volume: 0
+							};
+						});
+						localVolumes = [];
+						// Update pair to reflect USD source
+						localChartPair = { ...voiPair, quoteSymbol: 'USD', quoteDecimals: 2 };
+					}
+				}
+
 				if (seq === fetchSeq) {
-					unifiedChartData = voiCandles;
-					unifiedVolumeData = [];
-					chartTokenPair = createVOITokenPair();
+					unifiedChartData = localCandles;
+					unifiedVolumeData = localVolumes;
+					chartTokenPair = localChartPair;
 				}
 			} else {
 				throw new Error('No token pair selected');
@@ -1401,12 +1510,12 @@
 			<!-- Chart + Markets side-by-side -->
 			<section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 				<div
-					class="lg:col-span-2 {showTokenChart && selectedToken && selectedToken.id !== 0
+					class="lg:col-span-2 {showTokenChart && selectedToken
 						? 'p-0'
 						: 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4'} overflow-hidden flex flex-col"
 					style="height: 640px;"
 				>
-					{#if showTokenChart && selectedToken && selectedToken.id !== 0}
+					{#if showTokenChart && selectedToken}
 						{#if tokenChartLoading}
 							<div
 								class="flex items-center justify-center h-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
@@ -1426,15 +1535,25 @@
 						{:else if tokenChartData.length > 0}
 							<div class="flex-1 min-h-0">
 								<OHLCVChart
-									tokenPair={{
-										baseTokenId: selectedToken.id,
-										quoteTokenId: 390001, // wVOI
-										baseSymbol: selectedToken.symbol,
-										quoteSymbol: 'VOI',
-										baseDecimals: selectedToken.decimals,
-										quoteDecimals: 6,
-										poolId: undefined
-									}}
+									tokenPair={selectedToken.id === 0
+										? {
+												baseTokenId: 0,
+												quoteTokenId: 302190, // aUSDC
+												baseSymbol: 'VOI',
+												quoteSymbol: currentQuoteCurrency === 'USD' ? 'USD' : 'aUSDC',
+												baseDecimals: 6,
+												quoteDecimals: 6,
+												poolId: undefined
+											}
+										: {
+												baseTokenId: selectedToken.id,
+												quoteTokenId: 390001, // wVOI
+												baseSymbol: selectedToken.symbol,
+												quoteSymbol: 'VOI',
+												baseDecimals: selectedToken.decimals,
+												quoteDecimals: 6,
+												poolId: undefined
+											}}
 									data={tokenChartData}
 									volumes={tokenChartVolumes}
 									loading={false}
@@ -1448,11 +1567,15 @@
 										console.log('quoteChange event received in markets page:', e.detail);
 										currentQuoteCurrency = e.detail;
 										console.log('currentQuoteCurrency updated to:', currentQuoteCurrency);
-										fetchTokenChartData(
-											selectedToken.id,
-											chartSettings.resolution,
-											currentQuoteCurrency
-										);
+										if (selectedToken.id === 0) {
+											fetchVOIChartData(chartSettings.resolution, currentQuoteCurrency);
+										} else {
+											fetchTokenChartData(
+												selectedToken.id,
+												chartSettings.resolution,
+												currentQuoteCurrency
+											);
+										}
 									}}
 								/>
 							</div>

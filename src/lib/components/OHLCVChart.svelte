@@ -420,11 +420,19 @@
 
 		console.log('Updating chart with data:', data.slice(0, 3)); // Show first 3 items
 
-		// Sort data by time to ensure proper ordering
-		const sortedData = [...data].sort((a, b) => a.time - b.time);
+		// Sort data by time and deduplicate (keep last entry for each timestamp)
+		// lightweight-charts requires unique timestamps
+		const sorted = [...data].sort((a, b) => a.time - b.time);
+		const deduped = new Map<number, OHLCVData>();
+		for (const item of sorted) {
+			deduped.set(item.time, item);
+		}
+		const sortedData = Array.from(deduped.values());
 		console.log('Data time range:', {
 			start: sortedData[0]?.time,
-			end: sortedData[sortedData.length - 1]?.time
+			end: sortedData[sortedData.length - 1]?.time,
+			count: sortedData.length,
+			originalCount: data.length
 		});
 
 		// Dynamically adjust price precision based on value range
@@ -473,8 +481,13 @@
 				if (!volumeSeries) {
 					createVolumeSeries();
 				}
-				const sortedVolumes = [...volumes].sort((a, b) => a.time - b.time);
-				const volumeData: HistogramData[] = sortedVolumes.map((item) => ({
+				// Sort and deduplicate volume data (keep last entry for each timestamp)
+				const sortedVols = [...volumes].sort((a, b) => a.time - b.time);
+				const dedupedVols = new Map<number, VolumeData>();
+				for (const item of sortedVols) {
+					dedupedVols.set(item.time, item);
+				}
+				const volumeData: HistogramData[] = Array.from(dedupedVols.values()).map((item) => ({
 					time: item.time,
 					value: item.value,
 					color: item.color || '#E5E7EB'
@@ -648,7 +661,17 @@
 		<div class="flex items-center justify-between w-full">
 			<div>
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-					{(tokenPair.baseSymbol || '').toUpperCase() === 'WVOI' ? 'VOI' : tokenPair.baseSymbol}/VOI
+					{#if (tokenPair.baseSymbol || '').toUpperCase() === 'VOI'}
+						VOI/{tokenPair.quoteSymbol === 'aUSDC'
+							? quoteCurrency === 'USD'
+								? 'USD'
+								: 'aUSDC'
+							: tokenPair.quoteSymbol || 'USD'}
+					{:else}
+						{(tokenPair.baseSymbol || '').toUpperCase() === 'WVOI'
+							? 'VOI'
+							: tokenPair.baseSymbol}/{tokenPair.quoteSymbol || 'VOI'}
+					{/if}
 					{#if loading}
 						<Spinner size="4" class="ml-2" />
 					{/if}

@@ -102,37 +102,38 @@ export function convertVOItoOHLCV(
 }
 
 /**
- * Creates a pseudo token pair for VOI to maintain consistency with the interface
+ * Creates a token pair for VOI/aUSDC to fetch OHLCV data from MIMIR
  */
 export function createVOITokenPair() {
 	return {
 		baseTokenId: 0, // VOI token ID
-		quoteTokenId: 999999, // Pseudo USD token ID
+		quoteTokenId: 302190, // aUSDC token ID
 		baseSymbol: 'VOI',
-		quoteSymbol: 'USD',
+		quoteSymbol: 'aUSDC',
 		baseDecimals: 6,
-		quoteDecimals: 2,
+		quoteDecimals: 6,
 		poolId: undefined
 	};
 }
 
 /**
- * Determines if a token should use VOI data or MIMIR data
+ * Determines if a token should use VOI price-history data or MIMIR OHLCV data.
+ * VOI now uses MIMIR OHLCV data like other tokens.
  */
 export function shouldUseVOIData(token: string): boolean {
-	return token === 'VOI';
+	return false; // VOI now uses OHLCV from MIMIR like other tokens
 }
 
 /**
  * Gets the appropriate chart type for a token
  */
 export function getDefaultChartType(token: string): 'candlestick' | 'line' {
-	return token === 'VOI' ? 'line' : 'candlestick';
+	return 'candlestick'; // All tokens default to candlestick
 }
 
 /**
  * Gets the appropriate resolution for a token
  */
 export function getDefaultResolution(token: string): Resolution {
-	return token === 'VOI' ? '15m' : '1d';
+	return '1h'; // All tokens default to 1h resolution
 }

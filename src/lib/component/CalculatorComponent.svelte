@@ -705,7 +705,9 @@
 						<div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
 							{#if inputMode === 'voi' && effectivePrice > 0}
 								<span>0 VOI</span>
-								<span>{Math.round((maxSliderValueUSD / 2) / effectivePrice).toLocaleString()} VOI</span>
+								<span
+									>{Math.round(maxSliderValueUSD / 2 / effectivePrice).toLocaleString()} VOI</span
+								>
 								<span>{Math.round(maxSliderValueUSD / effectivePrice).toLocaleString()} VOI</span>
 							{:else}
 								<span>$0</span>
@@ -923,9 +925,7 @@
 			<div class="mb-5">
 				<div class="flex items-end justify-center gap-3">
 					<div class="flex flex-col items-center">
-						<label class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-							Monthly node cost
-						</label>
+						<label class="text-sm text-gray-600 dark:text-gray-400 mb-2"> Monthly node cost </label>
 						<div class="flex items-center gap-2">
 							<button
 								class="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xl font-bold transition-colors"
