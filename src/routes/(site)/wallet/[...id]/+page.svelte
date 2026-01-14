@@ -166,11 +166,8 @@
 			let rewardStake = 0;
 
 			if (epochData) {
-				// get community stake
-				const communityStake =
-					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 				rewardStake =
-					communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
+					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 			}
 
 			const balance = Number(accountInfo?.amount ?? 0);

@@ -259,10 +259,8 @@
 			const epochData = await dataTable.fetchData(latestEpoch.id);
 
 			if (epochData && supply?.['online-money']) {
-				const communityStake =
-					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 				rewardStake =
-					communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
+					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 
 				if (walletAddress) {
 					await updateWalletBalance();

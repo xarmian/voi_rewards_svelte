@@ -122,11 +122,14 @@
 				dataArrays = [...data.data];
 				ballasts = [...data.blacklist];
 				//totalWallets = data.num_proposers;
-				totalBlocks = data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
+				const selectedEpoch = dates.find((date) => date.id === selectedDate)?.epoch ?? 0;
+				totalBlocks = selectedEpoch >= 62
+					? data.num_blocks
+					: data.num_blocks + Math.min(data.num_blocks / 3, data.num_blocks_ballast);
 				latestBlock.set({ block: data.block_height, timestamp: block_height_timestamp });
 
 				await updateRewardParams();
-				eligibleOnlineStake = getEligibleOnlineStake();
+				eligibleOnlineStake = getEligibleOnlineStake(selectedEpoch);
 			}
 		} catch (err) {
 			console.error('Error loading dashboard data:', err);
@@ -202,10 +205,13 @@
 		}
 	}
 
-	function getEligibleOnlineStake() {
-		const commonBalance = (supply?.['online-money'] ?? 0) - (supply?.['blacklisted-money'] ?? 0);
+	function getEligibleOnlineStake(epoch: number) {
+		const communityStake = (supply?.['online-money'] ?? 0) - (supply?.['blacklisted-money'] ?? 0);
+		if (epoch >= 62) {
+			return Math.round(communityStake / Math.pow(10, 6));
+		}
 		return Math.round(
-			(commonBalance + Math.min(supply?.['blacklisted-money'] ?? 0, commonBalance / 3)) /
+			(communityStake + Math.min(supply?.['blacklisted-money'] ?? 0, communityStake / 3)) /
 				Math.pow(10, 6)
 		);
 	}

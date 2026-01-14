@@ -60,11 +60,8 @@
 			epochRewards = await Promise.all(epochPromises);
 
 			if (epochData) {
-				// Calculate community stake
-				const communityStake =
-					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 				rewardStake =
-					communityStake + Math.min(epochData?.blacklist_balance_total, communityStake / 3);
+					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 			}
 
 			// Get account information with force refresh option
