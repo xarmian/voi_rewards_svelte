@@ -1,23 +1,31 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="type" property="og:type" content="website" />
-		<meta name="image" property="og:image" content="%sveltekit.assets%/android-chrome-512x512.png" />
 		<meta name="author" content="@xarmian" />
 		%sveltekit.head%
 	</head>
-	<body data-sveltekit-preload-data="hover" class="bg-white dark:bg-gray-800">
+	<body class="bg-white dark:bg-gray-800">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
-	<script async src="https://www.googletagmanager.com/gtag/js?id=G-NDX21XVC4G"></script>
 	<script>
-	window.dataLayer = window.dataLayer || [];
-	function gtag(){dataLayer.push(arguments);}
-	gtag('js', new Date());
+		// Check for dark mode preference
+		if (
+			localStorage.getItem('color-theme') === 'dark' ||
+			(!localStorage.getItem('color-theme') &&
+				window.matchMedia('(prefers-color-scheme: dark)').matches)
+		) {
+			document.documentElement.classList.add('dark');
+		} else {
+			document.documentElement.classList.remove('dark');
+		}
 
-	gtag('config', 'G-NDX21XVC4G');
+		function onRecaptchaLoad() {
+			grecaptcha.render('g-recaptcha');
+		}
+		//(adsbygoogle = window.adsbygoogle || []).push({});
 	</script>
 </html>

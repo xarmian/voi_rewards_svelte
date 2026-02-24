@@ -1,21 +1,31 @@
 <script lang="ts">
-    import { Popover } from "flowbite-svelte";
+	import { Popover } from 'flowbite-svelte';
 
-    export let noAbsolute = false;
+	export let noAbsolute = false;
+	export let buttonColor = 'dark:text-blue-200 text-blue-600';
+	export let showIcon = true;
+	export let customTrigger = false;
 
-    let id = `info-${Math.random().toString(36).substring(2, 11)}`;
+	let id = `info-${Math.random().toString(36).substring(2, 11)}`;
 </script>
-<div class="text-2xl font-bold text-gray-800 dark:text-gray-200 flex flex-col place-items-center {!noAbsolute ? 'm-2 absolute top-0 right-0' : 'ml-1 -mt-1 -mb-1'}">
-    <button id={id}>
-        <i class="fas fa-info-circle mr-2 text-blue-200"></i>
-    </button>
-    <Popover
-        triggeredBy="#{id}"
-        placement="bottom"
-        class="w-64 text-sm p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-lg"
-        style="z-index: 1000"
-    >
-        <slot />
-    </Popover>
-</div>
 
+<div class="{!noAbsolute ? 'absolute top-0 right-0 m-2' : 'inline-flex items-center ml-1'} z-10">
+	{#if customTrigger}
+		<div {id}>
+			<slot name="trigger" />
+		</div>
+	{:else}
+		<button {id} class="text-lg" aria-label="Additional information">
+			{#if showIcon}
+				<i class="fas fa-info-circle {buttonColor} hover:opacity-80 transition-opacity"></i>
+			{/if}
+		</button>
+	{/if}
+	<Popover
+		triggeredBy="#{id}"
+		class="w-64 text-sm font-normal p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+		placement="bottom"
+	>
+		<slot />
+	</Popover>
+</div>

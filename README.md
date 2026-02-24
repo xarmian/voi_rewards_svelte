@@ -10,6 +10,7 @@ This website is an unofficial resource. It is not affiliated with the VOI Core T
 The website is written using the [Svelte framework](https://svelte.dev).
 
 To run locally:
+
 ```
 git clone https://github.com/xarmian/voi_rewards_svelte.git
 cd voi_rewards_svelte
