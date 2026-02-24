@@ -51,6 +51,8 @@
 		{ href: 'https://ecosystem.voi.network', label: 'Ecosystem', external: true }
 	];
 
+	//	{ href: '/reports', label: 'Weekly Reports', icon: 'fas fa-file-alt' },
+
 	const resourceItems: ResourceItem[] = [
 		{ href: '/directory', label: 'Directory', icon: 'fas fa-book' },
 		{ href: '/faq', label: 'FAQ', icon: 'fas fa-question-circle' },
