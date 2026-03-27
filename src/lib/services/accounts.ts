@@ -24,6 +24,39 @@ interface UnifiedAssetsResponse {
 	'current-round': number;
 }
 
+async function fetchAllAssetBalances(walletAddress: string): Promise<UnifiedAssetsResponse> {
+	const baseUrl = `https://voi-mainnet-mimirapi.nftnavigator.xyz/account/assets`;
+	const allBalances: UnifiedAssetBalance[] = [];
+	let nextToken: string | null = null;
+	let totalCount = 0;
+	let currentRound = 0;
+
+	do {
+		const url = new URL(baseUrl);
+		url.searchParams.set('accountId', walletAddress);
+		url.searchParams.set('limit', '1000');
+		if (nextToken) {
+			url.searchParams.set('next-token', nextToken);
+		}
+
+		const response = await fetch(url.toString());
+		if (!response.ok) throw new Error('Failed to fetch unified assets');
+
+		const data: UnifiedAssetsResponse = await response.json();
+		allBalances.push(...data.balances);
+		nextToken = data['next-token'];
+		totalCount = data['total-count'];
+		currentRound = data['current-round'];
+	} while (nextToken && allBalances.length < totalCount);
+
+	return {
+		balances: allBalances,
+		'next-token': null,
+		'total-count': totalCount,
+		'current-round': currentRound
+	};
+}
+
 export async function fetchFungibleTokens(
 	walletAddress: string | undefined,
 	voiPriceUSD: number = 0
@@ -32,20 +65,15 @@ export async function fetchFungibleTokens(
 
 	try {
 		// Fetch all data in parallel
-		const [liquidityPools, unifiedAssetsResponse, approvalsResponse, outgoingApprovalsResponse] =
+		const [liquidityPools, unifiedAssetsData, approvalsResponse, outgoingApprovalsResponse] =
 			await Promise.all([
 				getLiquidityPools(),
-				fetch(
-					`https://voi-mainnet-mimirapi.nftnavigator.xyz/account/assets?accountId=${walletAddress}`
-				),
+				fetchAllAssetBalances(walletAddress),
 				fetch(
 					`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?spender=${walletAddress}`
 				),
 				fetch(`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?owner=${walletAddress}`)
 			]);
-
-		if (!unifiedAssetsResponse.ok) throw new Error('Failed to fetch unified assets');
-		const unifiedAssetsData: UnifiedAssetsResponse = await unifiedAssetsResponse.json();
 
 		// Process approvals data
 		const approvalsData = approvalsResponse.ok ? await approvalsResponse.json() : { approvals: [] };
