@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { config } from '$lib/config';
+	import { getLockContractByAddress } from '$lib/services/lockvest';
 	import { fade } from 'svelte/transition';
 	import { algodClient } from '$lib/utils/algod';
 	import { onDestroy } from 'svelte';
@@ -176,18 +176,13 @@
 		error = null;
 		try {
 			// First get the contract ID from the API
-			const curl = `${config.lockvestApiBaseUrl}?contractAddress=${address}`;
-			const response = await fetch(curl, {
-				cache: 'no-store',
-				signal: AbortSignal.timeout(10000)
-			});
-			const data = await response.json();
+			const contract = await getLockContractByAddress(address);
 
-			if (!data.accounts?.[0]?.contractId) {
+			if (!contract?.contractId) {
 				throw new Error('Contract ID not found');
 			}
 
-			const contractId = data.accounts[0].contractId;
+			const contractId = contract.contractId;
 
 			// Get the application info using algodClient
 			const appInfo = await algodClient.getApplicationByID(contractId).do();

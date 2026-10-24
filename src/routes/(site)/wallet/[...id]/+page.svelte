@@ -3,7 +3,7 @@
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 	import AccountInfo from '$lib/components/wallet/AccountInfo.svelte';
-	import { config } from '$lib/config';
+	import { getLockContractsByOwner } from '$lib/services/lockvest';
 	import type { LockContract } from '$lib/data/types';
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
@@ -234,15 +234,9 @@
 			}
 
 			// Handle child accounts similarly
-			const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
 			let lockAccounts: LockContract[] = [];
 			try {
-				const response = await fetch(curl, {
-					cache: 'no-store',
-					signal: AbortSignal.timeout(10000)
-				});
-				const data = await response.json();
-				lockAccounts = data.accounts ?? [];
+				lockAccounts = await getLockContractsByOwner(address);
 			} catch (error) {
 				console.error('Lockvest lookup failed:', error);
 			}
