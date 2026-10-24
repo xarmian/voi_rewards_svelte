@@ -177,7 +177,10 @@
 		try {
 			// First get the contract ID from the API
 			const curl = `${config.lockvestApiBaseUrl}?contractAddress=${address}`;
-			const response = await fetch(curl, { cache: 'no-store' });
+			const response = await fetch(curl, {
+				cache: 'no-store',
+				signal: AbortSignal.timeout(10000)
+			});
 			const data = await response.json();
 
 			if (!data.accounts?.[0]?.contractId) {

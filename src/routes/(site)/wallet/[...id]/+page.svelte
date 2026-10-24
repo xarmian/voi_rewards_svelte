@@ -235,11 +235,20 @@
 
 			// Handle child accounts similarly
 			const curl = `${config.lockvestApiBaseUrl}?owner=${address}`;
-			const response = await fetch(curl, { cache: 'no-store' });
-			const data = await response.json();
+			let lockAccounts: LockContract[] = [];
+			try {
+				const response = await fetch(curl, {
+					cache: 'no-store',
+					signal: AbortSignal.timeout(10000)
+				});
+				const data = await response.json();
+				lockAccounts = data.accounts ?? [];
+			} catch (error) {
+				console.error('Lockvest lookup failed:', error);
+			}
 
 			await Promise.all(
-				data.accounts.map(async (account: LockContract) => {
+				lockAccounts.map(async (account: LockContract) => {
 					const childAccountInfo = await getAccountInfo(account.contractAddress);
 					const childBalance = Number(childAccountInfo?.amount ?? 0);
 					const childShareOfStake = childBalance / rewardStake;

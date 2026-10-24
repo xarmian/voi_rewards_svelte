@@ -8,12 +8,19 @@ export const load = (async ({ params, fetch, depends }) => {
 
 	let parentWalletId: string | null = null;
 	if (params.id) {
-		const response = await fetch(`${config.lockvestApiBaseUrl}?contractAddress=${params.id}`);
-		if (response.ok) {
-			const data = await response.json();
-			if (data.accounts.length > 0) {
-				parentWalletId = data.accounts[0].global_owner;
+		// The lockvest indexer can hang; don't let it block the page render.
+		try {
+			const response = await fetch(`${config.lockvestApiBaseUrl}?contractAddress=${params.id}`, {
+				signal: AbortSignal.timeout(5000)
+			});
+			if (response.ok) {
+				const data = await response.json();
+				if (data.accounts?.length > 0) {
+					parentWalletId = data.accounts[0].global_owner;
+				}
 			}
+		} catch (error) {
+			console.error('Lockvest lookup failed:', error);
 		}
 	}
 
