@@ -19,6 +19,7 @@
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.1.1",
+		"@sveltejs/adapter-vercel": "5.10.3",
 		"@sveltejs/kit": "^2.8.1",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@types/canvas-confetti": "^1.9.0",
