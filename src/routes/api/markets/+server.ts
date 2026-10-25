@@ -43,7 +43,10 @@ async function getTokenEquivalentIds(
 }
 
 // Cross-chain market snapshots, ONLY for VOI (any equivalent is VOI 0 or wVOI 390001). Never throws.
-async function fetchCrossChainSnapshots(equivalentIds: number[]): Promise<any[]> {
+async function fetchCrossChainSnapshots(
+	equivalentIds: number[],
+	onFailure: () => void
+): Promise<any[]> {
 	const voiIds = [0, 390001];
 	if (!equivalentIds.some((id) => voiIds.includes(id))) return [];
 	try {
@@ -72,6 +75,7 @@ async function fetchCrossChainSnapshots(equivalentIds: number[]): Promise<any[]>
 			.order('timestamp', { ascending: false })
 			.limit(50); // Get recent snapshots
 
+		if (snapshotsError) onFailure();
 		if (snapshotsError || !snapshots) return [];
 
 		// Group by trading_pair_id and get the latest for each
@@ -114,6 +118,7 @@ async function fetchCrossChainSnapshots(equivalentIds: number[]): Promise<any[]>
 			}));
 	} catch (e) {
 		console.warn('Failed to fetch cross-chain snapshots:', e);
+		onFailure();
 		return [];
 	}
 }
@@ -121,7 +126,8 @@ async function fetchCrossChainSnapshots(equivalentIds: number[]): Promise<any[]>
 // The token's Algorand asset id, if it has one (gates the Vestige markets). Never throws.
 async function fetchAlgoAssetId(
 	tokenId: number,
-	supabaseMimirClient: MimirClient
+	supabaseMimirClient: MimirClient,
+	onFailure: () => void
 ): Promise<number | null> {
 	try {
 		const { data: tokenData, error: tokenError } = await supabaseMimirClient
@@ -129,9 +135,11 @@ async function fetchAlgoAssetId(
 			.select('algo_asset_id')
 			.eq('contract_id', tokenId)
 			.single();
+		if (tokenError && tokenError.code !== 'PGRST116') onFailure();
 		return !tokenError && tokenData?.algo_asset_id ? Number(tokenData.algo_asset_id) : null;
 	} catch (error) {
 		console.error('Error fetching Vestige markets:', error);
+		onFailure();
 		return null;
 	}
 }
@@ -183,6 +191,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		// Circulating supply depends on nothing else: start it now, await it where the response is built (TASK-27)
 		const supplyPromise = fetchCirculatingSupply().catch((error) => {
 			console.error('Failed to fetch circulating supply:', error);
+			// TASK-55: this upstream fails on prod; its supply fallback must not disable markets caching.
 			return { circulatingSupply: '0', percentDistributed: '0' };
 		});
 		const supplyResponse = async () => {
@@ -194,6 +203,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		};
 
 		// If a tokenId is provided, build markets using both MIMIR data and cross-chain snapshots
+		let degraded = false;
+		const onFailure = () => {
+			degraded = true;
+		};
 		let marketData: any[] = [];
 		let voiUsd: number | null = null;
 		// null = no VOI/USD conversion was attempted (no pools, or no tokenId), so nothing to flag
@@ -297,8 +310,8 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 					supabaseMimirClient,
 					pairs.map((p) => p.poolId)
 				),
-				fetchCrossChainSnapshots(equivalentIds),
-				fetchAlgoAssetId(tokenId, supabaseMimirClient)
+				fetchCrossChainSnapshots(equivalentIds, onFailure),
+				fetchAlgoAssetId(tokenId, supabaseMimirClient, onFailure)
 			]);
 			({ voiUsd, status: voiUsdStatus, asOf: voiUsdAsOf } = voiUsdRef);
 			if (voiUsdStatus !== 'ok') {
@@ -576,12 +589,17 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 							priceMapForVestige.set(symbol, usdPrice);
 						}
 					}
-					vestigeMarkets = await fetchVestigeMarketsForAsset(algoAssetId, priceMapForVestige);
+					vestigeMarkets = await fetchVestigeMarketsForAsset(
+						algoAssetId,
+						priceMapForVestige,
+						onFailure
+					);
 				} else {
 					console.log(`Token ${tokenId} has no algo_asset_id, skipping Vestige markets`);
 				}
 			} catch (error) {
 				console.error('Error fetching Vestige markets:', error);
+				onFailure();
 				// Continue without Vestige data
 			}
 
@@ -697,7 +715,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			},
 			{
 				headers:
-					voiUsdStatus !== 'unavailable' && voiUsdStatus !== 'invalid'
+					!degraded && voiUsdStatus !== 'unavailable' && voiUsdStatus !== 'invalid'
 						? publicCache(CACHE_TTL.markets.sMaxAge, CACHE_TTL.markets.staleWhileRevalidate)
 						: undefined
 			}

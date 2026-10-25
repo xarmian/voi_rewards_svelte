@@ -43,7 +43,9 @@ export const GET: RequestHandler = async () => {
 			},
 			{
 				headers:
-					'error' in data
+					'error' in data ||
+					!Array.isArray(data.epochs) ||
+					!Number.isFinite(Number(data.current_epoch))
 						? undefined
 						: publicCache(CACHE_TTL.epochs.sMaxAge, CACHE_TTL.epochs.staleWhileRevalidate)
 			}

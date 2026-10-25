@@ -145,10 +145,12 @@ export async function GET({ url }: RequestEvent) {
 
 		return new Response(csvContent, {
 			headers: {
-				...publicCache(
-					CACHE_TTL['relay-rewards'].sMaxAge,
-					CACHE_TTL['relay-rewards'].staleWhileRevalidate
-				),
+				...(rawData.length > 0
+					? publicCache(
+							CACHE_TTL['relay-rewards'].sMaxAge,
+							CACHE_TTL['relay-rewards'].staleWhileRevalidate
+						)
+					: {}),
 				'Content-Type': 'text/csv',
 				'Content-Disposition': `attachment; filename="relay-rewards-${startStr}-${endStr}.csv"`
 			}

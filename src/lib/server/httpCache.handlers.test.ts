@@ -87,12 +87,25 @@ afterEach(() => {
 
 describe('TASK-29 markets response caching', () => {
 	it.each(['ok', 'stale'])('caches a complete result with %s VOI/USD status', async (status) => {
+		mocks.from.mockImplementationOnce(() => query([]));
+		mocks.from.mockImplementationOnce(() => query([pool]));
+		mocks.from.mockImplementationOnce(() => query(null, { code: 'PGRST116' }));
 		const time = new Date(Date.now() - (status === 'stale' ? 7_200_000 : 0)).toISOString();
 		const fetcher = vi.fn().mockResolvedValue(Response.json([{ time, value: 0.01 }]));
 		const response = await marketsGET(event('/api/markets?tokenId=123', fetcher));
 		expect(response.status).toBe(200);
 		expect((await response.json()).voiUsdStatus).toBe(status);
 		expect(response.headers.get('Cache-Control')).toBe(minuteCache);
+
+		mocks.supply.mockRejectedValue(new Error('supply unavailable'));
+		fetcher.mockResolvedValue(Response.json([{ time, value: 0.01 }]));
+		const supplyFallback = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+		expect(supplyFallback.status).toBe(200);
+		expect(await supplyFallback.json()).toMatchObject({
+			voiUsdStatus: status,
+			circulatingSupply: { circulatingSupply: 0, percentDistributed: 0 }
+		});
+		expect(supplyFallback.headers.get('Cache-Control')).toBe(minuteCache);
 	});
 
 	it('caches genuine empty pools and the legacy empty market list', async () => {
@@ -347,6 +360,15 @@ describe('TASK-29 hourly cache exclusions', () => {
 	it('caches token info but does not cache a token not found by ID or symbol', async () => {
 		const voi = await infoGET(event('/api/token-info?tokenId=0'));
 		expect(voi.headers.get('Cache-Control')).toBe(hourlyCache);
+		mocks.from.mockImplementationOnce(() =>
+			query({ contract_id: 123, symbol: 'TEST', decimals: 6 })
+		);
+		mocks.from.mockImplementationOnce(() => query([]));
+		mocks.from.mockImplementationOnce(() => query(null, { code: 'PGRST116' }));
+		mocks.from.mockImplementationOnce(() => query(null, { code: 'PGRST116' }));
+		const noSupply = await infoGET(event('/api/token-info?tokenId=123'));
+		expect(await noSupply.json()).toMatchObject({ info: { equivalents: [], totalSupply: null } });
+		expect(noSupply.headers.get('Cache-Control')).toBe(hourlyCache);
 		mocks.from.mockImplementation(() => query(null));
 		for (const search of ['tokenId=123', 'symbol=MISSING']) {
 			const response = await infoGET(event(`/api/token-info?${search}`));
