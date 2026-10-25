@@ -1,6 +1,12 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import {
+	fetchPoolAggregates,
+	tokenVolumeMetrics,
+	tokenTvlMetrics,
+	type PoolAggregate
+} from '$lib/server/poolAggregates';
 
 // Create MIMIR client for dex swap data
 const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
@@ -74,145 +80,6 @@ async function getTokenEquivalents(tokenId: number): Promise<TokenEquivalents> {
 	} catch (error) {
 		console.error('Failed to get token equivalents:', error);
 		return { tokenId, equivalents: [] };
-	}
-}
-
-// Calculate volume metrics for token and its equivalents
-async function calculateVolumeMetrics(
-	tokenId: number,
-	equivalents: number[]
-): Promise<VolumeMetrics> {
-	const allIds = [tokenId, ...equivalents];
-
-	try {
-		// Calculate 24h volume
-		const { data: volume24hData, error: volume24hError } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('volume_base, volume_quote, base_token_id, quote_token_id')
-			.gte('ts', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-			.or(`base_token_id.in.(${allIds.join(',')}),quote_token_id.in.(${allIds.join(',')})`);
-
-		if (volume24hError) throw volume24hError;
-
-		// Calculate 7d volume
-		const { data: volume7dData, error: volume7dError } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('volume_base, volume_quote, base_token_id, quote_token_id')
-			.gte('ts', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-			.or(`base_token_id.in.(${allIds.join(',')}),quote_token_id.in.(${allIds.join(',')})`);
-
-		if (volume7dError) throw volume7dError;
-
-		// Calculate 30d volume
-		const { data: volume30dData, error: volume30dError } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('volume_base, volume_quote, base_token_id, quote_token_id')
-			.gte('ts', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-			.or(`base_token_id.in.(${allIds.join(',')}),quote_token_id.in.(${allIds.join(',')})`);
-
-		if (volume30dError) throw volume30dError;
-
-		// Aggregate volume for each period
-		const volume24h = aggregateVolume(volume24hData || [], allIds);
-		const volume7d = aggregateVolume(volume7dData || [], allIds);
-		const volume30d = aggregateVolume(volume30dData || [], allIds);
-
-		return {
-			volume24h,
-			volume7d,
-			volume30d
-		};
-	} catch (error) {
-		console.error('Failed to calculate volume metrics:', error);
-		return {
-			volume24h: 0,
-			volume7d: 0,
-			volume30d: 0
-		};
-	}
-}
-
-// Helper function to aggregate volume from swap data
-function aggregateVolume(
-	swaps: Array<{
-		volume_base: number;
-		volume_quote: number;
-		base_token_id: number;
-		quote_token_id: number;
-	}>,
-	targetTokenIds: number[]
-): number {
-	return swaps.reduce((total, swap) => {
-		let volume = 0;
-
-		// Add volume when token is the base token
-		if (targetTokenIds.includes(swap.base_token_id)) {
-			volume += swap.volume_base || 0;
-		}
-
-		// Add volume when token is the quote token
-		if (targetTokenIds.includes(swap.quote_token_id)) {
-			volume += swap.volume_quote || 0;
-		}
-
-		return total + volume;
-	}, 0);
-}
-
-// Calculate TVL metrics using latest pool balances
-async function calculateTVLMetrics(tokenId: number, equivalents: number[]): Promise<TVLMetrics> {
-	const allIds = [tokenId, ...equivalents];
-
-	try {
-		// Get latest pool balances for each pool containing our tokens
-		const { data, error } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('pool_id, poolbal_a, poolbal_b, base_token_id, quote_token_id, ts')
-			.or(`base_token_id.in.(${allIds.join(',')}),quote_token_id.in.(${allIds.join(',')})`);
-
-		if (error) throw error;
-
-		if (!data || data.length === 0) {
-			return { totalTvl: 0, poolCount: 0 };
-		}
-
-		// Group by pool_id and get the latest entry for each pool
-		const latestPoolData = new Map();
-
-		data.forEach((row) => {
-			const poolId = row.pool_id;
-			const ts = new Date(row.ts).getTime();
-
-			if (!latestPoolData.has(poolId) || latestPoolData.get(poolId).ts < ts) {
-				latestPoolData.set(poolId, {
-					...row,
-					ts
-				});
-			}
-		});
-
-		// Calculate TVL for our token across all pools
-		let totalTvl = 0;
-		let poolCount = 0;
-
-		latestPoolData.forEach((poolData) => {
-			// Add balance for our token from this pool
-			if (allIds.includes(poolData.base_token_id)) {
-				totalTvl += poolData.poolbal_a || 0;
-			}
-			if (allIds.includes(poolData.quote_token_id)) {
-				totalTvl += poolData.poolbal_b || 0;
-			}
-			poolCount++;
-		});
-
-		return {
-			totalTvl,
-			poolCount
-		};
-	} catch (error) {
-		console.error('Failed to calculate TVL metrics:', error);
-		return { totalTvl: 0, poolCount: 0 };
 	}
 }
 
@@ -295,10 +162,25 @@ export const GET: RequestHandler = async ({ url }) => {
 			getTokenInfo(tokenId)
 		]);
 
-		const [volumeMetrics, tvlMetrics] = await Promise.all([
-			calculateVolumeMetrics(tokenId, equivalents.equivalents),
-			calculateTVLMetrics(tokenId, equivalents.equivalents)
-		]);
+		// TASK-52, C11, P06: discover pools once and share their aggregates across both metrics.
+		const allIds = [tokenId, ...equivalents.equivalents];
+		let aggregates = new Map<number, PoolAggregate>();
+		try {
+			const { data: pools, error } = await supabaseMimirClient
+				.from('pool_catalog')
+				.select('pool_id, token_a_id, token_b_id')
+				.or(`token_a_id.in.(${allIds.join(',')}),token_b_id.in.(${allIds.join(',')})`);
+			if (error) throw error;
+			aggregates = await fetchPoolAggregates(
+				supabaseMimirClient,
+				(pools || []).map((pool) => pool.pool_id)
+			);
+		} catch (error) {
+			// One RPC feeds both metrics, so a failure zeroes both (TASK-52 review r1).
+			console.error('Failed to fetch pool aggregates for volume and TVL metrics:', error);
+		}
+		const volumeMetrics = tokenVolumeMetrics(aggregates.values(), allIds);
+		const tvlMetrics = tokenTvlMetrics(aggregates.values(), allIds);
 
 		const analytics: TokenAnalytics = {
 			tokenId,
