@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Card, Tooltip, Button, Spinner, Badge, Tabs, TabItem, Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
+	import { createMarketDataLoader } from '$lib/markets/marketDataLoader';
 	import { fade, slide } from 'svelte/transition';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
@@ -53,6 +54,7 @@
 	}
 
 	export let data: PageData;
+	let { marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } = data;
 	$: ({ marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } =
 		data);
 
@@ -118,7 +120,6 @@
 
 	onMount(() => {
 		loadAllTokens();
-		setupKeyboardShortcuts();
 
 		// Responsive handling
 		const handleResize = () => {
@@ -143,35 +144,23 @@
 		}
 	}
 
-	function setupKeyboardShortcuts() {
-		const handleKeydown = (event: KeyboardEvent) => {
-			// Command palette (Cmd/Ctrl + K)
-			if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-				event.preventDefault();
-				commandPaletteOpen = true;
-			}
-			// Search (Cmd/Ctrl + F)
-			else if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
-				event.preventDefault();
-				// Focus search input instead of opening filter builder
-				const searchInput = document.querySelector('#market-search') as HTMLInputElement;
-				if (searchInput) searchInput.focus();
-			}
-			// Watchlist (Cmd/Ctrl + W)
-			else if ((event.metaKey || event.ctrlKey) && event.key === 'w') {
-				event.preventDefault();
-				watchlistOpen = true;
-			}
-			// View mode shortcuts
-			else if ((event.metaKey || event.ctrlKey) && event.key >= '1' && event.key <= '4') {
-				event.preventDefault();
-				const modes: (typeof viewMode)[] = ['table', 'heatmap', 'galaxy', 'comparison'];
-				viewMode = modes[parseInt(event.key) - 1];
-			}
-		};
-
-		if (browser) {
-			document.addEventListener('keydown', handleKeydown);
+	function handleKeydown(event: KeyboardEvent) {
+		// Command palette (Cmd/Ctrl + K)
+		if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+			event.preventDefault();
+			commandPaletteOpen = true;
+		}
+		// Search (Cmd/Ctrl + F)
+		else if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+			event.preventDefault();
+			// Focus search input instead of opening filter builder
+			const searchInput = document.querySelector('#market-search') as HTMLInputElement;
+			if (searchInput) searchInput.focus();
+		}
+		// Watchlist (Cmd/Ctrl + W)
+		else if ((event.metaKey || event.ctrlKey) && event.key === 'w') {
+			event.preventDefault();
+			watchlistOpen = true;
 		}
 	}
 
@@ -180,15 +169,6 @@
 		const { type, data } = event.detail;
 
 		switch (type) {
-			case 'heatmap':
-				viewMode = 'heatmap';
-				break;
-			case 'galaxy':
-				viewMode = 'galaxy';
-				break;
-			case 'compare':
-				viewMode = 'comparison';
-				break;
 			case 'filter':
 				// Filter functionality removed - using simple search instead
 				break;
@@ -362,76 +342,49 @@
 	});
 
 	let fetchingMarketData = false;
-	let lastFetchedTokenId: number | null = null;
-	// Fetch market data for a specific token by ID
-	async function fetchMarketDataForToken(tokenId: number) {
-		console.log('fetchMarketDataForToken called for tokenId:', tokenId);
-
-		// Skip if we're already fetching or just fetched the same token
-		if (tokenId === lastFetchedTokenId) {
-			if (fetchingMarketData) {
-				console.log('Skipping fetchMarketDataForToken - already fetching', tokenId);
-				return;
-			}
-			// Also skip if we already have data for this token (avoid duplicate on page load + reactive)
-			if (realMarketData.length > 0) {
-				console.log('Skipping fetchMarketDataForToken - already have data for', tokenId);
-				return;
-			}
+	let marketDataError: string | null = null;
+	const loader = createMarketDataLoader(
+		(url) => fetch(url),
+		(state) => {
+			realMarketData = state.marketData;
+			aggregates = state.aggregates;
+			realCirculatingSupply = state.circulatingSupply;
+			fetchingMarketData = state.loading;
+			marketDataError = state.error;
+		},
+		{
+			tokenId: data.resolvedToken?.id ?? 0,
+			marketData: realMarketData,
+			aggregates,
+			circulatingSupply: realCirculatingSupply
 		}
+	);
 
-		lastFetchedTokenId = tokenId;
-		fetchingMarketData = true;
+	// Fetch market data for a specific token by ID
+	async function fetchMarketDataForToken(tokenId: number, force = false) {
+		const applied = await loader.load(tokenId, { force });
+		if (!applied || loader.state.tokenId !== tokenId) return;
 
-		try {
-			const response = await fetch(`/api/markets?tokenId=${tokenId}`);
-			const data = await response.json();
-
-			if (data.error) {
-				throw new Error(data.error);
-			}
-
-			if (data.marketData) {
-				realMarketData = Array.isArray(data.marketData) ? data.marketData : [];
-			}
-			if (data.aggregates) {
-				aggregates = data.aggregates;
-			}
-			if (data.circulatingSupply) {
-				realCirculatingSupply = data.circulatingSupply;
-			}
-
-			// For non-VOI tokens, token analytics is fetched by +page.ts on initial load
-			// Only fetch here if we don't have it (client-side token switch without page reload)
-			if (tokenId !== 0) {
-				if (!tokenAnalytics || tokenAnalytics.tokenId !== tokenId) {
-					try {
-						const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${tokenId}`);
-						const analyticsData = await analyticsResponse.json();
-						if (analyticsData.analytics) {
-							tokenAnalytics = analyticsData.analytics;
-						}
-					} catch (e) {
-						console.warn('Failed to fetch token analytics:', e);
+		// For non-VOI tokens, token analytics is fetched by +page.ts on initial load
+		// Only fetch here if we don't have it (client-side token switch without page reload)
+		if (tokenId !== 0) {
+			if (!tokenAnalytics || tokenAnalytics.tokenId !== tokenId) {
+				const requestId = loader.currentRequestId;
+				try {
+					const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${tokenId}`);
+					const analyticsData = await analyticsResponse.json();
+					if (loader.isCurrent(requestId) && analyticsData.analytics) {
+						tokenAnalytics = analyticsData.analytics;
 					}
-				} else {
-					console.log('Skipping token-analytics fetch - already have data for tokenId', tokenId);
+				} catch (e) {
+					console.warn('Failed to fetch token analytics:', e);
 				}
 			} else {
-				// Clear analytics for VOI
-				tokenAnalytics = null;
+				console.log('Skipping token-analytics fetch - already have data for tokenId', tokenId);
 			}
-
-			console.log(`Fetched market data for tokenId ${tokenId}:`, {
-				realMarketData: realMarketData.length,
-				aggregates,
-				tokenAnalytics: !!tokenAnalytics
-			});
-		} catch (error) {
-			console.error('Failed to fetch market data:', error);
-			// Don't clear existing data on error, just show it's failed
-		} finally {
-			fetchingMarketData = false;
+		} else {
+			// Clear analytics for VOI
+			tokenAnalytics = null;
 		}
 	}
 
@@ -440,7 +393,6 @@
 		selectedToken = event.detail;
 		// Reset server data tracking and cache when user manually selects a token
 		serverDataToken = null;
-		lastFetchedTokenId = null;
 		// Clear cache when switching tokens to ensure fresh data
 		voiPriceHistoryCache = null;
 		voiPriceHistoryPromise = null;
@@ -461,9 +413,6 @@
 			selectedPool = null;
 
 			if (browser) {
-				// Start loading state immediately
-				fetchingMarketData = true;
-
 				// Market data will be fetched by reactive statement
 				// Just fetch chart data here
 				fetchUnifiedChartData('VOI', chartSettings.resolution);
@@ -688,7 +637,7 @@
 		try {
 			// Refresh market data for the currently selected token
 			const tokenIdToFetch = selectedToken?.id ?? 0;
-			await fetchMarketDataForToken(tokenIdToFetch);
+			await fetchMarketDataForToken(tokenIdToFetch, true);
 			// Skip invalidateAll to prevent full page reload - we already fetched what we need
 			// await invalidateAll();
 		} finally {
@@ -728,6 +677,44 @@
 		priceHistory = await response.json();
 	}
 
+	// Click market row: load pool chart normalized to USD when possible
+	async function handleMarketRowClick(market: any) {
+		selectedTradingPairId = market.trading_pair_id;
+		selectedMarket = {
+			exchange: market.exchange,
+			pair: market.pair,
+			trading_pair_id: market.trading_pair_id
+		};
+
+		// Prefer OHLCV so we can normalize to USD when quote is VOI
+		const baseId = market.base_token_id;
+		const quoteId = market.quote_token_id;
+		try {
+			const res = await fetch(
+				`/api/ohlcv?baseTokenId=${baseId}&quoteTokenId=${quoteId}&resolution=${chartSettings.resolution}&limit=500`
+			);
+			if (!res.ok) throw new Error(`Failed to load market OHLCV (${res.status})`);
+			const json = await res.json();
+			let candles = json?.candles || [];
+			const quoteSym = (market.pair.split('/')[1] || '').toUpperCase();
+			// If quote is VOI or WVOI, convert to USD using VOI reference series (with caching)
+			if (candles.length && (quoteSym === 'VOI' || quoteSym === 'WVOI')) {
+				try {
+					const refJson = await getVoiUsdReferenceData();
+					if (refJson) {
+						candles = convertVoiQuotedCandlesToUsd(candles, refJson);
+					}
+				} catch (e) {
+					console.warn('USD normalization failed; showing VOI quote');
+				}
+			}
+			// Map to line data for PriceChart
+			priceHistory = (candles || []).map((c: any) => ({ time: c.time, value: c.close }));
+		} catch (e) {
+			console.warn('Failed to load market OHLCV:', e);
+		}
+	}
+
 	// Fallback: clicking a pair when server markets are empty
 	async function handlePairClick(pair: TokenPair) {
 		selectedTradingPairId = null;
@@ -747,39 +734,6 @@
 			const json = await res.json();
 			if (json?.candles) {
 				priceHistory = json.candles.map((c: any) => ({ time: c.time, value: c.close }));
-			}
-
-			// Click market row: load pool chart normalized to USD when possible
-			async function handleMarketRowClick(market: any) {
-				selectedTradingPairId = market.trading_pair_id;
-				selectedMarket = {
-					exchange: market.exchange,
-					pair: market.pair,
-					trading_pair_id: market.trading_pair_id
-				};
-
-				// Prefer OHLCV so we can normalize to USD when quote is VOI
-				const baseId = market.base_token_id;
-				const quoteId = market.quote_token_id;
-				const res = await fetch(
-					`/api/ohlcv?baseTokenId=${baseId}&quoteTokenId=${quoteId}&resolution=${chartSettings.resolution}&limit=500`
-				);
-				const json = await res.json();
-				let candles = json?.candles || [];
-				const quoteSym = (market.pair.split('/')[1] || '').toUpperCase();
-				// If quote is VOI or WVOI, convert to USD using VOI reference series (with caching)
-				if (candles.length && (quoteSym === 'VOI' || quoteSym === 'WVOI')) {
-					try {
-						const refJson = await getVoiUsdReferenceData();
-						if (refJson) {
-							candles = convertVoiQuotedCandlesToUsd(candles, refJson);
-						}
-					} catch (e) {
-						console.warn('USD normalization failed; showing VOI quote');
-					}
-				}
-				// Map to line data for PriceChart
-				priceHistory = (candles || []).map((c: any) => ({ time: c.time, value: c.close }));
 			}
 		} catch (e) {
 			console.warn('Failed to load pair OHLCV:', e);
@@ -1256,6 +1210,8 @@
 		}
 	}
 </script>
+
+<svelte:document on:keydown={handleKeydown} />
 
 <!-- Modern Token Analytics Interface -->
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -1749,6 +1705,15 @@
 											</span>
 										</td>
 									</tr>
+								{:else}
+									{#if marketDataError}
+										<tr>
+											<td colspan="6" class="text-center py-12">
+												<p class="text-gray-600 dark:text-gray-400 mb-3">Couldn't load markets for this token.</p>
+												<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}>Retry</Button>
+											</td>
+										</tr>
+									{/if}
 								{/each}
 							</tbody>
 						</table>
@@ -2089,6 +2054,11 @@
 										{/each}
 									</tbody>
 								</table>
+							</div>
+						{:else if marketDataError}
+							<div class="text-center py-12">
+								<p class="text-gray-600 dark:text-gray-400 mb-3">Couldn't load markets for this token.</p>
+								<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}>Retry</Button>
 							</div>
 						{:else if fallbackPairs.length > 0}
 							<!-- Fallback pairs listing when markets API returns none -->
