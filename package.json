@@ -2,9 +2,6 @@
 	"name": "voi_rewards_auditor",
 	"version": "0.0.1",
 	"private": true,
-	"main": "dist/index.js",
-	"module": "dist/index.js",
-	"svelte": "dist/index.js",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "node scripts/generateFaqData.js && vite build",
