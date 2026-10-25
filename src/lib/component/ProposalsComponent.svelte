@@ -27,6 +27,7 @@
 	let historicalExpectedProposals: any = {};
 
 	let isLoading = false;
+	let loadError: string | null = null;
 	let isMounted = false;
 
 	// Watch for wallet changes
@@ -107,11 +108,12 @@
 		const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
 		try {
 			const [response, accountInfoResult, supplyResult] = await Promise.all([
-				fetch(url, { cache: 'no-store' }),
+				fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) }),
 				getAccountInfo(walletId),
 				getSupplyInfo()
 			]);
 
+			if (!response.ok) throw new Error(`Failed to fetch proposals: HTTP ${response.status}`);
 			apiData = await response.json();
 			console.log('Received API data:', apiData);
 			accountInfo = accountInfoResult ?? null;
@@ -154,7 +156,9 @@
 
 			data.sort((a: { date: Date }, b: { date: Date }) => a.date.getTime() - b.date.getTime());
 			console.log('Processed data:', data);
+			loadError = null;
 		} catch (error) {
+			loadError = error instanceof Error ? error.message : String(error);
 			console.error('Error in updateChartData:', error);
 		} finally {
 			isLoading = false;
@@ -335,7 +339,16 @@
 				</div>
 			{/if}
 		</div>
-		{#if apiData == null || isLoading}
+		{#if isLoading}
+			<div class="flex justify-center items-center h-64">
+				<Spinner size="16" />
+			</div>
+		{:else if loadError}
+			<div class="text-center text-gray-500 dark:text-gray-400 py-8" role="status">
+				Couldn't load proposals.
+				<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => updateChartData()}>Retry</button>
+			</div>
+		{:else if apiData == null}
 			<div class="flex justify-center items-center h-64">
 				<Spinner size="16" />
 			</div>

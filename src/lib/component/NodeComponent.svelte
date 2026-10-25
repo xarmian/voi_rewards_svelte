@@ -16,6 +16,7 @@
 	let accountInfo: any;
 	let supply: any;
 	let showRegisterVoteKey = false;
+	let consensusError = false;
 	$: estimatedBlocks = 0;
 	$: balance = 0;
 	$: apiData = {} as any;
@@ -68,6 +69,7 @@
 			accountInfo = await getAccountInfo(walletId, forceRefresh);
 			balance = Number(accountInfo?.amount ?? 0);
 			apiData = await getConsensusInfo(walletId, forceRefresh);
+			consensusError = apiData === undefined;
 
 			averageBlockTime = calculateAverageBlockTime();
 			expectedBlocksPerDay = calculateExpectedBlocks(1);
@@ -185,7 +187,12 @@
 				</div>
 			{:else}
 				<div class="space-y-3">
-					{#if typeof apiData?.total_blocks == 'undefined' || !supply}
+					{#if consensusError}
+						<div class="text-center text-gray-600 dark:text-gray-400 py-8" role="status">
+							Couldn't load consensus data.
+							<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => fetchNodeData(true)}>Retry</button>
+						</div>
+					{:else if typeof apiData?.total_blocks == 'undefined' || !supply}
 						<div class="flex justify-center items-center h-24">
 							<Spinner size="16" />
 						</div>
