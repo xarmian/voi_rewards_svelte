@@ -57,7 +57,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	try {
 		const anaRes = await fetch(`/api/token-analytics?tokenId=${tokenIdResolved}`);
 		const anaJson = await anaRes.json();
-		tokenAnalytics = anaJson?.analytics || null;
+		tokenAnalytics = anaJson?.analytics ? { ...anaJson.analytics, partial: !!anaJson.partial } : null;
 	} catch {}
 
 	// Compose page OG/Twitter metadata used by +layout.svelte

@@ -4,6 +4,8 @@ export interface MarketDataState {
 	marketData: any[];
 	aggregates: { totalVolume: number; totalTvl: number; weightedAveragePrice: number };
 	circulatingSupply: { circulatingSupply: number; percentDistributed: number } | null;
+	voiUsdStatus: 'ok' | 'stale' | 'invalid' | 'unavailable' | null;
+	voiUsdAsOf: string | null;
 	loading: boolean;
 	error: string | null;
 }
@@ -25,6 +27,8 @@ export function createMarketDataLoader(
 		marketData: [],
 		aggregates: EMPTY_AGGREGATES,
 		circulatingSupply: null,
+		voiUsdStatus: null,
+		voiUsdAsOf: null,
 		loading: false,
 		error: null,
 		...initial
@@ -61,6 +65,8 @@ export function createMarketDataLoader(
 			tokenId,
 			marketData: switching ? [] : state.marketData,
 			aggregates: switching ? EMPTY_AGGREGATES : state.aggregates,
+			voiUsdStatus: switching ? null : state.voiUsdStatus,
+			voiUsdAsOf: switching ? null : state.voiUsdAsOf,
 			loading: true,
 			error: null
 		});
@@ -78,6 +84,8 @@ export function createMarketDataLoader(
 					marketData: Array.isArray(data.marketData) ? data.marketData : [],
 					aggregates: data.aggregates || EMPTY_AGGREGATES,
 					circulatingSupply: data.circulatingSupply ?? state.circulatingSupply,
+					voiUsdStatus: data.voiUsdStatus ?? null,
+					voiUsdAsOf: data.voiUsdAsOf ?? null,
 					loading: false,
 					error: null
 				});
@@ -87,6 +95,8 @@ export function createMarketDataLoader(
 					...state,
 					marketData: [],
 					aggregates: EMPTY_AGGREGATES,
+					voiUsdStatus: null,
+					voiUsdAsOf: null,
 					loading: false,
 					error: error instanceof Error ? error.message : String(error)
 				});

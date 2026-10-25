@@ -3,9 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import {
 	fetchPoolAggregates,
-	poolVolumeMetrics,
-	poolLatestReserves,
-	type PoolAggregate
+	poolMetricsOrUnavailable,
+	poolLatestReserves
 } from '$lib/server/poolAggregates';
 
 // Create MIMIR client for pool data
@@ -27,11 +26,11 @@ interface PoolAnalytics {
 	escrowAddress: string;
 	outstandingLpAmount: string;
 	volume: {
-		volume24h: number;
-		volume7d: number;
-		volume30d: number;
-		volumeTokenA24h: number;
-		volumeTokenB24h: number;
+		volume24h: number | null;
+		volume7d: number | null;
+		volume30d: number | null;
+		volumeTokenA24h: number | null;
+		volumeTokenB24h: number | null;
 	};
 	liquidity: {
 		totalTvlUsd: number | null;
@@ -40,10 +39,10 @@ interface PoolAnalytics {
 		lpTokenSupply: number;
 	};
 	metrics: {
-		priceRatio: number;
+		priceRatio: number | null;
 		averageFee: number | null;
-		swapCount24h: number;
-		uniqueTraders24h: number;
+		swapCount24h: number | null;
+		uniqueTraders24h: number | null;
 	};
 }
 
@@ -58,17 +57,17 @@ async function getPoolData(poolId: number): Promise<any> {
 
 		if (error) {
 			console.error('Error calling get_arc200_pools:', error);
-			return null;
+			return { pool: null, failed: true };
 		}
 
 		if (!data || !data.pools || data.pools.length === 0) {
-			return null;
+			return { pool: null, failed: false };
 		}
 
-		return data.pools[0];
+		return { pool: data.pools[0], failed: false };
 	} catch (error) {
 		console.error('Failed to get pool data:', error);
-		return null;
+		return { pool: null, failed: true };
 	}
 }
 
@@ -91,27 +90,33 @@ export const GET: RequestHandler = async ({ url }) => {
 		const poolId = parseInt(poolIdParam, 10);
 
 		// Get pool data and volume metrics in parallel
-		const [poolData, aggregates] = await Promise.all([
+		const [poolResult, aggregates] = await Promise.all([
 			getPoolData(poolId),
 			fetchPoolAggregates(supabaseMimirClient, [poolId]).catch((error) => {
 				console.error('Failed to fetch pool aggregates:', error);
-				return new Map<number, PoolAggregate>();
+				return null;
 			})
 		]);
 
+		if (poolResult.failed) {
+			return json({ error: 'Pool data unavailable' }, { status: 502 });
+		}
+		const poolData = poolResult.pool;
 		if (!poolData) {
 			return json({ error: 'Pool not found' }, { status: 404 });
 		}
 
 		// TASK-52, C11, P06: one aggregate supplies both volume and latest reserves.
-		const agg = aggregates.get(poolId);
-		const volumeMetrics = poolVolumeMetrics(agg);
+		const partialReasons = aggregates === null ? ['aggregates'] : [];
+		const agg = aggregates?.get(poolId);
+		const volumeMetrics = poolMetricsOrUnavailable(agg, aggregates === null);
 		const reserves = poolLatestReserves(agg);
+		const reserveA = reserves?.reserveA || parseFloat(poolData.tokenA.balance);
+		const reserveB = reserves?.reserveB || parseFloat(poolData.tokenB.balance);
 		const averageFee = await calculateAverageFee(poolId);
 
 		// Calculate price ratio (tokenB/tokenA)
-		const priceRatio =
-			reserves && reserves.reserveA > 0 ? reserves.reserveB / reserves.reserveA : 0;
+		const priceRatio = reserveA > 0 ? reserveB / reserveA : null;
 
 		// Construct analytics response
 		const analytics: PoolAnalytics = {
@@ -129,8 +134,8 @@ export const GET: RequestHandler = async ({ url }) => {
 			},
 			liquidity: {
 				totalTvlUsd: null, // Could be calculated with price data
-				reserveA: reserves?.reserveA || parseFloat(poolData.tokenA.balance),
-				reserveB: reserves?.reserveB || parseFloat(poolData.tokenB.balance),
+				reserveA,
+				reserveB,
 				lpTokenSupply: parseFloat(poolData.outstandingLpAmount)
 			},
 			metrics: {
@@ -143,6 +148,8 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		return json({
 			success: true,
+			partial: partialReasons.length > 0,
+			partialReasons,
 			analytics,
 			timestamp: new Date().toISOString(),
 			currentRound: poolData['current-round'] || null

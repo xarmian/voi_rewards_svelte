@@ -169,3 +169,34 @@ export function pairWindow(
 			: null
 	};
 }
+
+export function tokenMetricsOrUnavailable(
+	aggregates: Map<number, PoolAggregate> | null,
+	allIds: number[]
+) {
+	if (aggregates === null) {
+		return {
+			volume: { volume24h: null, volume7d: null, volume30d: null },
+			tvl: { totalTvl: null, poolCount: null }
+		};
+	}
+	return {
+		volume: tokenVolumeMetrics(aggregates.values(), allIds),
+		tvl: tokenTvlMetrics(aggregates.values(), allIds)
+	};
+}
+
+export function poolMetricsOrUnavailable(agg: PoolAggregate | undefined, failed: boolean) {
+	if (failed) {
+		return {
+			volume24h: null,
+			volume7d: null,
+			volume30d: null,
+			volumeTokenA24h: null,
+			volumeTokenB24h: null,
+			swapCount24h: null,
+			uniqueTraders24h: null
+		};
+	}
+	return poolVolumeMetrics(agg);
+}

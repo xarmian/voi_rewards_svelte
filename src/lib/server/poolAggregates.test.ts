@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import * as aggregateHelpers from './poolAggregates.ts';
 import {
 	fetchPoolAggregates,
 	latestSwapRow,
@@ -340,4 +341,37 @@ test('round zero still represents a swap, and null balances become zero', () => 
 	assert.deepEqual(poolLatestReserves(agg), { reserveA: 0, reserveB: 0 });
 	assert.ok(latestSwapRow(agg));
 	assert.deepEqual(tokenTvlMetrics([agg], [0, 302190]), { totalTvl: 0, poolCount: 1 });
+});
+
+
+test('token metrics are null when aggregates are unavailable', () => {
+	assert.deepEqual(aggregateHelpers.tokenMetricsOrUnavailable(null, [0]), {
+		volume: { volume24h: null, volume7d: null, volume30d: null },
+		tvl: { totalTvl: null, poolCount: null }
+	});
+});
+
+test('token metrics are real zeros for a token with no pools', () => {
+	assert.deepEqual(aggregateHelpers.tokenMetricsOrUnavailable(new Map(), [0]), {
+		volume: { volume24h: 0, volume7d: 0, volume30d: 0 },
+		tvl: { totalTvl: 0, poolCount: 0 }
+	});
+});
+
+test('pool metrics are null when the aggregate read failed', () => {
+	assert.deepEqual(aggregateHelpers.poolMetricsOrUnavailable(undefined, true), {
+		volume24h: null,
+		volume7d: null,
+		volume30d: null,
+		volumeTokenA24h: null,
+		volumeTokenB24h: null,
+		swapCount24h: null,
+		uniqueTraders24h: null
+	});
+});
+
+test('pool metrics preserve successful aggregates and genuinely empty results', () => {
+	for (const agg of [undefined, ...aggregates]) {
+		assert.deepEqual(aggregateHelpers.poolMetricsOrUnavailable(agg, false), poolVolumeMetrics(agg));
+	}
 });

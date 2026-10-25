@@ -37,6 +37,8 @@ const seeded: Partial<MarketDataState> = {
   marketData: token1Rows,
   aggregates,
   circulatingSupply: supply,
+  voiUsdStatus: "stale",
+  voiUsdAsOf: "2026-10-25T10:00:00Z",
 };
 
 function setup(initial?: Partial<MarketDataState>) {
@@ -107,6 +109,8 @@ test("switch clears rows immediately before the response resolves", async () => 
     marketData: [],
     aggregates: EMPTY_AGGREGATES,
     circulatingSupply: supply,
+    voiUsdStatus: null,
+    voiUsdAsOf: null,
     loading: true,
     error: null,
   });
@@ -180,4 +184,43 @@ test("success guards non-array rows, defaults aggregates, and retains supply", a
   assert.deepEqual(loader.state.circulatingSupply, supply);
   assert.equal(loader.state.error, null);
   assert.equal(loader.state.loading, false);
+});
+
+
+test("VOI/USD status and asOf are initially null and applied on success", async () => {
+  const { loader, request } = setup();
+  assert.equal(loader.state.voiUsdStatus, null);
+  assert.equal(loader.state.voiUsdAsOf, null);
+  for (const voiUsdStatus of ["ok", "stale", "invalid", "unavailable"] as const) {
+    const pending = loader.load(1, { force: true });
+    const voiUsdAsOf = "2026-10-25T11:00:00Z";
+    request(1, ["ok", "stale", "invalid", "unavailable"].indexOf(voiUsdStatus)).resolve(
+      Response.json({ marketData: token1Rows, voiUsdStatus, voiUsdAsOf }),
+    );
+    await pending;
+    assert.equal(loader.state.voiUsdStatus, voiUsdStatus);
+    assert.equal(loader.state.voiUsdAsOf, voiUsdAsOf);
+  }
+});
+
+test("VOI/USD status and asOf reset immediately on token switch", async () => {
+  const { loader, request } = setup(seeded);
+  const pending = loader.load(2);
+  assert.equal(loader.state.voiUsdStatus, null);
+  assert.equal(loader.state.voiUsdAsOf, null);
+  request(2).resolve(Response.json({ marketData: token2Rows }));
+  await pending;
+  assert.equal(loader.state.voiUsdStatus, null);
+  assert.equal(loader.state.voiUsdAsOf, null);
+});
+
+test("VOI/USD status and asOf reset on refresh failure", async () => {
+  const { loader, request } = setup(seeded);
+  const pending = loader.load(1, { force: true });
+  assert.equal(loader.state.voiUsdStatus, seeded.voiUsdStatus);
+  assert.equal(loader.state.voiUsdAsOf, seeded.voiUsdAsOf);
+  request(1).reject(new Error("Network unavailable"));
+  await pending;
+  assert.equal(loader.state.voiUsdStatus, null);
+  assert.equal(loader.state.voiUsdAsOf, null);
 });
