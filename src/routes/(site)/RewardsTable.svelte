@@ -308,7 +308,7 @@
 		</div>
 		<button
 			on:click={handleRefresh}
-			class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
+			class="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 flex items-center"
 			disabled={isRefreshing}
 		>
 			<i class="fas fa-sync-alt mr-2 {isRefreshing ? 'animate-spin' : ''}"></i>
@@ -475,7 +475,8 @@
 											<Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
 											<button
 												on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
-												class="text-blue-500 hover:text-blue-600 underline">{item.proposer}</button
+												class="text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline"
+												>{item.proposer}</button
 											>
 
 											<!-- Action buttons group -->
@@ -508,7 +509,7 @@
 												<a
 													href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
 													target="_blank"
-													class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+													class="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-blue-700 bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 dark:hover:text-blue-300 rounded-lg transition-colors"
 													on:click|stopPropagation
 												>
 													<i class="fas fa-search"></i>
@@ -550,7 +551,7 @@
 												<a
 													href="https://app.envoi.sh/#/{item.nfd}"
 													target="_blank"
-													class="text-blue-500 hover:text-blue-700 hover:underline"
+													class="text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
 													on:click|stopPropagation
 												>
 													{item.nfd}
@@ -625,8 +626,8 @@
 </Modal>
 
 <style>
+	/* No colour here: a scoped a{color} beat the Tailwind text classes, and #007bff failed contrast (VIS-01). */
 	a {
-		color: #007bff;
 		text-decoration: none;
 		background-color: transparent;
 	}

@@ -267,7 +267,7 @@
 		{#if !hideSubmitButton}
 			<button
 				on:click={() => handleSubmit()}
-				class="bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg"
+				class="wallet-submit bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg"
 			>
 				<SearchOutline class="block sm:hidden" />
 				<span class="hidden sm:block">Submit</span>
@@ -380,7 +380,8 @@
 		@apply border-b-0;
 	}
 
-	button {
+	/* The purple Submit sets its own white text; this rule beat text-white on light (VIS-01, TASK-23). */
+	button:not(.wallet-submit) {
 		@apply text-gray-900;
 	}
 
