@@ -1,7 +1,7 @@
-import { test, beforeEach } from 'vitest';
+import { test, beforeEach, afterEach, vi, expect } from 'vitest';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
-import { voiPrice, updateVoiPrice, fetchVoiPriceWith } from './price.ts';
+import { voiPrice, updateVoiPrice, fetchVoiPriceWith, VOI_PRICE_TTL_MS } from './price.ts';
 
 const previousDate = new Date('2026-10-20T12:00:00Z');
 const newDate = '2026-10-25T12:00:00Z';
@@ -58,4 +58,35 @@ test('a refresh never emits a zero price', async () => {
 test('an already-set price skips a fetch unless refreshed', async () => {
 	await fetchVoiPriceWith(async () => { assert.fail('should not fetch'); });
 	assert.equal(get(voiPrice).price, 0.0002);
+});
+
+
+afterEach(() => vi.restoreAllMocks());
+
+test('TASK-30 concurrent refresh callers share one fetch and both see the updated store', async () => {
+	let resolve!: (response: Response) => void;
+	const fetchFn = vi.fn(() => new Promise<Response>((done) => (resolve = done)));
+	const first = fetchVoiPriceWith(fetchFn, true);
+	const second = fetchVoiPriceWith(fetchFn, true);
+	await Promise.resolve();
+	expect(fetchFn).toHaveBeenCalledTimes(1);
+	resolve(poolResponse());
+	await Promise.all([first, second].map(async (pending) => {
+		await pending;
+		expect(get(voiPrice).price).toBe(0.0003);
+	}));
+});
+
+test('TASK-30 price expires using fetch time rather than pool.lastUpdated', async () => {
+	expect(VOI_PRICE_TTL_MS).toBe(60_000);
+	let time = 1000;
+	vi.spyOn(Date, 'now').mockImplementation(() => time);
+	const fetchFn = vi.fn(async () => poolResponse());
+	await fetchVoiPriceWith(fetchFn, true);
+	time += VOI_PRICE_TTL_MS - 1;
+	await fetchVoiPriceWith(fetchFn);
+	expect(fetchFn).toHaveBeenCalledTimes(1);
+	time++;
+	await fetchVoiPriceWith(fetchFn);
+	expect(fetchFn).toHaveBeenCalledTimes(2);
 });
