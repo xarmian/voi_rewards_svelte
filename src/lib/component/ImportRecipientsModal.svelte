@@ -3,7 +3,6 @@
 	import type { Recipient } from '$lib/types/recipients';
 	import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
 	import algosdk from 'algosdk';
-	import * as XLSX from 'xlsx';
 
 	export let open = false;
 	export let onClose = () => {};
@@ -151,41 +150,24 @@
 
 		const file = event.dataTransfer?.files[0];
 		if (!file) return;
-
-		try {
-			if (file.name.toLowerCase().endsWith('.xlsx')) {
-				const arrayBuffer = await file.arrayBuffer();
-				const workbook = XLSX.read(arrayBuffer);
-				const firstSheetName = workbook.SheetNames[0];
-				const worksheet = workbook.Sheets[firstSheetName];
-				const jsonData = XLSX.utils.sheet_to_json(worksheet);
-				rawContent = JSON.stringify(jsonData);
-			} else {
-				rawContent = await file.text();
-			}
-			parseContent();
-			importStep = 'preview';
-		} catch (err) {
-			error = 'Failed to read file. Please try again.';
-		}
+		await importFile(file);
 	}
 
 	async function handleFileInput(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
+		await importFile(file);
+	}
 
+	// Excel import is disabled (TASK-45, SEC-09); drag-and-drop ignores the input's accept list.
+	async function importFile(file: File) {
+		if (/\.(xlsx|xls)$/i.test(file.name)) {
+			error = 'Excel files are not supported. Save the sheet as CSV and import that instead.';
+			return;
+		}
 		try {
-			if (file.name.toLowerCase().endsWith('.xlsx')) {
-				const arrayBuffer = await file.arrayBuffer();
-				const workbook = XLSX.read(arrayBuffer);
-				const firstSheetName = workbook.SheetNames[0];
-				const worksheet = workbook.Sheets[firstSheetName];
-				const jsonData = XLSX.utils.sheet_to_json(worksheet);
-				rawContent = JSON.stringify(jsonData);
-			} else {
-				rawContent = await file.text();
-			}
+			rawContent = await file.text();
 			parseContent();
 			importStep = 'preview';
 		} catch (err) {
@@ -1275,7 +1257,7 @@
 										type="file"
 										id="file-upload"
 										class="hidden"
-										accept=".txt,.csv,.md,.json,.xlsx"
+										accept=".txt,.csv,.tsv,.md,.json"
 										on:change={handleFileInput}
 									/>
 									<Button
@@ -1316,7 +1298,7 @@
 							</div>
 
 							<p class="text-xs text-gray-500 dark:text-gray-400">
-								Supported formats: CSV, TSV, TXT, XLSX, Markdown tables, or JSON arrays
+								Supported formats: CSV, TSV, TXT, Markdown tables, or JSON arrays
 							</p>
 						</div>
 					{/if}

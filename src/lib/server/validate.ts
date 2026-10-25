@@ -8,10 +8,6 @@ function parseInteger(value: string, min: number, max = Infinity): number | null
 	return Number.isSafeInteger(number) && number >= min && number <= max ? number : null;
 }
 
-export function validateBallastLookback(value: string | null): number | null {
-	return value === null ? 5 : parseInteger(value, 1, 50);
-}
-
 export function validatePhase2Pagination(
 	params: URLSearchParams
 ): { page: number; pageSize: number } | { error: string } {
