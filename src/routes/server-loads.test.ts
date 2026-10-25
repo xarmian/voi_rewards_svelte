@@ -56,7 +56,7 @@ const quests = [
 
 beforeEach(() => {
 	vi.resetAllMocks();
-	selectedWallet.set(null);
+	selectedWallet.update(() => null);
 	vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => vi.restoreAllMocks());
