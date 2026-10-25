@@ -1,4 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { pgrstQuote, validateTokenSearch } from '$lib/server/validate';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import type { PoolCatalog } from '$lib/types/ohlcv.types';
@@ -17,6 +18,8 @@ export interface UniqueToken {
 
 export const GET: RequestHandler = async ({ url }) => {
 	try {
+		const validationError = validateTokenSearch(url.searchParams.get('q'), 'q');
+		if (validationError) return json({ error: validationError }, { status: 400 });
 		const query = url.searchParams.get('q') || '';
 		const limit = parseInt(url.searchParams.get('limit') || '100');
 
@@ -29,7 +32,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		if (query) {
 			// Search by either token_a_symbol or token_b_symbol
-			poolQuery = poolQuery.or(`token_a_symbol.ilike.%${query}%,token_b_symbol.ilike.%${query}%`);
+			const escapedQuery = query.replace(/[\\%_]/g, '\\$&');
+			poolQuery = poolQuery.or(
+				`token_a_symbol.ilike.${pgrstQuote(`%${escapedQuery}%`)},token_b_symbol.ilike.${pgrstQuote(`%${escapedQuery}%`)}`
+			);
 		}
 
 		const { data, error } = await poolQuery;
