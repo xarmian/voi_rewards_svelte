@@ -176,8 +176,8 @@ export const GET: RequestHandler = async ({ url }) => {
 				(pools || []).map((pool) => pool.pool_id)
 			);
 		} catch (error) {
-			console.error('Failed to calculate volume metrics:', error);
-			console.error('Failed to calculate TVL metrics:', error);
+			// One RPC feeds both metrics, so a failure zeroes both (TASK-52 review r1).
+			console.error('Failed to fetch pool aggregates for volume and TVL metrics:', error);
 		}
 		const volumeMetrics = tokenVolumeMetrics(aggregates.values(), allIds);
 		const tvlMetrics = tokenTvlMetrics(aggregates.values(), allIds);
