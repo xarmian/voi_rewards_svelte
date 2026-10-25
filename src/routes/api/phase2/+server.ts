@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { validatePhase2Pagination } from '$lib/server/validate';
 import { supabasePublicClient } from '$lib/supabase';
 
 const corsHeaders = {
@@ -8,6 +9,10 @@ const corsHeaders = {
 };
 
 const DEFAULT_PAGE_SIZE = 1000;
+const archiveHeaders = {
+	...corsHeaders,
+	'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800'
+};
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
@@ -15,8 +20,11 @@ export async function GET({ url }) {
 	const fetchAll = url.searchParams.get('fetchAll') === 'true';
 	const combine = url.searchParams.get('combine') === 'true';
 	const csv = url.searchParams.get('csv') === 'true';
-	const page = parseInt(url.searchParams.get('page') ?? '1', 10);
-	const pageSize = parseInt(url.searchParams.get('pageSize') ?? DEFAULT_PAGE_SIZE.toString(), 10);
+	const pagination = validatePhase2Pagination(url.searchParams);
+	if ('error' in pagination) {
+		return json({ error: pagination.error }, { status: 400, headers: corsHeaders });
+	}
+	const { page, pageSize } = pagination;
 
 	if (!wallet && !fetchAll) {
 		return json(
@@ -41,12 +49,12 @@ export async function GET({ url }) {
 					return csv
 						? new Response('address,airdrop_amount\n', {
 								headers: {
-									...corsHeaders,
+									...archiveHeaders,
 									'Content-Type': 'text/csv',
 									'Content-Disposition': 'attachment; filename="phase2_airdrop.csv"'
 								}
 							})
-						: json({ wallets: [] }, { headers: corsHeaders });
+						: json({ wallets: [] }, { headers: archiveHeaders });
 				}
 
 				// Calculate number of requests needed
@@ -83,7 +91,7 @@ export async function GET({ url }) {
 				if (csv) {
 					return new Response(csvContent, {
 						headers: {
-							...corsHeaders,
+							...archiveHeaders,
 							'Content-Type': 'text/csv',
 							'Content-Disposition': 'attachment; filename="phase2_airdrop.csv"'
 						}
@@ -93,7 +101,7 @@ export async function GET({ url }) {
 				return json(
 					{ wallets: allWallets },
 					{
-						headers: corsHeaders
+						headers: archiveHeaders
 					}
 				);
 			}
@@ -132,7 +140,7 @@ export async function GET({ url }) {
 					}
 				},
 				{
-					headers: corsHeaders
+					headers: archiveHeaders
 				}
 			);
 		} else {
