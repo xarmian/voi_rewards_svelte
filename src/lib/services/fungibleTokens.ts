@@ -146,7 +146,7 @@ export async function fetchFungibleTokens(
 			let tokenValue = 0;
 			let tokenUsdValue = 0;
 
-			if (asset.usdValue != null) {
+			if (asset.usdValue != null && asset.usdValue !== 'null' && asset.usdValue !== '') {
 				let usdValuePerToken = parseFloat(asset.usdValue);
 				if (!Number.isFinite(usdValuePerToken)) {
 					usdValuePerToken = 0;

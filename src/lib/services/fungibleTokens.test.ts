@@ -152,3 +152,16 @@ test('NaN USD price uses zero values and reports partial', async () => {
 	assert.equal(result.tokens[0].usdValue, 0);
 	assert.equal(result.partial, true);
 });
+
+// The assets API sends JSON null for unpriced tokens; 'null' and '' are guarded too (TASK-22 r4).
+test("a missing USD price ('null', '' or null) is not partial", async () => {
+	for (const usdValue of ['null', '', null]) {
+		const result = await fetchFungibleTokens('wallet', 0.0002, {
+			getLiquidityPools: async () => [],
+			fetch: async (input) => new URL(String(input)).pathname === '/account/assets'
+				? Response.json({ balances: [{ ...balances[0], usdValue }], 'next-token': null })
+				: fakeFetch()(input)
+		});
+		assert.equal(result.partial, false, `usdValue ${JSON.stringify(usdValue)}`);
+	}
+});
