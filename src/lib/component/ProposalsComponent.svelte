@@ -25,8 +25,11 @@
 	$: accountInfo = null as Account | null;
 	let expectedBlockTime: string | null = null;
 	let historicalExpectedProposals: any = {};
+	let expectedUnavailable = false;
 
 	let isLoading = false;
+	let proposalsRequestId = 0;
+	let loadError: string | null = null;
 	let isMounted = false;
 
 	// Watch for wallet changes
@@ -97,28 +100,42 @@
 	}
 
 	async function updateChartData() {
-		if (isLoading) return;
+		const requested = walletId;
+		const requestId = ++proposalsRequestId;
+		apiData = null;
+		data = [];
+		loadError = null;
+		expectedUnavailable = false;
+		expectedBlockTime = null;
+		accountInfo = null;
 
 		console.log('Starting updateChartData...');
 		isLoading = true;
 
 		// Don't dispose of the chart here anymore, let the reactive statement handle it
 
-		const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
+		const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${requested}`;
 		try {
 			const [response, accountInfoResult, supplyResult] = await Promise.all([
-				fetch(url, { cache: 'no-store' }),
-				getAccountInfo(walletId),
+				fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) }),
+				getAccountInfo(requested),
 				getSupplyInfo()
 			]);
+			if (requestId !== proposalsRequestId) return;
 
-			apiData = await response.json();
+			if (!response.ok) throw new Error(`Failed to fetch proposals: HTTP ${response.status}`);
+			const proposals = await response.json();
+			if (requestId !== proposalsRequestId) return;
+			apiData = proposals;
 			console.log('Received API data:', apiData);
 			accountInfo = accountInfoResult ?? null;
 			supply = supplyResult;
+			expectedUnavailable = accountInfoResult === undefined || supplyResult == null;
+			expectedBlockTime = null;
+			historicalExpectedProposals = {};
 
 			// Calculate expected block time using current supply
-			if (accountInfo?.amount && supply?.['online-money']) {
+			if (!expectedUnavailable && accountInfo?.amount && supply?.['online-money']) {
 				const balance = Number(accountInfo?.amount);
 				const secondsPerDay = 24 * 60 * 60;
 				const blocksPerDay = secondsPerDay / 2.8;
@@ -130,34 +147,40 @@
 				expectedBlockTime = `${hours}h ${minutes}m`;
 			}
 
-			const chartData = await fetchOnlineStakeHistory();
-			console.log('Received chart data:', chartData);
-
 			// Calculate expected proposals using chartData
-			historicalExpectedProposals = {};
-			chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
-				if (new Date(dayData.date) < new Date('2024-10-30')) return;
-				if (dayData.avg_online_stake) {
-					const balance = Number(accountInfo?.amount ?? 0);
-					const secondsPerDay = 24 * 60 * 60;
-					const blocksPerDay = secondsPerDay / 2.8;
-					const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
-					historicalExpectedProposals[dayData.date] = expectedBlocks;
-				}
-			});
+			if (!expectedUnavailable) {
+				const chartData = await fetchOnlineStakeHistory();
+				if (requestId !== proposalsRequestId) return;
+				console.log('Received chart data:', chartData);
+				if (chartData === null) {
+					expectedUnavailable = true;
+				} else chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
+					if (new Date(dayData.date) < new Date('2024-10-30')) return;
+					if (dayData.avg_online_stake) {
+						const balance = Number(accountInfo?.amount ?? 0);
+						const secondsPerDay = 24 * 60 * 60;
+						const blocksPerDay = secondsPerDay / 2.8;
+						const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
+						historicalExpectedProposals[dayData.date] = expectedBlocks;
+					}
+				});
+			}
 
 			data = Object.keys(apiData).map((date) => ({
 				date: new Date(date + 'T00:00:00'),
 				actual: apiData[date].length,
-				expected: historicalExpectedProposals[date] ?? 0
+				expected: expectedUnavailable ? null : (historicalExpectedProposals[date] ?? null)
 			}));
 
 			data.sort((a: { date: Date }, b: { date: Date }) => a.date.getTime() - b.date.getTime());
 			console.log('Processed data:', data);
+			loadError = null;
 		} catch (error) {
+			if (requestId !== proposalsRequestId) return;
+			loadError = error instanceof Error ? error.message : String(error);
 			console.error('Error in updateChartData:', error);
 		} finally {
-			isLoading = false;
+			if (requestId === proposalsRequestId) isLoading = false;
 		}
 	}
 
@@ -195,7 +218,7 @@
 						custom: 'eee, MMMM do'
 					});
 					let result = `${escapeHtml(formattedDate)}<br/>`;
-					const expected = params.find((p: any) => p.seriesName === 'Expected Proposals');
+					const expected = params.find((p: any) => p.seriesName === 'Expected Proposals' && p.value != null);
 					const actual = params.find((p: any) => p.seriesName === 'Actual Proposals');
 					if (expected) {
 						result += `Expected Proposals: ${escapeHtml(Math.round(expected.value))}<br/>`;
@@ -335,7 +358,16 @@
 				</div>
 			{/if}
 		</div>
-		{#if apiData == null || isLoading}
+		{#if isLoading}
+			<div class="flex justify-center items-center h-64">
+				<Spinner size="16" />
+			</div>
+		{:else if loadError}
+			<div class="text-center text-gray-500 dark:text-gray-400 py-8" role="status">
+				Couldn't load proposals.
+				<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => updateChartData()}>Retry</button>
+			</div>
+		{:else if apiData == null}
 			<div class="flex justify-center items-center h-64">
 				<Spinner size="16" />
 			</div>
@@ -344,7 +376,7 @@
 				No proposals found in last 30 days
 			</div>
 		{:else}
-			{#if accountInfo?.status !== 'Online'}
+			{#if accountInfo && accountInfo.status !== 'Online'}
 				<div
 					class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-50 rounded-lg dark:bg-yellow-900 dark:text-yellow-100"
 				>
@@ -377,6 +409,9 @@
 						</div>
 					</div>
 				</div>
+			{/if}
+			{#if expectedUnavailable}
+				<p class="mb-2 text-xs text-gray-500 dark:text-gray-400">Expected proposals unavailable.</p>
 			{/if}
 			<div
 				class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded"

@@ -16,6 +16,7 @@
 	let accountInfo: any;
 	let supply: any;
 	let showRegisterVoteKey = false;
+	let consensusError = false;
 	$: estimatedBlocks = 0;
 	$: balance = 0;
 	$: apiData = {} as any;
@@ -33,6 +34,7 @@
 	let currentEpoch: number;
 	let epochRewards: number[] = [];
 	const EPOCHS_PER_YEAR = 52;
+	let nodeRequestId = 0;
 
 	$: if (walletId) {
 		fetchNodeData();
@@ -43,31 +45,66 @@
 	onMount(async () => {});
 
 	async function fetchNodeData(forceRefresh: boolean = false) {
+		if (!walletId) return;
+		const requested = walletId;
+		const requestId = ++nodeRequestId;
+		accountInfo = undefined;
+		apiData = {};
+		balance = 0;
+		consensusError = false;
 		loading = true;
 		try {
-			supply = await getSupplyInfo();
+			const supplyResult = await getSupplyInfo();
+			if (requestId !== nodeRequestId) return;
+			supply = supplyResult;
+			if (supply == null) {
+				consensusError = true;
+				return;
+			}
 
 			// Get latest epoch data
 			const dates = await dataTable.fetchDateRanges();
+			if (requestId !== nodeRequestId) return;
+			if (!Array.isArray(dates) || dates.length === 0 || !Number.isFinite(dates[dates.length - 1]?.epoch)) {
+				consensusError = true;
+				return;
+			}
 			const latestEpoch = dates[dates.length - 1];
 			currentEpoch = latestEpoch.epoch;
 			const epochData = await dataTable.fetchData(latestEpoch.id);
+			if (requestId !== nodeRequestId) return;
+			if (!epochData || !Number.isFinite(Number(epochData.blacklist_balance_total))) {
+				consensusError = true;
+				return;
+			}
 
 			// Fetch next year's worth of epoch rewards
 			const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) =>
 				getTokensByEpoch(currentEpoch + i)
 			);
-			epochRewards = await Promise.all(epochPromises);
-
-			if (epochData) {
-				rewardStake =
-					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
+			const rewards = await Promise.all(epochPromises);
+			if (requestId !== nodeRequestId) return;
+			if (rewards.some((reward) => !Number.isFinite(reward))) {
+				consensusError = true;
+				return;
 			}
+			epochRewards = rewards;
+
+			rewardStake = Number(supply['online-money']) - Number(epochData.blacklist_balance_total);
 
 			// Get account information with force refresh option
-			accountInfo = await getAccountInfo(walletId, forceRefresh);
+			const accountResult = await getAccountInfo(requested, forceRefresh);
+			if (requestId !== nodeRequestId) return;
+			accountInfo = accountResult;
+			if (accountInfo === undefined) {
+				consensusError = true;
+				return;
+			}
 			balance = Number(accountInfo?.amount ?? 0);
-			apiData = await getConsensusInfo(walletId, forceRefresh);
+			const consensusResult = await getConsensusInfo(requested, forceRefresh);
+			if (requestId !== nodeRequestId) return;
+			apiData = consensusResult;
+			consensusError = apiData === undefined;
 
 			averageBlockTime = calculateAverageBlockTime();
 			expectedBlocksPerDay = calculateExpectedBlocks(1);
@@ -79,11 +116,12 @@
 			estimatedRewardsPerWeek = calculateRewardsForPeriod(1);
 			estimatedRewardsPerMonth = calculateRewardsForPeriod(30.44 / 7); // ~4.33 weeks
 
-			loading = false;
 		} catch (error) {
+			if (requestId !== nodeRequestId) return;
+			consensusError = true;
 			console.error('Failed to fetch node data:', error);
 		} finally {
-			loading = false;
+			if (requestId === nodeRequestId) loading = false;
 		}
 	}
 
@@ -178,6 +216,11 @@
 			{#if loading}
 				<div class="flex justify-center items-center h-24">
 					<Spinner size="16" />
+				</div>
+			{:else if consensusError}
+				<div class="text-center text-gray-600 dark:text-gray-400 py-8" role="status">
+					Couldn't load consensus data.
+					<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => fetchNodeData(true)}>Retry</button>
 				</div>
 			{:else if balance == 0 || Number(supply?.['online-money'] ?? 0) == 0}
 				<div class="flex justify-center items-center h-24">

@@ -59,10 +59,12 @@ function createOnlineStakeStore() {
 
 	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-	async function fetchData() {
+	async function fetchData(): Promise<OnlineStakeData[] | null> {
 		try {
 			const response = await fetch(`${config.proposalApiBaseUrl}?action=online-stake-history`);
+			if (!response.ok) throw new Error(`Failed to fetch online stake history: HTTP ${response.status}`);
 			const data = await response.json();
+			if (!Array.isArray(data)) throw new Error('Invalid online stake history');
 			update(() => ({
 				data,
 				lastFetched: Date.now()
@@ -70,21 +72,22 @@ function createOnlineStakeStore() {
 			return data;
 		} catch (error) {
 			console.error('Error fetching online stake history:', error);
-			return [];
+			return null;
 		}
 	}
 
-	async function getData() {
+	async function getData(): Promise<OnlineStakeData[] | null> {
 		let currentValue: OnlineStakeStore | undefined;
 		subscribe((store) => {
 			currentValue = store;
 		})();
 
-		if (!currentValue?.lastFetched || Date.now() - currentValue.lastFetched > CACHE_DURATION) {
-			return await fetchData();
+		if (currentValue?.lastFetched && Array.isArray(currentValue.data) &&
+			Date.now() - currentValue.lastFetched <= CACHE_DURATION) {
+			return currentValue.data;
 		}
 
-		return currentValue.data;
+		return await fetchData();
 	}
 
 	return {
@@ -118,24 +121,6 @@ export async function getConsensusInfo(
 		const response = await fetch(url, { cache: 'no-store' });
 
 		if (!response.ok) {
-			if (response.status === 500) {
-				// Return empty consensus info for new/inactive wallets
-				const emptyConsensus: ConsensusDetails = {
-					first_block: 0,
-					last_block: 0,
-					last_vote_block: 0,
-					last_vote_timestamp: new Date().toISOString(),
-					total_blocks: 0,
-					vote_count: 0
-				};
-
-				consensusInfo.update((current) => ({
-					...current,
-					[address]: emptyConsensus
-				}));
-
-				return emptyConsensus;
-			}
 			throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
 		}
 
@@ -188,9 +173,13 @@ export async function getSupplyInfo(): Promise<SupplyInfo | null> {
 
 	try {
 		const data = (await algodClient.supply().do()) as SupplyInfo;
-		const ballastBalance = await fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`)
-			.then((res) => res.json())
-			.then((data) => data['blacklist_balance_total']);
+		const res = await fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`);
+		if (!res.ok) throw new Error(`Failed to fetch blacklist balance: HTTP ${res.status}`);
+		const blacklistData = await res.json();
+		const ballastBalance = Number(blacklistData.blacklist_balance_total);
+		if (!Number.isFinite(ballastBalance) || ballastBalance < 0) {
+			throw new Error('Invalid blacklist balance');
+		}
 
 		supply.set({ ...data, 'blacklisted-money': ballastBalance });
 
