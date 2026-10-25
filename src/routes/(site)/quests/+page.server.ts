@@ -1,4 +1,8 @@
-export const load = async () => {
+import { fetchProjects } from '../phase2/[...slug]/projects';
+import type { PageServerLoad } from './$types';
+
+export const load = (async () => {
+	const projects = await fetchProjects();
 	const pageMetaTags = {
 		title: 'Voi Testnet Quests',
 		description: 'Get Your Quest On, with the Voi Testnet Network',
@@ -6,6 +10,7 @@ export const load = async () => {
 	};
 
 	return {
+		projects,
 		pageMetaTags
 	};
-};
+}) satisfies PageServerLoad;

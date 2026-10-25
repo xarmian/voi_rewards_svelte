@@ -1,6 +1,7 @@
+import type { PageServerLoad } from './$types';
 import { fetchProjects } from '../../phase2/[...slug]/projects';
 
-export const load = async ({ params }) => {
+export const load = (async ({ params }) => {
 	const { projectId } = params;
 	const projects = await fetchProjects();
 	let project;
@@ -10,7 +11,7 @@ export const load = async ({ params }) => {
 		if (!project) {
 			return {
 				status: 404,
-				error: new Error('Project not found')
+				error: 'Project not found'
 			};
 		}
 	}
@@ -24,9 +25,10 @@ export const load = async ({ params }) => {
 	};
 
 	return {
+		projects,
 		props: {
 			projectId: project?.id
 		},
 		pageMetaTags
 	};
-};
+}) satisfies PageServerLoad;

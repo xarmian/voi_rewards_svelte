@@ -1,5 +1,5 @@
 import { supabasePublicClient } from '$lib/supabase';
-import type { PageLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
 interface WeekRange {
 	start: string;
@@ -53,7 +53,7 @@ function generateWeekRanges(startDate: string, endDate: string): WeekRange[] {
 	return weeks;
 }
 
-export const load: PageLoad = async () => {
+export const load: PageServerLoad = async () => {
 	// Get the max date from the database
 	const { data: maxDateResult, error: maxDateError } = await supabasePublicClient
 		.from('vr_relay_peers')

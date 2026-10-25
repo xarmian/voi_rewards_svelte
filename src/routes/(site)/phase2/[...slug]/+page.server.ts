@@ -4,14 +4,27 @@ import {
 	type VrPhase2,
 	type VrQuest
 } from '$lib/supabase';
+import type { PageServerLoad } from './$types';
 import { fetchProjects } from '../../phase2/[...slug]/projects';
 
-export const load = async ({ params }) => {
+export const load = (async ({ params }) => {
 	const { slug } = params;
 	const parts = slug.split('/');
 	const wallet = parts[0] && parts[0] === '_' ? '' : (parts[0] ?? '');
 
-	const projects = await fetchProjects();
+	const [projects, walletResults] = await Promise.all([
+		fetchProjects(),
+		wallet.length > 0
+			? Promise.all([
+					supabasePublicClient.from('leaderboard').select('*').eq('wallet', wallet),
+					supabasePublicClient.from('vr_phase2').select('*').eq('address', wallet),
+					supabasePublicClient
+						.from('vr_quests')
+						.select('*')
+						.or('status.is.null,status.neq.inactive')
+				])
+			: Promise.resolve(null)
+	]);
 	const project =
 		projects.find((p) => p.column === parts[1]) ?? projects.find((p) => p.id === Number(parts[1]));
 	const projectId = project?.id ?? 0;
@@ -49,29 +62,20 @@ export const load = async ({ params }) => {
         'Grand Voiager': 1.1,
     };*/
 
-	if (wallet.length > 0) {
-		const { data, error } = await supabasePublicClient
-			.from('leaderboard')
-			.select('*')
-			.eq('wallet', wallet);
+	if (walletResults) {
+		const [
+			{ data, error },
+			{ data: qData, error: questError },
+			{ data: qList, error: questListError }
+		] = walletResults;
 
 		if (!error) {
 			leaderboardData = data && data[0];
 		}
 
-		const { data: qData, error: questError } = await supabasePublicClient
-			.from('vr_phase2')
-			.select('*')
-			.eq('address', wallet);
-
 		if (!questError) {
 			questData = qData[0];
 		}
-
-		const { data: qList, error: questListError } = await supabasePublicClient
-			.from('vr_quests')
-			.select('*')
-			.or('status.is.null,status.neq.inactive');
 
 		if (!questListError) {
 			questList = qList;
@@ -146,4 +150,4 @@ export const load = async ({ params }) => {
 		},
 		pageMetaTags
 	};
-};
+}) satisfies PageServerLoad;

@@ -67,7 +67,7 @@ describe('TASK-32 leaderboard server load', () => {
 		const rows = query();
 		const count = query();
 		mocks.from.mockReturnValueOnce(rows.builder).mockReturnValueOnce(count.builder);
-		const pending = load({} as never);
+		const pending = load();
 		await vi.waitFor(() => {
 			expect(rows.started).toHaveBeenCalledOnce();
 			expect(count.started).toHaveBeenCalledOnce();
@@ -96,7 +96,7 @@ describe('TASK-32 leaderboard server load', () => {
 		mocks.from.mockReturnValueOnce(rows.builder).mockReturnValueOnce(count.builder);
 		rows.resolve([], failure === 'rows' ? { message: 'rows failed' } : null);
 		count.resolve(null, failure === 'count' ? { message: 'count failed' } : null, 0);
-		const result = await load({} as never);
+		const result = await load();
 		expect(result).toEqual({ status: 500, error: 'Failed to fetch leaderboard data' });
 		expect(() => stringify(result)).not.toThrow();
 	});
@@ -316,7 +316,7 @@ describe('TASK-32 quests server loads', () => {
 		mocks.from.mockReturnValueOnce(projects.builder).mockReturnValueOnce(allQuests.builder);
 		projects.resolve([project]);
 		allQuests.resolve(quests);
-		expect(await load({} as never)).toEqual({
+		expect(await load()).toEqual({
 			projects: [{ ...project, quests: quests.slice(0, 3) }],
 			pageMetaTags: {
 				title: 'Voi Testnet Quests',

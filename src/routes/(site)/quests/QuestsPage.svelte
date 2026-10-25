@@ -10,10 +10,12 @@
 	export let selectedProjectId: number | null = null;
 	export let filteredProjects: IProject[] = [];
 
-	let projects: IProject[] = [];
+	export let projects: IProject[] | undefined = undefined;
 
 	onMount(async () => {
-		projects = await fetchProjects();
+		if (projects === undefined) {
+			projects = await fetchProjects();
+		}
 	});
 
 	$: if (selectedProjectId || selectedProjectId == null) {
@@ -23,14 +25,14 @@
 			} else {
 				document.body.style.overflow = 'auto';
 			}
-			const p = projects.find((p) => p.id === selectedProjectId);
+			const p = projects?.find((p) => p.id === selectedProjectId);
 
 			const newUrl = '/quests/' + encodeURIComponent(p?.title ?? '');
 			history.pushState({ path: newUrl }, '', newUrl);
 		}
 	}
 
-	$: if (projects.length > 0) {
+	$: if (projects && projects.length > 0) {
 		// filter projects list by title, keep only the titles in the keep array and sort by keep array
 		const keep = [
 			'Kibisis',
