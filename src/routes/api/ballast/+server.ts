@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { error } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { validateBallastLookback } from '$lib/server/validate';
 import algosdk from 'algosdk';
 
 const algod = new algosdk.Algodv2('', 'https://testnet-api.voi.nodly.io', '443');
@@ -21,10 +22,10 @@ const fetchBallast = async () => {
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
 	const urlParams = url.searchParams;
-	console.log(process.version);
-
-	const lookback_param = urlParams.has('lookback') ? urlParams.get('lookback') : null;
-	const lookback_blocks = lookback_param ? parseInt(lookback_param) : 5;
+	const lookback_blocks = validateBallastLookback(urlParams.get('lookback'));
+	if (lookback_blocks === null) {
+		return json({ error: 'lookback must be an integer between 1 and 50' }, { status: 400 });
+	}
 
 	const end_block = (await algod.status().do())['last-round'];
 
