@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/supabase-server';
@@ -264,14 +265,19 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			});
 
 			if (pairs.length === 0) {
-				return json({
-					marketData: [],
-					voiUsd,
-					voiUsdStatus,
-					voiUsdAsOf,
-					aggregates: { totalVolume: 0, totalTvl: 0, weightedAveragePrice: 0 },
-					circulatingSupply: await supplyResponse()
-				});
+				return json(
+					{
+						marketData: [],
+						voiUsd,
+						voiUsdStatus,
+						voiUsdAsOf,
+						aggregates: { totalVolume: 0, totalTvl: 0, weightedAveragePrice: 0 },
+						circulatingSupply: await supplyResponse()
+					},
+					{
+						headers: publicCache(CACHE_TTL.markets.sMaxAge, CACHE_TTL.markets.staleWhileRevalidate)
+					}
+				);
 			}
 
 			// TASK-27: everything below depends only on the pools (or only on the token), so these
@@ -677,17 +683,25 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			return acc + (market.price || 0) * (volume / totalVolume);
 		}, 0);
 
-		return json({
-			marketData: processedMarketData,
-			voiUsd,
-			voiUsdStatus,
-			voiUsdAsOf,
-			aggregates: {
-				...aggregates,
-				weightedAveragePrice
+		return json(
+			{
+				marketData: processedMarketData,
+				voiUsd,
+				voiUsdStatus,
+				voiUsdAsOf,
+				aggregates: {
+					...aggregates,
+					weightedAveragePrice
+				},
+				circulatingSupply: await supplyResponse()
 			},
-			circulatingSupply: await supplyResponse()
-		});
+			{
+				headers:
+					voiUsdStatus !== 'unavailable' && voiUsdStatus !== 'invalid'
+						? publicCache(CACHE_TTL.markets.sMaxAge, CACHE_TTL.markets.staleWhileRevalidate)
+						: undefined
+			}
+		);
 	} catch (error) {
 		console.error('Error fetching market data:', error);
 		return json({ error: 'Failed to fetch market data' }, { status: 500 });

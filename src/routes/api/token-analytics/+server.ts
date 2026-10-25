@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
@@ -204,14 +205,25 @@ export const GET: RequestHandler = async ({ url }) => {
 			}
 		};
 
-		return json({
-			success: true,
-			partial: partialReasons.length > 0,
-			partialReasons,
-			analytics,
-			equivalents: equivalents.equivalents,
-			timestamp: new Date().toISOString()
-		});
+		return json(
+			{
+				success: true,
+				partial: partialReasons.length > 0,
+				partialReasons,
+				analytics,
+				equivalents: equivalents.equivalents,
+				timestamp: new Date().toISOString()
+			},
+			{
+				headers:
+					partialReasons.length === 0
+						? publicCache(
+								CACHE_TTL['token-analytics'].sMaxAge,
+								CACHE_TTL['token-analytics'].staleWhileRevalidate
+							)
+						: undefined
+			}
+		);
 	} catch (error) {
 		console.error('Token analytics API error:', error);
 		const message = error instanceof Error ? error.message : 'Unknown error';

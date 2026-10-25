@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
@@ -173,7 +174,9 @@ export const GET: RequestHandler = async ({ url }) => {
 			volumes
 		};
 
-		return json(response);
+		return json(response, {
+			headers: publicCache(CACHE_TTL.ohlcv.sMaxAge, CACHE_TTL.ohlcv.staleWhileRevalidate)
+		});
 	} catch (error) {
 		console.error('OHLCV API Error:', error);
 

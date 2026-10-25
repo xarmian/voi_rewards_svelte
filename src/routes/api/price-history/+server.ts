@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/supabase-server';
@@ -22,7 +23,12 @@ export const GET: RequestHandler = async ({ url }) => {
 			})
 		);
 
-		return json(mappedData);
+		return json(mappedData, {
+			headers: publicCache(
+				CACHE_TTL['price-history'].sMaxAge,
+				CACHE_TTL['price-history'].staleWhileRevalidate
+			)
+		});
 	} catch (error) {
 		console.error('Error fetching price history:', error);
 		return json({ error: 'Failed to fetch price history' }, { status: 500 });

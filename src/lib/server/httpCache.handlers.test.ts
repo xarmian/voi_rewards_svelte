@@ -58,8 +58,8 @@ function query(data: unknown, error: unknown = null) {
 	return builder;
 }
 
-function event(path: string, fetcher = vi.fn()) {
-	return { url: new URL(path, 'https://example.test'), fetch: fetcher } as unknown as RequestEvent;
+function event<T extends RequestEvent>(path: string, fetcher = vi.fn()): T {
+	return { url: new URL(path, 'https://example.test'), fetch: fetcher } as unknown as T;
 }
 
 beforeEach(() => {

@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import { supabasePublicClient } from '$lib/supabase';
 import type { PeerRecord } from '$lib/types';
@@ -144,6 +145,10 @@ export async function GET({ url }: RequestEvent) {
 
 		return new Response(csvContent, {
 			headers: {
+				...publicCache(
+					CACHE_TTL['relay-rewards'].sMaxAge,
+					CACHE_TTL['relay-rewards'].staleWhileRevalidate
+				),
 				'Content-Type': 'text/csv',
 				'Content-Disposition': `attachment; filename="relay-rewards-${startStr}-${endStr}.csv"`
 			}

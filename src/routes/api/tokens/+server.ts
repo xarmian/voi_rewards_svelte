@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { pgrstQuote, validateTokenSearch } from '$lib/server/validate';
 import { createClient } from '@supabase/supabase-js';
@@ -120,10 +121,13 @@ export const GET: RequestHandler = async ({ url }) => {
 		// Apply limit
 		tokens = tokens.slice(0, limit);
 
-		return json({
-			tokens,
-			total: tokens.length
-		});
+		return json(
+			{
+				tokens,
+				total: tokens.length
+			},
+			{ headers: publicCache(CACHE_TTL.tokens.sMaxAge, CACHE_TTL.tokens.staleWhileRevalidate) }
+		);
 	} catch (error) {
 		console.error('Tokens API Error:', error);
 
