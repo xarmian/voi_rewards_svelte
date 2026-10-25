@@ -141,33 +141,41 @@
 				$selectedWallet?.address === walletAddress &&
 				$selectedWallet?.app !== '' &&
 				$selectedWallet?.app !== 'Watch';
+			fungibleTokens = [];
+			tokensError = null;
+			tokensPartial = false;
+			totalValue = 0;
+			totalUsdValue = 0;
 			initializePortfolio();
 		}
+	}
+
+	function recomputeTotals() {
+		// Recalculate total value
+		totalValue =
+			fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
+			asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
+			accountBalance / 1e6;
+
+		// Calculate total USD value separately
+		totalUsdValue =
+			fungibleTokens.reduce((acc, token) => acc + (token.usdValue || 0), 0) +
+			asaDetails.reduce((acc, asa) => {
+				// For ASA tokens, calculate USD value if it's aUSDC
+				if (asa.id === 302190) {
+					return acc + asa.amount / Math.pow(10, asa.decimals || 6);
+				}
+				return acc;
+			}, 0) +
+			// Add VOI balance USD value if VOI price is available
+			($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
 	}
 
 	async function refreshPortfolio() {
 		isLoadingPortfolio = true;
 		try {
 			await Promise.all([fetchAccountDetails(), fetchVoiPrice()]);
-
-			// Recalculate total value
-			totalValue =
-				fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
-				asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
-				accountBalance / 1e6;
-
-			// Calculate total USD value separately
-			totalUsdValue =
-				fungibleTokens.reduce((acc, token) => acc + (token.usdValue || 0), 0) +
-				asaDetails.reduce((acc, asa) => {
-					// For ASA tokens, calculate USD value if it's aUSDC
-					if (asa.id === 302190) {
-						return acc + asa.amount / Math.pow(10, asa.decimals || 6);
-					}
-					return acc;
-				}, 0) +
-				// Add VOI balance USD value if VOI price is available
-				($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
+			recomputeTotals();
 		} catch (error) {
 			console.error('Error refreshing portfolio:', error);
 		} finally {
@@ -176,23 +184,30 @@
 	}
 
 	async function refreshTokens() {
+		const requestedWallet = walletAddress;
 		isLoadingTokens = true;
 		isLoadingLPTokens = true;
 		try {
-			const { tokens, partial } = await fetchFungibleTokens(walletAddress, $voiPrice.price);
+			const { tokens, partial } = await fetchFungibleTokens(requestedWallet, $voiPrice.price);
+			if (walletAddress !== requestedWallet) return;
 			fungibleTokens = tokens;
 			tokensError = null;
 			tokensPartial = partial;
+			recomputeTotals();
 		} catch (error) {
+			if (walletAddress !== requestedWallet) return;
 			tokensError = error instanceof Error ? error.message : String(error);
 			console.error('Error refreshing tokens:', error);
 		} finally {
-			isLoadingTokens = false;
-			isLoadingLPTokens = false;
+			if (walletAddress === requestedWallet) {
+				isLoadingTokens = false;
+				isLoadingLPTokens = false;
+			}
 		}
 	}
 
 	async function initializePortfolio() {
+		const requestedWallet = walletAddress;
 		try {
 			// First load essential account info
 			isLoadingPortfolio = true;
@@ -201,46 +216,36 @@
 				fetchVoiPrice()
 				//fetchPoolData() // Fetch pool data early as it's used by token fetching
 			]);
+			if (walletAddress !== requestedWallet) return;
 			isLoadingPortfolio = false;
 
 			// Then load tokens in parallel
 			isLoadingTokens = true;
 			isLoadingLPTokens = true;
 			try {
-				const { tokens, partial } = await fetchFungibleTokens(walletAddress, $voiPrice.price);
+				const { tokens, partial } = await fetchFungibleTokens(requestedWallet, $voiPrice.price);
+				if (walletAddress !== requestedWallet) return;
 				fungibleTokens = tokens;
 				tokensError = null;
 				tokensPartial = partial;
 			} catch (error) {
+				if (walletAddress !== requestedWallet) return;
 				tokensError = error instanceof Error ? error.message : String(error);
 				console.error('Error loading tokens:', error);
 			} finally {
-				isLoadingTokens = false;
-				isLoadingLPTokens = false;
+				if (walletAddress === requestedWallet) {
+					isLoadingTokens = false;
+					isLoadingLPTokens = false;
+				}
 			}
 
 			// Calculate total value after all data is loaded
-			totalValue =
-				fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
-				asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
-				accountBalance / 1e6;
-
-			// Calculate total USD value separately
-			totalUsdValue =
-				fungibleTokens.reduce((acc, token) => acc + (token.usdValue || 0), 0) +
-				asaDetails.reduce((acc, asa) => {
-					// For ASA tokens, calculate USD value if it's aUSDC
-					if (asa.id === 302190) {
-						return acc + asa.amount / Math.pow(10, asa.decimals || 6);
-					}
-					return acc;
-				}, 0) +
-				// Add VOI balance USD value if VOI price is available
-				($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
+			recomputeTotals();
 		} catch (error) {
+			if (walletAddress !== requestedWallet) return;
 			console.error('Error initializing portfolio:', error);
 		} finally {
-			isLoadingPortfolio = false;
+			if (walletAddress === requestedWallet) isLoadingPortfolio = false;
 		}
 	}
 
@@ -318,7 +323,7 @@
                         name: details.params.name ?? (Buffer.from(details.params['name-b64'], 'base64').toString('utf8') ?? ''),
                         unitName: details.params['unit-name'] ?? (Buffer.from(details.params['unit-name-b64'], 'base64').toString('utf8') ?? ''),
                         decimals: details.params.decimals,
-                        value: (asa.assetId === 302190 ? value / $voiPrice.price : 0),
+                        value: (asa.assetId === 302190 && $voiPrice.price > 0 ? value / $voiPrice.price : 0),
                         poolId: (asa.assetId === 302190 ? 395553 : undefined),
                         amount: (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount)
                     };
@@ -775,8 +780,15 @@
 			<p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
 			<p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(totalValue)} VOI</p>
 			<p class="text-sm font-bold text-gray-900 dark:text-white">
-				${formatNumber(totalUsdValue)} USD
+				{#if $voiPrice.price <= 0 && $voiPrice.error}
+					USD price unavailable
+				{:else}
+					${formatNumber(totalUsdValue)} USD
+				{/if}
 			</p>
+			{#if tokensError && fungibleTokens.length === 0}
+				<p class="text-xs text-gray-500 dark:text-gray-400">Excludes token balances (unavailable).</p>
+			{/if}
 		</div>
 	</div>
 

@@ -465,8 +465,11 @@ export async function fetchFungibleTokens(
 							});
 						}
 					}
+				} else {
+					partial = true;
 				}
 			} catch (err) {
+				partial = true;
 				console.warn('Failed to fetch details for approval-only tokens:', err);
 			}
 		}

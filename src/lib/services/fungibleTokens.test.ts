@@ -46,6 +46,31 @@ test('non-ok approvals preserve balance tokens and report partial enrichment', a
 	assert.equal(result.partial, true);
 });
 
+for (const failure of ['500', 'reject'] as const) {
+	test(`approval-only token details ${failure} preserves balances and reports partial enrichment`, async () => {
+		let detailsRequested = false;
+		const result = await fetchFungibleTokens('wallet', 0.0002, {
+			getLiquidityPools: async () => [],
+			fetch: async (input) => {
+				const url = new URL(String(input));
+				if (url.pathname === '/arc200/approvals') {
+					return Response.json({ approvals: [{ contractId: 789, amount: '1000000' }] });
+				}
+				if (url.pathname === '/arc200/tokens') {
+					assert.equal(url.searchParams.get('contractId'), '789');
+					detailsRequested = true;
+					if (failure === 'reject') throw new Error('token details network error');
+					return new Response(null, { status: 500 });
+				}
+				return fakeFetch()(input);
+			}
+		});
+		assert.equal(detailsRequested, true);
+		assertBalanceTokens(result.tokens);
+		assert.equal(result.partial, true);
+	});
+}
+
 test('a balances 500 rejects instead of returning an empty list', async () => {
 	await assert.rejects(fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools: async () => [], fetch: fakeFetch('ok', 500) }), /Failed to fetch token balances/);
 });

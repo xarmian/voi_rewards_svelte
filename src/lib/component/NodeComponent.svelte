@@ -44,6 +44,8 @@
 	onMount(async () => {});
 
 	async function fetchNodeData(forceRefresh: boolean = false) {
+		if (!walletId) return;
+		consensusError = false;
 		loading = true;
 		try {
 			supply = await getSupplyInfo();
@@ -83,6 +85,7 @@
 
 			loading = false;
 		} catch (error) {
+			consensusError = true;
 			console.error('Failed to fetch node data:', error);
 		} finally {
 			loading = false;
@@ -181,18 +184,18 @@
 				<div class="flex justify-center items-center h-24">
 					<Spinner size="16" />
 				</div>
+			{:else if consensusError}
+				<div class="text-center text-gray-600 dark:text-gray-400 py-8" role="status">
+					Couldn't load consensus data.
+					<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => fetchNodeData(true)}>Retry</button>
+				</div>
 			{:else if balance == 0 || Number(supply?.['online-money'] ?? 0) == 0}
 				<div class="flex justify-center items-center h-24">
 					<span class="text-gray-600 dark:text-gray-400">No data available</span>
 				</div>
 			{:else}
 				<div class="space-y-3">
-					{#if consensusError}
-						<div class="text-center text-gray-600 dark:text-gray-400 py-8" role="status">
-							Couldn't load consensus data.
-							<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => fetchNodeData(true)}>Retry</button>
-						</div>
-					{:else if typeof apiData?.total_blocks == 'undefined' || !supply}
+					{#if typeof apiData?.total_blocks == 'undefined' || !supply}
 						<div class="flex justify-center items-center h-24">
 							<Spinner size="16" />
 						</div>

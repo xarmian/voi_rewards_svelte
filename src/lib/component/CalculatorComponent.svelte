@@ -803,7 +803,7 @@
 								</div>
 							{:else}
 								<span class="font-bold text-purple-600 dark:text-purple-400">
-									{$voiPrice.price > 0 ? formatUSD($voiPrice.price, 6) : 'Loading...'}
+									{$voiPrice.price > 0 ? formatUSD($voiPrice.price, 6) : $voiPrice.error ? 'Unavailable' : 'Loading...'}
 								</span>
 								<button
 									class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
