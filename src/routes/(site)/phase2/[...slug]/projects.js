@@ -1,20 +1,16 @@
 import { supabasePublicClient } from '$lib/supabase';
 
 export async function fetchProjects() {
-	// Fetch projects
-	const { data: projectsData, error: projectsError } = await supabasePublicClient
-		.from('vr_projects')
-		.select('*');
+	const [{ data: projectsData, error: projectsError }, { data: questsData, error: questsError }] =
+		await Promise.all([
+			supabasePublicClient.from('vr_projects').select('*'),
+			supabasePublicClient.from('vr_quests').select('*')
+		]);
 
 	if (projectsError) {
 		console.error('Error fetching projects:', projectsError);
 		return [];
 	}
-
-	// Fetch quests
-	const { data: questsData, error: questsError } = await supabasePublicClient
-		.from('vr_quests')
-		.select('*');
 
 	if (questsError) {
 		console.error('Error fetching quests:', questsError);

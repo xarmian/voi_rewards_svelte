@@ -1,23 +1,22 @@
 import { supabasePublicClient } from '$lib/supabase';
 import type { VRPhase2 } from '$lib/supabase';
+import type { PageServerLoad } from './$types';
 
-export const load = async () => {
-	const { data, error } = await supabasePublicClient
-		.from('vr_phase2')
-		.select('*')
-		.order('total_quest_points', { ascending: false })
-		.limit(50);
-
-	// get count of number of rows in leaderboard table
-	const { count, error: countError } = await supabasePublicClient
-		.from('vr_phase2')
-		.select('count', { count: 'exact' });
+export const load = (async () => {
+	const [{ data, error }, { count, error: countError }] = await Promise.all([
+		supabasePublicClient
+			.from('vr_phase2')
+			.select('*')
+			.order('total_quest_points', { ascending: false })
+			.limit(50),
+		supabasePublicClient.from('vr_phase2').select('count', { count: 'exact' })
+	]);
 
 	if (error || countError) {
 		console.error(error, countError);
 		return {
 			status: 500,
-			error: new Error('Failed to fetch leaderboard data')
+			error: 'Failed to fetch leaderboard data'
 		};
 	}
 
@@ -32,4 +31,4 @@ export const load = async () => {
 		total_accounts: count,
 		pageMetaTags
 	};
-};
+}) satisfies PageServerLoad;

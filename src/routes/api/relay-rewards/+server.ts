@@ -73,21 +73,19 @@ export async function GET({ url }: RequestEvent) {
 			endStr = end.toISOString().split('T')[0];
 		}
 
-		// Fetch peer data for the week
-		const { data: rawData, error: queryError } = await supabasePublicClient
-			.from('vr_relay_peers')
-			.select('*')
-			.gte('peer_date', startStr)
-			.lte('peer_date', endStr)
-			.order('host_name')
-			.returns<PeerRecord[]>();
+		const [{ data: rawData, error: queryError }, { data: walletMappings, error: mappingError }] =
+			await Promise.all([
+				supabasePublicClient
+					.from('vr_relay_peers')
+					.select('*')
+					.gte('peer_date', startStr)
+					.lte('peer_date', endStr)
+					.order('host_name')
+					.returns<PeerRecord[]>(),
+				supabasePublicClient.from('vr_relay_wallets').select('host_prefix, wallet_address')
+			]);
 
 		if (queryError) throw queryError;
-
-		// Get wallet mappings
-		const { data: walletMappings, error: mappingError } = await supabasePublicClient
-			.from('vr_relay_wallets')
-			.select('host_prefix, wallet_address');
 
 		if (mappingError) throw mappingError;
 

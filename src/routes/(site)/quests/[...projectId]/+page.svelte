@@ -6,4 +6,4 @@
 	$: projectId = data.props?.projectId ? Number(data.props.projectId) : undefined;
 </script>
 
-<QuestPage selectedProjectId={projectId} />
+<QuestPage selectedProjectId={projectId} projects={data.projects} />
