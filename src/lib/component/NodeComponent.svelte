@@ -65,10 +65,18 @@
 			// Get latest epoch data
 			const dates = await dataTable.fetchDateRanges();
 			if (requestId !== nodeRequestId) return;
+			if (!Array.isArray(dates) || dates.length === 0 || !Number.isFinite(dates[dates.length - 1]?.epoch)) {
+				consensusError = true;
+				return;
+			}
 			const latestEpoch = dates[dates.length - 1];
 			currentEpoch = latestEpoch.epoch;
 			const epochData = await dataTable.fetchData(latestEpoch.id);
 			if (requestId !== nodeRequestId) return;
+			if (!epochData || !Number.isFinite(Number(epochData.blacklist_balance_total))) {
+				consensusError = true;
+				return;
+			}
 
 			// Fetch next year's worth of epoch rewards
 			const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) =>
@@ -76,12 +84,13 @@
 			);
 			const rewards = await Promise.all(epochPromises);
 			if (requestId !== nodeRequestId) return;
+			if (rewards.some((reward) => !Number.isFinite(reward))) {
+				consensusError = true;
+				return;
+			}
 			epochRewards = rewards;
 
-			if (epochData) {
-				rewardStake =
-					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
-			}
+			rewardStake = Number(supply['online-money']) - Number(epochData.blacklist_balance_total);
 
 			// Get account information with force refresh option
 			const accountResult = await getAccountInfo(requested, forceRefresh);

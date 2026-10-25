@@ -146,8 +146,12 @@ export async function fetchFungibleTokens(
 			let tokenValue = 0;
 			let tokenUsdValue = 0;
 
-			if (asset.usdValue && asset.usdValue !== 'null') {
-				const usdValuePerToken = parseFloat(asset.usdValue);
+			if (asset.usdValue != null) {
+				let usdValuePerToken = parseFloat(asset.usdValue);
+				if (!Number.isFinite(usdValuePerToken)) {
+					usdValuePerToken = 0;
+					partial = true;
+				}
 				const userTokenBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
 
 				// Calculate total USD value for user's holdings
@@ -176,14 +180,22 @@ export async function fetchFungibleTokens(
 								const circulatingSupply = Number(escrowLpBalance) * -1;
 								pool.supply = circulatingSupply.toString();
 							}
+						} else {
+							partial = true;
 						}
 					} catch (err) {
+						partial = true;
 						console.warn('Failed to fetch nomadex pool escrow info for supply calculation:', err);
 					}
 				}
 
 				// Calculate value from pool data for ARC200 tokens
-				tokenValue = calculateTokenValueFromPool(asset, pool);
+				const poolValue = calculateTokenValueFromPool(asset, pool);
+				if (poolValue === null || !Number.isFinite(poolValue)) {
+					partial = true;
+				} else {
+					tokenValue = poolValue;
+				}
 
 				// Calculate USD value for LP tokens
 				if (voiPriceUSD > 0) {
@@ -260,6 +272,7 @@ export async function fetchFungibleTokens(
 
 						// Supply calculation moved to before value calculation
 					} catch (err) {
+						partial = true;
 						console.warn('Failed to fetch nomadex pool escrow info:', err);
 						tvlBalance = pool.tvl;
 					}
@@ -484,7 +497,7 @@ export async function fetchFungibleTokens(
 	}
 }
 
-function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo): number {
+function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo): number | null {
 	try {
 		// For LP tokens, calculate value based on user's share of the pool
 		const userLpBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
@@ -508,6 +521,6 @@ function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo)
 		return voiValue;
 	} catch (err) {
 		console.error('Error calculating token value:', err);
-		return 0;
+		return null;
 	}
 }

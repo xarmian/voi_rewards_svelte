@@ -28,6 +28,7 @@
 	let expectedUnavailable = false;
 
 	let isLoading = false;
+	let proposalsRequestId = 0;
 	let loadError: string | null = null;
 	let isMounted = false;
 
@@ -99,23 +100,33 @@
 	}
 
 	async function updateChartData() {
-		if (isLoading) return;
+		const requested = walletId;
+		const requestId = ++proposalsRequestId;
+		apiData = null;
+		data = [];
+		loadError = null;
+		expectedUnavailable = false;
+		expectedBlockTime = null;
+		accountInfo = null;
 
 		console.log('Starting updateChartData...');
 		isLoading = true;
 
 		// Don't dispose of the chart here anymore, let the reactive statement handle it
 
-		const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${walletId}`;
+		const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${requested}`;
 		try {
 			const [response, accountInfoResult, supplyResult] = await Promise.all([
 				fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) }),
-				getAccountInfo(walletId),
+				getAccountInfo(requested),
 				getSupplyInfo()
 			]);
+			if (requestId !== proposalsRequestId) return;
 
 			if (!response.ok) throw new Error(`Failed to fetch proposals: HTTP ${response.status}`);
-			apiData = await response.json();
+			const proposals = await response.json();
+			if (requestId !== proposalsRequestId) return;
+			apiData = proposals;
 			console.log('Received API data:', apiData);
 			accountInfo = accountInfoResult ?? null;
 			supply = supplyResult;
@@ -139,6 +150,7 @@
 			// Calculate expected proposals using chartData
 			if (!expectedUnavailable) {
 				const chartData = await fetchOnlineStakeHistory();
+				if (requestId !== proposalsRequestId) return;
 				console.log('Received chart data:', chartData);
 				if (chartData === null) {
 					expectedUnavailable = true;
@@ -164,10 +176,11 @@
 			console.log('Processed data:', data);
 			loadError = null;
 		} catch (error) {
+			if (requestId !== proposalsRequestId) return;
 			loadError = error instanceof Error ? error.message : String(error);
 			console.error('Error in updateChartData:', error);
 		} finally {
-			isLoading = false;
+			if (requestId === proposalsRequestId) isLoading = false;
 		}
 	}
 
