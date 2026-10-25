@@ -118,19 +118,6 @@ export async function getConsensusInfo(
 		const response = await fetch(url, { cache: 'no-store' });
 
 		if (!response.ok) {
-			if (response.status === 500) {
-				// Return empty consensus info for new/inactive wallets
-				const emptyConsensus: ConsensusDetails = {
-					first_block: 0,
-					last_block: 0,
-					last_vote_block: 0,
-					last_vote_timestamp: new Date().toISOString(),
-					total_blocks: 0,
-					vote_count: 0
-				};
-
-				return emptyConsensus;
-			}
 			throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
 		}
 

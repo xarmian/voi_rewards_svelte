@@ -25,6 +25,7 @@
 	$: accountInfo = null as Account | null;
 	let expectedBlockTime: string | null = null;
 	let historicalExpectedProposals: any = {};
+	let expectedUnavailable = false;
 
 	let isLoading = false;
 	let loadError: string | null = null;
@@ -118,9 +119,12 @@
 			console.log('Received API data:', apiData);
 			accountInfo = accountInfoResult ?? null;
 			supply = supplyResult;
+			expectedUnavailable = accountInfoResult === undefined || supplyResult == null;
+			expectedBlockTime = null;
+			historicalExpectedProposals = {};
 
 			// Calculate expected block time using current supply
-			if (accountInfo?.amount && supply?.['online-money']) {
+			if (!expectedUnavailable && accountInfo?.amount && supply?.['online-money']) {
 				const balance = Number(accountInfo?.amount);
 				const secondsPerDay = 24 * 60 * 60;
 				const blocksPerDay = secondsPerDay / 2.8;
@@ -132,26 +136,26 @@
 				expectedBlockTime = `${hours}h ${minutes}m`;
 			}
 
-			const chartData = await fetchOnlineStakeHistory();
-			console.log('Received chart data:', chartData);
-
 			// Calculate expected proposals using chartData
-			historicalExpectedProposals = {};
-			chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
-				if (new Date(dayData.date) < new Date('2024-10-30')) return;
-				if (dayData.avg_online_stake) {
-					const balance = Number(accountInfo?.amount ?? 0);
-					const secondsPerDay = 24 * 60 * 60;
-					const blocksPerDay = secondsPerDay / 2.8;
-					const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
-					historicalExpectedProposals[dayData.date] = expectedBlocks;
-				}
-			});
+			if (!expectedUnavailable) {
+				const chartData = await fetchOnlineStakeHistory();
+				console.log('Received chart data:', chartData);
+				chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
+					if (new Date(dayData.date) < new Date('2024-10-30')) return;
+					if (dayData.avg_online_stake) {
+						const balance = Number(accountInfo?.amount ?? 0);
+						const secondsPerDay = 24 * 60 * 60;
+						const blocksPerDay = secondsPerDay / 2.8;
+						const expectedBlocks = (balance / dayData.avg_online_stake) * blocksPerDay;
+						historicalExpectedProposals[dayData.date] = expectedBlocks;
+					}
+				});
+			}
 
 			data = Object.keys(apiData).map((date) => ({
 				date: new Date(date + 'T00:00:00'),
 				actual: apiData[date].length,
-				expected: historicalExpectedProposals[date] ?? 0
+				expected: expectedUnavailable ? null : (historicalExpectedProposals[date] ?? 0)
 			}));
 
 			data.sort((a: { date: Date }, b: { date: Date }) => a.date.getTime() - b.date.getTime());
@@ -199,7 +203,7 @@
 						custom: 'eee, MMMM do'
 					});
 					let result = `${escapeHtml(formattedDate)}<br/>`;
-					const expected = params.find((p: any) => p.seriesName === 'Expected Proposals');
+					const expected = params.find((p: any) => p.seriesName === 'Expected Proposals' && p.value != null);
 					const actual = params.find((p: any) => p.seriesName === 'Actual Proposals');
 					if (expected) {
 						result += `Expected Proposals: ${escapeHtml(Math.round(expected.value))}<br/>`;
@@ -390,6 +394,9 @@
 						</div>
 					</div>
 				</div>
+			{/if}
+			{#if expectedUnavailable}
+				<p class="mb-2 text-xs text-gray-500 dark:text-gray-400">Expected proposals unavailable.</p>
 			{/if}
 			<div
 				class="h-[300px] p-4 border border-gray-200 dark:border-gray-700 rounded"

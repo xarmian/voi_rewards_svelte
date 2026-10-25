@@ -49,6 +49,10 @@
 		loading = true;
 		try {
 			supply = await getSupplyInfo();
+			if (supply == null) {
+				consensusError = true;
+				return;
+			}
 
 			// Get latest epoch data
 			const dates = await dataTable.fetchDateRanges();
@@ -69,6 +73,10 @@
 
 			// Get account information with force refresh option
 			accountInfo = await getAccountInfo(walletId, forceRefresh);
+			if (accountInfo === undefined) {
+				consensusError = true;
+				return;
+			}
 			balance = Number(accountInfo?.amount ?? 0);
 			apiData = await getConsensusInfo(walletId, forceRefresh);
 			consensusError = apiData === undefined;

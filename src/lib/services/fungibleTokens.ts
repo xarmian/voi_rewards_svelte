@@ -362,7 +362,10 @@ export async function fetchFungibleTokens(
 
 					for (const tokenId of approvalOnlyTokenIds) {
 						const tokenDetails = tokenDetailsMap.get(tokenId);
-						if (!tokenDetails) continue;
+						if (!tokenDetails) {
+							partial = true;
+							continue;
+						}
 
 						const pool = poolsMap.get(tokenId);
 

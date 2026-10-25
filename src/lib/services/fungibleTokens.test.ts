@@ -46,7 +46,7 @@ test('non-ok approvals preserve balance tokens and report partial enrichment', a
 	assert.equal(result.partial, true);
 });
 
-for (const failure of ['500', 'reject'] as const) {
+for (const failure of ['500', 'reject', '200 empty'] as const) {
 	test(`approval-only token details ${failure} preserves balances and reports partial enrichment`, async () => {
 		let detailsRequested = false;
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
@@ -60,6 +60,7 @@ for (const failure of ['500', 'reject'] as const) {
 					assert.equal(url.searchParams.get('contractId'), '789');
 					detailsRequested = true;
 					if (failure === 'reject') throw new Error('token details network error');
+					if (failure === '200 empty') return Response.json({ tokens: [] });
 					return new Response(null, { status: 500 });
 				}
 				return fakeFetch()(input);

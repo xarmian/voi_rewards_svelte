@@ -89,6 +89,7 @@
 	let isLoadingTokens = false;
 	let tokensError: string | null = null;
 	let tokensPartial = false;
+	let lastTokenPrice = 0;
 	let isLoadingNFTs = false;
 	let voteKeyExpiry: number | undefined;
 	let voteKeyExpiryDate: Date | undefined;
@@ -142,12 +143,17 @@
 				$selectedWallet?.app !== '' &&
 				$selectedWallet?.app !== 'Watch';
 			fungibleTokens = [];
+			lastTokenPrice = 0;
 			tokensError = null;
 			tokensPartial = false;
 			totalValue = 0;
 			totalUsdValue = 0;
 			initializePortfolio();
 		}
+	}
+
+	$: if ($voiPrice.price > 0 && lastTokenPrice <= 0 && fungibleTokens.length > 0 && !isLoadingTokens) {
+		refreshTokens();
 	}
 
 	function recomputeTotals() {
@@ -187,8 +193,9 @@
 		const requestedWallet = walletAddress;
 		isLoadingTokens = true;
 		isLoadingLPTokens = true;
+		lastTokenPrice = $voiPrice.price;
 		try {
-			const { tokens, partial } = await fetchFungibleTokens(requestedWallet, $voiPrice.price);
+			const { tokens, partial } = await fetchFungibleTokens(requestedWallet, lastTokenPrice);
 			if (walletAddress !== requestedWallet) return;
 			fungibleTokens = tokens;
 			tokensError = null;
@@ -222,8 +229,9 @@
 			// Then load tokens in parallel
 			isLoadingTokens = true;
 			isLoadingLPTokens = true;
+			lastTokenPrice = $voiPrice.price;
 			try {
-				const { tokens, partial } = await fetchFungibleTokens(requestedWallet, $voiPrice.price);
+				const { tokens, partial } = await fetchFungibleTokens(requestedWallet, lastTokenPrice);
 				if (walletAddress !== requestedWallet) return;
 				fungibleTokens = tokens;
 				tokensError = null;
@@ -788,6 +796,8 @@
 			</p>
 			{#if tokensError && fungibleTokens.length === 0}
 				<p class="text-xs text-gray-500 dark:text-gray-400">Excludes token balances (unavailable).</p>
+			{:else if $voiPrice.price <= 0 && $voiPrice.error && fungibleTokens.length > 0}
+				<p class="text-xs text-gray-500 dark:text-gray-400">Excludes token values (VOI price unavailable).</p>
 			{/if}
 		</div>
 	</div>
