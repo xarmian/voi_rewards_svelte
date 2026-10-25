@@ -114,3 +114,23 @@ it('schedules after a rejected task and permits a one-off run while stopped', as
 	expect(task).toHaveBeenCalledTimes(3);
 	poller.destroy();
 });
+
+it('TASK-30 runs a hidden one-off exactly once after stop without scheduling polls', async () => {
+	const visibility = new Visibility();
+	const task = vi.fn(async () => {});
+	const poller = createPoller({ task, visibility });
+	visibility.set('hidden');
+	await poller.run();
+	poller.stop();
+	expect(task).not.toHaveBeenCalled();
+	visibility.set('visible');
+	await vi.advanceTimersByTimeAsync(0);
+	expect(task).toHaveBeenCalledTimes(1);
+	expect(vi.getTimerCount()).toBe(0);
+	visibility.set('hidden');
+	visibility.set('visible');
+	await vi.advanceTimersByTimeAsync(5000);
+	expect(task).toHaveBeenCalledTimes(1);
+	expect(vi.getTimerCount()).toBe(0);
+	poller.destroy();
+});

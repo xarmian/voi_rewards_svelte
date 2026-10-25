@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 it('TASK-30 shares concurrent account lookups and updates the store', async () => {
-	const values = await Promise.all([getAccountInfo('X'), getAccountInfo('X', true)]);
+	const values = await Promise.all([getAccountInfo('X'), getAccountInfo('X')]);
 	expect(mocks.account).toHaveBeenCalledTimes(1);
 	expect(values).toEqual([{ amount: 100 }, { amount: 100 }]);
 	expect(get(accountInfo).X).toEqual(values[0]);
@@ -68,6 +68,41 @@ it('does not cache account failures', async () => {
 	expect(mocks.account).toHaveBeenCalledTimes(2);
 });
 
+it('TASK-30 returns the stale account after an expired algod request rejects and retries next time', async () => {
+	const previous = await getAccountInfo('X');
+	vi.setSystemTime(1000 + ACCOUNT_CACHE_TTL.account);
+	mocks.account.mockReturnValueOnce({ do: vi.fn().mockRejectedValue(new Error('offline')) });
+	expect(await getAccountInfo('X')).toBe(previous);
+	expect(get(accountInfo).X).toBe(previous);
+	await getAccountInfo('X');
+	expect(mocks.account).toHaveBeenCalledTimes(3);
+});
+
+it('TASK-30 returns the stale supply after an expired algod request rejects and retries next time', async () => {
+	const previous = await getSupplyInfo();
+	vi.setSystemTime(1000 + ACCOUNT_CACHE_TTL.supply);
+	mocks.supply.mockReturnValueOnce({ do: vi.fn().mockRejectedValue(new Error('offline')) });
+	expect(await getSupplyInfo()).toBe(previous);
+	expect(get(supply)).toBe(previous);
+	await getSupplyInfo();
+	expect(mocks.supply).toHaveBeenCalledTimes(3);
+});
+
+it('TASK-30 only publishes the newest forced account result', async () => {
+	let resolve!: (value: { amount: number }) => void;
+	mocks.account.mockReturnValueOnce({ do: () => new Promise((done) => (resolve = done)) });
+	const older = getAccountInfo('X');
+	await Promise.resolve();
+	const forced = getAccountInfo('X', true);
+	// TASK-30: settle the newer fetch before the old response can overwrite the public store.
+	await vi.advanceTimersByTimeAsync(0);
+	resolve({ amount: 1 });
+	await Promise.all([older, forced]);
+	expect(mocks.account).toHaveBeenCalledTimes(2);
+	expect(get(accountInfo).X).toEqual({ amount: 100 });
+	expect(await getAccountInfo('X')).toEqual({ amount: 100 });
+});
+
 it('shares supply and blacklist requests, expires supply, and retries failures', async () => {
 	const values = await Promise.all([getSupplyInfo(), getSupplyInfo()]);
 	expect(mocks.supply).toHaveBeenCalledTimes(1);
@@ -76,14 +111,14 @@ it('shares supply and blacklist requests, expires supply, and retries failures',
 	expect(get(supply)).toEqual(values[0]);
 	vi.setSystemTime(1000 + 300_000);
 	vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
-	expect(await getSupplyInfo()).toBeNull();
+	expect(await getSupplyInfo()).toBe(values[0]);
 	await getSupplyInfo();
 	expect(mocks.supply).toHaveBeenCalledTimes(3);
 });
 
 it('shares consensus requests, respects TTL and force, and retries HTTP failures', async () => {
 	vi.mocked(fetch).mockImplementation(async () => Response.json({ vote_count: 3 }));
-	const values = await Promise.all([getConsensusInfo('X'), getConsensusInfo('X', true)]);
+	const values = await Promise.all([getConsensusInfo('X'), getConsensusInfo('X')]);
 	expect(fetch).toHaveBeenCalledTimes(1);
 	expect(get(consensusInfo).X).toEqual(values[0]);
 	await getConsensusInfo('X');
@@ -91,7 +126,7 @@ it('shares consensus requests, respects TTL and force, and retries HTTP failures
 	vi.setSystemTime(31_000);
 	await getConsensusInfo('X');
 	vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
-	expect(await getConsensusInfo('X', true)).toBeUndefined();
+	expect(await getConsensusInfo('X', true)).toEqual(values[0]);
 	vi.setSystemTime(61_000);
 	await getConsensusInfo('X');
 	expect(fetch).toHaveBeenCalledTimes(4);

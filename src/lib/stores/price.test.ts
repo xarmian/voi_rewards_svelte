@@ -63,19 +63,56 @@ test('an already-set price skips a fetch unless refreshed', async () => {
 
 afterEach(() => vi.restoreAllMocks());
 
-test('TASK-30 concurrent refresh callers share one fetch and both see the updated store', async () => {
-	let resolve!: (response: Response) => void;
-	const fetchFn = vi.fn(() => new Promise<Response>((done) => (resolve = done)));
-	const first = fetchVoiPriceWith(fetchFn, true);
-	const second = fetchVoiPriceWith(fetchFn, true);
-	await Promise.resolve();
-	expect(fetchFn).toHaveBeenCalledTimes(1);
-	resolve(poolResponse());
-	await Promise.all([first, second].map(async (pending) => {
-		await pending;
-		expect(get(voiPrice).price).toBe(0.0003);
-	}));
-});
+test.each(['older first', 'newer first', 'older rejects'])(
+	'TASK-30 refresh starts a new fetch and only the newest changes the store (%s)',
+	async (order) => {
+		let resolveOld!: (response: Response) => void;
+		let rejectOld!: (error: Error) => void;
+		let resolveNew!: (response: Response) => void;
+		const older = new Promise<Response>((resolve, reject) => {
+			resolveOld = resolve;
+			rejectOld = reject;
+		});
+		const newer = new Promise<Response>((resolve) => (resolveNew = resolve));
+		const fetchFn = vi.fn().mockReturnValueOnce(older).mockReturnValue(newer);
+		const first = fetchVoiPriceWith(fetchFn, true);
+		const forced = fetchVoiPriceWith(fetchFn, true);
+		let joinedSettled = false;
+		const joined = fetchVoiPriceWith(fetchFn).then(() => { joinedSettled = true; });
+		try {
+			await Promise.resolve();
+			expect(fetchFn).toHaveBeenCalledTimes(2);
+			if (order === 'older first') {
+				resolveOld(poolResponse(10000, 1));
+				await first;
+				expect(get(voiPrice).price).toBe(0.0002);
+				expect(joinedSettled).toBe(false);
+				let laterSettled = false;
+				const later = fetchVoiPriceWith(fetchFn).then(() => { laterSettled = true; });
+				await Promise.resolve();
+				expect(laterSettled).toBe(false);
+				resolveNew(poolResponse());
+				await later;
+			} else {
+				resolveNew(poolResponse());
+				await forced;
+				expect(get(voiPrice).price).toBe(0.0003);
+				if (order === 'older rejects') rejectOld(new Error('old request failed'));
+				else resolveOld(poolResponse(10000, 1));
+			}
+			await Promise.all([first, forced, joined]);
+			expect(get(voiPrice)).toEqual({
+				price: 0.0003, lastUpdated: new Date(newDate), error: null
+			});
+			expect(fetchFn).toHaveBeenCalledTimes(2);
+		} finally {
+			// TASK-30: drain both requests when the old sharing behavior fails the assertions.
+			resolveOld(poolResponse(10000, 1));
+			resolveNew(poolResponse());
+			await Promise.all([first, forced, joined]);
+		}
+	}
+);
 
 test('TASK-30 price expires using fetch time rather than pool.lastUpdated', async () => {
 	let time = 1000;
