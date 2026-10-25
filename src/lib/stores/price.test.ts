@@ -78,15 +78,15 @@ test('TASK-30 concurrent refresh callers share one fetch and both see the update
 });
 
 test('TASK-30 price expires using fetch time rather than pool.lastUpdated', async () => {
-	expect(VOI_PRICE_TTL_MS).toBe(60_000);
 	let time = 1000;
 	vi.spyOn(Date, 'now').mockImplementation(() => time);
 	const fetchFn = vi.fn(async () => poolResponse());
 	await fetchVoiPriceWith(fetchFn, true);
-	time += VOI_PRICE_TTL_MS - 1;
+	time += 60_000 - 1;
 	await fetchVoiPriceWith(fetchFn);
 	expect(fetchFn).toHaveBeenCalledTimes(1);
 	time++;
 	await fetchVoiPriceWith(fetchFn);
 	expect(fetchFn).toHaveBeenCalledTimes(2);
+	expect(VOI_PRICE_TTL_MS).toBe(60_000);
 });

@@ -3,6 +3,7 @@ import { config } from '$lib/config';
 import algosdk from 'algosdk';
 import { algodClient } from '$lib/utils/algod';
 import { getNFD } from '$lib/utils/nfd';
+import { createKeyedCache } from '$lib/utils/asyncCache';
 
 export interface ConsensusInfo {
 	[key: string]: ConsensusDetails;
@@ -105,89 +106,85 @@ export const accountInfo = writable<Record<string, algosdk.modelsv2.Account>>({}
 export const supply = writable<SupplyInfo | null>(null);
 export const nfDomains = writable<Record<string, NFDomainResponse | null>>({});
 
-// Consensus Info fetching with cache
+export const ACCOUNT_CACHE_TTL = Object.freeze({
+	account: 30_000,
+	consensus: 30_000,
+	supply: 5 * 60_000
+});
+
+const consensusCache = createKeyedCache<string, ConsensusDetails | undefined>({
+	ttlMs: ACCOUNT_CACHE_TTL.consensus
+});
+const accountCache = createKeyedCache<string, Account | undefined>({ ttlMs: ACCOUNT_CACHE_TTL.account });
+const supplyCache = createKeyedCache<string, SupplyInfo | null>({ ttlMs: ACCOUNT_CACHE_TTL.supply });
+let cacheGeneration = 0;
+
+// TASK-30: cache fresh values and share requests for the same address.
 export async function getConsensusInfo(
 	address: string,
 	forceRefresh: boolean = false
 ): Promise<ConsensusDetails | undefined> {
 	if (!address) return;
-
-	const info = get(consensusInfo);
-
-	if (info[address] && !forceRefresh) return info[address];
-
-	try {
-		const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
-		const response = await fetch(url, { cache: 'no-store' });
-
-		if (!response.ok) {
-			throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
+	const generation = cacheGeneration;
+	return consensusCache.get(address, async () => {
+		try {
+			const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
+			const response = await fetch(url, { cache: 'no-store' });
+			if (!response.ok) {
+				throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
+			}
+			const data: ConsensusDetails = await response.json();
+			if (generation === cacheGeneration) {
+				consensusInfo.update((current) => ({ ...current, [address]: data }));
+			}
+			return data;
+		} catch (error) {
+			console.error('Error fetching consensus info:', error);
+			return undefined;
 		}
-
-		const data: ConsensusDetails = await response.json();
-
-		consensusInfo.update((current) => ({
-			...current,
-			[address]: data
-		}));
-
-		return data;
-	} catch (error) {
-		console.error('Error fetching consensus info:', error);
-		// Return undefined to indicate error, but don't cache the error
-		return undefined;
-	}
+	}, { force: forceRefresh });
 }
 
-// Account Information fetching with cache
 export async function getAccountInfo(
 	address: string,
 	forceRefresh: boolean = false
 ): Promise<algosdk.modelsv2.Account | undefined> {
 	if (!address) return;
-
-	const info = get(accountInfo);
-
-	if (info[address] && !forceRefresh) return info[address];
-
-	try {
-		const data = (await algodClient.accountInformation(address).do()) as algosdk.modelsv2.Account;
-
-		accountInfo.update((current) => ({
-			...current,
-			[address]: data
-		}));
-
-		return data;
-	} catch (error) {
-		console.error('Error fetching account info:', error);
-		return undefined;
-	}
+	const generation = cacheGeneration;
+	return accountCache.get(address, async () => {
+		try {
+			const data = (await algodClient.accountInformation(address).do()) as algosdk.modelsv2.Account;
+			if (generation === cacheGeneration) {
+				accountInfo.update((current) => ({ ...current, [address]: data }));
+			}
+			return data;
+		} catch (error) {
+			console.error('Error fetching account info:', error);
+			return undefined;
+		}
+	}, { force: forceRefresh });
 }
 
-// Supply information fetching with cache
 export async function getSupplyInfo(): Promise<SupplyInfo | null> {
-	const currentSupply = get(supply);
-
-	if (currentSupply) return currentSupply;
-
-	try {
-		const data = (await algodClient.supply().do()) as SupplyInfo;
-		const res = await fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`);
-		if (!res.ok) throw new Error(`Failed to fetch blacklist balance: HTTP ${res.status}`);
-		const blacklistData = await res.json();
-		const ballastBalance = Number(blacklistData.blacklist_balance_total);
-		if (!Number.isFinite(ballastBalance) || ballastBalance < 0) {
-			throw new Error('Invalid blacklist balance');
+	const generation = cacheGeneration;
+	return supplyCache.get('supply', async () => {
+		try {
+			const data = (await algodClient.supply().do()) as SupplyInfo;
+			const res = await fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`);
+			if (!res.ok) throw new Error(`Failed to fetch blacklist balance: HTTP ${res.status}`);
+			const blacklistData = await res.json();
+			const ballastBalance = Number(blacklistData.blacklist_balance_total);
+			if (!Number.isFinite(ballastBalance) || ballastBalance < 0) {
+				throw new Error('Invalid blacklist balance');
+			}
+			const result = { ...data, 'blacklisted-money': ballastBalance };
+			if (generation === cacheGeneration) supply.set(result);
+			return result;
+		} catch (error) {
+			console.error('Error fetching supply info:', error);
+			return null;
 		}
-
-		supply.set({ ...data, 'blacklisted-money': ballastBalance });
-
-		return { ...data, 'blacklisted-money': ballastBalance };
-	} catch (error) {
-		console.error('Error fetching supply info:', error);
-		return null;
-	}
+	});
 }
 
 export async function getNFDomains(
@@ -343,6 +340,10 @@ export async function getNFDomain(address: string): Promise<NFDomainResponse | n
 
 // Optional: Function to clear caches
 export function clearCaches() {
+	cacheGeneration++;
+	consensusCache.invalidate();
+	accountCache.invalidate();
+	supplyCache.invalidate();
 	consensusInfo.set({});
 	accountInfo.set({});
 	supply.set(null);

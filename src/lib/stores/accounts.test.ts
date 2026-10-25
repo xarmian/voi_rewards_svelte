@@ -49,16 +49,16 @@ it('TASK-30 shares concurrent account lookups and updates the store', async () =
 });
 
 it('expires accounts after 30s and allows forced refreshes', async () => {
-	expect(Object.isFrozen(ACCOUNT_CACHE_TTL)).toBe(true);
-	expect(ACCOUNT_CACHE_TTL).toEqual({ account: 30_000, consensus: 30_000, supply: 300_000 });
 	await getAccountInfo('X');
-	vi.setSystemTime(1000 + ACCOUNT_CACHE_TTL.account - 1);
+	vi.setSystemTime(1000 + 30_000 - 1);
 	await getAccountInfo('X');
 	expect(mocks.account).toHaveBeenCalledTimes(1);
-	vi.setSystemTime(1000 + ACCOUNT_CACHE_TTL.account);
+	vi.setSystemTime(1000 + 30_000);
 	await getAccountInfo('X');
 	await getAccountInfo('X', true);
 	expect(mocks.account).toHaveBeenCalledTimes(3);
+	expect(Object.isFrozen(ACCOUNT_CACHE_TTL)).toBe(true);
+	expect(ACCOUNT_CACHE_TTL).toEqual({ account: 30_000, consensus: 30_000, supply: 300_000 });
 });
 
 it('does not cache account failures', async () => {
