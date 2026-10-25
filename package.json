@@ -9,8 +9,8 @@
 		"dev": "vite dev",
 		"build": "node scripts/generateFaqData.js && vite build",
 		"preview": "node scripts/generateFaqData.js && vite preview",
-		"test:unit": "node --test src/lib/server/*.test.ts",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"test:unit": "node --test 'src/lib/**/*.test.ts'",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write ."
