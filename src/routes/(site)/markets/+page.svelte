@@ -88,8 +88,8 @@
 	let selectedPool: TokenPair | null = null;
 	let poolsLoading = false;
 
-	// Token overview and analytics state
-	let tokenInfo: any = null;
+	// Token overview and analytics state (seeded by +page.ts so hydration does not refetch it)
+	let tokenInfo: any = data.tokenInfo ?? null;
 	let tokenInfoLoading = false; // For VOI market data compatibility
 
 	// Enhanced UI state
@@ -366,7 +366,9 @@
 			aggregates,
 			circulatingSupply: realCirculatingSupply,
 			voiUsdStatus,
-			voiUsdAsOf
+			voiUsdAsOf,
+			// A failed server load is not a settled result: the loader retries it after hydration
+			error: data.error ? String(data.error) : null
 		}
 	);
 

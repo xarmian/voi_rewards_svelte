@@ -7,14 +7,33 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	let ogImageUrl: string | null = null;
 	let tokenSymbolResolved = 'VOI';
 	let tokenIdResolved: number = 0;
+	let tokenInfo: Record<string, unknown> | null = null;
 
-	// If a numeric ID is provided, use it directly
+	const fetchJson = async (path: string) => (await fetch(path)).json();
+	const fetchTokenAnalytics = async (tokenId: number) => {
+		try {
+			const anaJson = await fetchJson(`/api/token-analytics?tokenId=${tokenId}`);
+			return anaJson?.analytics ? { ...anaJson.analytics, partial: !!anaJson.partial } : null;
+		} catch {
+			return null;
+		}
+	};
+
+	// TASK-27: markets and token analytics need only the token id, price history only the symbol.
+	// A numeric id starts both id reads at once; a symbol must resolve through token-info first.
+	let marketDataPromise: ReturnType<typeof fetchJson>;
+	let tokenAnalyticsPromise: ReturnType<typeof fetchTokenAnalytics>;
 	if (/^\d+$/.test(rawToken)) {
 		tokenIdResolved = parseInt(rawToken, 10);
+		marketDataPromise = fetchJson(`/api/markets?tokenId=${tokenIdResolved}`);
+		// Observed now so a failure during the token-info await is not an unhandled rejection;
+		// Promise.all below still rejects with it.
+		marketDataPromise.catch(() => {});
+		tokenAnalyticsPromise = fetchTokenAnalytics(tokenIdResolved);
 		// Try to get token info via tokenId
 		try {
-			const imgRes = await fetch(`/api/token-info?tokenId=${tokenIdResolved}`);
-			const imgJson = await imgRes.json();
+			const imgJson = await fetchJson(`/api/token-info?tokenId=${tokenIdResolved}`);
+			tokenInfo = imgJson?.info ?? null;
 			ogImageUrl = imgJson?.info?.imageUrl || null;
 			tokenSymbolResolved = imgJson?.info?.symbol || 'VOI';
 		} catch {}
@@ -22,43 +41,34 @@ export const load: PageLoad = async ({ fetch, url }) => {
 		// Symbol provided - resolve to tokenId via token-info
 		tokenSymbolResolved = (rawToken || 'VOI').toUpperCase();
 		try {
-			const imgRes = await fetch(
+			const imgJson = await fetchJson(
 				`/api/token-info?symbol=${encodeURIComponent(tokenSymbolResolved)}`
 			);
-			const imgJson = await imgRes.json();
+			tokenInfo = imgJson?.info ?? null;
 			ogImageUrl = imgJson?.info?.imageUrl || null;
 			tokenIdResolved = imgJson?.info?.tokenId ?? 0;
 			tokenSymbolResolved = imgJson?.info?.symbol || tokenSymbolResolved;
 		} catch {}
+		marketDataPromise = fetchJson(`/api/markets?tokenId=${tokenIdResolved}`);
+		tokenAnalyticsPromise = fetchTokenAnalytics(tokenIdResolved);
 	}
 
-	const [marketDataRes, priceHistoryRes] = await Promise.all([
-		fetch(`/api/markets?tokenId=${tokenIdResolved}`),
-		fetch(`/api/price-history?period=24h&token=${tokenSymbolResolved}`)
+	const [marketData, priceHistory, tokenAnalytics] = await Promise.all([
+		marketDataPromise,
+		fetchJson(`/api/price-history?period=24h&token=${tokenSymbolResolved}`),
+		tokenAnalyticsPromise
 	]);
-
-	const marketData = await marketDataRes.json();
-	const priceHistory = await priceHistoryRes.json();
 
 	// Fallback: if no markets found, provide token pairs for the UI to list selectable pools
 	let tokenPairs: any[] = [];
-	let tokenAnalytics: any = null;
 	if (!marketData?.marketData || marketData.marketData.length === 0) {
 		try {
-			const pairsRes = await fetch(
+			const pairsJson = await fetchJson(
 				`/api/token-pairs?tokenSymbol=${encodeURIComponent(tokenSymbolResolved)}&limit=50`
 			);
-			const pairsJson = await pairsRes.json();
 			tokenPairs = pairsJson?.pairs || [];
 		} catch {}
 	}
-
-	// Fetch token analytics to populate aggregate metrics when markets are sparse
-	try {
-		const anaRes = await fetch(`/api/token-analytics?tokenId=${tokenIdResolved}`);
-		const anaJson = await anaRes.json();
-		tokenAnalytics = anaJson?.analytics ? { ...anaJson.analytics, partial: !!anaJson.partial } : null;
-	} catch {}
 
 	// Compose page OG/Twitter metadata used by +layout.svelte
 	const title = tokenSymbolResolved === 'VOI' ? 'VOI Markets' : `${tokenSymbolResolved} Markets`;
@@ -80,6 +90,8 @@ export const load: PageLoad = async ({ fetch, url }) => {
 		priceHistory,
 		tokenPairs,
 		tokenAnalytics,
+		// Seeds the page's token info so hydration does not refetch /api/token-info (TASK-27)
+		tokenInfo,
 		pageMetaTags,
 		// Return resolved token info for component initialization
 		resolvedToken: {

@@ -3,16 +3,21 @@ import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/supabase-server';
 import { fetchCirculatingSupply } from '$lib/utils/voi';
 import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
 import { fetchPoolAggregates, latestSwapRow, pairWindow } from '$lib/server/poolAggregates';
 import { resolveVoiUsd } from '$lib/server/voiUsdReference';
 import type { VoiUsdStatus } from '$lib/server/voiUsdReference';
 
+// The untyped Mimir client created below; its rows are untyped (no generated schema)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MimirClient = SupabaseClient<any, any, any>;
+
 // Get all equivalent token IDs for a given token (handles wrapped/native mappings)
 async function getTokenEquivalentIds(
 	tokenId: number,
-	supabaseMimirClient: ReturnType<typeof createClient>
+	supabaseMimirClient: MimirClient
 ): Promise<number[]> {
 	const ids = new Set<number>([tokenId]);
 
@@ -34,6 +39,100 @@ async function getTokenEquivalentIds(
 	}
 
 	return Array.from(ids);
+}
+
+// Cross-chain market snapshots, ONLY for VOI (any equivalent is VOI 0 or wVOI 390001). Never throws.
+async function fetchCrossChainSnapshots(equivalentIds: number[]): Promise<any[]> {
+	const voiIds = [0, 390001];
+	if (!equivalentIds.some((id) => voiIds.includes(id))) return [];
+	try {
+		// Get latest snapshots from cross-chain exchanges (Tinyman, PactFi, Uniswap, etc.)
+		const { data: snapshots, error: snapshotsError } = await supabasePrivateClient
+			.from('market_snapshots')
+			.select(
+				`
+                    trading_pair_id,
+                    price,
+                    volume_24h,
+                    tvl,
+                    high_24h,
+                    low_24h,
+                    price_change_24h,
+                    price_change_percentage_24h,
+                    timestamp,
+                    trading_pairs!inner(
+                        id,
+                        base_token,
+                        quote_token,
+                        exchange:exchanges!inner(name, type, network)
+                    )
+                `
+			)
+			.order('timestamp', { ascending: false })
+			.limit(50); // Get recent snapshots
+
+		if (snapshotsError || !snapshots) return [];
+
+		// Group by trading_pair_id and get the latest for each
+		const latestSnapshots = new Map();
+		snapshots.forEach((snapshot) => {
+			const pairId = snapshot.trading_pair_id;
+			if (
+				!latestSnapshots.has(pairId) ||
+				new Date(snapshot.timestamp) > new Date(latestSnapshots.get(pairId).timestamp)
+			) {
+				latestSnapshots.set(pairId, snapshot);
+			}
+		});
+
+		// Filter out Voi network exchanges (Humble, Nomadex) since we get those from MIMIR
+		// Also exclude MEXC (trading_pair_id = 1) which is no longer active
+		return Array.from(latestSnapshots.values())
+			.filter(
+				(snapshot) =>
+					snapshot.trading_pairs.exchange.network !== 'Voi' && snapshot.trading_pair_id !== 1
+			)
+			.map((snapshot) => ({
+				trading_pair_id: snapshot.trading_pair_id,
+				exchange: snapshot.trading_pairs.exchange.name,
+				pair: `${snapshot.trading_pairs.quote_token}/${snapshot.trading_pairs.base_token}`,
+				type: snapshot.trading_pairs.exchange.type,
+				network: snapshot.trading_pairs.exchange.network,
+				url: null,
+				pool_url: null,
+				base_token_id: 0, // VOI
+				quote_token_id: null,
+				price: snapshot.price,
+				volume_24h: snapshot.volume_24h,
+				tvl: snapshot.tvl,
+				high_24h: snapshot.high_24h,
+				low_24h: snapshot.low_24h,
+				price_change_24h: snapshot.price_change_24h,
+				price_change_percentage_24h: snapshot.price_change_percentage_24h,
+				lastUpdated: snapshot.timestamp
+			}));
+	} catch (e) {
+		console.warn('Failed to fetch cross-chain snapshots:', e);
+		return [];
+	}
+}
+
+// The token's Algorand asset id, if it has one (gates the Vestige markets). Never throws.
+async function fetchAlgoAssetId(
+	tokenId: number,
+	supabaseMimirClient: MimirClient
+): Promise<number | null> {
+	try {
+		const { data: tokenData, error: tokenError } = await supabaseMimirClient
+			.from('arc200_contracts')
+			.select('algo_asset_id')
+			.eq('contract_id', tokenId)
+			.single();
+		return !tokenError && tokenData?.algo_asset_id ? Number(tokenData.algo_asset_id) : null;
+	} catch (error) {
+		console.error('Error fetching Vestige markets:', error);
+		return null;
+	}
 }
 
 interface MarketSnapshot {
@@ -80,17 +179,18 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			}
 		}
 
-		// Fetch the circulating supply data with error handling
-		let circulatingSupply = '0';
-		let percentDistributed = '0';
-
-		try {
-			const supplyData = await fetchCirculatingSupply();
-			circulatingSupply = supplyData.circulatingSupply;
-			percentDistributed = supplyData.percentDistributed;
-		} catch (error) {
+		// Circulating supply depends on nothing else: start it now, await it where the response is built (TASK-27)
+		const supplyPromise = fetchCirculatingSupply().catch((error) => {
 			console.error('Failed to fetch circulating supply:', error);
-		}
+			return { circulatingSupply: '0', percentDistributed: '0' };
+		});
+		const supplyResponse = async () => {
+			const { circulatingSupply, percentDistributed } = await supplyPromise;
+			return {
+				circulatingSupply: parseFloat(circulatingSupply),
+				percentDistributed: parseFloat(percentDistributed)
+			};
+		};
 
 		// If a tokenId is provided, build markets using both MIMIR data and cross-chain snapshots
 		let marketData: any[] = [];
@@ -170,33 +270,36 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 					voiUsdStatus,
 					voiUsdAsOf,
 					aggregates: { totalVolume: 0, totalTvl: 0, weightedAveragePrice: 0 },
-					circulatingSupply: {
-						circulatingSupply: parseFloat(circulatingSupply),
-						percentDistributed: parseFloat(percentDistributed)
-					}
+					circulatingSupply: await supplyResponse()
 				});
 			}
 
-			// USD helpers
-			// VOI USD reference - get from price history which uses proper sources
-			try {
-				const refRes = await fetch(`${url.origin}/api/price-history?period=24h&token=VOI`);
-				({ voiUsd, status: voiUsdStatus, asOf: voiUsdAsOf } = resolveVoiUsd(
-					refRes.ok ? await refRes.json() : null
-				));
-			} catch {
-				voiUsd = null;
-				voiUsdStatus = 'unavailable';
-			}
+			// TASK-27: everything below depends only on the pools (or only on the token), so these
+			// reads run together. Each keeps its own failure handling; Vestige still waits for symbolUsd.
+			const [voiUsdRef, poolAggregates, crossChainSnapshots, algoAssetId] = await Promise.all([
+				// VOI USD reference - get from price history which uses proper sources
+				(async () => {
+					try {
+						const refRes = await fetch(`${url.origin}/api/price-history?period=24h&token=VOI`);
+						return resolveVoiUsd(refRes.ok ? await refRes.json() : null);
+					} catch {
+						return { voiUsd: null, status: 'unavailable' as const, asOf: null };
+					}
+				})(),
+				// TASK-52, C11, P06: share pool aggregates for latest swaps and the 24h window.
+				fetchPoolAggregates(
+					supabaseMimirClient,
+					pairs.map((p) => p.poolId)
+				),
+				fetchCrossChainSnapshots(equivalentIds),
+				fetchAlgoAssetId(tokenId, supabaseMimirClient)
+			]);
+			({ voiUsd, status: voiUsdStatus, asOf: voiUsdAsOf } = voiUsdRef);
 			if (voiUsdStatus !== 'ok') {
 				console.warn('VOI USD reference status:', voiUsdStatus);
 			}
 			const voiUsdForMath = voiUsd ?? 0;
 
-			const poolIds = pairs.map((p) => p.poolId);
-
-			// TASK-52, C11, P06: share pool aggregates for latest swaps and the 24h window.
-			const poolAggregates = await fetchPoolAggregates(supabaseMimirClient, poolIds);
 			const latestByPool = new Map<number, ReturnType<typeof latestSwapRow>>();
 			for (const agg of poolAggregates.values()) {
 				const row = latestSwapRow(agg);
@@ -302,83 +405,6 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 				if (!symbolUsd.has(s)) {
 					symbolUsd.set(s, 0);
 					console.warn(`No price path found for token: ${s}`);
-				}
-			}
-
-			// 4) Get cross-chain market snapshots ONLY for VOI
-			let crossChainSnapshots: any[] = [];
-			// Check if any equivalent is VOI (0) or wVOI (390001)
-			const voiIds = [0, 390001];
-			if (equivalentIds.some((id) => voiIds.includes(id))) {
-				try {
-					// Get latest snapshots from cross-chain exchanges (Tinyman, PactFi, Uniswap, etc.)
-					const { data: snapshots, error: snapshotsError } = await supabasePrivateClient
-						.from('market_snapshots')
-						.select(
-							`
-                            trading_pair_id,
-                            price,
-                            volume_24h,
-                            tvl,
-                            high_24h,
-                            low_24h,
-                            price_change_24h,
-                            price_change_percentage_24h,
-                            timestamp,
-                            trading_pairs!inner(
-                                id,
-                                base_token,
-                                quote_token,
-                                exchange:exchanges!inner(name, type, network)
-                            )
-                        `
-						)
-						.order('timestamp', { ascending: false })
-						.limit(50); // Get recent snapshots
-
-					if (!snapshotsError && snapshots) {
-						// Group by trading_pair_id and get the latest for each
-						const latestSnapshots = new Map();
-						snapshots.forEach((snapshot) => {
-							const pairId = snapshot.trading_pair_id;
-							if (
-								!latestSnapshots.has(pairId) ||
-								new Date(snapshot.timestamp) > new Date(latestSnapshots.get(pairId).timestamp)
-							) {
-								latestSnapshots.set(pairId, snapshot);
-							}
-						});
-
-						// Filter out Voi network exchanges (Humble, Nomadex) since we get those from MIMIR
-						// Also exclude MEXC (trading_pair_id = 1) which is no longer active
-						crossChainSnapshots = Array.from(latestSnapshots.values())
-							.filter(
-								(snapshot) =>
-									snapshot.trading_pairs.exchange.network !== 'Voi' &&
-									snapshot.trading_pair_id !== 1
-							)
-							.map((snapshot) => ({
-								trading_pair_id: snapshot.trading_pair_id,
-								exchange: snapshot.trading_pairs.exchange.name,
-								pair: `${snapshot.trading_pairs.quote_token}/${snapshot.trading_pairs.base_token}`,
-								type: snapshot.trading_pairs.exchange.type,
-								network: snapshot.trading_pairs.exchange.network,
-								url: null,
-								pool_url: null,
-								base_token_id: 0, // VOI
-								quote_token_id: null,
-								price: snapshot.price,
-								volume_24h: snapshot.volume_24h,
-								tvl: snapshot.tvl,
-								high_24h: snapshot.high_24h,
-								low_24h: snapshot.low_24h,
-								price_change_24h: snapshot.price_change_24h,
-								price_change_percentage_24h: snapshot.price_change_percentage_24h,
-								lastUpdated: snapshot.timestamp
-							}));
-					}
-				} catch (e) {
-					console.warn('Failed to fetch cross-chain snapshots:', e);
 				}
 			}
 
@@ -536,14 +562,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			// 6) Fetch Vestige (Algorand) markets if token has algo_asset_id
 			let vestigeMarkets: any[] = [];
 			try {
-				// Check if the selected token has an algo_asset_id
-				const { data: tokenData, error: tokenError } = await supabaseMimirClient
-					.from('arc200_contracts')
-					.select('algo_asset_id')
-					.eq('contract_id', tokenId)
-					.single();
-
-				if (!tokenError && tokenData && tokenData.algo_asset_id) {
+				if (algoAssetId) {
 					// Create a price map from our symbol USD prices for TVL calculation
 					const priceMapForVestige = new Map<string, number>();
 					for (const [symbol, usdPrice] of symbolUsd) {
@@ -551,10 +570,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 							priceMapForVestige.set(symbol, usdPrice);
 						}
 					}
-					vestigeMarkets = await fetchVestigeMarketsForAsset(
-						tokenData.algo_asset_id,
-						priceMapForVestige
-					);
+					vestigeMarkets = await fetchVestigeMarketsForAsset(algoAssetId, priceMapForVestige);
 				} else {
 					console.log(`Token ${tokenId} has no algo_asset_id, skipping Vestige markets`);
 				}
@@ -670,10 +686,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 				...aggregates,
 				weightedAveragePrice
 			},
-			circulatingSupply: {
-				circulatingSupply: parseFloat(circulatingSupply),
-				percentDistributed: parseFloat(percentDistributed)
-			}
+			circulatingSupply: await supplyResponse()
 		});
 	} catch (error) {
 		console.error('Error fetching market data:', error);

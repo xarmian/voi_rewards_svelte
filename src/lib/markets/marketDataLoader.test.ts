@@ -136,6 +136,35 @@ test("dedupe skips seeded rows, force refreshes, and concurrent loads share a pr
   assert.equal(await second, true);
 });
 
+test("TASK-27: a seeded empty result for the same token is settled and not refetched", async () => {
+  const { loader, requests } = setup({ ...seeded, marketData: [] });
+  assert.equal(await loader.load(1), false);
+  assert.equal(requests.size, 0);
+});
+
+test("TASK-27: a seeded server failure is retried for the same token", async () => {
+  const { loader, request, requests } = setup({
+    ...seeded,
+    marketData: [],
+    error: "Failed to fetch market data",
+  });
+  const pending = loader.load(1);
+  assert.equal(requests.get("/api/markets?tokenId=1")?.length, 1);
+  request(1).resolve(Response.json({ marketData: token1Rows }));
+  assert.equal(await pending, true);
+  assert.deepEqual(loader.state.marketData, token1Rows);
+  assert.equal(loader.state.error, null);
+});
+
+test("TASK-27: an empty result loaded on the client is reused for the same token", async () => {
+  const { loader, request, requests } = setup();
+  const first = loader.load(5);
+  request(5).resolve(Response.json({ marketData: [] }));
+  assert.equal(await first, true);
+  assert.equal(await loader.load(5), false);
+  assert.equal(requests.get("/api/markets?tokenId=5")?.length, 1);
+});
+
 test("a JSON error on HTTP 200 is a failure and clears refreshed rows", async () => {
   const { loader, request } = setup(seeded);
   const pending = loader.load(1, { force: true });
