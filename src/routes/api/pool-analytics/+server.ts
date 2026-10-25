@@ -111,8 +111,8 @@ export const GET: RequestHandler = async ({ url }) => {
 		const agg = aggregates?.get(poolId);
 		const volumeMetrics = poolMetricsOrUnavailable(agg, aggregates === null);
 		const reserves = poolLatestReserves(agg);
-		const reserveA = reserves?.reserveA ?? parseFloat(poolData.tokenA.balance);
-		const reserveB = reserves?.reserveB ?? parseFloat(poolData.tokenB.balance);
+		const reserveA = reserves?.reserveA || parseFloat(poolData.tokenA.balance);
+		const reserveB = reserves?.reserveB || parseFloat(poolData.tokenB.balance);
 		const averageFee = await calculateAverageFee(poolId);
 
 		// Calculate price ratio (tokenB/tokenA)
