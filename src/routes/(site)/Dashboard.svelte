@@ -319,7 +319,11 @@
 					<p class="text-2xl font-bold text-gray-900 dark:text-white">
 						${currentPrice ? formatNumber(currentPrice, 6) : '-.--'}
 						{#if priceChange24h}
-							<span class="text-sm ml-2 {priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}">
+							<span
+								class="text-sm ml-2 {priceChange24h >= 0
+									? 'text-green-700 dark:text-green-400'
+									: 'text-red-700 dark:text-red-400'}"
+							>
 								{priceChange24h >= 0 ? '+' : ''}{formatNumber(priceChange24h, 2)}%
 							</span>
 						{/if}

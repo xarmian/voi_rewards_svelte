@@ -57,17 +57,15 @@
 		return () => subscription.unsubscribe();
 	});
 
-	const metadata = $page.data.pageMetaTags ?? {};
-	const pageName = metadata.title
-		? metadata.title + ' | Voi Rewards Auditor'
-		: 'Voi Rewards Auditor';
-	const description =
+	$: metadata = $page.data.pageMetaTags ?? {};
+	$: pageName = metadata.title ? metadata.title + ' | Voi Rewards Auditor' : 'Voi Rewards Auditor';
+	$: description =
 		metadata.description ??
 		'View real-time expected token rewards for block proposals and node health. Voi, the blockchain for You All.';
-	const imageUrl = metadata.imageUrl ?? 'https://voirewards.com/android-chrome-192x192.png';
+	$: imageUrl = metadata.imageUrl ?? 'https://voirewards.com/android-chrome-192x192.png';
 	//const twitterHandle = metadata.twitterHandle;
-	const siteName = metadata.siteName ?? ' Voi Rewards Auditor';
-	const cardType = metadata.cardType ?? 'summary';
+	$: siteName = metadata.siteName ?? ' Voi Rewards Auditor';
+	$: cardType = metadata.cardType ?? 'summary';
 </script>
 
 <svelte:head>

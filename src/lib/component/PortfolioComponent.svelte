@@ -857,7 +857,7 @@
 									<span class="block md:hidden font-mono text-sm text-gray-600 dark:text-gray-300"
 										>{(walletAddress ?? '').slice(0, 4)}...{(walletAddress ?? '').slice(-4)}</span
 									>
-									<CopyComponent text={walletAddress} />
+									<CopyComponent ariaLabel="Copy address" text={walletAddress} />
 								</div>
 								{#if envoiName}
 									<a
