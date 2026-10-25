@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { escapeHtml } from '$lib/utils/escapeHtml';
+	import { clampPage } from '$lib/utils/paging';
 	import {
 		Label,
 		Table,
@@ -83,8 +84,25 @@
 		}
 	};
 
+	// Called from the filter recompute only. A sort or data refresh keeps the expanded row, so
+	// refresh its balance. A filter change clears expandedRow instead (TASK-23), so skip the stale
+	// index. Reads happen inside a function so the reactive block does not depend on (and cycle
+	// with) the page-reset block that assigns currentPage/expandedRow.
+	function refreshExpandedBalance() {
+		const filterChanged =
+			searchTerm !== previousSearchTerm || showOnlyFavorites !== previousShowOnlyFavorites;
+		if (filterChanged || expandedRow == null) return;
+		const index = (currentPage - 1) * itemsPerPage + expandedRow;
+		if (filterItems[index]) updateSelectedBalance(index);
+	}
+
+	// Only the latest request may write selectedBalance, so a slow response for a row that was
+	// collapsed (e.g. by a filter change) can't overwrite a later expansion's balance (TASK-23 r1).
+	let balanceRequest = 0;
 	const updateSelectedBalance = async (row: number) => {
+		const request = ++balanceRequest;
 		const accountInfo = await getAccountInfo(filterItems[row].proposer);
+		if (request !== balanceRequest) return;
 		selectedBalance = Number(accountInfo?.amount ?? 0) / Math.pow(10, 6);
 	};
 
@@ -104,6 +122,8 @@
 	$: onDestroy(unsubRewardParams);
 
 	let searchTerm: string = '';
+	let previousSearchTerm = searchTerm;
+	let previousShowOnlyFavorites = showOnlyFavorites;
 
 	const handleSort = (event: any) => {
 		sortTable(event.detail.sortKey);
@@ -221,11 +241,7 @@
 			}
 		);
 
-		if (filterItems.length > 0 && expandedRow != null) {
-			// find row in filterItems, using currentPage and itemsPerPage
-			const index = (currentPage - 1) * itemsPerPage + expandedRow;
-			updateSelectedBalance(index);
-		}
+		refreshExpandedBalance();
 
 		// get page of items
 		//const pageOfItems = filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -237,6 +253,24 @@
       });
     })();*/
 	}
+
+	$: {
+		if (searchTerm !== previousSearchTerm || showOnlyFavorites !== previousShowOnlyFavorites) {
+			currentPage = 1;
+			expandedRow = null;
+			previousSearchTerm = searchTerm;
+			previousShowOnlyFavorites = showOnlyFavorites;
+		}
+		clampToResults(filterItems.length);
+	}
+
+	// Through a function so the block above does not depend on currentPage: it re-clamps when the
+	// results change, not on each keystroke in the bound page box (on:change clamps edits; r1).
+	function clampToResults(total: number) {
+		currentPage = clampPage(currentPage, total, itemsPerPage);
+	}
+
+	$: totalPages = Math.max(1, Math.ceil(filterItems.length / itemsPerPage));
 
 	let columns: any = [
 		{ id: 'rank', desc: 'Rank', tooltip: null },
@@ -274,7 +308,7 @@
 		</div>
 		<button
 			on:click={handleRefresh}
-			class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
+			class="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 flex items-center"
 			disabled={isRefreshing}
 		>
 			<i class="fas fa-sync-alt mr-2 {isRefreshing ? 'animate-spin' : ''}"></i>
@@ -332,6 +366,14 @@
 					</TableBodyCell>
 				</TableBodyRow>
 			</TableBody>
+		{:else if filterItems.length === 0}
+			<TableBody tableBodyClass="divide-y">
+				<TableBodyRow>
+					<TableBodyCell colspan={columns.length} class="p-2 text-center">
+						No validators match your filters.
+					</TableBodyCell>
+				</TableBodyRow>
+			</TableBody>
 		{:else}
 			<TableBody tableBodyClass="divide-y">
 				{#each filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) as item, i}
@@ -383,8 +425,7 @@
 								<div class="flex items-center gap-2">
 									<button
 										on:click|stopPropagation={() => {
-											const row = filterItems[i];
-											row.showNicknameInput = !row.showNicknameInput;
+											item.showNicknameInput = !item.showNicknameInput;
 											filterItems = filterItems;
 										}}
 										class="text-gray-500 hover:text-gray-600 px-2"
@@ -434,12 +475,14 @@
 											<Label defaultClass="text-sm font-medium inline-block w-40">Address:</Label>
 											<button
 												on:click|stopPropagation={() => goto(`/wallet/${item.proposer}`)}
-												class="text-blue-500 hover:text-blue-600 underline">{item.proposer}</button
+												class="text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline"
+												>{item.proposer}</button
 											>
 
 											<!-- Action buttons group -->
 											<div class="mt-2 flex gap-2">
 												<CopyComponent
+													ariaLabel="Copy address"
 													text={item.proposer}
 													toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(item.proposer.substr(0, 20))}...`}
 													failureMessage={`Failed to copy wallet address to clipboard.`}
@@ -466,7 +509,7 @@
 												<a
 													href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
 													target="_blank"
-													class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+													class="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-blue-700 bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 dark:hover:text-blue-300 rounded-lg transition-colors"
 													on:click|stopPropagation
 												>
 													<i class="fas fa-search"></i>
@@ -508,7 +551,7 @@
 												<a
 													href="https://app.envoi.sh/#/{item.nfd}"
 													target="_blank"
-													class="text-blue-500 hover:text-blue-700 hover:underline"
+													class="text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
 													on:click|stopPropagation
 												>
 													{item.nfd}
@@ -539,7 +582,7 @@
 	</Table>
 	<div class="flex justify-between items-center gap-4">
 		<button
-			class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+			class="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
 			on:click={() => (currentPage = Math.max(1, currentPage - 1))}
 			disabled={currentPage === 1}
 		>
@@ -551,22 +594,21 @@
 				type="number"
 				bind:value={currentPage}
 				min="1"
-				max={Math.ceil(filterItems.length / itemsPerPage)}
+				max={totalPages}
 				class="w-16 px-2 py-1 border rounded text-center text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-800"
 				on:change={(e) => {
-					const value = parseInt(e.currentTarget.value);
-					const maxPage = Math.ceil(filterItems.length / itemsPerPage);
-					if (value < 1) currentPage = 1;
-					else if (value > maxPage) currentPage = maxPage;
-					else currentPage = value;
+					currentPage = clampPage(
+						parseInt(e.currentTarget.value) || 1,
+						filterItems.length,
+						itemsPerPage
+					);
 				}}
 			/>
-			<span>of {Math.ceil(filterItems.length / itemsPerPage)}</span>
+			<span>of {totalPages}</span>
 		</div>
 		<button
-			class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-			on:click={() =>
-				(currentPage = Math.min(Math.ceil(filterItems.length / itemsPerPage), currentPage + 1))}
+			class="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+			on:click={() => (currentPage = clampPage(currentPage + 1, filterItems.length, itemsPerPage))}
 			disabled={currentPage * itemsPerPage >= filterItems.length}
 		>
 			Next
@@ -584,8 +626,8 @@
 </Modal>
 
 <style>
+	/* No colour here: a scoped a{color} beat the Tailwind text classes, and #007bff failed contrast (VIS-01). */
 	a {
-		color: #007bff;
 		text-decoration: none;
 		background-color: transparent;
 	}

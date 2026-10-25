@@ -167,8 +167,7 @@
 			let rewardStake = 0;
 
 			if (epochData) {
-				rewardStake =
-					Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
+				rewardStake = Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
 			}
 
 			const balance = Number(accountInfo?.amount ?? 0);
@@ -468,6 +467,8 @@
 											: walletId.slice(-4)}</span
 									>
 									<CopyComponent
+										mode="span"
+										ariaLabel="Copy address"
 										text={parentWalletId ?? walletId}
 										toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(parentWalletId ?? walletId.slice(0, 20))}...`}
 										failureMessage={`Failed to copy wallet address to clipboard.`}
@@ -500,6 +501,8 @@
 									<div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
 										<span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
 										<CopyComponent
+											mode="span"
+											ariaLabel="Copy address"
 											text={account.address}
 											toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(account.address.slice(0, 20))}...`}
 											failureMessage={`Failed to copy wallet address to clipboard.`}
@@ -719,6 +722,8 @@
 													: walletId.slice(-4)}</span
 											>
 											<CopyComponent
+												mode="span"
+												ariaLabel="Copy address"
 												text={parentWalletId ?? walletId}
 												toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(parentWalletId ?? walletId.slice(0, 20))}...`}
 												failureMessage={`Failed to copy wallet address to clipboard.`}
@@ -751,6 +756,8 @@
 											<div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
 												<span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
 												<CopyComponent
+													mode="span"
+													ariaLabel="Copy address"
 													text={account.address}
 													toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(account.address.slice(0, 20))}...`}
 													failureMessage={`Failed to copy wallet address to clipboard.`}
