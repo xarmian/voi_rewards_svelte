@@ -129,11 +129,6 @@ export async function getConsensusInfo(
 					vote_count: 0
 				};
 
-				consensusInfo.update((current) => ({
-					...current,
-					[address]: emptyConsensus
-				}));
-
 				return emptyConsensus;
 			}
 			throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
