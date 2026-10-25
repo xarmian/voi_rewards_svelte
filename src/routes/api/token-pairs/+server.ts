@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { pgrstQuote, validateTokenPairFilters, validateTokenPairIds } from '$lib/server/validate';
 import { createClient } from '@supabase/supabase-js';
@@ -148,13 +149,21 @@ export const GET: RequestHandler = async ({ url }) => {
 			)
 		];
 
-		return json({
-			pairs: normalizedPairs,
-			groupedPairs,
-			baseTokens,
-			quoteTokens,
-			total: normalizedPairs.length
-		});
+		return json(
+			{
+				pairs: normalizedPairs,
+				groupedPairs,
+				baseTokens,
+				quoteTokens,
+				total: normalizedPairs.length
+			},
+			{
+				headers: publicCache(
+					CACHE_TTL['token-pairs'].sMaxAge,
+					CACHE_TTL['token-pairs'].staleWhileRevalidate
+				)
+			}
+		);
 	} catch (error) {
 		console.error('Token Pairs API Error:', error);
 

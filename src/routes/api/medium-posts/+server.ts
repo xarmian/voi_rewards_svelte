@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { XMLParser } from 'fast-xml-parser';
@@ -18,7 +19,14 @@ export const GET: RequestHandler = async ({ fetch }) => {
 				pubDate: item.pubDate
 			}));
 
-		return json(posts);
+		return json(posts, {
+			headers: response.ok
+				? publicCache(
+						CACHE_TTL['medium-posts'].sMaxAge,
+						CACHE_TTL['medium-posts'].staleWhileRevalidate
+					)
+				: undefined
+		});
 	} catch (error) {
 		console.error('Error fetching Medium posts:', error);
 		return json([]);

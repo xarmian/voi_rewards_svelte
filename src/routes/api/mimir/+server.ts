@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import { json } from '@sveltejs/kit';
@@ -21,7 +22,10 @@ export async function GET({ url }: RequestEvent) {
 			return json({ error: error.message }, { status: 500 });
 		}
 
-		return json({ data });
+		return json(
+			{ data },
+			{ headers: publicCache(CACHE_TTL.mimir.sMaxAge, CACHE_TTL.mimir.staleWhileRevalidate) }
+		);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Failed to fetch data';
 		return json({ error: message }, { status: 500 });

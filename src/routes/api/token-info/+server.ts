@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
@@ -17,7 +18,7 @@ interface TokenInfo {
 }
 
 // Get token equivalents from arc200_contracts table
-async function getTokenEquivalents(tokenId: number): Promise<number[]> {
+async function getTokenEquivalents(tokenId: number): Promise<{ value: number[]; failed: boolean }> {
 	try {
 		const { data, error } = await supabaseMimirClient
 			.from('arc200_contracts')
@@ -25,7 +26,7 @@ async function getTokenEquivalents(tokenId: number): Promise<number[]> {
 			.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
 
 		if (error || !data || data.length === 0) {
-			return [];
+			return { value: [], failed: !!error && error.code !== 'PGRST116' };
 		}
 
 		const equivalents: number[] = [];
@@ -44,19 +45,21 @@ async function getTokenEquivalents(tokenId: number): Promise<number[]> {
 			}
 		});
 
-		return equivalents;
+		return { value: equivalents, failed: false };
 	} catch (error) {
 		console.error('Failed to get token equivalents:', error);
-		return [];
+		return { value: [], failed: true };
 	}
 }
 
 // Get token total supply
-async function getTokenTotalSupply(tokenId: number): Promise<number | null> {
+async function getTokenTotalSupply(
+	tokenId: number
+): Promise<{ value: number | null; failed: boolean }> {
 	try {
 		// Handle VOI (token ID 0)
 		if (tokenId === 0) {
-			return 10_000_000_000; // 10B VOI total supply
+			return { value: 10_000_000_000, failed: false }; // 10B VOI total supply
 		}
 
 		// Try ARC200 contracts first
@@ -67,8 +70,10 @@ async function getTokenTotalSupply(tokenId: number): Promise<number | null> {
 			.single();
 
 		if (!arc200Error && arc200Data && arc200Data.total_supply) {
-			return parseInt(arc200Data.total_supply, 10);
+			return { value: parseInt(arc200Data.total_supply, 10), failed: false };
 		}
+
+		const arc200Failed = !!arc200Error && arc200Error.code !== 'PGRST116';
 
 		// Fallback to assets table for ASA
 		const { data: assetData, error: assetError } = await supabaseMimirClient
@@ -79,13 +84,16 @@ async function getTokenTotalSupply(tokenId: number): Promise<number | null> {
 
 		if (!assetError && assetData && assetData.params) {
 			const params = assetData.params as any;
-			return params.t || null; // total supply
+			return { value: params.t || null, failed: arc200Failed }; // total supply
 		}
 
-		return null;
+		return {
+			value: null,
+			failed: arc200Failed || (!!assetError && assetError.code !== 'PGRST116')
+		};
 	} catch (error) {
 		console.error('Failed to get token total supply:', error);
-		return null;
+		return { value: null, failed: true };
 	}
 }
 
@@ -100,6 +108,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		let targetTokenId: number;
 		let tokenInfo: TokenInfo;
+		let degraded = false;
 
 		if (tokenId) {
 			targetTokenId = Number(tokenId);
@@ -110,6 +119,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					getTokenEquivalents(0),
 					getTokenTotalSupply(0)
 				]);
+				degraded ||= equivalents.failed || totalSupply.failed;
 
 				tokenInfo = {
 					tokenId: 0,
@@ -117,8 +127,8 @@ export const GET: RequestHandler = async ({ url }) => {
 					decimals: 6,
 					imageUrl: null,
 					type: 'VOI',
-					equivalents,
-					totalSupply
+					equivalents: equivalents.value,
+					totalSupply: totalSupply.value
 				};
 			} else {
 				// Try ARC200 contracts first
@@ -133,6 +143,7 @@ export const GET: RequestHandler = async ({ url }) => {
 						getTokenEquivalents(targetTokenId),
 						getTokenTotalSupply(targetTokenId)
 					]);
+					degraded ||= equivalents.failed || totalSupply.failed;
 
 					tokenInfo = {
 						tokenId: arc200Data.contract_id,
@@ -141,11 +152,12 @@ export const GET: RequestHandler = async ({ url }) => {
 						imageUrl: arc200Data.image_url || null,
 						algoAssetId: arc200Data.algo_asset_id || null,
 						type: 'ARC200',
-						equivalents,
-						totalSupply
+						equivalents: equivalents.value,
+						totalSupply: totalSupply.value
 					};
 				} else {
 					// Fallback to assets table for ASA
+					degraded ||= !!arc200Error && arc200Error.code !== 'PGRST116';
 					const { data: assetData, error: assetError } = await supabaseMimirClient
 						.from('asset')
 						.select('params')
@@ -158,6 +170,7 @@ export const GET: RequestHandler = async ({ url }) => {
 							getTokenEquivalents(targetTokenId),
 							getTokenTotalSupply(targetTokenId)
 						]);
+						degraded ||= equivalents.failed || totalSupply.failed;
 
 						tokenInfo = {
 							tokenId: targetTokenId,
@@ -165,8 +178,8 @@ export const GET: RequestHandler = async ({ url }) => {
 							decimals: params.dc || 0,
 							imageUrl: null,
 							type: 'ASA',
-							equivalents,
-							totalSupply
+							equivalents: equivalents.value,
+							totalSupply: totalSupply.value
 						};
 					} else {
 						return json({ info: null });
@@ -180,6 +193,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					getTokenEquivalents(0),
 					getTokenTotalSupply(0)
 				]);
+				degraded ||= equivalents.failed || totalSupply.failed;
 
 				tokenInfo = {
 					tokenId: 0,
@@ -187,8 +201,8 @@ export const GET: RequestHandler = async ({ url }) => {
 					decimals: 6,
 					imageUrl: null,
 					type: 'VOI',
-					equivalents,
-					totalSupply
+					equivalents: equivalents.value,
+					totalSupply: totalSupply.value
 				};
 			} else {
 				// Case-insensitive match on symbol in ARC200 contracts
@@ -207,6 +221,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					getTokenEquivalents(row.contract_id),
 					getTokenTotalSupply(row.contract_id)
 				]);
+				degraded ||= equivalents.failed || totalSupply.failed;
 
 				tokenInfo = {
 					tokenId: row.contract_id,
@@ -214,17 +229,27 @@ export const GET: RequestHandler = async ({ url }) => {
 					decimals: row.decimals || 0,
 					imageUrl: row.image_url || null,
 					type: 'ARC200',
-					equivalents,
-					totalSupply
+					equivalents: equivalents.value,
+					totalSupply: totalSupply.value
 				};
 			}
 		} else {
 			return json({ info: null });
 		}
 
-		return json({
-			info: tokenInfo
-		});
+		return json(
+			{
+				info: tokenInfo
+			},
+			{
+				headers: degraded
+					? undefined
+					: publicCache(
+							CACHE_TTL['token-info'].sMaxAge,
+							CACHE_TTL['token-info'].staleWhileRevalidate
+						)
+			}
+		);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';
 		return json({ error: message }, { status: 500 });

@@ -1,3 +1,4 @@
+import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/supabase-server';
@@ -10,10 +11,18 @@ export const GET: RequestHandler = async () => {
 	try {
 		// Return cached price if it's still valid
 		if (cachedPrice > 0 && lastFetched && Date.now() - lastFetched.getTime() < CACHE_DURATION) {
-			return json({
-				price: cachedPrice,
-				lastUpdated: lastFetched
-			});
+			return json(
+				{
+					price: cachedPrice,
+					lastUpdated: lastFetched
+				},
+				{
+					headers: publicCache(
+						CACHE_TTL['voi-price'].sMaxAge,
+						CACHE_TTL['voi-price'].staleWhileRevalidate
+					)
+				}
+			);
 		}
 
 		// Get VOI price from price history (which uses proper market data)
@@ -32,10 +41,21 @@ export const GET: RequestHandler = async () => {
 
 			console.log('VOI price from price history:', cachedPrice);
 
-			return json({
-				price: cachedPrice,
-				lastUpdated: lastFetched
-			});
+			return json(
+				{
+					price: cachedPrice,
+					lastUpdated: lastFetched
+				},
+				{
+					headers:
+						cachedPrice > 0
+							? publicCache(
+									CACHE_TTL['voi-price'].sMaxAge,
+									CACHE_TTL['voi-price'].staleWhileRevalidate
+								)
+							: undefined
+				}
+			);
 		}
 
 		throw new Error('No price data available');
