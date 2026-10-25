@@ -34,8 +34,7 @@
 					Team.
 				</p>
 				<p class="text-gray-700 dark:text-gray-300">
-					The network is currently in TestNet, and TestNet is a game. Token amounts will reset prior
-					to MainNet.
+					Voi MainNet is live. Rewards and balances shown here are real VOI on MainNet.
 				</p>
 				<p class="text-gray-700 dark:text-gray-300">
 					For more information about VOI, see the resources below:
