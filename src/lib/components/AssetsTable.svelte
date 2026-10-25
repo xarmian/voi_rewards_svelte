@@ -298,7 +298,8 @@
 										<i class="fas fa-search"></i>
 									</a>
 								{/if}
-								<CopyComponent ariaLabel="Copy asset ID"
+								<CopyComponent
+									ariaLabel="Copy asset ID"
 									text={asset.contractId}
 									toastMessage="Asset ID copied to clipboard"
 									failureMessage="Failed to copy Asset ID"

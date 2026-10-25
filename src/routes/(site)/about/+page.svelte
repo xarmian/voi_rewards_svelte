@@ -6,14 +6,17 @@
 <div class="about">
 	<header class="bg-gray-100 dark:bg-gray-800 py-4 px-8">
 		<h1 class="text-2xl font-bold">About</h1>
-		<h2 class="text-lg font-medium text-gray-600 dark:text-gray-300">What is the Voi Rewards Auditor?</h2>
+		<h2 class="text-lg font-medium text-gray-600 dark:text-gray-300">
+			What is the Voi Rewards Auditor?
+		</h2>
 	</header>
 	<p class="m-5">
 		<span class="text-blue-800 dark:text-blue-200">VOI Rewards Auditor</span> is a tool to help estimate
 		and calculate rewards for running a node on the VOI blockchain network.
 	</p>
 	<p class="m-5">
-		Voi MainNet is live. Rewards and balances shown here are real VOI on MainNet.
+		Voi MainNet is live. The Phase 1 and Phase 2 pages are a read-only archive of the TestNet
+		programmes.
 	</p>
 	<p class="m-5">
 		This website is an unofficial resource. It is not affiliated with the VOI Core Team.

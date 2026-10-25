@@ -58,9 +58,7 @@
 	});
 
 	$: metadata = $page.data.pageMetaTags ?? {};
-	$: pageName = metadata.title
-		? metadata.title + ' | Voi Rewards Auditor'
-		: 'Voi Rewards Auditor';
+	$: pageName = metadata.title ? metadata.title + ' | Voi Rewards Auditor' : 'Voi Rewards Auditor';
 	$: description =
 		metadata.description ??
 		'View real-time expected token rewards for block proposals and node health. Voi, the blockchain for You All.';

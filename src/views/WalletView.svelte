@@ -141,7 +141,8 @@
 			>
 				<span>Account</span>
 				<div>
-					<CopyComponent ariaLabel="Copy address"
+					<CopyComponent
+						ariaLabel="Copy address"
 						text={walletId}
 						toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(walletId.substring(0, 20))}...`}
 						failureMessage={`Failed to copy wallet address to clipboard.`}

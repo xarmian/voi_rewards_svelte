@@ -96,8 +96,13 @@
 		if (filterItems[index]) updateSelectedBalance(index);
 	}
 
+	// Only the latest request may write selectedBalance, so a slow response for a row that was
+	// collapsed (e.g. by a filter change) can't overwrite a later expansion's balance (TASK-23 r1).
+	let balanceRequest = 0;
 	const updateSelectedBalance = async (row: number) => {
+		const request = ++balanceRequest;
 		const accountInfo = await getAccountInfo(filterItems[row].proposer);
+		if (request !== balanceRequest) return;
 		selectedBalance = Number(accountInfo?.amount ?? 0) / Math.pow(10, 6);
 	};
 
@@ -256,7 +261,13 @@
 			previousSearchTerm = searchTerm;
 			previousShowOnlyFavorites = showOnlyFavorites;
 		}
-		currentPage = clampPage(currentPage, filterItems.length, itemsPerPage);
+		clampToResults(filterItems.length);
+	}
+
+	// Through a function so the block above does not depend on currentPage: it re-clamps when the
+	// results change, not on each keystroke in the bound page box (on:change clamps edits; r1).
+	function clampToResults(total: number) {
+		currentPage = clampPage(currentPage, total, itemsPerPage);
 	}
 
 	$: totalPages = Math.max(1, Math.ceil(filterItems.length / itemsPerPage));
@@ -469,7 +480,8 @@
 
 											<!-- Action buttons group -->
 											<div class="mt-2 flex gap-2">
-												<CopyComponent ariaLabel="Copy address"
+												<CopyComponent
+													ariaLabel="Copy address"
 													text={item.proposer}
 													toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(item.proposer.substr(0, 20))}...`}
 													failureMessage={`Failed to copy wallet address to clipboard.`}
@@ -595,8 +607,7 @@
 		</div>
 		<button
 			class="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-			on:click={() =>
-				(currentPage = clampPage(currentPage + 1, filterItems.length, itemsPerPage))}
+			on:click={() => (currentPage = clampPage(currentPage + 1, filterItems.length, itemsPerPage))}
 			disabled={currentPage * itemsPerPage >= filterItems.length}
 		>
 			Next

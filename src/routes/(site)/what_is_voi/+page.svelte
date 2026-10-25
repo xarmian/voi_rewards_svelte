@@ -34,7 +34,8 @@
 					Team.
 				</p>
 				<p class="text-gray-700 dark:text-gray-300">
-					Voi MainNet is live. Rewards and balances shown here are real VOI on MainNet.
+					Voi MainNet is live. The Phase 1 and Phase 2 pages are a read-only archive of the TestNet
+					programmes.
 				</p>
 				<p class="text-gray-700 dark:text-gray-300">
 					For more information about VOI, see the resources below:
