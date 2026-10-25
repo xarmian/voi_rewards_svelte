@@ -88,8 +88,10 @@
 	let selectedPool: TokenPair | null = null;
 	let poolsLoading = false;
 
-	// Token overview and analytics state (seeded by +page.ts so hydration does not refetch it)
-	let tokenInfo: any = data.tokenInfo ?? null;
+	// Token overview and analytics state. Seeded by +page.ts so hydration does not refetch it, but
+	// never for VOI: VOI's overview runs without token info, and SSR must match (TASK-27 r1).
+	let tokenInfo: any =
+		data.resolvedToken?.id && data.resolvedToken.symbol !== 'VOI' ? (data.tokenInfo ?? null) : null;
 	let tokenInfoLoading = false; // For VOI market data compatibility
 
 	// Enhanced UI state
@@ -222,7 +224,7 @@
 	// Fetch token info when token changes
 	async function fetchTokenInfo(tokenId: number) {
 		// Skip if we already have token info from server data for the same token
-		if (selectedToken?.symbol === serverDataToken && tokenInfo) {
+		if (selectedToken?.symbol === serverDataToken && tokenInfo?.tokenId === tokenId) {
 			console.log(
 				'Skipping fetchTokenInfo - already have data from server for',
 				selectedToken.symbol
