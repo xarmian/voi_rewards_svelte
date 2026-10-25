@@ -50,7 +50,7 @@ export function createPoller({ task, visibility }: PollerOptions) {
 
 	function stop() {
 		enabled = false;
-		pendingRun = false;
+		// TASK-30: a hidden one-shot run is still owed when polling stops.
 		clearTimer();
 	}
 
@@ -63,6 +63,7 @@ export function createPoller({ task, visibility }: PollerOptions) {
 
 	function destroy() {
 		destroyed = true;
+		pendingRun = false;
 		stop();
 		visibility.removeEventListener('visibilitychange', onVisibilityChange);
 	}

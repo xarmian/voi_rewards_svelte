@@ -113,11 +113,18 @@ export const ACCOUNT_CACHE_TTL = Object.freeze({
 });
 
 const consensusCache = createKeyedCache<string, ConsensusDetails | undefined>({
-	ttlMs: ACCOUNT_CACHE_TTL.consensus
+	ttlMs: ACCOUNT_CACHE_TTL.consensus,
+	onValue: (address, data) => consensusInfo.update((current) => ({ ...current, [address]: data }))
 });
-const accountCache = createKeyedCache<string, Account | undefined>({ ttlMs: ACCOUNT_CACHE_TTL.account });
-const supplyCache = createKeyedCache<string, SupplyInfo | null>({ ttlMs: ACCOUNT_CACHE_TTL.supply });
-let cacheGeneration = 0;
+// TASK-30: publish stores only when the cache accepts the newest non-invalidated result.
+const accountCache = createKeyedCache<string, Account | undefined>({
+	ttlMs: ACCOUNT_CACHE_TTL.account,
+	onValue: (address, data) => accountInfo.update((current) => ({ ...current, [address]: data }))
+});
+const supplyCache = createKeyedCache<string, SupplyInfo | null>({
+	ttlMs: ACCOUNT_CACHE_TTL.supply,
+	onValue: (_, data) => supply.set(data)
+});
 
 // TASK-30: cache fresh values and share requests for the same address.
 export async function getConsensusInfo(
@@ -125,7 +132,6 @@ export async function getConsensusInfo(
 	forceRefresh: boolean = false
 ): Promise<ConsensusDetails | undefined> {
 	if (!address) return;
-	const generation = cacheGeneration;
 	return consensusCache.get(address, async () => {
 		try {
 			const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
@@ -134,9 +140,6 @@ export async function getConsensusInfo(
 				throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
 			}
 			const data: ConsensusDetails = await response.json();
-			if (generation === cacheGeneration) {
-				consensusInfo.update((current) => ({ ...current, [address]: data }));
-			}
 			return data;
 		} catch (error) {
 			console.error('Error fetching consensus info:', error);
@@ -150,13 +153,9 @@ export async function getAccountInfo(
 	forceRefresh: boolean = false
 ): Promise<algosdk.modelsv2.Account | undefined> {
 	if (!address) return;
-	const generation = cacheGeneration;
 	return accountCache.get(address, async () => {
 		try {
 			const data = (await algodClient.accountInformation(address).do()) as algosdk.modelsv2.Account;
-			if (generation === cacheGeneration) {
-				accountInfo.update((current) => ({ ...current, [address]: data }));
-			}
 			return data;
 		} catch (error) {
 			console.error('Error fetching account info:', error);
@@ -166,7 +165,6 @@ export async function getAccountInfo(
 }
 
 export async function getSupplyInfo(): Promise<SupplyInfo | null> {
-	const generation = cacheGeneration;
 	return supplyCache.get('supply', async () => {
 		try {
 			const data = (await algodClient.supply().do()) as SupplyInfo;
@@ -178,7 +176,6 @@ export async function getSupplyInfo(): Promise<SupplyInfo | null> {
 				throw new Error('Invalid blacklist balance');
 			}
 			const result = { ...data, 'blacklisted-money': ballastBalance };
-			if (generation === cacheGeneration) supply.set(result);
 			return result;
 		} catch (error) {
 			console.error('Error fetching supply info:', error);
@@ -340,7 +337,6 @@ export async function getNFDomain(address: string): Promise<NFDomainResponse | n
 
 // Optional: Function to clear caches
 export function clearCaches() {
-	cacheGeneration++;
 	consensusCache.invalidate();
 	accountCache.invalidate();
 	supplyCache.invalidate();

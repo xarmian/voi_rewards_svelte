@@ -11,6 +11,7 @@ export const voiPrice = writable<PriceData>({ price: 0, lastUpdated: null, error
 export const VOI_PRICE_TTL_MS = 60_000;
 let fetchedAt: number | null = null;
 let inFlight: Promise<void> | null = null;
+let requestSequence = 0;
 
 export function updateVoiPrice(price: number, lastUpdated: Date) {
 	fetchedAt = Date.now();
@@ -25,11 +26,12 @@ export async function fetchVoiPriceWith(
 	fetchFn: (url: string) => Promise<Response>,
 	refresh = false
 ) {
-	// TASK-30: all callers wait for an active refresh to update the store.
-	if (inFlight) return inFlight;
+	// TASK-30: refresh starts a new fetch; ordinary callers join the newest request.
+	if (!refresh && inFlight) return inFlight;
 	const currentPrice = get(voiPrice);
 	if (currentPrice.price > 0 && fetchedAt !== null && Date.now() - fetchedAt < VOI_PRICE_TTL_MS && !refresh) return;
 
+	const sequence = ++requestSequence;
 	inFlight = Promise.resolve().then(async () => {
 		try {
 			const response = await fetchFn(
@@ -41,16 +43,19 @@ export async function fetchVoiPriceWith(
 			const pool = data.pools[0];
 			const price = pool.tokenB.balance / pool.tokenA.balance;
 			if (!Number.isFinite(price) || price <= 0) throw new Error('Invalid VOI price');
-			updateVoiPrice(price, new Date(pool.lastUpdated));
+			// TASK-30: an older request cannot replace a newer price or error.
+			if (sequence === requestSequence) updateVoiPrice(price, new Date(pool.lastUpdated));
 		} catch (error) {
 			console.error('Error fetching VOI price:', error);
-			voiPrice.update((current) => ({
-				...current,
-				error: error instanceof Error ? error.message : String(error)
-			}));
+			if (sequence === requestSequence) {
+				voiPrice.update((current) => ({
+					...current,
+					error: error instanceof Error ? error.message : String(error)
+				}));
+			}
 		}
 	}).finally(() => {
-		inFlight = null;
+		if (sequence === requestSequence) inFlight = null;
 	});
 	return inFlight;
 }
