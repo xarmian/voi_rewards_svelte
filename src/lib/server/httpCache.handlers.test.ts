@@ -117,6 +117,27 @@ describe('TASK-29 markets response caching', () => {
 		}
 	});
 
+	it.each([0, 1])('does not cache an equivalents error with %i pools', async (poolCount) => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+		mocks.from.mockImplementation((table: string) =>
+			query(table === 'pool_catalog' ? [pool].slice(0, poolCount) : [])
+		);
+		const time = new Date().toISOString();
+		const fetcher = vi.fn().mockImplementation(async () => Response.json([{ time, value: 0.01 }]));
+		const complete = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+		const body = await complete.json();
+		expect(complete.status).toBe(200);
+		expect(body.marketData).toHaveLength(poolCount);
+		expect(complete.headers.get('Cache-Control')).toBe(minuteCache);
+
+		mocks.from.mockImplementationOnce(() => query(null, { code: 'XX000' }));
+		const response = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual(body);
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
 	it.each(['query error', 'throw'])('does not cache a snapshot %s', async (failure) => {
 		mocks.from.mockImplementation((table: string) => {
 			if (table === 'market_snapshots') {
@@ -467,6 +488,27 @@ describe('TASK-29 hourly cache exclusions', () => {
 });
 
 describe('TASK-29 epoch response caching', () => {
+	it.each([null, ''])('does not cache an empty current_epoch %j', async (current_epoch) => {
+		vi.stubGlobal(
+			'fetch',
+			vi
+				.fn()
+				.mockResolvedValueOnce(Response.json({ epochs: [], current_epoch: '42' }))
+				.mockResolvedValueOnce(Response.json({ epochs: [], current_epoch }))
+		);
+		const complete = await epochsGET(event('/api/epochs'));
+		expect(complete.status).toBe(200);
+		expect(await complete.json()).toEqual({ epochs: [], current_epoch: 42 });
+		expect(complete.headers.get('Cache-Control')).toBe(
+			'public, max-age=0, s-maxage=300, stale-while-revalidate=3600'
+		);
+
+		const response = await epochsGET(event('/api/epochs'));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ epochs: [], current_epoch: 0 });
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
 	it.each([
 		{ current_epoch: 1 },
 		{ epochs: {}, current_epoch: 1 },
