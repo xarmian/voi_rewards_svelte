@@ -40,7 +40,8 @@ export function createKeyedCache<K, V>({
 			.then(
 				(value) => {
 					// TASK-30: failed refetches retain the previous value and its original timestamp.
-					if (value == null) return current.value ?? value;
+					// TASK-30 r2: never across an invalidation (a detached entry's value was discarded).
+					if (value == null) return entries.get(key) === current ? (current.value ?? value) : value;
 					// TASK-30: only the newest non-invalidated request may publish a value.
 					if (entries.get(key) === current && current.sequence === sequence) {
 						current.value = value;
@@ -50,7 +51,7 @@ export function createKeyedCache<K, V>({
 					return value;
 				},
 				(error) => {
-					if (current.value != null) return current.value;
+					if (current.value != null && entries.get(key) === current) return current.value;
 					throw error;
 				}
 			)

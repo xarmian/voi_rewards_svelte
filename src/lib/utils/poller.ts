@@ -18,13 +18,14 @@ export function createPoller({ task, visibility }: PollerOptions) {
 
 	function trigger() {
 		// TASK-30: automatic polls keep running after failures; manual callers can await errors.
-		void run().catch(() => undefined);
+		void run(false).catch(() => undefined);
 	}
 
-	function run(): Promise<void> {
+	// TASK-30 r2: only a manual run is owed after a hidden tab; a hidden poll resumes via `enabled`.
+	function run(manual = true): Promise<void> {
 		if (destroyed) return Promise.resolve();
 		if (visibility.visibilityState === 'hidden') {
-			pendingRun = true;
+			if (manual) pendingRun = true;
 			return Promise.resolve();
 		}
 		pendingRun = false;
