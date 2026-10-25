@@ -134,3 +134,16 @@ it('TASK-30 runs a hidden one-off exactly once after stop without scheduling pol
 	expect(vi.getTimerCount()).toBe(0);
 	poller.destroy();
 });
+
+it('TASK-30 r2: a hidden start() owes no run once polling is stopped', async () => {
+	const visibility = new Visibility();
+	visibility.set('hidden');
+	const task = vi.fn(async () => {});
+	const poller = createPoller({ task, visibility });
+	poller.start(1000);
+	poller.stop();
+	visibility.set('visible');
+	await vi.advanceTimersByTimeAsync(5000);
+	expect(task).not.toHaveBeenCalled();
+	poller.destroy();
+});

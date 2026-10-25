@@ -145,3 +145,24 @@ describe('TASK-30 keyed async cache', () => {
 		expect(fresh).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('TASK-30 r2: stale fallback never crosses an invalidation', () => {
+	it.each(['null result', 'rejection'])('returns no pre-invalidation value (%s)', async (kind) => {
+		const { cache, advance } = setup();
+		await cache.get('X', async () => 1);
+		advance(200);
+		let settle!: () => void;
+		const pending = cache.get(
+			'X',
+			() =>
+				new Promise<number | null>((done, fail) => {
+					settle = () => (kind === 'null result' ? done(null) : fail(new Error('down')));
+				})
+		);
+		await Promise.resolve();
+		cache.invalidate();
+		settle();
+		if (kind === 'null result') expect(await pending).toBeNull();
+		else await expect(pending).rejects.toThrow('down');
+	});
+});
