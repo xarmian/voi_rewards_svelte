@@ -1210,7 +1210,7 @@
 				{/each}
 				{#if fungibleTokens.filter((token) => isLPToken(token) && showZeroBalancesCondition(token)).length === 0}
 					<div class="text-gray-500 dark:text-gray-400 text-center py-4">
-						{#if tokensError}
+						{#if tokensError && fungibleTokens.length === 0}
 							Token balances unavailable.
 							<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
 						{:else}
