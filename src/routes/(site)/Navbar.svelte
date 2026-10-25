@@ -37,6 +37,8 @@
 		isDark = document.documentElement.classList.contains('dark');
 	});
 
+	// Widened to string: Kit 2.70 types pathname as a route-path union, but the click handler assigns any href.
+	let activeLink: string;
 	$: activeLink = $page.url.pathname;
 	let touchStart = 0;
 	let touchX = 0;
