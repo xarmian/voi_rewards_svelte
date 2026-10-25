@@ -5,7 +5,7 @@ function isIntegerString(value: string): boolean {
 function parseInteger(value: string, min: number, max = Infinity): number | null {
 	if (!isIntegerString(value)) return null;
 	const number = Number(value);
-	return Number.isInteger(number) && number >= min && number <= max ? number : null;
+	return Number.isSafeInteger(number) && number >= min && number <= max ? number : null;
 }
 
 export function validateBallastLookback(value: string | null): number | null {
@@ -15,8 +15,11 @@ export function validateBallastLookback(value: string | null): number | null {
 export function validatePhase2Pagination(
 	params: URLSearchParams
 ): { page: number; pageSize: number } | { error: string } {
-	const page = parseInteger(params.get('page') ?? '1', 1);
-	if (page === null) return { error: 'page must be an integer >= 1' };
+	for (const key of ['page', 'pageSize']) {
+		if (params.getAll(key).length > 1) return { error: `Duplicate parameter: ${key}` };
+	}
+	const page = parseInteger(params.get('page') ?? '1', 1, 1_000_000);
+	if (page === null) return { error: 'page must be an integer between 1 and 1000000' };
 	const pageSize = parseInteger(params.get('pageSize') ?? '1000', 1, 1000);
 	if (pageSize === null) return { error: 'pageSize must be an integer between 1 and 1000' };
 	return { page, pageSize };
@@ -58,6 +61,11 @@ const mimirSchemas: Record<string, Record<string, ParamParser>> = {
 export function validateMimirParams(
 	searchParams: URLSearchParams
 ): { action: string; params: Record<string, RpcParam> } | { error: string } {
+	const seen = new Set<string>();
+	for (const key of searchParams.keys()) {
+		if (seen.has(key)) return { error: `Duplicate parameter: ${key}` };
+		seen.add(key);
+	}
 	const action = searchParams.get('action') ?? 'get_online_account_count';
 	if (!Object.keys(mimirSchemas).includes(action)) {
 		return {
@@ -73,20 +81,22 @@ export function validateMimirParams(
 
 	const params: Record<string, RpcParam> = {};
 	for (const [key, parse] of Object.entries(schema)) {
-		const values = searchParams.getAll(key);
-		if (values.length === 0) return { error: `Missing required parameter: ${key}` };
-		for (const value of values) {
-			const parsed = parse(value);
-			if (parsed === null) return { error: `Invalid parameter: ${key}` };
-			params[key] = parsed;
-		}
+		const value = searchParams.get(key);
+		if (value === null) return { error: `Missing required parameter: ${key}` };
+		const parsed = parse(value);
+		if (parsed === null) return { error: `Invalid parameter: ${key}` };
+		params[key] = parsed;
 	}
 	return { action, params };
 }
 
+export function pgrstQuote(value: string): string {
+	return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
 export function validateTokenSearch(value: string | null, parameter: string): string | null {
-	if (value !== null && (value.length < 1 || value.length > 32 || /[^A-Za-z0-9._ -]/.test(value))) {
-		return `${parameter} must contain 1 to 32 letters, digits, dots, underscores, spaces or hyphens`;
+	if (value !== null && value.length > 64) {
+		return `${parameter} must contain at most 64 characters`;
 	}
 	return null;
 }

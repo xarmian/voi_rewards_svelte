@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { validateTokenPairFilters, validateTokenPairIds } from '$lib/server/validate';
+import { pgrstQuote, validateTokenPairFilters, validateTokenPairIds } from '$lib/server/validate';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import type { PoolCatalog, TokenPair } from '$lib/types/ohlcv.types';
@@ -34,13 +34,17 @@ export const GET: RequestHandler = async ({ url }) => {
 					`token_a_symbol.ilike.VOI,token_b_symbol.ilike.VOI,token_a_symbol.ilike.wVOI,token_b_symbol.ilike.wVOI`
 				);
 			} else {
+				const escapedSymbol = tokenSymbol.replace(/[\\%_]/g, '\\$&');
 				poolQuery = poolQuery.or(
-					`token_a_symbol.ilike.${tokenSymbol},token_b_symbol.ilike.${tokenSymbol}`
+					`token_a_symbol.ilike.${pgrstQuote(escapedSymbol)},token_b_symbol.ilike.${pgrstQuote(escapedSymbol)}`
 				);
 			}
 		} else if (query) {
 			// Search by symbol
-			poolQuery = poolQuery.or(`token_a_symbol.ilike.%${query}%,token_b_symbol.ilike.%${query}%`);
+			const escapedQuery = query.replace(/[\\%_]/g, '\\$&');
+			poolQuery = poolQuery.or(
+				`token_a_symbol.ilike.${pgrstQuote(`%${escapedQuery}%`)},token_b_symbol.ilike.${pgrstQuote(`%${escapedQuery}%`)}`
+			);
 		}
 
 		if (popular) {

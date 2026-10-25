@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { validateTokenSearch } from '$lib/server/validate';
+import { pgrstQuote, validateTokenSearch } from '$lib/server/validate';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import type { PoolCatalog } from '$lib/types/ohlcv.types';
@@ -32,7 +32,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		if (query) {
 			// Search by either token_a_symbol or token_b_symbol
-			poolQuery = poolQuery.or(`token_a_symbol.ilike.%${query}%,token_b_symbol.ilike.%${query}%`);
+			const escapedQuery = query.replace(/[\\%_]/g, '\\$&');
+			poolQuery = poolQuery.or(
+				`token_a_symbol.ilike.${pgrstQuote(`%${escapedQuery}%`)},token_b_symbol.ilike.${pgrstQuote(`%${escapedQuery}%`)}`
+			);
 		}
 
 		const { data, error } = await poolQuery;
