@@ -334,9 +334,8 @@
 	$: activeMarketsCount =
 		realMarketData.length > 0
 			? realMarketData.length
-			: tokenAnalytics?.tvl?.poolCount === null
-				? null
-				: (fallbackPairs?.length ?? tokenAnalytics?.tvl?.poolCount ?? 0);
+			: (fallbackPairs?.length ??
+				(tokenAnalytics?.tvl?.poolCount === null ? null : (tokenAnalytics?.tvl?.poolCount ?? 0)));
 
 	// Debug active markets count
 	$: console.log('Active markets calculation:', {

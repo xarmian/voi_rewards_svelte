@@ -95,7 +95,8 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		// If a tokenId is provided, build markets using both MIMIR data and cross-chain snapshots
 		let marketData: any[] = [];
 		let voiUsd: number | null = null;
-		let voiUsdStatus: VoiUsdStatus = 'unavailable';
+		// null = no VOI/USD conversion was attempted (no pools, or no tokenId), so nothing to flag
+		let voiUsdStatus: VoiUsdStatus | null = null;
 		let voiUsdAsOf: string | null = null;
 		if (tokenId !== null) {
 			const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
