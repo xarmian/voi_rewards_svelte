@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@supabase/supabase-js', () => ({
 	createClient: () => ({ from: mocks.from, rpc: mocks.rpc })
 }));
+vi.mock('$lib/supabase', () => ({ supabasePublicClient: { from: mocks.from } }));
+vi.mock('$lib/utils', () => ({ getTokensByEpoch: vi.fn().mockResolvedValue(100) }));
 vi.mock('$lib/supabase-server', () => ({
 	supabasePrivateClient: { from: mocks.from, rpc: mocks.rpc }
 }));
@@ -26,6 +28,7 @@ import { GET as tokenGET, OPTIONS as tokenOPTIONS } from '../../routes/api/token
 import { GET as poolGET } from '../../routes/api/pool-analytics/+server';
 import { GET as infoGET } from '../../routes/api/token-info/+server';
 import { GET as mediumGET } from '../../routes/api/medium-posts/+server';
+import { GET as relayGET } from '../../routes/api/relay-rewards/+server';
 import { GET as epochsGET } from '../../routes/api/epochs/+server';
 
 const minuteCache = 'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
@@ -45,6 +48,9 @@ function query(data: unknown, error: unknown = null) {
 	const result = Promise.resolve({ data, error });
 	const builder = {
 		select: () => builder,
+		gte: () => builder,
+		lte: () => builder,
+		returns: () => result,
 		or: () => builder,
 		eq: () => builder,
 		limit: () => builder,
@@ -97,6 +103,105 @@ describe('TASK-29 markets response caching', () => {
 			expect(response.headers.get('Cache-Control')).toBe(minuteCache);
 		}
 	});
+
+	it.each(['query error', 'throw'])('does not cache a snapshot %s', async (failure) => {
+		mocks.from.mockImplementation((table: string) => {
+			if (table === 'market_snapshots') {
+				if (failure === 'throw') throw new Error('snapshot unavailable');
+				return query(null, new Error('snapshot unavailable'));
+			}
+			return query(table === 'pool_catalog' ? [pool] : []);
+		});
+		const fetcher = vi
+			.fn()
+			.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+		const response = await marketsGET(event('/api/markets?tokenId=0', fetcher));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({
+			voiUsdStatus: 'ok',
+			marketData: [expect.objectContaining({ trading_pair_id: 1 })]
+		});
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
+	it.each(['query error', 'throw'])('does not cache an algo-id %s', async (failure) => {
+		mocks.from.mockImplementationOnce(() => query([]));
+		mocks.from.mockImplementationOnce(() => query([pool]));
+		mocks.from.mockImplementationOnce(() => {
+			if (failure === 'throw') throw new Error('algo id unavailable');
+			return query(null, { code: 'XX000' });
+		});
+		const fetcher = vi
+			.fn()
+			.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+		const response = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+		expect(response.status).toBe(200);
+		expect((await response.json()).voiUsdStatus).toBe('ok');
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
+	it('does not cache a Vestige throw', async () => {
+		mocks.from.mockImplementationOnce(() => query([]));
+		mocks.from.mockImplementationOnce(() => query([pool]));
+		mocks.from.mockImplementationOnce(() => query({ algo_asset_id: 456 }));
+		mocks.vestige.mockRejectedValue(new Error('Vestige unavailable'));
+		const fetcher = vi
+			.fn()
+			.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+		const response = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+		expect(mocks.vestige).toHaveBeenCalled();
+		expect(response.status).toBe(200);
+		expect((await response.json()).marketData).toHaveLength(1);
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
+	it.each(['pool throw', 'pool HTTP error', 'asset HTTP error', 'protocol throw'])(
+		'does not cache a swallowed Vestige %s',
+		async (failure) => {
+			const actual =
+				await vi.importActual<typeof import('$lib/utils/vestige')>('$lib/utils/vestige');
+			mocks.vestige.mockImplementation(actual.fetchVestigeMarketsForAsset);
+			mocks.from.mockImplementationOnce(() => query([]));
+			mocks.from.mockImplementationOnce(() => query([pool]));
+			mocks.from.mockImplementationOnce(() => query({ algo_asset_id: 456 }));
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async (url: string) => {
+					if (url.includes('/pools?')) {
+						if (failure === 'pool throw') throw new Error('Vestige unavailable');
+						if (failure === 'pool HTTP error') return new Response('', { status: 503 });
+						return Response.json({
+							results: [
+								{
+									id: 99,
+									asset_1_id: 456,
+									asset_2_id: 789,
+									asset_1_supply: 10,
+									asset_2_supply: 10,
+									protocol_id: 0
+								}
+							]
+						});
+					}
+					if (url.includes('/assets?')) {
+						if (failure === 'asset HTTP error') return new Response('', { status: 503 });
+						return Response.json([
+							{ id: 456, ticker: 'USDC', decimals: 0 },
+							{ id: 789, ticker: 'USDT', decimals: 0 }
+						]);
+					}
+					throw new Error('protocol unavailable');
+				})
+			);
+			const fetcher = vi
+				.fn()
+				.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+			const response = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+			expect(response.status).toBe(200);
+			expect((await response.json()).voiUsdStatus).toBe('ok');
+			expect(response.headers.has('Cache-Control')).toBe(false);
+		}
+	);
 
 	it.each(['unavailable', 'invalid'])('does not cache %s VOI/USD results', async (status) => {
 		const fetcher = vi
@@ -250,6 +355,70 @@ describe('TASK-29 hourly cache exclusions', () => {
 		}
 	});
 
+	it.each([
+		'equivalents error',
+		'equivalents throw',
+		'ARC supply error',
+		'ARC supply throw',
+		'ASA supply error',
+		'ASA supply throw',
+		'ARC supply error with ASA fallback'
+	])('does not cache token info after %s', async (failure) => {
+		for (const search of ['tokenId=123', 'symbol=TEST']) {
+			const token = { contract_id: 123, symbol: 'TEST', decimals: 6 };
+			mocks.from.mockImplementationOnce(() => query(search.startsWith('symbol') ? [token] : token));
+			mocks.from.mockImplementationOnce(() => {
+				if (failure === 'equivalents throw') throw new Error('equivalents unavailable');
+				return query([], failure === 'equivalents error' ? { code: 'XX000' } : null);
+			});
+			mocks.from.mockImplementationOnce(() => {
+				if (failure === 'ARC supply throw') throw new Error('supply unavailable');
+				return query(
+					failure.startsWith('equivalents') ? { total_supply: '100' } : null,
+					failure.startsWith('ARC supply error')
+						? { code: 'XX000' }
+						: failure.startsWith('equivalents')
+							? null
+							: { code: 'PGRST116' }
+				);
+			});
+			if (!failure.startsWith('equivalents') && failure !== 'ARC supply throw') {
+				mocks.from.mockImplementationOnce(() => {
+					if (failure === 'ASA supply throw') throw new Error('supply unavailable');
+					return query(
+						failure.endsWith('fallback') ? { params: { t: 100 } } : null,
+						failure === 'ASA supply error' ? { code: 'XX000' } : null
+					);
+				});
+			}
+			const response = await infoGET(event(`/api/token-info?${search}`));
+			expect(response.status).toBe(200);
+			expect(await response.json()).toMatchObject({
+				info: {
+					tokenId: 123,
+					equivalents: [],
+					totalSupply:
+						failure.endsWith('fallback') || failure.startsWith('equivalents') ? 100 : null
+				}
+			});
+			expect(response.headers.has('Cache-Control')).toBe(false);
+		}
+	});
+
+	it('does not cache token info when the ARC lookup fails before a successful ASA fallback', async () => {
+		mocks.from.mockImplementationOnce(() => query(null, { code: 'XX000' }));
+		mocks.from.mockImplementationOnce(() => query({ params: { un: 'TEST', dc: 6 } }));
+		mocks.from.mockImplementationOnce(() => query([]));
+		mocks.from.mockImplementationOnce(() => query(null, { code: 'PGRST116' }));
+		mocks.from.mockImplementationOnce(() => query({ params: { t: 100 } }));
+		const response = await infoGET(event('/api/token-info?tokenId=123'));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({
+			info: { tokenId: 123, type: 'ASA', equivalents: [], totalSupply: 100 }
+		});
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
 	it('caches parsed Medium posts but does not cache the upstream-failure empty fallback', async () => {
 		const xml =
 			'<rss><channel><item><title>One</title></item><item><title>Two</title></item></channel></rss>';
@@ -276,6 +445,22 @@ describe('TASK-29 hourly cache exclusions', () => {
 });
 
 describe('TASK-29 epoch response caching', () => {
+	it.each([
+		{ current_epoch: 1 },
+		{ epochs: {}, current_epoch: 1 },
+		{ epochs: [], current_epoch: 'invalid' },
+		{ epochs: [], current_epoch: 'Infinity' }
+	])('does not cache incomplete epoch data %j', async (data) => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)));
+		const response = await epochsGET(event('/api/epochs'));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			epochs: [],
+			current_epoch: Number.isFinite(Number(data.current_epoch)) ? Number(data.current_epoch) : null
+		});
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+
 	it.each([false, true])(
 		'does not cache an upstream error carried in a 200 body (error=%s)',
 		async (error) => {
@@ -294,4 +479,18 @@ describe('TASK-29 epoch response caching', () => {
 			);
 		}
 	);
+});
+
+describe('TASK-29 relay rewards response caching', () => {
+	it('does not cache the CSV before peer rows arrive', async () => {
+		mocks.from.mockImplementation(() => query([]));
+		const response = await relayGET(event('/api/relay-rewards?from=2026-10-14&to=2026-10-20'));
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('account,userType,tokenAmount');
+		expect(response.headers.get('Content-Type')).toBe('text/csv');
+		expect(response.headers.get('Content-Disposition')).toBe(
+			'attachment; filename="relay-rewards-2026-10-14-2026-10-20.csv"'
+		);
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
 });
