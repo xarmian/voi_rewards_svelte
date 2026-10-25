@@ -48,12 +48,9 @@ export function createMarketDataLoader(
 	function load(tokenId: number, opts?: { force?: boolean }): Promise<boolean> {
 		if (!opts?.force) {
 			if (inFlight?.tokenId === tokenId) return inFlight.promise;
-			if (
-				!inFlight &&
-				state.tokenId === tokenId &&
-				state.marketData.length > 0 &&
-				state.error === null
-			) {
+			// A settled, error-free result for this token is reused even when it has no rows: a
+			// pool-less token's empty server result must not refetch after hydration (TASK-27).
+			if (!inFlight && state.tokenId === tokenId && !state.loading && state.error === null) {
 				return Promise.resolve(false);
 			}
 		}
