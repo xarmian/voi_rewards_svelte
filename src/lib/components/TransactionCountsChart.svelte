@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import * as echarts from 'echarts';
@@ -136,15 +137,15 @@
 						day: 'numeric'
 					});
 
-					let tooltip = `<div class="font-bold">${fullDate}</div>`;
+					let tooltip = `<div class="font-bold">${escapeHtml(fullDate)}</div>`;
 
 					if (chartDataPoint.isEstimated) {
 						const periodLabel = period === 'day' ? 'day' : 'week';
 						const progressPercent = Math.round(chartDataPoint.completionRatio * 100);
-						tooltip += `<div>Actual (${progressPercent}% of ${periodLabel}): <span class="font-semibold">${chartDataPoint.actualCount.toLocaleString()}</span></div>`;
-						tooltip += `<div>Estimated Full ${periodLabel}: <span class="font-semibold" style="color: orange;">${params[0].value.toLocaleString()}</span></div>`;
+						tooltip += `<div>Actual (${escapeHtml(progressPercent)}% of ${escapeHtml(periodLabel)}): <span class="font-semibold">${escapeHtml(chartDataPoint.actualCount.toLocaleString())}</span></div>`;
+						tooltip += `<div>Estimated Full ${escapeHtml(periodLabel)}: <span class="font-semibold" style="color: orange;">${escapeHtml(params[0].value.toLocaleString())}</span></div>`;
 					} else {
-						tooltip += `<div>Transactions: <span class="font-semibold">${params[0].value.toLocaleString()}</span></div>`;
+						tooltip += `<div>Transactions: <span class="font-semibold">${escapeHtml(params[0].value.toLocaleString())}</span></div>`;
 					}
 
 					return tooltip;

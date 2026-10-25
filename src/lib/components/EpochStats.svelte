@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, afterUpdate } from 'svelte';
 	import { formatNumber } from '$lib/utils';
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import * as echarts from 'echarts';
 	import type { EChartsOption } from 'echarts';
 	import TransactionCountsChart from './TransactionCountsChart.svelte';
@@ -208,13 +209,13 @@
 					const epoch = epochs[dataIndex];
 					const dateLabel = formatDateLabel(epoch.epoch_end);
 
-					let tooltip = `<div class="font-bold">Epoch ${epoch.epoch_number} (${dateLabel})</div>`;
+					let tooltip = `<div class="font-bold">Epoch ${escapeHtml(epoch.epoch_number)} (${escapeHtml(dateLabel)})</div>`;
 
 					params.forEach((param: any) => {
 						if (param.seriesName === 'Block Reward APR') {
-							tooltip += `<div>APR: <span class="font-semibold">${param.value.toFixed(2)}%</span></div>`;
+							tooltip += `<div>APR: <span class="font-semibold">${escapeHtml(param.value.toFixed(2))}%</span></div>`;
 						} else if (param.seriesName === 'Rewarded Accounts') {
-							tooltip += `<div>Accounts: <span class="font-semibold">${formatNumber(param.value)}</span></div>`;
+							tooltip += `<div>Accounts: <span class="font-semibold">${escapeHtml(formatNumber(param.value))}</span></div>`;
 						}
 					});
 
@@ -348,7 +349,7 @@
 				},
 				formatter: (params: any) => {
 					if (!Array.isArray(params)) return '';
-					let result = `${params[0].name}<br/>`;
+					let result = `${escapeHtml(params[0].name)}<br/>`;
 
 					// Find community and ballast stake values
 					const communityStake =
@@ -359,13 +360,13 @@
 
 					// Add total stake first
 					const totalColor = isDarkMode ? '#34D399' : '#10B981';
-					result += `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${totalColor};"></span>Total Stake: ${totalStake.toFixed(3)}M<br/>`;
+					result += `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${escapeHtml(totalColor)};"></span>Total Stake: ${escapeHtml(totalStake.toFixed(3))}M<br/>`;
 
 					// Add other values
 					params.forEach((param: any) => {
 						const color = param.color;
-						const marker = `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${color};"></span>`;
-						result += `${marker}${param.seriesName}: ${param.value.toFixed(3)}M<br/>`;
+						const marker = `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${escapeHtml(color)};"></span>`;
+						result += `${marker}${escapeHtml(param.seriesName)}: ${escapeHtml(param.value.toFixed(3))}M<br/>`;
 					});
 					return result;
 				}
@@ -473,7 +474,7 @@
 				},
 				formatter: (params: any) => {
 					const data = Array.isArray(params) ? params[0] : params;
-					return `${data.name}<br/>Price: $${data.value.toFixed(6)}`;
+					return `${escapeHtml(data.name)}<br/>Price: $${escapeHtml(data.value.toFixed(6))}`;
 				}
 			},
 			grid: {

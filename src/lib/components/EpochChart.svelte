@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import * as echarts from 'echarts';
@@ -59,12 +60,12 @@
 					if (!Array.isArray(params)) return '';
 					const data = params[0].data;
 					return `
-                        <div class="font-bold">Epoch ${data.epoch}</div>
-                        <div>Blocks: ${data.userBlocksProduced} / ${data.totalBlocksProduced}</div>
+                        <div class="font-bold">Epoch ${escapeHtml(data.epoch)}</div>
+                        <div>Blocks: ${escapeHtml(data.userBlocksProduced)} / ${escapeHtml(data.totalBlocksProduced)}</div>
                         ${
 													data.actualReward
-														? `<div>Actual: ${data.actualReward.toFixed(2)} VOI</div>`
-														: `<div>Estimate: ${data.expectedReward.toFixed(2)} VOI</div>`
+														? `<div>Actual: ${escapeHtml(data.actualReward.toFixed(2))} VOI</div>`
+														: `<div>Estimate: ${escapeHtml(data.expectedReward.toFixed(2))} VOI</div>`
 												}
                     `;
 				}
