@@ -59,8 +59,9 @@ export const load: LayoutLoad = async ({ url, data, fetch, depends }) => {
 			});
 
 	// TASK-54: SSR uses the validated server data without another auth lookup.
+	// The browser session is cookie-backed and unverified; `user` is always the server-validated one (r1).
 	const session = isBrowser() ? (await supabase.auth.getSession()).data.session : data.session;
-	const user = isBrowser() ? (session?.user ?? null) : data.user;
+	const user = data.user;
 
 	return {
 		baseMetaTags,
