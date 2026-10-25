@@ -87,6 +87,8 @@
 	let isLoadingPortfolio = false;
 	let isLoadingLPTokens = false;
 	let isLoadingTokens = false;
+	let tokensError: string | null = null;
+	let tokensPartial = false;
 	let isLoadingNFTs = false;
 	let voteKeyExpiry: number | undefined;
 	let voteKeyExpiryDate: Date | undefined;
@@ -177,8 +179,12 @@
 		isLoadingTokens = true;
 		isLoadingLPTokens = true;
 		try {
-			fungibleTokens = await fetchFungibleTokens(walletAddress, $voiPrice.price);
+			const { tokens, partial } = await fetchFungibleTokens(walletAddress, $voiPrice.price);
+			fungibleTokens = tokens;
+			tokensError = null;
+			tokensPartial = partial;
 		} catch (error) {
+			tokensError = error instanceof Error ? error.message : String(error);
 			console.error('Error refreshing tokens:', error);
 		} finally {
 			isLoadingTokens = false;
@@ -200,9 +206,18 @@
 			// Then load tokens in parallel
 			isLoadingTokens = true;
 			isLoadingLPTokens = true;
-			fungibleTokens = await fetchFungibleTokens(walletAddress, $voiPrice.price);
-			isLoadingTokens = false;
-			isLoadingLPTokens = false;
+			try {
+				const { tokens, partial } = await fetchFungibleTokens(walletAddress, $voiPrice.price);
+				fungibleTokens = tokens;
+				tokensError = null;
+				tokensPartial = partial;
+			} catch (error) {
+				tokensError = error instanceof Error ? error.message : String(error);
+				console.error('Error loading tokens:', error);
+			} finally {
+				isLoadingTokens = false;
+				isLoadingLPTokens = false;
+			}
 
 			// Calculate total value after all data is loaded
 			totalValue =
@@ -224,6 +239,8 @@
 				($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
 		} catch (error) {
 			console.error('Error initializing portfolio:', error);
+		} finally {
+			isLoadingPortfolio = false;
 		}
 	}
 
@@ -1193,7 +1210,12 @@
 				{/each}
 				{#if fungibleTokens.filter((token) => isLPToken(token) && showZeroBalancesCondition(token)).length === 0}
 					<div class="text-gray-500 dark:text-gray-400 text-center py-4">
-						No LP tokens found in this account.
+						{#if tokensError}
+							Token balances unavailable.
+							<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
+						{:else}
+							No LP tokens found in this account.
+						{/if}
 					</div>
 				{/if}
 			{/if}
@@ -1307,11 +1329,26 @@
 			</div>
 		</div>
 
+		{#if tokensError && fungibleTokens.length > 0}
+			<div class="mt-4 text-sm text-gray-500 dark:text-gray-400" role="status">
+				Couldn't refresh token balances; showing the last loaded values.
+				<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
+			</div>
+		{/if}
+		{#if tokensPartial}
+			<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Some pool or approval details are unavailable.</p>
+		{/if}
+
 		<!-- Combined Tokens Grid -->
 		<div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
 			{#if isLoadingTokens}
 				<div class="col-span-3 flex justify-center items-center py-8">
 					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+				</div>
+			{:else if tokensError && fungibleTokens.length === 0}
+				<div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3" role="status">
+					Token balances unavailable.
+					<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
 				</div>
 			{:else}
 				{#each sortTokens(filterTokens([...asaTokens.map( (t) => ({ ...t, tokenType: 'vsa' as const }) ), ...fungibleTokens
