@@ -18,16 +18,18 @@ type MimirClient = SupabaseClient<any, any, any>;
 // Get all equivalent token IDs for a given token (handles wrapped/native mappings)
 async function getTokenEquivalentIds(
 	tokenId: number,
-	supabaseMimirClient: MimirClient
+	supabaseMimirClient: MimirClient,
+	onFailure: () => void
 ): Promise<number[]> {
 	const ids = new Set<number>([tokenId]);
 
 	// Query arc200_contracts for mappings in both directions
-	const { data } = await supabaseMimirClient
+	const { data, error } = await supabaseMimirClient
 		.from('arc200_contracts')
 		.select('contract_id, token_id')
 		.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
 
+	if (error) onFailure();
 	if (data) {
 		for (const row of data) {
 			ids.add(row.contract_id);
@@ -216,7 +218,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
 			// Get all equivalent token IDs (handles wrapped/native mappings)
-			const equivalentIds = await getTokenEquivalentIds(tokenId, supabaseMimirClient);
+			const equivalentIds = await getTokenEquivalentIds(tokenId, supabaseMimirClient, onFailure);
 
 			// 1) Find pools containing any of the equivalent token IDs
 			const orConditions = equivalentIds
@@ -288,7 +290,9 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 						circulatingSupply: await supplyResponse()
 					},
 					{
-						headers: publicCache(CACHE_TTL.markets.sMaxAge, CACHE_TTL.markets.staleWhileRevalidate)
+						headers: degraded
+							? undefined
+							: publicCache(CACHE_TTL.markets.sMaxAge, CACHE_TTL.markets.staleWhileRevalidate)
 					}
 				);
 			}

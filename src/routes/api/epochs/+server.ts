@@ -15,7 +15,7 @@ interface EpochData {
 
 interface EpochResponse {
 	epochs: EpochData[];
-	current_epoch: number;
+	current_epoch?: number | string | null;
 }
 
 export const GET: RequestHandler = async () => {
@@ -45,6 +45,8 @@ export const GET: RequestHandler = async () => {
 				headers:
 					'error' in data ||
 					!Array.isArray(data.epochs) ||
+					(typeof data.current_epoch !== 'number' &&
+						(typeof data.current_epoch !== 'string' || data.current_epoch.trim() === '')) ||
 					!Number.isFinite(Number(data.current_epoch))
 						? undefined
 						: publicCache(CACHE_TTL.epochs.sMaxAge, CACHE_TTL.epochs.staleWhileRevalidate)
