@@ -27,8 +27,10 @@ export function resolveVoiUsd(
 	if (!Number.isFinite(value) || value <= 0) {
 		return { voiUsd: null, status: 'invalid', asOf };
 	}
+	// Stale (or undated) keeps the value and flags it: the old code used the last value
+	// regardless of age, and nulling it would zero every VOI-quoted pool (TASK-21 r1).
 	if (asOf === null || nowMs - timeMs > maxAgeMs) {
-		return { voiUsd: null, status: 'stale', asOf };
+		return { voiUsd: value, status: 'stale', asOf };
 	}
 	if (timeMs - nowMs > 5 * 60 * 1000) {
 		return { voiUsd: null, status: 'invalid', asOf };

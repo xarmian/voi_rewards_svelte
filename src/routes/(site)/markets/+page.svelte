@@ -362,8 +362,10 @@
 
 	// Fetch market data for a specific token by ID
 	async function fetchMarketDataForToken(tokenId: number, force = false) {
+		// Never show the previous token's analytics under the new token (UX-01, TASK-21 r1)
+		if (tokenAnalytics && tokenAnalytics.tokenId !== tokenId) tokenAnalytics = null;
 		const applied = await loader.load(tokenId, { force });
-		if (!applied || loader.state.tokenId !== tokenId) return;
+		if (!applied || loader.state.tokenId !== tokenId || loader.state.error) return;
 
 		// For non-VOI tokens, token analytics is fetched by +page.ts on initial load
 		// Only fetch here if we don't have it (client-side token switch without page reload)

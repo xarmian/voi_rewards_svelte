@@ -45,13 +45,15 @@ test("empty and non-array series are unavailable", () => {
   }
 });
 
+// Stale keeps the value (the price is valid, only its age is unproven) so the
+// markets math does not zero every VOI-quoted pool when the feed lags (TASK-21 r1).
 test("two-hour-old points are stale and 59-minute-old points are fresh", () => {
   assert.equal(VOI_USD_MAX_AGE_MS, 60 * 60 * 1000);
   const oldTime = now - 2 * 60 * 60 * 1000;
   assert.deepEqual(
     resolveVoiUsd([{ time: oldTime / 1000, value: 0.01 }], now),
     {
-      voiUsd: null,
+      voiUsd: 0.01,
       status: "stale",
       asOf: new Date(oldTime).toISOString(),
     },
@@ -101,7 +103,7 @@ test("only the last element determines the reference", () => {
 test("unparseable times are stale and points beyond five minutes in the future are invalid", () => {
   for (const time of ["not-a-date", "", null, Infinity, 1e20]) {
     assert.deepEqual(resolveVoiUsd([{ time, value: 0.01 }], now), {
-      voiUsd: null,
+      voiUsd: 0.01,
       status: "stale",
       asOf: null,
     });
