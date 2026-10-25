@@ -140,7 +140,9 @@
 			if (!expectedUnavailable) {
 				const chartData = await fetchOnlineStakeHistory();
 				console.log('Received chart data:', chartData);
-				chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
+				if (chartData === null) {
+					expectedUnavailable = true;
+				} else chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
 					if (new Date(dayData.date) < new Date('2024-10-30')) return;
 					if (dayData.avg_online_stake) {
 						const balance = Number(accountInfo?.amount ?? 0);
@@ -155,7 +157,7 @@
 			data = Object.keys(apiData).map((date) => ({
 				date: new Date(date + 'T00:00:00'),
 				actual: apiData[date].length,
-				expected: expectedUnavailable ? null : (historicalExpectedProposals[date] ?? 0)
+				expected: expectedUnavailable ? null : (historicalExpectedProposals[date] ?? null)
 			}));
 
 			data.sort((a: { date: Date }, b: { date: Date }) => a.date.getTime() - b.date.getTime());
@@ -361,7 +363,7 @@
 				No proposals found in last 30 days
 			</div>
 		{:else}
-			{#if accountInfo?.status !== 'Online'}
+			{#if accountInfo && accountInfo.status !== 'Online'}
 				<div
 					class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-50 rounded-lg dark:bg-yellow-900 dark:text-yellow-100"
 				>

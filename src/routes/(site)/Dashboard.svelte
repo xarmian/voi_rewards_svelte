@@ -46,7 +46,7 @@
 	let supply: SupplyInfo | null = null;
 	let ballasts: string[] = [];
 	let showEnlargedStakeChart = false;
-	let onlineStakeHistory: any[] = [];
+	let onlineStakeHistory: any[] | null = [];
 	let eligibleOnlineStake = 0;
 	let isLoading = true;
 	let isRefreshing = false;
@@ -191,6 +191,7 @@
 	}
 
 	async function fetchOnlineStakeHistory() {
+		onlineStakeHistory = [];
 		onlineStakeHistory = await onlineStakeStore.getData();
 	}
 
@@ -536,7 +537,9 @@
 {#if showEnlargedStakeChart}
 	<Modal bind:open={showEnlargedStakeChart} size="xl">
 		<h2 class="text-2xl font-bold mb-4">Online Stake History</h2>
-		{#if onlineStakeHistory.length > 0}
+		{#if onlineStakeHistory === null}
+			<p role="status">Online stake history unavailable.</p>
+		{:else if onlineStakeHistory.length > 0}
 			<MiniStakeChart chartData={onlineStakeHistory} />
 		{:else}
 			<p>Loading chart data...</p>

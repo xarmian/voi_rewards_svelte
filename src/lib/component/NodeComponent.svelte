@@ -34,6 +34,7 @@
 	let currentEpoch: number;
 	let epochRewards: number[] = [];
 	const EPOCHS_PER_YEAR = 52;
+	let nodeRequestId = 0;
 
 	$: if (walletId) {
 		fetchNodeData();
@@ -45,10 +46,17 @@
 
 	async function fetchNodeData(forceRefresh: boolean = false) {
 		if (!walletId) return;
+		const requested = walletId;
+		const requestId = ++nodeRequestId;
+		accountInfo = undefined;
+		apiData = {};
+		balance = 0;
 		consensusError = false;
 		loading = true;
 		try {
-			supply = await getSupplyInfo();
+			const supplyResult = await getSupplyInfo();
+			if (requestId !== nodeRequestId) return;
+			supply = supplyResult;
 			if (supply == null) {
 				consensusError = true;
 				return;
@@ -56,15 +64,19 @@
 
 			// Get latest epoch data
 			const dates = await dataTable.fetchDateRanges();
+			if (requestId !== nodeRequestId) return;
 			const latestEpoch = dates[dates.length - 1];
 			currentEpoch = latestEpoch.epoch;
 			const epochData = await dataTable.fetchData(latestEpoch.id);
+			if (requestId !== nodeRequestId) return;
 
 			// Fetch next year's worth of epoch rewards
 			const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) =>
 				getTokensByEpoch(currentEpoch + i)
 			);
-			epochRewards = await Promise.all(epochPromises);
+			const rewards = await Promise.all(epochPromises);
+			if (requestId !== nodeRequestId) return;
+			epochRewards = rewards;
 
 			if (epochData) {
 				rewardStake =
@@ -72,13 +84,17 @@
 			}
 
 			// Get account information with force refresh option
-			accountInfo = await getAccountInfo(walletId, forceRefresh);
+			const accountResult = await getAccountInfo(requested, forceRefresh);
+			if (requestId !== nodeRequestId) return;
+			accountInfo = accountResult;
 			if (accountInfo === undefined) {
 				consensusError = true;
 				return;
 			}
 			balance = Number(accountInfo?.amount ?? 0);
-			apiData = await getConsensusInfo(walletId, forceRefresh);
+			const consensusResult = await getConsensusInfo(requested, forceRefresh);
+			if (requestId !== nodeRequestId) return;
+			apiData = consensusResult;
 			consensusError = apiData === undefined;
 
 			averageBlockTime = calculateAverageBlockTime();
@@ -91,12 +107,12 @@
 			estimatedRewardsPerWeek = calculateRewardsForPeriod(1);
 			estimatedRewardsPerMonth = calculateRewardsForPeriod(30.44 / 7); // ~4.33 weeks
 
-			loading = false;
 		} catch (error) {
+			if (requestId !== nodeRequestId) return;
 			consensusError = true;
 			console.error('Failed to fetch node data:', error);
 		} finally {
-			loading = false;
+			if (requestId === nodeRequestId) loading = false;
 		}
 	}
 
