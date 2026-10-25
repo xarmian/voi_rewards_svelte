@@ -96,6 +96,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		let marketData: any[] = [];
 		let voiUsd: number | null = null;
 		let voiUsdStatus: VoiUsdStatus = 'unavailable';
+		let voiUsdAsOf: string | null = null;
 		if (tokenId !== null) {
 			const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
@@ -166,6 +167,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 					marketData: [],
 					voiUsd,
 					voiUsdStatus,
+					voiUsdAsOf,
 					aggregates: { totalVolume: 0, totalTvl: 0, weightedAveragePrice: 0 },
 					circulatingSupply: {
 						circulatingSupply: parseFloat(circulatingSupply),
@@ -178,7 +180,9 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			// VOI USD reference - get from price history which uses proper sources
 			try {
 				const refRes = await fetch(`${url.origin}/api/price-history?period=24h&token=VOI`);
-				({ voiUsd, status: voiUsdStatus } = resolveVoiUsd(refRes.ok ? await refRes.json() : null));
+				({ voiUsd, status: voiUsdStatus, asOf: voiUsdAsOf } = resolveVoiUsd(
+					refRes.ok ? await refRes.json() : null
+				));
 			} catch {
 				voiUsd = null;
 				voiUsdStatus = 'unavailable';
@@ -660,6 +664,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			marketData: processedMarketData,
 			voiUsd,
 			voiUsdStatus,
+			voiUsdAsOf,
 			aggregates: {
 				...aggregates,
 				weightedAveragePrice

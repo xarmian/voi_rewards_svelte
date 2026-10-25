@@ -3,8 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import {
 	fetchPoolAggregates,
-	tokenVolumeMetrics,
-	tokenTvlMetrics,
+	tokenMetricsOrUnavailable,
 	type PoolAggregate
 } from '$lib/server/poolAggregates';
 
@@ -14,17 +13,18 @@ const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KE
 interface TokenEquivalents {
 	tokenId: number;
 	equivalents: number[];
+	failed: boolean;
 }
 
 interface VolumeMetrics {
-	volume24h: number;
-	volume7d: number;
-	volume30d: number;
+	volume24h: number | null;
+	volume7d: number | null;
+	volume30d: number | null;
 }
 
 interface TVLMetrics {
-	totalTvl: number;
-	poolCount: number;
+	totalTvl: number | null;
+	poolCount: number | null;
 }
 
 interface TokenAnalytics {
@@ -52,11 +52,11 @@ async function getTokenEquivalents(tokenId: number): Promise<TokenEquivalents> {
 
 		if (error) {
 			console.error('Error fetching token equivalents:', error);
-			return { tokenId, equivalents: [] };
+			return { tokenId, equivalents: [], failed: true };
 		}
 
 		if (!data || data.length === 0) {
-			return { tokenId, equivalents: [] };
+			return { tokenId, equivalents: [], failed: false };
 		}
 
 		// Extract all equivalent IDs
@@ -76,10 +76,10 @@ async function getTokenEquivalents(tokenId: number): Promise<TokenEquivalents> {
 			}
 		});
 
-		return { tokenId, equivalents };
+		return { tokenId, equivalents, failed: false };
 	} catch (error) {
 		console.error('Failed to get token equivalents:', error);
-		return { tokenId, equivalents: [] };
+		return { tokenId, equivalents: [], failed: true };
 	}
 }
 
@@ -88,6 +88,7 @@ async function getTokenInfo(tokenId: number): Promise<{
 	symbol: string;
 	decimals: number;
 	imageUrl: string | null;
+	failed: boolean;
 }> {
 	try {
 		// Handle VOI (token ID 0)
@@ -95,7 +96,8 @@ async function getTokenInfo(tokenId: number): Promise<{
 			return {
 				symbol: 'VOI',
 				decimals: 6,
-				imageUrl: null
+				imageUrl: null,
+				failed: false
 			};
 		}
 
@@ -104,13 +106,14 @@ async function getTokenInfo(tokenId: number): Promise<{
 			.from('arc200_contracts')
 			.select('symbol, decimals, image_url')
 			.eq('contract_id', tokenId)
-			.single();
+			.maybeSingle();
 
 		if (!arc200Error && arc200Data) {
 			return {
 				symbol: arc200Data.symbol || 'UNKNOWN',
 				decimals: arc200Data.decimals || 0,
-				imageUrl: arc200Data.image_url || null
+				imageUrl: arc200Data.image_url || null,
+				failed: false
 			};
 		}
 
@@ -119,14 +122,15 @@ async function getTokenInfo(tokenId: number): Promise<{
 			.from('asset')
 			.select('params')
 			.eq('index', tokenId)
-			.single();
+			.maybeSingle();
 
 		if (!assetError && assetData && assetData.params) {
 			const params = assetData.params as any;
 			return {
 				symbol: params.un || 'UNKNOWN',
 				decimals: params.dc || 0,
-				imageUrl: null
+				imageUrl: null,
+				failed: !!arc200Error
 			};
 		}
 
@@ -134,14 +138,16 @@ async function getTokenInfo(tokenId: number): Promise<{
 		return {
 			symbol: 'UNKNOWN',
 			decimals: 0,
-			imageUrl: null
+			imageUrl: null,
+			failed: !!arc200Error || !!assetError
 		};
 	} catch (error) {
 		console.error('Failed to get token info:', error);
 		return {
 			symbol: 'UNKNOWN',
 			decimals: 0,
-			imageUrl: null
+			imageUrl: null,
+			failed: true
 		};
 	}
 }
@@ -164,7 +170,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		// TASK-52, C11, P06: discover pools once and share their aggregates across both metrics.
 		const allIds = [tokenId, ...equivalents.equivalents];
-		let aggregates = new Map<number, PoolAggregate>();
+		const partialReasons: string[] = [];
+		if (equivalents.failed) partialReasons.push('equivalents');
+		if (tokenInfo.failed) partialReasons.push('tokenInfo');
+		let aggregates: Map<number, PoolAggregate> | null = null;
 		try {
 			const { data: pools, error } = await supabaseMimirClient
 				.from('pool_catalog')
@@ -176,19 +185,18 @@ export const GET: RequestHandler = async ({ url }) => {
 				(pools || []).map((pool) => pool.pool_id)
 			);
 		} catch (error) {
-			// One RPC feeds both metrics, so a failure zeroes both (TASK-52 review r1).
+			partialReasons.push('aggregates');
 			console.error('Failed to fetch pool aggregates for volume and TVL metrics:', error);
 		}
-		const volumeMetrics = tokenVolumeMetrics(aggregates.values(), allIds);
-		const tvlMetrics = tokenTvlMetrics(aggregates.values(), allIds);
+		const { volume, tvl } = tokenMetricsOrUnavailable(aggregates, allIds);
 
 		const analytics: TokenAnalytics = {
 			tokenId,
 			symbol: tokenInfo.symbol,
 			decimals: tokenInfo.decimals,
 			imageUrl: tokenInfo.imageUrl,
-			volume: volumeMetrics,
-			tvl: tvlMetrics,
+			volume,
+			tvl,
 			priceMetrics: {
 				currentPrice: null, // To be filled by existing price data
 				priceChange24h: null,
@@ -198,6 +206,8 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		return json({
 			success: true,
+			partial: partialReasons.length > 0,
+			partialReasons,
 			analytics,
 			equivalents: equivalents.equivalents,
 			timestamp: new Date().toISOString()
