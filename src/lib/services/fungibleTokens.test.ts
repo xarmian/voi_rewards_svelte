@@ -95,7 +95,7 @@ function lpPool(provider = 'humble'): PoolInfo {
 
 for (const failure of ['500', 'reject'] as const) {
 	test(`Nomadex escrow ARC200 ${failure} preserves tokens and reports partial`, async () => {
-		vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => ({ amount: 10_000_000 }) }) as ReturnType<typeof algodClient.accountInformation>);
+		vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => ({ amount: 10_000_000 }) }) as unknown as ReturnType<typeof algodClient.accountInformation>);
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
 			getLiquidityPools: async () => [lpPool('nomadex')],
 			fetch: async (input) => {
@@ -112,7 +112,7 @@ for (const failure of ['500', 'reject'] as const) {
 }
 
 test('Nomadex Algod escrow fallback preserves tokens and reports partial', async () => {
-	vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => { throw new Error('Algod unavailable'); } }) as ReturnType<typeof algodClient.accountInformation>);
+	vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => { throw new Error('Algod unavailable'); } }) as unknown as ReturnType<typeof algodClient.accountInformation>);
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools: async () => [lpPool('nomadex')],
 		fetch: async (input) => new URL(String(input)).pathname === '/arc200/balances'
