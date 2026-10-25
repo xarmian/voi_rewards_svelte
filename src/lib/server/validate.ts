@@ -21,3 +21,65 @@ export function validatePhase2Pagination(
 	if (pageSize === null) return { error: 'pageSize must be an integer between 1 and 1000' };
 	return { page, pageSize };
 }
+
+function parseAddress(value: string): string | null {
+	return value.length === 58 && /^[A-Z2-7]{58}$/.test(value) ? value : null;
+}
+
+function parseAddressArray(value: string): string[] | null {
+	if (!value.startsWith('{') || !value.endsWith('}')) return null;
+	const addresses = value.slice(1, -1).split(',');
+	return addresses.length >= 1 && addresses.length <= 10 && addresses.every(parseAddress)
+		? addresses
+		: null;
+}
+
+type RpcParam = string | number | string[];
+type ParamParser = (value: string) => RpcParam | null;
+
+const mimirSchemas: Record<string, Record<string, ParamParser>> = {
+	get_online_account_count: {},
+	get_tx_counts: {
+		p_period: (value) => (value === 'day' || value === 'week' ? value : null),
+		p_n: (value) => parseInteger(value, 1, 60)
+	},
+	get_arc200_transfers: {
+		p_contractid: (value) => parseInteger(value, 0),
+		p_user: parseAddress,
+		p_limit: (value) => parseInteger(value, 1, 100),
+		p_offset: (value) => parseInteger(value, 0, 100000)
+	},
+	get_account_transactions_multi: {
+		from_addresses: parseAddressArray,
+		to_address: parseAddress
+	}
+};
+
+export function validateMimirParams(
+	searchParams: URLSearchParams
+): { action: string; params: Record<string, RpcParam> } | { error: string } {
+	const action = searchParams.get('action') ?? 'get_online_account_count';
+	if (!Object.keys(mimirSchemas).includes(action)) {
+		return {
+			error: `Invalid action. Allowed actions are: ${Object.keys(mimirSchemas).join(', ')}`
+		};
+	}
+	const schema = mimirSchemas[action];
+	for (const key of searchParams.keys()) {
+		if (key !== 'action' && !Object.keys(schema).includes(key)) {
+			return { error: `Unknown parameter: ${key}` };
+		}
+	}
+
+	const params: Record<string, RpcParam> = {};
+	for (const [key, parse] of Object.entries(schema)) {
+		const values = searchParams.getAll(key);
+		if (values.length === 0) return { error: `Missing required parameter: ${key}` };
+		for (const value of values) {
+			const parsed = parse(value);
+			if (parsed === null) return { error: `Invalid parameter: ${key}` };
+			params[key] = parsed;
+		}
+	}
+	return { action, params };
+}
