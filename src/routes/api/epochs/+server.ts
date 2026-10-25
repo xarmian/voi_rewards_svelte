@@ -28,7 +28,7 @@ export const GET: RequestHandler = async () => {
 		const data: EpochResponse = await response.json();
 		return json({
 			...data,
-			epochs: data.epochs.map((epoch) => ({
+			epochs: (Array.isArray(data.epochs) ? data.epochs : []).map((epoch) => ({
 				...epoch,
 				epoch_number: Number(epoch.epoch_number),
 				reward: Number(epoch.reward),

@@ -205,7 +205,7 @@
 					}
 					if (expected && actual) {
 						const diff = actual.value - expected.value;
-						result += `Difference: ${escapeHtml(diff > 0 ? '+' : '')}${escapeHtml(Math.round(diff))}`;
+						result += `Difference: ${diff > 0 ? '+' : ''}${escapeHtml(Math.round(diff))}`;
 					}
 					return result;
 				}

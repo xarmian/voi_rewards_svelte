@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import {
 		Label,
 		Table,
@@ -440,7 +441,7 @@
 											<div class="mt-2 flex gap-2">
 												<CopyComponent
 													text={item.proposer}
-													toastMessage={`Wallet Copied to Clipboard:<br/> ${item.proposer.substr(0, 20)}...`}
+													toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(item.proposer.substr(0, 20))}...`}
 													failureMessage={`Failed to copy wallet address to clipboard.`}
 												>
 													<span

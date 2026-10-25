@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import NodeComponent from '../lib/component/NodeComponent.svelte';
 	import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
 	import LockVestComponent from '$lib/component/LockVestComponent.svelte';
@@ -142,7 +143,7 @@
 				<div>
 					<CopyComponent
 						text={walletId}
-						toastMessage={`Wallet Copied to Clipboard:<br/> ${walletId.substring(0, 20)}...`}
+						toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(walletId.substring(0, 20))}...`}
 						failureMessage={`Failed to copy wallet address to clipboard.`}
 					/>
 					{#if isModal}
