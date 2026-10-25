@@ -5,6 +5,8 @@ import { fetchCirculatingSupply } from '$lib/utils/voi';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
+import { resolveVoiUsd } from '$lib/server/voiUsdReference';
+import type { VoiUsdStatus } from '$lib/server/voiUsdReference';
 
 // Get all equivalent token IDs for a given token (handles wrapped/native mappings)
 async function getTokenEquivalentIds(
@@ -91,6 +93,8 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 
 		// If a tokenId is provided, build markets using both MIMIR data and cross-chain snapshots
 		let marketData: any[] = [];
+		let voiUsd: number | null = null;
+		let voiUsdStatus: VoiUsdStatus = 'unavailable';
 		if (tokenId !== null) {
 			const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
@@ -159,6 +163,8 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			if (pairs.length === 0) {
 				return json({
 					marketData: [],
+					voiUsd,
+					voiUsdStatus,
 					aggregates: { totalVolume: 0, totalTvl: 0, weightedAveragePrice: 0 },
 					circulatingSupply: {
 						circulatingSupply: parseFloat(circulatingSupply),
@@ -169,23 +175,18 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 
 			// USD helpers
 			// VOI USD reference - get from price history which uses proper sources
-			let voiUsd = 0;
 			try {
 				const refRes = await fetch(`${url.origin}/api/price-history?period=24h&token=VOI`);
-				const refJson = await refRes.json();
-				if (Array.isArray(refJson) && refJson.length) {
-					const rawVoiUsd = Number(refJson[refJson.length - 1]?.value || 0);
-					// Filter out obviously wrong VOI prices (should be around $0.0007, not $0.01+)
-					voiUsd = rawVoiUsd > 0.005 ? 0 : rawVoiUsd;
-					if (rawVoiUsd !== voiUsd) {
-						console.warn('Filtered out inflated VOI price:', rawVoiUsd, 'using 0 instead');
-					}
-				}
-			} catch (e) {
-				console.warn('Failed to fetch VOI price from price-history API:', e);
+				({ voiUsd, status: voiUsdStatus } = resolveVoiUsd(refRes.ok ? await refRes.json() : null));
+			} catch {
+				voiUsd = null;
+				voiUsdStatus = 'unavailable';
 			}
+			if (voiUsdStatus !== 'ok') {
+				console.warn('VOI USD reference status:', voiUsdStatus);
+			}
+			const voiUsdForMath = voiUsd ?? 0;
 
-			// console.log('VOI USD price for conversion:', voiUsd);
 			const poolIds = pairs.map((p) => p.poolId);
 
 			// 2) Latest swap for price + reserves
@@ -280,7 +281,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 
 			// Step 5: Build final USD price map
 			const symbolUsd = new Map<string, number>();
-			symbolUsd.set('VOI', voiUsd);
+			symbolUsd.set('VOI', voiUsdForMath);
 			symbolUsd.set('USDC', 1);
 			symbolUsd.set('AUSDC', 1);
 			symbolUsd.set('USDT', 1);
@@ -289,7 +290,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			// Convert VOI prices to USD prices
 			for (const [symbol, voiPrice] of priceInVoi) {
 				if (!symbolUsd.has(symbol)) {
-					const usdPrice = voiPrice * voiUsd;
+					const usdPrice = voiPrice * voiUsdForMath;
 					symbolUsd.set(symbol, usdPrice);
 				}
 			}
@@ -696,6 +697,8 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 
 		return json({
 			marketData: processedMarketData,
+			voiUsd,
+			voiUsdStatus,
 			aggregates: {
 				...aggregates,
 				weightedAveragePrice
