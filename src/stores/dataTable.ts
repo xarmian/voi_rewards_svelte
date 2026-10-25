@@ -44,8 +44,13 @@ function createDataTable() {
 
 	// Cache expiration time (5 minutes)
 	const CACHE_EXPIRATION = 5 * 60 * 1000;
+	const inFlight = new Map<string, ReturnType<Response['json']>>();
+	let dateRangesInFlight: Promise<DateRange[]> | null = null;
+	let activeRequests = 0;
+	let generation = 0;
 
 	async function fetchDateRanges(forceRefresh = false) {
+		if (dateRangesInFlight) return dateRangesInFlight;
 		const store = get({ subscribe });
 
 		// Return cached date ranges if they exist and aren't expired
@@ -58,50 +63,61 @@ function createDataTable() {
 			return store.dateRanges;
 		}
 
-		try {
-			const response = await fetch(`${config.proposalApiBaseUrl}`, { cache: 'no-store' });
-			const data = await response.json();
+		const requestGeneration = generation;
+		const request = Promise.resolve()
+			.then(async () => {
+				try {
+					const response = await fetch(`${config.proposalApiBaseUrl}`, { cache: 'no-store' });
+					if (!response.ok) throw new Error(`Failed to fetch date ranges: HTTP ${response.status}`);
+					const data = await response.json();
 
-			const minTimestamp = new Date('2024-10-30T00:00:00Z');
-			const maxTimestamp = new Date(data.max_timestamp);
+					const minTimestamp = new Date('2024-10-30T00:00:00Z');
+					const maxTimestamp = new Date(data.max_timestamp);
 
-			const dates: DateRange[] = [];
-			const currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
-			let epoch = 1;
+					const dates: DateRange[] = [];
+					const currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
+					let epoch = 1;
 
-			while (currentDate <= maxTimestamp) {
-				const startOfWeek = new Date(currentDate);
-				startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3);
+					while (currentDate <= maxTimestamp) {
+						const startOfWeek = new Date(currentDate);
+						startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3);
 
-				const endOfWeek = new Date(startOfWeek);
-				endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
+						const endOfWeek = new Date(startOfWeek);
+						endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
 
-				const dateStr = `${startOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
-				dates.push({
-					id: dateStr,
-					desc: dateStr.replace(
-						/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
-						'$1-$2-$3 to $4-$5-$6'
-					),
-					epoch
-				});
+						const dateStr = `${startOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
+						dates.push({
+							id: dateStr,
+							desc: dateStr.replace(
+								/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
+								'$1-$2-$3 to $4-$5-$6'
+							),
+							epoch
+						});
 
-				currentDate.setUTCDate(currentDate.getUTCDate() + 7);
-				epoch++;
-			}
+						currentDate.setUTCDate(currentDate.getUTCDate() + 7);
+						epoch++;
+					}
 
-			// Update the store with new date ranges
-			update((state) => ({
-				...state,
-				dateRanges: dates,
-				dateRangesLastUpdated: new Date()
-			}));
+					if (requestGeneration === generation) {
+						update((state) => ({
+							...state,
+							dateRanges: dates,
+							dateRangesLastUpdated: new Date()
+						}));
+					}
 
-			return dates;
-		} catch (error) {
-			console.error('Error fetching date ranges:', error);
-			throw error;
-		}
+					return dates;
+				} catch (error) {
+					console.error('Error fetching date ranges:', error);
+					throw error;
+				}
+			})
+			.finally(() => {
+				if (dateRangesInFlight === request) dateRangesInFlight = null;
+			});
+		dateRangesInFlight = request;
+		return request;
 	}
 
 	async function getCurrentEpoch() {
@@ -110,68 +126,73 @@ function createDataTable() {
 	}
 
 	async function fetchData(dateRange?: string) {
-		let store = get({ subscribe });
-
-		if (store.loading) {
-			// Wait up to 5 seconds for store to load
-			const startTime = Date.now();
-			while (store.loading && Date.now() - startTime < 5000) {
-				await new Promise((resolve) => setTimeout(resolve, 100));
-				store = get({ subscribe });
-			}
-			if (store.loading) return; // Still loading after 5s, return
-		}
-
+		const requestGeneration = generation;
+		activeRequests++;
+		update((state) => ({ ...state, loading: true, error: null }));
 		try {
-			update((state) => ({ ...state, loading: true, error: null }));
-
-			// If no date range provided, get current epoch
 			const targetRange = dateRange || (await getCurrentEpoch());
-
-			// Check if we have cached data that isn't expired
+			const pending = inFlight.get(targetRange);
+			if (pending) return await pending;
+			const store = get({ subscribe });
 			const cachedData = store.data[targetRange];
 			const lastUpdate = store.lastUpdated[targetRange];
 			if (cachedData && lastUpdate && Date.now() - lastUpdate.getTime() < CACHE_EXPIRATION) {
-				update((state) => ({
-					...state,
-					currentRange: targetRange,
-					loading: false
-				}));
+				if (requestGeneration === generation) {
+					update((state) => ({ ...state, currentRange: targetRange }));
+				}
 				return cachedData;
 			}
 
-			// Parse date range and fetch data
-			const [start, end] = targetRange.split('-');
-			const startDate = `${start.substring(0, 4)}-${start.substring(4, 6)}-${start.substring(6, 8)}`;
-			const endDate = `${end.substring(0, 4)}-${end.substring(4, 6)}-${end.substring(6, 8)}`;
-
-			const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
-			const response = await fetch(url, { cache: 'no-store' });
-			const data = await response.json();
-
-			update((state) => ({
-				...state,
-				data: { ...state.data, [targetRange]: data },
-				currentRange: targetRange,
-				loading: false,
-				lastUpdated: { ...state.lastUpdated, [targetRange]: new Date() }
-			}));
-
-			return data;
+			const request = Promise.resolve()
+				.then(async () => {
+					const [start, end] = targetRange.split('-');
+					const startDate = `${start.substring(0, 4)}-${start.substring(4, 6)}-${start.substring(6, 8)}`;
+					const endDate = `${end.substring(0, 4)}-${end.substring(4, 6)}-${end.substring(6, 8)}`;
+					const url = `${config.proposalApiBaseUrl}?start=${startDate}&end=${endDate}`;
+					const response = await fetch(url, { cache: 'no-store' });
+					if (!response.ok) throw new Error(`Failed to fetch data: HTTP ${response.status}`);
+					const data = await response.json();
+					if (requestGeneration === generation) {
+						update((state) => ({
+							...state,
+							data: { ...state.data, [targetRange]: data },
+							currentRange: targetRange,
+							lastUpdated: { ...state.lastUpdated, [targetRange]: new Date() }
+						}));
+					}
+					return data;
+				})
+				.finally(() => {
+					if (inFlight.get(targetRange) === request) inFlight.delete(targetRange);
+				});
+			if (requestGeneration === generation) inFlight.set(targetRange, request);
+			return await request;
 		} catch (error) {
-			update((state) => ({
-				...state,
-				loading: false,
-				error: error instanceof Error ? error.message : 'An error occurred'
-			}));
+			if (requestGeneration === generation) {
+				update((state) => ({
+					...state,
+					error: error instanceof Error ? error.message : 'An error occurred'
+				}));
+			}
 			throw error;
+		} finally {
+			if (requestGeneration === generation) {
+				activeRequests--;
+				update((state) => ({ ...state, loading: activeRequests > 0 }));
+			}
 		}
 	}
 
 	function clearCache() {
+		// TASK-30: old requests may settle, but cannot restore cleared state.
+		generation++;
+		inFlight.clear();
+		dateRangesInFlight = null;
+		activeRequests = 0;
 		update((state) => ({
 			...state,
 			data: {},
+			loading: false,
 			dateRanges: null,
 			dateRangesLastUpdated: null,
 			lastUpdated: {}
