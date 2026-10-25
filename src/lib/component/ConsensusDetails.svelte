@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { getConsensusInfo } from '$lib/stores/accounts';
+	import { createPoller } from '$lib/utils/poller';
 	import InfoButton from './ui/InfoButton.svelte';
 
 	export let walletAddress: string;
@@ -27,8 +28,8 @@
 	let timeSinceLastVote: number | undefined;
 	let lastVoteTimestamp: number | undefined;
 	let voteTimeInterval: ReturnType<typeof setInterval> | null = null;
-	let consensusUpdateInterval: ReturnType<typeof setInterval> | null = null;
-	let initialUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+	let consensusPoller: ReturnType<typeof createPoller> | undefined;
+	let mounted = false;
 	let lastWalletAddress: string | undefined;
 
 	interface ConsensusThreshold {
@@ -71,7 +72,6 @@
 	];
 
 	function updateConsensusHealth(timeSinceLastVote: number, balanceInVoi: number) {
-		console.log('timeSinceLastVote', timeSinceLastVote);
 		if (balanceInVoi < 1_000 && timeSinceLastVote > 86400) {
 			consensusHealth = 'unknown';
 			return;
@@ -95,48 +95,56 @@
 	}
 
 	async function updateConsensusDetails() {
-		if (!walletAddress || accountStatus !== 'Online') return;
-
-		try {
-			const updatedConsensus = await getConsensusInfo(walletAddress, true);
-			if (updatedConsensus) {
-				consensusDetails = updatedConsensus;
-
-				if (updatedConsensus.last_vote_timestamp) {
-					lastVoteTimestamp = new Date(updatedConsensus.last_vote_timestamp).getTime();
-					timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
-					updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
-				} else {
-					consensusHealth = 'unknown';
+		// TASK-30: a wallet change during a request is handled next, without overlap or stale writes.
+		while (
+			mounted &&
+			walletAddress &&
+			accountStatus === 'Online' &&
+			document.visibilityState !== 'hidden'
+		) {
+			const requestedAddress = walletAddress;
+			try {
+				const updatedConsensus = await getConsensusInfo(requestedAddress, true);
+				if (!mounted || accountStatus !== 'Online') return;
+				if (requestedAddress !== walletAddress) continue;
+				if (updatedConsensus) {
+					consensusDetails = updatedConsensus;
+					if (updatedConsensus.last_vote_timestamp) {
+						lastVoteTimestamp = new Date(updatedConsensus.last_vote_timestamp).getTime();
+						timeSinceLastVote = (Date.now() - lastVoteTimestamp) / 1000;
+						updateConsensusHealth(timeSinceLastVote, accountBalance / 1e6);
+					} else {
+						consensusHealth = 'unknown';
+					}
 				}
+			} catch (error) {
+				console.error('Error updating consensus details:', error);
 			}
-		} catch (error) {
-			console.error('Error updating consensus details:', error);
+			return;
 		}
 	}
 
-	// Watch for changes in isConsensusDetailsExpanded
-	$: if (isConsensusDetailsExpanded !== undefined) {
-		if (consensusUpdateInterval) {
-			clearInterval(consensusUpdateInterval);
-			consensusUpdateInterval = null;
-		}
-
-		if (isConsensusDetailsExpanded && autoRefresh) {
-			// Initial update when expanded
-			updateConsensusDetails();
-			// Then start the regular interval
-			consensusUpdateInterval = setInterval(updateConsensusDetails, refreshInterval);
+	$: if (consensusPoller) {
+		if (isConsensusDetailsExpanded && autoRefresh && accountStatus === 'Online') {
+			consensusPoller.start(refreshInterval);
+		} else {
+			consensusPoller.stop();
 		}
 	}
 
-	// Watch for changes in walletAddress - single update when wallet changes
-	$: if (walletAddress && accountStatus === 'Online' && walletAddress !== lastWalletAddress) {
-		updateConsensusDetails();
+	$: if (
+		consensusPoller &&
+		walletAddress &&
+		accountStatus === 'Online' &&
+		walletAddress !== lastWalletAddress
+	) {
+		void consensusPoller.run();
 		lastWalletAddress = walletAddress;
 	}
 
 	onMount(() => {
+		mounted = true;
+		consensusPoller = createPoller({ task: updateConsensusDetails, visibility: document });
 		// Update time since last vote every second, but only update health when expanded
 		voteTimeInterval = setInterval(() => {
 			if (lastVoteTimestamp !== undefined && consensusDetails) {
@@ -154,14 +162,8 @@
 			clearInterval(voteTimeInterval);
 			voteTimeInterval = null;
 		}
-		if (consensusUpdateInterval) {
-			clearInterval(consensusUpdateInterval);
-			consensusUpdateInterval = null;
-		}
-		if (initialUpdateTimeout) {
-			clearTimeout(initialUpdateTimeout);
-			initialUpdateTimeout = null;
-		}
+		mounted = false;
+		consensusPoller?.destroy();
 	});
 </script>
 
