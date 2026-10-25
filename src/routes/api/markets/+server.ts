@@ -5,6 +5,7 @@ import { fetchCirculatingSupply } from '$lib/utils/voi';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
+import { fetchPoolAggregates, latestSwapRow, pairWindow } from '$lib/server/poolAggregates';
 
 // Get all equivalent token IDs for a given token (handles wrapped/native mappings)
 async function getTokenEquivalentIds(
@@ -188,16 +189,12 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			// console.log('VOI USD price for conversion:', voiUsd);
 			const poolIds = pairs.map((p) => p.poolId);
 
-			// 2) Latest swap for price + reserves
-			const latestRes = await supabaseMimirClient
-				.from('dex_swaps_materialized')
-				.select('pool_id, ts, base_token_id, quote_token_id, price_quote, poolbal_a, poolbal_b')
-				.in('pool_id', poolIds)
-				.order('ts', { ascending: false });
-			if (latestRes.error) throw latestRes.error;
-			const latestByPool = new Map<number, any>();
-			for (const row of latestRes.data || []) {
-				if (!latestByPool.has(row.pool_id)) latestByPool.set(row.pool_id, row);
+			// TASK-52, C11, P06: share pool aggregates for latest swaps and the 24h window.
+			const poolAggregates = await fetchPoolAggregates(supabaseMimirClient, poolIds);
+			const latestByPool = new Map<number, ReturnType<typeof latestSwapRow>>();
+			for (const agg of poolAggregates.values()) {
+				const row = latestSwapRow(agg);
+				if (row) latestByPool.set(row.pool_id, row);
 			}
 
 			// Build comprehensive price map using multi-hop resolution through VOI
@@ -300,24 +297,6 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 					symbolUsd.set(s, 0);
 					console.warn(`No price path found for token: ${s}`);
 				}
-			}
-
-			// 3) 24h window for volume & change
-			const startISO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-			const windowRes = await supabaseMimirClient
-				.from('dex_swaps_materialized')
-				.select(
-					'pool_id, ts, base_token_id, quote_token_id, price_quote, volume_base, volume_quote'
-				)
-				.in('pool_id', poolIds)
-				.gte('ts', startISO)
-				.order('ts', { ascending: true });
-			if (windowRes.error) throw windowRes.error;
-			const windowByPool = new Map<number, any[]>();
-			for (const row of windowRes.data || []) {
-				const arr = windowByPool.get(row.pool_id) || [];
-				arr.push(row);
-				windowByPool.set(row.pool_id, arr);
 			}
 
 			// 4) Get cross-chain market snapshots ONLY for VOI
@@ -459,29 +438,11 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 					reserveTokenB = Number(latest.poolbal_b || 0);
 				}
 
-				const rows = windowByPool.get(pair.poolId) || [];
-				let volQuoteSum = 0;
-				let firstPrice: number | null = null;
-				let lastPrice: number | null = null;
-				for (const r of rows) {
-					const pq = Number(r.price_quote || 0);
-					let orientedPrice = 0; // pair base in pair quote units
-					if (r.base_token_id === pair.baseTokenId && r.quote_token_id === pair.quoteTokenId) {
-						orientedPrice = pq;
-						// quote volume already in pair.quote units
-						volQuoteSum += Number(r.volume_quote || 0);
-					} else if (
-						r.base_token_id === pair.quoteTokenId &&
-						r.quote_token_id === pair.baseTokenId &&
-						pq > 0
-					) {
-						orientedPrice = 1 / pq;
-						// In this orientation, "quote" is the pair base. Use volume_base which is pair.quote units
-						volQuoteSum += Number(r.volume_base || 0);
-					}
-					if (!firstPrice && orientedPrice > 0) firstPrice = orientedPrice;
-					if (orientedPrice > 0) lastPrice = orientedPrice;
-				}
+				const { volQuoteSum, firstPrice, lastPrice } = pairWindow(
+					poolAggregates.get(pair.poolId),
+					pair.baseTokenId,
+					pair.quoteTokenId
+				);
 
 				// USD conversion using comprehensive price resolution (normalize symbols for lookup)
 				const qUsd = symbolUsd.get(norm(pair.quoteSymbol)) || 0;

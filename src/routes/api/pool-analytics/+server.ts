@@ -1,6 +1,12 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import {
+	fetchPoolAggregates,
+	poolVolumeMetrics,
+	poolLatestReserves,
+	type PoolAggregate
+} from '$lib/server/poolAggregates';
 
 // Create MIMIR client for pool data
 const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
@@ -66,120 +72,6 @@ async function getPoolData(poolId: number): Promise<any> {
 	}
 }
 
-// Calculate volume metrics for specific pool
-async function calculatePoolVolumeMetrics(poolId: number): Promise<{
-	volume24h: number;
-	volume7d: number;
-	volume30d: number;
-	volumeTokenA24h: number;
-	volumeTokenB24h: number;
-	swapCount24h: number;
-	uniqueTraders24h: number;
-}> {
-	try {
-		// Calculate 24h metrics with detailed breakdown
-		const { data: volume24hData, error: volume24hError } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('volume_base, volume_quote, base_token_id, quote_token_id, trader_hex')
-			.eq('pool_id', poolId)
-			.gte('ts', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-		if (volume24hError) throw volume24hError;
-
-		// Calculate 7d volume
-		const { data: volume7dData, error: volume7dError } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('volume_base, volume_quote')
-			.eq('pool_id', poolId)
-			.gte('ts', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-
-		if (volume7dError) throw volume7dError;
-
-		// Calculate 30d volume
-		const { data: volume30dData, error: volume30dError } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('volume_base, volume_quote')
-			.eq('pool_id', poolId)
-			.gte('ts', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-
-		if (volume30dError) throw volume30dError;
-
-		// Process 24h data for detailed metrics
-		const volume24h = (volume24hData || []).reduce((total, swap) => {
-			return total + (swap.volume_base || 0) + (swap.volume_quote || 0);
-		}, 0);
-
-		const volumeTokenA24h = (volume24hData || []).reduce((total, swap) => {
-			return total + (swap.volume_base || 0);
-		}, 0);
-
-		const volumeTokenB24h = (volume24hData || []).reduce((total, swap) => {
-			return total + (swap.volume_quote || 0);
-		}, 0);
-
-		const swapCount24h = volume24hData?.length || 0;
-		const uniqueTraders24h = new Set((volume24hData || []).map((swap) => swap.trader_hex)).size;
-
-		// Calculate 7d and 30d volumes
-		const volume7d = (volume7dData || []).reduce((total, swap) => {
-			return total + (swap.volume_base || 0) + (swap.volume_quote || 0);
-		}, 0);
-
-		const volume30d = (volume30dData || []).reduce((total, swap) => {
-			return total + (swap.volume_base || 0) + (swap.volume_quote || 0);
-		}, 0);
-
-		return {
-			volume24h,
-			volume7d,
-			volume30d,
-			volumeTokenA24h,
-			volumeTokenB24h,
-			swapCount24h,
-			uniqueTraders24h
-		};
-	} catch (error) {
-		console.error('Failed to calculate pool volume metrics:', error);
-		return {
-			volume24h: 0,
-			volume7d: 0,
-			volume30d: 0,
-			volumeTokenA24h: 0,
-			volumeTokenB24h: 0,
-			swapCount24h: 0,
-			uniqueTraders24h: 0
-		};
-	}
-}
-
-// Get latest pool reserves from most recent swap data
-async function getLatestPoolReserves(poolId: number): Promise<{
-	reserveA: number;
-	reserveB: number;
-} | null> {
-	try {
-		const { data, error } = await supabaseMimirClient
-			.from('dex_swaps_materialized')
-			.select('poolbal_a, poolbal_b')
-			.eq('pool_id', poolId)
-			.order('ts', { ascending: false })
-			.limit(1)
-			.single();
-
-		if (error || !data) {
-			return null;
-		}
-
-		return {
-			reserveA: data.poolbal_a || 0,
-			reserveB: data.poolbal_b || 0
-		};
-	} catch (error) {
-		console.error('Failed to get pool reserves:', error);
-		return null;
-	}
-}
-
 // Calculate average swap fee for the pool
 async function calculateAverageFee(poolId: number): Promise<number | null> {
 	// This would require additional pool configuration data
@@ -199,20 +91,23 @@ export const GET: RequestHandler = async ({ url }) => {
 		const poolId = parseInt(poolIdParam, 10);
 
 		// Get pool data and volume metrics in parallel
-		const [poolData, volumeMetrics] = await Promise.all([
+		const [poolData, aggregates] = await Promise.all([
 			getPoolData(poolId),
-			calculatePoolVolumeMetrics(poolId)
+			fetchPoolAggregates(supabaseMimirClient, [poolId]).catch((error) => {
+				console.error('Failed to fetch pool aggregates:', error);
+				return new Map<number, PoolAggregate>();
+			})
 		]);
 
 		if (!poolData) {
 			return json({ error: 'Pool not found' }, { status: 404 });
 		}
 
-		// Get latest reserves and average fee
-		const [reserves, averageFee] = await Promise.all([
-			getLatestPoolReserves(poolId),
-			calculateAverageFee(poolId)
-		]);
+		// TASK-52, C11, P06: one aggregate supplies both volume and latest reserves.
+		const agg = aggregates.get(poolId);
+		const volumeMetrics = poolVolumeMetrics(agg);
+		const reserves = poolLatestReserves(agg);
+		const averageFee = await calculateAverageFee(poolId);
 
 		// Calculate price ratio (tokenB/tokenA)
 		const priceRatio =
