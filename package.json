@@ -18,9 +18,8 @@
 		"node": "24.x"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^3.1.1",
-		"@sveltejs/adapter-vercel": "5.10.3",
-		"@sveltejs/kit": "^2.8.1",
+		"@sveltejs/adapter-vercel": "6.3.4",
+		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@types/canvas-confetti": "^1.9.0",
 		"@types/d3-scale": "^4.0.8",
@@ -35,7 +34,7 @@
 		"eslint": "^8.57.0",
 		"eslint-config-prettier": "^8.10.0",
 		"eslint-plugin-svelte": "^2.35.1",
-		"fast-xml-parser": "^4.5.0",
+		"fast-xml-parser": "^4.5.7",
 		"postcss": "^8.4.35",
 		"prettier": "^3.3.3",
 		"prettier-plugin-svelte": "^3.2.8",
@@ -48,7 +47,7 @@
 		"tslib": "^2.6.2",
 		"typescript": "^5.3.3",
 		"ulujs": "^0.11.16",
-		"vite": "^5.1.4",
+		"vite": "^5.4.21",
 		"yargs": "^17.7.2"
 	},
 	"type": "module",
@@ -56,7 +55,6 @@
 		"@fortawesome/fontawesome-free": "^6.7.0",
 		"@pactfi/pactsdk": "^0.8.1",
 		"@resvg/resvg-js": "^2.6.2",
-		"@supabase/auth-helpers-sveltekit": "^0.13.0",
 		"@supabase/ssr": "^0.4.0",
 		"@supabase/supabase-js": "^2.47.13",
 		"@types/qrcode": "^1.5.5",
