@@ -3,9 +3,11 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
+		"predev": "node scripts/generateFaqData.js",
 		"dev": "vite dev",
 		"build": "node scripts/generateFaqData.js && vite build",
 		"preview": "node scripts/generateFaqData.js && vite preview",
+		"precheck": "node scripts/generateFaqData.js",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"test:unit": "node --test 'src/lib/**/*.test.ts'",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
