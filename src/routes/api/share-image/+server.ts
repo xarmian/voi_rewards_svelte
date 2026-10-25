@@ -28,7 +28,17 @@ async function loadFont(): Promise<ArrayBuffer> {
 	return fontData;
 }
 
-export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
+// Disabled 2026-10-25: tokenImage was fetched from any URL (server-side request
+// forgery). This rendered dork.fi trade P&L share cards; re-enable by exporting
+// renderShareImage as GET, after restricting tokenImage to known image hosts.
+export const GET: RequestHandler = async () =>
+	new Response(JSON.stringify({ error: 'This endpoint has been disabled.' }), {
+		status: 410,
+		headers: { 'content-type': 'application/json' }
+	});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for re-enabling
+const renderShareImage: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	try {
 		// Get query parameters
 		const tokenName = url.searchParams.get('tokenName') || 'TOKEN';
