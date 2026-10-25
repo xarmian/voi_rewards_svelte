@@ -10,6 +10,8 @@ test('root server load returns only sb-* cookies and depends on supabase:auth', 
 		cookies: {
 			getAll: () => [
 				{ name: 'sb-ref-auth-token', value: 'auth' },
+				{ name: 'sb-ref-auth-token.0', value: 'chunk0' },
+				{ name: 'sb-ref-auth-token-code-verifier', value: 'pkce' },
 				{ name: 'admin_session', value: 'secret' },
 				{ name: '_vercel_jwt', value: 'preview' }
 			]
@@ -19,7 +21,11 @@ test('root server load returns only sb-* cookies and depends on supabase:auth', 
 	expect(result).toEqual({
 		session: null,
 		user: null,
-		cookies: [{ name: 'sb-ref-auth-token', value: 'auth' }]
+		cookies: [
+			{ name: 'sb-ref-auth-token', value: 'auth' },
+			{ name: 'sb-ref-auth-token.0', value: 'chunk0' },
+			{ name: 'sb-ref-auth-token-code-verifier', value: 'pkce' }
+		]
 	});
 	expect(depends).toHaveBeenCalledWith('supabase:auth');
 });
