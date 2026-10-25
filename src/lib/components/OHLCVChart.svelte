@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+	import { onMount, createEventDispatcher } from 'svelte';
+	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { Button, ButtonGroup, Spinner } from 'flowbite-svelte';
 	import {
 		createChart,
@@ -41,9 +42,10 @@
 	export let quoteCurrency: 'VOI' | 'USD' = 'USD';
 
 	let chartContainer: HTMLElement;
-	let chart: IChartApi;
-	let mainSeries: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'>;
-	let volumeSeries: ISeriesApi<'Histogram'>;
+	let chart: IChartApi | undefined;
+	const lifecycle = createChartLifecycle();
+	let mainSeries: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | undefined;
+	let volumeSeries: ISeriesApi<'Histogram'> | undefined;
 	let isDarkMode = false;
 	let prevPairKey: string | null = null;
 	let isInitializing = false;
@@ -64,9 +66,6 @@
 		chartType = settings.chartType;
 		chartTypeInitialized = true;
 	}
-
-	// Debug reactive statement to track quoteCurrency changes
-	$: console.log('quoteCurrency reactive update:', quoteCurrency);
 
 	function formatTimeByResolution(ts: number, resolution: Resolution): string {
 		const d = new Date(ts * 1000);
@@ -157,6 +156,7 @@
 	}
 
 	function initializeChart() {
+		if (lifecycle.disposed) return;
 		if (!chartContainer) {
 			console.error('Chart container not found');
 			return;
@@ -165,17 +165,15 @@
 		if (isInitializing || chart) {
 			return;
 		}
-		isInitializing = true;
-
-		console.log('Initializing chart with container:', chartContainer);
-		console.log('Container dimensions:', { width: chartContainer.clientWidth, height: height });
 
 		if (chartContainer.clientWidth === 0) {
 			console.warn('Chart container has zero width, retrying...');
-			setTimeout(() => initializeChart(), 100);
+			// TASK-31: retries are tracked and cannot initialize after disposal.
+			lifecycle.deferred(initializeChart, 100);
 			return;
 		}
 
+		isInitializing = true;
 		chart = createChart(chartContainer, {
 			height,
 			width: chartContainer.clientWidth,
@@ -214,13 +212,13 @@
 			}
 		});
 
-		// Reset any previous series handles from old chart instances
-		mainSeries = undefined as any;
-		volumeSeries = undefined as any;
-
-		// Reset any previous series handles from old chart instances
-		mainSeries = undefined as any;
-		volumeSeries = undefined as any;
+		const instance = chart;
+		lifecycle.add(() => {
+			instance.remove();
+			chart = undefined;
+			mainSeries = undefined;
+			volumeSeries = undefined;
+		});
 
 		createMainSeries();
 
@@ -232,7 +230,7 @@
 		applyTimeFormatter();
 
 		// Subscribe to crosshair to update footer stats with hovered values
-		chart.subscribeCrosshairMove((param: any) => {
+		const handleCrosshairMove = (param: any) => {
 			try {
 				if (!param || !mainSeries) {
 					hovered = null;
@@ -287,14 +285,15 @@
 			} catch (e) {
 				console.warn('crosshair handler error', e);
 			}
-		});
+		};
+		chart.subscribeCrosshairMove(handleCrosshairMove);
+		lifecycle.add(() => instance.unsubscribeCrosshairMove(handleCrosshairMove));
 
 		// Update data if available
 		if (data.length > 0) {
 			updateChartData();
 		}
 
-		console.log('Chart initialization complete');
 		isInitializing = false;
 
 		// Set up resize observer
@@ -307,6 +306,7 @@
 				chart.timeScale().fitContent();
 			}
 		});
+		lifecycle.add(() => resizeObserver.disconnect());
 		resizeObserver.observe(chartContainer);
 
 		// Set up theme observer
@@ -317,18 +317,11 @@
 				}
 			});
 		});
+		lifecycle.add(() => themeObserver.disconnect());
 		themeObserver.observe(document.documentElement, {
 			attributes: true,
 			attributeFilter: ['class']
 		});
-
-		return () => {
-			resizeObserver.disconnect();
-			themeObserver.disconnect();
-			if (chart) {
-				chart.remove();
-			}
-		};
 	}
 
 	function createMainSeries() {
@@ -407,18 +400,9 @@
 	}
 
 	function updateChartData() {
-		console.log('updateChartData called', {
-			mainSeries: !!mainSeries,
-			dataLength: data.length,
-			chartType
-		});
-
-		if (!mainSeries || !data.length) {
-			console.log('updateChartData: Missing mainSeries or data');
+		if (!chart || !mainSeries || !data.length) {
 			return;
 		}
-
-		console.log('Updating chart with data:', data.slice(0, 3)); // Show first 3 items
 
 		// Sort data by time and deduplicate (keep last entry for each timestamp)
 		// lightweight-charts requires unique timestamps
@@ -428,12 +412,6 @@
 			deduped.set(item.time, item);
 		}
 		const sortedData = Array.from(deduped.values());
-		console.log('Data time range:', {
-			start: sortedData[0]?.time,
-			end: sortedData[sortedData.length - 1]?.time,
-			count: sortedData.length,
-			originalCount: data.length
-		});
 
 		// Dynamically adjust price precision based on value range
 		try {
@@ -464,14 +442,12 @@
 				low: item.low,
 				close: item.close
 			}));
-			console.log('Setting candlestick data:', candlestickData.slice(0, 2));
 			(mainSeries as ISeriesApi<'Candlestick'>).setData(candlestickData);
 		} else {
 			const lineData: LineData[] = sortedData.map((item) => ({
 				time: item.time,
 				value: item.close
 			}));
-			console.log('Setting line data:', lineData.slice(0, 2));
 			(mainSeries as ISeriesApi<'Line'>).setData(lineData);
 		}
 
@@ -492,15 +468,14 @@
 					value: item.value,
 					color: item.color || '#E5E7EB'
 				}));
-				console.log('Setting volume data:', volumeData.slice(0, 2));
-				volumeSeries.setData(volumeData);
+				volumeSeries?.setData(volumeData);
 				chart.priceScale('right').applyOptions({
 					scaleMargins: { top: 0.1, bottom: 0.4 }
 				});
 			} else {
 				if (volumeSeries) {
 					chart.removeSeries(volumeSeries);
-					volumeSeries = undefined as any;
+					volumeSeries = undefined;
 				}
 				chart.priceScale('right').applyOptions({
 					scaleMargins: { top: 0.1, bottom: 0.1 }
@@ -512,12 +487,9 @@
 		if (chart) {
 			chart.timeScale().fitContent();
 		}
-
-		console.log('Chart data updated, fitting content');
 	}
 
 	function handleResolutionChange(resolution: Resolution) {
-		console.log('Resolution change requested to', resolution);
 		// Notify parent; parent will update settings.resolution and we'll re-apply formatter then
 		dispatch('resolutionChange', resolution);
 	}
@@ -536,13 +508,14 @@
 
 	function toggleVolume() {
 		settings.showVolume = !settings.showVolume;
+		if (!chart) return;
 
 		if (settings.showVolume) {
 			createVolumeSeries();
 			updateChartData();
 		} else if (volumeSeries) {
 			chart.removeSeries(volumeSeries);
-			volumeSeries = undefined as any;
+			volumeSeries = undefined;
 		}
 
 		// Update price scale margins
@@ -555,27 +528,14 @@
 	}
 
 	function toggleQuoteCurrency() {
-		console.log('toggleQuoteCurrency called, current:', quoteCurrency);
 		quoteCurrency = quoteCurrency === 'VOI' ? 'USD' : 'VOI';
-		console.log('quoteCurrency updated to:', quoteCurrency);
 		dispatch('quoteChange', quoteCurrency);
-		console.log('quoteChange event dispatched');
 	}
 
 	onMount(() => {
-		// Delay initialization to ensure DOM is ready
-		setTimeout(() => {
-			const cleanup = initializeChart();
-			return cleanup;
-		}, 100);
-	});
-
-	onDestroy(() => {
-		if (chart) {
-			chart.remove();
-		}
-		mainSeries = undefined as any;
-		volumeSeries = undefined as any;
+		// TASK-31: the mount owns both deferred initialization and all chart resources.
+		lifecycle.deferred(initializeChart, 100);
+		return lifecycle.dispose;
 	});
 
 	// Reactive updates: update chart whenever new data arrives or resolution changes
@@ -600,7 +560,7 @@
 					}
 					if (volumeSeries) {
 						chart.removeSeries(volumeSeries);
-						volumeSeries = undefined as any;
+						volumeSeries = undefined;
 					}
 					chart.priceScale('right').applyOptions({
 						scaleMargins: { top: 0.1, bottom: 0.1 }
@@ -635,7 +595,6 @@
 	let prevResolution = settings.resolution;
 	$: if (chart && chartType !== prevChartType) {
 		prevChartType = chartType;
-		console.log('Chart type actually changed, recreating series');
 		createMainSeries();
 		if (data.length > 0) {
 			updateChartData();
@@ -699,7 +658,6 @@
 							class:dark:hover:text-white={quoteCurrency !== 'VOI'}
 							on:click={() => {
 								if (quoteCurrency !== 'VOI') {
-									console.log('Setting quoteCurrency to VOI');
 									quoteCurrency = 'VOI';
 									dispatch('quoteChange', quoteCurrency);
 								}
@@ -720,7 +678,6 @@
 							class:dark:hover:text-white={quoteCurrency !== 'USD'}
 							on:click={() => {
 								if (quoteCurrency !== 'USD') {
-									console.log('Setting quoteCurrency to USD');
 									quoteCurrency = 'USD';
 									dispatch('quoteChange', quoteCurrency);
 								}

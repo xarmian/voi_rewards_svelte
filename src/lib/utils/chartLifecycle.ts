@@ -28,7 +28,7 @@ export function createChartLifecycle() {
 	function dispose() {
 		if (disposed) return;
 		disposed = true;
-		// TASK-31: release observers/listeners before the chart they reference.
+		// TASK-31: release resources in reverse registration order.
 		for (const release of [...disposers].reverse()) release();
 	}
 

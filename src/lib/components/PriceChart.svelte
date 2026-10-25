@@ -1,6 +1,7 @@
 <!-- PriceChart.svelte -->
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, tick } from 'svelte';
+	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { createChart, type IChartApi, type ISeriesApi, type LineData } from 'lightweight-charts';
 
 	export let data: LineData[] = [];
@@ -12,8 +13,9 @@
 	} | null = null;
 
 	let chartContainer: HTMLElement;
-	let chart: IChartApi;
-	let series: ISeriesApi<'Line'>;
+	let chart: IChartApi | undefined;
+	let series: ISeriesApi<'Line'> | undefined;
+	const lifecycle = createChartLifecycle();
 	let isDarkMode = false;
 
 	// Time period selection
@@ -102,8 +104,9 @@
 	}
 
 	onMount(() => {
-		// Wait for next tick to ensure container is rendered
-		setTimeout(() => {
+		// TASK-31: return cleanup synchronously and guard the pending tick after unmount.
+		tick().then(() => {
+			if (lifecycle.disposed || !chartContainer) return;
 			chart = createChart(chartContainer, {
 				height,
 				width: chartContainer.clientWidth,
@@ -148,6 +151,13 @@
 				}
 			});
 
+			const instance = chart;
+			lifecycle.add(() => {
+				instance.remove();
+				chart = undefined;
+				series = undefined;
+			});
+
 			series = chart.addLineSeries({
 				color: '#8B5CF6',
 				lineWidth: 2,
@@ -179,6 +189,7 @@
 				});
 			});
 
+			lifecycle.add(() => observer.disconnect());
 			observer.observe(document.documentElement, {
 				attributes: true,
 				attributeFilter: ['class']
@@ -200,26 +211,14 @@
 					chart.timeScale().fitContent();
 				}
 			});
+			lifecycle.add(() => resizeObserver.disconnect());
 			resizeObserver.observe(chartContainer);
 
 			// Add window resize listener
 			window.addEventListener('resize', handleResize);
-
-			return () => {
-				resizeObserver.disconnect();
-				window.removeEventListener('resize', handleResize);
-				observer.disconnect();
-				if (chart) {
-					chart.remove();
-				}
-			};
-		}, 0);
-	});
-
-	onDestroy(() => {
-		if (chart) {
-			chart.remove();
-		}
+			lifecycle.add(() => window.removeEventListener('resize', handleResize));
+		});
+		return lifecycle.dispose;
 	});
 
 	$: if (series && data) {
