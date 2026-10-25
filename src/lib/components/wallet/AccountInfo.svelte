@@ -99,7 +99,7 @@
 					{/if}
 
 					<div class="flex items-center gap-1">
-						<CopyComponent
+						<CopyComponent ariaLabel="Copy address"
 							text={account.address}
 							toastMessage={`Address copied to clipboard`}
 							failureMessage={`Failed to copy address to clipboard`}

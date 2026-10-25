@@ -459,7 +459,7 @@
 
 											<!-- Action buttons group -->
 											<div class="mt-2 flex gap-2">
-												<CopyComponent
+												<CopyComponent ariaLabel="Copy address"
 													text={item.proposer}
 													toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(item.proposer.substr(0, 20))}...`}
 													failureMessage={`Failed to copy wallet address to clipboard.`}

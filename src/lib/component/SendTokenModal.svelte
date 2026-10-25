@@ -1470,7 +1470,7 @@
 										>
 											{txId.slice(0, 8)}...{txId.slice(-8)}
 										</a>
-										<CopyComponent
+										<CopyComponent ariaLabel="Copy transaction ID"
 											text={txId}
 											toastMessage="Transaction ID copied"
 											failureMessage="Failed to copy transaction ID"
