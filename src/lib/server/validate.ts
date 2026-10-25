@@ -98,13 +98,18 @@ export function validateTokenSearch(value: string | null, parameter: string): st
 	if (value !== null && value.length > 64) {
 		return `${parameter} must contain at most 64 characters`;
 	}
+	// PostgREST reads * as a LIKE wildcard even inside quotes, so it cannot be matched literally.
+	if (value !== null && value.includes('*')) {
+		return `${parameter} must not contain *`;
+	}
 	return null;
 }
 
 export function validateTokenPairFilters(params: URLSearchParams): string | null {
 	const tokenId = params.get('tokenId');
-	if (tokenId !== null && !isIntegerString(tokenId)) {
-		return 'tokenId must be a non-negative integer string';
+	// An empty tokenId is ignored by the handler, as before validation existed.
+	if (tokenId !== null && tokenId !== '' && parseInteger(tokenId, 0) === null) {
+		return 'tokenId must be a non-negative safe integer';
 	}
 	return (
 		validateTokenSearch(params.get('q'), 'q') ??
