@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Card, Tooltip, Button, Spinner, Badge, Tabs, TabItem, Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
-	import { createMarketDataLoader } from '$lib/markets/marketDataLoader';
+	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
 	import { fade, slide } from 'svelte/transition';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
@@ -272,6 +272,9 @@
 	}
 
 	// Aggregate metrics with fallbacks when markets are empty
+	let totalVolume24h: number | null;
+	let totalTvlAll: number | null;
+	let activeMarketsCount: number | null;
 	$: totalVolume24h = (() => {
 		if (realMarketData.length > 0) {
 			const sum = realMarketData.reduce((s, m) => s + (m.volume_24h || 0), 0);
@@ -299,7 +302,7 @@
 				return sum; // Use market data, ignore inflated analytics
 			}
 		}
-		return tokenAnalytics?.volume?.volume24h ?? 0;
+		return tokenAnalytics?.volume?.volume24h ?? null;
 	})();
 
 	$: totalTvlAll = (() => {
@@ -326,12 +329,14 @@
 				return sum; // Use market data, ignore inflated analytics
 			}
 		}
-		return tokenAnalytics?.tvl?.totalTvl ?? 0;
+		return tokenAnalytics?.tvl?.totalTvl ?? null;
 	})();
 	$: activeMarketsCount =
 		realMarketData.length > 0
 			? realMarketData.length
-			: (fallbackPairs?.length ?? tokenAnalytics?.tvl?.poolCount ?? 0);
+			: tokenAnalytics?.tvl?.poolCount === null
+				? null
+				: (fallbackPairs?.length ?? tokenAnalytics?.tvl?.poolCount ?? 0);
 
 	// Debug active markets count
 	$: console.log('Active markets calculation:', {
@@ -343,6 +348,8 @@
 
 	let fetchingMarketData = false;
 	let marketDataError: string | null = null;
+	let voiUsdStatus: MarketDataState['voiUsdStatus'] = data.voiUsdStatus ?? null;
+	let voiUsdAsOf: string | null = data.voiUsdAsOf ?? null;
 	const loader = createMarketDataLoader(
 		(url) => fetch(url),
 		(state) => {
@@ -351,12 +358,16 @@
 			realCirculatingSupply = state.circulatingSupply;
 			fetchingMarketData = state.loading;
 			marketDataError = state.error;
+			voiUsdStatus = state.voiUsdStatus;
+			voiUsdAsOf = state.voiUsdAsOf;
 		},
 		{
 			tokenId: data.resolvedToken?.id ?? 0,
 			marketData: realMarketData,
 			aggregates,
-			circulatingSupply: realCirculatingSupply
+			circulatingSupply: realCirculatingSupply,
+			voiUsdStatus,
+			voiUsdAsOf
 		}
 	);
 
@@ -376,7 +387,7 @@
 					const analyticsResponse = await fetch(`/api/token-analytics?tokenId=${tokenId}`);
 					const analyticsData = await analyticsResponse.json();
 					if (loader.isCurrent(requestId) && analyticsData.analytics) {
-						tokenAnalytics = analyticsData.analytics;
+						tokenAnalytics = { ...analyticsData.analytics, partial: !!analyticsData.partial };
 					}
 				} catch (e) {
 					console.warn('Failed to fetch token analytics:', e);
@@ -1376,7 +1387,7 @@
 						{#if fetchingMarketData}
 							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-20"></div>
 						{:else}
-							{formatCurrency(totalVolume24h)}
+							{totalVolume24h === null ? '—' : formatCurrency(totalVolume24h)}
 						{/if}
 					</div>
 				</div>
@@ -1394,7 +1405,7 @@
 						{#if fetchingMarketData}
 							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-24"></div>
 						{:else}
-							{formatCurrency(totalTvlAll)}
+							{totalTvlAll === null ? '—' : formatCurrency(totalTvlAll)}
 						{/if}
 					</div>
 				</div>
@@ -1445,7 +1456,7 @@
 						{#if fetchingMarketData}
 							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-12"></div>
 						{:else}
-							{activeMarketsCount}
+							{activeMarketsCount === null ? '—' : activeMarketsCount}
 						{/if}
 					</div>
 					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -1550,6 +1561,21 @@
 					<div
 						class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600 flex-shrink-0"
 					>
+						{#if voiUsdStatus === 'stale'}
+							<p class="text-sm text-gray-600 dark:text-gray-400">
+								VOI/USD reference is stale (as of {voiUsdAsOf
+									? new Date(voiUsdAsOf).toLocaleString()
+									: 'unknown time'}). USD values may be out of date.
+							</p>
+						{:else if voiUsdStatus === 'invalid' || voiUsdStatus === 'unavailable'}
+							<p class="text-sm text-gray-600 dark:text-gray-400">
+								VOI/USD reference unavailable. USD values for VOI-quoted pools are missing.
+							</p>
+						{/if}
+						{#if tokenAnalytics?.partial}
+							<p class="text-sm text-gray-600 dark:text-gray-400">Some analytics are unavailable.</p>
+						{/if}
+
 						<div class="flex items-center justify-between mb-4">
 							<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Token Markets</h2>
 							<span class="text-sm text-gray-600 dark:text-gray-400"
