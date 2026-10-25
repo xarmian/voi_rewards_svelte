@@ -53,24 +53,21 @@ export const load: LayoutLoad = async ({ url, data, fetch, depends }) => {
 				},
 				cookies: {
 					getAll() {
-						return data?.cookies;
+						return data.cookies;
 					}
 				}
 			});
 
-	/**
-	 * It's fine to use `getSession` here, because on the client, `getSession` is
-	 * safe, and on the server, it reads `session` from the `LayoutData`, which
-	 * safely checked the session using `safeGetSession`.
-	 */
-	const {
-		data: { session }
-	} = await supabase.auth.getSession();
+	// TASK-54: SSR uses the validated server data without another auth lookup.
+	// The browser session is cookie-backed and unverified; `user` is always the server-validated one (r1).
+	const session = isBrowser() ? (await supabase.auth.getSession()).data.session : data.session;
+	const user = data.user;
 
 	return {
 		baseMetaTags,
 		url,
 		session,
+		user,
 		supabase
 	};
 };
