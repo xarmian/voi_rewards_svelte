@@ -1,8 +1,10 @@
-import { test } from 'node:test';
+import { test, afterEach, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { fetchFungibleTokens } from './fungibleTokens.ts';
 import { algodClient } from '../utils/algod.ts';
 import type { PoolInfo } from './lp.ts';
+
+afterEach(() => vi.restoreAllMocks());
 
 const balances = [
 	{ name: 'ARC token', symbol: 'ARC', balance: '2000000', decimals: 6, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 123 },
@@ -92,8 +94,8 @@ function lpPool(provider = 'humble'): PoolInfo {
 }
 
 for (const failure of ['500', 'reject'] as const) {
-	test(`Nomadex escrow ARC200 ${failure} preserves tokens and reports partial`, async (t) => {
-		t.mock.method(algodClient, 'accountInformation', () => ({ do: async () => ({ amount: 10_000_000 }) }));
+	test(`Nomadex escrow ARC200 ${failure} preserves tokens and reports partial`, async () => {
+		vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => ({ amount: 10_000_000 }) }) as ReturnType<typeof algodClient.accountInformation>);
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
 			getLiquidityPools: async () => [lpPool('nomadex')],
 			fetch: async (input) => {
@@ -109,8 +111,8 @@ for (const failure of ['500', 'reject'] as const) {
 	});
 }
 
-test('Nomadex Algod escrow fallback preserves tokens and reports partial', async (t) => {
-	t.mock.method(algodClient, 'accountInformation', () => ({ do: async () => { throw new Error('Algod unavailable'); } }));
+test('Nomadex Algod escrow fallback preserves tokens and reports partial', async () => {
+	vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => { throw new Error('Algod unavailable'); } }) as ReturnType<typeof algodClient.accountInformation>);
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools: async () => [lpPool('nomadex')],
 		fetch: async (input) => new URL(String(input)).pathname === '/arc200/balances'

@@ -9,7 +9,8 @@
 		"preview": "node scripts/generateFaqData.js && vite preview",
 		"precheck": "node scripts/generateFaqData.js",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"test:unit": "node --test 'src/lib/**/*.test.ts'",
+		"test": "vitest run",
+		"test:unit": "vitest run",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "eslint .",
 		"format": "prettier --write .",
@@ -49,6 +50,7 @@
 		"typescript": "^5.3.3",
 		"ulujs": "^0.11.16",
 		"vite": "^5.4.21",
+		"vitest": "3.2.7",
 		"yargs": "^17.7.2"
 	},
 	"type": "module",
