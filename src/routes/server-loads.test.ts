@@ -357,6 +357,30 @@ describe('TASK-32 quests server loads', () => {
 	});
 });
 
+describe('TASK-32 relays server load', () => {
+	it('builds week ranges up to the latest peer date', async () => {
+		const { load } = await import('./(site)/relays/+page.server');
+		const maxDate = query();
+		mocks.from.mockReturnValueOnce(maxDate.builder);
+		maxDate.resolve({ peer_date: '2024-10-08' });
+		const result = (await load({} as never)) as {
+			weeks: { start: string; end: string; label: string }[];
+			defaultWeek: { start: string };
+		};
+		expect(result.weeks.map((w) => w.start)).toEqual(['2024-09-18', '2024-09-25', '2024-10-02']);
+		expect(result.defaultWeek).toEqual(result.weeks[2]);
+		expect(() => stringify(result)).not.toThrow();
+	});
+
+	it('still throws when the max date query fails', async () => {
+		const { load } = await import('./(site)/relays/+page.server');
+		const maxDate = query();
+		mocks.from.mockReturnValueOnce(maxDate.builder);
+		maxDate.resolve(null, { message: 'boom' });
+		await expect(load({} as never)).rejects.toThrow('Failed to fetch max date');
+	});
+});
+
 it('TASK-32 keeps DB loads on the server and only wallet merging universal', () => {
 	for (const route of [
 		'leaderboard',

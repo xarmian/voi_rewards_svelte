@@ -13,7 +13,8 @@
 	export let projects: IProject[] | undefined = undefined;
 
 	onMount(async () => {
-		if (projects === undefined) {
+		// TASK-32 r1: fetchProjects returns [] on failure, so an empty server result retries here.
+		if (!projects?.length) {
 			projects = await fetchProjects();
 		}
 	});
