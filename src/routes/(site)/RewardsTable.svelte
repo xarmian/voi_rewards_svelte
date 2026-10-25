@@ -84,6 +84,18 @@
 		}
 	};
 
+	// Called from the filter recompute only. A sort or data refresh keeps the expanded row, so
+	// refresh its balance. A filter change clears expandedRow instead (TASK-23), so skip the stale
+	// index. Reads happen inside a function so the reactive block does not depend on (and cycle
+	// with) the page-reset block that assigns currentPage/expandedRow.
+	function refreshExpandedBalance() {
+		const filterChanged =
+			searchTerm !== previousSearchTerm || showOnlyFavorites !== previousShowOnlyFavorites;
+		if (filterChanged || expandedRow == null) return;
+		const index = (currentPage - 1) * itemsPerPage + expandedRow;
+		if (filterItems[index]) updateSelectedBalance(index);
+	}
+
 	const updateSelectedBalance = async (row: number) => {
 		const accountInfo = await getAccountInfo(filterItems[row].proposer);
 		selectedBalance = Number(accountInfo?.amount ?? 0) / Math.pow(10, 6);
@@ -223,6 +235,9 @@
 				return matchesSearch && matchesFavorites;
 			}
 		);
+
+		refreshExpandedBalance();
+
 		// get page of items
 		//const pageOfItems = filterItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 		//const allAddresses = pageOfItems.map((item: any) => item.proposer);
@@ -245,11 +260,6 @@
 	}
 
 	$: totalPages = Math.max(1, Math.ceil(filterItems.length / itemsPerPage));
-
-	$: if (expandedRow != null) {
-		const index = (currentPage - 1) * itemsPerPage + expandedRow;
-		if (filterItems[index]) updateSelectedBalance(index);
-	}
 
 	let columns: any = [
 		{ id: 'rank', desc: 'Rank', tooltip: null },

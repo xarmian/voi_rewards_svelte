@@ -62,7 +62,7 @@
 				<i class="fab fa-instagram mr-2"></i>
 				Instagram
 			</Button>
-			<CopyComponent ariaLabel="Copy URL"
+			<CopyComponent mode="wrapper" ariaLabel="Copy URL"
 				text={url}
 				toastMessage={`URL Copied to Clipboard:<br/> ${escapeHtml(url.substring(0, 20))}...`}
 				failureMessage={`Failed to copy URL to clipboard.`}
