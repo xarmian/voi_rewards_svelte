@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { resolveVoiUsd, VOI_USD_MAX_AGE_MS } from "./voiUsdReference.ts";
 

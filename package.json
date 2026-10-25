@@ -2,18 +2,19 @@
 	"name": "voi_rewards_auditor",
 	"version": "0.0.1",
 	"private": true,
-	"main": "dist/index.js",
-	"module": "dist/index.js",
-	"svelte": "dist/index.js",
 	"scripts": {
+		"predev": "node scripts/generateFaqData.js",
 		"dev": "vite dev",
 		"build": "node scripts/generateFaqData.js && vite build",
 		"preview": "node scripts/generateFaqData.js && vite preview",
+		"precheck": "node scripts/generateFaqData.js",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"test:unit": "node --test 'src/lib/**/*.test.ts'",
+		"test": "vitest run",
+		"test:unit": "vitest run",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "prettier --plugin-search-dir . --check . && eslint .",
-		"format": "prettier --plugin-search-dir . --write ."
+		"lint": "eslint .",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
 	},
 	"engines": {
 		"node": "24.x"
@@ -49,6 +50,7 @@
 		"typescript": "^5.3.3",
 		"ulujs": "^0.11.16",
 		"vite": "^5.4.21",
+		"vitest": "3.2.7",
 		"yargs": "^17.7.2"
 	},
 	"type": "module",
