@@ -83,3 +83,30 @@ export function validateMimirParams(
 	}
 	return { action, params };
 }
+
+export function validateTokenSearch(value: string | null, parameter: string): string | null {
+	if (value !== null && (value.length < 1 || value.length > 32 || /[^A-Za-z0-9._ -]/.test(value))) {
+		return `${parameter} must contain 1 to 32 letters, digits, dots, underscores, spaces or hyphens`;
+	}
+	return null;
+}
+
+export function validateTokenPairFilters(params: URLSearchParams): string | null {
+	const tokenId = params.get('tokenId');
+	if (tokenId !== null && !isIntegerString(tokenId)) {
+		return 'tokenId must be a non-negative integer string';
+	}
+	return (
+		validateTokenSearch(params.get('q'), 'q') ??
+		validateTokenSearch(params.get('tokenSymbol'), 'tokenSymbol')
+	);
+}
+
+export function validateTokenPairIds(baseTokenId: unknown, quoteTokenId: unknown): string | null {
+	for (const [key, value] of Object.entries({ baseTokenId, quoteTokenId })) {
+		if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+			return `${key} must be a non-negative safe integer`;
+		}
+	}
+	return null;
+}

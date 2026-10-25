@@ -1,4 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { validateTokenPairFilters, validateTokenPairIds } from '$lib/server/validate';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import type { PoolCatalog, TokenPair } from '$lib/types/ohlcv.types';
@@ -8,6 +9,8 @@ const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KE
 
 export const GET: RequestHandler = async ({ url }) => {
 	try {
+		const validationError = validateTokenPairFilters(url.searchParams);
+		if (validationError) return json({ error: validationError }, { status: 400 });
 		const query = url.searchParams.get('q') || '';
 		const popular = url.searchParams.get('popular') === 'true';
 		const tokenId = url.searchParams.get('tokenId');
@@ -159,11 +162,10 @@ export const GET: RequestHandler = async ({ url }) => {
 // Validate specific token pair
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const { baseTokenId, quoteTokenId } = await request.json();
+		const { baseTokenId, quoteTokenId } = (await request.json()) ?? {};
 
-		if (typeof baseTokenId !== 'number' || typeof quoteTokenId !== 'number') {
-			return json({ error: 'baseTokenId and quoteTokenId must be numbers' }, { status: 400 });
-		}
+		const validationError = validateTokenPairIds(baseTokenId, quoteTokenId);
+		if (validationError) return json({ error: validationError }, { status: 400 });
 
 		// Check if token pair exists in pool catalog
 		const { data, error } = await supabaseMimirClient
