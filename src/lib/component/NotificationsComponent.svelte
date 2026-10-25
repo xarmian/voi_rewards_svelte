@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import type { Account } from '$lib/types';
 	import { toast } from '@zerodevx/svelte-toast';
 
@@ -32,7 +33,7 @@
 
 		if (!response.ok) {
 			const data = await response.json();
-			toast.push(data.error.message, { theme: { '--toastBackground': '#EF4444' } });
+			toast.push(escapeHtml(data.error.message), { theme: { '--toastBackground': '#EF4444' } });
 			return false;
 		} else {
 			isEmailOptedIn = value;

@@ -74,7 +74,7 @@
 						? communityBlocks
 						: communityBlocks + Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)
 				);
-				const userBlocksProduced = epochData.proposers[walletAddress] ?? 0;
+				const userBlocksProduced = Number(epochData.proposers[walletAddress] ?? 0) || 0;
 				const tokens = await getTokensByEpoch(date.epoch);
 				const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
 

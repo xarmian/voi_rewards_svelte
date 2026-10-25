@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { Button, Popover } from 'flowbite-svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { copy } from 'svelte-copy';
@@ -63,7 +64,7 @@
 			</Button>
 			<CopyComponent
 				text={url}
-				toastMessage={`URL Copied to Clipboard:<br/> ${url.substring(0, 20)}...`}
+				toastMessage={`URL Copied to Clipboard:<br/> ${escapeHtml(url.substring(0, 20))}...`}
 				failureMessage={`Failed to copy URL to clipboard.`}
 			>
 				<Button color="alternative">

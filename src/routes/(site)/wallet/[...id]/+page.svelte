@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { Web3Wallet, selectedWallet, connectedWallets } from 'avm-wallet-svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
@@ -468,7 +469,7 @@
 									>
 									<CopyComponent
 										text={parentWalletId ?? walletId}
-										toastMessage={`Wallet Copied to Clipboard:<br/> ${parentWalletId ?? walletId.slice(0, 20)}...`}
+										toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(parentWalletId ?? walletId.slice(0, 20))}...`}
 										failureMessage={`Failed to copy wallet address to clipboard.`}
 									/>
 									<span class="text-gray-400">|</span>
@@ -500,7 +501,7 @@
 										<span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
 										<CopyComponent
 											text={account.address}
-											toastMessage={`Wallet Copied to Clipboard:<br/> ${account.address.slice(0, 20)}...`}
+											toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(account.address.slice(0, 20))}...`}
 											failureMessage={`Failed to copy wallet address to clipboard.`}
 										/>
 										<span class="text-gray-400">|</span>
@@ -719,7 +720,7 @@
 											>
 											<CopyComponent
 												text={parentWalletId ?? walletId}
-												toastMessage={`Wallet Copied to Clipboard:<br/> ${parentWalletId ?? walletId.slice(0, 20)}...`}
+												toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(parentWalletId ?? walletId.slice(0, 20))}...`}
 												failureMessage={`Failed to copy wallet address to clipboard.`}
 											/>
 											<span class="text-gray-400">|</span>
@@ -751,7 +752,7 @@
 												<span>{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
 												<CopyComponent
 													text={account.address}
-													toastMessage={`Wallet Copied to Clipboard:<br/> ${account.address.slice(0, 20)}...`}
+													toastMessage={`Wallet Copied to Clipboard:<br/> ${escapeHtml(account.address.slice(0, 20))}...`}
 													failureMessage={`Failed to copy wallet address to clipboard.`}
 												/>
 												<span class="text-gray-400">|</span>

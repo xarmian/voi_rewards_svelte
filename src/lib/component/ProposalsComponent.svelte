@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import * as echarts from 'echarts';
@@ -193,18 +194,18 @@
 					const formattedDate = format(date, PeriodType.Custom, {
 						custom: 'eee, MMMM do'
 					});
-					let result = `${formattedDate}<br/>`;
+					let result = `${escapeHtml(formattedDate)}<br/>`;
 					const expected = params.find((p: any) => p.seriesName === 'Expected Proposals');
 					const actual = params.find((p: any) => p.seriesName === 'Actual Proposals');
 					if (expected) {
-						result += `Expected Proposals: ${Math.round(expected.value)}<br/>`;
+						result += `Expected Proposals: ${escapeHtml(Math.round(expected.value))}<br/>`;
 					}
 					if (actual) {
-						result += `Actual Proposals: ${Math.round(actual.value)}<br/>`;
+						result += `Actual Proposals: ${escapeHtml(Math.round(actual.value))}<br/>`;
 					}
 					if (expected && actual) {
 						const diff = actual.value - expected.value;
-						result += `Difference: ${diff > 0 ? '+' : ''}${Math.round(diff)}`;
+						result += `Difference: ${diff > 0 ? '+' : ''}${escapeHtml(Math.round(diff))}`;
 					}
 					return result;
 				}
