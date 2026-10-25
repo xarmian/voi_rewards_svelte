@@ -1,0 +1,110 @@
+/*
+ * Design tokens (DESIGN-SYSTEM.md §1). Colour variables hold space-separated RGB
+ * channels so Tailwind opacity modifiers work: bg-accent/20.
+ * scripts/contrast-check.mjs reads this file and recomputes §1.2; keep values as
+ * literal channels or hex so it can parse them.
+ */
+:root {
+	color-scheme: light;
+	--c-canvas: 245 242 253; /* #f5f2fd */
+	--c-surface: 255 255 255; /* #ffffff */
+	--c-surface-2: 249 247 255; /* #f9f7ff */
+	--c-line: 230 224 247; /* #e6e0f7 */
+	--c-edge: 139 128 173; /* #8b80ad */
+	--c-ink: 27 20 51; /* #1b1433 */
+	--c-ink-muted: 102 93 134; /* #665d86 */
+	--c-accent: 109 40 217; /* #6d28d9 */
+	--c-accent-fill: 124 58 237; /* #7c3aed */
+	--c-accent-soft: 239 231 255; /* #efe7ff */
+	--c-hi: 219 39 119; /* #db2777 */
+	--c-hi-ink: 190 24 93; /* #be185d */
+	--c-hi-soft: 252 231 243; /* #fce7f3 */
+	--c-ok: 4 120 87; /* #047857 */
+	--c-ok-soft: 220 252 231; /* #dcfce7 */
+	--c-warn: 161 92 7; /* #a15c07 */
+	--c-warn-soft: 254 243 199; /* #fef3c7 */
+	--c-danger: 190 18 60; /* #be123c */
+	--c-danger-soft: 253 226 232; /* #fde2e8 */
+	--c-focus: 109 40 217; /* #6d28d9 */
+	--c-grid: 238 233 251; /* #eee9fb */
+	--c-series-3: 180 83 9; /* #b45309 */
+	--c-expected: 27 20 51; /* #1b1433 */
+	--c-expected-halo: 255 255 255; /* #ffffff */
+	--c-on-hero: 255 255 255; /* #ffffff */
+	--c-on-hero-muted: 237 233 254; /* #ede9fe */
+	--c-on-hero-surface: rgba(20, 0, 50, 0.28);
+
+	--g-hero: linear-gradient(135deg, #5b21b6 0%, #7c3aed 45%, #a21caf 100%);
+	--g-bar: linear-gradient(90deg, rgb(var(--c-accent-fill)), rgb(var(--c-hi)));
+	--shadow-card: 0 1px 2px rgba(40, 20, 90, 0.06), 0 8px 24px rgba(40, 20, 90, 0.06);
+
+	/* §1.4 sizes with a smaller value below md (768px) */
+	--sp-bento: 12px;
+	--sp-card: 16px;
+	--r-card: 18px;
+	--r-hero: 24px;
+	--sp-page-x: 16px;
+}
+
+@media (min-width: 768px) {
+	:root {
+		--sp-bento: 16px;
+		--sp-card: 20px;
+		--r-card: 22px;
+		--r-hero: 32px;
+		--sp-page-x: 24px;
+	}
+}
+
+:root.dark {
+	color-scheme: dark;
+	--c-canvas: 15 11 29; /* #0f0b1d */
+	--c-surface: 25 19 48; /* #191330 */
+	--c-surface-2: 21 16 41; /* #151029 */
+	--c-line: 42 33 72; /* #2a2148 */
+	--c-edge: 122 111 163; /* #7a6fa3 */
+	--c-ink: 241 237 255; /* #f1edff */
+	--c-ink-muted: 165 156 200; /* #a59cc8 */
+	--c-accent: 180 156 255; /* #b49cff */
+	--c-accent-fill: 167 139 250; /* #a78bfa */
+	--c-accent-soft: 42 31 82; /* #2a1f52 */
+	--c-hi: 244 114 182; /* #f472b6 */
+	--c-hi-ink: 249 168 212; /* #f9a8d4 */
+	--c-hi-soft: 61 20 48; /* #3d1430 */
+	--c-ok: 74 222 128; /* #4ade80 */
+	--c-ok-soft: 18 53 38; /* #123526 */
+	--c-warn: 251 191 36; /* #fbbf24 */
+	--c-warn-soft: 58 42 12; /* #3a2a0c */
+	--c-danger: 251 113 133; /* #fb7185 */
+	--c-danger-soft: 59 18 32; /* #3b1220 */
+	--c-focus: 196 181 253; /* #c4b5fd */
+	--c-grid: 37 29 64; /* #251d40 */
+	--c-series-3: 251 191 36; /* #fbbf24 */
+	--c-expected: 241 237 255; /* #f1edff */
+	--c-expected-halo: 15 11 29; /* #0f0b1d */
+	--c-on-hero: 255 255 255; /* #ffffff */
+	--c-on-hero-muted: 237 233 254; /* #ede9fe */
+	--c-on-hero-surface: rgba(20, 0, 50, 0.28);
+
+	--g-hero: linear-gradient(135deg, #2e1065 0%, #5b21b6 50%, #86198f 100%);
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:focus-visible {
+	outline: 2px solid rgb(var(--c-focus));
+	outline-offset: 2px;
+}
+.on-hero :focus-visible {
+	outline-color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

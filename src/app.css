@@ -1,44 +1,51 @@
+@import './lib/ds/tokens.css';
+@import '@fontsource/lato/latin-400.css';
+@import '@fontsource/lato/latin-700.css';
+@import '@fontsource/lato/latin-900.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-	font-family: 'N27';
-	src: url('/fonts/N27-Regular.woff') format('woff');
+@layer components {
+	/* DESIGN-SYSTEM.md §1.4: max 1240px with 24px side padding (16px below md). */
+	.container-page {
+		@apply mx-auto w-full max-w-[1240px] px-[var(--sp-page-x)];
+	}
 }
-.n27 {
-	font-family: 'N27', sans-serif;
-}
-body {
-	font-family: 'N27', sans-serif;
+
+@layer utilities {
+	.num {
+		font-variant-numeric: tabular-nums;
+	}
 }
 
 .markdown p {
-	@apply text-base text-gray-800 dark:text-gray-200 mb-4 mt-4;
+	@apply text-base text-ink mb-4 mt-4;
 }
 .markdown h1 {
-	@apply text-3xl font-bold text-gray-800 dark:text-gray-200;
+	@apply text-3xl font-bold text-ink;
 }
 .markdown h2 {
-	@apply text-2xl font-bold text-gray-800 dark:text-gray-200;
+	@apply text-2xl font-bold text-ink;
 }
 .markdown h3 {
-	@apply text-xl font-bold text-gray-800 dark:text-gray-200;
+	@apply text-xl font-bold text-ink;
 }
 .markdown p {
-	@apply text-base text-gray-800 dark:text-gray-200;
+	@apply text-base text-ink;
 }
 .markdown a {
-	@apply text-blue-500 dark:text-blue-400;
+	@apply text-accent;
 }
 .markdown code {
-	@apply bg-gray-200 dark:bg-gray-700 p-1 rounded;
+	@apply bg-surface-2 p-1 rounded;
 }
 .markdown pre {
-	@apply bg-gray-200 dark:bg-gray-700 p-2 rounded overflow-auto;
+	@apply bg-surface-2 p-2 rounded overflow-auto;
 }
 .markdown blockquote {
-	@apply border-l-4 border-gray-200 dark:border-gray-700 pl-4 italic;
+	@apply border-l-4 border-line pl-4 italic;
 }
 .markdown ul,
 .markdown ol {

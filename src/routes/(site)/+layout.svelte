@@ -10,7 +10,7 @@
 	const options = {};
 </script>
 
-<div class="dark:text-white bg-[#662ed9]">
+<div class="dark:text-white bg-canvas">
 	<Navbar />
 	{#if showNotice}
 		<div
@@ -45,9 +45,7 @@
 			</button>
 		</div>
 	{/if}
-	<main
-		class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-0 px-0"
-	>
+	<main class="bg-canvas min-h-screen py-0 px-0">
 		<slot />
 	</main>
 	<SvelteToast {options} />
