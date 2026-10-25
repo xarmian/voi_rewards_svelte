@@ -1033,7 +1033,6 @@
 	async function fetchUnifiedChartData(
 		token: string,
 		resolution: Resolution,
-		refresh = false,
 		tradingPairId?: number
 	) {
 		chartLoading = true;
@@ -1052,7 +1051,6 @@
 						baseTokenId: baseId.toString(),
 						quoteTokenId: quoteId.toString(),
 						resolution,
-						refresh: refresh.toString(),
 						limit: '500'
 					});
 					const response = await fetch(`/api/ohlcv?${params}`);
@@ -1128,7 +1126,6 @@
 					baseTokenId: voiPair.baseTokenId.toString(),
 					quoteTokenId: voiPair.quoteTokenId.toString(),
 					resolution,
-					refresh: refresh.toString(),
 					limit: '500'
 				});
 
@@ -1219,19 +1216,15 @@
 
 	// Token pair selection now handled via handlePoolSelect
 
+	// A plain refetch: candles are rebuilt server-side every 5 minutes (TASK-17).
 	function handleUnifiedRefresh(
 		event: CustomEvent<{ tokenPair: TokenPair; resolution: Resolution }>
 	) {
 		const { resolution } = event.detail;
 		if (shouldUseVOIData(selectedToken?.symbol || 'VOI')) {
-			fetchUnifiedChartData(
-				selectedToken?.symbol || 'VOI',
-				resolution,
-				true,
-				selectedTradingPairId
-			);
+			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution, selectedTradingPairId);
 		} else {
-			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution, true);
+			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution);
 		}
 	}
 
@@ -1239,7 +1232,7 @@
 		chartSettings = { ...chartSettings, resolution: event.detail };
 		const tokenSymbol = selectedToken?.symbol || 'VOI';
 		if (shouldUseVOIData(tokenSymbol)) {
-			fetchUnifiedChartData(tokenSymbol, event.detail, false, selectedTradingPairId);
+			fetchUnifiedChartData(tokenSymbol, event.detail, selectedTradingPairId);
 		} else if (selectedPool) {
 			fetchUnifiedChartData(tokenSymbol, event.detail);
 		}
