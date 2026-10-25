@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { escapeHtml } from '$lib/utils/escapeHtml';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
+	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { browser } from '$app/environment';
 	import * as echarts from 'echarts';
 	import type { EChartsOption } from 'echarts';
@@ -20,6 +21,7 @@
 	let screenSize: number;
 	let chartDiv: HTMLElement;
 	let chart: echarts.ECharts | null = null;
+	let chartLifecycle: ReturnType<typeof createChartLifecycle> | null = null;
 
 	let supply: any;
 	$: accountInfo = null as Account | null;
@@ -34,42 +36,41 @@
 
 	// Watch for wallet changes
 	$: if (walletId && isMounted) {
-		console.log('Wallet ID changed, updating data...', { walletId, isMounted });
 		updateChartData();
 	}
 
 	// Track when chartDiv becomes available and data changes
-	$: if (chartDiv && browser && data.length > 0) {
-		console.log('Chart div available or data updated, ensuring chart is ready');
+	$: if (chartDiv && browser && isMounted && data.length > 0) {
 		ensureChart();
 	}
 
 	// Track when chartDiv is removed (during loading)
 	$: if (!chartDiv && chart) {
-		console.log('Chart div removed, cleaning up chart instance');
-		chart.dispose();
+		disposeChart();
+	}
+
+	// TASK-31: loading can remove the div; release that chart's listeners with it.
+	function disposeChart() {
+		chartLifecycle?.dispose();
+		chartLifecycle = null;
 		chart = null;
 	}
 
 	function ensureChart() {
-		if (!chartDiv || !browser) return;
+		if (!chartDiv || !browser || !isMounted) return;
 
 		try {
 			// Force the div to have dimensions if they're missing
 			if (!chartDiv.clientWidth || !chartDiv.clientHeight) {
-				console.log('Forcing chart dimensions');
 				chartDiv.style.width = '100%';
 				chartDiv.style.height = '300px';
 			}
 
 			if (!chart) {
-				console.log('Initializing new chart with div dimensions:', {
-					width: chartDiv.clientWidth,
-					height: chartDiv.clientHeight
-				});
-
 				chart = echarts.init(chartDiv);
-				console.log('Chart initialized:', chart);
+				const instance = chart;
+				chartLifecycle = createChartLifecycle();
+				chartLifecycle.add(() => instance.dispose());
 
 				// Set up theme observer
 				const observer = new MutationObserver((mutations) => {
@@ -80,12 +81,14 @@
 					});
 				});
 
+				chartLifecycle.add(() => observer.disconnect());
 				observer.observe(document.documentElement, {
 					attributes: true,
 					attributeFilter: ['class']
 				});
 
 				window.addEventListener('resize', handleResize);
+				chartLifecycle.add(() => window.removeEventListener('resize', handleResize));
 			}
 
 			// Update chart with current data
@@ -109,10 +112,9 @@
 		expectedBlockTime = null;
 		accountInfo = null;
 
-		console.log('Starting updateChartData...');
 		isLoading = true;
 
-		// Don't dispose of the chart here anymore, let the reactive statement handle it
+		// TASK-31: the div removal releases its chart and subscriptions reactively.
 
 		const url = `${config.proposalApiBaseUrl}?action=proposals&wallet=${requested}`;
 		try {
@@ -127,7 +129,6 @@
 			const proposals = await response.json();
 			if (requestId !== proposalsRequestId) return;
 			apiData = proposals;
-			console.log('Received API data:', apiData);
 			accountInfo = accountInfoResult ?? null;
 			supply = supplyResult;
 			expectedUnavailable = accountInfoResult === undefined || supplyResult == null;
@@ -151,7 +152,6 @@
 			if (!expectedUnavailable) {
 				const chartData = await fetchOnlineStakeHistory();
 				if (requestId !== proposalsRequestId) return;
-				console.log('Received chart data:', chartData);
 				if (chartData === null) {
 					expectedUnavailable = true;
 				} else chartData.forEach((dayData: { date: string; avg_online_stake: number }) => {
@@ -173,7 +173,6 @@
 			}));
 
 			data.sort((a: { date: Date }, b: { date: Date }) => a.date.getTime() - b.date.getTime());
-			console.log('Processed data:', data);
 			loadError = null;
 		} catch (error) {
 			if (requestId !== proposalsRequestId) return;
@@ -185,13 +184,6 @@
 	}
 
 	function updateChart() {
-		console.log('updateChart called with conditions:', {
-			chartExists: !!chart,
-			dataLength: data.length,
-			isBrowser: browser,
-			chartDivExists: !!chartDiv
-		});
-
 		if (!chart || !data.length || !browser) return;
 
 		const isDarkMode = document.documentElement.classList.contains('dark');
@@ -303,9 +295,7 @@
 		};
 
 		try {
-			console.log('Setting chart options:', options);
 			chart.setOption(options, true);
-			console.log('Chart options set successfully');
 		} catch (error) {
 			console.error('Error updating chart:', error);
 		}
@@ -327,20 +317,14 @@
 	}
 
 	onMount(() => {
-		console.log('Component mounting...', { browser });
 		if (!browser) return;
 
-		console.log('Browser environment confirmed');
 		isMounted = true;
-	});
-
-	onDestroy(() => {
-		if (browser && chart) {
-			chart.dispose();
-		}
-		if (browser) {
-			window.removeEventListener('resize', handleResize);
-		}
+		return () => {
+			isMounted = false;
+			proposalsRequestId++;
+			disposeChart();
+		};
 	});
 
 	$: screenSize = browser ? (window?.innerWidth ?? 1024) : 1024;

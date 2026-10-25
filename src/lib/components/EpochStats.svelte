@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { onMount, afterUpdate } from 'svelte';
+	import { onMount } from 'svelte';
+	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
+	import { getEpochChartUpdates, type EpochChartInputs } from '$lib/utils/epochChartUpdates';
 	import { formatNumber } from '$lib/utils';
 	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import * as echarts from 'echarts';
@@ -39,6 +41,9 @@
 	let stakeChart: echarts.ECharts | null = null;
 	let priceChart: echarts.ECharts | null = null;
 	let mounted = false;
+	let dark = false;
+	let previousChartInputs: EpochChartInputs | null = null;
+	const lifecycle = createChartLifecycle();
 	let currentPrice: number | null = null;
 	let priceChange24h: number | null = null;
 	let priceHistory: PriceData[] = [];
@@ -72,6 +77,15 @@
 
 	onMount(() => {
 		mounted = true;
+		dark = document.documentElement.classList.contains('dark');
+		const observer = new MutationObserver(() => {
+			if (!lifecycle.disposed) dark = document.documentElement.classList.contains('dark');
+		});
+		lifecycle.add(() => observer.disconnect());
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
 		const fetchData = async () => {
 			try {
 				const [epochsResponse, marketsResponse, priceHistoryResponse, onlineAccountsResponse] =
@@ -124,30 +138,35 @@
 		};
 
 		window.addEventListener('resize', handleResize);
+		lifecycle.add(() => window.removeEventListener('resize', handleResize));
 
 		return () => {
-			window.removeEventListener('resize', handleResize);
-			if (aprChart) {
-				aprChart.dispose();
-				aprChart = null;
-			}
-			if (stakeChart) {
-				stakeChart.dispose();
-				stakeChart = null;
-			}
-			if (priceChart) {
-				priceChart.dispose();
-				priceChart = null;
-			}
 			mounted = false;
+			lifecycle.dispose();
+			aprChart = null;
+			stakeChart = null;
+			priceChart = null;
 		};
 	});
 
-	afterUpdate(() => {
-		if (mounted && !loading && !error && epochs.length > 0) {
-			initCharts();
-		}
-	});
+	// TASK-31: only chart inputs and container readiness can trigger chart updates.
+	$: if (
+		mounted &&
+		!loading &&
+		!error &&
+		epochs.length > 0 &&
+		aprChartDiv &&
+		stakeChartDiv &&
+		priceChartDiv
+	) {
+		updateCharts({ epochs, priceHistory, dark });
+	}
+
+	function createOwnedChart(container: HTMLElement) {
+		const instance = echarts.init(container);
+		lifecycle.add(() => instance.dispose());
+		return instance;
+	}
 
 	function calculateDailyAverages(priceData: PriceData[]): DailyPrice[] {
 		const dailyPrices = new Map<string, { sum: number; count: number }>();
@@ -184,10 +203,10 @@
 		return date.toLocaleDateString();
 	}
 
-	function initCharts() {
-		if (!aprChartDiv || !stakeChartDiv || !priceChartDiv) return;
-
-		const isDarkMode = document.documentElement.classList.contains('dark');
+	function updateCharts(inputs: EpochChartInputs) {
+		if (lifecycle.disposed) return;
+		const updates = getEpochChartUpdates(previousChartInputs, inputs);
+		const isDarkMode = inputs.dark;
 		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
 		const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
 		const backgroundColor = isDarkMode ? 'transparent' : 'transparent';
@@ -541,45 +560,17 @@
 		};
 
 		try {
-			// Dispose of existing charts if they exist
-			if (aprChart) {
-				aprChart.dispose();
-			}
-			if (stakeChart) {
-				stakeChart.dispose();
-			}
-			if (priceChart) {
-				priceChart.dispose();
-			}
+			aprChart ??= createOwnedChart(aprChartDiv);
+			stakeChart ??= createOwnedChart(stakeChartDiv);
+			priceChart ??= createOwnedChart(priceChartDiv);
 
-			// Initialize new charts
-			aprChart = echarts.init(aprChartDiv);
-			stakeChart = echarts.init(stakeChartDiv);
-			priceChart = echarts.init(priceChartDiv);
-
-			// Set options
-			aprChart.setOption(aprOptions);
-			stakeChart.setOption(stakeOptions);
-			priceChart.setOption(priceOptions);
+			if (updates.apr) aprChart.setOption(aprOptions, { notMerge: true });
+			if (updates.stake) stakeChart.setOption(stakeOptions, { notMerge: true });
+			if (updates.price) priceChart.setOption(priceOptions, { notMerge: true });
+			previousChartInputs = inputs;
 		} catch (e) {
 			console.error('Failed to initialize charts:', e);
 		}
-	}
-
-	// Watch for theme changes
-	if (typeof window !== 'undefined') {
-		const observer = new MutationObserver((mutations) => {
-			mutations.forEach((mutation) => {
-				if (mutation.attributeName === 'class') {
-					initCharts();
-				}
-			});
-		});
-
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class']
-		});
 	}
 </script>
 
