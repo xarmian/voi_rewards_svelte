@@ -79,7 +79,6 @@ export interface OHLCVRequest {
 	start?: Date;
 	end?: Date;
 	limit?: number;
-	refresh?: boolean;
 }
 
 export interface OHLCVResponse {

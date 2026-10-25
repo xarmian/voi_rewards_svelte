@@ -71,29 +71,6 @@ export class OHLCVService {
 	}
 
 	/**
-	 * Refreshes price candles for a specific token pair and time range
-	 */
-	static async refreshPriceCandles(
-		baseTokenId: number,
-		quoteTokenId: number,
-		resolution: Resolution,
-		start: Date,
-		end: Date
-	): Promise<void> {
-		const { error } = await supabaseMimirClient.rpc('refresh_price_candles', {
-			p_base_token_id: baseTokenId,
-			p_quote_token_id: quoteTokenId,
-			p_resolution: resolution,
-			p_start: start.toISOString(),
-			p_end: end.toISOString()
-		});
-
-		if (error) {
-			throw new Error(`Failed to refresh price candles: ${error.message}`);
-		}
-	}
-
-	/**
 	 * Fetches OHLCV data from the database
 	 */
 	static async fetchOHLCVData(request: OHLCVRequest): Promise<OHLCVResponse> {
@@ -103,8 +80,7 @@ export class OHLCVService {
 			resolution,
 			start,
 			end,
-			limit = 500,
-			refresh = false
+			limit = 500
 		} = request;
 
 		// Calculate time range
@@ -112,11 +88,6 @@ export class OHLCVService {
 		const endTime = end || now;
 		const startTime =
 			start || new Date(endTime.getTime() - limit * this.getResolutionInterval(resolution) * 1000);
-
-		// Refresh candles if requested
-		if (refresh) {
-			await this.refreshPriceCandles(baseTokenId, quoteTokenId, resolution, startTime, endTime);
-		}
 
 		// Fetch candles from database
 		const { data, error } = await supabaseMimirClient

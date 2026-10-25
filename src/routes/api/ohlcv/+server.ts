@@ -37,7 +37,6 @@ export const GET: RequestHandler = async ({ url }) => {
 		const startParam = url.searchParams.get('start');
 		const endParam = url.searchParams.get('end');
 		const limitParam = url.searchParams.get('limit');
-		const refresh = url.searchParams.get('refresh') === 'true';
 
 		// Validate required parameters
 		if (isNaN(baseTokenId)) {
@@ -117,29 +116,6 @@ export const GET: RequestHandler = async ({ url }) => {
 				},
 				{ status: 400 }
 			);
-		}
-
-		// Refresh candles if requested
-		if (refresh) {
-			const baseIds = getEquivalentTokenIds(baseTokenId);
-			const quoteIds = getEquivalentTokenIds(finalQuoteTokenId);
-
-			// Refresh all combinations of base/quote token equivalents
-			for (const bId of baseIds) {
-				for (const qId of quoteIds) {
-					const { error: refreshError } = await supabaseMimirClient.rpc('refresh_price_candles', {
-						p_base_token_id: bId,
-						p_quote_token_id: qId,
-						p_resolution: resolution,
-						p_start: startTime.toISOString(),
-						p_end: endTime.toISOString()
-					});
-
-					if (refreshError) {
-						console.warn('Failed to refresh price candles:', refreshError);
-					}
-				}
-			}
 		}
 
 		// Fetch candles from MIMIR database
