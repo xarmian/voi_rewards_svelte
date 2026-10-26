@@ -48,7 +48,8 @@
 
 <script lang="ts">
 	import type { FungibleTokenType, LPToken, TokenApproval } from '$lib/types/assets';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
+	import { getProcessedIcon, iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import SendTokenModal from './SendTokenModal.svelte';
 	import OptOutModal from './OptOutModal.svelte';
 	import TokenTransfersModal from './TokenTransfersModal.svelte';
@@ -74,8 +75,8 @@
 	let creatorEnvoiName: string | null = null;
 	let totalSupply: number | null = null;
 	let creator: string | null = null;
-	let tokenImages = new Map<string, string>();
-	let failedTokenImages = new Set<string>();
+	let cardElement: HTMLDivElement;
+	let processedIcons: Record<string, string | null> = {};
 	let claimingApproval: string | null = null;
 	let claimingError: string | null = null;
 	let claimSuccess: boolean = false;
@@ -88,85 +89,52 @@
 		const tokenId = img.dataset.tokenId;
 		if (!tokenId) return;
 
-		// Add to failed set
-		failedTokenImages.add(tokenId);
+		markIconMissing(tokenId);
 
 		// Immediately set the fallback image
-		img.src = '/icons/default-token-image.svg';
+		if (img.getAttribute('src') !== '/icons/default-token-image.svg') {
+			img.src = '/icons/default-token-image.svg';
+		}
 	}
 
-	async function cacheTokenImage(tokenId: string) {
-		if (!tokenId || tokenImages.has(tokenId) || failedTokenImages.has(tokenId)) return;
+	onMount(() => {
+		let destroyed = false;
+		let started = false;
+		let observer: IntersectionObserver | undefined;
 
-		try {
-			const response = await fetch(`https://asset-verification.nautilus.sh/icons/${tokenId}.png`);
-			if (!response.ok) {
-				failedTokenImages.add(tokenId);
-				return;
+		function probeIcons() {
+			if (started || destroyed) return;
+			started = true;
+			observer?.disconnect();
+
+			const ids =
+				isLPToken(token) && token.poolInfo
+					? [token.poolInfo.tokAId, token.poolInfo.tokBId]
+					: [token.id];
+			for (const id of ids) {
+				getProcessedIcon(id).then((processed) => {
+					if (!destroyed && !isIconMissing(id)) processedIcons[id] = processed;
+				});
 			}
-
-			const blob = await response.blob();
-			const img = new Image();
-
-			img.onerror = () => {
-				failedTokenImages.add(tokenId);
-			};
-
-			img.onload = () => {
-				const canvas = document.createElement('canvas');
-				canvas.width = img.width;
-				canvas.height = img.height;
-				const ctx = canvas.getContext('2d');
-				if (!ctx) {
-					failedTokenImages.add(tokenId);
-					return;
-				}
-
-				// Draw the image
-				ctx.drawImage(img, 0, 0);
-
-				// Get the image data
-				const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-				const data = imageData.data;
-
-				// Convert white (or near-white) pixels to transparent
-				for (let i = 0; i < data.length; i += 4) {
-					const r = data[i];
-					const g = data[i + 1];
-					const b = data[i + 2];
-
-					// Check if the pixel is white or very close to white
-					if (r > 250 && g > 250 && b > 250) {
-						// Make it transparent
-						data[i + 3] = 0;
-					}
-				}
-
-				// Put the modified image data back
-				ctx.putImageData(imageData, 0, 0);
-
-				// Convert to base64
-				const base64 = canvas.toDataURL('image/png');
-				tokenImages.set(tokenId, base64);
-				tokenImages = tokenImages; // Trigger Svelte reactivity
-			};
-
-			img.src = URL.createObjectURL(blob);
-		} catch (error) {
-			console.error('Error caching token image:', error);
-			failedTokenImages.add(tokenId);
 		}
-	}
 
-	// Cache images when token changes
-	$: if (token) {
-		if (isLPToken(token) && token.poolInfo) {
-			cacheTokenImage(token.poolInfo.tokAId);
-			cacheTokenImage(token.poolInfo.tokBId);
+		if (typeof IntersectionObserver === 'undefined') {
+			probeIcons();
 		} else {
-			cacheTokenImage(token.id);
+			observer = new IntersectionObserver(
+				(entries) => {
+					if (entries.some((entry) => entry.isIntersecting)) probeIcons();
+				},
+				{ rootMargin: '200px' }
+			);
+			observer.observe(cardElement);
 		}
-	}
+
+		return () => {
+			destroyed = true;
+			observer?.disconnect();
+		};
+	});
 
 	async function fetchTokenDetails() {
 		try {
@@ -341,7 +309,7 @@
 	}
 </script>
 
-<div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
+<div bind:this={cardElement} class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
 	{#if canSignTransactions && token.balance === 0 && token.type !== 'arc200'}
 		<button
 			class="absolute top-7 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
@@ -362,26 +330,22 @@
 				<div class="relative w-16 h-16">
 					<div class="absolute top-0 left-0 w-12 h-12 rounded-lg backdrop-blur-sm">
 						<img
-							src={tokenImages.get(tokAId) ||
-								(tokAId === '390001'
-									? '/icons/voi-token.png'
-									: `https://asset-verification.nautilus.sh/icons/${tokAId === '302190' ? '395614' : tokAId}.png`)}
+							src={processedIcons[tokAId] ?? iconUrl(tokAId)}
 							alt={token.poolInfo.tokASymbol}
 							class="w-full h-full rounded-lg object-cover"
 							data-token-id={tokAId}
 							on:error={onImageError}
+							loading="lazy"
 						/>
 					</div>
 					<div class="absolute bottom-0 right-0 w-12 h-12 rounded-lg backdrop-blur-sm">
 						<img
-							src={tokenImages.get(tokBId) ||
-								(tokBId === '390001'
-									? '/icons/voi-token.png'
-									: `https://asset-verification.nautilus.sh/icons/${tokBId === '302190' ? '395614' : tokBId}.png`)}
+							src={processedIcons[tokBId] ?? iconUrl(tokBId)}
 							alt={token.poolInfo.tokBSymbol}
 							class="w-full h-full rounded-lg object-cover"
 							data-token-id={tokBId}
 							on:error={onImageError}
+							loading="lazy"
 						/>
 					</div>
 				</div>
@@ -389,14 +353,12 @@
 				<div class="relative w-16 h-16">
 					<div class="w-full h-full rounded-lg backdrop-blur-sm">
 						<img
-							src={tokenImages.get(token.id) ||
-								(token.id === '390001'
-									? '/icons/voi-token.png'
-									: `https://asset-verification.nautilus.sh/icons/${token.id === '302190' ? '395614' : token.id}.png`)}
+							src={processedIcons[token.id] ?? iconUrl(token.id)}
 							alt={token.name}
 							class="w-full h-full rounded-lg object-cover"
 							data-token-id={token.id}
 							on:error={onImageError}
+							loading="lazy"
 						/>
 					</div>
 				</div>
