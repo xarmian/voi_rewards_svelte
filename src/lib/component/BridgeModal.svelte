@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Modal } from 'flowbite-svelte';
 	import { createEventDispatcher, onDestroy } from 'svelte';
 	import { selectedWallet, signTransactions, connectedWallets } from 'avm-wallet-svelte';
@@ -624,16 +625,16 @@
 
 		isLoadingBalance = true;
 		try {
-			const accountInfo = await algodClient.accountInformation(address).do();
+			const accountInfo = await requireAccountInfo(address, { force: true });
 			if (selectedToken.voiAssetId === '0') {
 				// For VOI token
-				voiBalance = accountInfo.amount / 1e6;
+				voiBalance = (accountInfo.amount as number) / 1e6;
 			} else {
 				// For ASAs
 				const asset = accountInfo['assets']?.find(
 					(a: any) => a['asset-id'].toString() === selectedToken.voiAssetId
 				);
-				voiBalance = asset ? asset.amount / 1e6 : 0;
+				voiBalance = asset ? (asset.amount as number) / 1e6 : 0;
 			}
 		} catch (error) {
 			console.error('Error fetching balance:', error);

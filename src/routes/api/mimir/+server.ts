@@ -1,11 +1,8 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import { json } from '@sveltejs/kit';
 import { validateMimirParams } from '$lib/server/validate';
 import type { RequestEvent } from './$types';
-
-const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
 export async function GET({ url }: RequestEvent) {
 	try {

@@ -7,7 +7,7 @@
 	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { dataTable } from '../../stores/dataTable';
 	import { getTokensByEpoch, decodeGlobalState } from '$lib/utils';
-	import { getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
+	import { getSupplyInfo, getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import { config } from '$lib/config';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -57,7 +57,6 @@
 		'confirmed-round': number;
 	}
 
-	//let poolData: Map<string, any> = new Map();
 	let asaTokens: ASAToken[] = [];
 
 	// Placeholder data for fungible tokens
@@ -221,7 +220,6 @@
 			await Promise.all([
 				fetchAccountDetails(),
 				fetchVoiPrice()
-				//fetchPoolData() // Fetch pool data early as it's used by token fetching
 			]);
 			if (walletAddress !== requestedWallet) return;
 			isLoadingPortfolio = false;
@@ -295,7 +293,7 @@
 		try {
 			// Fetch account information
 			const accountIndexerInfo = await algodIndexer.lookupAccountByID(walletAddress).do();
-			const account = await algodClient.accountInformation(walletAddress).do();
+			const account = await requireAccountInfo(walletAddress);
 			accountBalance = accountIndexerInfo.account.amount;
 			accountStatus = accountIndexerInfo.account.status || 'Offline';
 			minBalance = accountIndexerInfo.account['min-balance'] || 0;
@@ -305,38 +303,15 @@
 
 			// Calculate vote key expiry if account is online
 			if (accountStatus === 'Online' && account.participation) {
-				const currentRound = account.round;
-				const lastValidRound = account.participation['vote-last-valid'];
+				const currentRound = account.round as number;
+				const lastValidRound = (account.participation as unknown as Record<string, number>)[
+					'vote-last-valid'
+				];
 				voteKeyExpiry = (lastValidRound - currentRound) * 3.3; // 3.3 seconds per block
 				voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
 			}
 
 			// Fetch ASA tokens
-			/*asaTokens = (accountIndexerInfo.account.assets || []).map((asset: any) => ({
-                assetId: asset['asset-id'],
-                amount: asset.amount,
-                creator: asset.creator,
-                frozen: asset['is-frozen'],
-            }));
-
-            // Fetch ASA token details
-            asaDetails = await Promise.all(
-                asaTokens.map(async (asa) => {
-                    const details = await algodClient.getAssetByID(asa.assetId).do();
-                    const value = (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount) / Math.pow(10, details.params.decimals);
-                    return {
-                        id: asa.assetId,
-                        creator: asa.creator,
-                        frozen: asa.frozen,
-                        name: details.params.name ?? (Buffer.from(details.params['name-b64'], 'base64').toString('utf8') ?? ''),
-                        unitName: details.params['unit-name'] ?? (Buffer.from(details.params['unit-name-b64'], 'base64').toString('utf8') ?? ''),
-                        decimals: details.params.decimals,
-                        value: (asa.assetId === 302190 && $voiPrice.price > 0 ? value / $voiPrice.price : 0),
-                        poolId: (asa.assetId === 302190 ? 395553 : undefined),
-                        amount: (details.params.creator === walletAddress ? details.params.total - asa.amount : asa.amount)
-                    };
-                })
-            );*/
 
 			const block = await algodIndexer
 				.lookupBlock(accountIndexerInfo.account['created-at-round'])
@@ -1213,7 +1188,6 @@
 			{:else}
 				{#each fungibleTokens.filter((token) => {
 					// Only show tokens with balance if showZeroBalances is false
-					//if (!showZeroBalances && token.value <= 1) return false;
 					// Must be an LP token
 					if (!isLPToken(token)) return false;
 					// Get unique identifier based on token ID and provider

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { getLockContractByAddress } from '$lib/services/lockvest';
 	import { fade } from 'svelte/transition';
 	import { algodClient } from '$lib/utils/algod';
@@ -188,8 +189,8 @@
 			const appInfo = await algodClient.getApplicationByID(contractId).do();
 
 			// Get current balance from the contract address
-			const accountInfo = await algodClient.accountInformation(address).do();
-			currentBalance = accountInfo.amount;
+			const accountInfo = await requireAccountInfo(address, { force: true });
+			currentBalance = accountInfo.amount as number;
 
 			// Decode the global state
 			contractData = decodeState(appInfo.params['global-state']);
@@ -289,7 +290,7 @@
 					}
 
 					// Calculate available withdrawal amount considering minimum balance
-					const minimumBalance = accountInfo['min-balance'];
+					const minimumBalance = (accountInfo as unknown as Record<string, number>)['min-balance'];
 					availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
 				}
 			}

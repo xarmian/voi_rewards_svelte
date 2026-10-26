@@ -7,7 +7,6 @@
 	import TokenCard from '$lib/component/ui/TokenCard.svelte';
 	import BreadcrumbCustom from '$lib/component/ui/BreadcrumbCustom.svelte';
 	//@ts-ignore
-	// import { mp as Contract } from 'ulujs';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 
 	export let data: PageData;
@@ -19,37 +18,6 @@
 	onMount(() => {
 		getTokens();
 	});
-
-	/*const getMarketplaceData = async (token: Token) => {
-        if (token.approved == zeroAddress || token.approved == token.owner) return null;
-        console.log(token);
-
-        try {
-            // Search for transactions involving the escrow account
-            let transactions = await algodIndexer.searchForTransactions().address(token.approved).txType('appl').do();
-            let contractId = null;
-            console.log(transactions);
-
-            for(let tx of transactions.transactions) {
-                if (tx['tx-type'] === 'appl') {
-                    console.log(`Found application call transaction: ${tx.id}`);
-                    console.log(`Application ID involved: ${tx['application-transaction']['application-id']}`);
-                    contractId = tx['application-transaction']['application-id'];
-                    break;
-                }
-            }
-
-            if (contractId == null) return null;
-
-            const ctc = new Contract(contractId,algodClient,algodIndexer);
-            const escrowData = await ctc.getEvents();
-            console.log(escrowData);
-
-        } catch (error) {
-            console.error('Error searching transactions:', error);
-        }
-        return null;
-    }*/
 
 	const getTokens = async () => {
 		if (contractId) {
@@ -68,34 +36,17 @@
 							metadata: metadata,
 							mintRound: token['mint-round'],
 							approved: token.approved
-							//marketId: token.marketId,
 						};
 					});
 					collectionName = tokens[0].metadata.name.replace(/[1#]/g, '');
 
 					// for each token in tokens, get the marketplace data
-					/*for (let token of tokens) {
-                        let mpData = await getMarketplaceData(token);
-                        if (mpData) break;
-                    }*/
 
 					tokens = tokens;
 				}
 			} catch (err) {
 				console.error(err);
 			}
-
-			/*try {
-                const nfd = await getNFD([walletId]); // nfd is array of objects with key = owner, replacementValue = nfd
-                const nfdObj: any = nfd.find((n: any) => n.key === walletId);
-                if (nfdObj) {
-                    walletNFD = nfdObj.replacementValue;
-                }
-
-            }
-            catch(err) {
-                console.error(err);
-            }*/
 		}
 	};
 </script>

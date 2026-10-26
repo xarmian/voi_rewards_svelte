@@ -1,15 +1,11 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import {
 	fetchPoolAggregates,
 	tokenMetricsOrUnavailable,
 	type PoolAggregate
 } from '$lib/server/poolAggregates';
-
-// Create MIMIR client for dex swap data
-const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
 interface TokenEquivalents {
 	tokenId: number;

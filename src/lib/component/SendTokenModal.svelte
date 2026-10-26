@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { requireAccountInfo } from '$lib/stores/accounts';
+	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
@@ -63,7 +65,8 @@
 	export let onTokenSent: () => void;
 
 	let selectedToken = token;
-	let tokenImages = new Map<string, string>();
+	let missingIconIds = new Set<string>();
+	$: selectedIconId = isNativeToken(selectedToken) ? '0' : String(selectedToken.id ?? '');
 	let isInitialLoad = true;
 	let notice: string | null = null;
 
@@ -83,20 +86,18 @@
 	// Fetch VOI balance only on initial modal open
 	$: if (open && $selectedWallet?.address && isInitialLoad) {
 		isInitialLoad = false;
-		algodClient
-			.accountInformation($selectedWallet.address)
-			.do()
+		requireAccountInfo($selectedWallet.address, { force: true })
 			.then((info) => {
 				nativeVoiToken = {
 					...nativeVoiToken,
-					balance: info.amount,
-					value: info.amount / 1e6
+					balance: info.amount as number,
+					value: (info.amount as number) / 1e6
 				};
 				// If the selected token is native VOI, update it too
 				if (isNativeToken(selectedToken)) {
 					selectedToken = {
 						...selectedToken,
-						balance: info.amount
+						balance: info.amount as number
 					};
 				}
 				// Force Svelte reactivity for available tokens
@@ -110,38 +111,10 @@
 		isInitialLoad = true;
 	}
 
-	// Cache token images
-	async function cacheTokenImage(token: FungibleTokenType) {
-		const tokenId = token.id;
-		if (!tokenId || tokenImages.has(tokenId)) return;
-
-		try {
-			const response = await fetch(`https://asset-verification.nautilus.sh/icons/${tokenId}.png`);
-			if (!response.ok) return;
-
-			const blob = await response.blob();
-			const reader = new FileReader();
-			reader.onloadend = () => {
-				tokenImages.set(tokenId, reader.result as string);
-				tokenImages = tokenImages; // Trigger Svelte reactivity
-			};
-			reader.readAsDataURL(blob);
-		} catch (error) {
-			console.error('Error caching token image:', error);
-		}
-	}
-
-	// Cache images for all tokens
-	$: {
-		availableTokens.forEach((token) => {
-			cacheTokenImage(token);
-		});
-	}
-
-	// Initialize VOI image immediately
-	$: if (open) {
-		tokenImages.set('0', `https://asset-verification.nautilus.sh/icons/0.png`);
-		tokenImages = tokenImages;
+	function onIconError(tokenId: string) {
+		markIconMissing(tokenId);
+		missingIconIds.add(tokenId);
+		missingIconIds = missingIconIds;
 	}
 
 	// Update the selected token when the token prop changes
@@ -244,7 +217,7 @@
 			let block;
 			try {
 				[accountInfo, block] = await Promise.all([
-					algodClient.accountInformation(address).do(),
+					requireAccountInfo(address, { force: true }),
 					algodIndexer
 						.lookupAccountByID(address)
 						.do()
@@ -281,7 +254,7 @@
 			}
 
 			recipients[index].info = {
-				balance: accountInfo.amount,
+				balance: accountInfo.amount as number,
 				createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
 				hasOptedIn,
 				assetBalance
@@ -961,11 +934,12 @@
 							class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2"
 							on:click={() => (showTokenSelect = !showTokenSelect)}
 						>
-							{#if (selectedToken.id && tokenImages.has(selectedToken.id)) || isNativeToken(selectedToken)}
+							{#if selectedIconId && !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
 								<img
 									src={isNativeToken(selectedToken)
 										? 'https://asset-verification.nautilus.sh/icons/0.png'
-										: tokenImages.get(selectedToken.id ?? '')!}
+										: iconUrl(selectedIconId)}
+									on:error={() => onIconError(selectedIconId)}
 									alt=""
 									class="w-4 h-4 rounded-full bg-transparent"
 								/>
@@ -982,6 +956,7 @@
 								class="absolute left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto"
 							>
 								{#each availableTokens as token (token.id ?? '0')}
+									{@const iconId = isNativeToken(token) ? '0' : String(token.id ?? '')}
 									<button
 										class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
 										on:click={() => {
@@ -989,11 +964,12 @@
 											showTokenSelect = false;
 										}}
 									>
-										{#if (token.id && tokenImages.has(token.id)) || isNativeToken(token)}
+										{#if iconId && !missingIconIds.has(iconId) && !isIconMissing(iconId)}
 											<img
 												src={isNativeToken(token)
 													? 'https://asset-verification.nautilus.sh/icons/0.png'
-													: tokenImages.get(token.id)!}
+													: iconUrl(iconId)}
+												on:error={() => onIconError(iconId)}
 												alt=""
 												class="w-4 h-4 rounded-full bg-transparent"
 											/>
@@ -1010,11 +986,12 @@
 				<div
 					class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto"
 				>
-					{#if (selectedToken.id && tokenImages.has(selectedToken.id)) || isNativeToken(selectedToken)}
+					{#if selectedIconId && !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
 						<img
 							src={isNativeToken(selectedToken)
 								? 'https://asset-verification.nautilus.sh/icons/0.png'
-								: tokenImages.get(selectedToken.id ?? '')!}
+								: iconUrl(selectedIconId)}
+							on:error={() => onIconError(selectedIconId)}
 							alt=""
 							class="h-8 sm:h-12 rounded-full bg-transparent"
 						/>

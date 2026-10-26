@@ -1,12 +1,8 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { pgrstQuote, validateTokenSearch } from '$lib/server/validate';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import type { PoolCatalog } from '$lib/types/ohlcv.types';
-
-// Create MIMIR client for OHLCV data
-const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
 export interface UniqueToken {
 	id: number;

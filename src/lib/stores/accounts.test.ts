@@ -8,6 +8,7 @@ import {
 	getAccountInfo,
 	getConsensusInfo,
 	getSupplyInfo,
+	requireAccountInfo,
 	supply
 } from './accounts';
 
@@ -19,7 +20,6 @@ vi.mock('$lib/utils/algod', () => ({
 	}
 }));
 vi.mock('$lib/config', () => ({ config: { proposalApiBaseUrl: 'https://test.invalid' } }));
-vi.mock('$lib/utils/nfd', () => ({ getNFD: vi.fn() }));
 
 beforeEach(() => {
 	clearCaches();
@@ -39,6 +39,36 @@ afterEach(() => {
 	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
+});
+
+it('requireAccountInfo returns and caches the account and publishes it to the store', async () => {
+	const account = await requireAccountInfo('X');
+	expect(account).toEqual({ amount: 100 });
+	expect(get(accountInfo).X).toBe(account);
+	expect(await getAccountInfo('X')).toBe(account);
+	expect(mocks.account).toHaveBeenCalledExactlyOnceWith('X');
+});
+
+it.each(['empty', 'expired', 'forced'])(
+	'requireAccountInfo propagates algod failure (%s cache)',
+	async (state) => {
+		const previous = state === 'empty' ? undefined : await getAccountInfo('X');
+		if (state === 'expired') vi.setSystemTime(1000 + ACCOUNT_CACHE_TTL.account);
+		const error = new Error('offline');
+		mocks.account.mockReturnValueOnce({ do: vi.fn().mockRejectedValue(error) });
+		await expect(requireAccountInfo('X', { force: state === 'forced' })).rejects.toBe(error);
+		expect(get(accountInfo).X).toBe(previous);
+	}
+);
+
+it('requireAccountInfo with force fetches again and publishes the new account', async () => {
+	await getAccountInfo('X');
+	mocks.account.mockReturnValueOnce({ do: vi.fn().mockResolvedValue({ amount: 200 }) });
+	const account = await requireAccountInfo('X', { force: true });
+	expect(account).toEqual({ amount: 200 });
+	expect(get(accountInfo).X).toBe(account);
+	expect(await getAccountInfo('X')).toBe(account);
+	expect(mocks.account).toHaveBeenCalledTimes(2);
 });
 
 it('TASK-30 shares concurrent account lookups and updates the store', async () => {
