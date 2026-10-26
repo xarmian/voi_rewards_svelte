@@ -281,11 +281,13 @@
 		{#if !hideSubmitButton}
 			<button
 				type="button"
+				aria-label="Search wallet"
 				on:click={() => handleSubmit()}
 				class="wallet-submit bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg"
 			>
+				<!-- Font Awesome's later .sr-only beats sm:not-sr-only (TASK-39), so the name comes from aria-label -->
 				<SearchOutline class="block sm:hidden" />
-				<span class="sr-only sm:not-sr-only">Search wallet</span>
+				<span class="hidden sm:block">Search wallet</span>
 			</button>
 		{/if}
 	</div>
