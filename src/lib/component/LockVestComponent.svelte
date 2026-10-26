@@ -2,7 +2,7 @@
 	import LockContract from './LockContract.svelte';
 
 	import { algodClient } from '$lib/utils/algod';
-	import * as algosdk from 'algosdk';
+	import { decodeLockContractState } from '$lib/chain/lockContract';
 	import WithdrawModal from './WithdrawModal.svelte';
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
 	import { getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
@@ -24,77 +24,6 @@
 	let showRegisterVoteKey = false;
 	let consensusData: { [key: string]: any } = {};
 
-	function decodeState(state: any, address: string): ContractDetails {
-		const result: any = {
-			contractAddress: address,
-			contractId: 0
-		};
-
-		// Helper to decode addresses
-		const decodeAddress = (bytes: Uint8Array): string => {
-			return algosdk.encodeAddress(bytes);
-		};
-
-		// Helper to decode numbers
-		const decodeNumber = (value: any): number => {
-			if (value.type === 2) {
-				// uint
-				return value.uint;
-			}
-			// If it's bytes, decode as uint64
-			return Number(algosdk.decodeUint64(Buffer.from(value.bytes, 'base64'), 'safe'));
-		};
-
-		// Helper to decode big numbers as strings
-		const decodeBigNumber = (value: any): string => {
-			if (value.type === 2) {
-				// uint
-				return value.uint.toString();
-			}
-			// If it's bytes, decode as uint64
-			return algosdk.decodeUint64(Buffer.from(value.bytes, 'base64'), 'safe').toString();
-		};
-
-		// Map of key to decode function
-		const decoders: { [key: string]: (value: any) => any } = {
-			deployer: (v) => decodeAddress(Buffer.from(v.bytes, 'base64')),
-			delegate: (v) => decodeAddress(Buffer.from(v.bytes, 'base64')),
-			deadline: decodeNumber,
-			distribution_count: decodeNumber,
-			distribution_seconds: decodeNumber,
-			funder: (v) => decodeAddress(Buffer.from(v.bytes, 'base64')),
-			funding: decodeBigNumber,
-			initial: decodeBigNumber,
-			lockup_delay: decodeNumber,
-			messenger_id: decodeNumber,
-			owner: (v) => decodeAddress(Buffer.from(v.bytes, 'base64')),
-			parent_id: decodeNumber,
-			period: decodeNumber,
-			period_limit: decodeNumber,
-			period_seconds: decodeNumber,
-			total: decodeBigNumber,
-			vesting_delay: decodeNumber
-		};
-
-		// Decode each state value
-		for (const item of state) {
-			const key = Buffer.from(item.key, 'base64').toString();
-
-			// Get the appropriate decoder
-			const decoder = decoders[key];
-			if (decoder) {
-				try {
-					// Add the global_ prefix to match our interface
-					result[`global_${key}`] = decoder(item.value);
-				} catch (err) {
-					console.error(`Error decoding ${key}:`, err, item.value);
-				}
-			}
-		}
-
-		return result;
-	}
-
 	async function loadContractDetails() {
 		isLoading = true;
 		error = null;
@@ -109,7 +38,10 @@
 					const currentBalance = accountInfo.amount as number;
 
 					// Decode the global state
-					const decodedState = decodeState(appInfo.params['global-state'], account.address);
+					const decodedState = decodeLockContractState(
+						appInfo.params['global-state'],
+						account.address
+					);
 
 					// Calculate periods and balances
 					const now = Math.floor(Date.now() / 1000);

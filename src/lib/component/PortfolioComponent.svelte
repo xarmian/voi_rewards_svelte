@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import PortfolioSectionNFT from './PortfolioSectionNFT.svelte';
 	import FungibleToken from './FungibleToken.svelte';
 	import ClaimableTokenCard from './ClaimableTokenCard.svelte';
@@ -43,11 +44,6 @@
 	let canSignTransactions = false;
 	let totalValue: number = 0;
 	let totalUsdValue = 0;
-
-	const rewardsAddress: string[] = [
-		'62TIVJSZOS4DRSSYYDDZELQAGFYQC5JWKCHRBPPYKTZN2OOOXTGLB5ZJ4E',
-		'CAGQDUFUPI6WAQCIQZHPHMX2Z7KACAKZWOMI4R72JV24U4AVAJTGCHA2BE'
-	];
 
 	interface Transaction {
 		'payment-transaction'?: {
@@ -267,7 +263,7 @@
 
 		try {
 			// Fetch all rewards transactions
-			const rewardsPromises = rewardsAddress.map((address) =>
+			const rewardsPromises = REWARDS_ADDRESSES.map((address) =>
 				algodIndexer
 					.searchForTransactions()
 					.address(walletAddress)
@@ -350,15 +346,13 @@
 					const epochData = snapshots.find((e: any) => e.start_date === formattedDate);
 					if (!epochData) return null;
 
-					const communityBlocks = epochData.total_blocks ?? 0;
-					const totalBlocksProduced = Math.round(
-						date.epoch >= 62
-							? communityBlocks
-							: communityBlocks + Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)
-					);
-					const userBlocksProduced = epochData.proposers[walletAddress] ?? 0;
 					const tokens = await getTokensByEpoch(date.epoch);
-					const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
+					const { totalBlocksProduced, userBlocksProduced, expectedReward } = calculateEpochRewards(
+						epochData,
+						date.epoch,
+						epochData.proposers[walletAddress],
+						tokens
+					);
 
 					return {
 						epoch: date.epoch,
