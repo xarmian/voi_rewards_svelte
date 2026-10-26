@@ -6,6 +6,7 @@
 	let {
 		values,
 		label,
+		decorative = false,
 		height = 44,
 		area = true,
 		tone = 'accent',
@@ -15,6 +16,8 @@
 	}: {
 		values: number[];
 		label: string;
+		/** Hide the SVG when its parent supplies the trend's accessible text. */
+		decorative?: boolean;
 		height?: number;
 		area?: boolean;
 		tone?: 'accent' | 'hi' | 'ok';
@@ -51,10 +54,11 @@
 			class="w-full"
 			{height}
 			viewBox="0 0 {width} {height}"
-			role="img"
-			aria-label="{label}: from {compact(finiteValues[0])} to {compact(
-				finiteValues[finiteValues.length - 1]
-			)}"
+			aria-hidden={decorative ? 'true' : undefined}
+			role={decorative ? undefined : 'img'}
+			aria-label={decorative
+				? undefined
+				: `${label}: from ${compact(finiteValues[0])} to ${compact(finiteValues[finiteValues.length - 1])}`}
 			focusable="false"
 		>
 			{#if area}<path d={geometry.area} class="fill-accent-soft" />{/if}

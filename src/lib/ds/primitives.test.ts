@@ -9,6 +9,7 @@ import type { DataState } from './types';
 const children = createRawSnippet(() => ({ render: () => '<p>Card content</p>' }));
 
 // SSR text in reading order, omitting decorative subtrees (including nested markup).
+// These text checks approximate accessible names; the seat verifies computed names in Chrome.
 function contentText(html: string): string {
 	const hidden: boolean[] = [];
 	let text = '';
@@ -71,6 +72,21 @@ describe('data states', () => {
 });
 
 describe('StatTile', () => {
+	for (const href of [undefined, '/ds']) {
+		test(`${href ? 'linked' : 'unlinked'} value and unit have a real space in text content`, () => {
+			const html = render(StatTile, {
+				props: {
+					label: 'Online stake',
+					value: '725.24M',
+					unit: 'VOI',
+					detail: '152 online accounts',
+					href
+				}
+			}).body;
+			assert.equal(contentText(html), 'Online stake 725.24M VOI 152 online accounts');
+		});
+	}
+
 	test('unlinked tiles with matching labels render no description IDs', () => {
 		const props = {
 			label: 'Epoch',
@@ -110,32 +126,75 @@ describe('StatTile', () => {
 			assert.doesNotMatch(link[0], /aria-label(?:ledby)?=|aria-describedby=/);
 			assert.doesNotMatch(html, /\bid=|aria-describedby=/);
 			const text = contentText(html);
-			assert.match(text, /^Epoch 59\s*% Epoch estimate up 0\.71% 24h/);
+			assert.match(text, /^Epoch 59 % Epoch estimate up 0\.71% 24h Epoch progress: 59 of 100/);
 			if (state === 'stale') {
-				assert.match(text, /up 0\.71% 24h as of /);
+				assert.match(text, /Epoch progress: 59 of 100 as of /);
 				assert.match(html, /<span aria-hidden="true">!<\/span>/);
 			} else assert.doesNotMatch(text, /as of /);
-			assert.doesNotMatch(text, /◆|●|!|\+0\.71%|Epoch progress/);
+			assert.doesNotMatch(text, /◆|●|!|\+0\.71%/);
 			assert.match(html, /<span\b[^>]*aria-hidden="true"[^>]*>◆<\/span>/);
 		});
 	}
 
 	for (const href of [undefined, '/ds']) {
-		test(`${href ? 'linked' : 'unlinked'} progressbar has no text or sibling description`, () => {
+		test(`${href ? 'linked progress is hidden with spoken totals' : 'unlinked progress keeps progressbar semantics without text'}`, () => {
 			const html = render(StatTile, {
 				props: {
-					label: 'Epoch',
-					value: '59%',
+					label: 'Blocks this epoch',
+					value: '126,874',
+					detail: '216,074 projected · Epoch 104',
 					href,
-					progress: { value: 59, max: 100, label: 'Epoch progress' }
+					progress: { value: 126874, max: 216074, label: 'Blocks against epoch projection' }
 				}
 			}).body.replace(/<!--[\s\S]*?-->/g, '');
-			const progressbar = /<div\b[^>]*role="progressbar"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/.exec(
-				html
-			);
+			const progressbar =
+				/<div\b[^>]*class="mt-3 h-2 rounded-full bg-grid"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/.exec(
+					html
+				);
 			assert.ok(progressbar);
 			assert.equal(progressbar[1].replace(/<[^>]*>/g, '').trim(), '');
-			assert.doesNotMatch(html, /<span[^>]*class="sr-only"[^>]*>Epoch progress/);
+			if (href) {
+				assert.match(progressbar[0], /aria-hidden="true"/);
+				assert.doesNotMatch(progressbar[0], /\brole=|aria-value(?:now|min|max)=|aria-label=/);
+				assert.match(
+					html,
+					/<span class="sr-only">Blocks against epoch projection: 126,874 of 216,074<\/span>/
+				);
+				assert.equal(
+					contentText(html),
+					'Blocks this epoch 126,874 216,074 projected · Epoch 104 Blocks against epoch projection: 126,874 of 216,074'
+				);
+			} else {
+				assert.match(progressbar[0], /role="progressbar"/);
+				assert.doesNotMatch(progressbar[0], /aria-hidden=/);
+				assert.doesNotMatch(html, /class="sr-only"/);
+			}
+		});
+	}
+
+	for (const href of [undefined, '/ds']) {
+		test(`${href ? 'linked trend is decorative with spoken endpoints' : 'unlinked trend keeps its full image label'}`, () => {
+			const html = render(StatTile, {
+				props: {
+					label: 'Staking APR',
+					value: '16.04%',
+					trend: [NaN, 18.99, 17, 16.04, Infinity],
+					href
+				}
+			}).body;
+			const svg = /<svg\b[^>]*>/.exec(html);
+			assert.ok(svg);
+			if (href) {
+				assert.match(svg[0], /aria-hidden="true"/);
+				assert.doesNotMatch(svg[0], /\brole=|aria-label=/);
+				assert.match(html, /<span class="sr-only">trend from 18.99 to 16.04<\/span>/);
+				assert.equal(contentText(html), 'Staking APR 16.04% trend from 18.99 to 16.04');
+			} else {
+				assert.match(svg[0], /role="img"/);
+				assert.match(svg[0], /aria-label="Staking APR: from 18.99 to 16.04"/);
+				assert.doesNotMatch(svg[0], /aria-hidden=/);
+				assert.doesNotMatch(html, /class="sr-only"/);
+			}
 		});
 	}
 

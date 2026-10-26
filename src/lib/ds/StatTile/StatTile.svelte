@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { ago, MISSING, pct } from '../format';
+	import { ago, comma, compact, MISSING, pct } from '../format';
 	import type { DataState } from '../types';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import Sparkline from '../Sparkline/Sparkline.svelte';
@@ -36,6 +36,7 @@
 	let linked = $derived(Boolean(href) && state !== 'loading' && state !== 'error');
 	let shownValue = $derived(state === 'empty' ? MISSING : value);
 	let hasValue = $derived(shownValue !== MISSING);
+	let finiteTrend = $derived(trend?.filter(Number.isFinite) ?? []);
 	let progressMax = $derived(progress ? Math.max(0, progress.max) : 0);
 	let progressValue = $derived(progress ? Math.min(progressMax, Math.max(0, progress.value)) : 0);
 	let changePercent = $derived(
@@ -70,10 +71,13 @@
 	{:else if state === 'error'}
 		<InlineAlert message="Unable to load {label}." {onretry} />
 	{:else}
+		<!-- The sr-only space before the unit preserves the existing visual margin. -->
 		<p class="num break-words text-stat">
 			{#if hasValue}{shownValue}{:else}<span aria-hidden="true">{shownValue}</span><span
 					class="sr-only">no data</span
-				>{/if}{#if hasValue && unit}<span class="ml-1 text-label text-ink-muted">{unit}</span>{/if}
+				>{/if}{#if hasValue && unit}<span class="sr-only">{' '}</span><span
+					class="ml-1 text-label text-ink-muted">{unit}</span
+				>{/if}
 		</p>
 		{#if hasValue}
 			{#if detail}<div class="mt-2 text-label text-ink-muted">
@@ -94,20 +98,31 @@
 								: '−'}{changePercent} {change.label}"
 					/>
 				</div>{/if}
-			{#if trend}<div class="mt-3"><Sparkline values={trend} {label} /></div>{/if}
+			{#if trend}<div class="mt-3">
+					<Sparkline values={trend} {label} decorative={linked} />
+					{#if linked && finiteTrend.length > 0}<span class="sr-only"
+							>trend from {compact(finiteTrend[0])} to {compact(
+								finiteTrend[finiteTrend.length - 1]
+							)}</span
+						>{/if}
+				</div>{/if}
 			{#if progress}<div
 					class="mt-3 h-2 rounded-full bg-grid"
-					role="progressbar"
-					aria-valuenow={progressValue}
-					aria-valuemin="0"
-					aria-valuemax={progressMax}
-					aria-label={progress.label}
+					aria-hidden={linked ? 'true' : undefined}
+					role={linked ? undefined : 'progressbar'}
+					aria-valuenow={linked ? undefined : progressValue}
+					aria-valuemin={linked ? undefined : 0}
+					aria-valuemax={linked ? undefined : progressMax}
+					aria-label={linked ? undefined : progress.label}
 				>
 					<div
 						class="h-full rounded-full bg-bar"
 						style:width={`${progressMax > 0 ? (progressValue / progressMax) * 100 : 0}%`}
 					></div>
-				</div>{/if}
+				</div>
+				{#if linked}<span class="sr-only"
+						>{progress.label}: {comma(progressValue)} of {comma(progressMax)}</span
+					>{/if}{/if}
 		{/if}
 		{#if state === 'stale'}<p class="mt-2 text-label text-warn">
 				<span aria-hidden="true">!</span> as of {ago(asOf)}
