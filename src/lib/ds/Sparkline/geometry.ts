@@ -2,6 +2,7 @@ import { scaleLinear } from 'd3-scale';
 import { area, curveMonotoneX, line } from 'd3-shape';
 
 export function sparklinePath(values: number[], width: number, height: number, padding: number) {
+	values = values.filter(Number.isFinite);
 	if (!values.length) return { line: '', area: '', end: null };
 	const x = scaleLinear()
 		.domain([0, Math.max(1, values.length - 1)])

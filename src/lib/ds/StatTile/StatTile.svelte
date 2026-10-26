@@ -2,11 +2,13 @@
 	import type { Snippet } from 'svelte';
 	import { ago, MISSING, pct } from '../format';
 	import type { DataState } from '../types';
+	import { slug } from '../slug';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import Sparkline from '../Sparkline/Sparkline.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
 	let {
 		label,
+		id,
 		icon,
 		value,
 		unit,
@@ -20,6 +22,8 @@
 		asOf
 	}: {
 		label: string;
+		/** Keep labels unique on a page, or supply an explicit ID for descriptions. */
+		id?: string;
 		icon?: string;
 		value: string;
 		unit?: string;
@@ -38,12 +42,32 @@
 	let hasValue = $derived(shownValue !== MISSING);
 	let progressMax = $derived(progress ? Math.max(0, progress.max) : 0);
 	let progressValue = $derived(progress ? Math.min(progressMax, Math.max(0, progress.value)) : 0);
+	let changePercent = $derived(
+		change && Number.isFinite(change.value) ? pct(Math.abs(change.value)) : undefined
+	);
+	let changeDirection = $derived(changePercent === pct(0) ? 0 : (change?.value ?? 0) > 0 ? 1 : -1);
+	let descriptionId = $derived(`${id ?? `ds-stat-${slug(label)}`}-desc`);
+	let describedBy = $derived(
+		[
+			hasValue && detail ? `${descriptionId}-detail` : undefined,
+			hasValue && changePercent ? `${descriptionId}-change` : undefined,
+			hasValue && progress ? `${descriptionId}-progress` : undefined,
+			state === 'stale' ? `${descriptionId}-stale` : undefined
+		]
+			.filter(Boolean)
+			.join(' ') || undefined
+	);
 </script>
 
 <svelte:element
 	this={linked ? 'a' : 'div'}
 	href={linked ? href : undefined}
-	aria-label={linked ? `${label}: ${shownValue} ${unit ?? ''}`.trim() : undefined}
+	aria-label={linked
+		? hasValue
+			? `${label}: ${shownValue} ${unit ?? ''}`.trim()
+			: `${label}: no data`
+		: undefined}
+	aria-describedby={linked ? describedBy : undefined}
 	aria-busy={state === 'loading' ? 'true' : undefined}
 	class="block min-w-0 rounded-card border border-line bg-surface p-card text-ink shadow-card {linked
 		? 'hover:ring-2 hover:ring-accent focus-visible:ring-2 focus-visible:ring-accent'
@@ -71,16 +95,22 @@
 			{shownValue}{#if unit}<span class="ml-1 text-label text-ink-muted">{unit}</span>{/if}
 		</p>
 		{#if hasValue}
-			{#if detail}<div class="mt-2 text-label text-ink-muted">
+			{#if detail}<div id={`${descriptionId}-detail`} class="mt-2 text-label text-ink-muted">
 					{#if typeof detail === 'string'}{detail}{:else}{@render detail()}{/if}
 				</div>{/if}
-			{#if change}<div class="mt-2">
+			{#if change && changePercent}<div id={`${descriptionId}-change`} class="mt-2">
 					<StatusPill
-						tone={change.value >= 0 ? 'ok' : 'danger'}
-						label="{change.value >= 0 ? 'up' : 'down'} {pct(Math.abs(change.value))} {change.label}"
-						visualLabel="{change.value >= 0 ? '+' : '−'}{pct(
-							Math.abs(change.value)
-						)} {change.label}"
+						tone={changeDirection === 0 ? 'neutral' : changeDirection > 0 ? 'ok' : 'danger'}
+						label="{changeDirection === 0
+							? 'unchanged'
+							: changeDirection > 0
+								? 'up'
+								: 'down'} {changePercent} {change.label}"
+						visualLabel="{changeDirection === 0
+							? ''
+							: changeDirection > 0
+								? '+'
+								: '−'}{changePercent} {change.label}"
 					/>
 				</div>{/if}
 			{#if trend}<div class="mt-3"><Sparkline values={trend} {label} /></div>{/if}
@@ -92,13 +122,16 @@
 					aria-valuemax={progressMax}
 					aria-label={progress.label}
 				>
+					<span id={`${descriptionId}-progress`} class="sr-only"
+						>{progress.label}: {progressValue} of {progressMax}</span
+					>
 					<div
 						class="h-full rounded-full bg-bar"
 						style:width={`${progressMax > 0 ? (progressValue / progressMax) * 100 : 0}%`}
 					></div>
 				</div>{/if}
 		{/if}
-		{#if state === 'stale'}<p class="mt-2 text-label text-warn">
+		{#if state === 'stale'}<p id={`${descriptionId}-stale`} class="mt-2 text-label text-warn">
 				<span aria-hidden="true">!</span> as of {ago(asOf)}
 			</p>{/if}
 	{/if}

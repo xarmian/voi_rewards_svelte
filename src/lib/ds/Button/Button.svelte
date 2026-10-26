@@ -31,7 +31,7 @@
 		ghost: 'text-accent'
 	};
 	let classes = $derived(
-		`inline-flex min-h-10 items-center justify-center gap-2 rounded-ds-sm font-bold duration-fast ease-out-soft [@media(pointer:coarse)]:min-h-11 ${size === 'sm' ? 'px-3 py-2 text-label' : 'px-4 py-2.5 text-sm'} ${variants[variant]} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`
+		`inline-flex min-h-10 items-center justify-center gap-2 rounded-ds-sm font-bold transition-colors duration-fast ease-out-soft [@media(pointer:coarse)]:min-h-11 ${size === 'sm' ? 'px-3 py-2 text-label' : 'px-4 py-2.5 text-sm'} ${variants[variant]} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`
 	);
 </script>
 
@@ -39,6 +39,7 @@
 	<a
 		{...rest}
 		href={disabled ? undefined : href}
+		role={disabled ? 'link' : rest.role}
 		aria-disabled={disabled || undefined}
 		tabindex={disabled ? -1 : rest.tabindex}
 		class={classes}

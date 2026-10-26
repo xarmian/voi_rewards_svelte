@@ -27,6 +27,7 @@
 	let starting = $state(false);
 	let animating = $state(false);
 	onMount(() => {
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 		starting = true;
 		let second: number;
 		let timeout: ReturnType<typeof setTimeout>;

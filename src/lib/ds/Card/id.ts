@@ -1,9 +1,5 @@
+import { slug } from '../slug';
+
 export function cardHeadingId(title: string): string {
-	return (
-		'ds-card-' +
-		title
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/^-|-$/g, '')
-	);
+	return 'ds-card-' + slug(title);
 }

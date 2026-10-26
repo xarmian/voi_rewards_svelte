@@ -26,7 +26,8 @@
 	let container: HTMLDivElement;
 	const strokes = { accent: 'stroke-accent-fill', hi: 'stroke-hi', ok: 'stroke-ok' };
 	const fills = { accent: 'fill-accent-fill', hi: 'fill-hi', ok: 'fill-ok' };
-	let geometry = $derived(sparklinePath(values, width, height, 4));
+	let finiteValues = $derived(values.filter(Number.isFinite));
+	let geometry = $derived(sparklinePath(finiteValues, width, height, 4));
 	$effect(() => {
 		if (!container || typeof ResizeObserver === 'undefined') return;
 		const observer = new ResizeObserver(([entry]) => {
@@ -43,7 +44,7 @@
 		<div aria-hidden="true" class="w-full rounded-ds-xs bg-grid" style:height={`${height}px`}></div>
 	{:else if dataState === 'error'}
 		<InlineAlert message="Unable to load {label}." {onretry} />
-	{:else if dataState === 'empty' || values.length === 0}
+	{:else if dataState === 'empty' || finiteValues.length === 0}
 		<p class="flex items-center text-sm text-ink-muted" style:min-height={`${height}px`}>No data</p>
 	{:else}
 		<svg
@@ -51,7 +52,9 @@
 			{height}
 			viewBox="0 0 {width} {height}"
 			role="img"
-			aria-label="{label}: from {compact(values[0])} to {compact(values[values.length - 1])}"
+			aria-label="{label}: from {compact(finiteValues[0])} to {compact(
+				finiteValues[finiteValues.length - 1]
+			)}"
 			focusable="false"
 		>
 			{#if area}<path d={geometry.area} class="fill-accent-soft" />{/if}

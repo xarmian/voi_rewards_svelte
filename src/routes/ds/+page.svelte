@@ -180,6 +180,7 @@
 					<div>
 						<h3 class="mb-2 text-sm font-bold">{state}</h3>
 						<StatTile
+							id={`gallery-staking-apr-${state}`}
 							label="Staking APR"
 							icon="%"
 							value={pct(network.apr)}
@@ -192,8 +193,14 @@
 						/>
 					</div>
 				{/each}
-				<StatTile label="Positive change (illustrative)" value="—" />
 				<StatTile
+					id="gallery-positive-change-first"
+					label="Positive change (illustrative)"
+					value={usd(network.price)}
+					change={{ value: 0.71, label: '24 hours' }}
+				/>
+				<StatTile
+					id="gallery-positive-change-second"
 					label="Positive change (illustrative)"
 					value={usd(network.price)}
 					change={{ value: 0.71, label: '24 hours' }}
@@ -224,10 +231,16 @@
 		<section aria-labelledby="gallery-sparkline">
 			<h2 id="gallery-sparkline" class="mb-4 text-h2">Sparkline</h2>
 			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-3">
-				{#each states as state (state)}<Card title="APR · {state}" headingLevel={3}
+				{#each states as state (state)}<Card
+						id={`gallery-apr-state-${state}`}
+						title="APR · {state}"
+						headingLevel={3}
 						><Sparkline values={aprHistory} label="APR" {state} {asOf} onretry={retry} /></Card
 					>{/each}
-				{#each sparklineTones as tone (tone)}<Card title="APR · {tone}" headingLevel={3}
+				{#each sparklineTones as tone (tone)}<Card
+						id={`gallery-apr-tone-${tone}`}
+						title="APR · {tone}"
+						headingLevel={3}
 						><Sparkline values={aprHistory} label="APR" {tone} />
 						<div class="mt-3">
 							<Sparkline
@@ -271,7 +284,7 @@
 			<h2 id="gallery-health-item" class="mb-4 text-h2">HealthItem</h2>
 			<div class="grid gap-bento md:grid-cols-2">
 				<Card title="Health item sizes and tones" headingLevel={3}
-					><ul aria-label="Node health checks">
+					><ul aria-label="Node health checks: sizes and tones">
 						{#each sizes as size (size)}{#each tones as tone (tone)}<HealthItem
 									{tone}
 									title="{statusLabels[tone]} · {size}"
@@ -281,7 +294,7 @@
 					</ul></Card
 				>
 				<Card title="Health items on hero" headingLevel={3} variant="hero"
-					><ul aria-label="Node health checks">
+					><ul aria-label="Node health checks: hero">
 						{#each sizes as size (size)}{#each tones as tone (tone)}<HealthItem
 									{tone}
 									title="{statusLabels[tone]} · {size}"
@@ -296,7 +309,7 @@
 						Synthetic examples: the snapshot has no expiring keys. Last vote examples assume an
 						online account.
 					</p>
-					<ul aria-label="Node health checks">
+					<ul aria-label="Node health checks: warnings">
 						{#each syntheticHealth.keys as item (item.keyDays)}<HealthItem
 								tone={item.tone}
 								title={item.title}
@@ -334,7 +347,10 @@
 						</ul>
 					</div></Card
 				>
-				{#each states as state (state)}<Card title="Contracts · {state}" headingLevel={3}
+				{#each states as state (state)}<Card
+						id={`gallery-contracts-state-${state}`}
+						title="Contracts · {state}"
+						headingLevel={3}
 						><HealthRing
 							value={onlineCount}
 							total={wallet.contracts.length}
@@ -344,7 +360,10 @@
 							onretry={retry}
 						/></Card
 					>{/each}
-				{#each ringTones as tone (tone)}<Card title="Ring · {tone}" headingLevel={3}
+				{#each ringTones as tone (tone)}<Card
+						id={`gallery-ring-tone-${tone}`}
+						title="Ring · {tone}"
+						headingLevel={3}
 						><HealthRing
 							value={tone === 'danger' ? 0 : tone === 'ok' ? 16 : onlineCount}
 							total={16}

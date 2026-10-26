@@ -1,22 +1,27 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	let { text, what, onHero = false }: { text: string; what: string; onHero?: boolean } = $props();
 	let status = $state<'idle' | 'copied' | 'failed'>('idle');
+	let announcement = $state('');
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	onDestroy(() => clearTimeout(timeout));
 	async function copy() {
 		clearTimeout(timeout);
+		announcement = '';
+		await tick();
 		try {
 			if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText)
 				throw new Error('Clipboard unavailable');
 			await navigator.clipboard.writeText(text);
 			status = 'copied';
-			timeout = setTimeout(() => {
-				status = 'idle';
-			}, 1500);
 		} catch {
 			status = 'failed';
 		}
+		announcement = status === 'copied' ? `Copied ${what}` : 'Copy failed';
+		timeout = setTimeout(() => {
+			status = 'idle';
+			announcement = '';
+		}, 1500);
 	}
 </script>
 
@@ -31,6 +36,4 @@
 	<span aria-hidden="true">{status === 'copied' ? '✓' : status === 'failed' ? '!' : '⧉'}</span>
 	{#if status === 'failed'}<span>Copy failed</span>{/if}
 </button>
-<span aria-live="polite" class="sr-only"
-	>{status === 'copied' ? `Copied ${what}` : status === 'failed' ? 'Copy failed' : ''}</span
->
+<span aria-live="polite" class="sr-only">{announcement}</span>

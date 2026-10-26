@@ -20,6 +20,7 @@
 		actions,
 		variant = 'surface',
 		span,
+		as = 'section',
 		children
 	}: Props = $props();
 	const lg = {
@@ -36,10 +37,10 @@
 </script>
 
 <svelte:element
-	this={title ? 'section' : 'div'}
-	aria-labelledby={headingId}
+	this={title ? as : 'div'}
+	aria-labelledby={title && as === 'section' ? headingId : undefined}
 	class="min-w-0 p-card shadow-card {variant === 'hero'
-		? 'on-hero rounded-hero bg-hero text-on-hero'
+		? 'on-hero rounded-card bg-hero text-on-hero'
 		: 'rounded-card border border-line bg-surface text-ink'} {span?.md ? md[span.md] : ''} {span?.lg
 		? lg[span.lg]
 		: ''}"
