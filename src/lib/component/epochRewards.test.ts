@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 interface Snapshot {
@@ -13,25 +12,47 @@ interface Rewards {
 	expectedReward: number;
 }
 
-// Execute each component's current inline calculation without importing its UI
-// dependencies or making API calls. Do not reconcile the two coercion rules or
-// reverse their ballast boundary without a decision on the TASK-34 brief.
+// Verbatim inline calculations captured before extraction. Keep their old
+// zero-block and malformed-count results as explicit historical references.
+function PortfolioComponentRewards(
+	epochData: Snapshot,
+	date: { epoch: number },
+	walletAddress: string,
+	tokens: number
+): Rewards {
+	const communityBlocks = epochData.total_blocks ?? 0;
+	const totalBlocksProduced = Math.round(
+		date.epoch >= 62
+			? communityBlocks
+			: communityBlocks + Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)
+	);
+	const userBlocksProduced = epochData.proposers[walletAddress] ?? 0;
+
+	// @ts-expect-error Preserve the original implicit coercion of string counts.
+	const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
+	return { totalBlocksProduced, userBlocksProduced, expectedReward };
+}
+
+function EpochComponentRewards(
+	epochData: Snapshot,
+	date: { epoch: number },
+	walletAddress: string,
+	tokens: number
+): Rewards {
+	const communityBlocks = epochData.total_blocks ?? 0;
+	const totalBlocksProduced = Math.round(
+		date.epoch >= 62
+			? communityBlocks
+			: communityBlocks + Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)
+	);
+	const userBlocksProduced = Number(epochData.proposers[walletAddress] ?? 0) || 0;
+
+	const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
+	return { totalBlocksProduced, userBlocksProduced, expectedReward };
+}
+
 function inlineRewards(component: string) {
-	const source = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
-	const start = source.indexOf('const communityBlocks =');
-	const end = source.indexOf('return {', start);
-	expect(start).toBeGreaterThan(-1);
-	expect(end).toBeGreaterThan(start);
-	const calculation = source
-		.slice(start, end)
-		.replace('const tokens = await getTokensByEpoch(date.epoch);', '');
-	return new Function(
-		'epochData',
-		'date',
-		'walletAddress',
-		'tokens',
-		`${calculation}\nreturn { totalBlocksProduced, userBlocksProduced, expectedReward };`
-	) as (snapshot: Snapshot, date: { epoch: number }, wallet: string, tokens: number) => Rewards;
+	return component === 'PortfolioComponent' ? PortfolioComponentRewards : EpochComponentRewards;
 }
 
 for (const component of ['PortfolioComponent', 'EpochComponent']) {
