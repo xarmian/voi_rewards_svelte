@@ -1,7 +1,6 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
+import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import type {
 	Resolution,
 	OHLCVRequest,
@@ -9,9 +8,6 @@ import type {
 	VolumeData,
 	PriceCandle
 } from '$lib/types/ohlcv.types';
-
-// Create MIMIR client for OHLCV data
-const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
 
 // VOI native token can be represented by either token ID 0 or 390001 (wVOI)
 const VOI_TOKEN_IDS = [0, 390001];

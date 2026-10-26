@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { supabasePrivateClient } from '$lib/supabase-server';
+import { supabasePrivateClient } from '$lib/server/supabase';
 
 export async function GET({ url }) {
 	const wallet = url.searchParams.get('wallet');

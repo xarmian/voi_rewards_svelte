@@ -1,10 +1,6 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
-
-// Create MIMIR client for token data
-const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
+import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 
 export interface TokenSupply {
 	tokenId: number;

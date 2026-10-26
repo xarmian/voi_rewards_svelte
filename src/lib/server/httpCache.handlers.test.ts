@@ -8,12 +8,12 @@ const mocks = vi.hoisted(() => ({
 	vestige: vi.fn()
 }));
 
-vi.mock('@supabase/supabase-js', () => ({
-	createClient: () => ({ from: mocks.from, rpc: mocks.rpc })
+vi.mock('$lib/mimir', () => ({
+	mimirClient: { from: mocks.from, rpc: mocks.rpc }
 }));
 vi.mock('$lib/supabase', () => ({ supabasePublicClient: { from: mocks.from } }));
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: vi.fn().mockResolvedValue(100) }));
-vi.mock('$lib/supabase-server', () => ({
+vi.mock('$lib/server/supabase', () => ({
 	supabasePrivateClient: { from: mocks.from, rpc: mocks.rpc }
 }));
 vi.mock('$env/static/public', () => ({
