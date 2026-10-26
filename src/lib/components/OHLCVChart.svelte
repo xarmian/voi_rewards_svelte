@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { theme, onThemeChange } from '$lib/theme.svelte';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { Button, ButtonGroup, Spinner } from 'flowbite-svelte';
@@ -125,7 +126,7 @@
 	function updateChartTheme() {
 		if (!chart) return;
 
-		isDarkMode = document.documentElement.classList.contains('dark');
+		isDarkMode = theme.current === 'dark';
 		const backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
 		const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
 		const textColor = isDarkMode ? '#D1D5DB' : '#4B5563';
@@ -309,19 +310,8 @@
 		lifecycle.add(() => resizeObserver.disconnect());
 		resizeObserver.observe(chartContainer);
 
-		// Set up theme observer
-		const themeObserver = new MutationObserver((mutations) => {
-			mutations.forEach((mutation) => {
-				if (mutation.attributeName === 'class') {
-					updateChartTheme();
-				}
-			});
-		});
-		lifecycle.add(() => themeObserver.disconnect());
-		themeObserver.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class']
-		});
+		// Subscribe to theme changes
+		lifecycle.add(onThemeChange(updateChartTheme));
 	}
 
 	function createMainSeries() {

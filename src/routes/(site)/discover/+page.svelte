@@ -3,7 +3,6 @@
 	import MarketData from './MarketData.svelte';
 	import { apps, getAppsByCategory, getIOSCompatibleApps } from './apps';
 	import { writable, derived } from 'svelte/store';
-	import { onMount, onDestroy } from 'svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -49,38 +48,6 @@
 		const target = event.target as HTMLInputElement;
 		searchQuery.set(target.value);
 	};
-
-	// Store original theme state
-	let originalTheme: string | null = null;
-	let hasAppliedThemeOverride = false;
-
-	// Apply theme override on mount
-	onMount(() => {
-		if (data.theme) {
-			// Store current theme state
-			originalTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-			hasAppliedThemeOverride = true;
-
-			// Apply the theme override
-			if (data.theme === 'dark') {
-				document.documentElement.classList.add('dark');
-			} else {
-				document.documentElement.classList.remove('dark');
-			}
-		}
-	});
-
-	// Restore original theme on destroy
-	onDestroy(() => {
-		if (hasAppliedThemeOverride && originalTheme !== null) {
-			// Restore the original theme
-			if (originalTheme === 'dark') {
-				document.documentElement.classList.add('dark');
-			} else {
-				document.documentElement.classList.remove('dark');
-			}
-		}
-	});
 </script>
 
 <svelte:head>

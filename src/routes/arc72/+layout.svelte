@@ -2,7 +2,6 @@
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
-	import { DarkMode } from 'flowbite-svelte';
 	import Icon from '$lib/assets/android-chrome-192x192.png';
 
 	const onSearch = (addr: string) => {
@@ -25,7 +24,6 @@
 		<div class="flex-grow content-center">
 			<WalletSearch onSubmit={onSearch} loadPreviousValue={false} />
 		</div>
-		<DarkMode />
 	</header>
 	<main>
 		<slot />

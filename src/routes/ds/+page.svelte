@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		Button,
 		Card,
@@ -11,6 +10,7 @@
 		Sparkline,
 		StatTile,
 		StatusPill,
+		ThemeToggle,
 		ago,
 		comma,
 		compact,
@@ -37,18 +37,10 @@
 		wallet
 	} from './fixtures';
 
-	let darkTheme = $state(false);
 	let retries = $state(0);
 	const retry = () => {
 		retries += 1;
 	};
-	onMount(() => {
-		darkTheme = document.documentElement.classList.contains('dark');
-	});
-	function toggleTheme() {
-		darkTheme = !darkTheme;
-		document.documentElement.classList.toggle('dark', darkTheme);
-	}
 
 	const colours: [string, string][] = [
 		['bg-canvas', 'canvas'],
@@ -131,7 +123,7 @@
 				Preview only
 			</span>
 			<div class="mt-4">
-				<Button variant="primary" onclick={toggleTheme} aria-pressed={darkTheme}>Dark theme</Button>
+				<ThemeToggle class="text-on-hero" />
 			</div>
 		</div>
 	</header>

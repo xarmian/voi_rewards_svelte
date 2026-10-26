@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { theme, onThemeChange } from '$lib/theme.svelte';
 	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { onMount } from 'svelte';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
@@ -72,20 +73,8 @@
 				chartLifecycle = createChartLifecycle();
 				chartLifecycle.add(() => instance.dispose());
 
-				// Set up theme observer
-				const observer = new MutationObserver((mutations) => {
-					mutations.forEach((mutation) => {
-						if (mutation.attributeName === 'class') {
-							updateChartTheme();
-						}
-					});
-				});
-
-				chartLifecycle.add(() => observer.disconnect());
-				observer.observe(document.documentElement, {
-					attributes: true,
-					attributeFilter: ['class']
-				});
+				// Subscribe to theme changes
+				chartLifecycle.add(onThemeChange(updateChartTheme));
 
 				window.addEventListener('resize', handleResize);
 				chartLifecycle.add(() => window.removeEventListener('resize', handleResize));
@@ -186,7 +175,7 @@
 	function updateChart() {
 		if (!chart || !data.length || !browser) return;
 
-		const isDarkMode = document.documentElement.classList.contains('dark');
+		const isDarkMode = theme.current === 'dark';
 		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
 		const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
 		const backgroundColor = 'transparent';

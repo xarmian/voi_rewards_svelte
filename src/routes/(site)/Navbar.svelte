@@ -2,7 +2,6 @@
 	import {
 		Navbar,
 		NavBrand,
-		DarkMode,
 		Avatar,
 		Dropdown,
 		DropdownItem,
@@ -10,7 +9,7 @@
 	} from 'flowbite-svelte';
 	import { page } from '$app/stores';
 	import { slide } from 'svelte/transition';
-	import { onMount } from 'svelte';
+	import { ThemeToggle } from '$lib/ds';
 
 	interface NavItem {
 		href: string;
@@ -31,11 +30,6 @@
 	}
 
 	let isMenuOpen = false;
-	let isDark = false;
-
-	onMount(() => {
-		isDark = document.documentElement.classList.contains('dark');
-	});
 
 	// Widened to string: Kit 2.70 types pathname as a route-path union, but the click handler assigns any href.
 	let activeLink: string;
@@ -137,17 +131,6 @@
 			window.location.href = href;
 		}, 100);
 	};
-
-	function handleDarkModeChange(e: CustomEvent) {
-		const isDark = e.detail;
-		if (isDark) {
-			localStorage.setItem('color-theme', 'dark');
-			document.documentElement.classList.add('dark');
-		} else {
-			localStorage.setItem('color-theme', 'light');
-			document.documentElement.classList.remove('dark');
-		}
-	}
 </script>
 
 <Navbar
@@ -225,7 +208,7 @@
 				<div class="px-4 py-2">
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-gray-700 dark:text-gray-200">Dark Mode</span>
-						<DarkMode class="ml-3" on:change={handleDarkModeChange} />
+						<ThemeToggle />
 					</div>
 				</div>
 			</Dropdown>
@@ -340,7 +323,7 @@
 				<div class="border-t border-gray-200 dark:border-slate-700 pt-4">
 					<div class="flex items-center justify-between px-4 py-2">
 						<span class="text-gray-700 dark:text-white text-lg">Dark Mode</span>
-						<DarkMode class="ml-3" on:change={handleDarkModeChange} />
+						<ThemeToggle />
 					</div>
 				</div>
 			</div>
