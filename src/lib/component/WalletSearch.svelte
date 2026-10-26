@@ -224,7 +224,7 @@
 	<div class="dark:bg-gray-800 bg-white flex items-center rounded-lg relative">
 		<input
 			id={inputId}
-			aria-label={label}
+			aria-label={inputId ? undefined : label}
 			type="text"
 			use:init
 			bind:value={searchText}

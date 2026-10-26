@@ -37,7 +37,7 @@
 	}
 
 	function closeOnEscape(event: KeyboardEvent) {
-		if (event.key !== 'Escape') return false;
+		if (event.key !== 'Escape' || !dropdownOpen) return false;
 		event.preventDefault();
 		event.stopPropagation();
 		dropdownOpen = false;
