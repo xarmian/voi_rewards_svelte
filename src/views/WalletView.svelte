@@ -11,7 +11,6 @@
 
 	import { onMount } from 'svelte';
 	import { Card } from 'flowbite-svelte';
-	import { algodClient } from '$lib/utils/algod';
 	import { getNFD } from '$lib/utils/nfd';
 	import { copy } from 'svelte-copy';
 	import { toast } from '@zerodevx/svelte-toast';
@@ -19,7 +18,7 @@
 	import { Badge } from 'flowbite-svelte';
 	import { pan } from 'svelte-gestures';
 	import { calculateRewards } from '$lib/utils/rewards';
-	import { getSupplyInfo } from '$lib/stores/accounts';
+	import { getSupplyInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import { dataTable } from '../stores/dataTable';
 	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -43,7 +42,7 @@
 	onMount(async () => {
 		try {
 			// Get account information
-			accountInfo = await algodClient.accountInformation(walletId).do();
+			accountInfo = await requireAccountInfo(walletId);
 
 			// Get supply and VOI per block data
 			const [supplyInfo, dates] = await Promise.all([getSupplyInfo(), dataTable.fetchDateRanges()]);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Input } from 'flowbite-svelte';
 	import WalletSearch from './WalletSearch.svelte';
 	import type { FungibleTokenType } from '$lib/types/assets';
@@ -72,7 +73,7 @@
 			let block;
 			try {
 				[accountInfo, block] = await Promise.all([
-					algodClient.accountInformation(address).do(),
+					requireAccountInfo(address, { force: true }),
 					algodIndexer
 						.lookupAccountByID(address)
 						.do()
@@ -109,7 +110,7 @@
 			}
 
 			recipient.info = {
-				balance: accountInfo.amount,
+				balance: accountInfo.amount as number,
 				createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
 				hasOptedIn,
 				assetBalance

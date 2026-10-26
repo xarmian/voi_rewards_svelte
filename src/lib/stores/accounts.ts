@@ -158,6 +158,17 @@ export async function getAccountInfo(
 	}, { force: forceRefresh });
 }
 
+export async function requireAccountInfo(
+	address: string,
+	{ force = false } = {}
+): Promise<algosdk.modelsv2.Account> {
+	return accountCache.get(
+		address,
+		async () => (await algodClient.accountInformation(address).do()) as algosdk.modelsv2.Account,
+		{ force, strict: true }
+	);
+}
+
 export async function getSupplyInfo(): Promise<SupplyInfo | null> {
 	return supplyCache.get('supply', async () => {
 		try {

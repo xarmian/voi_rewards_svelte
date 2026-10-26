@@ -17,10 +17,24 @@ export function createKeyedCache<K, V>({
 	}
 	const entries = new Map<K, Entry>();
 
-	function get(key: K, fetcher: () => Promise<V>, { force = false } = {}): Promise<V> {
+	function get(
+		key: K,
+		fetcher: () => Promise<V>,
+		options: { force?: boolean; strict: true }
+	): Promise<NonNullable<V>>;
+	function get(
+		key: K,
+		fetcher: () => Promise<V>,
+		options?: { force?: boolean; strict?: boolean }
+	): Promise<V>;
+	function get(
+		key: K,
+		fetcher: () => Promise<V>,
+		{ force = false, strict = false } = {}
+	): Promise<V> {
 		let entry = entries.get(key);
 		// TASK-30: ordinary callers join the newest request, even if a stored value is fresh.
-		if (!force && entry?.inFlight) return entry.inFlight;
+		if (!strict && !force && entry?.inFlight) return entry.inFlight;
 		if (
 			!force &&
 			entry?.value != null &&
@@ -35,10 +49,12 @@ export function createKeyedCache<K, V>({
 		}
 		const current = entry;
 		const sequence = ++current.sequence;
-		current.inFlight = Promise.resolve()
+		// Strict reads start their own request so stale fallback cannot mask a failure.
+		const request = Promise.resolve()
 			.then(fetcher)
 			.then(
 				(value) => {
+					if (strict && value == null) throw new Error('Account not found');
 					// TASK-30: failed refetches retain the previous value and its original timestamp.
 					// TASK-30 r2: never across an invalidation (a detached entry's value was discarded).
 					if (value == null) return entries.get(key) === current ? (current.value ?? value) : value;
@@ -51,16 +67,19 @@ export function createKeyedCache<K, V>({
 					return value;
 				},
 				(error) => {
+					if (strict) throw error;
 					if (current.value != null && entries.get(key) === current) return current.value;
 					throw error;
 				}
 			)
 			.finally(() => {
+				if (current.inFlight === request) delete current.inFlight;
 				if (current.sequence !== sequence) return;
-				delete current.inFlight;
 				if (current.value == null && entries.get(key) === current) entries.delete(key);
 			});
-		return current.inFlight;
+		// Only ordinary requests may be joined: strict failures must stay with strict callers.
+		if (!strict) current.inFlight = request;
+		return request;
 	}
 
 	function invalidate(key?: K) {

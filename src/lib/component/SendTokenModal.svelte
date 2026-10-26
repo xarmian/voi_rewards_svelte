@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
@@ -83,20 +84,18 @@
 	// Fetch VOI balance only on initial modal open
 	$: if (open && $selectedWallet?.address && isInitialLoad) {
 		isInitialLoad = false;
-		algodClient
-			.accountInformation($selectedWallet.address)
-			.do()
+		requireAccountInfo($selectedWallet.address, { force: true })
 			.then((info) => {
 				nativeVoiToken = {
 					...nativeVoiToken,
-					balance: info.amount,
-					value: info.amount / 1e6
+					balance: info.amount as number,
+					value: (info.amount as number) / 1e6
 				};
 				// If the selected token is native VOI, update it too
 				if (isNativeToken(selectedToken)) {
 					selectedToken = {
 						...selectedToken,
-						balance: info.amount
+						balance: info.amount as number
 					};
 				}
 				// Force Svelte reactivity for available tokens
@@ -244,7 +243,7 @@
 			let block;
 			try {
 				[accountInfo, block] = await Promise.all([
-					algodClient.accountInformation(address).do(),
+					requireAccountInfo(address, { force: true }),
 					algodIndexer
 						.lookupAccountByID(address)
 						.do()
@@ -281,7 +280,7 @@
 			}
 
 			recipients[index].info = {
-				balance: accountInfo.amount,
+				balance: accountInfo.amount as number,
 				createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
 				hasOptedIn,
 				assetBalance

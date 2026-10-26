@@ -1,9 +1,9 @@
 <script lang="ts">
+	import { requireAccountInfo } from '$lib/stores/accounts';
 	import QuestCard from './QuestCard.svelte';
 
 	import type { IProject, IQuest } from '$lib/data/types';
 	import { supabasePublicClient } from '$lib/supabase';
-	import { algodClient } from '$lib/utils/algod';
 	import InfoButton from './ui/InfoButton.svelte';
 	import WalletSearch from './WalletSearch.svelte';
 
@@ -84,14 +84,14 @@
 					ni.earned = filteredPoints.reduce((acc, cur) => acc + cur.points, 0);
 				}
 
-				const accountInfo = await algodClient.accountInformation(wallet).do();
+				const accountInfo = await requireAccountInfo(wallet);
 				if (accountInfo.status === 'Offline') {
 					steps[0].detected = false;
 					steps[0].name = 'Wallet Offline';
 				} else if (accountInfo.status === 'Online') {
 					steps[0].detected = true;
 					steps[0].name = 'Wallet Online';
-					steps[0].additionalInfo = `Online Balance: ${displayBalance(accountInfo.amount)} VOI`;
+					steps[0].additionalInfo = `Online Balance: ${displayBalance(accountInfo.amount as number)} VOI`;
 				}
 
 				if (points && points.length > 0) {
