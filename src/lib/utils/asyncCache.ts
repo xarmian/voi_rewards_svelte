@@ -14,6 +14,7 @@ export function createKeyedCache<K, V>({
 		fetchedAt?: number;
 		inFlight?: Promise<V>;
 		sequence: number;
+		strictSequence: number;
 	}
 	const entries = new Map<K, Entry>();
 
@@ -45,12 +46,13 @@ export function createKeyedCache<K, V>({
 		}
 		const createdEntry = !entry;
 		if (!entry) {
-			entry = { sequence: 0 };
+			entry = { sequence: 0, strictSequence: 0 };
 			entries.set(key, entry);
 		}
 		const current = entry;
 		// Strict reads observe ordinary request ordering without superseding those requests.
 		const sequence = strict ? current.sequence : ++current.sequence;
+		const strictSequence = strict ? ++current.strictSequence : undefined;
 		// Strict reads start their own request so stale fallback cannot mask a failure.
 		const request = Promise.resolve()
 			.then(fetcher)
@@ -64,7 +66,8 @@ export function createKeyedCache<K, V>({
 					if (
 						entries.get(key) === current &&
 						current.sequence === sequence &&
-						(!strict || !current.inFlight)
+						(!strict || !current.inFlight) &&
+						(!strict || current.strictSequence === strictSequence)
 					) {
 						current.value = value;
 						current.fetchedAt = now();

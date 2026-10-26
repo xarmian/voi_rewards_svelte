@@ -11,6 +11,51 @@ function setup() {
 }
 
 describe('TASK-35 strict keyed async cache', () => {
+	it('keeps the newer overlapping strict result cached and never publishes the older result', async () => {
+		const onValue = vi.fn();
+		const cache = createKeyedCache<string, number>({ ttlMs: 100, onValue });
+		let resolveOld!: (value: number) => void;
+		let resolveNew!: (value: number) => void;
+		const older = new Promise<number>((done) => (resolveOld = done));
+		const newer = new Promise<number>((done) => (resolveNew = done));
+		const first = cache.get('X', () => older, { force: true, strict: true });
+		const second = cache.get('X', () => newer, { force: true, strict: true });
+		resolveNew(2);
+		expect(await second).toBe(2);
+		resolveOld(1);
+		expect(await first).toBe(1);
+		const fetcher = vi.fn().mockResolvedValue(3);
+		expect.soft(await cache.get('X', fetcher)).toBe(2);
+		expect.soft(onValue.mock.calls).toEqual([['X', 2]]);
+		expect(fetcher).not.toHaveBeenCalled();
+	});
+
+	it('removes an empty entry after its creating strict read fails', async () => {
+		const { cache } = setup();
+		const error = new Error('strict failure');
+		await expect(cache.get('X', async () => Promise.reject(error), { strict: true })).rejects.toBe(
+			error
+		);
+		const fetcher = vi.fn().mockResolvedValue(2);
+		expect(await cache.get('X', fetcher)).toBe(2);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
+	it('preserves an ordinary value when the strict read that created the entry later fails', async () => {
+		const { cache } = setup();
+		let reject!: (error: Error) => void;
+		const pending = new Promise<number>((_, fail) => (reject = fail));
+		const strict = cache.get('X', () => pending, { strict: true });
+		const fetcher = vi.fn().mockResolvedValue(2);
+		expect(await cache.get('X', fetcher)).toBe(2);
+		const error = new Error('strict failure');
+		const rejection = expect(strict).rejects.toBe(error);
+		reject(error);
+		await rejection;
+		expect(await cache.get('X', fetcher)).toBe(2);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
 	it.each([new Error('offline'), null, undefined])(
 		'rejects on %s and preserves the stored value and timestamp',
 		async (failure) => {
