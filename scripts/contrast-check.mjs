@@ -40,10 +40,10 @@ function primary(shade) {
 	return hex(m[1]);
 }
 
-// Alpha-composite an rgba() over an opaque background.
+// Alpha-composite an rgba() over an opaque background, rounded to 8-bit channels as rendered.
 function over(rgba, bg) {
 	const [r, g, b, a] = rgba.match(/[\d.]+/g).map(Number);
-	return [r, g, b].map((c, i) => c * a + bg[i] * (1 - a));
+	return [r, g, b].map((c, i) => Math.round(c * a + bg[i] * (1 - a)));
 }
 
 function luminance(c) {
@@ -88,7 +88,7 @@ const pairs = [
 		[`on-hero on stop ${i + 1}`, TEXT, (t) => [rgb(t, 'on-hero'), stops(t)[i]]],
 		[`on-hero-muted on stop ${i + 1}`, TEXT, (t) => [rgb(t, 'on-hero-muted'), stops(t)[i]]],
 		[
-			`on-hero on on-hero-surface over stop ${i + 1}`,
+			`on-hero (#fff) on on-hero-surface over stop ${i + 1}`,
 			TEXT,
 			(t) => [rgb(t, 'on-hero'), over(t['--c-on-hero-surface'], stops(t)[i])]
 		],

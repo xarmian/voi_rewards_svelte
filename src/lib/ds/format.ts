@@ -13,7 +13,12 @@ function fmt(min: number, max: number): Intl.NumberFormat {
 	const key = `${min}:${max}`;
 	let f = fmtCache.get(key);
 	if (!f) {
-		f = new Intl.NumberFormat('en-US', { minimumFractionDigits: min, maximumFractionDigits: max });
+		// signDisplay 'negative': a negative that rounds to zero prints "0", not "-0".
+		f = new Intl.NumberFormat('en-US', {
+			minimumFractionDigits: min,
+			maximumFractionDigits: max,
+			signDisplay: 'negative'
+		});
 		fmtCache.set(key, f);
 	}
 	return f;

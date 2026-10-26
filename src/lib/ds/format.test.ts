@@ -89,6 +89,12 @@ describe('pct', () => {
 		assert.equal(pct(148, 0), '148%');
 	});
 	test('negatives', () => assert.equal(pct(-3.5), '-3.5%'));
+	test('a tiny negative that rounds to zero has no sign', () => {
+		assert.equal(pct(-0.004), '0%');
+		assert.equal(comma(-0.3), '0');
+		assert.equal(compact(-0.001), '0');
+		assert.equal(compact(-0), '0');
+	});
 });
 
 describe('ago', () => {
