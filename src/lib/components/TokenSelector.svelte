@@ -146,7 +146,7 @@
 			on:input={() => (dropdownOpen = true)}
 			on:keydown={handleInputKeydown}
 			aria-label="Search tokens"
-			aria-controls={listId}
+			aria-controls={dropdownOpen ? listId : undefined}
 			placeholder="Search tokens (e.g., USDC, ALGO, 12345)"
 			{disabled}
 			class="pr-20"
