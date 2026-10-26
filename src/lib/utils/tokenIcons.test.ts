@@ -45,6 +45,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
@@ -74,7 +75,8 @@ describe('token icons', () => {
 		expect(await first).toBe('data:image/png;base64,processed');
 		expect(getProcessedIcon('302190')).toBe(first);
 		expect(fetcher).toHaveBeenCalledExactlyOnceWith(
-			'https://asset-verification.nautilus.sh/icons/395614.png'
+			'https://asset-verification.nautilus.sh/icons/395614.png',
+			{ signal: expect.any(AbortSignal) }
 		);
 		expect([...pixels]).toEqual([
 			255, 255, 255, 0, 251, 251, 251, 0, 250, 255, 255, 255, 255, 249, 255, 128
@@ -84,7 +86,7 @@ describe('token icons', () => {
 	});
 
 	it.each(['http', 'network', 'decode', 'canvas', 'pixels', 'encode'])(
-		'remembers %s failures and releases object URLs',
+		'remembers %s failures, marks only HTTP misses and releases object URLs',
 		async (failure) => {
 			const { canvas, context, revoke } = mockBrowser();
 			const fetcher = vi.fn().mockImplementation(async () => {
@@ -117,12 +119,127 @@ describe('token icons', () => {
 			}
 			const { getProcessedIcon, isIconMissing } = await import('./tokenIcons');
 			expect(await getProcessedIcon('404')).toBeNull();
-			expect(isIconMissing('404')).toBe(true);
+			expect(isIconMissing('404')).toBe(failure === 'http');
 			expect(await getProcessedIcon('404')).toBeNull();
 			expect(fetcher).toHaveBeenCalledTimes(1);
 			expect(revoke).toHaveBeenCalledTimes(['http', 'network'].includes(failure) ? 0 : 1);
 		}
 	);
+
+	it.each(['fetch', 'blob', 'decode'])(
+		'times out a hung %s after 10 seconds, starts the seventh probe and keeps raw icons eligible',
+		async (stage) => {
+			vi.useFakeTimers();
+			const { context, revoke } = mockBrowser();
+			const response = deferred<Response>();
+			const blob = deferred<Blob>();
+			const images: { onload: (() => void) | null; onerror: (() => void) | null }[] = [];
+			if (stage === 'decode') {
+				vi.stubGlobal(
+					'Image',
+					class {
+						width = 4;
+						height = 1;
+						onload: (() => void) | null = null;
+						onerror: (() => void) | null = null;
+						src = '';
+						constructor() {
+							images.push(this);
+							if (images.length > 6) queueMicrotask(() => this.onload?.());
+						}
+					}
+				);
+			}
+			const signals: AbortSignal[] = [];
+			const fetcher = vi.fn((_url: string, options?: RequestInit): Promise<Response> => {
+				if (options?.signal) signals.push(options.signal);
+				if (fetcher.mock.calls.length > 6) return Promise.resolve(okResponse());
+				if (stage === 'fetch') return response.promise;
+				if (stage === 'blob') {
+					return Promise.resolve({ ok: true, blob: () => blob.promise } as Response);
+				}
+				// Spend eight seconds fetching and reading the blob before decode stalls.
+				return new Promise<Response>((resolve) => {
+					setTimeout(
+						() =>
+							resolve({
+								ok: true,
+								blob: () =>
+									new Promise<Blob>((done) => {
+										setTimeout(() => done(new Blob(['icon'])), 4000);
+									})
+							} as Response),
+						4000
+					);
+				});
+			});
+			vi.stubGlobal('fetch', fetcher);
+			const { getProcessedIcon, isIconMissing } = await import('./tokenIcons');
+			const promises = Array.from({ length: 7 }, (_, i) => getProcessedIcon(String(i)));
+			const settled = vi.fn();
+			void promises[0].then(settled);
+			expect(fetcher).toHaveBeenCalledTimes(6);
+			await vi.advanceTimersByTimeAsync(9999);
+			expect(fetcher).toHaveBeenCalledTimes(6);
+			expect(settled).not.toHaveBeenCalled();
+			await vi.advanceTimersByTimeAsync(1);
+			expect(fetcher).toHaveBeenCalledTimes(7);
+			expect(await Promise.all(promises)).toEqual([
+				...Array(6).fill(null),
+				'data:image/png;base64,processed'
+			]);
+			expect(signals.slice(0, 6)).toHaveLength(6);
+			expect(signals.slice(0, 6).every((signal) => signal.aborted)).toBe(true);
+			for (let i = 0; i < 6; i += 1) expect(isIconMissing(String(i))).toBe(false);
+			expect(getProcessedIcon('0')).toBe(promises[0]);
+			expect(revoke).toHaveBeenCalledTimes(stage === 'decode' ? 7 : 1);
+			expect(context.drawImage).toHaveBeenCalledTimes(1);
+			expect(vi.getTimerCount()).toBe(0);
+
+			// Late responses cannot mark a timed-out icon missing or resume processing.
+			response.resolve(new Response(null, { status: 404 }));
+			blob.resolve(new Blob(['late icon']));
+			images.slice(0, 6).forEach((image) => image.onload?.());
+			await vi.advanceTimersByTimeAsync(0);
+			for (let i = 0; i < 6; i += 1) expect(isIconMissing(String(i))).toBe(false);
+			expect(context.drawImage).toHaveBeenCalledTimes(1);
+			expect(revoke).toHaveBeenCalledTimes(stage === 'decode' ? 7 : 1);
+		}
+	);
+
+	it.each(['', undefined])('skips an empty or undefined id (%s) without fetching', async (id) => {
+		mockBrowser();
+		const fetcher = vi.fn().mockImplementation(async () => okResponse());
+		vi.stubGlobal('fetch', fetcher);
+		const { getProcessedIcon, iconUrl } = await import('./tokenIcons');
+		expect(await getProcessedIcon(id as string)).toBeNull();
+		expect(iconUrl(id as string)).toBe('/icons/default-token-image.svg');
+		expect(fetcher).not.toHaveBeenCalled();
+	});
+
+	it('shares one cache entry and fetch for numeric 0 and string 0', async () => {
+		mockBrowser();
+		const fetcher = vi.fn().mockImplementation(async () => okResponse());
+		vi.stubGlobal('fetch', fetcher);
+		const { getProcessedIcon } = await import('./tokenIcons');
+		const first = getProcessedIcon(0);
+		expect(getProcessedIcon('0')).toBe(first);
+		expect(await first).toBe('data:image/png;base64,processed');
+		expect(getProcessedIcon('0')).toBe(first);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
+	it('shares misses between numeric 0 and string 0', async () => {
+		mockBrowser();
+		const fetcher = vi.fn();
+		vi.stubGlobal('fetch', fetcher);
+		const { getProcessedIcon, isIconMissing, markIconMissing } = await import('./tokenIcons');
+		markIconMissing(0);
+		expect(isIconMissing('0')).toBe(true);
+		expect(isIconMissing(0)).toBe(true);
+		expect(await getProcessedIcon('0')).toBeNull();
+		expect(fetcher).not.toHaveBeenCalled();
+	});
 
 	it('caps 20 requests at six probes, drains FIFO and shares queued promises', async () => {
 		mockBrowser();

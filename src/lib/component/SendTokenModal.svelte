@@ -66,7 +66,7 @@
 
 	let selectedToken = token;
 	let missingIconIds = new Set<string>();
-	$: selectedIconId = isNativeToken(selectedToken) ? '0' : (selectedToken.id ?? '');
+	$: selectedIconId = isNativeToken(selectedToken) ? '0' : String(selectedToken.id ?? '');
 	let isInitialLoad = true;
 	let notice: string | null = null;
 
@@ -934,7 +934,7 @@
 							class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2"
 							on:click={() => (showTokenSelect = !showTokenSelect)}
 						>
-							{#if !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
+							{#if selectedIconId && !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
 								<img
 									src={isNativeToken(selectedToken)
 										? 'https://asset-verification.nautilus.sh/icons/0.png'
@@ -956,7 +956,7 @@
 								class="absolute left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto"
 							>
 								{#each availableTokens as token (token.id ?? '0')}
-									{@const iconId = isNativeToken(token) ? '0' : token.id}
+									{@const iconId = isNativeToken(token) ? '0' : String(token.id ?? '')}
 									<button
 										class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
 										on:click={() => {
@@ -964,7 +964,7 @@
 											showTokenSelect = false;
 										}}
 									>
-										{#if !missingIconIds.has(iconId) && !isIconMissing(iconId)}
+										{#if iconId && !missingIconIds.has(iconId) && !isIconMissing(iconId)}
 											<img
 												src={isNativeToken(token)
 													? 'https://asset-verification.nautilus.sh/icons/0.png'
@@ -986,7 +986,7 @@
 				<div
 					class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto"
 				>
-					{#if !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
+					{#if selectedIconId && !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
 						<img
 							src={isNativeToken(selectedToken)
 								? 'https://asset-verification.nautilus.sh/icons/0.png'
