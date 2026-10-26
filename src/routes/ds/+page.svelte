@@ -1,8 +1,54 @@
 <script lang="ts">
-	import { ago, comma, compact, pct, shortAddr, usd } from '$lib/ds/format';
+	import { onMount } from 'svelte';
+	import {
+		Button,
+		Card,
+		Chip,
+		CopyButton,
+		HealthItem,
+		HealthRing,
+		InlineAlert,
+		Sparkline,
+		StatTile,
+		StatusPill,
+		ago,
+		comma,
+		compact,
+		pct,
+		shortAddr,
+		usd
+	} from '$lib/ds';
+	import {
+		aprHistory,
+		asOf,
+		buttonVariants,
+		cardSpans,
+		chipTones,
+		network,
+		offlineCount,
+		onlineCount,
+		ringTones,
+		sizes,
+		sparklineTones,
+		states,
+		statusLabels,
+		syntheticHealth,
+		tones,
+		wallet
+	} from './fixtures';
 
-	// Design-system gallery shell (DESIGN-SYSTEM.md §4). Components from C1 onward add a
-	// section here with every state, using fixture data.
+	let darkTheme = $state(false);
+	let retries = $state(0);
+	const retry = () => {
+		retries += 1;
+	};
+	onMount(() => {
+		darkTheme = document.documentElement.classList.contains('dark');
+	});
+	function toggleTheme() {
+		darkTheme = !darkTheme;
+		document.documentElement.classList.toggle('dark', darkTheme);
+	}
 
 	const colours: [string, string][] = [
 		['bg-canvas', 'canvas'],
@@ -78,15 +124,317 @@
 		<div class="container-page">
 			<h1 class="text-display">Design system</h1>
 			<p class="mt-2 text-lede text-on-hero-muted">
-				Tokens, type and formatting (T1). Components are added here as they land.
+				Tokens, type, formatting and display primitives. Snapshot data with labelled illustrative
+				health warnings.
 			</p>
 			<span class="mt-4 inline-block rounded-full bg-on-hero-surface px-3 py-1 text-micro">
 				Preview only
 			</span>
+			<div class="mt-4">
+				<Button variant="primary" onclick={toggleTheme} aria-pressed={darkTheme}>Dark theme</Button>
+			</div>
 		</div>
 	</header>
 
 	<main class="container-page -mt-[60px] grid gap-bento pb-16">
+		<section aria-labelledby="gallery-stat-tile">
+			<h2 id="gallery-stat-tile" class="mb-4 text-h2">StatTile</h2>
+			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-4">
+				<StatTile
+					label="VOI price"
+					icon="$"
+					value={usd(network.price)}
+					change={{ value: network.change24h, label: '24 hours' }}
+					href="/ds"
+				/>
+				<StatTile
+					label="Online stake"
+					icon="◆"
+					value={compact(network.online_stake)}
+					unit="VOI"
+					detail="{comma(network.online_accounts)} online accounts"
+					href="/ds"
+				/>
+				<StatTile
+					label="Staking APR"
+					icon="%"
+					value={pct(network.apr)}
+					trend={aprHistory}
+					href="/ds"
+				/>
+				<StatTile
+					label="Blocks this epoch"
+					icon="▤"
+					value={comma(network.blocks)}
+					detail="{comma(network.projected_blocks)} projected · Epoch {network.epoch}"
+					progress={{
+						value: network.blocks,
+						max: network.projected_blocks,
+						label: 'Blocks against epoch projection'
+					}}
+					href="/ds"
+				/>
+			</div>
+			<div class="mt-4 grid gap-bento md:grid-cols-2 lg:grid-cols-3">
+				{#each states as state (state)}
+					<div>
+						<h3 class="mb-2 text-sm font-bold">{state}</h3>
+						<StatTile
+							label="Staking APR"
+							icon="%"
+							value={pct(network.apr)}
+							{state}
+							{asOf}
+							onretry={retry}
+							detail="Annualised estimate"
+							trend={aprHistory}
+							href="/ds"
+						/>
+					</div>
+				{/each}
+				<StatTile
+					label="Positive change (illustrative)"
+					value={usd(network.price)}
+					change={{ value: 0.71, label: '24 hours' }}
+				/>
+				<StatTile
+					label="Positive change (illustrative)"
+					value={usd(network.price)}
+					change={{ value: 0.71, label: '24 hours' }}
+				/>
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-card">
+			<h2 id="gallery-card" class="mb-4 text-h2">Card</h2>
+			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-12">
+				<Card title="Surface card" headingLevel={3} span={{ lg: 6, md: 1 }}
+					><p class="text-body">A titled section with a decorative border.</p>
+					{#snippet actions()}<Button variant="soft" size="sm" href="/ds">View data</Button
+						>{/snippet}</Card
+				>
+				<Card title="This epoch" headingLevel={3} variant="hero" span={{ lg: 6, md: 1 }}
+					><p class="num text-hero-num">{network.epoch}</p>
+					<p class="mt-2 text-label text-on-hero-muted">
+						{comma(network.elapsed_days, 2)} of 7 days elapsed
+					</p></Card
+				>
+				{#each cardSpans as span (span)}<Card span={{ lg: span, md: 2 }}
+						><p class="text-label">Untitled · lg span {span} · md span 2</p></Card
+					>{/each}
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-sparkline">
+			<h2 id="gallery-sparkline" class="mb-4 text-h2">Sparkline</h2>
+			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-3">
+				{#each states as state (state)}<Card
+						id={`gallery-apr-state-${state}`}
+						title="APR · {state}"
+						headingLevel={3}
+						><Sparkline values={aprHistory} label="APR" {state} {asOf} onretry={retry} /></Card
+					>{/each}
+				{#each sparklineTones as tone (tone)}<Card
+						id={`gallery-apr-tone-${tone}`}
+						title="APR · {tone}"
+						headingLevel={3}
+						><Sparkline values={aprHistory} label="APR" {tone} />
+						<div class="mt-3">
+							<Sparkline
+								values={aprHistory}
+								label="APR without area"
+								{tone}
+								area={false}
+								height={64}
+							/>
+						</div></Card
+					>{/each}
+				<Card title="Small series" headingLevel={3}
+					><Sparkline values={[network.apr]} label="One APR sample" /><Sparkline
+						values={[16, 16, 16]}
+						label="Constant APR"
+					/><Sparkline values={[]} label="No APR samples" /></Card
+				>
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-status-pill">
+			<h2 id="gallery-status-pill" class="mb-4 text-h2">StatusPill</h2>
+			<div class="flex flex-wrap gap-3 rounded-card bg-surface p-card">
+				{#each sizes as size (size)}{#each tones as tone (tone)}<StatusPill
+							{tone}
+							label="{statusLabels[tone]} · {size}"
+							{size}
+						/>{/each}{/each}
+			</div>
+			<div class="on-hero mt-3 flex flex-wrap gap-3 rounded-hero bg-hero p-card">
+				{#each sizes as size (size)}{#each tones as tone (tone)}<StatusPill
+							{tone}
+							label="{statusLabels[tone]} · {size}"
+							{size}
+							onHero
+						/>{/each}{/each}
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-health-item">
+			<h2 id="gallery-health-item" class="mb-4 text-h2">HealthItem</h2>
+			<div class="grid gap-bento md:grid-cols-2">
+				<Card title="Health item sizes and tones" headingLevel={3}
+					><ul aria-label="Node health checks: sizes and tones">
+						{#each sizes as size (size)}{#each tones as tone (tone)}<HealthItem
+									{tone}
+									title="{statusLabels[tone]} · {size}"
+									detail="Status includes a glyph and a word"
+									{size}
+								/>{/each}{/each}
+					</ul></Card
+				>
+				<Card title="Health items on hero" headingLevel={3} variant="hero"
+					><ul aria-label="Node health checks: hero">
+						{#each sizes as size (size)}{#each tones as tone (tone)}<HealthItem
+									{tone}
+									title="{statusLabels[tone]} · {size}"
+									detail="Hero detail colour"
+									{size}
+									onHero
+								/>{/each}{/each}
+					</ul></Card
+				>
+				<Card title="Illustrative key and vote warnings" headingLevel={3}
+					><p class="mb-2 text-label text-ink-muted">
+						Synthetic examples: the snapshot has no expiring keys. Last vote examples assume an
+						online account.
+					</p>
+					<ul aria-label="Node health checks: warnings">
+						{#each syntheticHealth.keys as item (item.keyDays)}<HealthItem
+								tone={item.tone}
+								title={item.title}
+								detail="Synthetic key expiry"
+							/>{/each}{#each syntheticHealth.votes as item (item.minutes)}<HealthItem
+								tone={item.tone}
+								title={item.title}
+								detail="Synthetic online account vote age"
+							/>{/each}
+					</ul></Card
+				>
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-health-ring">
+			<h2 id="gallery-health-ring" class="mb-4 text-h2">HealthRing</h2>
+			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-3">
+				<Card title="Node health" headingLevel={3}
+					><div class="flex flex-wrap items-center gap-4">
+						<HealthRing value={onlineCount} total={wallet.contracts.length} tone="ok" />
+						<ul aria-label="Node health checks">
+							<HealthItem
+								tone="ok"
+								title="{onlineCount} contracts online"
+								detail="Voting on the network"
+							/><HealthItem
+								tone="neutral"
+								title="{offlineCount} contracts offline"
+								detail="Not participating"
+							/><HealthItem
+								tone="ok"
+								title="Participation keys valid"
+								detail="Online keys have {comma(wallet.contracts[0].key_days)} days remaining"
+							/>
+						</ul>
+					</div></Card
+				>
+				{#each states as state (state)}<Card
+						id={`gallery-contracts-state-${state}`}
+						title="Contracts · {state}"
+						headingLevel={3}
+						><HealthRing
+							value={onlineCount}
+							total={wallet.contracts.length}
+							tone="warn"
+							{state}
+							{asOf}
+							onretry={retry}
+						/></Card
+					>{/each}
+				{#each ringTones as tone (tone)}<Card
+						id={`gallery-ring-tone-${tone}`}
+						title="Ring · {tone}"
+						headingLevel={3}
+						><HealthRing
+							value={tone === 'danger' ? 0 : tone === 'ok' ? 16 : onlineCount}
+							total={16}
+							{tone}
+						/></Card
+					>{/each}
+				<Card title="No staking contracts" headingLevel={3}
+					><HealthRing value={0} total={0} tone="danger" /></Card
+				>
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-button" class="rounded-card bg-surface p-card">
+			<h2 id="gallery-button" class="mb-4 text-h2">Button</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				{#each buttonVariants as variant (variant)}{#each sizes as size (size)}<Button
+							{variant}
+							{size}>{variant} · {size}</Button
+						><Button {variant} {size} disabled>{variant} disabled · {size}</Button><Button
+							{variant}
+							{size}
+							href="/ds">{variant} link · {size}</Button
+						><Button {variant} {size} href="/ds" disabled>{variant} link disabled · {size}</Button
+						>{/each}{/each}
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-chip" class="rounded-card bg-surface p-card">
+			<h2 id="gallery-chip" class="mb-4 text-h2">Chip</h2>
+			<div class="flex flex-wrap gap-3">
+				{#each chipTones as tone (tone)}<Chip {tone} label={tone} /><Chip
+						{tone}
+						label={tone}
+						count={onlineCount}
+					/>{/each}
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-copy-button">
+			<h2 id="gallery-copy-button" class="mb-4 text-h2">CopyButton</h2>
+			<div class="flex flex-wrap items-center gap-3 rounded-card bg-surface p-card">
+				<span class="text-sm">{shortAddr(wallet.owner)}</span><CopyButton
+					text={wallet.owner}
+					what="wallet address"
+				/><span class="text-label text-ink-muted"
+					>Copy with Enter or Space. Success is announced; clipboard failures show “Copy failed”.</span
+				>
+			</div>
+			<div class="on-hero mt-3 flex items-center gap-3 rounded-hero bg-hero p-card text-on-hero">
+				<span class="text-sm">{shortAddr(wallet.owner)}</span><CopyButton
+					text={wallet.owner}
+					what="wallet address on hero"
+					onHero
+				/>
+			</div>
+		</section>
+
+		<section
+			aria-labelledby="gallery-inline-alert"
+			class="space-y-3 rounded-card bg-surface p-card"
+		>
+			<h2 id="gallery-inline-alert" class="text-h2">InlineAlert</h2>
+			<InlineAlert message="Unable to refresh node health." onretry={retry} />
+			<InlineAlert message="Unable to refresh node health. Retry unavailable." />
+			<InlineAlert
+				tone="warn"
+				message="Data may be out of date."
+				onretry={retry}
+				retryLabel="Refresh"
+			/>
+			<InlineAlert tone="warn" message="Data may be out of date. Retry unavailable." />
+			<p class="text-label text-ink-muted" aria-live="polite">Gallery retry clicks: {retries}</p>
+		</section>
+
 		<section class="rounded-card bg-surface p-card shadow-card">
 			<h2 class="text-h2">Colour</h2>
 			<ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
