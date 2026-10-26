@@ -69,8 +69,8 @@
 					class={fills[tone]}
 				/>{/if}
 		</svg>
-		{#if dataState === 'stale'}<p class="mt-1 text-label text-warn">
-				<span aria-hidden="true">!</span> as of {ago(asOf)}
-			</p>{/if}
+	{/if}
+	{#if dataState === 'stale'}
+		<p class="mt-1 text-label text-warn"><span aria-hidden="true">!</span> as of {ago(asOf)}</p>
 	{/if}
 </div>

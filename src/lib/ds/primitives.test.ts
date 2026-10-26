@@ -136,6 +136,18 @@ test('HealthRing: zero total is neutral with no arc', () => {
 	assert.doesNotMatch(html, /stroke-danger|stroke-dashoffset/);
 });
 
+test('stale no-contract and no-sample results retain their timestamp', () => {
+	const asOf = '2026-10-25T12:00:00Z';
+	const ring = render(HealthRing, { props: { value: 0, total: 0, state: 'stale', asOf } }).body;
+	const sparkline = render(Sparkline, {
+		props: { values: [], label: 'APR', state: 'stale', asOf }
+	}).body;
+	assert.match(ring, /No contracts/);
+	assert.match(sparkline, /No data/);
+	assert.match(ring, /as of /);
+	assert.match(sparkline, /as of /);
+});
+
 describe('Card', () => {
 	test('titled section matches derived heading ID', () => {
 		const html = render(Card, { props: { title: 'Node health', headingLevel: 3, children } }).body;
