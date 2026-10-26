@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Verbatim legacy decoder references. */
 import * as algosdk from 'algosdk';
 import { describe, expect, it, vi } from 'vitest';
+import { decodeLockContractState } from './lockContract';
 
 // Bodies copied verbatim from both components before extraction. Staking's
 // address was captured from its component prop; pass it explicitly here.
@@ -201,7 +202,8 @@ const expected = {
 
 for (const [component, decode] of [
 	['LockVestComponent', decodeLockVestState],
-	['StakingComponent', decodeStakingState]
+	['StakingComponent', decodeStakingState],
+	['decodeLockContractState', decodeLockContractState]
 ] as const) {
 	describe(`${component} lock-state characterization`, () => {
 		it('decodes base64 keys, addresses, uints and byte-encoded uint64s', () => {
@@ -214,7 +216,9 @@ for (const [component, decode] of [
 		it('logs an invalid field and continues decoding other fields', () => {
 			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 			try {
-				expect(decode([entry('deadline', bytes('AAAAAAAAAAAA')), entry('total', uint(42))], address)).toEqual({
+				expect(
+					decode([entry('deadline', bytes('AAAAAAAAAAAA')), entry('total', uint(42))], address)
+				).toEqual({
 					contractAddress: address,
 					contractId: 0,
 					global_total: '42'
