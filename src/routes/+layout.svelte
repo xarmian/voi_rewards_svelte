@@ -2,6 +2,8 @@
 	// import need to init tailwind
 	import '../app.css';
 	import '@fortawesome/fontawesome-free/css/all.min.css';
+	import lato700 from '@fontsource/lato/files/lato-latin-700-normal.woff2?url';
+	import lato900 from '@fontsource/lato/files/lato-latin-900-normal.woff2?url';
 	import { page } from '$app/stores';
 
 	import { dev } from '$app/environment';
@@ -69,6 +71,8 @@
 </script>
 
 <svelte:head>
+	<link rel="preload" as="font" type="font/woff2" href={lato700} crossorigin="anonymous" />
+	<link rel="preload" as="font" type="font/woff2" href={lato900} crossorigin="anonymous" />
 	<title>{pageName}</title>
 	<meta name="description" content={description} />
 	<meta name="og:title" content={pageName} />

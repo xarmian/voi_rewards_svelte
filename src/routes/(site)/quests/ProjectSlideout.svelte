@@ -21,7 +21,7 @@
 </script>
 
 <div
-	class="n27 h-3/4 modal border-lg shadow relative z-10"
+	class="h-3/4 modal border-lg shadow relative z-10"
 	on:click={() => (projectid = null)}
 	on:click|stopPropagation
 	on:keydown={(e) => e.key === 'Escape' && (projectid = null)}
