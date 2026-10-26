@@ -558,3 +558,61 @@ describe('TASK-29 relay rewards response caching', () => {
 		expect(response.headers.has('Cache-Control')).toBe(false);
 	});
 });
+
+describe('TASK-60 canonical token equivalents in routes', () => {
+	const rows = [
+		{ contract_id: 123, token_id: '456' },
+		{ contract_id: 789, token_id: '123' },
+		{ contract_id: 123, token_id: '456' },
+		{ contract_id: 789, token_id: '123' },
+		{ contract_id: 123, token_id: '123' },
+		{ contract_id: 123, token_id: '12,34' },
+		{ contract_id: 123, token_id: null },
+		{ contract_id: 123, token_id: '234' }
+	];
+
+	it('returns deduplicated token-info equivalents', async () => {
+		mocks.from.mockImplementationOnce(() =>
+			query({ contract_id: 123, symbol: 'TEST', decimals: 6 })
+		);
+		mocks.from.mockImplementationOnce(() => query(rows));
+		mocks.from.mockImplementationOnce(() => query({ total_supply: '100' }));
+		const response = await infoGET(event('/api/token-info?tokenId=123'));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({ info: { equivalents: [456, 789, 234] } });
+		expect(response.headers.get('Cache-Control')).toBe(hourlyCache);
+	});
+
+	it('returns deduplicated token-analytics equivalents', async () => {
+		mocks.from.mockImplementationOnce(() => query(rows));
+		mocks.from.mockImplementationOnce(() => query({ symbol: 'TEST', decimals: 6 }));
+		const response = await tokenGET(event('/api/token-analytics?tokenId=123'));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({ equivalents: [456, 789, 234] });
+		expect(response.headers.get('Cache-Control')).toBe(analyticsCache);
+	});
+
+	it('preserves the markets pool filter with self first and deduplicated equivalents', async () => {
+		const poolQuery = query([]);
+		const poolOr = vi.spyOn(poolQuery, 'or');
+		mocks.from.mockImplementationOnce(() => query(rows));
+		mocks.from.mockImplementationOnce(() => poolQuery);
+		const response = await marketsGET(event('/api/markets?tokenId=123'));
+		expect(response.status).toBe(200);
+		expect(mocks.from).toHaveBeenNthCalledWith(2, 'pool_catalog');
+		expect(poolOr).toHaveBeenCalledWith(
+			'token_a_id.eq.123,token_b_id.eq.123,token_a_id.eq.456,token_b_id.eq.456,token_a_id.eq.789,token_b_id.eq.789,token_a_id.eq.234,token_b_id.eq.234'
+		);
+	});
+
+	it('returns uncached markets after an equivalents throw when the pool query succeeds', async () => {
+		mocks.from.mockImplementationOnce(() => {
+			throw new Error('equivalents unavailable');
+		});
+		mocks.from.mockImplementationOnce(() => query([]));
+		const response = await marketsGET(event('/api/markets?tokenId=123'));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({ marketData: [] });
+		expect(response.headers.has('Cache-Control')).toBe(false);
+	});
+});

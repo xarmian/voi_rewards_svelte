@@ -1,6 +1,7 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
+import { getTokenEquivalents } from '$lib/tokens/equivalents';
 
 interface TokenInfo {
 	tokenId: number;
@@ -11,41 +12,6 @@ interface TokenInfo {
 	equivalents: number[];
 	totalSupply: number | null;
 	algoAssetId: number | null;
-}
-
-// Get token equivalents from arc200_contracts table
-async function getTokenEquivalents(tokenId: number): Promise<{ value: number[]; failed: boolean }> {
-	try {
-		const { data, error } = await supabaseMimirClient
-			.from('arc200_contracts')
-			.select('contract_id, token_id')
-			.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
-
-		if (error || !data || data.length === 0) {
-			return { value: [], failed: !!error && error.code !== 'PGRST116' };
-		}
-
-		const equivalents: number[] = [];
-		data.forEach((row) => {
-			// Add the contract_id (ARC200 token) if different from input
-			if (row.contract_id !== tokenId) {
-				equivalents.push(row.contract_id);
-			}
-
-			// Add the token_id (ASA/native token) if it exists and contains no comma
-			if (row.token_id && typeof row.token_id === 'string' && !row.token_id.includes(',')) {
-				const equivalentId = parseInt(row.token_id, 10);
-				if (!isNaN(equivalentId) && equivalentId !== tokenId) {
-					equivalents.push(equivalentId);
-				}
-			}
-		});
-
-		return { value: equivalents, failed: false };
-	} catch (error) {
-		console.error('Failed to get token equivalents:', error);
-		return { value: [], failed: true };
-	}
 }
 
 // Get token total supply
@@ -123,7 +89,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					decimals: 6,
 					imageUrl: null,
 					type: 'VOI',
-					equivalents: equivalents.value,
+					equivalents: equivalents.ids,
 					totalSupply: totalSupply.value
 				};
 			} else {
@@ -148,7 +114,7 @@ export const GET: RequestHandler = async ({ url }) => {
 						imageUrl: arc200Data.image_url || null,
 						algoAssetId: arc200Data.algo_asset_id || null,
 						type: 'ARC200',
-						equivalents: equivalents.value,
+						equivalents: equivalents.ids,
 						totalSupply: totalSupply.value
 					};
 				} else {
@@ -174,7 +140,7 @@ export const GET: RequestHandler = async ({ url }) => {
 							decimals: params.dc || 0,
 							imageUrl: null,
 							type: 'ASA',
-							equivalents: equivalents.value,
+							equivalents: equivalents.ids,
 							totalSupply: totalSupply.value
 						};
 					} else {
@@ -197,7 +163,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					decimals: 6,
 					imageUrl: null,
 					type: 'VOI',
-					equivalents: equivalents.value,
+					equivalents: equivalents.ids,
 					totalSupply: totalSupply.value
 				};
 			} else {
@@ -225,7 +191,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					decimals: row.decimals || 0,
 					imageUrl: row.image_url || null,
 					type: 'ARC200',
-					equivalents: equivalents.value,
+					equivalents: equivalents.ids,
 					totalSupply: totalSupply.value
 				};
 			}
