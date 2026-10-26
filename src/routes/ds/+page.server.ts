@@ -1,9 +1,12 @@
 import { error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/public';
+import { env as privateEnv } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 import type { PageServerLoad } from './$types';
 
-// Design-system gallery (DESIGN-SYSTEM.md §4). Only on Preview, where PUBLIC_DS_GALLERY=1.
+// Design-system gallery (DESIGN-SYSTEM.md §4): on Vercel previews, or locally with
+// PUBLIC_DS_GALLERY=1. Production returns 404.
 export const load: PageServerLoad = () => {
-	if (env.PUBLIC_DS_GALLERY !== '1') error(404, 'Not found');
+	const enabled = privateEnv.VERCEL_ENV === 'preview' || publicEnv.PUBLIC_DS_GALLERY === '1';
+	if (!enabled) error(404, 'Not found');
 	return {};
 };

@@ -45,9 +45,9 @@
 	];
 
 	const radii = [
-		'rounded-xs',
-		'rounded-sm',
-		'rounded-md',
+		'rounded-ds-xs',
+		'rounded-ds-sm',
+		'rounded-ds-md',
 		'rounded-card',
 		'rounded-hero',
 		'rounded-full'
@@ -92,13 +92,13 @@
 			<ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
 				{#each colours as [cls, name] (name)}
 					<li class="text-label">
-						<div class="h-12 rounded-xs border border-line {cls}"></div>
+						<div class="h-12 rounded-ds-xs border border-line {cls}"></div>
 						<span class="mt-1 block text-ink-muted">{name}</span>
 					</li>
 				{/each}
 			</ul>
 			<div class="mt-4 grid gap-3 sm:grid-cols-2">
-				<div class="h-12 rounded-xs bg-hero"></div>
+				<div class="h-12 rounded-ds-xs bg-hero"></div>
 				<div class="h-3 self-center rounded-full bg-bar"></div>
 			</div>
 		</section>
@@ -125,11 +125,11 @@
 					</li>
 				{/each}
 				<li class="text-label text-ink-muted">
-					<div class="h-16 w-24 rounded-sm bg-surface shadow-card"></div>
+					<div class="h-16 w-24 rounded-ds-sm bg-surface shadow-card"></div>
 					<span class="mt-1 block">shadow-card</span>
 				</li>
 				<li class="text-label text-ink-muted">
-					<div class="h-16 w-24 rounded-sm bg-surface shadow-pop"></div>
+					<div class="h-16 w-24 rounded-ds-sm bg-surface shadow-pop"></div>
 					<span class="mt-1 block">shadow-pop</span>
 				</li>
 			</ul>
@@ -158,11 +158,13 @@
 		<section class="rounded-card bg-surface p-card shadow-card">
 			<h2 class="text-h2">Controls</h2>
 			<div class="mt-4 flex flex-wrap items-center gap-3">
-				<button class="rounded-sm bg-primary-700 px-4 py-2.5 font-bold text-white">Primary</button>
-				<button class="rounded-sm bg-accent-soft px-4 py-2.5 font-bold text-accent">Soft</button>
-				<button class="rounded-sm px-4 py-2.5 font-bold text-accent">Ghost</button>
+				<button class="rounded-ds-sm bg-primary-700 px-4 py-2.5 font-bold text-white"
+					>Primary</button
+				>
+				<button class="rounded-ds-sm bg-accent-soft px-4 py-2.5 font-bold text-accent">Soft</button>
+				<button class="rounded-ds-sm px-4 py-2.5 font-bold text-accent">Ghost</button>
 				<input
-					class="rounded-sm border border-edge bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted"
+					class="rounded-ds-sm border border-edge bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted"
 					placeholder="Input with edge border"
 					aria-label="Example input"
 				/>

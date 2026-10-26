@@ -75,10 +75,11 @@ export default {
 				label: type('0.8125rem', '1.4', '700'),
 				micro: type('0.75rem', '1.35', '700')
 			},
+			// ds- prefix so legacy rounded-sm/md keep Tailwind's defaults (T1 ruling, §1.4 amended).
 			borderRadius: {
-				xs: '8px',
-				sm: '12px',
-				md: '16px',
+				'ds-xs': '8px',
+				'ds-sm': '12px',
+				'ds-md': '16px',
 				card: 'var(--r-card)',
 				hero: 'var(--r-hero)'
 			},

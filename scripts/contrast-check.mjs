@@ -115,8 +115,18 @@ const pairs = [
 	]),
 	['focus vs surface', NON_TEXT, (t) => [rgb(t, 'focus'), rgb(t, 'surface')]],
 	['focus vs canvas', NON_TEXT, (t) => [rgb(t, 'focus'), rgb(t, 'canvas')]],
-	// Light focus is the primary colour itself; outline-offset puts the ring on the page
-	// background there, so only dark (where the button sits under a light ring) is checked.
+	// The ring is drawn at a 2px outline-offset, so it sits on the page background, not the
+	// control: check it against the worst of the three backgrounds in both themes. In light the
+	// ring is the primary colour itself, so ring vs button only applies in dark (§1.1: 3.85).
+	[
+		'focus ring (2px offset) vs worst page background',
+		NON_TEXT,
+		(t) => {
+			const ring = rgb(t, 'focus');
+			const bgs = ['canvas', 'surface', 'surface-2'].map((bg) => rgb(t, bg));
+			return [ring, bgs.reduce((a, b) => (ratio(ring, a) <= ratio(ring, b) ? a : b))];
+		}
+	],
 	['focus vs primary button (dark)', NON_TEXT, (t) => [rgb(t, 'focus'), primary(700)], ['dark']]
 ];
 
