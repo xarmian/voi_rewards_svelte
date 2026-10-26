@@ -1,17 +1,12 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
+import { getTokenEquivalents } from '$lib/tokens/equivalents';
 import {
 	fetchPoolAggregates,
 	tokenMetricsOrUnavailable,
 	type PoolAggregate
 } from '$lib/server/poolAggregates';
-
-interface TokenEquivalents {
-	tokenId: number;
-	equivalents: number[];
-	failed: boolean;
-}
 
 interface VolumeMetrics {
 	volume24h: number | null;
@@ -36,48 +31,6 @@ interface TokenAnalytics {
 		priceChange24h: number | null;
 		priceChangePercentage24h: number | null;
 	};
-}
-
-// Get token equivalents from arc200_contracts table
-async function getTokenEquivalents(tokenId: number): Promise<TokenEquivalents> {
-	try {
-		// Query arc200_contracts to find equivalent tokens
-		const { data, error } = await supabaseMimirClient
-			.from('arc200_contracts')
-			.select('contract_id, token_id')
-			.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
-
-		if (error) {
-			console.error('Error fetching token equivalents:', error);
-			return { tokenId, equivalents: [], failed: true };
-		}
-
-		if (!data || data.length === 0) {
-			return { tokenId, equivalents: [], failed: false };
-		}
-
-		// Extract all equivalent IDs
-		const equivalents: number[] = [];
-		data.forEach((row) => {
-			// Add the contract_id (ARC200 token)
-			if (row.contract_id !== tokenId) {
-				equivalents.push(row.contract_id);
-			}
-
-			// Add the token_id (ASA/native token) if it exists and contains no comma
-			if (row.token_id && typeof row.token_id === 'string' && !row.token_id.includes(',')) {
-				const equivalentId = parseInt(row.token_id, 10);
-				if (!isNaN(equivalentId) && equivalentId !== tokenId) {
-					equivalents.push(equivalentId);
-				}
-			}
-		});
-
-		return { tokenId, equivalents, failed: false };
-	} catch (error) {
-		console.error('Failed to get token equivalents:', error);
-		return { tokenId, equivalents: [], failed: true };
-	}
 }
 
 // Get token basic info
@@ -166,7 +119,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		]);
 
 		// TASK-52, C11, P06: discover pools once and share their aggregates across both metrics.
-		const allIds = [tokenId, ...equivalents.equivalents];
+		const allIds = [tokenId, ...equivalents.ids];
 		const partialReasons: string[] = [];
 		if (equivalents.failed) partialReasons.push('equivalents');
 		if (tokenInfo.failed) partialReasons.push('tokenInfo');
@@ -207,7 +160,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				partial: partialReasons.length > 0,
 				partialReasons,
 				analytics,
-				equivalents: equivalents.equivalents,
+				equivalents: equivalents.ids,
 				timestamp: new Date().toISOString()
 			},
 			{

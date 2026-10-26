@@ -4,44 +4,11 @@ import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/server/supabase';
 import { fetchCirculatingSupply } from '$lib/utils/voi';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { getTokenEquivalents, type MimirClient } from '$lib/tokens/equivalents';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
 import { fetchPoolAggregates, latestSwapRow, pairWindow } from '$lib/server/poolAggregates';
 import { resolveVoiUsd } from '$lib/server/voiUsdReference';
 import type { VoiUsdStatus } from '$lib/server/voiUsdReference';
-
-// The untyped Mimir client; its rows are untyped (no generated schema)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type MimirClient = SupabaseClient<any, any, any>;
-
-// Get all equivalent token IDs for a given token (handles wrapped/native mappings)
-async function getTokenEquivalentIds(
-	tokenId: number,
-	supabaseMimirClient: MimirClient,
-	onFailure: () => void
-): Promise<number[]> {
-	const ids = new Set<number>([tokenId]);
-
-	// Query arc200_contracts for mappings in both directions
-	const { data, error } = await supabaseMimirClient
-		.from('arc200_contracts')
-		.select('contract_id, token_id')
-		.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
-
-	if (error) onFailure();
-	if (data) {
-		for (const row of data) {
-			ids.add(row.contract_id);
-			// Only add token_id if it's a single number (not a pool's comma-separated pair)
-			if (row.token_id && !row.token_id.includes(',')) {
-				const parsed = parseInt(row.token_id, 10);
-				if (!isNaN(parsed)) ids.add(parsed);
-			}
-		}
-	}
-
-	return Array.from(ids);
-}
 
 // Cross-chain market snapshots, ONLY for VOI (any equivalent is VOI 0 or wVOI 390001). Never throws.
 async function fetchCrossChainSnapshots(
@@ -215,7 +182,9 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		let voiUsdAsOf: string | null = null;
 		if (tokenId !== null) {
 			// Get all equivalent token IDs (handles wrapped/native mappings)
-			const equivalentIds = await getTokenEquivalentIds(tokenId, supabaseMimirClient, onFailure);
+			const equivalents = await getTokenEquivalents(tokenId, supabaseMimirClient);
+			if (equivalents.failed) onFailure();
+			const equivalentIds = [tokenId, ...equivalents.ids];
 
 			// 1) Find pools containing any of the equivalent token IDs
 			const orConditions = equivalentIds
