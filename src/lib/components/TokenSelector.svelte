@@ -76,16 +76,23 @@
 				.slice(0, 20)
 		: allTokens.slice(0, 10); // Show first 10 tokens when no search
 
+	// Keyboard picks (click detail 0) return focus to the input; pointer picks leave the input,
+	// as before, so a touch keyboard closes (TASK-39 r2).
+	function afterPick(event?: MouseEvent) {
+		if (event && event.detail > 0) inputEl()?.blur();
+		else focusInput();
+	}
+
 	// Handle token selection
-	function selectToken(token: UniqueToken) {
+	function selectToken(token: UniqueToken, event?: MouseEvent) {
 		dispatch('tokenSelect', token);
 		searchQuery = '';
 		dropdownOpen = false;
-		focusInput();
+		afterPick(event);
 	}
 
 	// Reset to VOI
-	function resetToVOI() {
+	function resetToVOI(event?: MouseEvent) {
 		const voiToken = {
 			id: 0,
 			symbol: 'VOI',
@@ -96,7 +103,7 @@
 		dispatch('tokenSelect', voiToken);
 		searchQuery = '';
 		dropdownOpen = false;
-		focusInput();
+		afterPick(event);
 	}
 
 	// Programmatic focus after selection or Escape must not reopen the results.
@@ -105,9 +112,9 @@
 	}
 
 	// Clear search and reset to VOI
-	function clearSearch() {
+	function clearSearch(event?: MouseEvent) {
 		searchQuery = '';
-		resetToVOI();
+		resetToVOI(event);
 	}
 
 	// Get token type styling
@@ -146,7 +153,7 @@
 			on:input={() => (dropdownOpen = true)}
 			on:keydown={handleInputKeydown}
 			aria-label="Search tokens"
-			aria-controls={dropdownOpen ? listId : undefined}
+			aria-controls={dropdownOpen && !disabled ? listId : undefined}
 			placeholder="Search tokens (e.g., USDC, ALGO, 12345)"
 			{disabled}
 			class="pr-20"
@@ -211,7 +218,7 @@
 						data-token-option
 						on:mousedown|preventDefault
 						on:keydown={(event) => handleOptionKeydown(event, index)}
-						on:click={() => selectToken(token)}
+						on:click={(event) => selectToken(token, event)}
 					>
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">
