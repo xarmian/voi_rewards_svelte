@@ -180,7 +180,6 @@
 					<div>
 						<h3 class="mb-2 text-sm font-bold">{state}</h3>
 						<StatTile
-							id={`gallery-staking-apr-${state}`}
 							label="Staking APR"
 							icon="%"
 							value={pct(network.apr)}
@@ -194,13 +193,11 @@
 					</div>
 				{/each}
 				<StatTile
-					id="gallery-positive-change-first"
 					label="Positive change (illustrative)"
 					value={usd(network.price)}
 					change={{ value: 0.71, label: '24 hours' }}
 				/>
 				<StatTile
-					id="gallery-positive-change-second"
 					label="Positive change (illustrative)"
 					value={usd(network.price)}
 					change={{ value: 0.71, label: '24 hours' }}

@@ -2,13 +2,11 @@
 	import type { Snippet } from 'svelte';
 	import { ago, MISSING, pct } from '../format';
 	import type { DataState } from '../types';
-	import { slug } from '../slug';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import Sparkline from '../Sparkline/Sparkline.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
 	let {
 		label,
-		id,
 		icon,
 		value,
 		unit,
@@ -22,8 +20,6 @@
 		asOf
 	}: {
 		label: string;
-		/** For linked tiles, keep labels unique on a page or supply an explicit description ID. */
-		id?: string;
 		icon?: string;
 		value: string;
 		unit?: string;
@@ -46,28 +42,11 @@
 		change && Number.isFinite(change.value) ? pct(Math.abs(change.value)) : undefined
 	);
 	let changeDirection = $derived(changePercent === pct(0) ? 0 : (change?.value ?? 0) > 0 ? 1 : -1);
-	let descriptionId = $derived(`${id ?? `ds-stat-${slug(label)}`}-desc`);
-	let describedBy = $derived(
-		[
-			hasValue && detail ? `${descriptionId}-detail` : undefined,
-			hasValue && changePercent ? `${descriptionId}-change` : undefined,
-			hasValue && progress ? `${descriptionId}-progress` : undefined,
-			state === 'stale' ? `${descriptionId}-stale` : undefined
-		]
-			.filter(Boolean)
-			.join(' ') || undefined
-	);
 </script>
 
 <svelte:element
 	this={linked ? 'a' : 'div'}
 	href={linked ? href : undefined}
-	aria-label={linked
-		? hasValue
-			? `${label}: ${shownValue} ${unit ?? ''}`.trim()
-			: `${label}: no data`
-		: undefined}
-	aria-describedby={linked ? describedBy : undefined}
 	aria-busy={state === 'loading' ? 'true' : undefined}
 	class="block min-w-0 rounded-card border border-line bg-surface p-card text-ink shadow-card {linked
 		? 'hover:ring-2 hover:ring-accent focus-visible:ring-2 focus-visible:ring-accent'
@@ -92,19 +71,15 @@
 		<InlineAlert message="Unable to load {label}." {onretry} />
 	{:else}
 		<p class="num break-words text-stat">
-			{shownValue}{#if unit}<span class="ml-1 text-label text-ink-muted">{unit}</span>{/if}
+			{#if hasValue}{shownValue}{:else}<span aria-hidden="true">{shownValue}</span><span
+					class="sr-only">no data</span
+				>{/if}{#if hasValue && unit}<span class="ml-1 text-label text-ink-muted">{unit}</span>{/if}
 		</p>
 		{#if hasValue}
-			{#if detail}<div
-					id={linked ? `${descriptionId}-detail` : undefined}
-					class="mt-2 text-label text-ink-muted"
-				>
+			{#if detail}<div class="mt-2 text-label text-ink-muted">
 					{#if typeof detail === 'string'}{detail}{:else}{@render detail()}{/if}
 				</div>{/if}
-			{#if change && changePercent}<div
-					id={linked ? `${descriptionId}-change` : undefined}
-					class="mt-2"
-				>
+			{#if change && changePercent}<div class="mt-2">
 					<StatusPill
 						tone={changeDirection === 0 ? 'neutral' : changeDirection > 0 ? 'ok' : 'danger'}
 						label="{changeDirection === 0
@@ -132,15 +107,9 @@
 						class="h-full rounded-full bg-bar"
 						style:width={`${progressMax > 0 ? (progressValue / progressMax) * 100 : 0}%`}
 					></div>
-				</div>
-				{#if linked}<span id={`${descriptionId}-progress`} class="sr-only"
-						>{progress.label}: {progressValue} of {progressMax}</span
-					>{/if}{/if}
+				</div>{/if}
 		{/if}
-		{#if state === 'stale'}<p
-				id={linked ? `${descriptionId}-stale` : undefined}
-				class="mt-2 text-label text-warn"
-			>
+		{#if state === 'stale'}<p class="mt-2 text-label text-warn">
 				<span aria-hidden="true">!</span> as of {ago(asOf)}
 			</p>{/if}
 	{/if}

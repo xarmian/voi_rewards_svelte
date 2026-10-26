@@ -8,19 +8,18 @@ import type { DataState } from './types';
 
 const children = createRawSnippet(() => ({ render: () => '<p>Card content</p>' }));
 
-function descriptions(html: string): string {
-	const ids = /<a\b[^>]*aria-describedby="([^"]+)"/.exec(html)?.[1].split(' ');
-	assert.ok(ids?.length, 'linked tile has descriptions');
-	return ids
-		.map((id) => {
-			const target = new RegExp(`<([a-z]+)\\b[^>]*id="${id}"[^>]*>([\\s\\S]*?)</\\1>`).exec(html);
-			assert.ok(target, `description target ${id} exists`);
-			return target[2]
-				.replace(/<[^>]+>/g, ' ')
-				.replace(/\s+/g, ' ')
-				.trim();
-		})
-		.join(' ');
+// SSR text in reading order, omitting decorative subtrees (including nested markup).
+function contentText(html: string): string {
+	const hidden: boolean[] = [];
+	let text = '';
+	for (const token of html.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g) ?? []) {
+		if (token.startsWith('<!--')) continue;
+		if (token.startsWith('</')) hidden.pop();
+		else if (token.startsWith('<')) {
+			hidden.push(Boolean(hidden.at(-1)) || /\baria-hidden="true"/.test(token));
+		} else if (!hidden.at(-1)) text += token;
+	}
+	return text.replace(/\s+/g, ' ').trim();
 }
 type StateProps = { state?: DataState; onretry?: () => void; asOf?: string };
 const fixtures = [
@@ -90,28 +89,39 @@ describe('StatTile', () => {
 		assert.match(html, /as of /);
 	});
 
-	test('linked tile retains every referenced description ID', () => {
-		const html = render(StatTile, {
-			props: {
-				label: 'Epoch',
-				value: '59%',
-				href: '/ds',
-				detail: 'Epoch estimate',
-				change: { value: 0.71, label: '24h' },
-				progress: { value: 59, max: 100, label: 'Epoch progress' },
-				state: 'stale',
-				asOf: '2026-10-25'
-			}
-		}).body;
-		assert.match(
-			html,
-			/aria-describedby="ds-stat-epoch-desc-detail ds-stat-epoch-desc-change ds-stat-epoch-desc-progress ds-stat-epoch-desc-stale"/
-		);
-		assert.match(descriptions(html), /Epoch estimate.*up 0.71% 24h.*Epoch progress.*as of /);
-	});
+	for (const state of ['ready', 'stale'] as const) {
+		test(`linked ${state} tile uses content in reading order without name or description overrides`, () => {
+			const html = render(StatTile, {
+				props: {
+					label: 'Epoch',
+					icon: '◆',
+					value: '59',
+					unit: '%',
+					href: '/ds',
+					detail: 'Epoch estimate',
+					change: { value: 0.71, label: '24h' },
+					progress: { value: 59, max: 100, label: 'Epoch progress' },
+					state,
+					asOf: '2026-10-25'
+				}
+			}).body;
+			const link = /<a\b[^>]*>/.exec(html);
+			assert.ok(link);
+			assert.doesNotMatch(link[0], /aria-label(?:ledby)?=|aria-describedby=/);
+			assert.doesNotMatch(html, /\bid=|aria-describedby=/);
+			const text = contentText(html);
+			assert.match(text, /^Epoch 59\s*% Epoch estimate up 0\.71% 24h/);
+			if (state === 'stale') {
+				assert.match(text, /up 0\.71% 24h as of /);
+				assert.match(html, /<span aria-hidden="true">!<\/span>/);
+			} else assert.doesNotMatch(text, /as of /);
+			assert.doesNotMatch(text, /◆|●|!|\+0\.71%|Epoch progress/);
+			assert.match(html, /<span\b[^>]*aria-hidden="true"[^>]*>◆<\/span>/);
+		});
+	}
 
 	for (const href of [undefined, '/ds']) {
-		test(`${href ? 'linked' : 'unlinked'} progressbar has no text and only linked progress has a sibling description`, () => {
+		test(`${href ? 'linked' : 'unlinked'} progressbar has no text or sibling description`, () => {
 			const html = render(StatTile, {
 				props: {
 					label: 'Epoch',
@@ -125,64 +135,34 @@ describe('StatTile', () => {
 			);
 			assert.ok(progressbar);
 			assert.equal(progressbar[1].replace(/<[^>]*>/g, '').trim(), '');
-			if (href) {
-				const target = /<span id="ds-stat-epoch-desc-progress" class="sr-only">([^<]+)<\/span>/;
-				assert.match(html, target);
-				assert.doesNotMatch(progressbar[0], target);
-				assert.match(descriptions(html), /Epoch progress: 59 of 100/);
-			} else {
-				assert.doesNotMatch(html, /<span[^>]*class="sr-only"[^>]*>Epoch progress/);
-			}
+			assert.doesNotMatch(html, /<span[^>]*class="sr-only"[^>]*>Epoch progress/);
 		});
 	}
 
-	test('linked stale tile describes its rendered timestamp with a stable ID', () => {
-		const html = render(StatTile, {
-			props: {
-				label: '  Node / HEALTH!!  ',
-				value: '3',
-				href: '/ds',
-				state: 'stale',
-				asOf: '2026-10-25'
-			}
-		}).body;
-		assert.match(html, /aria-describedby="ds-stat-node-health-desc[^"]*"/);
-		assert.match(descriptions(html), /as of /);
-	});
-	test('linked tile describes detail, spoken change and progress with explicit IDs', () => {
-		const html = render(StatTile, {
-			props: {
-				id: 'blocks',
-				label: 'Blocks',
-				value: '3',
-				href: '/ds',
-				detail: 'Epoch estimate',
-				change: { value: 0.71, label: '24h' },
-				progress: { value: 3, max: 16, label: 'Projected blocks' }
-			}
-		}).body;
-		assert.match(html, /aria-describedby="blocks-desc[^"]*"/);
-		const text = descriptions(html);
-		assert.match(text, /Epoch estimate/);
-		assert.match(text, /up 0.71% 24h/);
-		assert.match(text, /Projected blocks: 3 of 16/);
-	});
-	for (const state of ['empty', 'ready'] as const) {
-		test(`linked ${state} missing value is named no data without its unit or dangling descriptions`, () => {
-			const html = render(StatTile, {
-				props: {
-					label: 'Stake',
-					value: state === 'empty' ? '12' : '—',
-					unit: 'VOI',
-					href: '/ds',
-					state,
-					detail: 'Hidden',
-					change: { value: 1, label: '24h' }
-				}
-			}).body;
-			assert.match(html, /aria-label="Stake: no data"/);
-			assert.doesNotMatch(html, /aria-describedby/);
-		});
+	for (const href of [undefined, '/ds']) {
+		for (const state of ['empty', 'ready', 'stale'] as const) {
+			test(`${href ? 'linked' : 'unlinked'} ${state} missing value hides the em dash and speaks no data`, () => {
+				const html = render(StatTile, {
+					props: {
+						label: 'Stake',
+						value: state === 'empty' ? '12' : '—',
+						unit: 'VOI',
+						href,
+						state,
+						asOf: '2026-10-25',
+						detail: 'Hidden',
+						change: { value: 1, label: '24h' }
+					}
+				}).body;
+				assert.match(html, /<span aria-hidden="true">—<\/span>/);
+				assert.match(html, /<span class="sr-only">no data<\/span>/);
+				const text = contentText(html);
+				if (state === 'stale') assert.match(text, /^Stake no data as of /);
+				else assert.equal(text, 'Stake no data');
+				assert.doesNotMatch(text, /—|VOI|Hidden|24h/);
+				assert.doesNotMatch(html, /aria-label=|aria-describedby=|\bid=/);
+			});
+		}
 	}
 	for (const value of [NaN, Infinity, -Infinity]) {
 		test(`non-finite change ${value} renders no pill`, () => {
@@ -202,7 +182,7 @@ describe('StatTile', () => {
 			assert.doesNotMatch(html, /[+−]0%|up |down /);
 		});
 	}
-	test('linked tile has exactly one interaction and a precise accessible name', () => {
+	test('linked tile has exactly one interaction', () => {
 		const html = render(StatTile, {
 			props: {
 				label: 'Stake',
@@ -215,7 +195,6 @@ describe('StatTile', () => {
 		}).body;
 		assert.equal((html.match(/<a\b/g) ?? []).length, 1);
 		assert.doesNotMatch(html, /<button/);
-		assert.match(html, /aria-label="Stake: 725.24M VOI"/);
 	});
 	test('href loading and error remain containers with optional retry', () => {
 		for (const state of ['loading', 'error'] as const) {
@@ -232,11 +211,11 @@ describe('StatTile', () => {
 			[-1.01, 'down', '−1.01%']
 		] as const) {
 			const html = render(StatTile, {
-				props: { label: 'Price', value: '$1', change: { value, label: '24 hours' } }
+				props: { label: 'Price', value: '$1', href: '/ds', change: { value, label: '24 hours' } }
 			}).body;
-			assert.ok(html.includes(`${word} ${Math.abs(value)}%`));
-			assert.ok(html.includes(visual));
-			assert.match(html, /aria-hidden="true"/);
+			assert.ok(html.includes(`<span aria-hidden="true">${visual} 24 hours</span>`));
+			assert.ok(html.includes(`<span class="sr-only">${word} ${Math.abs(value)}% 24 hours</span>`));
+			assert.equal(contentText(html), `Price $1 ${word} ${Math.abs(value)}% 24 hours`);
 		}
 	});
 	test('progress has all accessible attributes', () => {
