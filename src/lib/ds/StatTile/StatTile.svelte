@@ -22,7 +22,7 @@
 		asOf
 	}: {
 		label: string;
-		/** Keep labels unique on a page, or supply an explicit ID for descriptions. */
+		/** For linked tiles, keep labels unique on a page or supply an explicit description ID. */
 		id?: string;
 		icon?: string;
 		value: string;
@@ -95,10 +95,16 @@
 			{shownValue}{#if unit}<span class="ml-1 text-label text-ink-muted">{unit}</span>{/if}
 		</p>
 		{#if hasValue}
-			{#if detail}<div id={`${descriptionId}-detail`} class="mt-2 text-label text-ink-muted">
+			{#if detail}<div
+					id={linked ? `${descriptionId}-detail` : undefined}
+					class="mt-2 text-label text-ink-muted"
+				>
 					{#if typeof detail === 'string'}{detail}{:else}{@render detail()}{/if}
 				</div>{/if}
-			{#if change && changePercent}<div id={`${descriptionId}-change`} class="mt-2">
+			{#if change && changePercent}<div
+					id={linked ? `${descriptionId}-change` : undefined}
+					class="mt-2"
+				>
 					<StatusPill
 						tone={changeDirection === 0 ? 'neutral' : changeDirection > 0 ? 'ok' : 'danger'}
 						label="{changeDirection === 0
@@ -122,16 +128,19 @@
 					aria-valuemax={progressMax}
 					aria-label={progress.label}
 				>
-					<span id={`${descriptionId}-progress`} class="sr-only"
-						>{progress.label}: {progressValue} of {progressMax}</span
-					>
 					<div
 						class="h-full rounded-full bg-bar"
 						style:width={`${progressMax > 0 ? (progressValue / progressMax) * 100 : 0}%`}
 					></div>
-				</div>{/if}
+				</div>
+				{#if linked}<span id={`${descriptionId}-progress`} class="sr-only"
+						>{progress.label}: {progressValue} of {progressMax}</span
+					>{/if}{/if}
 		{/if}
-		{#if state === 'stale'}<p id={`${descriptionId}-stale`} class="mt-2 text-label text-warn">
+		{#if state === 'stale'}<p
+				id={linked ? `${descriptionId}-stale` : undefined}
+				class="mt-2 text-label text-warn"
+			>
 				<span aria-hidden="true">!</span> as of {ago(asOf)}
 			</p>{/if}
 	{/if}

@@ -72,6 +72,70 @@ describe('data states', () => {
 });
 
 describe('StatTile', () => {
+	test('unlinked tiles with matching labels render no description IDs', () => {
+		const props = {
+			label: 'Epoch',
+			value: '59%',
+			detail: 'Epoch estimate',
+			change: { value: 0.71, label: '24h' },
+			progress: { value: 59, max: 100, label: 'Epoch progress' },
+			state: 'stale' as const,
+			asOf: '2026-10-25'
+		};
+		const html = render(StatTile, { props }).body + render(StatTile, { props }).body;
+		assert.doesNotMatch(html, /\bid="[^"]*-desc-(?:detail|change|progress|stale)"/);
+		assert.doesNotMatch(html, /aria-describedby/);
+		assert.match(html, /Epoch estimate/);
+		assert.match(html, /up 0.71% 24h/);
+		assert.match(html, /as of /);
+	});
+
+	test('linked tile retains every referenced description ID', () => {
+		const html = render(StatTile, {
+			props: {
+				label: 'Epoch',
+				value: '59%',
+				href: '/ds',
+				detail: 'Epoch estimate',
+				change: { value: 0.71, label: '24h' },
+				progress: { value: 59, max: 100, label: 'Epoch progress' },
+				state: 'stale',
+				asOf: '2026-10-25'
+			}
+		}).body;
+		assert.match(
+			html,
+			/aria-describedby="ds-stat-epoch-desc-detail ds-stat-epoch-desc-change ds-stat-epoch-desc-progress ds-stat-epoch-desc-stale"/
+		);
+		assert.match(descriptions(html), /Epoch estimate.*up 0.71% 24h.*Epoch progress.*as of /);
+	});
+
+	for (const href of [undefined, '/ds']) {
+		test(`${href ? 'linked' : 'unlinked'} progressbar has no text and only linked progress has a sibling description`, () => {
+			const html = render(StatTile, {
+				props: {
+					label: 'Epoch',
+					value: '59%',
+					href,
+					progress: { value: 59, max: 100, label: 'Epoch progress' }
+				}
+			}).body.replace(/<!--[\s\S]*?-->/g, '');
+			const progressbar = /<div\b[^>]*role="progressbar"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/.exec(
+				html
+			);
+			assert.ok(progressbar);
+			assert.equal(progressbar[1].replace(/<[^>]*>/g, '').trim(), '');
+			if (href) {
+				const target = /<span id="ds-stat-epoch-desc-progress" class="sr-only">([^<]+)<\/span>/;
+				assert.match(html, target);
+				assert.doesNotMatch(progressbar[0], target);
+				assert.match(descriptions(html), /Epoch progress: 59 of 100/);
+			} else {
+				assert.doesNotMatch(html, /<span[^>]*class="sr-only"[^>]*>Epoch progress/);
+			}
+		});
+	}
+
 	test('linked stale tile describes its rendered timestamp with a stable ID', () => {
 		const html = render(StatTile, {
 			props: {
