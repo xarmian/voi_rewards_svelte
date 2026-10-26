@@ -14,13 +14,28 @@ export function createKeyedCache<K, V>({
 		fetchedAt?: number;
 		inFlight?: Promise<V>;
 		sequence: number;
+		strictSequence: number;
 	}
 	const entries = new Map<K, Entry>();
 
-	function get(key: K, fetcher: () => Promise<V>, { force = false } = {}): Promise<V> {
+	function get(
+		key: K,
+		fetcher: () => Promise<V>,
+		options: { force?: boolean; strict: true }
+	): Promise<NonNullable<V>>;
+	function get(
+		key: K,
+		fetcher: () => Promise<V>,
+		options?: { force?: boolean; strict?: boolean }
+	): Promise<V>;
+	function get(
+		key: K,
+		fetcher: () => Promise<V>,
+		{ force = false, strict = false } = {}
+	): Promise<V> {
 		let entry = entries.get(key);
 		// TASK-30: ordinary callers join the newest request, even if a stored value is fresh.
-		if (!force && entry?.inFlight) return entry.inFlight;
+		if (!strict && !force && entry?.inFlight) return entry.inFlight;
 		if (
 			!force &&
 			entry?.value != null &&
@@ -29,21 +44,31 @@ export function createKeyedCache<K, V>({
 		) {
 			return Promise.resolve(entry.value);
 		}
+		const createdEntry = !entry;
 		if (!entry) {
-			entry = { sequence: 0 };
+			entry = { sequence: 0, strictSequence: 0 };
 			entries.set(key, entry);
 		}
 		const current = entry;
-		const sequence = ++current.sequence;
-		current.inFlight = Promise.resolve()
+		// Strict reads observe ordinary request ordering without superseding those requests.
+		const sequence = strict ? current.sequence : ++current.sequence;
+		const strictSequence = strict ? ++current.strictSequence : undefined;
+		// Strict reads start their own request so stale fallback cannot mask a failure.
+		const request = Promise.resolve()
 			.then(fetcher)
 			.then(
 				(value) => {
+					if (strict && value == null) throw new Error('Account not found');
 					// TASK-30: failed refetches retain the previous value and its original timestamp.
 					// TASK-30 r2: never across an invalidation (a detached entry's value was discarded).
 					if (value == null) return entries.get(key) === current ? (current.value ?? value) : value;
 					// TASK-30: only the newest non-invalidated request may publish a value.
-					if (entries.get(key) === current && current.sequence === sequence) {
+					if (
+						entries.get(key) === current &&
+						current.sequence === sequence &&
+						(!strict || !current.inFlight) &&
+						(!strict || current.strictSequence === strictSequence)
+					) {
 						current.value = value;
 						current.fetchedAt = now();
 						onValue?.(key, value);
@@ -51,16 +76,21 @@ export function createKeyedCache<K, V>({
 					return value;
 				},
 				(error) => {
+					if (strict) throw error;
 					if (current.value != null && entries.get(key) === current) return current.value;
 					throw error;
 				}
 			)
 			.finally(() => {
+				// Strict reads may only clean up their own entry while no ordinary read is pending.
+				if (strict && (!createdEntry || current.inFlight)) return;
+				if (current.inFlight === request) delete current.inFlight;
 				if (current.sequence !== sequence) return;
-				delete current.inFlight;
 				if (current.value == null && entries.get(key) === current) entries.delete(key);
 			});
-		return current.inFlight;
+		// Only ordinary requests may be joined: strict failures must stay with strict callers.
+		if (!strict) current.inFlight = request;
+		return request;
 	}
 
 	function invalidate(key?: K) {

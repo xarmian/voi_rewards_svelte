@@ -1,7 +1,7 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { supabasePrivateClient } from '$lib/supabase-server';
+import { supabasePrivateClient } from '$lib/server/supabase';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const period = url.searchParams.get('period') || '24h';

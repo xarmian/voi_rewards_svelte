@@ -10,6 +10,202 @@ function setup() {
 	return { cache, advance: (ms: number) => (time += ms) };
 }
 
+describe('TASK-35 strict keyed async cache', () => {
+	it('keeps the newer overlapping strict result cached and never publishes the older result', async () => {
+		const onValue = vi.fn();
+		const cache = createKeyedCache<string, number>({ ttlMs: 100, onValue });
+		let resolveOld!: (value: number) => void;
+		let resolveNew!: (value: number) => void;
+		const older = new Promise<number>((done) => (resolveOld = done));
+		const newer = new Promise<number>((done) => (resolveNew = done));
+		const first = cache.get('X', () => older, { force: true, strict: true });
+		const second = cache.get('X', () => newer, { force: true, strict: true });
+		resolveNew(2);
+		expect(await second).toBe(2);
+		resolveOld(1);
+		expect(await first).toBe(1);
+		const fetcher = vi.fn().mockResolvedValue(3);
+		expect.soft(await cache.get('X', fetcher)).toBe(2);
+		expect.soft(onValue.mock.calls).toEqual([['X', 2]]);
+		expect(fetcher).not.toHaveBeenCalled();
+	});
+
+	it('removes an empty entry after its creating strict read fails', async () => {
+		const { cache } = setup();
+		const error = new Error('strict failure');
+		await expect(cache.get('X', async () => Promise.reject(error), { strict: true })).rejects.toBe(
+			error
+		);
+		const fetcher = vi.fn().mockResolvedValue(2);
+		expect(await cache.get('X', fetcher)).toBe(2);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
+	it('preserves an ordinary value when the strict read that created the entry later fails', async () => {
+		const { cache } = setup();
+		let reject!: (error: Error) => void;
+		const pending = new Promise<number>((_, fail) => (reject = fail));
+		const strict = cache.get('X', () => pending, { strict: true });
+		const fetcher = vi.fn().mockResolvedValue(2);
+		expect(await cache.get('X', fetcher)).toBe(2);
+		const error = new Error('strict failure');
+		const rejection = expect(strict).rejects.toBe(error);
+		reject(error);
+		await rejection;
+		expect(await cache.get('X', fetcher)).toBe(2);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
+	it.each([new Error('offline'), null, undefined])(
+		'rejects on %s and preserves the stored value and timestamp',
+		async (failure) => {
+			const { cache, advance } = setup();
+			await cache.get('X', async () => 1);
+			advance(99);
+			const fetcher = vi.fn(async () => {
+				if (failure instanceof Error) throw failure;
+				return failure;
+			});
+			const pending = cache.get('X', fetcher, { force: true, strict: true });
+			if (failure instanceof Error) await expect(pending).rejects.toBe(failure);
+			else await expect(pending).rejects.toThrow('Account not found');
+			expect(await cache.get('X', fetcher)).toBe(1);
+			advance(1);
+			// The failure did not renew the timestamp or replace the stored value.
+			expect(await cache.get('X', fetcher)).toBe(1);
+			expect(fetcher).toHaveBeenCalledTimes(2);
+		}
+	);
+
+	it('returns a fresh value within TTL, even during a non-strict refresh', async () => {
+		const { cache, advance } = setup();
+		await cache.get('X', async () => 1);
+		advance(99);
+		let resolve!: (value: number) => void;
+		const pending = cache.get('X', () => new Promise<number>((done) => (resolve = done)), {
+			force: true
+		});
+		const fetcher = vi.fn().mockResolvedValue(3);
+		expect(await cache.get('X', fetcher, { strict: true })).toBe(1);
+		expect(fetcher).not.toHaveBeenCalled();
+		resolve(2);
+		await pending;
+	});
+
+	it('always fetches with force and publishes the result', async () => {
+		const onValue = vi.fn();
+		const cache = createKeyedCache<string, number>({ ttlMs: 100, onValue });
+		const fetcher = vi.fn().mockResolvedValueOnce(1).mockResolvedValue(2);
+		await cache.get('X', fetcher);
+		expect(await cache.get('X', fetcher, { force: true, strict: true })).toBe(2);
+		expect(await cache.get('X', fetcher)).toBe(2);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(onValue.mock.calls).toEqual([
+			['X', 1],
+			['X', 2]
+		]);
+	});
+
+	it.each(['fails', 'succeeds'])(
+		'lets an in-flight ordinary request publish when a later strict request %s',
+		async (outcome) => {
+			const onValue = vi.fn();
+			const cache = createKeyedCache<string, number>({ ttlMs: 100, onValue });
+			let resolve!: (value: number) => void;
+			const ordinary = cache.get('X', () => new Promise<number>((done) => (resolve = done)));
+			const error = new Error('strict failure');
+			const strict = cache.get(
+				'X',
+				async () => {
+					if (outcome === 'fails') throw error;
+					return 1;
+				},
+				{ strict: true }
+			);
+			if (outcome === 'fails') await expect(strict).rejects.toBe(error);
+			else expect(await strict).toBe(1);
+			expect(onValue).not.toHaveBeenCalled();
+			const fetcher = vi.fn().mockResolvedValue(3);
+			const joined = cache.get('X', fetcher);
+			resolve(2);
+			expect(await ordinary).toBe(2);
+			expect(await joined).toBe(2);
+			expect(joined).toBe(ordinary);
+			expect(await cache.get('X', fetcher)).toBe(2);
+			expect(fetcher).not.toHaveBeenCalled();
+			expect(onValue.mock.calls).toEqual([['X', 2]]);
+		}
+	);
+
+	it('publishes a strict success into an empty cache with no ordinary request in flight', async () => {
+		const onValue = vi.fn();
+		const cache = createKeyedCache<string, number>({ ttlMs: 100, onValue });
+		expect(await cache.get('X', async () => 1, { strict: true })).toBe(1);
+		const fetcher = vi.fn().mockResolvedValue(2);
+		expect(await cache.get('X', fetcher)).toBe(1);
+		expect(fetcher).not.toHaveBeenCalled();
+		expect(onValue.mock.calls).toEqual([['X', 1]]);
+	});
+
+	it('does not join a non-strict request whose failure substitutes a stale value', async () => {
+		const { cache, advance } = setup();
+		await cache.get('X', async () => 1);
+		advance(100);
+		let reject!: (error: Error) => void;
+		const ordinary = cache.get('X', () => new Promise<number>((_, fail) => (reject = fail)));
+		const error = new Error('strict failure');
+		const fetcher = vi.fn().mockRejectedValue(error);
+		const strict = cache.get('X', fetcher, { strict: true });
+		expect(strict).not.toBe(ordinary);
+		await expect(strict).rejects.toBe(error);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+		reject(new Error('ordinary failure'));
+		expect(await ordinary).toBe(1);
+	});
+
+	it('keeps non-strict readers on their own in-flight request when a strict read fails', async () => {
+		const { cache, advance } = setup();
+		await cache.get('X', async () => 1);
+		advance(100);
+		let reject!: (error: Error) => void;
+		const ordinary = cache.get('X', () => new Promise<number>((_, fail) => (reject = fail)));
+		const error = new Error('strict failure');
+		const strict = cache.get(
+			'X',
+			async () => {
+				throw error;
+			},
+			{ strict: true }
+		);
+		const joined = cache.get('X', async () => 3);
+		const strictFailure = expect(strict).rejects.toBe(error);
+		const ordinaryResult = expect(joined).resolves.toBe(1);
+		await Promise.resolve();
+		reject(new Error('ordinary failure'));
+		await Promise.all([strictFailure, ordinaryResult]);
+		expect(joined).toBe(ordinary);
+	});
+
+	it.each(['newer fetch', 'invalidation'])(
+		'does not publish a strict result superseded by %s',
+		async (kind) => {
+			const { cache } = setup();
+			let resolve!: (value: number) => void;
+			const pending = cache.get('X', () => new Promise<number>((done) => (resolve = done)), {
+				strict: true
+			});
+			await Promise.resolve();
+			if (kind === 'invalidation') cache.invalidate('X');
+			const fetcher = vi.fn().mockResolvedValue(2);
+			await cache.get('X', fetcher, { force: true });
+			resolve(1);
+			expect(await pending).toBe(1);
+			expect(await cache.get('X', fetcher)).toBe(2);
+			expect(fetcher).toHaveBeenCalledTimes(1);
+		}
+	);
+});
+
 describe('TASK-30 keyed async cache', () => {
 	it('shares a pending fetch between non-forced callers', async () => {
 		const { cache } = setup();

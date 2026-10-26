@@ -1,9 +1,11 @@
-import { test, afterEach, vi } from 'vitest';
+import { test, beforeEach, afterEach, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { fetchFungibleTokens } from './fungibleTokens.ts';
 import { algodClient } from '../utils/algod.ts';
 import type { PoolInfo } from './lp.ts';
+import { clearCaches } from '$lib/stores/accounts';
 
+beforeEach(() => clearCaches());
 afterEach(() => vi.restoreAllMocks());
 
 const balances = [

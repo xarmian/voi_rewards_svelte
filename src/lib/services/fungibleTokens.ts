@@ -1,6 +1,6 @@
+import { requireAccountInfo } from '$lib/stores/accounts';
 import type { PoolInfo } from '$lib/services/lp';
 import type { FungibleTokenType, TokenApproval, ARC200Token } from '$lib/types/assets';
-import { algodClient } from '../utils/algod.ts';
 import algosdk from 'algosdk';
 
 // Type for the unified API response
@@ -267,8 +267,8 @@ export async function fetchFungibleTokens(
 					poolName = `${tokenAInfo.name}/${tokenBInfo.name} LP`;
 					const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
 					try {
-						const poolEscrowInfo = await algodClient.accountInformation(poolEscrowAddr).do();
-						tvlBalance = (poolEscrowInfo.amount * 2) / Math.pow(10, 6);
+						const poolEscrowInfo = await requireAccountInfo(poolEscrowAddr);
+						tvlBalance = ((poolEscrowInfo.amount as number) * 2) / Math.pow(10, 6);
 
 						// Supply calculation moved to before value calculation
 					} catch (err) {

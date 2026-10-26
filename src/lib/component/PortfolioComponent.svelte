@@ -7,7 +7,7 @@
 	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { dataTable } from '../../stores/dataTable';
 	import { getTokensByEpoch, decodeGlobalState } from '$lib/utils';
-	import { getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
+	import { getSupplyInfo, getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import { config } from '$lib/config';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -293,7 +293,7 @@
 		try {
 			// Fetch account information
 			const accountIndexerInfo = await algodIndexer.lookupAccountByID(walletAddress).do();
-			const account = await algodClient.accountInformation(walletAddress).do();
+			const account = await requireAccountInfo(walletAddress);
 			accountBalance = accountIndexerInfo.account.amount;
 			accountStatus = accountIndexerInfo.account.status || 'Offline';
 			minBalance = accountIndexerInfo.account['min-balance'] || 0;
@@ -303,8 +303,10 @@
 
 			// Calculate vote key expiry if account is online
 			if (accountStatus === 'Online' && account.participation) {
-				const currentRound = account.round;
-				const lastValidRound = account.participation['vote-last-valid'];
+				const currentRound = account.round as number;
+				const lastValidRound = (account.participation as unknown as Record<string, number>)[
+					'vote-last-valid'
+				];
 				voteKeyExpiry = (lastValidRound - currentRound) * 3.3; // 3.3 seconds per block
 				voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
 			}

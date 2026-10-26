@@ -1,17 +1,16 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { supabasePrivateClient } from '$lib/supabase-server';
+import { supabasePrivateClient } from '$lib/server/supabase';
 import { fetchCirculatingSupply } from '$lib/utils/voi';
-import { createClient } from '@supabase/supabase-js';
+import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { PUBLIC_MIMIR_ANON_KEY, PUBLIC_MIMIR_URL } from '$env/static/public';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
 import { fetchPoolAggregates, latestSwapRow, pairWindow } from '$lib/server/poolAggregates';
 import { resolveVoiUsd } from '$lib/server/voiUsdReference';
 import type { VoiUsdStatus } from '$lib/server/voiUsdReference';
 
-// The untyped Mimir client created below; its rows are untyped (no generated schema)
+// The untyped Mimir client; its rows are untyped (no generated schema)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MimirClient = SupabaseClient<any, any, any>;
 
@@ -215,8 +214,6 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		let voiUsdStatus: VoiUsdStatus | null = null;
 		let voiUsdAsOf: string | null = null;
 		if (tokenId !== null) {
-			const supabaseMimirClient = createClient(PUBLIC_MIMIR_URL!, PUBLIC_MIMIR_ANON_KEY!);
-
 			// Get all equivalent token IDs (handles wrapped/native mappings)
 			const equivalentIds = await getTokenEquivalentIds(tokenId, supabaseMimirClient, onFailure);
 

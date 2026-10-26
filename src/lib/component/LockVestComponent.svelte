@@ -5,7 +5,7 @@
 	import * as algosdk from 'algosdk';
 	import WithdrawModal from './WithdrawModal.svelte';
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
-	import { getConsensusInfo } from '$lib/stores/accounts';
+	import { getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import type { ContractDetails } from '$lib/types';
 	import { selectedWallet } from 'avm-wallet-svelte';
 
@@ -105,8 +105,8 @@
 				try {
 					// Get the application info using algodClient
 					const appInfo = await algodClient.getApplicationByID(account.contractId).do();
-					const accountInfo = await algodClient.accountInformation(account.address).do();
-					const currentBalance = accountInfo.amount;
+					const accountInfo = await requireAccountInfo(account.address, { force: true });
+					const currentBalance = accountInfo.amount as number;
 
 					// Decode the global state
 					const decodedState = decodeState(appInfo.params['global-state'], account.address);
@@ -193,7 +193,9 @@
 						}
 
 						// Calculate available withdrawal amount considering minimum balance
-						const minimumBalance = accountInfo['min-balance'];
+						const minimumBalance = (accountInfo as unknown as Record<string, number>)[
+							'min-balance'
+						];
 						availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
 					}
 
@@ -229,7 +231,7 @@
 						periodSeconds: Number(decodedState.global_period_seconds ?? 0),
 						period: Number(decodedState.global_period ?? 0),
 						consensusDetails: consensusInfo,
-						accountInfo: accountInfo
+						accountInfo: accountInfo as unknown as ContractDetails['accountInfo']
 					};
 				} catch (err) {
 					console.error('Error loading contract:', err);
