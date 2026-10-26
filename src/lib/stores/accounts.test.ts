@@ -19,7 +19,6 @@ vi.mock('$lib/utils/algod', () => ({
 	}
 }));
 vi.mock('$lib/config', () => ({ config: { proposalApiBaseUrl: 'https://test.invalid' } }));
-vi.mock('$lib/utils/nfd', () => ({ getNFD: vi.fn() }));
 
 beforeEach(() => {
 	clearCaches();

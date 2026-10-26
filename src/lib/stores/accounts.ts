@@ -2,7 +2,6 @@ import { writable, get } from 'svelte/store';
 import { config } from '$lib/config';
 import algosdk from 'algosdk';
 import { algodClient } from '$lib/utils/algod';
-import { getNFD } from '$lib/utils/nfd';
 import { createKeyedCache } from '$lib/utils/asyncCache';
 
 export interface ConsensusInfo {
@@ -35,11 +34,6 @@ export interface NFDomainResponse {
 }
 
 export type Account = algosdk.modelsv2.Account;
-
-interface NFDomainResult {
-	key: string;
-	replacementValue: string;
-}
 
 interface OnlineStakeData {
 	date: string;
@@ -261,70 +255,6 @@ async function getEnvoi(
 	const response = await fetch(url);
 	const data = await response.json();
 	return data;
-}
-
-// NFDomains fetching with cache - now supports batch operations
-export async function getNFDomainsx(
-	addresses: string[]
-): Promise<Record<string, NFDomainResponse | null>> {
-	if (!addresses.length) return {};
-
-	const domains = get(nfDomains);
-	const uncachedAddresses: string[] = [];
-	const results: Record<string, NFDomainResponse | null> = {};
-
-	// First check cache for each address
-	addresses.forEach((address) => {
-		if (address in domains) {
-			results[address] = domains[address];
-		} else {
-			uncachedAddresses.push(address);
-		}
-	});
-
-	// If we have uncached addresses, fetch them
-	if (uncachedAddresses.length > 0) {
-		try {
-			const newDomains = await getNFD(uncachedAddresses);
-
-			// Process the results
-			newDomains.forEach((result: NFDomainResult) => {
-				const domainData: NFDomainResponse = {
-					name: result.replacementValue,
-					properties: {
-						address: result.key,
-						caAlgo: result.key,
-						verified: true // You might want to adjust this based on actual data
-					}
-				};
-
-				results[result.key] = domainData;
-
-				// Update the cache
-				nfDomains.update((current) => ({
-					...current,
-					[result.key]: domainData
-				}));
-			});
-
-			// Cache null results for addresses that didn't return a domain
-			uncachedAddresses.forEach((address) => {
-				if (!(address in results)) {
-					results[address] = null;
-					nfDomains.update((current) => ({
-						...current,
-						[address]: null
-					}));
-				}
-			});
-		} catch (error) {
-			console.error('Error fetching NFDomains:', error);
-		}
-	}
-
-	console.log(results);
-
-	return results;
 }
 
 // Keep the single address lookup for backwards compatibility
