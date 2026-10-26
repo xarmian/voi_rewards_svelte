@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 
 interface Snapshot {
 	total_blocks?: number;
@@ -55,9 +56,13 @@ function inlineRewards(component: string) {
 	return component === 'PortfolioComponent' ? PortfolioComponentRewards : EpochComponentRewards;
 }
 
-for (const component of ['PortfolioComponent', 'EpochComponent']) {
+for (const component of ['PortfolioComponent', 'EpochComponent', 'calculateEpochRewards']) {
 	describe(`${component} inline epoch-reward characterization`, () => {
-		const calculate = inlineRewards(component);
+		const calculate =
+			component === 'calculateEpochRewards'
+				? (snapshot: Snapshot, date: { epoch: number }, wallet: string, tokens: number) =>
+						calculateEpochRewards(snapshot, date.epoch, snapshot.proposers[wallet], tokens)
+				: inlineRewards(component);
 		const snapshot: Snapshot = {
 			total_blocks: 120,
 			ballast_blocks: 20,
@@ -65,9 +70,9 @@ for (const component of ['PortfolioComponent', 'EpochComponent']) {
 		};
 
 		it.each([
-			[61, 140, 120],
-			[62, 120, 140]
-		])('currently epoch %i produces %i blocks and %i rewards', (epoch, blocks, reward) => {
+			['includes ballast at epoch 61', 61, 140, 120],
+			['excludes ballast from epoch 62', 62, 120, 140]
+		] as const)('%s', (_rule, epoch, blocks, reward) => {
 			expect(calculate(snapshot, { epoch }, 'wallet', 1400)).toEqual({
 				totalBlocksProduced: blocks,
 				userBlocksProduced: 12,
@@ -104,19 +109,23 @@ for (const component of ['PortfolioComponent', 'EpochComponent']) {
 			).toEqual({ totalBlocksProduced: 133, userBlocksProduced: 12, expectedReward: 120 });
 		});
 
-		it('currently produces NaN for a zero-block epoch with no wallet blocks', () => {
-			expect(calculate({ total_blocks: 0, proposers: {} }, { epoch: 62 }, 'wallet', 1400)).toEqual({
-				totalBlocksProduced: 0,
-				userBlocksProduced: 0,
-				expectedReward: NaN
+		if (component !== 'calculateEpochRewards') {
+			it('currently produces NaN for a zero-block epoch with no wallet blocks', () => {
+				expect(
+					calculate({ total_blocks: 0, proposers: {} }, { epoch: 62 }, 'wallet', 1400)
+				).toEqual({
+					totalBlocksProduced: 0,
+					userBlocksProduced: 0,
+					expectedReward: NaN
+				});
 			});
-		});
 
-		it('currently produces Infinity for zero total blocks and positive wallet blocks', () => {
-			expect(
-				calculate({ total_blocks: 0, proposers: { wallet: 12 } }, { epoch: 62 }, 'wallet', 1400)
-			).toEqual({ totalBlocksProduced: 0, userBlocksProduced: 12, expectedReward: Infinity });
-		});
+			it('currently produces Infinity for zero total blocks and positive wallet blocks', () => {
+				expect(
+					calculate({ total_blocks: 0, proposers: { wallet: 12 } }, { epoch: 62 }, 'wallet', 1400)
+				).toEqual({ totalBlocksProduced: 0, userBlocksProduced: 12, expectedReward: Infinity });
+			});
+		}
 
 		it('preserves the component-specific handling of a numeric string proposer count', () => {
 			expect(
@@ -139,3 +148,59 @@ for (const component of ['PortfolioComponent', 'EpochComponent']) {
 		});
 	});
 }
+
+describe('canonical epoch reward guards', () => {
+	it.each([61, 62])(
+		'returns zero rewards for a zero-block epoch %i, replacing old NaN and Infinity',
+		(epoch) => {
+			for (const blocks of [0, 12]) {
+				const result = calculateEpochRewards(
+					{ total_blocks: 0, ballast_blocks: 200 },
+					epoch,
+					blocks,
+					1400
+				);
+				expect(result).toEqual({
+					totalBlocksProduced: 0,
+					userBlocksProduced: blocks,
+					expectedReward: 0
+				});
+				expect(Number.isFinite(result.expectedReward)).toBe(true);
+			}
+		}
+	);
+	it('returns zero when the snapshot omits its block counts', () => {
+		expect(calculateEpochRewards({}, 61, undefined, 1400)).toEqual({
+			totalBlocksProduced: 0,
+			userBlocksProduced: 0,
+			expectedReward: 0
+		});
+	});
+	it("explicitly changes Portfolio's old 'bad' proposer reward from NaN to canonical zero", () => {
+		const snapshot = { total_blocks: 120, proposers: { wallet: 'bad' } };
+		expect(
+			PortfolioComponentRewards(snapshot, { epoch: 62 }, 'wallet', 1400).expectedReward
+		).toBeNaN();
+		expect(calculateEpochRewards(snapshot, 62, 'bad', 1400)).toEqual({
+			totalBlocksProduced: 120,
+			userBlocksProduced: 0,
+			expectedReward: 0
+		});
+	});
+	it.each(['bad', NaN, Infinity, -Infinity, 'Infinity', undefined, null])(
+		'normalizes a non-finite or absent proposer count %s to zero',
+		(blocks) => {
+			expect(calculateEpochRewards({ total_blocks: 120 }, 62, blocks, 1400)).toEqual({
+				totalBlocksProduced: 120,
+				userBlocksProduced: 0,
+				expectedReward: 0
+			});
+		}
+	);
+	it('preserves both reward sender addresses and their order', () => {
+		expect(REWARDS_ADDRESSES).toEqual([
+			'62TIVJSZOS4DRSSYYDDZELQAGFYQC5JWKCHRBPPYKTZN2OOOXTGLB5ZJ4E',
+			'CAGQDUFUPI6WAQCIQZHPHMX2Z7KACAKZWOMI4R72JV24U4AVAJTGCHA2BE'
+		]);
+	});
+});
