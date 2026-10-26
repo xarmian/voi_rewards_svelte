@@ -4,6 +4,31 @@
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" />
 		<meta name="viewport" content="width=device-width" />
+		<meta name="color-scheme" content="light dark" />
+		<meta name="theme-color" content="#5b21b6" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#2e1065" media="(prefers-color-scheme: dark)" />
+		<script id="theme-init">
+			(function () {
+				var d = document.documentElement,
+					q = new URLSearchParams(location.search).get('theme');
+				var forced =
+					location.pathname.indexOf('/discover') === 0 && (q === 'light' || q === 'dark')
+						? q
+						: null;
+				var s = null;
+				try {
+					s = localStorage.getItem('color-theme');
+				} catch (e) {}
+				if (s !== 'light' && s !== 'dark') s = null;
+				var dark = forced
+					? forced === 'dark'
+					: s
+						? s === 'dark'
+						: matchMedia('(prefers-color-scheme: dark)').matches;
+				d.classList.toggle('dark', dark);
+				d.dataset.themeSource = forced ? 'forced' : s ? 'user' : 'system';
+			})();
+		</script>
 		<meta name="type" property="og:type" content="website" />
 		<meta name="author" content="@xarmian" />
 		%sveltekit.head%
@@ -12,17 +37,6 @@
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 	<script>
-		// Check for dark mode preference
-		if (
-			localStorage.getItem('color-theme') === 'dark' ||
-			(!localStorage.getItem('color-theme') &&
-				window.matchMedia('(prefers-color-scheme: dark)').matches)
-		) {
-			document.documentElement.classList.add('dark');
-		} else {
-			document.documentElement.classList.remove('dark');
-		}
-
 		function onRecaptchaLoad() {
 			grecaptcha.render('g-recaptcha');
 		}
