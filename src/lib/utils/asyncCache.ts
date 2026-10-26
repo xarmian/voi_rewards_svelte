@@ -43,12 +43,14 @@ export function createKeyedCache<K, V>({
 		) {
 			return Promise.resolve(entry.value);
 		}
+		const createdEntry = !entry;
 		if (!entry) {
 			entry = { sequence: 0 };
 			entries.set(key, entry);
 		}
 		const current = entry;
-		const sequence = ++current.sequence;
+		// Strict reads observe ordinary request ordering without superseding those requests.
+		const sequence = strict ? current.sequence : ++current.sequence;
 		// Strict reads start their own request so stale fallback cannot mask a failure.
 		const request = Promise.resolve()
 			.then(fetcher)
@@ -59,7 +61,11 @@ export function createKeyedCache<K, V>({
 					// TASK-30 r2: never across an invalidation (a detached entry's value was discarded).
 					if (value == null) return entries.get(key) === current ? (current.value ?? value) : value;
 					// TASK-30: only the newest non-invalidated request may publish a value.
-					if (entries.get(key) === current && current.sequence === sequence) {
+					if (
+						entries.get(key) === current &&
+						current.sequence === sequence &&
+						(!strict || !current.inFlight)
+					) {
 						current.value = value;
 						current.fetchedAt = now();
 						onValue?.(key, value);
@@ -73,6 +79,8 @@ export function createKeyedCache<K, V>({
 				}
 			)
 			.finally(() => {
+				// Strict reads may only clean up their own entry while no ordinary read is pending.
+				if (strict && (!createdEntry || current.inFlight)) return;
 				if (current.inFlight === request) delete current.inFlight;
 				if (current.sequence !== sequence) return;
 				if (current.value == null && entries.get(key) === current) entries.delete(key);

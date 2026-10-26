@@ -2,8 +2,6 @@ import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 
-// MIMIR client (public anon)
-
 interface TokenInfo {
 	tokenId: number;
 	symbol: string;

@@ -189,7 +189,7 @@
 			const appInfo = await algodClient.getApplicationByID(contractId).do();
 
 			// Get current balance from the contract address
-			const accountInfo = await requireAccountInfo(address);
+			const accountInfo = await requireAccountInfo(address, { force: true });
 			currentBalance = accountInfo.amount as number;
 
 			// Decode the global state
