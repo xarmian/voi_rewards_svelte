@@ -1,3 +1,7 @@
+<script context="module" lang="ts">
+	let nextId = 0;
+</script>
+
 <script lang="ts">
 	import {
 		getEnvoiAddresses,
@@ -23,8 +27,13 @@
 	export let storeAddress: boolean = true;
 	export let clearOnSubmit: boolean = true;
 	export let hideSubmitButton: boolean = false;
+	export let label = 'Wallet address or enVoi name';
+	export let inputId: string | undefined = undefined;
+	let uid: number | undefined;
+	$: listboxId = uid === undefined ? undefined : `wallet-search-${uid}`;
 
 	onMount(() => {
+		uid = ++nextId;
 		windowDefined = typeof window !== 'undefined';
 		if (windowDefined) {
 			document.addEventListener('click', handleClickOutside);
@@ -214,6 +223,8 @@
 <div class="relative" bind:this={componentElement}>
 	<div class="dark:bg-gray-800 bg-white flex items-center rounded-lg relative">
 		<input
+			id={inputId}
+			aria-label={inputId ? undefined : label}
 			type="text"
 			use:init
 			bind:value={searchText}
@@ -235,13 +246,16 @@
 			autocomplete="off"
 			role="combobox"
 			aria-expanded={addressList.length > 0}
-			aria-controls="search-listbox"
-			aria-activedescendant={selectedAddressIndex >= 0
-				? `option-${selectedAddressIndex}`
+			aria-controls={listboxId}
+			aria-activedescendant={listboxId &&
+			selectedAddressIndex >= 0 &&
+			selectedAddressIndex < addressList.length
+				? `${listboxId}-opt-${selectedAddressIndex}`
 				: undefined}
 		/>
 		{#if searchText}
 			<button
+				type="button"
 				class="absolute inset-y-0 {hideSubmitButton
 					? 'right-2'
 					: 'right-16'} pr-0 flex items-center cursor-pointer"
@@ -266,11 +280,14 @@
 		{/if}
 		{#if !hideSubmitButton}
 			<button
+				type="button"
+				aria-label="Search wallet"
 				on:click={() => handleSubmit()}
 				class="wallet-submit bg-[#6F2AE2] border border-bg-[#6F2AE2] text-white p-2 rounded-r-lg"
 			>
+				<!-- Font Awesome's later .sr-only beats sm:not-sr-only (TASK-39), so the name comes from aria-label -->
 				<SearchOutline class="block sm:hidden" />
-				<span class="hidden sm:block">Submit</span>
+				<span class="hidden sm:block">Search wallet</span>
 			</button>
 		{/if}
 	</div>
@@ -286,14 +303,16 @@
 				class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-64 border border-gray-200 dark:border-gray-700 w-full"
 			>
 				<ul
-					id="search-listbox"
+					id={listboxId}
 					role="listbox"
 					class="overflow-y-auto max-h-64 w-full"
 					bind:this={dropdownList}
 				>
 					{#each addressList as result, index}
-						<li>
+						<li role="presentation">
 							<button
+								id={listboxId ? `${listboxId}-opt-${index}` : undefined}
+								tabindex="-1"
 								class="p-2 border border-solid text-left w-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white {index ===
 								selectedAddressIndex
 									? 'bg-purple-100 dark:bg-purple-900 ring-2 ring-[#6F2AE2] ring-opacity-50'

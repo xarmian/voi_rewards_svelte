@@ -1,5 +1,10 @@
+<script context="module" lang="ts">
+	let nextId = 0;
+</script>
+
 <script lang="ts">
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { createEventDispatcher, onMount, tick } from 'svelte';
+	import { leavesWidget, nextOptionIndex } from '$lib/a11y/keyboard';
 	import { slide } from 'svelte/transition';
 	import { Input, Badge } from 'flowbite-svelte';
 	import type { UniqueToken } from '../../routes/api/tokens/+server';
@@ -14,7 +19,51 @@
 
 	let searchQuery = '';
 	let dropdownOpen = false;
-	let searchInput: HTMLInputElement;
+	let root: HTMLDivElement;
+	let suppressOpen = false;
+	let uid: number | undefined;
+	$: listId = uid === undefined ? undefined : `token-results-${uid}`;
+	onMount(() => {
+		uid = ++nextId;
+	});
+
+	const inputEl = () => root?.querySelector('input');
+	const options = () => root.querySelectorAll<HTMLButtonElement>('[data-token-option]');
+
+	function focusInput() {
+		suppressOpen = true;
+		inputEl()?.focus();
+		suppressOpen = false;
+	}
+
+	function closeOnEscape(event: KeyboardEvent) {
+		if (event.key !== 'Escape' || !dropdownOpen) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		dropdownOpen = false;
+		focusInput();
+		return true;
+	}
+
+	async function handleInputKeydown(event: KeyboardEvent) {
+		if (closeOnEscape(event)) return;
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			dropdownOpen = true;
+			await tick();
+			options()[0]?.focus();
+		}
+	}
+
+	function handleOptionKeydown(event: KeyboardEvent, index: number) {
+		if (closeOnEscape(event)) return;
+		if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+			event.preventDefault();
+			const next = nextOptionIndex(index, filteredTokens.length, event.key);
+			if (next === -1) focusInput();
+			else options()[next]?.focus();
+		}
+	}
 
 	// Filter tokens based on search query
 	$: filteredTokens = searchQuery.trim()
@@ -27,18 +76,23 @@
 				.slice(0, 20)
 		: allTokens.slice(0, 10); // Show first 10 tokens when no search
 
+	// Keyboard picks (click detail 0) return focus to the input; pointer picks leave the input,
+	// as before, so a touch keyboard closes (TASK-39 r2).
+	function afterPick(event?: MouseEvent) {
+		if (event && event.detail > 0) inputEl()?.blur();
+		else focusInput();
+	}
+
 	// Handle token selection
-	function selectToken(token: UniqueToken) {
+	function selectToken(token: UniqueToken, event?: MouseEvent) {
 		dispatch('tokenSelect', token);
 		searchQuery = '';
 		dropdownOpen = false;
-		if (searchInput && typeof searchInput.blur === 'function') {
-			searchInput.blur();
-		}
+		afterPick(event);
 	}
 
 	// Reset to VOI
-	function resetToVOI() {
+	function resetToVOI(event?: MouseEvent) {
 		const voiToken = {
 			id: 0,
 			symbol: 'VOI',
@@ -49,27 +103,18 @@
 		dispatch('tokenSelect', voiToken);
 		searchQuery = '';
 		dropdownOpen = false;
-		if (searchInput && typeof searchInput.blur === 'function') {
-			searchInput.blur();
-		}
+		afterPick(event);
 	}
 
-	// Handle input focus/blur
+	// Programmatic focus after selection or Escape must not reopen the results.
 	function handleFocus() {
-		dropdownOpen = true;
-	}
-
-	function handleBlur() {
-		// Small delay to allow clicking on dropdown items
-		setTimeout(() => {
-			dropdownOpen = false;
-		}, 150);
+		if (!suppressOpen) dropdownOpen = true;
 	}
 
 	// Clear search and reset to VOI
-	function clearSearch() {
+	function clearSearch(event?: MouseEvent) {
 		searchQuery = '';
-		resetToVOI();
+		resetToVOI(event);
 	}
 
 	// Get token type styling
@@ -92,14 +137,23 @@
 	}
 </script>
 
-<div class="relative w-full">
+<div
+	class="relative w-full"
+	bind:this={root}
+	on:focusout={(event) => {
+		if (leavesWidget(root, event.relatedTarget)) dropdownOpen = false;
+	}}
+>
 	<!-- Search Input -->
 	<div class="relative">
 		<Input
-			bind:this={searchInput}
 			bind:value={searchQuery}
 			on:focus={handleFocus}
-			on:blur={handleBlur}
+			on:click={() => (dropdownOpen = true)}
+			on:input={() => (dropdownOpen = true)}
+			on:keydown={handleInputKeydown}
+			aria-label="Search tokens"
+			aria-controls={dropdownOpen && !disabled ? listId : undefined}
 			placeholder="Search tokens (e.g., USDC, ALGO, 12345)"
 			{disabled}
 			class="pr-20"
@@ -113,8 +167,9 @@
 					on:click={clearSearch}
 					class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
 					title="Clear search"
+					aria-label="Clear search"
 				>
-					<i class="fas fa-times text-sm"></i>
+					<i class="fas fa-times text-sm" aria-hidden="true"></i>
 				</button>
 			{/if}
 
@@ -124,18 +179,22 @@
 					on:click={resetToVOI}
 					class="text-gray-400 hover:text-red-500 transition-colors"
 					title="Reset to VOI"
+					aria-label="Reset to VOI"
 				>
-					<i class="fas fa-undo text-sm"></i>
+					<i class="fas fa-undo text-sm" aria-hidden="true"></i>
 				</button>
 			{/if}
 
-			<i class="fas fa-search text-gray-400"></i>
+			<i class="fas fa-search text-gray-400" aria-hidden="true"></i>
 		</div>
 	</div>
 
 	<!-- Dropdown -->
 	{#if dropdownOpen && !disabled}
 		<div
+			id={listId}
+			role="group"
+			aria-label="Token results"
 			class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-96 overflow-y-auto"
 			transition:slide={{ duration: 200, axis: 'y' }}
 		>
@@ -152,11 +211,14 @@
 				</div>
 
 				<!-- Token List -->
-				{#each filteredTokens as token}
+				{#each filteredTokens as token, index}
 					<button
 						type="button"
-						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none transition-all duration-200 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:shadow-sm hover:scale-[1.01]"
-						on:click={() => selectToken(token)}
+						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus transition-all duration-200 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:shadow-sm hover:scale-[1.01]"
+						data-token-option
+						on:mousedown|preventDefault
+						on:keydown={(event) => handleOptionKeydown(event, index)}
+						on:click={(event) => selectToken(token, event)}
 					>
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">

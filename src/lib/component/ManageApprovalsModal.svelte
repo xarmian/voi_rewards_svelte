@@ -263,6 +263,7 @@
 									Spender Address
 								</label>
 								<WalletSearch
+									inputId="spender"
 									onSubmit={handleSpenderSelected}
 									loadPreviousValue={false}
 									storeAddress={false}

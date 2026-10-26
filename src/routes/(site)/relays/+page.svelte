@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ariaSortFor } from '$lib/a11y/keyboard';
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { PageData } from './$types';
 	import type { PeerRecord } from '$lib/types';
@@ -371,51 +372,96 @@
 						<thead class="bg-gray-50 dark:bg-gray-700">
 							<tr>
 								<th
-									class="sticky left-0 bg-gray-50 dark:bg-gray-700 px-3 sm:px-4 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm z-10"
-									on:click={() => handleSort('host_name')}
+									scope="col"
+									aria-sort={ariaSortFor(sortField, 'host_name', sortDirection)}
+									class="sticky left-0 bg-gray-50 dark:bg-gray-700 text-left text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm z-10"
 								>
-									Relay
-									{#if sortField === 'host_name'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
+									<button
+										type="button"
+										class="block w-full px-3 sm:px-4 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+										on:click={() => handleSort('host_name')}
+									>
+										Relay
+										{#if sortField === 'host_name'}
+											<span class="ml-1" aria-hidden="true"
+												>{sortDirection === 'asc' ? '↑' : '↓'}</span
+											>
+										{/if}
+									</button>
 								</th>
 								{#each dates as date}
 									<th
-										class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap transition-colors text-xs sm:text-sm"
-										on:click={() => handleSort(`daily_${date}`)}
+										scope="col"
+										aria-sort={ariaSortFor(sortField, `daily_${date}`, sortDirection)}
+										class="text-center text-gray-700 dark:text-gray-200 font-medium whitespace-nowrap transition-colors text-xs sm:text-sm"
 									>
-										{formatDate(date)}
-										{#if sortField === `daily_${date}`}
-											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-										{/if}
+										<button
+											type="button"
+											class="block w-full px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+											on:click={() => handleSort(`daily_${date}`)}
+										>
+											{formatDate(date)}
+											{#if sortField === `daily_${date}`}
+												<span class="ml-1" aria-hidden="true"
+													>{sortDirection === 'asc' ? '↑' : '↓'}</span
+												>
+											{/if}
+										</button>
 									</th>
 								{/each}
 								<th
-									class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
-									on:click={() => handleSort('total_peers')}
+									scope="col"
+									aria-sort={ariaSortFor(sortField, 'total_peers', sortDirection)}
+									class="text-center text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
 								>
-									Total
-									{#if sortField === 'total_peers'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
+									<button
+										type="button"
+										class="block w-full px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+										on:click={() => handleSort('total_peers')}
+									>
+										Total
+										{#if sortField === 'total_peers'}
+											<span class="ml-1" aria-hidden="true"
+												>{sortDirection === 'asc' ? '↑' : '↓'}</span
+											>
+										{/if}
+									</button>
 								</th>
 								<th
-									class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
-									on:click={() => handleSort('percentage')}
+									scope="col"
+									aria-sort={ariaSortFor(sortField, 'percentage', sortDirection)}
+									class="text-center text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
 								>
-									%
-									{#if sortField === 'percentage'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
+									<button
+										type="button"
+										class="block w-full px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+										on:click={() => handleSort('percentage')}
+									>
+										%
+										{#if sortField === 'percentage'}
+											<span class="ml-1" aria-hidden="true"
+												>{sortDirection === 'asc' ? '↑' : '↓'}</span
+											>
+										{/if}
+									</button>
 								</th>
 								<th
-									class="px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
-									on:click={() => handleSort('reward')}
+									scope="col"
+									aria-sort={ariaSortFor(sortField, 'reward', sortDirection)}
+									class="text-center text-gray-700 dark:text-gray-200 font-medium transition-colors text-xs sm:text-sm"
 								>
-									Reward
-									{#if sortField === 'reward'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
+									<button
+										type="button"
+										class="block w-full px-3 sm:px-4 py-2 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+										on:click={() => handleSort('reward')}
+									>
+										Reward
+										{#if sortField === 'reward'}
+											<span class="ml-1" aria-hidden="true"
+												>{sortDirection === 'asc' ? '↑' : '↓'}</span
+											>
+										{/if}
+									</button>
 								</th>
 							</tr>
 						</thead>

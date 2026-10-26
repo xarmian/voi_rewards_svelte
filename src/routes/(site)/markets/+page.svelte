@@ -10,7 +10,7 @@
 	import OHLCVChart from '$lib/components/OHLCVChart.svelte';
 	import PriceChart from '$lib/components/PriceChart.svelte';
 	import TokenSelector from '$lib/components/TokenSelector.svelte';
-	import PoolSelector from '$lib/components/PoolSelector.svelte';
+	import { ariaSortFor } from '$lib/a11y/keyboard';
 	import TokenMetricsBar from '$lib/components/TokenMetricsBar.svelte';
 	import PoolDetails from '$lib/components/PoolDetails.svelte';
 	// Enhanced components (keep only used ones for now)
@@ -143,26 +143,6 @@
 			}
 		} catch (error) {
 			console.error('Failed to load tokens:', error);
-		}
-	}
-
-	function handleKeydown(event: KeyboardEvent) {
-		// Command palette (Cmd/Ctrl + K)
-		if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-			event.preventDefault();
-			commandPaletteOpen = true;
-		}
-		// Search (Cmd/Ctrl + F)
-		else if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
-			event.preventDefault();
-			// Focus search input instead of opening filter builder
-			const searchInput = document.querySelector('#market-search') as HTMLInputElement;
-			if (searchInput) searchInput.focus();
-		}
-		// Watchlist (Cmd/Ctrl + W)
-		else if ((event.metaKey || event.ctrlKey) && event.key === 'w') {
-			event.preventDefault();
-			watchlistOpen = true;
 		}
 	}
 
@@ -1227,8 +1207,6 @@
 	}
 </script>
 
-<svelte:document on:keydown={handleKeydown} />
-
 <!-- Modern Token Analytics Interface -->
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
 	<!-- Beta Disclaimer Banner -->
@@ -1620,41 +1598,74 @@
 							>
 								<tr>
 									<th
+										scope="col"
 										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 										>Pair</th
 									>
 									<th
+										scope="col"
 										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 										>Exchange</th
 									>
 									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-										on:click={() => sortData('price')}
+										scope="col"
+										aria-sort={ariaSortFor(sortColumn, 'price', sortDirection)}
+										class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 									>
-										Price
-										{#if sortColumn === 'price'}
-											<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-										{/if}
+										<button
+											type="button"
+											class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+											on:click={() => sortData('price')}
+										>
+											Price
+											{#if sortColumn === 'price'}
+												<i
+													aria-hidden="true"
+													class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
+												></i>
+											{/if}
+										</button>
 									</th>
 									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-										on:click={() => sortData('tvl')}
+										scope="col"
+										aria-sort={ariaSortFor(sortColumn, 'tvl', sortDirection)}
+										class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 									>
-										TVL (USD)
-										{#if sortColumn === 'tvl'}
-											<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-										{/if}
+										<button
+											type="button"
+											class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+											on:click={() => sortData('tvl')}
+										>
+											TVL (USD)
+											{#if sortColumn === 'tvl'}
+												<i
+													aria-hidden="true"
+													class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
+												></i>
+											{/if}
+										</button>
 									</th>
 									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-										on:click={() => sortData('volume_24h')}
+										scope="col"
+										aria-sort={ariaSortFor(sortColumn, 'volume_24h', sortDirection)}
+										class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 									>
-										24h Volume
-										{#if sortColumn === 'volume_24h'}
-											<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-										{/if}
+										<button
+											type="button"
+											class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+											on:click={() => sortData('volume_24h')}
+										>
+											24h Volume
+											{#if sortColumn === 'volume_24h'}
+												<i
+													aria-hidden="true"
+													class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
+												></i>
+											{/if}
+										</button>
 									</th>
 									<th
+										scope="col"
 										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 										>24h Change</th
 									>
@@ -1669,22 +1680,42 @@
 										on:click={() => handleMarketRowClick(market)}
 									>
 										<td class="px-6 py-3 whitespace-nowrap text-sm">
-											{#if market.pool_url}
-												<a
-													href={market.pool_url}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
-													on:click|stopPropagation
-												>
-													{normalizePair(market.pair)}
-													<i class="fas fa-external-link-alt text-xs opacity-50"></i>
-												</a>
-											{:else}
-												<span class="text-gray-900 dark:text-white"
-													>{normalizePair(market.pair)}</span
-												>
-											{/if}
+											<div class="flex items-center gap-2">
+												{#if market.pool_url}
+													<a
+														href={market.pool_url}
+														target="_blank"
+														rel="noopener noreferrer"
+														class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+														on:click|stopPropagation
+													>
+														{normalizePair(market.pair)}
+														<i
+															class="fas fa-external-link-alt text-xs opacity-50"
+															aria-hidden="true"
+														></i>
+													</a>
+													<button
+														type="button"
+														aria-label={`Show ${normalizePair(market.pair)} chart`}
+														aria-pressed={selectedTradingPairId === market.trading_pair_id}
+														class="p-1 text-purple-600 dark:text-purple-400 rounded focus-visible:ring-2 focus-visible:ring-focus"
+														on:click|stopPropagation={() => handleMarketRowClick(market)}
+													>
+														<i class="fas fa-chart-line" aria-hidden="true"></i>
+													</button>
+												{:else}
+													<button
+														type="button"
+														aria-label={`Show ${normalizePair(market.pair)} chart`}
+														aria-pressed={selectedTradingPairId === market.trading_pair_id}
+														class="text-gray-900 dark:text-white rounded focus-visible:ring-2 focus-visible:ring-focus"
+														on:click|stopPropagation={() => handleMarketRowClick(market)}
+													>
+														{normalizePair(market.pair)}
+													</button>
+												{/if}
+											</div>
 										</td>
 										<td class="px-6 py-3 whitespace-nowrap text-sm">
 											<span
