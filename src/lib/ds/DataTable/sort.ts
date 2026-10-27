@@ -1,3 +1,4 @@
+import { MISSING } from '../format';
 import type { Column, SortState } from './types';
 
 export function sortRows<T>(rows: T[], column: Column<T>, dir: SortState['dir']): T[] {
@@ -28,4 +29,19 @@ export function sortRows<T>(rows: T[], column: Column<T>, dir: SortState['dir'])
 
 export function visibleRows<T>(rows: T[], limit: number | undefined, expanded: boolean): T[] {
 	return limit === undefined || expanded ? rows : rows.slice(0, limit);
+}
+
+/** "Show more" focus target: the first priority-1 column, which is never display:none (review r1). */
+export function focusColumnIndex<T>(columns: Column<T>[]): number {
+	return Math.max(
+		0,
+		columns.findIndex((column) => column.priority === 1)
+	);
+}
+
+/** Default cell text: missing values (null, undefined, NaN) render as the em dash. */
+export function cellText(value: unknown): string {
+	return value == null || (typeof value === 'number' && Number.isNaN(value))
+		? MISSING
+		: String(value);
 }

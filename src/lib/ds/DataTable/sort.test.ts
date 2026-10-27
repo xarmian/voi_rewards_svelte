@@ -1,6 +1,6 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { sortRows, visibleRows } from './sort';
+import { cellText, focusColumnIndex, sortRows, visibleRows } from './sort';
 import type { Column } from './types';
 
 type Row = { id: string; value: number | string | null | undefined };
@@ -76,5 +76,18 @@ describe('visibleRows', () => {
 	test('collapsed limits and expanded reveals all rows', () => {
 		assert.deepEqual(visibleRows(rows, 2, false), [1, 2]);
 		assert.deepEqual(visibleRows(rows, 2, true), rows);
+	});
+});
+
+describe('cell helpers (review r1/r2)', () => {
+	test('focus goes to the first priority-1 column, not a hidden one', () => {
+		const c = (priority: 1 | 2 | 3) => ({ key: String(priority), header: 'h', priority });
+		assert.equal(focusColumnIndex([c(3), c(2), c(1), c(1)]), 2);
+		assert.equal(focusColumnIndex([c(1), c(3)]), 0);
+	});
+	test('missing values render as the em dash', () => {
+		for (const v of [null, undefined, NaN]) assert.equal(cellText(v), '—');
+		assert.equal(cellText(0), '0');
+		assert.equal(cellText('A'), 'A');
 	});
 });

@@ -11,3 +11,8 @@ export function epochUrl(url: URL, epoch: number, max: number): URL {
 	else next.searchParams.set('epoch', String(epoch));
 	return next;
 }
+
+/** syncUrl's first read: only a present ?epoch overrides the caller's epoch (review r1). */
+export function initialEpoch(url: URL, current: number, min: number, max: number): number {
+	return url.searchParams.has('epoch') ? readEpoch(url, min, max) : current;
+}

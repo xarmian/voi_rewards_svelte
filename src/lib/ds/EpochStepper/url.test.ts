@@ -1,6 +1,6 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { readEpoch, epochUrl } from './url';
+import { readEpoch, epochUrl, initialEpoch } from './url';
 const url = (value = '') => new URL(`https://example.test/ds${value}`);
 describe('readEpoch', () => {
 	test('accepts an integer inside the bounds', () => {
@@ -34,5 +34,13 @@ describe('epochUrl', () => {
 		const result = epochUrl(url('?theme=dark#table'), 103, 104);
 		assert.equal(result.href, 'https://example.test/ds?theme=dark&epoch=103#table');
 		assert.equal(readEpoch(result, 1, 104), 103);
+	});
+});
+
+describe('initialEpoch (review r1)', () => {
+	test("keeps the caller's epoch without ?epoch and reads it when present", () => {
+		assert.equal(initialEpoch(new URL('https://example.test/ds'), 100, 1, 104), 100);
+		assert.equal(initialEpoch(new URL('https://example.test/ds?epoch=97'), 100, 1, 104), 97);
+		assert.equal(initialEpoch(new URL('https://example.test/ds?epoch=abc'), 100, 1, 104), 104);
 	});
 });

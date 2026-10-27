@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { epochUrl, readEpoch } from './url';
+	import { epochUrl, initialEpoch } from './url';
 	let {
 		epoch = $bindable(),
 		min,
@@ -22,10 +22,7 @@
 	let announcement = $state('');
 	let epochs = $derived(Array.from({ length: max - min + 1 }, (_, i) => max - i));
 	onMount(() => {
-		// Only a present ?epoch overrides the caller's value; without it the caller's epoch stands
-		// (review r1: readEpoch's missing -> max would jump after hydration).
-		const url = new URL(window.location.href);
-		if (syncUrl && url.searchParams.has('epoch')) epoch = readEpoch(url, min, max);
+		if (syncUrl) epoch = initialEpoch(new URL(window.location.href), epoch, min, max);
 	});
 	async function change(next: number) {
 		if (next < min || next > max || next === epoch) return;

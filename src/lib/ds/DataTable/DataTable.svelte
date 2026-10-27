@@ -4,12 +4,12 @@
 	import { tick, type Snippet } from 'svelte';
 	import Button from '../Button/Button.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
-	import { MISSING, ago } from '../format';
+	import { ago } from '../format';
 	import { slug } from '../slug';
 	import type { DataState } from '../types';
 	import RowMenu from './RowMenu.svelte';
 	import { tableId, detailsId } from './ids';
-	import { sortRows, visibleRows } from './sort';
+	import { cellText, focusColumnIndex, sortRows, visibleRows } from './sort';
 	import type { Column, SortState } from './types';
 
 	let {
@@ -73,12 +73,7 @@
 	let hiddenColumns = $derived(columns.filter((column) => column.priority > 1));
 	// Focus target after "Show more": the first always-visible (priority 1) column; a priority 2/3
 	// cell is display:none at narrow widths and can't take focus (review r1).
-	let focusColumn = $derived(
-		Math.max(
-			0,
-			columns.findIndex((column) => column.priority === 1)
-		)
-	);
+	let focusColumn = $derived(focusColumnIndex(columns));
 	let disclosure = $derived(Boolean(detail) || (expandable && hiddenColumns.length > 0));
 	let disclosureClass = $derived(
 		detail ? '' : hiddenColumns.some((column) => column.priority === 3) ? 'lg:hidden' : 'md:hidden'
@@ -157,8 +152,8 @@
 </script>
 
 {#snippet cell(column: Column<T>, row: T)}
-	{#if column.cell}{@render column.cell(row)}{:else}{String(
-			(row as Record<string, unknown>)[column.key] ?? MISSING
+	{#if column.cell}{@render column.cell(row)}{:else}{cellText(
+			(row as Record<string, unknown>)[column.key]
 		)}{/if}
 {/snippet}
 
