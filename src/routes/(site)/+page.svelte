@@ -1,23 +1,14 @@
 <script lang="ts">
 	import Dashboard from './Dashboard.svelte';
-	import Quests from './quests/QuestsPage.svelte';
-	import { onMount } from 'svelte';
-
-	let page: null | string = null;
-
-	onMount(async () => {
-		const url = window.location.href;
-
-		if (url.includes('quests.voirewards.com')) {
-			page = 'quests';
-		} else {
-			page = 'dashboard';
-		}
-	});
+	import QuestsPage from './quests/QuestsPage.svelte';
+	import HomeTop from './HomeTop.svelte';
+	import type { HomeData } from '$lib/server/home';
+	let { data }: { data: HomeData } = $props();
 </script>
 
-{#if page === 'quests'}
-	<Quests />
-{:else if page === 'dashboard'}
-	<Dashboard />
+{#if data.page === 'quests'}
+	<QuestsPage />
+{:else}
+	<HomeTop {data} />
+	<Dashboard initial={data.rewards} />
 {/if}
