@@ -15,3 +15,27 @@ export type { DataState, Tone } from './types';
 export { DataTable } from './DataTable';
 export type { Column, SortState } from './DataTable';
 export { EpochStepper } from './EpochStepper';
+export { Tabs, createHashTabs } from './Tabs';
+export type { NavProps, SegmentedProps, HashTabsOptions } from './Tabs';
+export { SearchBox, createResolver } from './SearchBox';
+export type {
+	SearchBoxProps,
+	Resolver,
+	ResolverOptions,
+	Resolution,
+	Suggestion
+} from './SearchBox';
+export { ChartFrame } from './ChartFrame';
+export type { ChartFrameProps } from './ChartFrame';
+export { LineChart, BarsVsExpected } from './charts';
+export type {
+	ChartContext,
+	Annotation,
+	XSpec,
+	ChartData,
+	ChartLegend,
+	LineChartProps,
+	BarsVsExpectedProps
+} from './charts';
+export { ArchiveBanner } from './ArchiveBanner';
+export type { ArchiveBannerProps } from './ArchiveBanner';
