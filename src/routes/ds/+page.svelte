@@ -910,7 +910,7 @@
 					summary="Produced blocks exceeded stake-weighted expectations, reaching 148% in epoch 102."
 					data={blocksData(blockHistory)}
 					x={{ kind: 'band', values: blockHistory.map((row) => row.epoch) }}
-					y={{ domain: [0, 28000] }}
+					y={{ domain: [0, 28000], format: (n) => (n === 0 ? '0' : comma(n / 1000, 1) + 'k') }}
 					describe={(index) => describeBlocks(index)}
 					annotations={annotationsFor('blocksVsExpected', 'epoch')}
 					legend={[
@@ -933,7 +933,7 @@
 					summary="Synthetic example: epoch 99 is below 85% of expected blocks, demonstrating the warning style."
 					data={blocksData(illustrativeLowBlocks)}
 					x={{ kind: 'band', values: illustrativeLowBlocks.map((row) => row.epoch) }}
-					y={{ domain: [0, 28000] }}
+					y={{ domain: [0, 28000], format: (n) => (n === 0 ? '0' : comma(n / 1000, 1) + 'k') }}
 					describe={(index) => describeBlocks(index, illustrativeLowBlocks)}
 					annotations={[
 						{
