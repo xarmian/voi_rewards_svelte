@@ -95,6 +95,19 @@ export function priceTile(loaded: Loaded<Price>) {
 	};
 }
 
+export function onlineStakeTile(loaded: Loaded<{ date: string; stake: number }[]>) {
+	if (loaded.state === 'error')
+		return { state: 'error' as const, value: MISSING, href: '/analytics' };
+	return {
+		state: loaded.state,
+		value: compact(loaded.value.at(-1)?.stake, 1),
+		detail: 'VOI · 30-day trend',
+		trend: loaded.value.map((row) => row.stake),
+		href: '/analytics',
+		asOf: loaded.state === 'stale' ? loaded.asOf : undefined
+	};
+}
+
 export function accountsDetail(loaded: Loaded<number>): string | undefined {
 	return loaded.state !== 'error' && Number.isFinite(loaded.value) && loaded.value > 0
 		? `/ ${comma(loaded.value)} online`

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { Card, ChartFrame, InlineAlert, LineChart, SearchBox, StatTile } from '$lib/ds';
-	import { ago, comma, compact, MISSING, pct } from '$lib/ds/format';
+	import { ago, comma, MISSING, pct } from '$lib/ds/format';
 	import { annotationsFor } from '$lib/data/chartEvents';
-	import { accountsDetail, headlineValues, priceTile } from '$lib/home/headline';
+	import { accountsDetail, headlineValues, onlineStakeTile, priceTile } from '$lib/home/headline';
 	import type { DashboardData } from '$lib/server/home';
 	let { data }: { data: DashboardData } = $props();
 	const retry = () => {
@@ -22,7 +22,6 @@
 	let headline = $derived(data.headline.state === 'error' ? undefined : data.headline.value);
 	let figures = $derived(headlineValues(headline));
 	let history = $derived(data.aprHistory.state === 'error' ? [] : data.aprHistory.value);
-	let stakes = $derived(data.onlineStake.state === 'error' ? [] : data.onlineStake.value);
 	let points = $derived(history.map((row) => ({ x: row.epoch, y: row.apr })));
 	let aprs = $derived(history.map((row) => row.apr).filter(Number.isFinite));
 	let wallets = $derived(history.flatMap((row) => (row.wallets === null ? [] : [row.wallets])));
@@ -123,17 +122,11 @@
 		</ChartFrame>
 	</div>
 	<div class="grid min-w-0 md:col-span-1 lg:col-span-3">
-		<StatTile
-			label="Online stake"
-			icon="ϟ"
-			value={compact(stakes.at(-1)?.stake, 1)}
-			detail="VOI · 30-day trend"
-			trend={stakes.map((row) => row.stake)}
-			href="/analytics"
-			state={data.onlineStake.state}
-			onretry={retry}
-			asOf={data.onlineStake.state === 'stale' ? data.onlineStake.asOf : undefined}
-		/>
+		{#await data.onlineStake}
+			<StatTile label="Online stake" icon="ϟ" value={MISSING} state="loading" />
+		{:then stake}
+			<StatTile label="Online stake" icon="ϟ" {...onlineStakeTile(stake)} onretry={retry} />
+		{/await}
 	</div>
 	<div class="grid min-w-0 md:col-span-1 lg:col-span-3">
 		<StatTile

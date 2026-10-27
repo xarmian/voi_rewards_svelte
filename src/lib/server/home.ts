@@ -32,7 +32,7 @@ export type DashboardData = {
 	chrome: 'hero';
 	headline: Loaded<Headline>;
 	aprHistory: Loaded<{ epoch: number; apr: number; wallets: number | null }[]>;
-	onlineStake: Loaded<{ date: string; stake: number }[]>;
+	onlineStake: Promise<Loaded<{ date: string; stake: number }[]>>;
 	rewards: Loaded<{ rangeId: string; dates: DateRange[]; data: unknown; params: RewardParams }>;
 	price: Promise<Loaded<Price>>;
 	onlineCount: Promise<Loaded<number>>;
@@ -146,7 +146,7 @@ export async function loadHome(
 			} satisfies Epoch;
 		})
 	);
-	const onlineStakePromise = read(
+	const onlineStake = read(
 		`${config.proposalApiBaseUrl}?action=online-stake-history`,
 		(value) => {
 			const cutoff = new Date(now);
@@ -165,7 +165,8 @@ export async function loadHome(
 				)
 				.sort((a, b) => a.date.localeCompare(b.date))
 				.slice(-30);
-		}
+		},
+		STREAM_TIMEOUT_MS
 	);
 	const price = read(
 		'/api/markets?token=VOI',
@@ -208,12 +209,7 @@ export async function loadHome(
 					: fetchRows(epoch, CRITICAL_TIMEOUT_MS - (Date.now() - startedAt));
 		return { epoch, rows: await selectedRows };
 	});
-	const [base, selected, epochs, onlineStake] = await Promise.all([
-		basePromise,
-		selectedPromise,
-		epochsPromise,
-		onlineStakePromise
-	]);
+	const [base, selected, epochs] = await Promise.all([basePromise, selectedPromise, epochsPromise]);
 	const { epoch, rows } = selected;
 	let rewards: DashboardData['rewards'] = failure('Unable to load epoch rewards.');
 	let headline: DashboardData['headline'] = failure('Unable to load the epoch headline.');

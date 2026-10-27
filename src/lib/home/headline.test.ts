@@ -4,6 +4,7 @@ import {
 	blocksForEpoch,
 	headlineValues,
 	priceTile,
+	onlineStakeTile,
 	accountsDetail,
 	rewardsRefreshMode
 } from './headline';
@@ -88,6 +89,27 @@ it('maps streamed price props and never presents an error as $0', () => {
 		detail: `24h · mcap ${usd(265986)}`
 	});
 	expect(priceTile({ state: 'error', message: 'offline' })).toMatchObject({
+		state: 'error',
+		value: MISSING
+	});
+});
+it('maps streamed stake to its compact value, trend and link, never showing errors as 0', () => {
+	expect(
+		onlineStakeTile({
+			state: 'ready',
+			value: [
+				{ date: '2026-10-24', stake: 750000000 },
+				{ date: '2026-10-25', stake: 725200000 }
+			]
+		})
+	).toMatchObject({
+		state: 'ready',
+		value: '725.2M',
+		trend: [750000000, 725200000],
+		detail: 'VOI · 30-day trend',
+		href: '/analytics'
+	});
+	expect(onlineStakeTile({ state: 'error', message: 'offline' })).toMatchObject({
 		state: 'error',
 		value: MISSING
 	});

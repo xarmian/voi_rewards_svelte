@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { load } from '../../routes/(site)/+page.server';
 import { config } from '$lib/config';
-import { CRITICAL_TIMEOUT_MS, type HomeData } from './home';
+import { CRITICAL_TIMEOUT_MS, STREAM_TIMEOUT_MS, type HomeData } from './home';
 const now = new Date('2026-10-25T02:38:00Z');
 const rows = {
 	data: [{ proposer: 'wallet', block_count: 126874 }],
@@ -47,25 +47,70 @@ afterEach(() => {
 	vi.useRealTimers();
 	vi.unstubAllGlobals();
 });
-it.each(['/api/markets', '/api/mimir'])(
+it.each(['/api/markets', '/api/mimir', 'online-stake-history'])(
 	'rewards never wait for %s; its deadline resolves to error',
 	async (slow) => {
 		fetcher.mockImplementation(async (input) =>
 			String(input).includes(slow) ? new Promise(() => {}) : Response.json(body(String(input)))
 		);
-		const result = dashboard(await run());
+		const loaded = vi.fn();
+		const pending = run().then((result) => {
+			loaded();
+			return result;
+		});
+		await vi.advanceTimersByTimeAsync(0);
+		expect(loaded).toHaveBeenCalledOnce();
+		const result = dashboard(await pending);
 		expect(result.chrome).toBe('hero');
 		expect(result.headline.state).toBe('ready');
 		expect(result.rewards.state).toBe('ready');
-		const streamed = slow === '/api/markets' ? result.price : result.onlineCount;
+		const streamed =
+			slow === '/api/markets'
+				? result.price
+				: slow === '/api/mimir'
+					? result.onlineCount
+					: result.onlineStake;
+		expect(streamed).toBeInstanceOf(Promise);
 		const settled = vi.fn();
 		void streamed.then(settled);
-		await vi.advanceTimersByTimeAsync(4000);
+		await vi.advanceTimersByTimeAsync(CRITICAL_TIMEOUT_MS);
 		expect(settled).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(1100);
+		await vi.advanceTimersByTimeAsync(STREAM_TIMEOUT_MS - CRITICAL_TIMEOUT_MS + 100);
 		expect(await streamed).toMatchObject({ state: 'error' });
 	}
 );
+it('streams stake history that takes 4.3s with the same filtered 30-day VOI series', async () => {
+	const history = [
+		{ date: '2026-10-25', avg_online_stake: 725200000e6 },
+		{ date: '2026-09-25', avg_online_stake: 800000000e6 },
+		{ date: '2026-09-26', avg_online_stake: 750000000e6 },
+		{ date: '2026-10-26', avg_online_stake: 700000000e6 },
+		{ date: '2026-10-24', avg_online_stake: 'invalid' }
+	];
+	fetcher.mockImplementation((input) =>
+		String(input).includes('online-stake-history')
+			? new Promise((resolve) => {
+					setTimeout(() => resolve(Response.json(history)), 4300);
+				})
+			: Promise.resolve(Response.json(body(String(input))))
+	);
+	const loaded = vi.fn();
+	const pending = run().then((result) => {
+		loaded();
+		return result;
+	});
+	await vi.advanceTimersByTimeAsync(0);
+	expect(loaded).toHaveBeenCalledOnce();
+	const result = dashboard(await pending);
+	await vi.advanceTimersByTimeAsync(4300);
+	expect(await result.onlineStake).toEqual({
+		state: 'ready',
+		value: [
+			{ date: '2026-09-26', stake: 750000000 },
+			{ date: '2026-10-25', stake: 725200000 }
+		]
+	});
+});
 it.each([0, null, NaN])('rejects invalid price and online count %s', async (value) => {
 	fetcher.mockImplementation(async (input) =>
 		Response.json(
@@ -94,7 +139,7 @@ it.each(['failure', 'timeout'])('isolates base date-range %s from both charts', 
 	expect(result.headline.state).toBe('error');
 	expect(result.rewards.state).toBe('error');
 	expect(result.aprHistory.state).toBe('ready');
-	expect(result.onlineStake.state).toBe('ready');
+	expect((await result.onlineStake).state).toBe('ready');
 });
 it('bounds an entirely unresponsive proposers API', async () => {
 	fetcher.mockImplementation(async (input) =>
@@ -108,7 +153,8 @@ it('bounds an entirely unresponsive proposers API', async () => {
 	expect(result.headline.state).toBe('error');
 	expect(result.rewards.state).toBe('error');
 	expect(result.aprHistory.state).toBe('ready');
-	expect(result.onlineStake.state).toBe('error');
+	await vi.advanceTimersByTimeAsync(STREAM_TIMEOUT_MS - CRITICAL_TIMEOUT_MS);
+	expect((await result.onlineStake).state).toBe('error');
 });
 it('refetches rows once for a lagging previous epoch', async () => {
 	fetcher.mockImplementation(async (input) =>
@@ -143,7 +189,7 @@ it('serves quests metadata without any upstream request or hero chrome', async (
 	});
 	expect(fetcher).not.toHaveBeenCalled();
 });
-it('starts all four critical upstreams before releasing any response, with deadline signals', async () => {
+it('starts all critical upstreams and stake history before releasing any response, with deadline signals', async () => {
 	const releases: (() => void)[] = [];
 	fetcher.mockImplementation((input, init) => {
 		expect(init?.signal).toBeInstanceOf(AbortSignal);
@@ -174,7 +220,7 @@ it.each(['/api/epochs', '?start'])(
 		);
 		const result = dashboard(await run());
 		expect(result.headline.state).toBe('error');
-		expect(result.onlineStake.state).toBe('ready');
+		expect((await result.onlineStake).state).toBe('ready');
 		expect(result.rewards.state).toBe(failing === '?start' ? 'error' : 'ready');
 		expect(result.aprHistory.state).toBe(failing === '/api/epochs' ? 'error' : 'ready');
 	}
