@@ -1,6 +1,8 @@
 <script lang="ts">
 	import {
 		Button,
+		Header,
+		Footer,
 		Card,
 		Chip,
 		CopyButton,
@@ -298,7 +300,8 @@
 </svelte:head>
 
 <div class="min-h-screen bg-canvas text-ink">
-	<header class="on-hero bg-hero pb-[84px] pt-10 text-on-hero rounded-b-hero">
+	<div class="on-hero bg-hero pb-[84px] text-on-hero rounded-b-hero">
+		<Header variant="hero" current={null} />
 		<div class="container-page">
 			<h1 class="text-display">Design system</h1>
 			<p class="mt-2 text-lede text-on-hero-muted">
@@ -312,9 +315,9 @@
 				<ThemeToggle class="text-on-hero" />
 			</div>
 		</div>
-	</header>
+	</div>
 
-	<main class="container-page -mt-[60px] grid gap-bento pb-16">
+	<main id="main" tabindex="-1" class="container-page -mt-[60px] grid gap-bento pb-16">
 		<section aria-labelledby="gallery-stat-tile">
 			<h2 id="gallery-stat-tile" class="mb-4 text-h2">StatTile</h2>
 			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-4">
@@ -985,4 +988,5 @@
 			<ArchiveBanner {...archiveExample} />
 		</section>
 	</main>
+	<Footer />
 </div>
