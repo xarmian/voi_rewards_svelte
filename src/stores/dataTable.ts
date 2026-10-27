@@ -1,7 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { config } from '$lib/config';
 
-interface RewardParams {
+export interface RewardParams {
 	block_reward_pool: number;
 	total_blocks: number;
 	reward_per_block: number;
@@ -19,6 +19,33 @@ export interface DateRange {
 	id: string;
 	desc: string;
 	epoch: number;
+}
+
+export function buildDateRanges(maxTimestamp: Date): DateRange[] {
+	const minTimestamp = new Date('2024-10-30T00:00:00Z');
+
+	const dates: DateRange[] = [];
+	const currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
+	let epoch = 1;
+
+	while (currentDate <= maxTimestamp) {
+		const startOfWeek = new Date(currentDate);
+		startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3);
+
+		const endOfWeek = new Date(startOfWeek);
+		endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
+
+		const dateStr = `${startOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
+		dates.push({
+			id: dateStr,
+			desc: dateStr.replace(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/, '$1-$2-$3 to $4-$5-$6'),
+			epoch
+		});
+
+		currentDate.setUTCDate(currentDate.getUTCDate() + 7);
+		epoch++;
+	}
+	return dates;
 }
 
 interface DataTableState {
@@ -71,33 +98,7 @@ function createDataTable() {
 					if (!response.ok) throw new Error(`Failed to fetch date ranges: HTTP ${response.status}`);
 					const data = await response.json();
 
-					const minTimestamp = new Date('2024-10-30T00:00:00Z');
-					const maxTimestamp = new Date(data.max_timestamp);
-
-					const dates: DateRange[] = [];
-					const currentDate = new Date(minTimestamp.toISOString().substring(0, 10) + 'T00:00:00Z');
-					let epoch = 1;
-
-					while (currentDate <= maxTimestamp) {
-						const startOfWeek = new Date(currentDate);
-						startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 3);
-
-						const endOfWeek = new Date(startOfWeek);
-						endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
-
-						const dateStr = `${startOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}-${endOfWeek.toISOString().substring(0, 10).replace(/-/g, '')}`;
-						dates.push({
-							id: dateStr,
-							desc: dateStr.replace(
-								/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/,
-								'$1-$2-$3 to $4-$5-$6'
-							),
-							epoch
-						});
-
-						currentDate.setUTCDate(currentDate.getUTCDate() + 7);
-						epoch++;
-					}
+					const dates = buildDateRanges(new Date(data.max_timestamp));
 
 					if (requestGeneration === generation) {
 						update((state) => ({

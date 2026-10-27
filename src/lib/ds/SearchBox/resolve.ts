@@ -11,14 +11,23 @@ export type ResolverOptions = {
 	search?: (query: string) => Promise<EnvoiSearchResult[]>;
 	lookup?: (name: string) => Promise<string[]>;
 	storage?: Pick<Storage, 'getItem' | 'setItem'>;
+	loadValidator?: () => Promise<(address: string) => boolean>;
 };
-export const isAddress = (input: string) => input.trim().length === 58;
+export const isAddress = (input: string) => /^[A-Z2-7]{58}$/.test(input.trim());
+let checksumValidator: Promise<(address: string) => boolean> | undefined;
+const loadChecksumValidator = () =>
+	(checksumValidator ??= import('algosdk').then(({ isValidAddress }) => isValidAddress));
 const key = 'ds-recent-wallets';
 export function createResolver({
 	search = searchEnvoi,
 	lookup = getEnvoiAddresses,
-	storage
+	storage,
+	loadValidator = loadChecksumValidator
 }: ResolverOptions = {}): Resolver {
+	let validator: Promise<(address: string) => boolean> | undefined;
+	async function valid(address: string) {
+		return isAddress(address) && (await (validator ??= loadValidator()))(address.trim());
+	}
 	// Access to the localStorage property itself can throw in private/sandboxed contexts.
 	function read(name: string) {
 		try {
@@ -74,13 +83,15 @@ export function createResolver({
 		async resolve(input, picked) {
 			input = input.trim();
 			const failure: Resolution = { ok: false, message: `No wallet found for "${input}"` };
-			if (picked)
-				return isAddress(picked.address) ? { ok: true, address: picked.address.trim() } : failure;
-			if (isAddress(input)) return { ok: true, address: input };
-			if (!input) return { ok: false, message: 'Enter a wallet address or enVoi name' };
 			try {
+				if (picked)
+					return (await valid(picked.address))
+						? { ok: true, address: picked.address.trim() }
+						: failure;
+				if (isAddress(input)) return (await valid(input)) ? { ok: true, address: input } : failure;
+				if (!input) return { ok: false, message: 'Enter a wallet address or enVoi name' };
 				const [address] = await lookup(input);
-				return address && isAddress(address) ? { ok: true, address: address.trim() } : failure;
+				return address && (await valid(address)) ? { ok: true, address: address.trim() } : failure;
 			} catch {
 				return failure;
 			}

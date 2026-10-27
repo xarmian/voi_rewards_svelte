@@ -172,8 +172,10 @@ export async function requireAccountInfo(
 export async function getSupplyInfo(): Promise<SupplyInfo | null> {
 	return supplyCache.get('supply', async () => {
 		try {
-			const data = (await algodClient.supply().do()) as SupplyInfo;
-			const res = await fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`);
+			const [data, res] = await Promise.all([
+				algodClient.supply().do() as Promise<SupplyInfo>,
+				fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`)
+			]);
 			if (!res.ok) throw new Error(`Failed to fetch blacklist balance: HTTP ${res.status}`);
 			const blacklistData = await res.json();
 			const ballastBalance = Number(blacklistData.blacklist_balance_total);
