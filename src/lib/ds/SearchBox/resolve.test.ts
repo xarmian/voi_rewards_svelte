@@ -1,7 +1,8 @@
 import { describe, test } from 'vitest';
+import { encodeAddress } from 'algosdk';
 import assert from 'node:assert/strict';
 import { createResolver, isAddress } from './resolve';
-const address = 'A'.repeat(58);
+const address = 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ';
 function memory(initial: Record<string, string> = {}) {
 	const values = new Map(Object.entries(initial));
 	return {
@@ -15,7 +16,7 @@ const search = async () => [
 	{ address, name: 'name.voi', metadata: { avatar: '/avatar.png' }, cached: true }
 ];
 describe('resolution', () => {
-	test('addresses use trimmed length', () => {
+	test('addresses use trimmed checksum validation', () => {
 		assert.equal(isAddress(address), true);
 		assert.equal(isAddress('A'.repeat(57)), false);
 		assert.equal(isAddress(` ${address} `), true);
@@ -72,11 +73,14 @@ describe('resolution', () => {
 describe('recent wallets', () => {
 	test('caps at five, newest first, without duplicates', () => {
 		const resolver = createResolver({ storage: memory() });
-		for (const char of 'ABCDEF') resolver.remember(char.repeat(58));
-		resolver.remember('D'.repeat(58));
+		const addresses = Array.from({ length: 6 }, (_, i) =>
+			encodeAddress(new Uint8Array(32).fill(i))
+		);
+		for (const address of addresses) resolver.remember(address);
+		resolver.remember(addresses[3]);
 		assert.deepEqual(
 			resolver.recents(),
-			['D', 'F', 'E', 'C', 'B'].map((c) => c.repeat(58))
+			[3, 5, 4, 2, 1].map((i) => addresses[i])
 		);
 	});
 	test('seeds legacy only once, even across resolver instances', () => {
@@ -103,3 +107,21 @@ describe('recent wallets', () => {
 		);
 	});
 });
+
+for (const example of [address, 'R7TBR3Y5QCM6Y2OPQP3BPNUQG7TLN75IOC2WTNRUKO4VPNSDQF52MZB4ZE']) {
+	test(`validates example checksum ${example.slice(0, 6)}`, async () => {
+		const bad = 'A' + example.slice(1);
+		const resolver = createResolver({
+			lookup: async () => [],
+			storage: memory({ 'ds-recent-wallets': JSON.stringify([bad, example]) })
+		});
+		assert.equal(isAddress(example), true);
+		assert.deepEqual(await resolver.resolve(example), { ok: true, address: example });
+		assert.equal(isAddress(bad), false);
+		assert.deepEqual(await resolver.resolve(bad), {
+			ok: false,
+			message: `No wallet found for "${bad}"`
+		});
+		assert.deepEqual(resolver.recents(), [example]);
+	});
+}

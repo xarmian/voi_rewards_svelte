@@ -1,3 +1,4 @@
+import { isValidAddress } from 'algosdk';
 import { searchEnvoi, getEnvoiAddresses, type EnvoiSearchResult } from '$lib/utils/envoi';
 export type Suggestion = { address: string; name?: string; avatar?: string };
 export type Resolution = { ok: true; address: string } | { ok: false; message: string };
@@ -12,7 +13,7 @@ export type ResolverOptions = {
 	lookup?: (name: string) => Promise<string[]>;
 	storage?: Pick<Storage, 'getItem' | 'setItem'>;
 };
-export const isAddress = (input: string) => input.trim().length === 58;
+export const isAddress = (input: string) => isValidAddress(input.trim());
 const key = 'ds-recent-wallets';
 export function createResolver({
 	search = searchEnvoi,
