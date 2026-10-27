@@ -13,11 +13,13 @@ export function epochAt(date: Date): number {
 export function epochRange(epoch: number): { start: Date; end: Date; id: string; label: string } {
 	const start = new Date(FIRST_EPOCH + (epoch - 1) * WEEK_MS);
 	const end = new Date(start.getTime() + WEEK_MS - 1);
+	const startYear =
+		start.getUTCFullYear() !== end.getUTCFullYear() ? `, ${start.getUTCFullYear()}` : '';
 	const idDate = (date: Date) => date.toISOString().slice(0, 10).replaceAll('-', '');
 	return {
 		start,
 		end,
 		id: `${idDate(start)}-${idDate(end)}`,
-		label: `${monthDay.format(start)} – ${monthDay.format(end)}, ${end.getUTCFullYear()}`
+		label: `${monthDay.format(start)}${startYear} – ${monthDay.format(end)}, ${end.getUTCFullYear()}`
 	};
 }

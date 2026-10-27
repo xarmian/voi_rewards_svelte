@@ -25,3 +25,11 @@ for (const epoch of [1, 52, 104]) {
 		assert.equal(epochAt(end), epoch);
 	});
 }
+
+test('an epoch spanning New Year includes both years in its label', () => {
+	const epoch = epochAt(new Date('2027-01-01T00:00:00Z'));
+	assert.equal(epoch, 114);
+	const range = epochRange(epoch);
+	assert.equal(range.id, '20261230-20270105');
+	assert.equal(range.label, 'Dec 30, 2026 – Jan 5, 2027');
+});
