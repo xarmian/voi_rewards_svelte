@@ -69,6 +69,7 @@ export async function loadHome(
 	fetcher: typeof fetch,
 	now = new Date()
 ): Promise<HomeData> {
+	const startedAt = Date.now();
 	if (url.hostname === 'quests.voirewards.com')
 		return {
 			page: 'quests',
@@ -102,7 +103,8 @@ export async function loadHome(
 		}
 	}
 	const requestedEpoch = epochAt(now);
-	const fetchRows = (epoch: number) => {
+	const fetchRows = (epoch: number, timeoutMs = CRITICAL_TIMEOUT_MS) => {
+		if (timeoutMs <= 0) return Promise.resolve(failure('Unable to load epoch rewards.'));
 		const range = epochRange(epoch);
 		return read(
 			`${config.proposalApiBaseUrl}?start=${range.start.toISOString().slice(0, 10)}&end=${range.end.toISOString().slice(0, 10)}`,
@@ -111,7 +113,8 @@ export async function loadHome(
 				list(rows.data);
 				if (finite(rows.num_blocks) === null) throw new Error('Missing blocks');
 				return rows as RewardRows;
-			}
+			},
+			timeoutMs
 		);
 	};
 	// Start all independent critical reads before awaiting any of them.
@@ -126,6 +129,10 @@ export async function loadHome(
 		return timestamp;
 	});
 	const rowsPromise = fetchRows(requestedEpoch);
+	const previousRowsPromise =
+		now.getTime() - epochRange(requestedEpoch).start.getTime() < 24 * 60 * 60 * 1000
+			? fetchRows(requestedEpoch - 1)
+			: undefined;
 	const epochsPromise = read('/api/epochs', (value) =>
 		list(record(value).epochs).map((value) => {
 			const row = record(value);
@@ -193,7 +200,13 @@ export async function loadHome(
 			base.state === 'error'
 				? requestedEpoch
 				: Math.min(requestedEpoch, epochAt(new Date(base.value)));
-		return { epoch, rows: await (epoch < requestedEpoch ? fetchRows(epoch) : rowsPromise) };
+		const selectedRows =
+			epoch === requestedEpoch
+				? rowsPromise
+				: epoch === requestedEpoch - 1 && previousRowsPromise
+					? previousRowsPromise
+					: fetchRows(epoch, CRITICAL_TIMEOUT_MS - (Date.now() - startedAt));
+		return { epoch, rows: await selectedRows };
 	});
 	const [base, selected, epochs, onlineStake] = await Promise.all([
 		basePromise,

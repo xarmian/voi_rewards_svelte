@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { load } from '../../routes/(site)/+page.server';
 import { config } from '$lib/config';
-import type { HomeData } from './home';
+import { CRITICAL_TIMEOUT_MS, type HomeData } from './home';
 const now = new Date('2026-10-25T02:38:00Z');
 const rows = {
 	data: [{ proposer: 'wallet', block_count: 126874 }],
@@ -197,4 +197,115 @@ it('includes parameters for synchronous SSR reward estimates, even if epoch hist
 	if (result.rewards.state !== 'error') {
 		expect(result.rewards.value.params.reward_per_block).toBeCloseTo(10.3507, 4);
 	}
+});
+
+it('prefetches both epoch rows before any response in the first day, even with a 3.9s base read', async () => {
+	vi.setSystemTime(new Date('2026-10-21T12:00:00Z'));
+	const started = Date.now();
+	const current = `${config.proposalApiBaseUrl}?start=2026-10-21&end=2026-10-27`;
+	const previous = `${config.proposalApiBaseUrl}?start=2026-10-14&end=2026-10-20`;
+	fetcher.mockImplementation(
+		(input) =>
+			new Promise((resolve) => {
+				const url = String(input);
+				setTimeout(
+					() =>
+						resolve(
+							Response.json(
+								url === config.proposalApiBaseUrl
+									? { max_timestamp: '2026-10-20T23:59:00Z' }
+									: body(url)
+							)
+						),
+					url === config.proposalApiBaseUrl ? 3900 : url.includes('?start') ? 3950 : 10
+				);
+			})
+	);
+	const settled = vi.fn();
+	const pending = run().then((value) => {
+		settled(Date.now() - started);
+		return value;
+	});
+	expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual(
+		expect.arrayContaining([current, previous])
+	);
+	await vi.advanceTimersByTimeAsync(CRITICAL_TIMEOUT_MS + 100);
+	expect(settled).toHaveBeenCalledWith(3950);
+	const result = dashboard(await pending);
+	expect(result.rewards).toMatchObject({ state: 'ready', value: { rangeId: '20261014-20261020' } });
+	expect(result.headline).toMatchObject({ state: 'ready', value: { epoch: 103 } });
+});
+
+it.each([
+	['2026-10-25T02:38:00Z', '2026-10-20T23:59:00Z', '2026-10-14'],
+	['2026-10-21T12:00:00Z', '2026-10-13T23:59:00Z', '2026-10-07']
+])(
+	'bounds a late lag correction at %s to the remaining second',
+	async (clock, timestamp, start) => {
+		vi.setSystemTime(new Date(clock));
+		const started = Date.now();
+		const lateUrl = `${config.proposalApiBaseUrl}?start=${start}`;
+		let lateStarted: number | undefined;
+		let lateSignal: AbortSignal | null | undefined;
+		fetcher.mockImplementation((input, init) => {
+			const url = String(input);
+			if (url === config.proposalApiBaseUrl)
+				return new Promise((resolve) => {
+					setTimeout(() => resolve(Response.json({ max_timestamp: timestamp })), 3000);
+				});
+			if (url.startsWith(lateUrl)) {
+				lateStarted = Date.now() - started;
+				lateSignal = init?.signal;
+				return new Promise(() => {});
+			}
+			return Promise.resolve(Response.json(body(url)));
+		});
+		const settled = vi.fn();
+		const pending = run().then((value) => {
+			settled(Date.now() - started);
+			return value;
+		});
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(lateStarted).toBe(3000);
+		expect(lateSignal?.aborted).toBe(false);
+		await vi.advanceTimersByTimeAsync(999);
+		expect(settled).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(101);
+		expect(settled).toHaveBeenCalledWith(CRITICAL_TIMEOUT_MS);
+		expect(lateSignal?.aborted).toBe(true);
+		const result = dashboard(await pending);
+		expect(result.rewards.state).toBe('error');
+		expect(result.headline.state).toBe('error');
+		expect(result.aprHistory.state).toBe('ready');
+	}
+);
+
+it.each(['2026-10-22T00:00:00Z', now.toISOString()])(
+	'does not prefetch previous rows outside the first day at %s without a lag',
+	async (clock) => {
+		vi.setSystemTime(new Date(clock));
+		await run();
+		expect(
+			fetcher.mock.calls.filter(([url]) => String(url).includes('?start')).map(([url]) => url)
+		).toEqual([`${config.proposalApiBaseUrl}?start=2026-10-21&end=2026-10-27`]);
+	}
+);
+
+it('does not start a lag correction when processing the base response exhausts the budget', async () => {
+	const started = Date.now();
+	fetcher.mockImplementation(async (input) => {
+		if (String(input) !== config.proposalApiBaseUrl) return Response.json(body(String(input)));
+		const response = Response.json({ max_timestamp: '2026-10-20T23:59:00Z' });
+		const json = response.json.bind(response);
+		response.json = async () => {
+			const value = await json();
+			vi.setSystemTime(started + CRITICAL_TIMEOUT_MS);
+			return value;
+		};
+		return response;
+	});
+	const result = dashboard(await run());
+	expect(result.rewards.state).toBe('error');
+	expect(result.headline.state).toBe('error');
+	expect(fetcher.mock.calls.filter(([url]) => String(url).includes('?start'))).toHaveLength(1);
 });
