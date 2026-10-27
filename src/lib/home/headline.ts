@@ -1,6 +1,6 @@
 import { epochRange } from '$lib/epochs';
 import { comma, compact, MISSING, pct, usd } from '$lib/ds/format';
-import type { Headline, Loaded, Price } from '$lib/server/home';
+import type { DashboardData, Headline, Loaded, Price } from '$lib/server/home';
 
 export type Epoch = {
 	epoch_number: number;
@@ -99,4 +99,12 @@ export function accountsDetail(loaded: Loaded<number>): string | undefined {
 	return loaded.state !== 'error' && Number.isFinite(loaded.value) && loaded.value > 0
 		? `/ ${comma(loaded.value)} online`
 		: undefined;
+}
+
+/** A retry can replace rows only until the user takes control of the epoch select. */
+export function rewardsRefreshMode(
+	initial: Pick<DashboardData['rewards'], 'state'>,
+	hasSelectedEpoch: boolean
+): 'all' | 'dates' | 'none' {
+	return initial.state === 'error' ? 'none' : hasSelectedEpoch ? 'dates' : 'all';
 }

@@ -4,7 +4,8 @@ import {
 	blocksForEpoch,
 	headlineValues,
 	priceTile,
-	accountsDetail
+	accountsDetail,
+	rewardsRefreshMode
 } from './headline';
 import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 import { MISSING, usd } from '$lib/ds/format';
@@ -94,4 +95,14 @@ it('maps streamed price props and never presents an error as $0', () => {
 it('maps online count to a detail only on success', () => {
 	expect(accountsDetail({ state: 'ready', value: 152 })).toBe('/ 152 online');
 	expect(accountsDetail({ state: 'error', message: 'offline' })).toBeUndefined();
+});
+
+it('refreshes server rows and params only before the user chooses an epoch', () => {
+	const ready = { state: 'ready' } as const;
+	expect(rewardsRefreshMode(ready, false)).toBe('all');
+	expect(rewardsRefreshMode(ready, true)).toBe('dates');
+});
+
+it.each([false, true])('an error retry preserves visible rows (user selected: %s)', (selected) => {
+	expect(rewardsRefreshMode({ state: 'error' }, selected)).toBe('none');
 });

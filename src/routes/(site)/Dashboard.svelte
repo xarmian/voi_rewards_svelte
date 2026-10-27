@@ -10,10 +10,12 @@
 	import GotVoiAd from '$lib/component/GotVoiAd.svelte';
 	import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
 	import type { DashboardData, RewardRows } from '$lib/server/home';
+	import { rewardsRefreshMode } from '$lib/home/headline';
 
 	export let initial: DashboardData['rewards'];
 	let dates: DateRange[] = [];
 	let selectedDate = '';
+	let hasSelectedEpoch = false;
 	let loadedRange = '';
 	let dataArrays: Record<string, unknown>[] = [];
 	let totalBlocks = 0;
@@ -32,15 +34,18 @@
 		loadedRange = rangeId;
 	}
 
-	// Use the server rows during SSR and again when invalidation replaces the data.
+	// Use server rows during SSR; retries preserve any epoch the user has chosen.
 	$: if (initial !== appliedInitial) {
+		const refresh = rewardsRefreshMode(initial, hasSelectedEpoch);
 		appliedInitial = initial;
 		if (initial.state !== 'error') {
 			dates = initial.value.dates;
-			selectedDate = initial.value.rangeId;
-			useRows(initial.value.data as RewardRows, selectedDate);
-			error = null;
-			void updateRewardParams(initial.value.params);
+			if (refresh === 'all') {
+				selectedDate = initial.value.rangeId;
+				useRows(initial.value.data as RewardRows, selectedDate);
+				error = null;
+				void updateRewardParams(initial.value.params);
+			}
 		}
 	}
 
@@ -207,6 +212,7 @@
 				<select
 					id="epoch-selector"
 					bind:value={selectedDate}
+					on:change={() => (hasSelectedEpoch = true)}
 					class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600
 							rounded-lg px-4 py-2
 							focus:ring-2 focus:ring-purple-500 focus:border-purple-500
