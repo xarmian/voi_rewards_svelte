@@ -16,6 +16,7 @@
 </script>
 
 <script lang="ts" generics="V extends string">
+	import { trackScrollLeft } from './scroll';
 	// As in DataTable, the pinned ESLint parser does not register Svelte generics.
 	/* global V */
 	type Props =
@@ -61,14 +62,18 @@
 		const element = track;
 		if (element && id) {
 			const link = Array.from(element.querySelectorAll('a')).find((a) => a.dataset.item === id);
-			link?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+			if (link) element.scrollLeft = trackScrollLeft(element, link);
 		}
 	});
 </script>
 
 {#if variant === 'nav'}
 	<nav aria-label={label} class={onHero ? 'on-hero' : undefined}>
-		<ul bind:this={track} class="flex max-w-full gap-1 overflow-x-auto p-1" style:mask-image={mask}>
+		<ul
+			bind:this={track}
+			class="relative flex max-w-full gap-1 overflow-x-auto p-1"
+			style:mask-image={mask}
+		>
 			{#each items ?? [] as item (item.id)}
 				<li class="shrink-0">
 					<a
