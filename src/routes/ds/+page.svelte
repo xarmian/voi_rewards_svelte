@@ -4,6 +4,11 @@
 		Card,
 		Chip,
 		CopyButton,
+		DataTable,
+		EpochStepper,
+		MISSING,
+		type Column,
+		type SortState,
 		HealthItem,
 		HealthRing,
 		InlineAlert,
@@ -24,6 +29,11 @@
 		buttonVariants,
 		cardSpans,
 		chipTones,
+		proposers,
+		lockContracts,
+		epochRange,
+		type Proposer,
+		type LockContract,
 		network,
 		offlineCount,
 		onlineCount,
@@ -104,7 +114,109 @@
 		['shortAddr(…)', shortAddr('G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ')],
 		['compact(null)', compact(null)]
 	];
+
+	let favourites = $state<string[]>([]);
+	let tableStatus = $state('');
+	let proposerSort = $state<SortState>({ key: 'blocks', dir: 'desc' });
+	let currentEpoch = $state(104);
+	let firstEpoch = $state(1);
+	let simpleEpoch = $state(103);
+	const proposerName = (row: Proposer) => row.name || shortAddr(row.addr);
+	const hiddenContracts = lockContracts.slice(7);
+	const hiddenBalance = hiddenContracts.reduce((sum, row) => sum + row.balance, 0);
+	const proposerColumns: Column<Proposer>[] = [
+		{ key: 'rank', header: 'Rank', priority: 1, numeric: true, width: '2rem' },
+		{ key: 'name', header: 'Proposer', priority: 1, cell: proposerLink },
+		{
+			key: 'blocks',
+			header: 'Blocks',
+			priority: 1,
+			numeric: true,
+			sortable: true,
+			sortValue: (r) => r.blocks,
+			cell: proposerBlocks
+		},
+		{
+			key: 'share',
+			header: 'Share',
+			priority: 2,
+			numeric: true,
+			sortable: true,
+			sortValue: (r) => r.share,
+			cell: proposerShare
+		},
+		{
+			key: 'est_reward',
+			header: 'Est. VOI',
+			priority: 2,
+			numeric: true,
+			sortable: true,
+			sortValue: (r) => r.est_reward,
+			cell: proposerReward
+		},
+		{ key: 'usd', header: '≈USD', priority: 3, numeric: true, cell: proposerUsd }
+	];
+	const contractColumns: Column<LockContract>[] = [
+		{ key: 'id', header: 'Contract', priority: 1, cell: contractId },
+		{ key: 'online', header: 'Status', priority: 1, cell: contractStatus },
+		{ key: 'balance', header: 'Balance', priority: 1, numeric: true, cell: contractBalance },
+		{
+			key: 'blocks_now',
+			header: 'Blocks this epoch',
+			priority: 2,
+			numeric: true,
+			cell: contractBlocks
+		},
+		{ key: 'key_expiry', header: 'Key expires', priority: 3, cell: contractKey },
+		{ key: 'next_vesting', header: 'Next unlock', priority: 3, cell: contractUnlock }
+	];
 </script>
+
+{#snippet proposerLink(row: Proposer)}
+	<a href={`/wallet/${row.addr}`} class="break-all text-accent">{proposerName(row)}</a>
+{/snippet}
+{#snippet proposerBlocks(row: Proposer)}<span title={String(row.blocks)}>{comma(row.blocks)}</span
+	>{/snippet}
+{#snippet proposerShare(row: Proposer)}
+	<div class="flex items-center justify-end gap-2">
+		<div aria-hidden="true" class="hidden h-1.5 w-16 rounded-full bg-grid md:block">
+			<div class="h-full rounded-full bg-bar" style:width={`${row.share * 100}%`}></div>
+		</div>
+		<span>{pct(row.share * 100)}</span>
+	</div>
+{/snippet}
+{#snippet proposerReward(row: Proposer)}<span title={String(row.est_reward)}
+		>{compact(row.est_reward)}</span
+	>{/snippet}
+{#snippet proposerUsd(row: Proposer)}{usd(row.est_reward * network.price)}{/snippet}
+{#snippet proposerActions(row: Proposer)}
+	<button
+		type="button"
+		role="menuitem"
+		class="block w-full rounded-ds-xs px-3 py-2 text-start hover:bg-surface-2"
+		onclick={() => (tableStatus = `Copy address selected for ${proposerName(row)} (illustrative).`)}
+		>Copy address</button
+	>
+	<button
+		type="button"
+		role="menuitem"
+		class="block w-full rounded-ds-xs px-3 py-2 text-start hover:bg-surface-2"
+		onclick={() =>
+			(tableStatus = `Edit nickname selected for ${proposerName(row)} (illustrative).`)}
+		>Edit nickname</button
+	>
+{/snippet}
+{#snippet contractId(row: LockContract)}#{row.id}{/snippet}
+{#snippet contractStatus(row: LockContract)}<StatusPill
+		tone={row.online ? 'ok' : 'neutral'}
+		label={row.online ? 'Online' : 'Not staking'}
+	/>{/snippet}
+{#snippet contractBalance(row: LockContract)}<span title={String(row.balance)}
+		>{compact(row.balance)}</span
+	>{/snippet}
+{#snippet contractBlocks(row: LockContract)}{comma(row.blocks_now)}{/snippet}
+{#snippet contractKey(row: LockContract)}{row.key_expiry ?? MISSING}{/snippet}
+{#snippet contractUnlock(row: LockContract)}{row.next_vesting} · {compact(row.next_amount)} VOI{/snippet}
 
 <svelte:head>
 	<title>Design system | Voi Rewards Auditor</title>
@@ -425,6 +537,101 @@
 			/>
 			<InlineAlert tone="warn" message="Data may be out of date. Retry unavailable." />
 			<p class="text-label text-ink-muted" aria-live="polite">Gallery retry clicks: {retries}</p>
+		</section>
+
+		<section aria-labelledby="gallery-data-table">
+			<h2 id="gallery-data-table" class="mb-4 text-h2">DataTable</h2>
+			<div class="grid gap-bento">
+				<Card title="Who's earning this epoch" headingLevel={3} id="gallery-proposers">
+					<DataTable
+						columns={proposerColumns}
+						rows={proposers}
+						rowKey={(row) => row.addr}
+						rowName={proposerName}
+						caption="Who's earning this epoch"
+						captionHidden
+						bind:sort={proposerSort}
+						limit={15}
+						moreLabel={() => `See all ${proposers.length} proposers`}
+						expandable
+						rowActions={proposerActions}
+						favourite={{
+							pressed: (row) => favourites.includes(row.addr),
+							ontoggle: (row) => {
+								favourites = favourites.includes(row.addr)
+									? favourites.filter((addr) => addr !== row.addr)
+									: [...favourites, row.addr];
+							}
+						}}
+					/>
+					<p class="mt-2 text-label text-ink-muted" aria-live="polite">{tableStatus}</p>
+				</Card>
+				<Card title="Lock contracts" headingLevel={3} id="gallery-lock-contracts">
+					<DataTable
+						columns={contractColumns}
+						rows={lockContracts}
+						rowKey={(row) => String(row.id)}
+						rowName={(row) => `contract #${row.id}`}
+						caption="Lock contracts"
+						captionHidden
+						density="compact"
+						expandable
+						limit={7}
+						moreLabel={(n) =>
+							`Show ${n} more not-staking contracts (${compact(hiddenBalance, 1)} VOI)`}
+					/>
+				</Card>
+				{#each states.filter((state) => state !== 'ready') as state (state)}
+					<Card title={`Table · ${state}`} headingLevel={3} id={`gallery-table-${state}`}>
+						<DataTable
+							columns={proposerColumns.slice(0, 3)}
+							rows={proposers.slice(0, 2)}
+							rowKey={(row) => row.addr}
+							caption={`Proposers · ${state}`}
+							{state}
+							{asOf}
+							onretry={retry}
+						/>
+					</Card>
+				{/each}
+			</div>
+		</section>
+		<section aria-labelledby="gallery-epoch-stepper">
+			<h2 id="gallery-epoch-stepper" class="mb-4 text-h2">EpochStepper</h2>
+			<div class="grid gap-bento">
+				<Card title="Current epoch · URL sync" headingLevel={3} id="gallery-current-epoch">
+					<EpochStepper
+						bind:epoch={currentEpoch}
+						min={1}
+						max={104}
+						rangeLabel={epochRange}
+						syncUrl
+						id="gallery-epoch-current"
+					/>
+					<p class="mt-2 text-label text-ink-muted">Selected: {currentEpoch}</p>
+				</Card>
+				<Card title="First epoch" headingLevel={3} id="gallery-first-epoch">
+					<EpochStepper
+						bind:epoch={firstEpoch}
+						min={1}
+						max={104}
+						rangeLabel={epochRange}
+						id="gallery-epoch-first"
+					/>
+					<p class="mt-2 text-label text-ink-muted">Selected: {firstEpoch}</p>
+				</Card>
+				<Card title="Epoch without jump" headingLevel={3} id="gallery-simple-epoch">
+					<EpochStepper
+						bind:epoch={simpleEpoch}
+						min={1}
+						max={104}
+						rangeLabel={epochRange}
+						jump={false}
+						id="gallery-epoch-simple"
+					/>
+					<p class="mt-2 text-label text-ink-muted">Selected: {simpleEpoch}</p>
+				</Card>
+			</div>
 		</section>
 
 		<section class="rounded-card bg-surface p-card shadow-card">
