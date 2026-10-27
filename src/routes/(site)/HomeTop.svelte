@@ -9,16 +9,6 @@
 	const retry = () => {
 		void invalidateAll();
 	};
-	const examples = [
-		{
-			label: 'shelly.of.voi',
-			href: '/wallet/G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ'
-		},
-		{
-			label: 'xarmian.voi',
-			href: '/wallet/R7TBR3Y5QCM6Y2OPQP3BPNUQG7TLN75IOC2WTNRUKO4VPNSDQF52MZB4ZE'
-		}
-	];
 	let headline = $derived(data.headline.state === 'error' ? undefined : data.headline.value);
 	let figures = $derived(headlineValues(headline));
 	let history = $derived(data.aprHistory.state === 'error' ? [] : data.aprHistory.value);
@@ -46,7 +36,6 @@
 			<SearchBox
 				variant="hero"
 				tone="hero"
-				{examples}
 				onsubmit={(address) => {
 					void goto('/wallet/' + address);
 				}}

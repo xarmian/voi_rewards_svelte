@@ -79,8 +79,7 @@ it.each([false, true])(
 		expect(body).toContain('Loading VOI price');
 		expect(body).not.toContain('$0');
 		expect(body).toContain('role="search"');
-		expect(body).toContain('/wallet/G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ');
-		expect(body).toContain('/wallet/R7TBR3Y5QCM6Y2OPQP3BPNUQG7TLN75IOC2WTNRUKO4VPNSDQF52MZB4ZE');
+		expect(body).not.toContain('>Try<');
 	}
 );
 it('shows a retry alert for a failed headline without a zero APR', () => {
