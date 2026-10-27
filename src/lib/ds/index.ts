@@ -39,3 +39,6 @@ export type {
 } from './charts';
 export { ArchiveBanner } from './ArchiveBanner';
 export type { ArchiveBannerProps } from './ArchiveBanner';
+export { Header, navItems, navCurrent } from './Header';
+export type { NavKey } from './Header';
+export { Footer } from './Footer';

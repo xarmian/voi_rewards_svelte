@@ -43,3 +43,23 @@ test('hero examples are links and two instances have unique IDs', () => {
 	const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
 	assert.equal(new Set(ids).size, ids.length);
 });
+
+for (const tone of ['surface', 'hero'] as const) {
+	test(`compact toggle ${tone} contrast`, () => {
+		const html = render(SearchBox, {
+			props: { variant: 'compact', onsubmit, ...(tone === 'hero' ? { tone } : {}) }
+		}).body;
+		const toggle = html.match(/<button[^>]*aria-label="Search wallets"[^>]*>/)?.[0] ?? '';
+		assert.match(toggle, tone === 'hero' ? /text-on-hero bg-on-hero-surface/ : /text-accent/);
+		assert.match(html, /bg-surface text-ink/);
+	});
+}
+test('noncollapsing compact search has no toggle and always displays its form', () => {
+	const html = render(SearchBox, {
+		props: { variant: 'compact', onsubmit, collapsible: false }
+	}).body;
+	assert.doesNotMatch(html, /aria-label="Search wallets"/);
+	const form = html.match(/<form[^>]*>/)?.[0] ?? '';
+	assert.match(form, /class="block(?: [^"]*)?"/);
+	assert.doesNotMatch(form, /hidden/);
+});

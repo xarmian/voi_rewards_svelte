@@ -2,6 +2,8 @@
 	import type { Resolver } from './resolve';
 	export type SearchBoxProps = {
 		variant: 'hero' | 'compact';
+		tone?: 'surface' | 'hero';
+		collapsible?: boolean;
 		placeholder?: string;
 		buttonLabel?: string;
 		examples?: { label: string; href: string }[];
@@ -21,6 +23,8 @@
 	import { createResolver, type Suggestion } from './resolve';
 	let {
 		variant,
+		tone = 'surface',
+		collapsible = true,
 		placeholder = 'Wallet address or enVoi name',
 		buttonLabel = 'Check',
 		examples = [],
@@ -166,14 +170,16 @@
 </script>
 
 <div bind:this={widget} onfocusout={focusout} class="min-w-0">
-	{#if variant === 'compact'}
+	{#if variant === 'compact' && collapsible}
 		<button
 			bind:this={toggle}
 			type="button"
 			aria-label="Search wallets"
 			aria-expanded={revealed}
 			aria-controls={`${id}-form`}
-			class="flex h-10 w-10 items-center justify-center rounded-ds-sm text-accent md:hidden"
+			class="flex h-10 w-10 items-center justify-center rounded-ds-sm {tone === 'hero'
+				? 'text-on-hero bg-on-hero-surface'
+				: 'text-accent'} md:hidden"
 			onclick={async () => {
 				revealed = !revealed;
 				if (revealed) {
@@ -187,7 +193,7 @@
 		id={`${id}-form`}
 		role="search"
 		aria-label={formLabel}
-		class={variant === 'compact' && !revealed ? 'hidden md:block' : 'block'}
+		class={variant === 'compact' && collapsible && !revealed ? 'hidden md:block' : 'block'}
 		onsubmit={(event) => {
 			event.preventDefault();
 			void submit(open && active >= 0 ? suggestions[active] : picked);
