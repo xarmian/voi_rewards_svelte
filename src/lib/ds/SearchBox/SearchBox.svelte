@@ -2,6 +2,9 @@
 	import type { Resolver } from './resolve';
 	export type SearchBoxProps = {
 		variant: 'hero' | 'compact';
+		tone?: 'surface' | 'hero';
+		collapsible?: boolean;
+		collapseBelow?: 'md' | 'lg';
 		placeholder?: string;
 		buttonLabel?: string;
 		examples?: { label: string; href: string }[];
@@ -16,11 +19,15 @@
 
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
+	import { errorClass, collapseOnSubmit } from './behavior';
 	import Button from '../Button/Button.svelte';
 	import { shortAddr } from '../format';
 	import { createResolver, type Suggestion } from './resolve';
 	let {
 		variant,
+		tone = 'surface',
+		collapsible = true,
+		collapseBelow = 'md',
 		placeholder = 'Wallet address or enVoi name',
 		buttonLabel = 'Check',
 		examples = [],
@@ -55,6 +62,11 @@
 	}
 	function requestSuggestions(delay = 0) {
 		cancelSuggestions();
+		if (error) {
+			suggestions = [];
+			open = false;
+			return;
+		}
 		const version = revision;
 		active = -1;
 		const query = text.trim();
@@ -109,9 +121,16 @@
 		if (version !== submission) return;
 		submitting = false;
 		if (result.ok) {
+			if (collapseOnSubmit({ compact: variant === 'compact', collapsible, revealed })) {
+				revealed = false;
+				toggle?.focus();
+			}
 			resolver.remember(result.address);
 			onsubmit(result.address);
-		} else error = result.message;
+		} else {
+			close();
+			error = result.message;
+		}
 	}
 	function keydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -149,6 +168,9 @@
 			toggle?.focus();
 		} else cancelSuggestions();
 	}
+	// TASK-65: focusout closes the listbox only. Collapsing the revealed form here broke mouse
+	// clicks on Check and the toggle where buttons don't take focus (Safari, macOS Firefox:
+	// relatedTarget is null), so the form collapses on success, the toggle or Escape.
 	function focusout(event: FocusEvent) {
 		if (!(event.relatedTarget instanceof Node) || !widget?.contains(event.relatedTarget)) close();
 	}
@@ -166,14 +188,16 @@
 </script>
 
 <div bind:this={widget} onfocusout={focusout} class="min-w-0">
-	{#if variant === 'compact'}
+	{#if variant === 'compact' && collapsible}
 		<button
 			bind:this={toggle}
 			type="button"
 			aria-label="Search wallets"
 			aria-expanded={revealed}
 			aria-controls={`${id}-form`}
-			class="flex h-10 w-10 items-center justify-center rounded-ds-sm text-accent md:hidden"
+			class="flex h-10 w-10 items-center justify-center rounded-ds-sm {tone === 'hero'
+				? 'text-on-hero bg-on-hero-surface'
+				: 'text-accent'} {collapseBelow === 'lg' ? 'lg:hidden' : 'md:hidden'}"
 			onclick={async () => {
 				revealed = !revealed;
 				if (revealed) {
@@ -187,7 +211,11 @@
 		id={`${id}-form`}
 		role="search"
 		aria-label={formLabel}
-		class={variant === 'compact' && !revealed ? 'hidden md:block' : 'block'}
+		class={variant === 'compact' && collapsible && !revealed
+			? collapseBelow === 'lg'
+				? 'hidden lg:block'
+				: 'hidden md:block'
+			: 'block'}
 		onsubmit={(event) => {
 			event.preventDefault();
 			void submit(open && active >= 0 ? suggestions[active] : picked);
@@ -263,14 +291,10 @@
 					{/each}
 				</ul>
 			{/if}
+			{#if error}<p id={`${id}-error`} role="alert" class={errorClass(variant, tone)}>
+					{error}
+				</p>{/if}
 		</div>
-		{#if error}<p
-				id={`${id}-error`}
-				role="alert"
-				class="mt-2 text-sm {variant === 'hero' ? 'text-on-hero' : 'text-danger'}"
-			>
-				{error}
-			</p>{/if}
 	</form>
 	{#if variant === 'hero' && examples.length}
 		<p class="mt-3 flex flex-wrap gap-3 text-sm text-on-hero">

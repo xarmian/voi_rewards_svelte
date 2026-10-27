@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { errorClass, collapseOnSubmit } from './behavior';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createRawSnippet } from 'svelte';
@@ -42,4 +44,67 @@ test('hero examples are links and two instances have unique IDs', () => {
 	assert.match(html, /<a href="\/wallet\/example"[^>]*>example.voi<\/a>/);
 	const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
 	assert.equal(new Set(ids).size, ids.length);
+});
+
+for (const tone of ['surface', 'hero'] as const) {
+	test(`compact toggle ${tone} contrast`, () => {
+		const html = render(SearchBox, {
+			props: { variant: 'compact', onsubmit, ...(tone === 'hero' ? { tone } : {}) }
+		}).body;
+		const toggle = html.match(/<button[^>]*aria-label="Search wallets"[^>]*>/)?.[0] ?? '';
+		assert.match(toggle, tone === 'hero' ? /text-on-hero bg-on-hero-surface/ : /text-accent/);
+		assert.match(html, /bg-surface text-ink/);
+	});
+}
+test('noncollapsing compact search has no toggle and always displays its form', () => {
+	const html = render(SearchBox, {
+		props: { variant: 'compact', onsubmit, collapsible: false }
+	}).body;
+	assert.doesNotMatch(html, /aria-label="Search wallets"/);
+	const form = html.match(/<form[^>]*>/)?.[0] ?? '';
+	assert.match(form, /class="block(?: [^"]*)?"/);
+	assert.doesNotMatch(form, /hidden/);
+});
+
+for (const collapseBelow of ['md', 'lg'] as const) {
+	test(`compact collapse breakpoint ${collapseBelow}`, () => {
+		const html = render(SearchBox, {
+			props: { variant: 'compact', onsubmit, ...(collapseBelow === 'lg' ? { collapseBelow } : {}) }
+		}).body;
+		const toggle = html.match(/<button[^>]*aria-label="Search wallets"[^>]*>/)?.[0] ?? '';
+		const form = html.match(/<form[^>]*>/)?.[0] ?? '';
+		assert.ok(toggle.includes(`${collapseBelow}:hidden`));
+		assert.ok(form.includes(`hidden ${collapseBelow}:block`));
+	});
+}
+test('error contrast follows the field variant and surrounding tone', () => {
+	assert.match(errorClass('compact', 'hero'), /bg-surface/);
+	assert.match(errorClass('compact', 'hero'), /text-danger/);
+	assert.match(errorClass('compact', 'hero'), /absolute inset-x-0 top-full/);
+	assert.equal(errorClass('compact', 'surface'), 'mt-2 text-sm text-danger');
+	for (const tone of ['hero', 'surface'] as const) {
+		assert.equal(errorClass('hero', tone), 'mt-2 text-sm text-on-hero');
+	}
+	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
+	assert.match(source, /class=\{errorClass\(variant, tone\)\}/);
+});
+test('only a revealed collapsible compact search collapses on a successful submit', () => {
+	const state = { compact: true, collapsible: true, revealed: true };
+	assert.equal(collapseOnSubmit(state), true);
+	for (const key of ['compact', 'collapsible', 'revealed'] as const) {
+		assert.equal(collapseOnSubmit({ ...state, [key]: false }), false);
+	}
+	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
+	assert.match(
+		source,
+		/if \(result.ok\) \{[\s\S]*?collapseOnSubmit\([\s\S]*?revealed = false;[\s\S]*?toggle\?\.focus\(\);[\s\S]*?onsubmit\(result.address\)/
+	);
+});
+test('focusout never collapses the revealed form (TASK-65: Safari click focus)', () => {
+	// Where buttons don't take focus on click, clicking Check or the toggle blurs the input with
+	// relatedTarget null; collapsing on that focusout swallowed the click.
+	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
+	const body = source.match(/function focusout\(event: FocusEvent\) \{([\s\S]*?)\n\t\}/)?.[1];
+	assert.ok(body, 'focusout handler found');
+	assert.doesNotMatch(body, /revealed/);
 });

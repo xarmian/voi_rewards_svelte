@@ -1,6 +1,8 @@
 <script lang="ts">
 	import {
 		Button,
+		Header,
+		Footer,
 		Card,
 		Chip,
 		CopyButton,
@@ -298,9 +300,11 @@
 </svelte:head>
 
 <div class="min-h-screen bg-canvas text-ink">
-	<header class="on-hero bg-hero pb-[84px] pt-10 text-on-hero rounded-b-hero">
-		<div class="container-page">
-			<h1 class="text-display">Design system</h1>
+	<div class="on-hero bg-hero pb-[84px] text-on-hero rounded-b-hero">
+		<Header variant="hero" current={null} />
+		<!-- TASK-65: the intro sits outside <header> now, so it needs its own landmark (axe region). -->
+		<section aria-labelledby="ds-gallery-title" class="container-page">
+			<h1 id="ds-gallery-title" class="text-display">Design system</h1>
 			<p class="mt-2 text-lede text-on-hero-muted">
 				Tokens, type, formatting and display primitives. Snapshot data with labelled illustrative
 				health warnings.
@@ -311,10 +315,10 @@
 			<div class="mt-4">
 				<ThemeToggle class="text-on-hero" />
 			</div>
-		</div>
-	</header>
+		</section>
+	</div>
 
-	<main class="container-page -mt-[60px] grid gap-bento pb-16">
+	<main id="main" tabindex="-1" class="container-page -mt-[60px] grid gap-bento pb-16">
 		<section aria-labelledby="gallery-stat-tile">
 			<h2 id="gallery-stat-tile" class="mb-4 text-h2">StatTile</h2>
 			<div class="grid gap-bento md:grid-cols-2 lg:grid-cols-4">
@@ -844,6 +848,7 @@
 				<Card title="Compact wallet search" headingLevel={3}>
 					<SearchBox
 						variant="compact"
+						formLabel="Gallery wallet search"
 						resolver={fixtureResolver}
 						connected={searchWallets.slice(0, 1)}
 						onsubmit={(address) => {
@@ -985,4 +990,5 @@
 			<ArchiveBanner {...archiveExample} />
 		</section>
 	</main>
+	<Footer />
 </div>
