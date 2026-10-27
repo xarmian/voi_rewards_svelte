@@ -1128,3 +1128,404 @@ export function epochRange(epoch: number): string {
 	});
 	return `${date.format(start)} – ${date.format(end)}, ${end.getUTCFullYear()}`;
 }
+
+// C3: literal chart series from phase1/data/snapshot.json.
+export const aprEpochs = [
+	{
+		epoch: 79,
+		apr: 18.986746357235294,
+		wallets: 231,
+		stake: 657849184.1094338
+	},
+	{
+		epoch: 80,
+		apr: 17.452206748865574,
+		wallets: 232,
+		stake: 713655492.352541
+	},
+	{
+		epoch: 81,
+		apr: 17.3927054302752,
+		wallets: 222,
+		stake: 714059123.796906
+	},
+	{
+		epoch: 82,
+		apr: 17.67838873269282,
+		wallets: 213,
+		stake: 700520312.527013
+	},
+	{
+		epoch: 83,
+		apr: 17.184991288244596,
+		wallets: 194,
+		stake: 718581964.510347
+	},
+	{
+		epoch: 84,
+		apr: 17.413533370534793,
+		wallets: 211,
+		stake: 707132650.105108
+	},
+	{
+		epoch: 85,
+		apr: 17.630173482898556,
+		wallets: 204,
+		stake: 696455721.885573
+	},
+	{
+		epoch: 86,
+		apr: 21.21158518914595,
+		wallets: 209,
+		stake: 577217171.221373
+	},
+	{
+		epoch: 87,
+		apr: 17.49163159557074,
+		wallets: 184,
+		stake: 697981816.807275
+	},
+	{
+		epoch: 88,
+		apr: 17.60877819117091,
+		wallets: 192,
+		stake: 691365083.246044
+	},
+	{
+		epoch: 89,
+		apr: 17.43773121189828,
+		wallets: 131,
+		stake: 696159761.409609
+	},
+	{
+		epoch: 90,
+		apr: 17.303631528247337,
+		wallets: 133,
+		stake: 699558238.988119
+	},
+	{
+		epoch: 91,
+		apr: 17.18567025390595,
+		wallets: 128,
+		stake: 702355382.226459
+	},
+	{
+		epoch: 92,
+		apr: 17.21703122998493,
+		wallets: 126,
+		stake: 699080546.420693
+	},
+	{
+		epoch: 93,
+		apr: 20.701615103586832,
+		wallets: 105,
+		stake: 579753760.271609
+	},
+	{
+		epoch: 94,
+		apr: 16.6396590439747,
+		wallets: 159,
+		stake: 719226299.551706
+	},
+	{
+		epoch: 95,
+		apr: 16.558635146475716,
+		wallets: 164,
+		stake: 720688649.422891
+	},
+	{
+		epoch: 96,
+		apr: 16.44343772719136,
+		wallets: 159,
+		stake: 723671910.790429
+	},
+	{
+		epoch: 97,
+		apr: 16.393186622838464,
+		wallets: 160,
+		stake: 723824273.644818
+	},
+	{
+		epoch: 98,
+		apr: 16.531977746213922,
+		wallets: 153,
+		stake: 715704907.279452
+	},
+	{
+		epoch: 99,
+		apr: 16.463230575435215,
+		wallets: 103,
+		stake: 716648068.915727
+	},
+	{
+		epoch: 100,
+		apr: 16.331690276672656,
+		wallets: 106,
+		stake: 720363942.7821
+	},
+	{
+		epoch: 101,
+		apr: 16.502102222874655,
+		wallets: 124,
+		stake: 710895972.013705
+	},
+	{
+		epoch: 102,
+		apr: 16.348282177024025,
+		wallets: 122,
+		stake: 715542701.877283
+	},
+	{
+		epoch: 103,
+		apr: 16.04577141286866,
+		wallets: 98,
+		stake: 726957782.2008
+	},
+	{
+		epoch: 104,
+		apr: 16.037916132129265,
+		wallets: 97,
+		stake: 725243947.167079
+	}
+];
+export const stakeDaily = [
+	{
+		date: '2026-09-25',
+		stake: 719.0083020694237
+	},
+	{
+		date: '2026-09-26',
+		stake: 719.0086262994771
+	},
+	{
+		date: '2026-09-27',
+		stake: 719.0109033311762
+	},
+	{
+		date: '2026-09-28',
+		stake: 718.9896049667507
+	},
+	{
+		date: '2026-09-29',
+		stake: 720.2949429399066
+	},
+	{
+		date: '2026-09-30',
+		stake: 721.5920615805909
+	},
+	{
+		date: '2026-10-01',
+		stake: 724.1621380463771
+	},
+	{
+		date: '2026-10-02',
+		stake: 726.1679986282775
+	},
+	{
+		date: '2026-10-03',
+		stake: 714.2187140697871
+	},
+	{
+		date: '2026-10-04',
+		stake: 720.8811054960935
+	},
+	{
+		date: '2026-10-05',
+		stake: 725.9989813980764
+	},
+	{
+		date: '2026-10-06',
+		stake: 720.9566629907814
+	},
+	{
+		date: '2026-10-07',
+		stake: 662.4400272815897
+	},
+	{
+		date: '2026-10-08',
+		stake: 476.30328961076714
+	},
+	{
+		date: '2026-10-09',
+		stake: 476.6017002317607
+	},
+	{
+		date: '2026-10-10',
+		stake: 476.6003043295545
+	},
+	{
+		date: '2026-10-11',
+		stake: 476.6156071835337
+	},
+	{
+		date: '2026-10-12',
+		stake: 476.6118146319474
+	},
+	{
+		date: '2026-10-13',
+		stake: 662.7755840096571
+	},
+	{
+		date: '2026-10-14',
+		stake: 719.3860646379331
+	},
+	{
+		date: '2026-10-15',
+		stake: 732.7688393750886
+	},
+	{
+		date: '2026-10-16',
+		stake: 732.8499257783955
+	},
+	{
+		date: '2026-10-17',
+		stake: 727.1464950522425
+	},
+	{
+		date: '2026-10-18',
+		stake: 727.1892541899506
+	},
+	{
+		date: '2026-10-19',
+		stake: 727.3287044809229
+	},
+	{
+		date: '2026-10-20',
+		stake: 726.9833837229269
+	},
+	{
+		date: '2026-10-21',
+		stake: 728.1455903582929
+	},
+	{
+		date: '2026-10-22',
+		stake: 727.8277182823796
+	},
+	{
+		date: '2026-10-23',
+		stake: 727.3178328740808
+	},
+	{
+		date: '2026-10-24',
+		stake: 725.2332347849485
+	},
+	{
+		date: '2026-10-25',
+		stake: 725.243947167079
+	}
+];
+export const blockHistory = [
+	{
+		epoch: 92,
+		blocks: 18329,
+		total: 217781,
+		est: 194805.36987616,
+		stake: 0,
+		expected: 17425.63863085058
+	},
+	{
+		epoch: 93,
+		blocks: 21305,
+		total: 218128,
+		est: 225431.4899050099,
+		stake: 0,
+		expected: 21045.71941777305
+	},
+	{
+		epoch: 94,
+		blocks: 18226,
+		total: 217675,
+		est: 192703.4331089928,
+		stake: 0,
+		expected: 16929.297087132447
+	},
+	{
+		epoch: 95,
+		blocks: 17440,
+		total: 218143,
+		est: 183473.80791499154,
+		stake: 0,
+		expected: 16931.26987443313
+	},
+	{
+		epoch: 96,
+		blocks: 17518,
+		total: 218544,
+		est: 183432.64335785928,
+		stake: 0,
+		expected: 16892.467990416204
+	},
+	{
+		epoch: 97,
+		blocks: 17428,
+		total: 218443,
+		est: 182054.9960218455,
+		stake: 0,
+		expected: 16881.106973909737
+	},
+	{
+		epoch: 98,
+		blocks: 17355,
+		total: 218268,
+		est: 180921.43026004726,
+		stake: 0,
+		expected: 17058.93863170591
+	},
+	{
+		epoch: 99,
+		blocks: 17418,
+		total: 218322,
+		est: 181016.61406546296,
+		stake: 0,
+		expected: 17040.702678021713
+	},
+	{
+		epoch: 100,
+		blocks: 17343,
+		total: 219543,
+		est: 178724.70115193835,
+		stake: 0,
+		expected: 17047.612332662706
+	},
+	{
+		epoch: 101,
+		blocks: 17195,
+		total: 219131,
+		est: 177027.339468172,
+		stake: 0,
+		expected: 17242.240560279508
+	},
+	{
+		epoch: 102,
+		blocks: 24840,
+		total: 215254,
+		est: 259600.00650394417,
+		stake: 0,
+		expected: 16827.190325650772
+	},
+	{
+		epoch: 103,
+		blocks: 17306,
+		total: 215613,
+		est: 180047.95977979063,
+		stake: 0,
+		expected: 16590.584431730123
+	}
+];
+
+// Synthetic low epoch: the snapshot has no epoch below 85% of expected.
+export const illustrativeLowBlocks = blockHistory.map((row) =>
+	row.epoch === 99 ? { ...row, blocks: 12000 } : { ...row }
+);
+export const searchWallets = [
+	{ name: 'shelly.of.voi', address: 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ' },
+	{ name: 'xarmian.voi', address: 'R7TBR3Y5QCM6Y2OPQP3BPNUQG7TLN75IOC2WTNRUKO4VPNSDQF52MZB4ZE' },
+	{ name: 'corn.voi', address: 'FZPGANXMQIHVSWYN6ZXS63QO5A5X4LEYCB4O52IP37HR6LY5RJY6FRC3LA' },
+	{ name: 'gov.voi', address: '2RMPWZ6VDF5FKNIWLQQRJFMIXRCOML5NWB2XBLIUOVPQCW56F7VTUQCMAU' }
+];
+// Illustrative archive dates, not a historical programme-end assertion.
+export const archiveExample = {
+	programme: 'Phase 2 testnet',
+	endedOn: 'Nov 2025',
+	frozenAt: 'Nov 30, 2025'
+};

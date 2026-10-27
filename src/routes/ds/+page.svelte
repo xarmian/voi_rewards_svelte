@@ -170,6 +170,80 @@
 		{ key: 'key_expiry', header: 'Key expires', priority: 3, cell: contractKey },
 		{ key: 'next_vesting', header: 'Next unlock', priority: 3, cell: contractUnlock }
 	];
+	import {
+		Tabs,
+		createHashTabs,
+		SearchBox,
+		createResolver,
+		ChartFrame,
+		LineChart,
+		BarsVsExpected,
+		ArchiveBanner,
+		type ChartData
+	} from '$lib/ds';
+	import { WALLET_TABS } from '$lib/ds/Tabs/hash';
+	import { annotationsFor } from '$lib/data/chartEvents';
+	import {
+		aprEpochs,
+		stakeDaily,
+		blockHistory,
+		illustrativeLowBlocks,
+		searchWallets,
+		archiveExample
+	} from './fixtures';
+	let tabPanel: HTMLDivElement | undefined = $state();
+	const hashTabs = createHashTabs({ ids: WALLET_TABS, panel: () => tabPanel });
+	const walletTabs = WALLET_TABS.map((id) => ({
+		id,
+		label: id[0].toUpperCase() + id.slice(1),
+		href: `#${id}`
+	}));
+	let selectedRange = $state('12');
+	let aprRange = $state('26');
+	let resolvedAddress = $state('Submit a wallet address or fixture name.');
+	const recentStorage = new Map<string, string>();
+	const fixtureResolver = createResolver({
+		search: async (query) =>
+			searchWallets
+				.filter((wallet) => wallet.name.includes(query.toLowerCase()))
+				.map((wallet) => ({ ...wallet, cached: true, metadata: {} })),
+		lookup: async (name) =>
+			searchWallets
+				.filter((wallet) => wallet.name === name.toLowerCase())
+				.map((wallet) => wallet.address),
+		storage: {
+			getItem: (key) => recentStorage.get(key) ?? null,
+			setItem: (key, value) => {
+				recentStorage.set(key, value);
+			}
+		}
+	});
+	const searchExamples = searchWallets
+		.slice(0, 2)
+		.map((wallet) => ({ label: wallet.name, href: `/wallet/${wallet.address}` }));
+	let shownApr = $derived(aprEpochs.slice(-Number(aprRange)));
+	let aprData: ChartData = $derived({
+		columns: ['Epoch', 'APR', 'Wallets'],
+		rows: shownApr.map((row) => [row.epoch, row.apr, row.wallets]),
+		caption: 'Network APR (%) and earning wallets by epoch'
+	});
+	const stakeData: ChartData = {
+		columns: ['Date', 'Online stake (M VOI)'],
+		rows: stakeDaily.map((row) => [row.date, row.stake]),
+		caption: 'Daily online stake in millions of VOI'
+	};
+	function blocksData(history: typeof blockHistory): ChartData {
+		return {
+			columns: ['Epoch', 'Blocks', 'Expected', 'Est. VOI'],
+			rows: history.map((row) => [row.epoch, row.blocks, row.expected, row.est]),
+			caption: 'Produced blocks, stake-weighted expected blocks and estimated VOI rewards'
+		};
+	}
+	function describeBlocks(index: number, history = blockHistory) {
+		const row = history[index];
+		return `Epoch ${row.epoch}: ${comma(row.blocks)} blocks vs ${comma(row.expected)} expected (${Math.round((row.blocks / row.expected) * 100)}%) · est. ${compact(row.est, 1)} VOI`;
+	}
+	const chartStates = ['loading', 'empty', 'error', 'stale'] as const;
 </script>
 
 {#snippet proposerLink(row: Proposer)}
@@ -717,6 +791,198 @@
 				/>
 				<a href="/ds" class="text-accent underline">A link</a>
 			</div>
+		</section>
+		<section aria-labelledby="gallery-tabs">
+			<h2 id="gallery-tabs" class="mb-4 text-title">Tabs</h2>
+			<div class="grid gap-bento">
+				<Card title="Wallet navigation" headingLevel={3}>
+					<div class="on-hero rounded-ds-md bg-hero p-3">
+						<Tabs
+							variant="nav"
+							items={walletTabs}
+							current={hashTabs.current}
+							label="Wallet sections"
+						/>
+					</div>
+					<div bind:this={tabPanel} tabindex="-1" class="mt-3 rounded-ds-xs p-2 text-body">
+						{walletTabs.find((tab) => tab.id === hashTabs.current)?.label}
+					</div>
+				</Card>
+				<Card title="Segmented range" headingLevel={3}>
+					<div class="flex flex-wrap items-center gap-3">
+						<Tabs
+							variant="segmented"
+							label="Range"
+							options={[
+								{ value: '12', label: '12 epochs' },
+								{ value: '26', label: '26 epochs' },
+								{ value: 'all', label: 'All' }
+							]}
+							bind:value={selectedRange}
+						/>
+						<span class="text-label"
+							>Selected: {selectedRange === 'all' ? 'All' : `${selectedRange} epochs`}</span
+						>
+					</div>
+				</Card>
+			</div>
+		</section>
+		<section aria-labelledby="gallery-search">
+			<h2 id="gallery-search" class="mb-4 text-title">SearchBox</h2>
+			<div class="grid gap-bento">
+				<Card title="Hero wallet search" headingLevel={3} variant="hero">
+					<SearchBox
+						variant="hero"
+						resolver={fixtureResolver}
+						connected={searchWallets.slice(0, 1)}
+						examples={searchExamples}
+						onsubmit={(address) => {
+							resolvedAddress = address;
+						}}
+					/>
+				</Card>
+				<Card title="Compact wallet search" headingLevel={3}>
+					<SearchBox
+						variant="compact"
+						resolver={fixtureResolver}
+						connected={searchWallets.slice(0, 1)}
+						onsubmit={(address) => {
+							resolvedAddress = address;
+						}}
+					/>
+				</Card>
+			</div>
+			<p role="status" class="mt-3 break-all text-sm">{resolvedAddress}</p>
+		</section>
+		<section aria-labelledby="gallery-charts">
+			<h2 id="gallery-charts" class="mb-4 text-title">ChartFrame and chart primitives</h2>
+			<div class="grid gap-bento lg:grid-cols-2">
+				<ChartFrame
+					title="APR by epoch"
+					headingLevel={3}
+					summary="Network APR by epoch, with the offline-stake event marked at epoch 102."
+					data={aprData}
+					x={{ kind: 'band', values: shownApr.map((row) => row.epoch) }}
+					y={{ domain: [0, Math.max(...shownApr.map((row) => row.apr))], format: pct }}
+					annotations={annotationsFor('apr', 'epoch')}
+					legend={[{ label: 'APR', swatch: 'fill' }]}
+				>
+					{#snippet actions()}<Tabs
+							variant="segmented"
+							label="APR range"
+							options={[
+								{ value: '12', label: '12 epochs' },
+								{ value: '26', label: '26 epochs' }
+							]}
+							bind:value={aprRange}
+						/>{/snippet}
+					{#snippet children(ctx)}<LineChart
+							{ctx}
+							points={shownApr.map((row) => ({ x: row.epoch, y: row.apr }))}
+							format={pct}
+						/>{/snippet}
+				</ChartFrame>
+				<ChartFrame
+					title="Online stake, 30 days"
+					headingLevel={3}
+					summary="Online stake fell during October 8–12 and recovered to 725.2 million VOI."
+					data={stakeData}
+					x={{
+						kind: 'time',
+						domain: [new Date(stakeDaily[0].date), new Date(stakeDaily[stakeDaily.length - 1].date)]
+					}}
+					y={{
+						domain: [0, Math.max(...stakeDaily.map((row) => row.stake))],
+						format: (n) => compact(n * 1e6, 1)
+					}}
+					annotations={annotationsFor('onlineStake', 'date')}
+					legend={[{ label: 'Online stake', swatch: 'fill' }]}
+				>
+					{#snippet children(ctx)}<LineChart
+							{ctx}
+							points={stakeDaily.map((row) => ({ x: new Date(row.date), y: row.stake }))}
+							format={(n) => compact(n * 1e6, 1)}
+						/>{/snippet}
+				</ChartFrame>
+				<ChartFrame
+					title="Blocks vs expected"
+					headingLevel={3}
+					summary="Produced blocks exceeded stake-weighted expectations, reaching 148% in epoch 102."
+					data={blocksData(blockHistory)}
+					x={{ kind: 'band', values: blockHistory.map((row) => row.epoch) }}
+					y={{ domain: [0, 28000], format: (n) => (n === 0 ? '0' : comma(n / 1000, 1) + 'k') }}
+					describe={(index) => describeBlocks(index)}
+					annotations={annotationsFor('blocksVsExpected', 'epoch')}
+					legend={[
+						{ label: 'Blocks', swatch: 'fill' },
+						{ label: 'Expected', swatch: 'expected' }
+					]}
+				>
+					{#snippet children(ctx)}<BarsVsExpected
+							{ctx}
+							bars={blockHistory.map((row) => ({
+								x: row.epoch,
+								value: row.blocks,
+								expected: row.expected
+							}))}
+						/>{/snippet}
+				</ChartFrame>
+				<ChartFrame
+					title="Blocks vs expected (illustrative low epoch)"
+					headingLevel={3}
+					summary="Synthetic example: epoch 99 is below 85% of expected blocks, demonstrating the warning style."
+					data={blocksData(illustrativeLowBlocks)}
+					x={{ kind: 'band', values: illustrativeLowBlocks.map((row) => row.epoch) }}
+					y={{ domain: [0, 28000], format: (n) => (n === 0 ? '0' : comma(n / 1000, 1) + 'k') }}
+					describe={(index) => describeBlocks(index, illustrativeLowBlocks)}
+					annotations={[
+						{
+							id: 'synthetic-low',
+							at: 99,
+							label: 'Synthetic low epoch',
+							detail:
+								'Illustrative data: epoch 99 was changed to 12,000 blocks to demonstrate a ratio below 85%.',
+							tone: 'neutral'
+						}
+					]}
+					legend={[
+						{ label: 'Blocks', swatch: 'fill' },
+						{ label: 'Expected', swatch: 'expected' }
+					]}
+				>
+					{#snippet children(ctx)}<BarsVsExpected
+							{ctx}
+							bars={illustrativeLowBlocks.map((row) => ({
+								x: row.epoch,
+								value: row.blocks,
+								expected: row.expected
+							}))}
+						/>{/snippet}
+				</ChartFrame>
+				{#each chartStates as state (state)}
+					<ChartFrame
+						title={`Chart state: ${state}`}
+						headingLevel={3}
+						summary="Network APR by epoch."
+						{state}
+						{asOf}
+						onretry={retry}
+						data={state === 'empty' ? { ...aprData, rows: [] } : aprData}
+						x={{ kind: 'band', values: shownApr.map((row) => row.epoch) }}
+						y={{ domain: [0, 25], format: pct }}
+					>
+						{#snippet children(ctx)}<LineChart
+								{ctx}
+								points={shownApr.map((row) => ({ x: row.epoch, y: row.apr }))}
+								format={pct}
+							/>{/snippet}
+					</ChartFrame>
+				{/each}
+			</div>
+		</section>
+		<section aria-labelledby="gallery-archive">
+			<h2 id="gallery-archive" class="mb-4 text-title">ArchiveBanner</h2>
+			<ArchiveBanner {...archiveExample} />
 		</section>
 	</main>
 </div>
