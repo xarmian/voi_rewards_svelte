@@ -110,3 +110,17 @@ it.each(['data', 'dates'])(
 		expect(get(dataTable).loading).toBe(false);
 	}
 );
+
+it('builds legacy ids, descriptions and epoch numbers matching every epoch range', async () => {
+	const { buildDateRanges } = await import('./dataTable');
+	const { epochRange } = await import('$lib/epochs');
+	const dates = buildDateRanges(new Date('2026-10-25T02:38:00Z'));
+	expect(dates).toHaveLength(104);
+	expect(dates[0]).toEqual({ id: '20241030-20241105', desc: '2024-10-30 to 2024-11-05', epoch: 1 });
+	expect(dates[103]).toEqual({
+		id: '20261021-20261027',
+		desc: '2026-10-21 to 2026-10-27',
+		epoch: 104
+	});
+	for (const date of dates) expect(date.id).toBe(epochRange(date.epoch).id);
+});

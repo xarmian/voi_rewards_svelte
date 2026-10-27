@@ -1,0 +1,97 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import {
+	deriveHeadline,
+	blocksForEpoch,
+	headlineValues,
+	priceTile,
+	accountsDetail
+} from './headline';
+import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
+import { MISSING, usd } from '$lib/ds/format';
+const now = new Date('2026-10-25T02:38:00Z');
+const epochs = [
+	{ epoch_number: 104, apr: 16.04, eligible_online_stake: 725200000, participating_wallets: 97 },
+	{ epoch_number: 103, apr: 16.2 }
+];
+async function fixture(timestamp = now.toISOString()) {
+	const pool = await getTokensByEpoch(104);
+	return deriveHeadline(
+		{
+			epoch: 104,
+			epochs,
+			pool,
+			blocks: 126874,
+			maxTimestamp: timestamp,
+			projection: extrapolateRewardPerBlock(126874, pool, '20261021-20261027')
+		},
+		now
+	);
+}
+afterEach(() => vi.useRealTimers());
+it('derives the snapshot from VOI stake and the legacy range projection', async () => {
+	vi.useFakeTimers();
+	vi.setSystemTime(now);
+	const h = await fixture();
+	expect(h.apr).toBe(16.04);
+	expect(h.prevApr).toBe(16.2);
+	expect(h.pool).toBe(2236808);
+	expect(Math.abs(h.perMillion - 3084)).toBeLessThan(1);
+	expect(h.voiPerBlock).toBeCloseTo(10.35, 2);
+	expect(h.projectedBlocks).toBe(216102);
+	expect(h.elapsedDays).toBeCloseTo(4.1, 1);
+	expect(h.earningAccounts).toBe(97);
+});
+it('clamps elapsed days at both ends', async () => {
+	expect((await fixture('2026-10-20T00:00:00Z')).elapsedDays).toBe(0);
+	const h = deriveHeadline(
+		{
+			epoch: 104,
+			epochs,
+			pool: 1,
+			blocks: 1,
+			maxTimestamp: '2026-11-01',
+			projection: { projectedTotalBlocks: 1, projectedRewardPerBlock: 1 }
+		},
+		new Date('2026-11-02')
+	);
+	expect(h.elapsedDays).toBe(7);
+});
+it('keeps the pre-62 ballast formula', () => {
+	expect(blocksForEpoch(61, { num_blocks: 120, num_blocks_ballast: 90 })).toBe(160);
+	expect(blocksForEpoch(62, { num_blocks: 120, num_blocks_ballast: 90 })).toBe(120);
+});
+it('formats missing and non-finite headline values as missing', () => {
+	const h = deriveHeadline(
+		{
+			epoch: 104,
+			epochs: [],
+			pool: NaN,
+			blocks: NaN,
+			maxTimestamp: '',
+			projection: { projectedTotalBlocks: NaN, projectedRewardPerBlock: NaN }
+		},
+		now
+	);
+	expect(Object.values(headlineValues(h))).toEqual(Array(7).fill(MISSING));
+});
+it('maps streamed price props and never presents an error as $0', () => {
+	const props = priceTile({
+		state: 'ready',
+		value: { price: 0.000127, change24h: -1.01, mcap: 265986 }
+	});
+	expect(props).toMatchObject({
+		state: 'ready',
+		href: '/markets',
+		value: usd(0.000127),
+		change: { value: -1.01, label: '24h' },
+		detail: `24h · mcap ${usd(265986)}`
+	});
+	expect(priceTile({ state: 'error', message: 'offline' })).toMatchObject({
+		state: 'error',
+		value: MISSING
+	});
+});
+it('maps online count to a detail only on success', () => {
+	expect(accountsDetail({ state: 'ready', value: 152 })).toBe('/ 152 online');
+	expect(accountsDetail({ state: 'error', message: 'offline' })).toBeUndefined();
+});
