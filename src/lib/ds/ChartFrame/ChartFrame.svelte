@@ -31,6 +31,7 @@
 	import { slug } from '../slug';
 	import { makeX, makeY, tickValues } from '../charts/scales';
 	import { layoutAnnotations } from '../charts/annotations';
+	import { shownMark, stepMark } from '../charts/interaction';
 	let {
 		title,
 		headingLevel = 2,
@@ -53,6 +54,7 @@
 	let container: HTMLDivElement | undefined = $state();
 	let width = $state(640);
 	let active: number | null = $state(null);
+	let hovered: number | null = $state(null);
 	let announcement = $state('');
 	const left = 48;
 	const right = 16;
@@ -92,7 +94,8 @@
 			.filter((m) => Number.isFinite(m.center))
 			.sort((a, b) => a.center - b.center)
 	);
-	let activeMark = $derived(marks.find((m) => m.index === active));
+	let shown = $derived(shownMark(hovered, active));
+	let activeMark = $derived(marks.find((m) => m.index === shown));
 	let activeText = $derived(activeMark ? describeMark(activeMark.index) : '');
 	let tooltipWidth = $derived(Math.max(1, Math.min(280, width - 16)));
 	let tooltipLeft = $derived(
@@ -115,18 +118,10 @@
 			clear();
 			return;
 		}
-		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !marks.length) return;
-		event.preventDefault();
 		const current = marks.findIndex((m) => m.index === active);
-		let next: number;
-		if (event.key === 'Home') next = 0;
-		else if (event.key === 'End') next = marks.length - 1;
-		else if (current < 0) next = event.key === 'ArrowRight' ? 0 : marks.length - 1;
-		else
-			next = Math.max(
-				0,
-				Math.min(marks.length - 1, current + (event.key === 'ArrowRight' ? 1 : -1))
-			);
+		const next = stepMark(event.key, current < 0 ? null : current, marks.length);
+		if (next === null) return;
+		event.preventDefault();
 		active = marks[next].index;
 		announcement = describeMark(active);
 	}
@@ -152,6 +147,7 @@
 		void data;
 		void x;
 		void dataState;
+		hovered = null;
 		clear();
 	});
 </script>
@@ -190,7 +186,9 @@
 				aria-describedby={annotations.length ? `${id}-notes` : undefined}
 				class="block"
 				onkeydown={keydown}
-				onpointerleave={clear}
+				onpointerleave={() => {
+					hovered = null;
+				}}
 				onblur={clear}
 			>
 				<g aria-hidden="true">
@@ -286,7 +284,7 @@
 							height={height - margin.top - margin.bottom}
 							fill="transparent"
 							onpointerenter={() => {
-								active = mark.index;
+								hovered = mark.index;
 							}}
 						/>
 					{/each}
