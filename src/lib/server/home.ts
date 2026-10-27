@@ -7,6 +7,8 @@ import { fetchWithTimeout } from './fetchWithTimeout';
 
 export const CRITICAL_TIMEOUT_MS = 4000;
 export const STREAM_TIMEOUT_MS = 5000;
+// The stake history upstream routinely takes 3.6-4.3 s; it is streamed, so a longer deadline blocks nothing.
+export const STAKE_TIMEOUT_MS = 8000;
 
 export type Loaded<T> =
 	| { state: 'ready'; value: T }
@@ -166,7 +168,7 @@ export async function loadHome(
 				.sort((a, b) => a.date.localeCompare(b.date))
 				.slice(-30);
 		},
-		STREAM_TIMEOUT_MS
+		STAKE_TIMEOUT_MS
 	);
 	const price = read(
 		'/api/markets?token=VOI',

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { load } from '../../routes/(site)/+page.server';
 import { config } from '$lib/config';
-import { CRITICAL_TIMEOUT_MS, STREAM_TIMEOUT_MS, type HomeData } from './home';
+import { CRITICAL_TIMEOUT_MS, STAKE_TIMEOUT_MS, STREAM_TIMEOUT_MS, type HomeData } from './home';
 const now = new Date('2026-10-25T02:38:00Z');
 const rows = {
 	data: [{ proposer: 'wallet', block_count: 126874 }],
@@ -73,13 +73,14 @@ it.each(['/api/markets', '/api/mimir', 'online-stake-history'])(
 		expect(streamed).toBeInstanceOf(Promise);
 		const settled = vi.fn();
 		void streamed.then(settled);
-		await vi.advanceTimersByTimeAsync(CRITICAL_TIMEOUT_MS);
+		const deadline = slow === 'online-stake-history' ? STAKE_TIMEOUT_MS : STREAM_TIMEOUT_MS;
+		await vi.advanceTimersByTimeAsync(deadline - 100);
 		expect(settled).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(STREAM_TIMEOUT_MS - CRITICAL_TIMEOUT_MS + 100);
+		await vi.advanceTimersByTimeAsync(200);
 		expect(await streamed).toMatchObject({ state: 'error' });
 	}
 );
-it('streams stake history that takes 4.3s with the same filtered 30-day VOI series', async () => {
+it('streams stake history that takes 6s (past the 5s stream deadline) with the same filtered 30-day VOI series', async () => {
 	const history = [
 		{ date: '2026-10-25', avg_online_stake: 725200000e6 },
 		{ date: '2026-09-25', avg_online_stake: 800000000e6 },
@@ -90,7 +91,7 @@ it('streams stake history that takes 4.3s with the same filtered 30-day VOI seri
 	fetcher.mockImplementation((input) =>
 		String(input).includes('online-stake-history')
 			? new Promise((resolve) => {
-					setTimeout(() => resolve(Response.json(history)), 4300);
+					setTimeout(() => resolve(Response.json(history)), 6000);
 				})
 			: Promise.resolve(Response.json(body(String(input))))
 	);
@@ -102,7 +103,7 @@ it('streams stake history that takes 4.3s with the same filtered 30-day VOI seri
 	await vi.advanceTimersByTimeAsync(0);
 	expect(loaded).toHaveBeenCalledOnce();
 	const result = dashboard(await pending);
-	await vi.advanceTimersByTimeAsync(4300);
+	await vi.advanceTimersByTimeAsync(6000);
 	expect(await result.onlineStake).toEqual({
 		state: 'ready',
 		value: [
@@ -153,7 +154,7 @@ it('bounds an entirely unresponsive proposers API', async () => {
 	expect(result.headline.state).toBe('error');
 	expect(result.rewards.state).toBe('error');
 	expect(result.aprHistory.state).toBe('ready');
-	await vi.advanceTimersByTimeAsync(STREAM_TIMEOUT_MS - CRITICAL_TIMEOUT_MS);
+	await vi.advanceTimersByTimeAsync(STAKE_TIMEOUT_MS - 4100);
 	expect((await result.onlineStake).state).toBe('error');
 });
 it('refetches rows once for a lagging previous epoch', async () => {
