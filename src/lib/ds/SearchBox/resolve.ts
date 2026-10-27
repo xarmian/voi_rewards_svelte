@@ -77,7 +77,7 @@ export function createResolver({
 			if (picked)
 				return isAddress(picked.address) ? { ok: true, address: picked.address.trim() } : failure;
 			if (isAddress(input)) return { ok: true, address: input };
-			if (!input) return failure;
+			if (!input) return { ok: false, message: 'Enter a wallet address or enVoi name' };
 			try {
 				const [address] = await lookup(input);
 				return address && isAddress(address) ? { ok: true, address: address.trim() } : failure;

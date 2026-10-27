@@ -232,6 +232,7 @@
 					id={`${id}-listbox`}
 					role="listbox"
 					aria-label="Suggestions"
+					onpointerdown={(event) => event.preventDefault()}
 					class="absolute inset-x-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-ds-sm border border-edge bg-surface p-1 text-ink shadow-pop"
 				>
 					{#each suggestions as option, index (`${option.address}-${index}`)}
@@ -246,7 +247,6 @@
 							index
 								? 'bg-accent-soft'
 								: ''}"
-							onpointerdown={(event) => event.preventDefault()}
 							onclick={() => pick(option)}
 						>
 							{#if option.avatar}<img

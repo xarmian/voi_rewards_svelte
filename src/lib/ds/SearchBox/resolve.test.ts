@@ -50,6 +50,24 @@ describe('resolution', () => {
 		const resolver = createResolver({ lookup: async () => ['short'], storage: memory() });
 		assert.equal((await resolver.resolve('bad.voi')).ok, false);
 	});
+	test('empty input asks for a wallet without calling lookup', async () => {
+		let lookups = 0;
+		const resolver = createResolver({
+			lookup: async () => {
+				lookups++;
+				return [address];
+			},
+			storage: memory()
+		});
+		for (const input of ['', ' \t\n ']) {
+			assert.deepEqual(await resolver.resolve(input), {
+				ok: false,
+				message: 'Enter a wallet address or enVoi name'
+			});
+		}
+		assert.deepEqual(await resolver.resolve('', { address }), { ok: true, address });
+		assert.equal(lookups, 0);
+	});
 });
 describe('recent wallets', () => {
 	test('caps at five, newest first, without duplicates', () => {
