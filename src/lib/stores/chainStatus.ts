@@ -52,6 +52,7 @@ export function createChainStatus(deps: Dependencies = {}) {
 		let state = { ...initial, startedAt: now() };
 		let active = true;
 		let inFlight = false;
+		let controller: AbortController | undefined;
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		set(state);
 
@@ -59,9 +60,12 @@ export function createChainStatus(deps: Dependencies = {}) {
 			if (!active || inFlight || document.visibilityState !== 'visible') return;
 			clearTimeout(timer);
 			inFlight = true;
+			const pollController = new AbortController();
+			controller = pollController;
+			const timeout = setTimeout(() => pollController.abort(), 10_000);
 			try {
 				const response = await fetch('https://mainnet-api.voi.nodely.dev/v2/status', {
-					signal: AbortSignal.timeout(10_000)
+					signal: pollController.signal
 				});
 				if (!response.ok) throw new Error(`Chain status HTTP ${response.status}`);
 				const data = await response.json();
@@ -72,13 +76,15 @@ export function createChainStatus(deps: Dependencies = {}) {
 				}
 				if (!active) return;
 				const checkedAt = now();
+				const lastRoundAt = checkedAt - ageNs / 1_000_000;
 				state = {
 					...state,
 					round,
 					checkedAt,
 					error: false,
-					lastRoundAt: checkedAt - ageNs / 1_000_000,
-					lastChangeAt: state.round === null || round > state.round ? checkedAt : state.lastChangeAt
+					lastRoundAt,
+					lastChangeAt:
+						state.round === null || round > state.round ? lastRoundAt : state.lastChangeAt
 				};
 				set(state);
 			} catch {
@@ -86,6 +92,8 @@ export function createChainStatus(deps: Dependencies = {}) {
 				state = { ...state, error: true, checkedAt: now() };
 				set(state);
 			} finally {
+				clearTimeout(timeout);
+				controller = undefined;
 				inFlight = false;
 				if (active && document.visibilityState === 'visible') timer = setTimeout(poll, 30_000);
 			}
@@ -98,6 +106,7 @@ export function createChainStatus(deps: Dependencies = {}) {
 		void poll();
 		return () => {
 			active = false;
+			controller?.abort();
 			clearTimeout(timer);
 			document.removeEventListener('visibilitychange', visibilityChanged);
 		};

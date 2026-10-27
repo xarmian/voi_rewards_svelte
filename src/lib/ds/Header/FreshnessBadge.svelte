@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { chainStatus, freshness } from '$lib/stores/chainStatus';
 	import { epochAt } from '$lib/epochs';
-	import { comma } from '../format';
+	import { badgeText } from './badge';
 	let { variant, epoch }: { variant: 'hero' | 'bar'; epoch?: number } = $props();
 	let clientEpoch: number | undefined = $state();
 	onMount(() => {
@@ -35,11 +35,6 @@
 				? 'bg-warn-soft text-warn'
 				: 'text-on-hero-muted'}">{status.tone === 'warn' ? '!' : '●'}</span
 	>
-	{#if status.unavailable}chain data unavailable{:else if status.tone === 'warn'}data {comma(
-			status.minutesOld
-		)} min old{:else if $chainStatus.round === null}Checking chain…{:else if variant === 'hero'}Epoch
-		{epoch ?? clientEpoch} live · block {comma($chainStatus.round)}{:else}#{comma(
-			$chainStatus.round
-		)} · {comma(seconds)} s{/if}
+	{badgeText({ status, round: $chainStatus.round, seconds, variant, epoch: epoch ?? clientEpoch })}
 </p>
 <span class="sr-only" role="status">{announcement}</span>
