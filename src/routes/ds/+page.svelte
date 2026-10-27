@@ -847,6 +847,7 @@
 				<Card title="Compact wallet search" headingLevel={3}>
 					<SearchBox
 						variant="compact"
+						formLabel="Gallery wallet search"
 						resolver={fixtureResolver}
 						connected={searchWallets.slice(0, 1)}
 						onsubmit={(address) => {

@@ -4,6 +4,7 @@
 		variant: 'hero' | 'compact';
 		tone?: 'surface' | 'hero';
 		collapsible?: boolean;
+		collapseBelow?: 'md' | 'lg';
 		placeholder?: string;
 		buttonLabel?: string;
 		examples?: { label: string; href: string }[];
@@ -18,6 +19,7 @@
 
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
+	import { errorClass, shouldCollapse } from './behavior';
 	import Button from '../Button/Button.svelte';
 	import { shortAddr } from '../format';
 	import { createResolver, type Suggestion } from './resolve';
@@ -25,6 +27,7 @@
 		variant,
 		tone = 'surface',
 		collapsible = true,
+		collapseBelow = 'md',
 		placeholder = 'Wallet address or enVoi name',
 		buttonLabel = 'Check',
 		examples = [],
@@ -59,6 +62,11 @@
 	}
 	function requestSuggestions(delay = 0) {
 		cancelSuggestions();
+		if (error) {
+			suggestions = [];
+			open = false;
+			return;
+		}
 		const version = revision;
 		active = -1;
 		const query = text.trim();
@@ -113,9 +121,23 @@
 		if (version !== submission) return;
 		submitting = false;
 		if (result.ok) {
+			if (
+				shouldCollapse({
+					compact: variant === 'compact',
+					collapsible,
+					revealed,
+					leaving: false,
+					hasError: Boolean(error),
+					submitted: true
+				})
+			)
+				revealed = false;
 			resolver.remember(result.address);
 			onsubmit(result.address);
-		} else error = result.message;
+		} else {
+			close();
+			error = result.message;
+		}
 	}
 	function keydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -154,7 +176,20 @@
 		} else cancelSuggestions();
 	}
 	function focusout(event: FocusEvent) {
-		if (!(event.relatedTarget instanceof Node) || !widget?.contains(event.relatedTarget)) close();
+		const leaving =
+			!(event.relatedTarget instanceof Node) || !widget?.contains(event.relatedTarget);
+		if (leaving) close();
+		if (
+			shouldCollapse({
+				compact: variant === 'compact',
+				collapsible,
+				revealed,
+				leaving,
+				hasError: Boolean(error),
+				submitted: false
+			})
+		)
+			revealed = false;
 	}
 	$effect(() => {
 		if (open && active >= 0) {
@@ -179,7 +214,7 @@
 			aria-controls={`${id}-form`}
 			class="flex h-10 w-10 items-center justify-center rounded-ds-sm {tone === 'hero'
 				? 'text-on-hero bg-on-hero-surface'
-				: 'text-accent'} md:hidden"
+				: 'text-accent'} {collapseBelow === 'lg' ? 'lg:hidden' : 'md:hidden'}"
 			onclick={async () => {
 				revealed = !revealed;
 				if (revealed) {
@@ -193,7 +228,11 @@
 		id={`${id}-form`}
 		role="search"
 		aria-label={formLabel}
-		class={variant === 'compact' && collapsible && !revealed ? 'hidden md:block' : 'block'}
+		class={variant === 'compact' && collapsible && !revealed
+			? collapseBelow === 'lg'
+				? 'hidden lg:block'
+				: 'hidden md:block'
+			: 'block'}
 		onsubmit={(event) => {
 			event.preventDefault();
 			void submit(open && active >= 0 ? suggestions[active] : picked);
@@ -269,14 +308,10 @@
 					{/each}
 				</ul>
 			{/if}
+			{#if error}<p id={`${id}-error`} role="alert" class={errorClass(variant, tone)}>
+					{error}
+				</p>{/if}
 		</div>
-		{#if error}<p
-				id={`${id}-error`}
-				role="alert"
-				class="mt-2 text-sm {variant === 'hero' ? 'text-on-hero' : 'text-danger'}"
-			>
-				{error}
-			</p>{/if}
 	</form>
 	{#if variant === 'hero' && examples.length}
 		<p class="mt-3 flex flex-wrap gap-3 text-sm text-on-hero">

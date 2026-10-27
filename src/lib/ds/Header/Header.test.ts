@@ -56,3 +56,10 @@ test('badge starts neutral with a separate empty live region in both variants', 
 		assert.doesNotMatch(html, /#0|NaN/);
 	}
 });
+
+test('desktop navigation and header search start at lg', () => {
+	const html = markup();
+	assert.match(html.match(/<nav aria-label="Main"[^>]*>/)?.[0] ?? '', /lg:block/);
+	assert.match(html.match(/<button[^>]*aria-label="Menu"[^>]*>/)?.[0] ?? '', /lg:hidden/);
+	assert.match(html.match(/<form id="ds-search-header-form"[^>]*>/)?.[0] ?? '', /hidden lg:block/);
+});
