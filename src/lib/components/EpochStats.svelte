@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { theme, onThemeChange } from '$lib/theme.svelte';
 	import { onMount } from 'svelte';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { getEpochChartUpdates, type EpochChartInputs } from '$lib/utils/epochChartUpdates';
@@ -77,15 +78,12 @@
 
 	onMount(() => {
 		mounted = true;
-		dark = document.documentElement.classList.contains('dark');
-		const observer = new MutationObserver(() => {
-			if (!lifecycle.disposed) dark = document.documentElement.classList.contains('dark');
-		});
-		lifecycle.add(() => observer.disconnect());
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class']
-		});
+		dark = theme.current === 'dark';
+		lifecycle.add(
+			onThemeChange(() => {
+				if (!lifecycle.disposed) dark = theme.current === 'dark';
+			})
+		);
 		const fetchData = async () => {
 			try {
 				const [epochsResponse, marketsResponse, priceHistoryResponse, onlineAccountsResponse] =

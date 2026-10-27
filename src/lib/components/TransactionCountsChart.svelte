@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { theme, onThemeChange } from '$lib/theme.svelte';
 	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
@@ -41,7 +42,7 @@
 	function updateChart() {
 		if (!chart || !data.length || !browser) return;
 
-		const isDarkMode = document.documentElement.classList.contains('dark');
+		const isDarkMode = theme.current === 'dark';
 		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
 		const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
 		const backgroundColor = 'transparent';
@@ -241,18 +242,11 @@
 		resizeObserver.observe(chartDiv);
 
 		// Watch for theme changes
-		const observer = new MutationObserver(() => {
-			updateChart();
-		});
-
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class']
-		});
+		const unsubscribeTheme = onThemeChange(updateChart);
 
 		return () => {
 			resizeObserver.disconnect();
-			observer.disconnect();
+			unsubscribeTheme();
 			chart.dispose();
 		};
 	});

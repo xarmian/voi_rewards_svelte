@@ -8,6 +8,7 @@ export { Button } from './Button';
 export { Chip } from './Chip';
 export { CopyButton } from './CopyButton';
 export { InlineAlert } from './InlineAlert';
+export { ThemeToggle } from './ThemeToggle';
 export * from './format';
 export { glyphs } from './types';
 export type { DataState, Tone } from './types';

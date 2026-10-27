@@ -11,6 +11,7 @@
 	// inject({ mode: dev ? 'development' : 'production' });
 	import { invalidate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { initTheme } from '$lib/theme.svelte';
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
 	import { startLoading, stopLoading } from '$lib/stores/loadingStore';
 	import { navigating } from '$app/stores';
@@ -28,6 +29,7 @@
 	$: ({ supabase, session } = data);
 
 	onMount(() => {
+		initTheme();
 		// Conditionally inject Google Analytics except on /discover
 		try {
 			const pathname = $page.url.pathname;

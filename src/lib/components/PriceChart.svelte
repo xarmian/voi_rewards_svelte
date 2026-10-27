@@ -1,5 +1,6 @@
 <!-- PriceChart.svelte -->
 <script lang="ts">
+	import { theme, onThemeChange } from '$lib/theme.svelte';
 	import { onMount, tick } from 'svelte';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { createChart, type IChartApi, type ISeriesApi, type LineData } from 'lightweight-charts';
@@ -63,7 +64,7 @@
 	function updateChartTheme() {
 		if (!chart) return;
 
-		isDarkMode = document.documentElement.classList.contains('dark');
+		isDarkMode = theme.current === 'dark';
 		const gridColor = isDarkMode ? '#2D3748' : '#E5E7EB';
 		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
 
@@ -180,20 +181,8 @@
 				chart.timeScale().fitContent();
 			}
 
-			// Set up theme observer
-			const observer = new MutationObserver((mutations) => {
-				mutations.forEach((mutation) => {
-					if (mutation.attributeName === 'class') {
-						updateChartTheme();
-					}
-				});
-			});
-
-			lifecycle.add(() => observer.disconnect());
-			observer.observe(document.documentElement, {
-				attributes: true,
-				attributeFilter: ['class']
-			});
+			// Subscribe to theme changes
+			lifecycle.add(onThemeChange(updateChartTheme));
 
 			// Initial theme setup
 			updateChartTheme();
