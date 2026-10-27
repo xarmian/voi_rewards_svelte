@@ -176,3 +176,27 @@ it('clearCaches invalidates pending and completed account results', async () => 
 	await getAccountInfo('X');
 	expect(mocks.account).toHaveBeenCalledTimes(3);
 });
+
+it('starts blacklist fetch before the pending algod supply resolves', async () => {
+	let finish!: (data: unknown) => void;
+	mocks.supply.mockReturnValueOnce({
+		do: () =>
+			new Promise((resolve) => {
+				finish = resolve;
+			})
+	});
+	const pending = getSupplyInfo();
+	await Promise.resolve();
+	expect(fetch).toHaveBeenCalledWith('https://test.invalid?action=blacklist-balance');
+	finish({ 'current-round': 10, 'online-money': 200, 'total-money': 1000 });
+	expect(await pending).toEqual({
+		'current-round': 10,
+		'online-money': 200,
+		'total-money': 1000,
+		'blacklisted-money': 50
+	});
+});
+it('supply failure still returns null when the parallel blacklist succeeds', async () => {
+	mocks.supply.mockReturnValueOnce({ do: () => Promise.reject(new Error('offline')) });
+	expect(await getSupplyInfo()).toBeNull();
+});
