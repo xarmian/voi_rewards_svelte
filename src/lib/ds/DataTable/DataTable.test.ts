@@ -137,6 +137,8 @@ describe('DataTable SSR', () => {
 		assert.equal((body.match(/aria-haspopup="menu"/g) ?? []).length, 2);
 		assert.equal((body.match(/aria-expanded="false"/g) ?? []).length, 2);
 		assert.doesNotMatch(body, /role="menu"/);
+		// A closed menu isn't rendered, so its trigger must not point at it (review r1).
+		assert.doesNotMatch(body, /aria-haspopup="menu"[^>]*aria-controls=|aria-controls="[^"]*-menu-/);
 		assert.match(body, /aria-pressed="true"/);
 		assert.match(body, /aria-pressed="false"/);
 		for (const r of rows) {
@@ -146,6 +148,14 @@ describe('DataTable SSR', () => {
 		noNestedControls(body);
 		assert.doesNotMatch(body, /<(?:tr|td)[^>]*(?:role="button"|tabindex="0")/);
 	});
+	test('the default cell renders missing values as the em dash, not null or undefined', () => {
+		const body = html({
+			rows: [{ name: 'Gamma', blocks: 1, share: null, reward: undefined } as unknown as Row]
+		});
+		assert.doesNotMatch(contentText(body), /\bnull\b|\bundefined\b/);
+		assert.ok((contentText(body).match(/—/g) ?? []).length >= 2);
+	});
+
 	test('loading uses five static skeleton rows and suppresses data', () => {
 		const body = html({ state: 'loading' });
 		assert.match(body, /<table[^>]*aria-busy="true"/);

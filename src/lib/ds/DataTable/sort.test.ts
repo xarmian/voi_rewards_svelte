@@ -13,6 +13,16 @@ const column: Column<Row> = {
 };
 const ids = (rows: Row[]) => rows.map((r) => r.id);
 describe('sortRows', () => {
+	test('infinite values compare consistently (review r1)', () => {
+		const rows = [
+			{ id: 'inf-a', value: Infinity },
+			{ id: 'one', value: 1 },
+			{ id: 'inf-b', value: Infinity },
+			{ id: 'neg', value: -Infinity }
+		];
+		assert.deepEqual(ids(sortRows(rows, column, 'asc')), ['neg', 'one', 'inf-a', 'inf-b']);
+		assert.deepEqual(ids(sortRows(rows, column, 'desc')), ['inf-a', 'inf-b', 'one', 'neg']);
+	});
 	test('numeric directions are stable and do not mutate input', () => {
 		const rows = [
 			{ id: 'low', value: 2 },

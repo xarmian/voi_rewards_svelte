@@ -4,7 +4,7 @@
 	import { tick, type Snippet } from 'svelte';
 	import Button from '../Button/Button.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
-	import { ago } from '../format';
+	import { MISSING, ago } from '../format';
 	import { slug } from '../slug';
 	import type { DataState } from '../types';
 	import RowMenu from './RowMenu.svelte';
@@ -71,6 +71,14 @@
 	let focusKey = $state<string>();
 	let resolvedId = $derived(tableId(caption, id));
 	let hiddenColumns = $derived(columns.filter((column) => column.priority > 1));
+	// Focus target after "Show more": the first always-visible (priority 1) column; a priority 2/3
+	// cell is display:none at narrow widths and can't take focus (review r1).
+	let focusColumn = $derived(
+		Math.max(
+			0,
+			columns.findIndex((column) => column.priority === 1)
+		)
+	);
 	let disclosure = $derived(Boolean(detail) || (expandable && hiddenColumns.length > 0));
 	let disclosureClass = $derived(
 		detail ? '' : hiddenColumns.some((column) => column.priority === 3) ? 'lg:hidden' : 'md:hidden'
@@ -150,7 +158,7 @@
 
 {#snippet cell(column: Column<T>, row: T)}
 	{#if column.cell}{@render column.cell(row)}{:else}{String(
-			(row as Record<string, unknown>)[column.key]
+			(row as Record<string, unknown>)[column.key] ?? MISSING
 		)}{/if}
 {/snippet}
 
@@ -250,8 +258,10 @@
 						{#each columns as column, columnIndex (column.key)}
 							<td
 								class="{padding} {visibility(column)} {alignment(column)} break-words"
-								tabindex={!favourite && columnIndex === 0 && focusKey === key ? -1 : undefined}
-								data-revealed-cell={!favourite && columnIndex === 0 && focusKey === key
+								tabindex={!favourite && columnIndex === focusColumn && focusKey === key
+									? -1
+									: undefined}
+								data-revealed-cell={!favourite && columnIndex === focusColumn && focusKey === key
 									? ''
 									: undefined}
 							>
@@ -264,7 +274,7 @@
 									type="button"
 									aria-haspopup="menu"
 									aria-expanded={openMenu?.key === key}
-									aria-controls={menuId}
+									aria-controls={openMenu?.key === key ? menuId : undefined}
 									class="text-accent"
 									onclick={(event) => toggleMenu(key, event.currentTarget)}
 									><span aria-hidden="true">⋯</span><span class="sr-only"

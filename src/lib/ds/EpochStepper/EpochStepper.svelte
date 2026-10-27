@@ -22,7 +22,10 @@
 	let announcement = $state('');
 	let epochs = $derived(Array.from({ length: max - min + 1 }, (_, i) => max - i));
 	onMount(() => {
-		if (syncUrl) epoch = readEpoch(new URL(window.location.href), min, max);
+		// Only a present ?epoch overrides the caller's value; without it the caller's epoch stands
+		// (review r1: readEpoch's missing -> max would jump after hydration).
+		const url = new URL(window.location.href);
+		if (syncUrl && url.searchParams.has('epoch')) epoch = readEpoch(url, min, max);
 	});
 	async function change(next: number) {
 		if (next < min || next > max || next === epoch) return;

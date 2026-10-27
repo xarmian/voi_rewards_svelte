@@ -12,7 +12,11 @@ export function sortRows<T>(rows: T[], column: Column<T>, dir: SortState['dir'])
 				return aMissing === bMissing ? a.index - b.index : aMissing ? 1 : -1;
 			const comparison =
 				typeof a.value === 'number' && typeof b.value === 'number'
-					? a.value - b.value
+					? a.value < b.value
+						? -1
+						: a.value > b.value
+							? 1
+							: 0
 					: String(a.value).localeCompare(String(b.value), undefined, {
 							numeric: true,
 							sensitivity: 'base'
