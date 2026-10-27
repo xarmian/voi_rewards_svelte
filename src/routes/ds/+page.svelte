@@ -302,8 +302,9 @@
 <div class="min-h-screen bg-canvas text-ink">
 	<div class="on-hero bg-hero pb-[84px] text-on-hero rounded-b-hero">
 		<Header variant="hero" current={null} />
-		<div class="container-page">
-			<h1 class="text-display">Design system</h1>
+		<!-- TASK-65: the intro sits outside <header> now, so it needs its own landmark (axe region). -->
+		<section aria-labelledby="ds-gallery-title" class="container-page">
+			<h1 id="ds-gallery-title" class="text-display">Design system</h1>
 			<p class="mt-2 text-lede text-on-hero-muted">
 				Tokens, type, formatting and display primitives. Snapshot data with labelled illustrative
 				health warnings.
@@ -314,7 +315,7 @@
 			<div class="mt-4">
 				<ThemeToggle class="text-on-hero" />
 			</div>
-		</div>
+		</section>
 	</div>
 
 	<main id="main" tabindex="-1" class="container-page -mt-[60px] grid gap-bento pb-16">
