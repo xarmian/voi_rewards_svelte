@@ -5,20 +5,15 @@ export function errorClass(variant: 'hero' | 'compact', tone: 'surface' | 'hero'
 		: 'mt-2 text-sm text-danger';
 }
 
-export function shouldCollapse({
+/** A revealed collapsible compact search collapses after a successful submit (TASK-65). */
+export function collapseOnSubmit({
 	compact,
 	collapsible,
-	revealed,
-	leaving,
-	hasError,
-	submitted
+	revealed
 }: {
 	compact: boolean;
 	collapsible: boolean;
 	revealed: boolean;
-	leaving: boolean;
-	hasError: boolean;
-	submitted: boolean;
 }): boolean {
-	return compact && collapsible && revealed && (submitted || (leaving && !hasError));
+	return compact && collapsible && revealed;
 }

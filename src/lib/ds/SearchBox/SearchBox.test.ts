@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { errorClass, shouldCollapse } from './behavior';
+import { errorClass, collapseOnSubmit } from './behavior';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createRawSnippet } from 'svelte';
@@ -88,27 +88,23 @@ test('error contrast follows the field variant and surrounding tone', () => {
 	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
 	assert.match(source, /class=\{errorClass\(variant, tone\)\}/);
 });
-test('only revealed collapsible compact searches dismiss on success or focus leaving without error', () => {
-	const state = {
-		compact: true,
-		collapsible: true,
-		revealed: true,
-		leaving: true,
-		hasError: false,
-		submitted: false
-	};
-	assert.equal(shouldCollapse(state), true);
-	assert.equal(shouldCollapse({ ...state, leaving: false }), false);
-	assert.equal(shouldCollapse({ ...state, hasError: true }), false);
-	assert.equal(shouldCollapse({ ...state, leaving: false, submitted: true }), true);
+test('only a revealed collapsible compact search collapses on a successful submit', () => {
+	const state = { compact: true, collapsible: true, revealed: true };
+	assert.equal(collapseOnSubmit(state), true);
 	for (const key of ['compact', 'collapsible', 'revealed'] as const) {
-		assert.equal(shouldCollapse({ ...state, [key]: false }), false);
-		assert.equal(shouldCollapse({ ...state, [key]: false, submitted: true }), false);
+		assert.equal(collapseOnSubmit({ ...state, [key]: false }), false);
 	}
 	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
 	assert.match(
 		source,
-		/if \(result.ok\) \{[\s\S]*?shouldCollapse\([\s\S]*?revealed = false;[\s\S]*?onsubmit\(result.address\)/
+		/if \(result.ok\) \{[\s\S]*?collapseOnSubmit\([\s\S]*?revealed = false;[\s\S]*?toggle\?\.focus\(\);[\s\S]*?onsubmit\(result.address\)/
 	);
-	assert.match(source, /function focusout[\s\S]*?shouldCollapse\([\s\S]*?revealed = false;/);
+});
+test('focusout never collapses the revealed form (TASK-65: Safari click focus)', () => {
+	// Where buttons don't take focus on click, clicking Check or the toggle blurs the input with
+	// relatedTarget null; collapsing on that focusout swallowed the click.
+	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
+	const body = source.match(/function focusout\(event: FocusEvent\) \{([\s\S]*?)\n\t\}/)?.[1];
+	assert.ok(body, 'focusout handler found');
+	assert.doesNotMatch(body, /revealed/);
 });

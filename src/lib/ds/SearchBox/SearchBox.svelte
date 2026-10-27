@@ -19,7 +19,7 @@
 
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
-	import { errorClass, shouldCollapse } from './behavior';
+	import { errorClass, collapseOnSubmit } from './behavior';
 	import Button from '../Button/Button.svelte';
 	import { shortAddr } from '../format';
 	import { createResolver, type Suggestion } from './resolve';
@@ -121,17 +121,10 @@
 		if (version !== submission) return;
 		submitting = false;
 		if (result.ok) {
-			if (
-				shouldCollapse({
-					compact: variant === 'compact',
-					collapsible,
-					revealed,
-					leaving: false,
-					hasError: Boolean(error),
-					submitted: true
-				})
-			)
+			if (collapseOnSubmit({ compact: variant === 'compact', collapsible, revealed })) {
 				revealed = false;
+				toggle?.focus();
+			}
 			resolver.remember(result.address);
 			onsubmit(result.address);
 		} else {
@@ -175,21 +168,11 @@
 			toggle?.focus();
 		} else cancelSuggestions();
 	}
+	// TASK-65: focusout closes the listbox only. Collapsing the revealed form here broke mouse
+	// clicks on Check and the toggle where buttons don't take focus (Safari, macOS Firefox:
+	// relatedTarget is null), so the form collapses on success, the toggle or Escape.
 	function focusout(event: FocusEvent) {
-		const leaving =
-			!(event.relatedTarget instanceof Node) || !widget?.contains(event.relatedTarget);
-		if (leaving) close();
-		if (
-			shouldCollapse({
-				compact: variant === 'compact',
-				collapsible,
-				revealed,
-				leaving,
-				hasError: Boolean(error),
-				submitted: false
-			})
-		)
-			revealed = false;
+		if (!(event.relatedTarget instanceof Node) || !widget?.contains(event.relatedTarget)) close();
 	}
 	$effect(() => {
 		if (open && active >= 0) {
