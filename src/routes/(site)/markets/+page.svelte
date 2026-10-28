@@ -1812,7 +1812,7 @@
 				<div transition:fade={{ duration: 200 }}>
 					<TokenHeatmap
 						tokens={allTokens}
-						loading={isLoading}
+						loading={false}
 						on:tokenSelect={handleTokenSelect}
 						on:tokenHover
 						on:compare={handleTokenComparison}
@@ -1827,7 +1827,7 @@
 					<TokenGalaxy
 						tokens={allTokens}
 						{selectedToken}
-						loading={isLoading}
+						loading={false}
 						on:tokenSelect={handleTokenSelect}
 						on:tokenHover
 					/>
