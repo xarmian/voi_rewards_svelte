@@ -249,6 +249,17 @@ export function keyregAccount(opts: {
 	return opts.walletAddress;
 }
 
+// The incentive opt-in (TASK-68): a pasted URI asking for the go-online fee pre-selects it.
+// Staking contracts never can: participate hard-codes the inner keyreg fee to the minimum.
+export function incentiveFromUri(fee: number | null, isStakingContract: boolean): boolean {
+	return !isStakingContract && fee !== null && fee >= INCENTIVE_KEYREG_FEE;
+}
+
+// The fee the opt-in selects; null is the network minimum (see keyregFee).
+export function incentiveKeyregFee(payIncentiveFee: boolean): number | null {
+	return payIncentiveFee ? INCENTIVE_KEYREG_FEE : null;
+}
+
 // The flat fee a wallet keyreg carries: the URI fee, raised to the network minimum.
 export function keyregFee(fee: number | null | undefined, minFee: number | undefined): number {
 	const min = minFee ?? MIN_KEYREG_FEE;
