@@ -6,7 +6,8 @@
 	import { algodClient } from '$lib/utils/algod';
 	import {
 		buildWalletKeyregTxn,
-		INCENTIVE_KEYREG_FEE,
+		incentiveFromUri,
+		incentiveKeyregFee,
 		keyregAccount,
 		keyregFee as walletKeyregFee,
 		isKeyregUri,
@@ -44,28 +45,20 @@
 	let transactionStatus: 'idle' | 'building' | 'signing' | 'submitting' | 'confirming' | 'success' =
 		'idle';
 	let transactionId: string | null = null;
-	// Flat keyreg fee from a pasted keyreg URI (&fee=); null means the minimum fee.
-	let keyregFee: number | null = null;
-	// The key fields the fee was pasted with, and the account a URI paste was checked against
-	// (null for partkeyinfo). The fee applies only while both are unchanged; submit refuses a
+	// The account a URI paste was checked against (null for partkeyinfo); submit refuses a
 	// URI paste if the account changed since.
-	let keyregFeeKeys = '';
 	let keyregPasteAccount: string | null = null;
 	$: currentAccount = keyregAccount({ walletAddress, parentWalletAddress, contractId });
+	$: isStakingContract = parentWalletAddress !== null;
+	// Incentive opt-in (TASK-68): pay the 2 VOI go-online fee that makes the account eligible
+	// for block rewards. Staking contracts can't: participate fixes the keyreg fee at the minimum.
+	let payIncentiveFee = false;
+	// Shown when a pasted URI asked for the fee on an account that can't pay it.
+	let incentiveNotice: string | null = null;
+	// From algod; eligibility survives later keyregs and going offline, but not suspension.
+	let alreadyEligible = false;
 	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
 	let minFee = MIN_KEYREG_FEE;
-	$: currentKeys = [
-		firstRound,
-		lastRound,
-		keyDilution,
-		selectionKey,
-		votingKey,
-		stateProofKey
-	].join('|');
-	$: activeKeyregFee =
-		keyregFee !== null && currentKeys === keyregFeeKeys && currentAccount === keyregPasteAccount
-			? keyregFee
-			: null;
 
 	onMount(async () => {
 		try {
@@ -73,6 +66,14 @@
 			minFee = params.minFee ?? MIN_KEYREG_FEE;
 		} catch (err) {
 			console.error('Error loading transaction params:', err);
+		}
+		if (!isStakingContract) {
+			try {
+				const info = await algodClient.accountInformation(walletAddress).exclude('all').do();
+				alreadyEligible = info['incentive-eligible'] === true;
+			} catch (err) {
+				console.error('Error loading account eligibility:', err);
+			}
 		}
 	});
 
@@ -111,15 +112,14 @@
 				selectionKey = parsed.selectionKey;
 				votingKey = parsed.votingKey;
 				stateProofKey = parsed.stateProofKey;
-				keyregFee = result.fee;
-				keyregFeeKeys = [
-					firstRound,
-					lastRound,
-					keyDilution,
-					selectionKey,
-					votingKey,
-					stateProofKey
-				].join('|');
+				// Only a URI that carries a fee sets the opt-in; partkeyinfo leaves the user's choice.
+				if (result.fee !== null) {
+					payIncentiveFee = incentiveFromUri(result.fee, isStakingContract);
+				}
+				incentiveNotice =
+					isStakingContract && incentiveFromUri(result.fee, false)
+						? 'This URI asks for the 2 VOI incentive fee, which staking contracts cannot pay. It will register with the normal fee.'
+						: null;
 				keyregPasteAccount = isKeyregUri(text) ? account : null;
 
 				// partkeyinfo only (a URI for another account is rejected above)
@@ -167,11 +167,6 @@
 			registerWalletVoteKey();
 		} else {
 			console.log('Account is a staking contract');
-			if (activeKeyregFee !== null && activeKeyregFee > MIN_KEYREG_FEE) {
-				error =
-					'The incentive fee is not supported for staking-contract accounts yet. Generate the keyreg URI without the fee and paste it again.';
-				return;
-			}
 			registerStakingContractVoteKey();
 		}
 	}
@@ -288,7 +283,7 @@
 				firstRound: Number(firstRound),
 				lastRound: Number(lastRound),
 				keyDilution: Number(keyDilution),
-				fee: activeKeyregFee
+				fee: incentiveKeyregFee(payIncentiveFee)
 			});
 
 			const txid = tx.txID();
@@ -670,6 +665,42 @@
 					<span>Paste All from Clipboard</span>
 				</button>
 			</div>
+
+			<div
+				class="p-3 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
+			>
+				<label
+					class="flex items-start gap-3 {isStakingContract
+						? 'cursor-not-allowed opacity-60'
+						: 'cursor-pointer'}"
+				>
+					<input
+						type="checkbox"
+						bind:checked={payIncentiveFee}
+						disabled={isStakingContract || transactionStatus !== 'idle'}
+						aria-describedby="incentive-fee-help"
+						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+					/>
+					<span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+						Pay 2 VOI to become eligible for block rewards (incentive eligible)
+					</span>
+				</label>
+				<p id="incentive-fee-help" class="mt-1 ml-7 text-xs text-gray-600 dark:text-gray-400">
+					{#if isStakingContract}
+						Not available for staking contracts: the contract always registers keys with the
+						normal 0.001 VOI fee.
+					{:else}
+						The fee is paid once, at key registration, and is not refundable. Off means the normal
+						0.001 VOI fee.
+						{#if alreadyEligible}
+							This account is already incentive eligible, so you don't need to pay it again.
+						{/if}
+					{/if}
+				</p>
+				{#if incentiveNotice}
+					<p class="mt-1 ml-7 text-xs text-amber-700 dark:text-amber-300">{incentiveNotice}</p>
+				{/if}
+			</div>
 		</div>
 	</div>
 
@@ -725,12 +756,9 @@
 					<span
 						>Transaction Cost: {parentWalletAddress
 							? '0.002'
-							: walletKeyregFee(activeKeyregFee, minFee) / 1e6} VOI</span
+							: walletKeyregFee(incentiveKeyregFee(payIncentiveFee), minFee) / 1e6} VOI</span
 					>
 				</div>
-				{#if !parentWalletAddress && activeKeyregFee === INCENTIVE_KEYREG_FEE}
-					<p class="mt-1">This fee makes the account eligible for participation incentives.</p>
-				{/if}
 			</div>
 
 			<div class="flex flex-col-reverse sm:flex-row justify-end gap-3">

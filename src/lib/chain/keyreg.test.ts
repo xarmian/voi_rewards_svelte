@@ -2,6 +2,8 @@ import * as algosdk from 'algosdk';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	buildWalletKeyregTxn,
+	incentiveFromUri,
+	incentiveKeyregFee,
 	isKeyregUri,
 	keyregAccount,
 	keyregFee,
@@ -367,5 +369,35 @@ describe('submit-time account re-check (r3)', () => {
 	it('tells a URI from partkeyinfo the way the parser does', () => {
 		expect(isKeyregUri(` ${uri()}`)).toBe(true);
 		expect(isKeyregUri(partkeyinfo)).toBe(false);
+	});
+});
+
+describe('incentive opt-in (TASK-68)', () => {
+	it('pre-selects only for a plain account whose URI asks for the go-online fee', () => {
+		expect(incentiveFromUri(2000000, false)).toBe(true);
+		expect(incentiveFromUri(1000, false)).toBe(false);
+		expect(incentiveFromUri(1999999, false)).toBe(false);
+		expect(incentiveFromUri(null, false)).toBe(false);
+	});
+
+	it('never pre-selects for a staking contract', () => {
+		expect(incentiveFromUri(2000000, true)).toBe(false);
+	});
+
+	it('maps the opt-in to the flat keyreg fee it builds', () => {
+		const params = {
+			fee: 0,
+			minFee: 1000,
+			flatFee: false,
+			firstRound: 4000000,
+			lastRound: 4001000,
+			genesisID: 'voimain-v1.0',
+			genesisHash: Buffer.alloc(32, 1).toString('base64')
+		};
+		const build = (on: boolean) =>
+			buildWalletKeyregTxn({ params, sender: address, ...keys, fee: incentiveKeyregFee(on) });
+		expect(build(true).fee).toBe(2000000);
+		expect(build(true).flatFee).toBe(true);
+		expect(build(false).fee).toBe(1000);
 	});
 });
