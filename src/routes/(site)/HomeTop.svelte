@@ -112,9 +112,14 @@
 	</div>
 	<div class="grid min-w-0 md:col-span-1 lg:col-span-3">
 		{#await data.onlineStake}
-			<StatTile label="Online stake" icon="ϟ" value={MISSING} state="loading" />
+			<StatTile label="Online stake" icon="ϟ" {...onlineStakeTile(data.headline)} onretry={retry} />
 		{:then stake}
-			<StatTile label="Online stake" icon="ϟ" {...onlineStakeTile(stake)} onretry={retry} />
+			<StatTile
+				label="Online stake"
+				icon="ϟ"
+				{...onlineStakeTile(data.headline, stake)}
+				onretry={retry}
+			/>
 		{/await}
 	</div>
 	<div class="grid min-w-0 md:col-span-1 lg:col-span-3">

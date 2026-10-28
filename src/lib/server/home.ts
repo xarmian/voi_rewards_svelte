@@ -27,6 +27,7 @@ export type Headline = {
 	perMillion: number;
 	elapsedDays: number;
 	earningAccounts: number | null;
+	onlineStake: number | null;
 };
 export type Price = { price: number; change24h: number | null; mcap: number | null };
 export type DashboardData = {
@@ -143,6 +144,7 @@ export async function loadHome(
 			return {
 				epoch_number: epoch,
 				apr: finite(row.apr),
+				online_stake: finite(row.online_stake),
 				eligible_online_stake: finite(row.eligible_online_stake),
 				participating_wallets: finite(row.participating_wallets)
 			} satisfies Epoch;

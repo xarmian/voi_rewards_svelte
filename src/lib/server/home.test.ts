@@ -22,6 +22,7 @@ function body(url: string) {
 			epochs: [103, 104].map((epoch_number) => ({
 				epoch_number,
 				apr: 16.04,
+				online_stake: epoch_number === 104 ? 729891544.76 : 720000000,
 				eligible_online_stake: 725200000,
 				participating_wallets: 97
 			}))
@@ -63,6 +64,8 @@ it.each(['/api/markets', '/api/mimir', 'online-stake-history'])(
 		const result = dashboard(await pending);
 		expect(result.chrome).toBe('hero');
 		expect(result.headline.state).toBe('ready');
+		// The current online stake is critical-path epoch-detail data, not the slow history stream.
+		expect(result.headline).toMatchObject({ value: { epoch: 104, onlineStake: 729891544.76 } });
 		expect(result.rewards.state).toBe('ready');
 		const streamed =
 			slow === '/api/markets'
@@ -168,7 +171,7 @@ it('refetches rows once for a lagging previous epoch', async () => {
 	const result = dashboard(await run());
 	expect(result.headline).toMatchObject({
 		state: 'ready',
-		value: { epoch: 103, rangeId: '20261014-20261020' }
+		value: { epoch: 103, rangeId: '20261014-20261020', onlineStake: 720000000 }
 	});
 	expect(result.rewards).toMatchObject({ state: 'ready', value: { rangeId: '20261014-20261020' } });
 	expect(

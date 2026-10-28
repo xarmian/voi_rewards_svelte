@@ -21,7 +21,8 @@ function fixture(pending = false): DashboardData {
 				voiPerBlock: 10.35,
 				perMillion: 3084,
 				elapsedDays: 4.1,
-				earningAccounts: 97
+				earningAccounts: 97,
+				onlineStake: 729891544.76
 			}
 		},
 		aprHistory: {
@@ -68,11 +69,11 @@ it.each([false, true])(
 		expect(body).toContain('16.04%');
 		expect(body).toContain('role="progressbar"');
 		expect(body).toContain('aria-valuemax="7"');
-		expect(body.match(/href="\/analytics"/g)).toHaveLength(2);
+		expect(body.match(/href="\/analytics"/g)).toHaveLength(3);
+		// SSR shows the current online stake from the headline, never the history's last average.
+		expect(body).toContain('729.9M');
 		expect(body).not.toContain('725.2M');
-		expect(body).toMatch(
-			/<div aria-busy="true"[^>]*>(?:(?!aria-busy="true")[\s\S])*?Loading Online stake/
-		);
+		expect(body).not.toContain('Loading Online stake');
 		expect(body).toContain('126.9k');
 		expect(body).toContain('97');
 		expect(body).toContain('aria-busy="true"');
