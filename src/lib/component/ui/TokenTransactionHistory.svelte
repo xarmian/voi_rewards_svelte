@@ -88,13 +88,13 @@
 							{#if !isMobile}
 								<td class="px-4 py-3"
 									><A
-										href="https://explorer.voi.network/explorer/transaction/{transfer.transactionId}"
+										href="https://block.voi.network/explorer/transaction/{transfer.transactionId}"
 										target="_blank">{transfer.transactionId.substring(0, 15)}...</A
 									></td
 								>
 								<td class="px-4 py-3"
 									><A
-										href="https://explorer.voi.network/explorer/block/{transfer.round.toString()}"
+										href="https://block.voi.network/explorer/block/{transfer.round.toString()}"
 										target="_blank">{transfer.round}</A
 									></td
 								>

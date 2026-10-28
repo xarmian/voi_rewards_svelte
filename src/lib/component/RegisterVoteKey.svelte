@@ -734,7 +734,7 @@
 						<span class="text-green-700 dark:text-green-300">Transaction successful!</span>
 						{#if transactionId}
 							<a
-								href={`https://explorer.voi.network/explorer/transaction/${transactionId}`}
+								href={`https://block.voi.network/explorer/transaction/${transactionId}`}
 								class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 ml-2"
 								target="_blank"
 								rel="noopener noreferrer"

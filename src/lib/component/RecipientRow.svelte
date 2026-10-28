@@ -300,7 +300,7 @@
 											<i class="fas fa-copy text-xs"></i>
 										</button>
 										<a
-											href={`https://explorer.voi.network/explorer/account/${recipient.address}`}
+											href={`https://block.voi.network/explorer/account/${recipient.address}`}
 											target="_blank"
 											rel="noopener noreferrer"
 											aria-label="View on explorer"

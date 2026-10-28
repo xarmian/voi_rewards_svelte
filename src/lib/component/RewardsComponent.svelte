@@ -75,7 +75,7 @@
 						<tr class="dark:border-gray-500">
 							<td class="dark:border-gray-500"
 								><a
-									href={'https://explorer.voi.network/explorer/block/' +
+									href={'https://block.voi.network/explorer/block/' +
 										tx['confirmed-round'] +
 										'/transactions'}
 									target="_blank">{tx['confirmed-round']}</a
@@ -89,7 +89,7 @@
 							>
 							<td class="dark:border-gray-500"
 								><a
-									href={'https://explorer.voi.network/explorer/transaction/' + tx['id']}
+									href={'https://block.voi.network/explorer/transaction/' + tx['id']}
 									target="_blank">{tx['id']}</a
 								></td
 							>
@@ -111,7 +111,7 @@
 				<Card class="bg-gray-100 dark:bg-gray-700 mb-3">
 					<h1>
 						Block: <a
-							href={'https://explorer.voi.network/explorer/block/' +
+							href={'https://block.voi.network/explorer/block/' +
 								tx['confirmed-round'] +
 								'/transactions'}
 							target="_blank">{tx['confirmed-round']}</a
@@ -124,7 +124,7 @@
 						</div>
 						<div>
 							Tx: <a
-								href={'https://explorer.voi.network/explorer/transaction/' + tx['id']}
+								href={'https://block.voi.network/explorer/transaction/' + tx['id']}
 								target="_blank">{tx['id'].slice(0, 6) + '...' + tx['id'].slice(-6)}</a
 							>
 						</div>

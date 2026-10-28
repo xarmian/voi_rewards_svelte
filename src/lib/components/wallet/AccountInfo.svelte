@@ -106,7 +106,7 @@
 							failureMessage={`Failed to copy address to clipboard`}
 						/>
 						<a
-							href={`https://explorer.voi.network/explorer/account/${account.address}`}
+							href={`https://block.voi.network/explorer/account/${account.address}`}
 							target="_blank"
 							on:click|stopPropagation
 							class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"

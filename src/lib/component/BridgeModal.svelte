@@ -1978,7 +1978,7 @@
 									>
 									<a
 										href={isVoiToAlgorand
-											? `https://explorer.voi.network/explorer/transaction/${bridgeDetails.sourceTxId}`
+											? `https://block.voi.network/explorer/transaction/${bridgeDetails.sourceTxId}`
 											: `https://allo.info/tx/${bridgeDetails.sourceTxId}`}
 										target="_blank"
 										rel="noopener noreferrer"
@@ -2004,7 +2004,7 @@
 										>
 										<a
 											href={!isVoiToAlgorand
-												? `https://explorer.voi.network/explorer/transaction/${bridgeDetails.destinationTxId}`
+												? `https://block.voi.network/explorer/transaction/${bridgeDetails.destinationTxId}`
 												: `https://allo.info/tx/${bridgeDetails.destinationTxId}`}
 											target="_blank"
 											rel="noopener noreferrer"

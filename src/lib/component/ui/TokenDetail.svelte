@@ -181,7 +181,7 @@
 			{/if}
 			<div>
 				Mint Round: <A
-					href="https://explorer.voi.network/explorer/block/{token.mintRound}/transactions"
+					href="https://block.voi.network/explorer/block/{token.mintRound}/transactions"
 					target="_blank">{token.mintRound}</A
 				>
 			</div>
