@@ -1,6 +1,13 @@
 import * as algosdk from 'algosdk';
 import { describe, expect, it, vi } from 'vitest';
-import { buildWalletKeyregTxn, keyregAccount, keyregFee, parseKeyregInput } from './keyreg';
+import {
+	buildWalletKeyregTxn,
+	isKeyregUri,
+	keyregAccount,
+	keyregFee,
+	keyregSubmitError,
+	parseKeyregInput
+} from './keyreg';
 
 const address = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 const voteBytes = Buffer.from(Array.from({ length: 32 }, (_, i) => 255 - i));
@@ -318,5 +325,47 @@ describe('keyregFee (r2)', () => {
 		expect(keyregFee(1000, 1500)).toBe(1500);
 		expect(keyregFee(2000000, 1000)).toBe(2000000);
 		expect(keyregFee(null, undefined)).toBe(1000);
+	});
+});
+
+describe('submit-time account re-check (r3)', () => {
+	const owner = algosdk.generateAccount().addr;
+	const accountFor = (contractId: number | null, walletAddress = address) =>
+		keyregAccount({
+			walletAddress,
+			parentWalletAddress: contractId === null ? null : owner,
+			contractId
+		});
+
+	it('passes when the paste was checked against the account still being registered', () => {
+		const checked = accountFor(40123456);
+		const parsed = parseKeyregInput(uri({}, `voi://net:voimain-v1.0/${checked}`), {
+			account: checked
+		});
+		expect(parsed.ok).toBe(true);
+		expect(keyregSubmitError(checked, accountFor(40123456))).toBeNull();
+	});
+
+	it('refuses after a contract switch, naming both accounts', () => {
+		const checked = accountFor(40123456);
+		const now = accountFor(40123457);
+		const error = keyregSubmitError(checked, now);
+		expect(error).toMatch(/Paste the keys for this account again/);
+		expect(error).toContain(`${checked.slice(0, 4)}…${checked.slice(-4)}`);
+		expect(error).toContain(`${now.slice(0, 4)}…${now.slice(-4)}`);
+	});
+
+	it('refuses after a plain wallet switch', () => {
+		const other = algosdk.generateAccount().addr;
+		expect(keyregSubmitError(accountFor(null), accountFor(null, other))).not.toBeNull();
+	});
+
+	it('does not apply to a partkeyinfo paste', () => {
+		expect(keyregSubmitError(null, accountFor(null))).toBeNull();
+	});
+
+	it('tells a URI from partkeyinfo the way the parser does', () => {
+		expect(isKeyregUri(` ${uri()}`)).toBe(true);
+		expect(isKeyregUri(partkeyinfo)).toBe(false);
 	});
 });

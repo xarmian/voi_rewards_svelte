@@ -9,6 +9,8 @@
 		INCENTIVE_KEYREG_FEE,
 		keyregAccount,
 		keyregFee as walletKeyregFee,
+		isKeyregUri,
+		keyregSubmitError,
 		MIN_KEYREG_FEE,
 		parseKeyregInput
 	} from '$lib/chain/keyreg';
@@ -44,11 +46,12 @@
 	let transactionId: string | null = null;
 	// Flat keyreg fee from a pasted keyreg URI (&fee=); null means the minimum fee.
 	let keyregFee: number | null = null;
-	// The key fields and wallet the fee was pasted with: the fee applies only while they are
-	// unchanged.
+	// The key fields the fee was pasted with, and the account a URI paste was checked against
+	// (null for partkeyinfo). The fee applies only while both are unchanged; submit refuses a
+	// URI paste if the account changed since.
 	let keyregFeeKeys = '';
-	let keyregFeeWallet = '';
-	$: currentWallet = `${$selectedWallet?.app ?? ''}|${$selectedWallet?.address ?? ''}`;
+	let keyregPasteAccount: string | null = null;
+	$: currentAccount = keyregAccount({ walletAddress, parentWalletAddress, contractId });
 	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
 	let minFee = MIN_KEYREG_FEE;
 	$: currentKeys = [
@@ -60,7 +63,7 @@
 		stateProofKey
 	].join('|');
 	$: activeKeyregFee =
-		keyregFee !== null && currentKeys === keyregFeeKeys && currentWallet === keyregFeeWallet
+		keyregFee !== null && currentKeys === keyregFeeKeys && currentAccount === keyregPasteAccount
 			? keyregFee
 			: null;
 
@@ -97,9 +100,8 @@
 			isLoading = true;
 			error = null;
 			const text = await navigator.clipboard.readText();
-			const result = parseKeyregInput(text, {
-				account: keyregAccount({ walletAddress, parentWalletAddress, contractId })
-			});
+			const account = currentAccount;
+			const result = parseKeyregInput(text, { account });
 
 			if (result.ok) {
 				const parsed = result.keys;
@@ -118,11 +120,12 @@
 					votingKey,
 					stateProofKey
 				].join('|');
-				keyregFeeWallet = currentWallet;
+				keyregPasteAccount = isKeyregUri(text) ? account : null;
 
-				// Validate if the parent address matches
+				// partkeyinfo only (a URI for another account is rejected above)
 				if (parsed.parentAddress && parsed.parentAddress !== walletAddress) {
-					error = 'Warning: The parent address in the key file does not match your wallet address';
+					error =
+						'Warning: The address in the pasted partkeyinfo does not match the account being registered';
 				}
 			} else {
 				error = result.error;
@@ -149,6 +152,12 @@
 			!stateProofKey
 		) {
 			error = 'Missing required fields';
+			return;
+		}
+
+		const accountError = keyregSubmitError(keyregPasteAccount, currentAccount);
+		if (accountError) {
+			error = accountError;
 			return;
 		}
 

@@ -33,11 +33,25 @@ const ARC90_KEYREG_PARAMS = new Set(['type', ...KEY_PARAMS, 'note', 'xnote', 'fe
 
 export function parseKeyregInput(text: string, opts: { account?: string } = {}): KeyregParseResult {
 	const input = text.trim();
-	if (/^(voi|algorand):\/\//i.test(input)) return parseKeyregUri(input, opts.account);
+	if (isKeyregUri(input)) return parseKeyregUri(input, opts.account);
 	const keys = parsePartkeyinfo(input);
 	return keys
 		? { ok: true, keys, fee: null }
 		: { ok: false, error: 'Invalid clipboard content format' };
+}
+
+export function isKeyregUri(text: string): boolean {
+	return /^(voi|algorand):\/\//i.test(text.trim());
+}
+
+// Submit-time re-check (TASK-67 r3): a URI paste is checked against one account; refuse to
+// register if the account the keyreg would now be sent from is a different one.
+export function keyregSubmitError(
+	checkedAccount: string | null,
+	currentAccount: string
+): string | null {
+	if (checkedAccount === null || checkedAccount === currentAccount) return null;
+	return `The pasted keyreg URI was for ${shortAddress(checkedAccount)}, but this registration is for ${shortAddress(currentAccount)}. Paste the keys for this account again.`;
 }
 
 function parsePartkeyinfo(text: string): ParsedKeys | null {
