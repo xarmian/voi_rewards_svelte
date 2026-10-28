@@ -16,6 +16,12 @@
 	// Enhanced components (keep only used ones for now)
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import WatchlistManager from '$lib/components/WatchlistManager.svelte';
+	// TASK-72 audit scaffold (preview only, never merged): reach the dormant components.
+	import TokenHeatmap from '$lib/components/TokenHeatmap.svelte';
+	import TokenGalaxy from '$lib/components/TokenGalaxy.svelte';
+	import TokenComparison from '$lib/components/TokenComparison.svelte';
+	import MetricsRadar from '$lib/components/MetricsRadar.svelte';
+	import MobileTokenCard from '$lib/components/MobileTokenCard.svelte';
 	import { TOKENS } from '$lib/utils/tokens';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type {
@@ -103,7 +109,8 @@
 	let selectedTokens: UniqueToken[] = [];
 	let allTokens: UniqueToken[] = [];
 	let isMobile = false;
-	let showAdvancedFeatures = false;
+	let showAdvancedFeatures = true; // TASK-72 audit scaffold: false on main
+	let auditView = '';
 
 	// Simple search functionality
 	let searchQuery = '';
@@ -121,7 +128,15 @@
 	}
 
 	onMount(() => {
-		loadAllTokens();
+		// TASK-72 audit scaffold: ?view=heatmap|galaxy|comparison|cards, ?palette=1, ?watchlist=1
+		const params = new URLSearchParams(window.location.search);
+		auditView = params.get('view') || '';
+		if (['heatmap', 'galaxy', 'comparison'].includes(auditView)) viewMode = auditView as any;
+		if (params.get('palette') === '1') commandPaletteOpen = true;
+		if (params.get('watchlist') === '1') watchlistOpen = true;
+		loadAllTokens().then(() => {
+			if (auditView === 'comparison') handleTokenComparison(allTokens.slice(0, 3));
+		});
 
 		// Responsive handling
 		const handleResize = () => {
@@ -1784,6 +1799,14 @@
 			</section>
 
 			<!-- Main Content Area - Clean Views -->
+			{#if auditView === 'cards'}
+				<!-- TASK-72 audit scaffold: MobileTokenCard has no mount site on main -->
+				<div class="grid gap-3 max-w-md">
+					{#each allTokens.slice(0, 6) as t (t.id)}
+						<MobileTokenCard token={t} on:tokenSelect={handleTokenSelect} />
+					{/each}
+				</div>
+			{/if}
 			{#if viewMode === 'heatmap'}
 				<!-- Token Performance Heatmap -->
 				<div transition:fade={{ duration: 200 }}>
