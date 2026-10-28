@@ -4,12 +4,22 @@
 	import { selectedWallet, signAndSendTransactions } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
 	import { algodClient } from '$lib/utils/algod';
+	import {
+		buildWalletKeyregTxn,
+		INCENTIVE_KEYREG_FEE,
+		keyregAccount,
+		keyregFee as walletKeyregFee,
+		isKeyregUri,
+		keyregSubmitError,
+		MIN_KEYREG_FEE,
+		parseKeyregInput
+	} from '$lib/chain/keyreg';
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
 	import OneClickInstructions from './node-instructions/OneClickInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
 	import { goto } from '$app/navigation';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -34,16 +44,37 @@
 	let transactionStatus: 'idle' | 'building' | 'signing' | 'submitting' | 'confirming' | 'success' =
 		'idle';
 	let transactionId: string | null = null;
+	// Flat keyreg fee from a pasted keyreg URI (&fee=); null means the minimum fee.
+	let keyregFee: number | null = null;
+	// The key fields the fee was pasted with, and the account a URI paste was checked against
+	// (null for partkeyinfo). The fee applies only while both are unchanged; submit refuses a
+	// URI paste if the account changed since.
+	let keyregFeeKeys = '';
+	let keyregPasteAccount: string | null = null;
+	$: currentAccount = keyregAccount({ walletAddress, parentWalletAddress, contractId });
+	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
+	let minFee = MIN_KEYREG_FEE;
+	$: currentKeys = [
+		firstRound,
+		lastRound,
+		keyDilution,
+		selectionKey,
+		votingKey,
+		stateProofKey
+	].join('|');
+	$: activeKeyregFee =
+		keyregFee !== null && currentKeys === keyregFeeKeys && currentAccount === keyregPasteAccount
+			? keyregFee
+			: null;
 
-	interface ParsedKeys {
-		parentAddress: string;
-		firstRound: number;
-		lastRound: number;
-		keyDilution: number;
-		selectionKey: string;
-		votingKey: string;
-		stateProofKey: string;
-	}
+	onMount(async () => {
+		try {
+			const params = await algodClient.getTransactionParams().do();
+			minFee = params.minFee ?? MIN_KEYREG_FEE;
+		} catch (err) {
+			console.error('Error loading transaction params:', err);
+		}
+	});
 
 	const nodeInstructions = {
 		'voi-swarm': {
@@ -64,77 +95,40 @@
 		}
 	};
 
-	async function parseClipboardContent(text: string): Promise<ParsedKeys | null> {
-		try {
-			const lines = text.split('\n');
-			const result: ParsedKeys = {
-				parentAddress: '',
-				firstRound: 0,
-				lastRound: 0,
-				keyDilution: 0,
-				selectionKey: '',
-				votingKey: '',
-				stateProofKey: ''
-			};
-
-			for (const line of lines) {
-				if (line.includes('Parent address:')) {
-					result.parentAddress = line.split(':')[1].trim();
-				} else if (line.includes('First round:')) {
-					result.firstRound = parseInt(line.split(':')[1].trim());
-				} else if (line.includes('Last round:')) {
-					result.lastRound = parseInt(line.split(':')[1].trim());
-				} else if (line.includes('Key dilution:')) {
-					result.keyDilution = parseInt(line.split(':')[1].trim());
-				} else if (line.includes('Selection key:')) {
-					result.selectionKey = line.split(':')[1].trim();
-				} else if (line.includes('Voting key:')) {
-					result.votingKey = line.split(':')[1].trim();
-				} else if (line.includes('State proof key:')) {
-					result.stateProofKey = line.split(':')[1].trim();
-				}
-			}
-
-			// Validate that we have all required fields
-			if (
-				!result.firstRound ||
-				!result.lastRound ||
-				!result.keyDilution ||
-				!result.selectionKey ||
-				!result.votingKey ||
-				!result.stateProofKey
-			) {
-				throw new Error('Missing required fields in clipboard content');
-			}
-
-			return result;
-		} catch (err) {
-			console.error('Error parsing clipboard content:', err);
-			return null;
-		}
-	}
-
 	async function handlePasteAll() {
 		try {
 			isLoading = true;
 			error = null;
 			const text = await navigator.clipboard.readText();
-			const parsed = await parseClipboardContent(text);
+			const account = currentAccount;
+			const result = parseKeyregInput(text, { account });
 
-			if (parsed) {
+			if (result.ok) {
+				const parsed = result.keys;
 				firstRound = parsed.firstRound.toString();
 				lastRound = parsed.lastRound.toString();
 				keyDilution = parsed.keyDilution.toString();
 				selectionKey = parsed.selectionKey;
 				votingKey = parsed.votingKey;
 				stateProofKey = parsed.stateProofKey;
+				keyregFee = result.fee;
+				keyregFeeKeys = [
+					firstRound,
+					lastRound,
+					keyDilution,
+					selectionKey,
+					votingKey,
+					stateProofKey
+				].join('|');
+				keyregPasteAccount = isKeyregUri(text) ? account : null;
 
-				// Validate if the parent address matches
+				// partkeyinfo only (a URI for another account is rejected above)
 				if (parsed.parentAddress && parsed.parentAddress !== walletAddress) {
-					error = 'Warning: The parent address in the key file does not match your wallet address';
+					error =
+						'Warning: The address in the pasted partkeyinfo does not match the account being registered';
 				}
 			} else {
-				error = 'Invalid clipboard content format';
+				error = result.error;
 			}
 		} catch (err) {
 			error = 'Failed to read clipboard content';
@@ -161,12 +155,23 @@
 			return;
 		}
 
+		const accountError = keyregSubmitError(keyregPasteAccount, currentAccount);
+		if (accountError) {
+			error = accountError;
+			return;
+		}
+
 		// check if our wallet is a smart contract escrow account or regular account
 		if (parentWalletAddress === null) {
 			console.log('Account is a regular account');
 			registerWalletVoteKey();
 		} else {
 			console.log('Account is a staking contract');
+			if (activeKeyregFee !== null && activeKeyregFee > MIN_KEYREG_FEE) {
+				error =
+					'The incentive fee is not supported for staking-contract accounts yet. Generate the keyreg URI without the fee and paste it again.';
+				return;
+			}
 			registerStakingContractVoteKey();
 		}
 	}
@@ -273,17 +278,17 @@
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
-			params.fee = 1000;
 
-			const tx = algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-				from: walletAddress,
-				voteKey: Buffer.from(votingKey, 'base64'),
-				selectionKey: Buffer.from(selectionKey, 'base64'),
-				stateProofKey: Buffer.from(stateProofKey, 'base64'),
-				voteFirst: Number(firstRound),
-				voteLast: Number(lastRound),
-				voteKeyDilution: Number(keyDilution),
-				suggestedParams: params
+			const tx = buildWalletKeyregTxn({
+				params,
+				sender: walletAddress,
+				votingKey,
+				selectionKey,
+				stateProofKey,
+				firstRound: Number(firstRound),
+				lastRound: Number(lastRound),
+				keyDilution: Number(keyDilution),
+				fee: activeKeyregFee
 			});
 
 			const txid = tx.txID();
@@ -310,14 +315,9 @@
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
-			params.fee = 1000;
 
 			// For going offline, we use a key registration transaction with nonParticipation set to true
-			const tx = algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-				from: walletAddress,
-				nonParticipation: true,
-				suggestedParams: params
-			});
+			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
 
 			const txid = tx.txID();
 
@@ -527,8 +527,8 @@
 			>
 				<i class="fas fa-info-circle text-blue-500"></i>
 				<span
-					>After generating your participation keys using the instructions, enter them below to
-					register.</span
+					>After generating your participation keys using the instructions, enter them below, or use
+					Paste All with either <code>goal account partkeyinfo</code> output or a keyreg URI (voi://…).</span
 				>
 			</div>
 
@@ -722,8 +722,15 @@
 			>
 				<div class="flex items-center gap-2">
 					<i class="fas fa-info-circle"></i>
-					<span>Transaction Cost: {parentWalletAddress ? '0.002' : '0.001'} VOI</span>
+					<span
+						>Transaction Cost: {parentWalletAddress
+							? '0.002'
+							: walletKeyregFee(activeKeyregFee, minFee) / 1e6} VOI</span
+					>
 				</div>
+				{#if !parentWalletAddress && activeKeyregFee === INCENTIVE_KEYREG_FEE}
+					<p class="mt-1">This fee makes the account eligible for participation incentives.</p>
+				{/if}
 			</div>
 
 			<div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
