@@ -293,16 +293,33 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 	});
 }
 
+/** The wallet sent the transaction, but our confirmation wait failed: it may still confirm. */
+export class KeyregUnconfirmedError extends Error {
+	constructor(readonly txid: string) {
+		super(
+			`Transaction ${txid} was sent but not confirmed within 4 rounds. Check it in the explorer before retrying.`
+		);
+		this.name = 'KeyregUnconfirmedError';
+	}
+}
+
 export async function sendWalletKeyreg(
 	tx: algosdk.Transaction,
 	deps: {
 		signAndSend: (groups: algosdk.Transaction[][]) => Promise<unknown>;
 		waitForConfirmation: (txid: string) => Promise<unknown>;
+		onSubmitted?: (txid: string) => void;
 	}
 ): Promise<string> {
 	const txid = tx.txID();
 	const result = await deps.signAndSend([[tx]]);
 	if (!result) throw new Error('Failed to send wallet key registration transaction');
-	await deps.waitForConfirmation(txid);
+	deps.onSubmitted?.(txid);
+	// Wallet providers wait one round and swallow errors, so a failed wait here is not a failed send.
+	try {
+		await deps.waitForConfirmation(txid);
+	} catch {
+		throw new KeyregUnconfirmedError(txid);
+	}
 	return txid;
 }

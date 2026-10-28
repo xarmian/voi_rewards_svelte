@@ -9,6 +9,7 @@ import {
 	keyregFee,
 	keyregSubmitError,
 	parseKeyregInput,
+	KeyregUnconfirmedError,
 	sendWalletKeyreg
 } from './keyreg';
 
@@ -290,6 +291,44 @@ describe('sendWalletKeyreg', () => {
 
 		await expect(sendWalletKeyreg(tx, { signAndSend, waitForConfirmation })).rejects.toBe(error);
 		expect(waitForConfirmation).not.toHaveBeenCalled();
+	});
+
+	it('reports submission before the confirmation wait, and never for a falsy result', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const calls: string[] = [];
+		const onSubmitted = vi.fn((id: string) => calls.push(`submitted ${id}`));
+		const waitForConfirmation = vi.fn(async (id: string) => calls.push(`wait ${id}`));
+
+		await sendWalletKeyreg(tx, {
+			signAndSend: vi.fn().mockResolvedValue(true),
+			waitForConfirmation,
+			onSubmitted
+		});
+		expect(calls).toEqual([`submitted ${tx.txID()}`, `wait ${tx.txID()}`]);
+
+		onSubmitted.mockClear();
+		await expect(
+			sendWalletKeyreg(tx, {
+				signAndSend: vi.fn().mockResolvedValue(undefined),
+				waitForConfirmation,
+				onSubmitted
+			})
+		).rejects.toThrow('Failed to send');
+		expect(onSubmitted).not.toHaveBeenCalled();
+	});
+
+	it('reports a failed wait after a send as unconfirmed, with the txid, not as a failed send', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const rejection = sendWalletKeyreg(tx, {
+			signAndSend: vi.fn().mockResolvedValue(true),
+			waitForConfirmation: vi
+				.fn()
+				.mockRejectedValue(new Error('Transaction not confirmed after 4 rounds'))
+		});
+
+		await expect(rejection).rejects.toBeInstanceOf(KeyregUnconfirmedError);
+		await expect(rejection).rejects.toMatchObject({ txid: tx.txID() });
+		await expect(rejection).rejects.toThrow(`Transaction ${tx.txID()} was sent but not confirmed`);
 	});
 });
 

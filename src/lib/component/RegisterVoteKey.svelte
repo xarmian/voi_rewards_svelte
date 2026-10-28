@@ -290,7 +290,11 @@
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
 				signAndSend: signAndSendTransactions,
-				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4)
+				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4),
+				onSubmitted: (id) => {
+					transactionId = id;
+					transactionStatus = 'confirming';
+				}
 			});
 			transactionId = txid;
 			transactionStatus = 'success';
@@ -314,7 +318,11 @@
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
 				signAndSend: signAndSendTransactions,
-				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4)
+				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4),
+				onSubmitted: (id) => {
+					transactionId = id;
+					transactionStatus = 'confirming';
+				}
 			});
 			transactionId = txid;
 			transactionStatus = 'success';
