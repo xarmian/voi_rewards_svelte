@@ -22,6 +22,7 @@ function body(url: string) {
 			epochs: [103, 104].map((epoch_number) => ({
 				epoch_number,
 				apr: 16.04,
+				online_stake: epoch_number === 104 ? 729891544.76 : 720000000,
 				eligible_online_stake: 725200000,
 				participating_wallets: 97
 			}))
@@ -63,6 +64,8 @@ it.each(['/api/markets', '/api/mimir', 'online-stake-history'])(
 		const result = dashboard(await pending);
 		expect(result.chrome).toBe('hero');
 		expect(result.headline.state).toBe('ready');
+		// The current online stake is critical-path epoch-detail data, not the slow history stream.
+		expect(result.currentStake).toEqual({ state: 'ready', value: 729891544.76 });
 		expect(result.rewards.state).toBe('ready');
 		const streamed =
 			slow === '/api/markets'
@@ -170,6 +173,7 @@ it('refetches rows once for a lagging previous epoch', async () => {
 		state: 'ready',
 		value: { epoch: 103, rangeId: '20261014-20261020' }
 	});
+	expect(result.currentStake).toEqual({ state: 'ready', value: 720000000 });
 	expect(result.rewards).toMatchObject({ state: 'ready', value: { rangeId: '20261014-20261020' } });
 	expect(
 		fetcher.mock.calls.filter(([url]) => String(url).includes('?start')).map(([url]) => url)
@@ -222,6 +226,8 @@ it.each(['/api/epochs', '?start'])(
 		const result = dashboard(await run());
 		expect(result.headline.state).toBe('error');
 		expect((await result.onlineStake).state).toBe('ready');
+		// The current stake needs only /api/epochs, not the rows that fail the headline.
+		expect(result.currentStake.state).toBe(failing === '/api/epochs' ? 'error' : 'ready');
 		expect(result.rewards.state).toBe(failing === '?start' ? 'error' : 'ready');
 		expect(result.aprHistory.state).toBe(failing === '/api/epochs' ? 'error' : 'ready');
 	}

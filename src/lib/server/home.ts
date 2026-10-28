@@ -34,6 +34,8 @@ export type DashboardData = {
 	chrome: 'hero';
 	headline: Loaded<Headline>;
 	aprHistory: Loaded<{ epoch: number; apr: number; wallets: number | null }[]>;
+	/** The selected epoch's live online stake (epoch-detail), the value /analytics shows. */
+	currentStake: Loaded<number | null>;
 	onlineStake: Promise<Loaded<{ date: string; stake: number }[]>>;
 	rewards: Loaded<{ rangeId: string; dates: DateRange[]; data: unknown; params: RewardParams }>;
 	price: Promise<Loaded<Price>>;
@@ -143,6 +145,7 @@ export async function loadHome(
 			return {
 				epoch_number: epoch,
 				apr: finite(row.apr),
+				online_stake: finite(row.online_stake),
 				eligible_online_stake: finite(row.eligible_online_stake),
 				participating_wallets: finite(row.participating_wallets)
 			} satisfies Epoch;
@@ -263,12 +266,18 @@ export async function loadHome(
 							wallets: row.participating_wallets
 						}))
 				);
+	// Depends on /api/epochs alone, so a base or rows failure does not hide it.
+	const currentStake: DashboardData['currentStake'] =
+		epochs.state === 'error'
+			? epochs
+			: ready(epochs.value.find((row) => row.epoch_number === epoch)?.online_stake ?? null);
 	return {
 		page: 'dashboard',
 		chrome: 'hero',
 		headline,
 		rewards,
 		aprHistory,
+		currentStake,
 		onlineStake,
 		price,
 		onlineCount
