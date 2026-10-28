@@ -478,8 +478,12 @@
 
 		<!-- Tabs -->
 		<div class="flex-1 min-h-0">
-			<Tabs style="underline" bind:activeTabValue={activeTab}>
-				<TabItem value="watchlist" title="Watchlist">
+			<Tabs style="underline">
+				<TabItem
+					open={activeTab === 'watchlist'}
+					on:click={() => (activeTab = 'watchlist')}
+					title="Watchlist"
+				>
 					<!-- Portfolio summary -->
 					{#if watchlist.length > 0}
 						<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -756,7 +760,11 @@
 					{/if}
 				</TabItem>
 
-				<TabItem value="alerts" title="Alerts">
+				<TabItem
+					open={activeTab === 'alerts'}
+					on:click={() => (activeTab = 'alerts')}
+					title="Alerts"
+				>
 					<div class="space-y-6">
 						<!-- Active alerts -->
 						{#if getActiveAlerts().length > 0}
@@ -862,7 +870,11 @@
 					</div>
 				</TabItem>
 
-				<TabItem value="insights" title="Portfolio Insights">
+				<TabItem
+					open={activeTab === 'insights'}
+					on:click={() => (activeTab = 'insights')}
+					title="Portfolio Insights"
+				>
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 						<!-- Performance distribution -->
 						<Card>

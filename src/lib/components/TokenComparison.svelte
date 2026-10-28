@@ -317,8 +317,12 @@
 		<!-- Comparison content -->
 	{:else if analytics.length > 0}
 		<div class="p-6">
-			<Tabs style="underline" bind:activeTabValue={selectedView}>
-				<TabItem value="overview" title="Overview">
+			<Tabs style="underline">
+				<TabItem
+					open={selectedView === 'overview'}
+					on:click={() => (selectedView = 'overview')}
+					title="Overview"
+				>
 					<!-- Token cards grid -->
 					<div
 						class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-{Math.min(
@@ -422,7 +426,11 @@
 					</div>
 				</TabItem>
 
-				<TabItem value="metrics" title="Detailed Metrics">
+				<TabItem
+					open={selectedView === 'metrics'}
+					on:click={() => (selectedView = 'metrics')}
+					title="Detailed Metrics"
+				>
 					<div class="space-y-6">
 						{#each comparisonMetrics as metric}
 							<div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
@@ -496,7 +504,11 @@
 					</div>
 				</TabItem>
 
-				<TabItem value="correlation" title="Correlation Analysis">
+				<TabItem
+					open={selectedView === 'correlation'}
+					on:click={() => (selectedView = 'correlation')}
+					title="Correlation Analysis"
+				>
 					{#if Object.keys(correlationData).length > 0}
 						<div class="space-y-4">
 							<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
