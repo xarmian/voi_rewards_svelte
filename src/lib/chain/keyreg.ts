@@ -220,6 +220,6 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 		voteFirst: input.firstRound,
 		voteLast: input.lastRound,
 		voteKeyDilution: input.keyDilution,
-		suggestedParams: { ...input.params, fee: input.fee ?? minFee, flatFee: true }
+		suggestedParams: { ...input.params, fee: Math.max(input.fee ?? minFee, minFee), flatFee: true }
 	});
 }

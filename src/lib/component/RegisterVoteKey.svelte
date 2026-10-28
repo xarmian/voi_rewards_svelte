@@ -42,6 +42,17 @@
 	let transactionId: string | null = null;
 	// Flat keyreg fee from a pasted keyreg URI (&fee=); null means the minimum fee.
 	let keyregFee: number | null = null;
+	// The key fields the fee was pasted with: the fee applies only while they are unchanged.
+	let keyregFeeKeys = '';
+	$: currentKeys = [
+		firstRound,
+		lastRound,
+		keyDilution,
+		selectionKey,
+		votingKey,
+		stateProofKey
+	].join('|');
+	$: activeKeyregFee = keyregFee !== null && currentKeys === keyregFeeKeys ? keyregFee : null;
 
 	const nodeInstructions = {
 		'voi-swarm': {
@@ -78,6 +89,14 @@
 				votingKey = parsed.votingKey;
 				stateProofKey = parsed.stateProofKey;
 				keyregFee = result.fee;
+				keyregFeeKeys = [
+					firstRound,
+					lastRound,
+					keyDilution,
+					selectionKey,
+					votingKey,
+					stateProofKey
+				].join('|');
 
 				// Validate if the parent address matches
 				if (parsed.parentAddress && parsed.parentAddress !== walletAddress) {
@@ -117,7 +136,7 @@
 			registerWalletVoteKey();
 		} else {
 			console.log('Account is a staking contract');
-			if (keyregFee !== null && keyregFee > MIN_KEYREG_FEE) {
+			if (activeKeyregFee !== null && activeKeyregFee > MIN_KEYREG_FEE) {
 				error =
 					'The incentive fee is not supported for staking-contract accounts yet. Generate the keyreg URI without the fee and paste it again.';
 				return;
@@ -238,7 +257,7 @@
 				firstRound: Number(firstRound),
 				lastRound: Number(lastRound),
 				keyDilution: Number(keyDilution),
-				fee: keyregFee
+				fee: activeKeyregFee
 			});
 
 			const txid = tx.txID();
@@ -673,14 +692,14 @@
 				<div class="flex items-center gap-2">
 					<i class="fas fa-info-circle"></i>
 					<span
-						>Transaction Cost: {!parentWalletAddress && keyregFee !== null
-							? keyregFee / 1e6
+						>Transaction Cost: {!parentWalletAddress && activeKeyregFee !== null
+							? activeKeyregFee / 1e6
 							: parentWalletAddress
 								? '0.002'
 								: '0.001'} VOI</span
 					>
 				</div>
-				{#if !parentWalletAddress && keyregFee === INCENTIVE_KEYREG_FEE}
+				{#if !parentWalletAddress && activeKeyregFee === INCENTIVE_KEYREG_FEE}
 					<p class="mt-1">This fee makes the account eligible for participation incentives.</p>
 				{/if}
 			</div>

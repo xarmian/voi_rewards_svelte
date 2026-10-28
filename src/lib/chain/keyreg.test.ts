@@ -219,6 +219,11 @@ describe('buildWalletKeyregTxn', () => {
 		expect(txn.nonParticipation).toBe(true);
 	});
 
+	it('raises a URI fee below the suggested minimum to that minimum', () => {
+		const raised = { ...online, params: { ...params, minFee: 1500 }, fee: 1000 };
+		expect(buildWalletKeyregTxn(raised).fee).toBe(1500);
+	});
+
 	it('uses a suggested minimum when supplied and falls back to 1000 when absent', () => {
 		expect(buildWalletKeyregTxn({ ...online, params: { ...params, minFee: 1500 } }).fee).toBe(1500);
 		expect(buildWalletKeyregTxn({ ...online, params: { ...params, minFee: undefined } }).fee).toBe(
