@@ -84,7 +84,7 @@
 										class="text-blue-600 dark:text-blue-400 underline"
 										on:click={() =>
 											window.open(
-												`https://explorer.voi.network/explorer/transaction/${data.rewardTxId}`,
+												`https://block.voi.network/explorer/transaction/${data.rewardTxId}`,
 												'_blank'
 											)}
 									>
@@ -164,7 +164,7 @@
 					</div>
 					<a
 						class="grid grid-cols-2 gap-2 text-sm"
-						href={`https://explorer.voi.network/explorer/transaction/${data.rewardTxId}`}
+						href={`https://block.voi.network/explorer/transaction/${data.rewardTxId}`}
 						target="_blank"
 					>
 						<div>Date Range:</div>

@@ -2233,7 +2233,7 @@
 											<div>
 												<div class="text-xs text-gray-500 dark:text-gray-400">From</div>
 												<a
-													href={`https://explorer.voi.network/explorer/account/${transfer.from}`}
+													href={`https://block.voi.network/explorer/account/${transfer.from}`}
 													class="text-blue-500 hover:text-blue-600 transition-colors text-sm block"
 													target="_blank"
 													rel="noopener noreferrer"
@@ -2253,7 +2253,7 @@
 											<div>
 												<div class="text-xs text-gray-500 dark:text-gray-400">To</div>
 												<a
-													href={`https://explorer.voi.network/explorer/account/${transfer.to}`}
+													href={`https://block.voi.network/explorer/account/${transfer.to}`}
 													class="text-blue-500 hover:text-blue-600 transition-colors text-sm block"
 													target="_blank"
 													rel="noopener noreferrer"
@@ -2304,7 +2304,7 @@
 											<div class="min-w-0">
 												<div class="text-xs text-gray-500 dark:text-gray-400">From</div>
 												<a
-													href={`https://explorer.voi.network/explorer/account/${transfer.from}`}
+													href={`https://block.voi.network/explorer/account/${transfer.from}`}
 													class="text-blue-500 hover:text-blue-600 transition-colors text-sm block"
 													target="_blank"
 													rel="noopener noreferrer"
@@ -2324,7 +2324,7 @@
 											<div class="min-w-0">
 												<div class="text-xs text-gray-500 dark:text-gray-400">To</div>
 												<a
-													href={`https://explorer.voi.network/explorer/account/${transfer.to}`}
+													href={`https://block.voi.network/explorer/account/${transfer.to}`}
 													class="text-blue-500 hover:text-blue-600 transition-colors text-sm block"
 													target="_blank"
 													rel="noopener noreferrer"
@@ -2568,7 +2568,7 @@
 											<!-- View link consistently positioned at top-right -->
 											<div class="flex-none ml-4">
 												<a
-													href={`https://explorer.voi.network/explorer/transaction/${transfer.type === 'inner-payment' ? transfer.parentTxId : transfer.transactionid}`}
+													href={`https://block.voi.network/explorer/transaction/${transfer.type === 'inner-payment' ? transfer.parentTxId : transfer.transactionid}`}
 													class="text-blue-500 hover:text-blue-600 transition-colors text-xs inline-flex items-center gap-1"
 													target="_blank"
 													rel="noopener noreferrer"

@@ -28,7 +28,7 @@
 
 	let infourl = `/arc72/collection/${token.contractId}/token/${token.tokenId}`;
 	let marketurl = `https://shellyssandbox.xyz/#/nft/collection/${token.contractId}/token/${token.tokenId}`;
-	let contracturl = `https://explorer.voi.network/explorer/application/${token.contractId}/transactions`;
+	let contracturl = `https://block.voi.network/explorer/application/${token.contractId}/transactions`;
 </script>
 
 <div

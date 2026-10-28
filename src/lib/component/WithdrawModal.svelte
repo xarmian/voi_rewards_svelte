@@ -20,7 +20,7 @@
 	$: availableBalanceVOI = microVOIToVOI(contract.availableForWithdrawal);
 	$: currentBalanceVOI = microVOIToVOI(contract.balance);
 	$: lockedBalanceVOI = microVOIToVOI(contract.lockedBalance);
-	$: explorerUrl = txId ? `https://explorer.voi.network/explorer/transaction/${txId}` : null;
+	$: explorerUrl = txId ? `https://block.voi.network/explorer/transaction/${txId}` : null;
 
 	function setMaxAmount() {
 		withdrawAmountVOI = availableBalanceVOI;

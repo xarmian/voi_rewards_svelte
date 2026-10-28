@@ -48,7 +48,7 @@
 	const goToContract = () => {
 		if (token)
 			window.open(
-				`https://explorer.voi.network/explorer/application/${token.contractId}/transactions`,
+				`https://block.voi.network/explorer/application/${token.contractId}/transactions`,
 				'_blank'
 			);
 	};

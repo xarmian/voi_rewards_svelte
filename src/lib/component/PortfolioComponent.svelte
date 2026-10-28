@@ -850,7 +850,7 @@
 									<i class="fas fa-external-link-alt ml-1"></i>
 								</a>
 								<a
-									href={`https://explorer.voi.network/explorer/account/${walletAddress}/transactions`}
+									href={`https://block.voi.network/explorer/account/${walletAddress}/transactions`}
 									target="_blank"
 									rel="noopener noreferrer"
 									class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"

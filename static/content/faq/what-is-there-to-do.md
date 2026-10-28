@@ -14,7 +14,7 @@ Visit the following applications to explore the Voi ecosystem:
 
 **Blockchain**
 
-- [Voi Block Explorer](https://explorer.voi.network)
+- [Voi Block Explorer](https://block.voi.network)
 - [Voi Staking](https://staking.voi.network/)
 - [Voi Swarm Node](https://voinetwork.github.io/voi-swarm/getting-started/introduction/)
 

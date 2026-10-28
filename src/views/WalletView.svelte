@@ -148,7 +148,7 @@
 					/>
 					{#if isModal}
 						<a
-							href="https://explorer.voi.network/explorer/account/{walletId}/transactions"
+							href="https://block.voi.network/explorer/account/{walletId}/transactions"
 							class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
 							target="_blank"
 							aria-label="View account on Voi Explorer"

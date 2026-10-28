@@ -1440,7 +1440,7 @@
 										class="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-md font-mono w-full"
 									>
 										<a
-											href={`https://explorer.voi.network/explorer/transaction/${txId}`}
+											href={`https://block.voi.network/explorer/transaction/${txId}`}
 											target="_blank"
 											class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 truncate"
 											title={txId}

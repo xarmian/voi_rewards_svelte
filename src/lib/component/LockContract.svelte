@@ -62,7 +62,7 @@
 							Lock Contract
 						</h3>
 						<a
-							href={`https://explorer.voi.network/explorer/application/${contract.contractId}`}
+							href={`https://block.voi.network/explorer/application/${contract.contractId}`}
 							target="_blank"
 							class="text-blue-500 hover:text-blue-600 transition-colors"
 							aria-label="View Contract on Explorer"
@@ -74,7 +74,7 @@
 					<p class="hidden lg:block text-sm text-gray-600 dark:text-gray-300">
 						<span class="font-medium">Address:</span>{' '}
 						<a
-							href={`https://explorer.voi.network/explorer/account/${contract.contractAddress}`}
+							href={`https://block.voi.network/explorer/account/${contract.contractAddress}`}
 							target="_blank"
 							class="text-blue-500 hover:text-blue-600 transition-colors"
 							aria-label="View Account on Explorer"

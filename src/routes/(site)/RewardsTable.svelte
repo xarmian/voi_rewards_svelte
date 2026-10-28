@@ -507,7 +507,7 @@
 												</button>
 
 												<a
-													href="https://explorer.voi.network/explorer/account/{item.proposer}/transactions"
+													href="https://block.voi.network/explorer/account/{item.proposer}/transactions"
 													target="_blank"
 													class="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-blue-700 bg-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 dark:hover:text-blue-300 rounded-lg transition-colors"
 													on:click|stopPropagation
