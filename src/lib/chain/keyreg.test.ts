@@ -8,7 +8,9 @@ import {
 	keyregAccount,
 	keyregFee,
 	keyregSubmitError,
-	parseKeyregInput
+	parseKeyregInput,
+	KeyregUnconfirmedError,
+	sendWalletKeyreg
 } from './keyreg';
 
 const address = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
@@ -23,6 +25,15 @@ const keys = {
 	selectionKey: selectionBytes.toString('base64'),
 	votingKey: voteBytes.toString('base64'),
 	stateProofKey: stateProofBytes.toString('base64')
+};
+const params = {
+	fee: 0,
+	minFee: 1000,
+	flatFee: false,
+	firstRound: 4000000,
+	lastRound: 4001000,
+	genesisID: 'voimain-v1.0',
+	genesisHash: Buffer.alloc(32, 1).toString('base64')
 };
 const partkeyinfo = `Parent address: ${address}
 First round: ${keys.firstRound}
@@ -191,15 +202,6 @@ State proof key:           wLM3N1RWc+WLU3PKng5ZS5gKhG9Xu+EAkdL2ztBzcj2Er43mWlwSp
 });
 
 describe('buildWalletKeyregTxn', () => {
-	const params = {
-		fee: 0,
-		minFee: 1000,
-		flatFee: false,
-		firstRound: 4000000,
-		lastRound: 4001000,
-		genesisID: 'voimain-v1.0',
-		genesisHash: Buffer.alloc(32, 1).toString('base64')
-	};
 	const online = { params, sender: address, ...keys };
 
 	it('uses the flat minimum fee online and preserves key material', () => {
@@ -252,6 +254,81 @@ describe('buildWalletKeyregTxn', () => {
 			suggestedParams: { ...params, fee: 1000, flatFee: false }
 		});
 		expect(txn.fee).toBeGreaterThan(1000);
+	});
+});
+
+describe('sendWalletKeyreg', () => {
+	it.each([{ result: true }, { result: ['provider-result'] }])(
+		'confirms the local transaction ID for a truthy wallet result: $result',
+		async ({ result }) => {
+			const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+			const txid = tx.txID();
+			const signAndSend = vi.fn().mockResolvedValue(result);
+			const waitForConfirmation = vi.fn().mockResolvedValue({});
+
+			await expect(sendWalletKeyreg(tx, { signAndSend, waitForConfirmation })).resolves.toBe(txid);
+			expect(signAndSend).toHaveBeenCalledExactlyOnceWith([[tx]]);
+			expect(waitForConfirmation).toHaveBeenCalledExactlyOnceWith(txid);
+		}
+	);
+
+	it.each([undefined, false])('rejects a falsy wallet result: %s', async (result) => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const signAndSend = vi.fn().mockResolvedValue(result);
+		const waitForConfirmation = vi.fn();
+
+		await expect(sendWalletKeyreg(tx, { signAndSend, waitForConfirmation })).rejects.toThrow(
+			'Failed to send wallet key registration transaction'
+		);
+		expect(waitForConfirmation).not.toHaveBeenCalled();
+	});
+
+	it('propagates the wallet error unchanged without waiting for confirmation', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const error = new Error('Wallet rejected the transaction');
+		const signAndSend = vi.fn().mockRejectedValue(error);
+		const waitForConfirmation = vi.fn();
+
+		await expect(sendWalletKeyreg(tx, { signAndSend, waitForConfirmation })).rejects.toBe(error);
+		expect(waitForConfirmation).not.toHaveBeenCalled();
+	});
+
+	it('reports submission before the confirmation wait, and never for a falsy result', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const calls: string[] = [];
+		const onSubmitted = vi.fn((id: string) => calls.push(`submitted ${id}`));
+		const waitForConfirmation = vi.fn(async (id: string) => calls.push(`wait ${id}`));
+
+		await sendWalletKeyreg(tx, {
+			signAndSend: vi.fn().mockResolvedValue(true),
+			waitForConfirmation,
+			onSubmitted
+		});
+		expect(calls).toEqual([`submitted ${tx.txID()}`, `wait ${tx.txID()}`]);
+
+		onSubmitted.mockClear();
+		await expect(
+			sendWalletKeyreg(tx, {
+				signAndSend: vi.fn().mockResolvedValue(undefined),
+				waitForConfirmation,
+				onSubmitted
+			})
+		).rejects.toThrow('Failed to send');
+		expect(onSubmitted).not.toHaveBeenCalled();
+	});
+
+	it('reports a failed wait after a send as unconfirmed, with the txid, not as a failed send', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const rejection = sendWalletKeyreg(tx, {
+			signAndSend: vi.fn().mockResolvedValue(true),
+			waitForConfirmation: vi
+				.fn()
+				.mockRejectedValue(new Error('Transaction not confirmed after 4 rounds'))
+		});
+
+		await expect(rejection).rejects.toBeInstanceOf(KeyregUnconfirmedError);
+		await expect(rejection).rejects.toMatchObject({ txid: tx.txID() });
+		await expect(rejection).rejects.toThrow(`Transaction ${tx.txID()} was sent but not confirmed`);
 	});
 });
 
