@@ -10,7 +10,6 @@ import {
 } from './headline';
 import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 import { MISSING, usd } from '$lib/ds/format';
-import type { Headline } from '$lib/server/home';
 const now = new Date('2026-10-25T02:38:00Z');
 const epochs = [
 	{
@@ -49,7 +48,6 @@ it('derives the snapshot from VOI stake and the legacy range projection', async 
 	expect(h.projectedBlocks).toBe(216102);
 	expect(h.elapsedDays).toBeCloseTo(4.1, 1);
 	expect(h.earningAccounts).toBe(97);
-	expect(h.onlineStake).toBe(729891544.76);
 });
 it('clamps elapsed days at both ends', async () => {
 	expect((await fixture('2026-10-20T00:00:00Z')).elapsedDays).toBe(0);
@@ -102,10 +100,7 @@ it('maps streamed price props and never presents an error as $0', () => {
 	});
 });
 it('shows the current online stake and draws the daily-average history only as the trend', () => {
-	const headline = {
-		state: 'ready' as const,
-		value: { onlineStake: 729891544.76 } as Headline
-	};
+	const current = { state: 'ready' as const, value: 729891544.76 };
 	const history = {
 		state: 'ready' as const,
 		value: [
@@ -114,7 +109,7 @@ it('shows the current online stake and draws the daily-average history only as t
 			{ date: '2026-10-28', stake: 727610000 }
 		]
 	};
-	expect(onlineStakeTile(headline, history)).toMatchObject({
+	expect(onlineStakeTile(current, history)).toMatchObject({
 		state: 'ready',
 		value: '729.9M',
 		trend: [750000000, 727610000],
@@ -123,12 +118,12 @@ it('shows the current online stake and draws the daily-average history only as t
 	});
 	// Before the stream resolves, and if it fails, the value stands without a trend.
 	for (const tile of [
-		onlineStakeTile(headline),
-		onlineStakeTile(headline, { state: 'error', message: 'offline' })
+		onlineStakeTile(current),
+		onlineStakeTile(current, { state: 'error', message: 'offline' })
 	])
 		expect(tile).toMatchObject({ state: 'ready', value: '729.9M', trend: [], detail: 'VOI' });
 	expect(
-		onlineStakeTile({ state: 'ready', value: { onlineStake: null } as Headline }, history)
+		onlineStakeTile({ state: 'ready', value: null }, history)
 	).toMatchObject({ value: MISSING });
 	expect(onlineStakeTile({ state: 'error', message: 'offline' }, history)).toMatchObject({
 		state: 'error',

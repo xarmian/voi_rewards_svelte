@@ -63,9 +63,7 @@ export function deriveHeadline(
 		voiPerBlock: projection.projectedRewardPerBlock,
 		perMillion: stake !== null && stake > 0 ? (pool / stake) * 1000000 : NaN,
 		elapsedDays: Math.min(7, Math.max(0, elapsed)),
-		earningAccounts: finite(current?.participating_wallets),
-		// epoch-detail keeps the current epoch's online stake live, as /analytics shows it.
-		onlineStake: finite(current?.online_stake)
+		earningAccounts: finite(current?.participating_wallets)
 	};
 }
 
@@ -99,23 +97,23 @@ export function priceTile(loaded: Loaded<Price>) {
 }
 
 /**
- * The value is the current online stake from the headline (epoch-detail); the streamed
+ * The value is the current online stake from epoch-detail; the streamed
  * history only draws the sparkline, whose last point is today's partial-day average.
  */
 export function onlineStakeTile(
-	headline: Loaded<Headline>,
+	current: Loaded<number | null>,
 	history?: Loaded<{ date: string; stake: number }[]>
 ) {
-	if (headline.state === 'error')
+	if (current.state === 'error')
 		return { state: 'error' as const, value: MISSING, href: '/analytics' };
 	const trend = history && history.state !== 'error' ? history.value.map((row) => row.stake) : [];
 	return {
-		state: headline.state,
-		value: compact(headline.value.onlineStake, 1),
+		state: current.state,
+		value: compact(current.value, 1),
 		detail: trend.length ? 'VOI · 30-day daily avg' : 'VOI',
 		trend,
 		href: '/analytics',
-		asOf: headline.state === 'stale' ? headline.asOf : undefined
+		asOf: current.state === 'stale' ? current.asOf : undefined
 	};
 }
 
