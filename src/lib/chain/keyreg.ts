@@ -27,10 +27,13 @@ export const INCENTIVE_KEYREG_FEE = 2_000_000;
 
 const SITE_NETWORK = `Voi MainNet only (voi://net:${SITE_GENESIS_ID}/)`;
 const KEY_PARAMS = ['votekey', 'selkey', 'sprfkey', 'votefst', 'votelst', 'votekd'] as const;
+// ARC-90 keyreg params. Its catch-all `otherparam` carries no defined meaning, so anything
+// else is rejected; note/xnote are defined but not carried by this site (TASK-67 r2).
+const ARC90_KEYREG_PARAMS = new Set(['type', ...KEY_PARAMS, 'note', 'xnote', 'fee']);
 
-export function parseKeyregInput(text: string): KeyregParseResult {
+export function parseKeyregInput(text: string, opts: { account?: string } = {}): KeyregParseResult {
 	const input = text.trim();
-	if (/^(voi|algorand):\/\//i.test(input)) return parseKeyregUri(input);
+	if (/^(voi|algorand):\/\//i.test(input)) return parseKeyregUri(input, opts.account);
 	const keys = parsePartkeyinfo(input);
 	return keys
 		? { ok: true, keys, fee: null }
@@ -91,7 +94,7 @@ function fail(error: string): KeyregParseResult {
 	return { ok: false, error };
 }
 
-function parseKeyregUri(input: string): KeyregParseResult {
+function parseKeyregUri(input: string, account?: string): KeyregParseResult {
 	const [, scheme, rest] = input.match(/^(voi|algorand):\/\/(.*)$/is) ?? [];
 	const network = rest.match(/^net:([^/?]*)\//i);
 	const label = network ? network[1] : null;
@@ -114,8 +117,22 @@ function parseKeyregUri(input: string): KeyregParseResult {
 	if (type !== 'keyreg') {
 		return fail(`The URI's type must be "keyreg" (found ${type ? `"${type}"` : 'none'}).`);
 	}
+	const seen = new Set<string>();
+	for (const name of query.keys()) {
+		if (seen.has(name)) return fail(`The URI repeats the ${name} parameter.`);
+		seen.add(name);
+		if (!ARC90_KEYREG_PARAMS.has(name)) return fail(`The URI has an unknown parameter: ${name}.`);
+	}
+	if (query.has('note') || query.has('xnote')) {
+		return fail('Keyreg URIs with a note (note or xnote) are not supported here.');
+	}
 	if (!algosdk.isValidAddress(address)) {
 		return fail('The URI does not contain a valid Voi address.');
+	}
+	if (account !== undefined && address !== account) {
+		return fail(
+			`This URI's keys are for a different account (${shortAddress(address)}), not the account being registered (${shortAddress(account)}).`
+		);
 	}
 	if (KEY_PARAMS.every((name) => !query.has(name))) {
 		return fail(
@@ -172,6 +189,10 @@ function parseKeyregUri(input: string): KeyregParseResult {
 	};
 }
 
+function shortAddress(address: string): string {
+	return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
 function wholeNumber(value: string): number | null {
 	if (!/^\d+$/.test(value)) return null;
 	const n = Number(value);
@@ -201,10 +222,29 @@ export type WalletKeyregInput = { params: KeyregParams; sender: string } & (
 	| OnlineKeyreg
 );
 
+// The account a keyreg registers: a staking contract's participate call makes the contract's
+// application account the keyreg sender; otherwise it is the wallet itself.
+export function keyregAccount(opts: {
+	walletAddress: string;
+	parentWalletAddress: string | null;
+	contractId: number | null;
+}): string {
+	if (opts.parentWalletAddress !== null && opts.contractId !== null) {
+		return algosdk.getApplicationAddress(Number(opts.contractId));
+	}
+	return opts.walletAddress;
+}
+
+// The flat fee a wallet keyreg carries: the URI fee, raised to the network minimum.
+export function keyregFee(fee: number | null | undefined, minFee: number | undefined): number {
+	const min = minFee ?? MIN_KEYREG_FEE;
+	return Math.max(fee ?? min, min);
+}
+
 // Always a flat fee: algod's suggested params come back with flatFee false, which
 // makes algosdk treat `fee` as per-byte (TASK-67: 396000 online, 212000 offline).
 export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transaction {
-	const minFee = input.params.minFee ?? MIN_KEYREG_FEE;
+	const minFee = keyregFee(null, input.params.minFee);
 	if (input.offline) {
 		return algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
 			from: input.sender,
@@ -220,6 +260,10 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 		voteFirst: input.firstRound,
 		voteLast: input.lastRound,
 		voteKeyDilution: input.keyDilution,
-		suggestedParams: { ...input.params, fee: Math.max(input.fee ?? minFee, minFee), flatFee: true }
+		suggestedParams: {
+			...input.params,
+			fee: keyregFee(input.fee, input.params.minFee),
+			flatFee: true
+		}
 	});
 }

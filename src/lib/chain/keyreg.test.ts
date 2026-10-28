@@ -1,6 +1,6 @@
 import * as algosdk from 'algosdk';
 import { describe, expect, it, vi } from 'vitest';
-import { buildWalletKeyregTxn, parseKeyregInput } from './keyreg';
+import { buildWalletKeyregTxn, keyregAccount, keyregFee, parseKeyregInput } from './keyreg';
 
 const address = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 const voteBytes = Buffer.from(Array.from({ length: 32 }, (_, i) => 255 - i));
@@ -243,5 +243,80 @@ describe('buildWalletKeyregTxn', () => {
 			suggestedParams: { ...params, fee: 1000, flatFee: false }
 		});
 		expect(txn.fee).toBeGreaterThan(1000);
+	});
+});
+
+describe('account check (r2)', () => {
+	const other = algosdk.generateAccount().addr;
+	const appId = 40123456;
+	const appAddress = algosdk.getApplicationAddress(appId);
+
+	it('accepts a URI for the plain account being registered', () => {
+		expect(parseKeyregInput(uri(), { account: address })).toEqual({ ok: true, keys, fee: null });
+	});
+
+	it('rejects a URI for a different plain account, naming both', () => {
+		const result = parseKeyregInput(uri({}, `voi://net:voimain-v1.0/${other}`), {
+			account: address
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toMatch(/different account/);
+			expect(result.error).toContain(`${other.slice(0, 4)}…${other.slice(-4)}`);
+			expect(result.error).toContain(`${address.slice(0, 4)}…${address.slice(-4)}`);
+		}
+	});
+
+	it('resolves a staking contract to its application account, a plain wallet to itself', () => {
+		expect(
+			keyregAccount({ walletAddress: appAddress, parentWalletAddress: other, contractId: appId })
+		).toBe(appAddress);
+		expect(
+			keyregAccount({ walletAddress: address, parentWalletAddress: null, contractId: null })
+		).toBe(address);
+	});
+
+	it('accepts a contract URI for the application account and rejects the owner address', () => {
+		const account = keyregAccount({
+			walletAddress: appAddress,
+			parentWalletAddress: other,
+			contractId: appId
+		});
+		const forApp = parseKeyregInput(uri({}, `voi://net:voimain-v1.0/${appAddress}`), { account });
+		expect(forApp.ok).toBe(true);
+		const forOwner = parseKeyregInput(uri({}, `voi://net:voimain-v1.0/${other}`), { account });
+		expect(forOwner).toMatchObject({
+			ok: false,
+			error: expect.stringMatching(/different account/)
+		});
+	});
+
+	it('keeps the partkeyinfo path free of the hard account check', () => {
+		expect(parseKeyregInput(partkeyinfo, { account: other })).toEqual({
+			ok: true,
+			keys,
+			fee: null
+		});
+	});
+});
+
+describe('URI params (r2)', () => {
+	it.each([
+		['&fee=1000&fee=2000000', /repeats the fee/],
+		[`&votekey=${uriParams.votekey}`, /repeats the votekey/],
+		['&foo=bar', /unknown parameter: foo/],
+		['&note=hi', /note/],
+		['&xnote=hi', /note/]
+	])('rejects %s', (extra, problem) => {
+		expectError(uri() + extra, problem);
+	});
+});
+
+describe('keyregFee (r2)', () => {
+	it('is the URI fee raised to the network minimum', () => {
+		expect(keyregFee(null, 1000)).toBe(1000);
+		expect(keyregFee(1000, 1500)).toBe(1500);
+		expect(keyregFee(2000000, 1000)).toBe(2000000);
+		expect(keyregFee(null, undefined)).toBe(1000);
 	});
 });

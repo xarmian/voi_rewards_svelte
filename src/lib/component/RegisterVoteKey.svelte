@@ -7,6 +7,8 @@
 	import {
 		buildWalletKeyregTxn,
 		INCENTIVE_KEYREG_FEE,
+		keyregAccount,
+		keyregFee as walletKeyregFee,
 		MIN_KEYREG_FEE,
 		parseKeyregInput
 	} from '$lib/chain/keyreg';
@@ -15,7 +17,7 @@
 	import OneClickInstructions from './node-instructions/OneClickInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
 	import { goto } from '$app/navigation';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -42,8 +44,13 @@
 	let transactionId: string | null = null;
 	// Flat keyreg fee from a pasted keyreg URI (&fee=); null means the minimum fee.
 	let keyregFee: number | null = null;
-	// The key fields the fee was pasted with: the fee applies only while they are unchanged.
+	// The key fields and wallet the fee was pasted with: the fee applies only while they are
+	// unchanged.
 	let keyregFeeKeys = '';
+	let keyregFeeWallet = '';
+	$: currentWallet = `${$selectedWallet?.app ?? ''}|${$selectedWallet?.address ?? ''}`;
+	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
+	let minFee = MIN_KEYREG_FEE;
 	$: currentKeys = [
 		firstRound,
 		lastRound,
@@ -52,7 +59,19 @@
 		votingKey,
 		stateProofKey
 	].join('|');
-	$: activeKeyregFee = keyregFee !== null && currentKeys === keyregFeeKeys ? keyregFee : null;
+	$: activeKeyregFee =
+		keyregFee !== null && currentKeys === keyregFeeKeys && currentWallet === keyregFeeWallet
+			? keyregFee
+			: null;
+
+	onMount(async () => {
+		try {
+			const params = await algodClient.getTransactionParams().do();
+			minFee = params.minFee ?? MIN_KEYREG_FEE;
+		} catch (err) {
+			console.error('Error loading transaction params:', err);
+		}
+	});
 
 	const nodeInstructions = {
 		'voi-swarm': {
@@ -78,7 +97,9 @@
 			isLoading = true;
 			error = null;
 			const text = await navigator.clipboard.readText();
-			const result = parseKeyregInput(text);
+			const result = parseKeyregInput(text, {
+				account: keyregAccount({ walletAddress, parentWalletAddress, contractId })
+			});
 
 			if (result.ok) {
 				const parsed = result.keys;
@@ -97,6 +118,7 @@
 					votingKey,
 					stateProofKey
 				].join('|');
+				keyregFeeWallet = currentWallet;
 
 				// Validate if the parent address matches
 				if (parsed.parentAddress && parsed.parentAddress !== walletAddress) {
@@ -692,11 +714,9 @@
 				<div class="flex items-center gap-2">
 					<i class="fas fa-info-circle"></i>
 					<span
-						>Transaction Cost: {!parentWalletAddress && activeKeyregFee !== null
-							? activeKeyregFee / 1e6
-							: parentWalletAddress
-								? '0.002'
-								: '0.001'} VOI</span
+						>Transaction Cost: {parentWalletAddress
+							? '0.002'
+							: walletKeyregFee(activeKeyregFee, minFee) / 1e6} VOI</span
 					>
 				</div>
 				{#if !parentWalletAddress && activeKeyregFee === INCENTIVE_KEYREG_FEE}
