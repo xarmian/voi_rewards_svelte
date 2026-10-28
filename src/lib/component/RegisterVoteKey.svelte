@@ -13,7 +13,8 @@
 		isKeyregUri,
 		keyregSubmitError,
 		MIN_KEYREG_FEE,
-		parseKeyregInput
+		parseKeyregInput,
+		sendWalletKeyreg
 	} from '$lib/chain/keyreg';
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
@@ -286,18 +287,14 @@
 				fee: incentiveKeyregFee(payIncentiveFee)
 			});
 
-			const txid = tx.txID();
-
 			transactionStatus = 'signing';
-			const signedTxns = await signAndSendTransactions([[tx]]);
-
-			if (signedTxns && Array.isArray(signedTxns) && signedTxns.length > 0) {
-				transactionId = txid;
-				transactionStatus = 'confirming';
-				await algosdk.waitForConfirmation(algodClient, signedTxns[0], 4);
-				transactionStatus = 'success';
-				onSuccess?.(true);
-			}
+			const txid = await sendWalletKeyreg(tx, {
+				signAndSend: signAndSendTransactions,
+				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4)
+			});
+			transactionId = txid;
+			transactionStatus = 'success';
+			onSuccess?.(true);
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
@@ -314,18 +311,14 @@
 			// For going offline, we use a key registration transaction with nonParticipation set to true
 			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
 
-			const txid = tx.txID();
-
 			transactionStatus = 'signing';
-			const signedTxns = await signAndSendTransactions([[tx]]);
-
-			if (signedTxns && Array.isArray(signedTxns) && signedTxns.length > 0) {
-				transactionId = txid;
-				transactionStatus = 'confirming';
-				await algosdk.waitForConfirmation(algodClient, signedTxns[0], 4);
-				transactionStatus = 'success';
-				onSuccess?.(true);
-			}
+			const txid = await sendWalletKeyreg(tx, {
+				signAndSend: signAndSendTransactions,
+				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4)
+			});
+			transactionId = txid;
+			transactionStatus = 'success';
+			onSuccess?.(true);
 		} catch (err) {
 			console.error('Error going offline:', err);
 			error = err instanceof Error ? err.message : 'Failed to go offline';

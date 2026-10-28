@@ -292,3 +292,17 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 		}
 	});
 }
+
+export async function sendWalletKeyreg(
+	tx: algosdk.Transaction,
+	deps: {
+		signAndSend: (groups: algosdk.Transaction[][]) => Promise<unknown>;
+		waitForConfirmation: (txid: string) => Promise<unknown>;
+	}
+): Promise<string> {
+	const txid = tx.txID();
+	const result = await deps.signAndSend([[tx]]);
+	if (!result) throw new Error('Failed to send wallet key registration transaction');
+	await deps.waitForConfirmation(txid);
+	return txid;
+}
