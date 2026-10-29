@@ -1,61 +1,38 @@
 <script lang="ts">
 	import {
-		formatNumber,
-		formatPrice,
-		normalizePair,
-		formatCurrency,
-		formatPercentage
-	} from '$lib/markets/format';
-	import {
-		weightedAveragePrice as getWeightedAveragePrice,
-		displayPrice as getDisplayPrice,
-		circulatingMarketCap as getCirculatingMarketCap,
-		tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
-		fullyDilutedMarketCap as getFullyDilutedMarketCap,
-		sortMarkets,
-		filterMarkets as getFilteredMarkets
+		weightedAveragePrice as getWeightedAveragePrice, displayPrice as getDisplayPrice,
+		circulatingMarketCap as getCirculatingMarketCap, tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
+		fullyDilutedMarketCap as getFullyDilutedMarketCap, sortMarkets, filterMarkets as getFilteredMarkets
 	} from '$lib/markets/derive';
 	import {
-		createVoiUsdReference,
-		fetchTokenChartData as loadTokenChartData,
+		createVoiUsdReference, fetchTokenChartData as loadTokenChartData,
 		fetchVOIChartData as loadVOIChartData
 	} from '$lib/markets/chartData';
-	import { Button, Spinner, Badge, Alert } from 'flowbite-svelte';
+	import { Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
-	import { Button as DsButton } from '$lib/ds';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
-	import { fade } from 'svelte/transition';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
-	import OHLCVChart from '$lib/components/OHLCVChart.svelte';
 	import PriceChart from '$lib/components/PriceChart.svelte';
-	import TokenSelector from '$lib/components/TokenSelector.svelte';
-	import { ariaSortFor } from '$lib/a11y/keyboard';
+	import MarketHeader from './MarketHeader.svelte';
+	import KeyMetrics from './KeyMetrics.svelte';
+	import MarketsPanel from './MarketsPanel.svelte';
+	import ChartPanel from './ChartPanel.svelte';
 	// Enhanced components (keep only used ones for now)
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type {
-		TokenPair,
-		OHLCVData,
-		VolumeData,
-		Resolution,
-		ChartSettings
+		TokenPair, OHLCVData, VolumeData, Resolution, ChartSettings
 	} from '$lib/types/ohlcv.types';
 	import {
-		convertVoiQuotedCandlesToUsd,
-		convertVoiQuotedVolumesToUsd,
-		clampCandlesByMAD
+		convertVoiQuotedCandlesToUsd, convertVoiQuotedVolumesToUsd, clampCandlesByMAD
 	} from '$lib/utils/price-conversion';
 	import {
-		convertVOItoOHLCV,
-		createVOITokenPair,
-		shouldUseVOIData,
-		getDefaultChartType,
-		getDefaultResolution
+		convertVOItoOHLCV, createVOITokenPair, shouldUseVOIData,
+		getDefaultChartType, getDefaultResolution
 	} from '$lib/utils/chart-adapters';
-
 
 	export let data: PageData;
 	let { marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } = data;
@@ -111,11 +88,9 @@
 	// Track user-initiated token clearing to prevent URL re-initialization
 	let _userClearedToken = false;
 
-
 	onMount(() => {
 		commandPaletteShortcut = /Mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 		loadAllTokens();
-
 	});
 
 	async function loadAllTokens() {
@@ -855,7 +830,6 @@
 		}
 	}
 </script>
-
 <!-- Modern Token Analytics Interface -->
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
 	<!-- Beta Disclaimer Banner -->
@@ -875,588 +849,33 @@
 			</Alert>
 		</div>
 	</div>
-
-	<!-- Market Overview Header -->
 	<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-			<!-- Main Market Info -->
-			<div class="mb-6">
-				<!-- Bottom Row: Token Info, Price, and Controls -->
-				<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-					<!-- Left Side: Token Info and Price -->
-					<div class="flex items-center gap-6">
-						<!-- Token Info -->
-						<div class="flex items-center gap-4">
-							<!-- Token Image/Icon -->
-							{#if (selectedToken?.symbol || 'VOI') === 'VOI'}
-								<!-- VOI Logo -->
-								<img
-									src="/icons/voi-token.png"
-									alt="VOI logo"
-									class="w-16 h-16 rounded-2xl object-cover bg-white"
-									on:error={(e) => {
-										e.currentTarget.style.display = 'none';
-										e.currentTarget.nextElementSibling.style.display = 'flex';
-									}}
-								/>
-								<div
-									class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center"
-									style="display: none;"
-								>
-									<i class="fas fa-coins text-white text-2xl"></i>
-								</div>
-							{:else if tokenInfo?.imageUrl}
-								<!-- Token Image from tokenInfo -->
-								<img
-									src={tokenInfo.imageUrl}
-									alt="{selectedToken?.symbol || 'VOI'} logo"
-									class="w-16 h-16 rounded-2xl object-cover bg-white"
-									on:error={(e) => {
-										e.currentTarget.style.display = 'none';
-										e.currentTarget.nextElementSibling.style.display = 'flex';
-									}}
-								/>
-								<div
-									class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center"
-									style="display: none;"
-								>
-									<i class="fas fa-coins text-white text-2xl"></i>
-								</div>
-							{:else if data.pageMetaTags?.imageUrl && data.pageMetaTags.imageUrl !== 'https://voirewards.com/android-chrome-192x192.png'}
-								<!-- Fallback to page meta image -->
-								<img
-									src={data.pageMetaTags.imageUrl}
-									alt="{selectedToken?.symbol || 'VOI'} logo"
-									class="w-16 h-16 rounded-2xl object-cover bg-white"
-									on:error={(e) => {
-										e.currentTarget.style.display = 'none';
-										e.currentTarget.nextElementSibling.style.display = 'flex';
-									}}
-								/>
-								<div
-									class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center"
-									style="display: none;"
-								>
-									<i class="fas fa-coins text-white text-2xl"></i>
-								</div>
-							{:else}
-								<!-- Default fallback icon -->
-								<div
-									class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center"
-								>
-									<i class="fas fa-coins text-white text-2xl"></i>
-								</div>
-							{/if}
+			<MarketHeader
+				{selectedToken} {tokenInfo} {data} {realMarketData} {fetchingMarketData} {displayPrice}
+				{commandPaletteShortcut} {allTokens} {handleTokenSelect} {refreshData} {isRefreshing} onSearch={() => (commandPaletteOpen = true)}
+			/>
 
-							<div>
-								<div class="flex items-center gap-3 mb-1">
-									<h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-										{selectedToken?.symbol || 'VOI' || 'VOI'}
-									</h1>
-									<Badge
-										class="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
-									>
-										{realMarketData.length} Markets
-									</Badge>
-								</div>
-								<p class="text-lg text-gray-600 dark:text-gray-400">
-									Volume-weighted average price across all exchanges
-								</p>
-							</div>
-						</div>
-
-						<!-- Price Display -->
-						<div class="text-center lg:text-right" transition:fade={{ duration: 300 }}>
-							<div class="flex items-center justify-center lg:justify-end gap-3">
-								{#if fetchingMarketData}
-									<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-12 w-32"></div>
-									<Spinner size="6" />
-								{:else}
-									<div
-										class="text-4xl font-bold text-gray-900 dark:text-white"
-										transition:fade={{ duration: 400 }}
-									>
-										{formatPrice(displayPrice)}
-									</div>
-								{/if}
-							</div>
-							<div class="text-sm text-gray-500 dark:text-gray-400">
-								{#if fetchingMarketData}
-									Updating price data...
-								{:else}
-									Last updated: {new Date().toLocaleTimeString()}
-								{/if}
-							</div>
-						</div>
-					</div>
-
-					<!-- Right Side Controls -->
-					<div class="flex items-center gap-3">
-						<DsButton
-							variant="ghost"
-							size="sm"
-							aria-haspopup="dialog"
-							onclick={() => (commandPaletteOpen = true)}
-						>
-							<svg
-								class="h-4 w-4"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								aria-hidden="true"
-							>
-								<circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" />
-							</svg>
-							Search
-							{#if commandPaletteShortcut}
-								<kbd
-									class="hidden whitespace-nowrap rounded-ds-sm border border-line bg-surface-2 px-2 text-label text-ink-muted md:inline"
-									>{commandPaletteShortcut}</kbd
-								>
-							{/if}
-						</DsButton>
-						<TokenSelector {selectedToken} {allTokens} on:tokenSelect={handleTokenSelect} />
-
-						<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}>
-							<i class="fas fa-sync-alt {isRefreshing ? 'animate-spin' : ''} mr-2"></i>
-							Refresh
-						</Button>
-					</div>
-				</div>
-			</div>
-
-			<!-- Key Metrics -->
-			<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
-				<!-- Total Volume -->
-				<div
-					class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-					transition:fade={{ duration: 300, delay: 200 }}
-				>
-					<div class="flex items-center justify-between mb-2">
-						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">24h Volume</h3>
-						<i class="fas fa-chart-bar text-blue-500"></i>
-					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">
-						{#if fetchingMarketData}
-							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-20"></div>
-						{:else}
-							{totalVolume24h === null ? '—' : formatCurrency(totalVolume24h)}
-						{/if}
-					</div>
-				</div>
-
-				<!-- Total TVL -->
-				<div
-					class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-					transition:fade={{ duration: 300, delay: 250 }}
-				>
-					<div class="flex items-center justify-between mb-2">
-						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Total TVL</h3>
-						<i class="fas fa-lock text-green-500"></i>
-					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">
-						{#if fetchingMarketData}
-							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-24"></div>
-						{:else}
-							{totalTvlAll === null ? '—' : formatCurrency(totalTvlAll)}
-						{/if}
-					</div>
-				</div>
-
-				<!-- Market Cap / FDV -->
-				<div
-					class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-					transition:fade={{ duration: 300, delay: 300 }}
-				>
-					<div class="flex items-center justify-between mb-2">
-						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
-							{(selectedToken?.symbol || 'VOI') === 'VOI' ? 'Market Cap' : 'FDV'}
-						</h3>
-						<i class="fas fa-coins text-purple-500"></i>
-					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">
-						{#if fetchingMarketData}
-							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-28"></div>
-						{:else}
-							{(selectedToken?.symbol || 'VOI') === 'VOI'
-								? formatCurrency(circulatingMarketCap)
-								: tokenTotalSupplyAdjusted != null
-									? formatCurrency(fullyDilutedMarketCap)
-									: '-'}
-						{/if}
-					</div>
-					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-						{#if (selectedToken?.symbol || 'VOI') === 'VOI'}
-							Circulating: {formatNumber(realCirculatingSupply.circulatingSupply, 0)}
-						{:else}
-							Total Supply: {tokenTotalSupplyAdjusted != null
-								? formatNumber(tokenTotalSupplyAdjusted, 0)
-								: '—'}
-						{/if}
-					</div>
-				</div>
-
-				<!-- Active Markets -->
-				<div
-					class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-					transition:fade={{ duration: 300, delay: 350 }}
-				>
-					<div class="flex items-center justify-between mb-2">
-						<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Markets</h3>
-						<i class="fas fa-exchange-alt text-orange-500"></i>
-					</div>
-					<div class="text-2xl font-bold text-gray-900 dark:text-white">
-						{#if fetchingMarketData}
-							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-12"></div>
-						{:else}
-							{activeMarketsCount === null ? '—' : activeMarketsCount}
-						{/if}
-					</div>
-					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-						{#if fetchingMarketData}
-							<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-3 w-20"></div>
-						{:else}
-							Across {new Set(realMarketData.map((m) => m.exchange)).size} exchanges
-						{/if}
-					</div>
-				</div>
-			</div>
+			<KeyMetrics
+				{selectedToken} {fetchingMarketData} {totalVolume24h} {totalTvlAll} {circulatingMarketCap}
+				{tokenTotalSupplyAdjusted} {fullyDilutedMarketCap} {realCirculatingSupply} {activeMarketsCount} {realMarketData}
+			/>
 
 			<!-- Chart + Markets side-by-side -->
 			<section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-				<div
-					class="lg:col-span-2 {showTokenChart && selectedToken
-						? 'p-0'
-						: 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4'} overflow-hidden flex flex-col"
-					style="height: 640px;"
+				<ChartPanel
+					{showTokenChart} {selectedToken} {tokenChartLoading} {tokenChartError} {tokenChartData}
+					{tokenChartVolumes} bind:currentQuoteCurrency {chartSettings}
+					{handleChartResolutionChange} {handleChartTypeChange} {fetchVOIChartData} {fetchTokenChartData} on:refreshData
 				>
-					{#if showTokenChart && selectedToken}
-						{#if tokenChartLoading}
-							<div
-								class="flex items-center justify-center h-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
-							>
-								<Spinner size="8" />
-								<span class="ml-2 text-gray-600 dark:text-gray-400">Loading chart...</span>
-							</div>
-						{:else if tokenChartError}
-							<div
-								class="flex items-center justify-center h-full text-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
-							>
-								<div>
-									<i class="fas fa-exclamation-triangle text-2xl text-yellow-500 mb-2"></i>
-									<p class="text-gray-600 dark:text-gray-400">{tokenChartError}</p>
-								</div>
-							</div>
-						{:else if tokenChartData.length > 0}
-							<div class="flex-1 min-h-0">
-								<OHLCVChart
-									tokenPair={selectedToken.id === 0
-										? {
-												baseTokenId: 0,
-												quoteTokenId: 302190, // aUSDC
-												baseSymbol: 'VOI',
-												quoteSymbol: currentQuoteCurrency === 'USD' ? 'USD' : 'aUSDC',
-												baseDecimals: 6,
-												quoteDecimals: 6,
-												poolId: undefined
-											}
-										: {
-												baseTokenId: selectedToken.id,
-												quoteTokenId: 390001, // wVOI
-												baseSymbol: selectedToken.symbol,
-												quoteSymbol: 'VOI',
-												baseDecimals: selectedToken.decimals,
-												quoteDecimals: 6,
-												poolId: undefined
-											}}
-									data={tokenChartData}
-									volumes={tokenChartVolumes}
-									loading={false}
-									height={400}
-									settings={chartSettings}
-									bind:quoteCurrency={currentQuoteCurrency}
-									on:refreshData
-									on:resolutionChange={(e) => handleChartResolutionChange(e.detail)}
-									on:chartTypeChange={(e) => handleChartTypeChange(e.detail)}
-									on:quoteChange={(e) => {
-										console.log('quoteChange event received in markets page:', e.detail);
-										currentQuoteCurrency = e.detail;
-										console.log('currentQuoteCurrency updated to:', currentQuoteCurrency);
-										if (selectedToken.id === 0) {
-											fetchVOIChartData(chartSettings.resolution, currentQuoteCurrency);
-										} else {
-											fetchTokenChartData(
-												selectedToken.id,
-												chartSettings.resolution,
-												currentQuoteCurrency
-											);
-										}
-									}}
-								/>
-							</div>
-						{/if}
-					{:else}
-						<!-- Default Price Chart for VOI or when no token selected -->
-						<div class="flex-1 min-h-0">
-							<PriceChart
-								data={priceHistory}
-								{selectedPeriod}
-								onPeriodChange={handlePeriodChange}
-								{selectedMarket}
-							/>
-						</div>
-					{/if}
-				</div>
-				<div
-					class="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-					style="height: 640px;"
-				>
-					<div
-						class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600 flex-shrink-0"
-					>
-						{#if voiUsdStatus === 'stale'}
-							<p class="text-sm text-gray-600 dark:text-gray-400">
-								VOI/USD reference is stale (as of {voiUsdAsOf
-									? new Date(voiUsdAsOf).toLocaleString()
-									: 'unknown time'}). USD values may be out of date.
-							</p>
-						{:else if voiUsdStatus === 'invalid' || voiUsdStatus === 'unavailable'}
-							<p class="text-sm text-gray-600 dark:text-gray-400">
-								VOI/USD reference unavailable. USD values for VOI-quoted pools are missing.
-							</p>
-						{/if}
-						{#if tokenAnalytics?.partial}
-							<p class="text-sm text-gray-600 dark:text-gray-400">Some analytics are unavailable.</p>
-						{/if}
-
-						<div class="flex items-center justify-between mb-4">
-							<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Token Markets</h2>
-							<span class="text-sm text-gray-600 dark:text-gray-400"
-								>{sortedMarketData.length} active</span
-							>
-						</div>
-
-						<!-- Search Bar -->
-						<div class="relative">
-							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-								<i class="fas fa-search text-gray-400"></i>
-							</div>
-							<input
-								id="market-search"
-								type="text"
-								bind:value={searchQuery}
-								on:input={() => filterMarkets(searchQuery)}
-								placeholder="Search markets, exchanges, networks..."
-								class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400"
-							/>
-							{#if searchQuery}
-								<button
-									type="button"
-									on:click={() => {
-										searchQuery = '';
-										filterMarkets('');
-									}}
-									class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-								>
-									<i class="fas fa-times"></i>
-								</button>
-							{/if}
-						</div>
-					</div>
-					<div class="flex-1 overflow-auto min-h-0">
-						<table class="w-full">
-							<thead
-								class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 sticky top-0 z-10"
-							>
-								<tr>
-									<th
-										scope="col"
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>Pair</th
-									>
-									<th
-										scope="col"
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>Exchange</th
-									>
-									<th
-										scope="col"
-										aria-sort={ariaSortFor(sortColumn, 'price', sortDirection)}
-										class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-									>
-										<button
-											type="button"
-											class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-											on:click={() => sortData('price')}
-										>
-											Price
-											{#if sortColumn === 'price'}
-												<i
-													aria-hidden="true"
-													class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
-												></i>
-											{/if}
-										</button>
-									</th>
-									<th
-										scope="col"
-										aria-sort={ariaSortFor(sortColumn, 'tvl', sortDirection)}
-										class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-									>
-										<button
-											type="button"
-											class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-											on:click={() => sortData('tvl')}
-										>
-											TVL (USD)
-											{#if sortColumn === 'tvl'}
-												<i
-													aria-hidden="true"
-													class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
-												></i>
-											{/if}
-										</button>
-									</th>
-									<th
-										scope="col"
-										aria-sort={ariaSortFor(sortColumn, 'volume_24h', sortDirection)}
-										class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-									>
-										<button
-											type="button"
-											class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-											on:click={() => sortData('volume_24h')}
-										>
-											24h Volume
-											{#if sortColumn === 'volume_24h'}
-												<i
-													aria-hidden="true"
-													class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
-												></i>
-											{/if}
-										</button>
-									</th>
-									<th
-										scope="col"
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>24h Change</th
-									>
-								</tr>
-							</thead>
-							<tbody
-								class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"
-							>
-								{#each sortedMarketData as market}
-									<tr
-										class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-										on:click={() => handleMarketRowClick(market)}
-									>
-										<td class="px-6 py-3 whitespace-nowrap text-sm">
-											<div class="flex items-center gap-2">
-												{#if market.pool_url}
-													<a
-														href={market.pool_url}
-														target="_blank"
-														rel="noopener noreferrer"
-														class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
-														on:click|stopPropagation
-													>
-														{normalizePair(market.pair)}
-														<i
-															class="fas fa-external-link-alt text-xs opacity-50"
-															aria-hidden="true"
-														></i>
-													</a>
-													<button
-														type="button"
-														aria-label={`Show ${normalizePair(market.pair)} chart`}
-														aria-pressed={selectedTradingPairId === market.trading_pair_id}
-														class="p-1 text-purple-600 dark:text-purple-400 rounded focus-visible:ring-2 focus-visible:ring-focus"
-														on:click|stopPropagation={() => handleMarketRowClick(market)}
-													>
-														<i class="fas fa-chart-line" aria-hidden="true"></i>
-													</button>
-												{:else}
-													<button
-														type="button"
-														aria-label={`Show ${normalizePair(market.pair)} chart`}
-														aria-pressed={selectedTradingPairId === market.trading_pair_id}
-														class="text-gray-900 dark:text-white rounded focus-visible:ring-2 focus-visible:ring-focus"
-														on:click|stopPropagation={() => handleMarketRowClick(market)}
-													>
-														{normalizePair(market.pair)}
-													</button>
-												{/if}
-											</div>
-										</td>
-										<td class="px-6 py-3 whitespace-nowrap text-sm">
-											<span
-												class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {market.exchange ===
-												'humble'
-													? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-													: market.exchange === 'nomadex'
-														? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-														: market.exchange === 'Humble'
-															? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-															: market.exchange === 'Nomadex'
-																? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-																: market.exchange === 'Tinyman' ||
-																	  market.exchange.startsWith('Tinyman')
-																	? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-																	: market.exchange === 'PactFi'
-																		? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-																		: market.exchange === 'Uniswap'
-																			? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300'
-																			: market.exchange === 'MEXC'
-																				? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
-																				: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300'}"
-											>
-												{market.exchange === 'humble'
-													? 'Humble'
-													: market.exchange === 'nomadex'
-														? 'Nomadex'
-														: market.exchange}
-											</span>
-										</td>
-										<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-											>{formatPrice(market.price)}</td
-										>
-										<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-											>{formatCurrency(market.tvl)}</td
-										>
-										<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-											>{market.volume_24h ? formatCurrency(market.volume_24h) : '-'}</td
-										>
-										<td class="px-6 py-3 whitespace-nowrap text-sm">
-											<span
-												class={(market.price_change_percentage_24h ?? 0) > 0
-													? 'text-green-600 dark:text-green-400'
-													: (market.price_change_percentage_24h ?? 0) < 0
-														? 'text-red-600 dark:text-red-400'
-														: 'text-gray-600 dark:text-gray-400'}
-											>
-												{formatPercentage(market.price_change_percentage_24h)}
-											</span>
-										</td>
-									</tr>
-								{:else}
-									{#if marketDataError}
-										<tr>
-											<td colspan="6" class="text-center py-12">
-												<p class="text-gray-600 dark:text-gray-400 mb-3">Couldn't load markets for this token.</p>
-												<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}>Retry</Button>
-											</td>
-										</tr>
-									{/if}
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
+					<PriceChart data={priceHistory} {selectedPeriod} onPeriodChange={handlePeriodChange} {selectedMarket} />
+				</ChartPanel>
+				<MarketsPanel
+					{voiUsdStatus} {voiUsdAsOf} {tokenAnalytics} {sortedMarketData} {searchQuery} onSearchQueryChange={(query) => (searchQuery = query)}
+					{filterMarkets} {sortColumn} {sortDirection} {sortData} {selectedTradingPairId} onRowClick={handleMarketRowClick}
+					{marketDataError} {refreshData} {isRefreshing} on:click
+				/>
 			</section>
-
-
 		</div>
 	</div>
 </div>
@@ -1464,34 +883,16 @@
 	bind:open={commandPaletteOpen}
 	onselect={(token) => handleTokenSelect(new CustomEvent('tokenSelect', { detail: token }))}
 />
-
 <style>
-	/* Enhanced styles for the new components */
-	kbd {
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Consolas, 'Liberation Mono',
-			'Courier New', monospace;
-		font-size: 0.75rem;
-		font-weight: 500;
-	}
-
 	/* Smooth transitions for view mode switches */
 	section {
 		transition: all 0.3s ease-in-out;
 	}
-
 	/* Enhanced mobile responsiveness */
 	@media (max-width: 768px) {
 		.max-w-7xl {
 			padding-left: 1rem;
 			padding-right: 1rem;
 		}
-	}
-
-	/* Improved focus indicators for accessibility */
-	button:focus-visible,
-	select:focus-visible,
-	input:focus-visible {
-		outline: 2px solid #8b5cf6;
-		outline-offset: 2px;
 	}
 </style>
