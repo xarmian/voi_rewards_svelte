@@ -50,11 +50,7 @@ describe('group retry safety', () => {
 			a,
 			{
 				pendingInfo: async () => ({}),
-				indexerLookup: async () => {
-					throw Object.assign(new Error('not found'), { status: 404 });
-				},
-				currentRound: async () => 101,
-				indexerRound: async () => 101
+				indexerSearch: async () => ({ 'current-round': 101, transactions: [] })
 			},
 			{ intervalMs: 1 }
 		);

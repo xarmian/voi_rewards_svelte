@@ -20,10 +20,14 @@ export type SendDependencies = {
 };
 
 type TrackingDependencies = {
-	pendingInfo(txId: string): Promise<{ 'confirmed-round'?: number; 'pool-error'?: string }>;
-	indexerLookup(txId: string): Promise<{ transaction?: { 'confirmed-round'?: number } }>;
-	currentRound(): Promise<number>;
-	indexerRound(): Promise<number>;
+	// Positive evidence only: any node reporting a confirmed round is proof it landed.
+	pendingInfo(txId: string): Promise<{ 'confirmed-round'?: number }>;
+	// GET /v2/transactions?txid=…: the round and the result come from the same response, so
+	// absence is only proven by the reader that answered (TASK-81 review P1).
+	indexerSearch(txId: string): Promise<{
+		'current-round': number;
+		transactions: { id?: string; 'confirmed-round'?: number }[];
+	}>;
 };
 
 export function groupInfo(signedGroup: Uint8Array[]) {
@@ -110,41 +114,26 @@ export async function trackPending(
 			if (confirmedRound !== undefined && confirmedRound > 0) {
 				return { status: 'confirmed', txIds: outcome.txIds, confirmedRound };
 			}
-			if (info?.['pool-error']?.trim()) {
-				return { status: 'rejected', txIds: outcome.txIds, error: info['pool-error'] };
-			}
+			// A pool error from one node is not proof the transaction is dead (TASK-81 review P1):
+			// only a 4xx on submit is, so this stays pending until it confirms or expires.
 
-			const [currentRound, indexerRound] = await Promise.all([
-				unknownOnError(() => deps.currentRound()),
-				unknownOnError(() => deps.indexerRound())
-			]);
+			// An error from the search proves nothing; keep polling.
+			const search = await unknownOnError(() => deps.indexerSearch(outcome.firstTxId));
 			if (signal?.aborted) break;
-			// Check absence AFTER the indexer's round, so a stale lookup cannot permit a retry.
-			let missing = false;
-			try {
-				const indexed = await deps.indexerLookup(outcome.firstTxId);
-				if (signal?.aborted) break;
-				if (indexed.transaction) {
+			if (search && Array.isArray(search.transactions)) {
+				const found = search.transactions[0];
+				if (found) {
 					return {
 						status: 'confirmed',
 						txIds: outcome.txIds,
-						confirmedRound: indexed.transaction['confirmed-round'] ?? 0
+						confirmedRound: found['confirmed-round'] ?? 0
 					};
 				}
-				missing = true;
-			} catch (error) {
-				// A transient lookup failure cannot prove that a transaction never landed.
-				missing = httpStatus(error) === 404;
-			}
-			if (signal?.aborted) break;
-			if (
-				missing &&
-				currentRound !== undefined &&
-				currentRound > outcome.lastValid &&
-				indexerRound !== undefined &&
-				indexerRound > outcome.lastValid
-			) {
-				return { status: 'expired', txIds: outcome.txIds };
+				// No transaction can confirm after lastValid, so a reader past it that lacks the txid
+				// proves it never landed.
+				if (search['current-round'] > outcome.lastValid) {
+					return { status: 'expired', txIds: outcome.txIds };
+				}
 			}
 			await pause(intervalMs, signal);
 		}

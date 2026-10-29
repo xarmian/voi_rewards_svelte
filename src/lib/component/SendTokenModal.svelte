@@ -157,9 +157,11 @@
 	};
 	const trackingDeps = {
 		pendingInfo: (txId: string) => algodClient.pendingTransactionInformation(txId).do(),
-		indexerLookup: (txId: string) => algodIndexer.lookupTransactionByID(txId).do(),
-		currentRound: async () => (await algodClient.status().do())['last-round'],
-		indexerRound: async () => (await algodIndexer.makeHealthCheck().do()).round
+		indexerSearch: async (txId: string) =>
+			(await algodIndexer.searchForTransactions().txid(txId).do()) as {
+				'current-round': number;
+				transactions: { id?: string; 'confirmed-round'?: number }[];
+			}
 	};
 	$: retryList = retryRecipients(groupOutcomes, recipientsByGroup);
 	$: confirmedTotal = Number(

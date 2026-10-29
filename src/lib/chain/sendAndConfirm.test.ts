@@ -1,6 +1,12 @@
 import algosdk from 'algosdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { groupInfo, sendAndConfirm, trackPending, type PendingOutcome } from './sendAndConfirm';
+import {
+	groupInfo,
+	retryable,
+	sendAndConfirm,
+	trackPending,
+	type PendingOutcome
+} from './sendAndConfirm';
 
 function signedGroup() {
 	const account = algosdk.generateAccount();
@@ -93,16 +99,16 @@ describe('trackPending', () => {
 		firstTxId: 'A',
 		lastValid: 100
 	};
+	type Search = {
+		'current-round': number;
+		transactions: { id?: string; 'confirmed-round'?: number }[];
+	};
 	function deps() {
 		return {
 			pendingInfo: vi.fn(
 				async (): Promise<{ 'confirmed-round'?: number; 'pool-error'?: string }> => ({})
 			),
-			indexerLookup: vi.fn(async (): Promise<{ transaction?: { 'confirmed-round'?: number } }> => {
-				throw Object.assign(new Error('not found'), { status: 404 });
-			}),
-			currentRound: vi.fn(async () => 90),
-			indexerRound: vi.fn(async () => 90)
+			indexerSearch: vi.fn(async (): Promise<Search> => ({ 'current-round': 90, transactions: [] }))
 		};
 	}
 
@@ -117,36 +123,27 @@ describe('trackPending', () => {
 		expect(d.pendingInfo).toHaveBeenCalledTimes(2);
 	});
 
-	it('confirms through the indexer when algod returns 404', async () => {
+	it('confirms through the indexer search when algod returns 404', async () => {
 		const d = deps();
 		d.pendingInfo.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
-		d.indexerLookup.mockResolvedValue({ transaction: { 'confirmed-round': 99 } });
+		d.indexerSearch.mockResolvedValue({
+			'current-round': 99,
+			transactions: [{ id: 'A', 'confirmed-round': 99 }]
+		});
 		expect(await trackPending(pending, d, { intervalMs: 1 })).toEqual({
 			status: 'confirmed',
 			txIds: pending.txIds,
 			confirmedRound: 99
 		});
-		expect(d.indexerLookup).toHaveBeenCalledWith('A');
+		expect(d.indexerSearch).toHaveBeenCalledWith('A');
 	});
 
-	it('reports an explicit pool error as rejected', async () => {
-		const d = deps();
-		d.pendingInfo.mockResolvedValue({ 'pool-error': 'overspend' });
-		expect(await trackPending(pending, d, { intervalMs: 1 })).toEqual({
-			status: 'rejected',
-			txIds: pending.txIds,
-			error: 'overspend'
-		});
-	});
-
-	it('keeps polling through lookup and round errors', async () => {
+	it('keeps polling through algod and search errors', async () => {
 		const d = deps();
 		d.pendingInfo
 			.mockRejectedValueOnce(new Error('offline'))
 			.mockResolvedValue({ 'confirmed-round': 99 });
-		d.currentRound.mockRejectedValue(new Error('offline'));
-		d.indexerRound.mockRejectedValue(new Error('offline'));
-		d.indexerLookup.mockRejectedValue(Object.assign(new Error('unavailable'), { status: 500 }));
+		d.indexerSearch.mockRejectedValue(Object.assign(new Error('unavailable'), { status: 500 }));
 		expect(await trackPending(pending, d, { intervalMs: 1 })).toEqual({
 			status: 'confirmed',
 			txIds: pending.txIds,
@@ -154,11 +151,12 @@ describe('trackPending', () => {
 		});
 	});
 
-	it('prefers an indexed confirmation over expiry even after both rounds pass lastValid', async () => {
+	it('prefers a found transaction over expiry even when the response is past lastValid', async () => {
 		const d = deps();
-		d.currentRound.mockResolvedValue(110);
-		d.indexerRound.mockResolvedValue(110);
-		d.indexerLookup.mockResolvedValue({ transaction: { 'confirmed-round': 100 } });
+		d.indexerSearch.mockResolvedValue({
+			'current-round': 110,
+			transactions: [{ id: 'A', 'confirmed-round': 100 }]
+		});
 		expect(await trackPending(pending, d, { intervalMs: 1 })).toEqual({
 			status: 'confirmed',
 			txIds: pending.txIds,
@@ -166,13 +164,14 @@ describe('trackPending', () => {
 		});
 	});
 
-	it('does not treat a transient indexer error as proof of expiry', async () => {
+	it('does not treat a transient search error as proof of expiry', async () => {
 		const d = deps();
-		d.currentRound.mockResolvedValue(110);
-		d.indexerRound.mockResolvedValue(110);
-		d.indexerLookup
+		d.indexerSearch
 			.mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }))
-			.mockResolvedValue({ transaction: { 'confirmed-round': 99 } });
+			.mockResolvedValue({
+				'current-round': 110,
+				transactions: [{ id: 'A', 'confirmed-round': 99 }]
+			});
 		expect(await trackPending(pending, d, { intervalMs: 1 })).toEqual({
 			status: 'confirmed',
 			txIds: pending.txIds,
@@ -180,33 +179,21 @@ describe('trackPending', () => {
 		});
 	});
 
-	it('waits for the indexer to pass lastValid before expiring', async () => {
+	it('waits for the answering reader to pass lastValid before expiring', async () => {
 		vi.useFakeTimers();
 		const d = deps();
-		d.currentRound.mockResolvedValue(110);
-		d.indexerRound.mockResolvedValueOnce(99).mockResolvedValueOnce(100).mockResolvedValue(101);
+		d.indexerSearch
+			.mockResolvedValueOnce({ 'current-round': 99, transactions: [] })
+			.mockResolvedValueOnce({ 'current-round': 100, transactions: [] })
+			.mockResolvedValue({ 'current-round': 101, transactions: [] });
 		const settled = vi.fn();
 		const tracking = trackPending(pending, d, { intervalMs: 1 }).then(settled);
 		await vi.advanceTimersByTimeAsync(1);
-		expect(d.pendingInfo).toHaveBeenCalledTimes(2);
+		expect(d.indexerSearch).toHaveBeenCalledTimes(2);
 		expect(settled).not.toHaveBeenCalled();
 		await vi.advanceTimersByTimeAsync(1);
 		await tracking;
 		expect(settled).toHaveBeenCalledWith({ status: 'expired', txIds: pending.txIds });
-	});
-
-	it('expires only after both rounds pass lastValid and a fresh indexer lookup lacks the txid', async () => {
-		const d = deps();
-		d.currentRound.mockResolvedValue(101);
-		d.indexerRound.mockResolvedValue(101);
-		d.indexerLookup.mockImplementation(async () => {
-			expect(d.indexerRound).toHaveBeenCalled();
-			throw Object.assign(new Error('not found'), { status: 404 });
-		});
-		expect(await trackPending(pending, d, { intervalMs: 1 })).toEqual({
-			status: 'expired',
-			txIds: pending.txIds
-		});
 	});
 
 	it('aborts during polling and makes no further requests', async () => {
@@ -229,7 +216,7 @@ describe('trackPending', () => {
 		const tracking = trackPending(pending, d, { intervalMs: 1, signal: controller.signal });
 		controller.abort();
 		expect(await tracking).toEqual(pending);
-		expect(d.indexerLookup).not.toHaveBeenCalled();
+		expect(d.indexerSearch).not.toHaveBeenCalled();
 	});
 
 	it('does not poll an already aborted signal', async () => {
@@ -238,5 +225,86 @@ describe('trackPending', () => {
 		controller.abort();
 		expect(await trackPending(pending, d, { signal: controller.signal })).toEqual(pending);
 		expect(d.pendingInfo).not.toHaveBeenCalled();
+	});
+});
+
+// TASK-81 review P1s (#70): only a 4xx on submit proves a transaction can never land, and absence
+// is proven only by a round taken from the same indexer response that lacked the txid.
+describe('trackPending review P1s', () => {
+	const pending: PendingOutcome = {
+		status: 'pending',
+		txIds: ['A'],
+		firstTxId: 'A',
+		lastValid: 100
+	};
+	const notFound = () => Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
+
+	it('keeps a pool error after a successful submit pending, and not retryable', async () => {
+		const controller = new AbortController();
+		const pendingInfo = vi.fn(async () => {
+			if (pendingInfo.mock.calls.length >= 3) controller.abort();
+			return { 'pool-error': 'transaction dropped by this node' };
+		});
+		const outcome = await trackPending(
+			pending,
+			{
+				pendingInfo,
+				indexerSearch: async () => ({ 'current-round': 90, transactions: [] }),
+				indexerLookup: notFound,
+				currentRound: async () => 90,
+				indexerRound: async () => 90
+			} as never,
+			{ intervalMs: 1, signal: controller.signal }
+		);
+		expect(outcome.status).toBe('pending');
+		expect(retryable([outcome])).toEqual([]);
+	});
+
+	it('does not expire when the response lacking the txid is itself behind lastValid', async () => {
+		// A load-balanced lagging reader 404s the txid while a separate health call says caught up.
+		const controller = new AbortController();
+		const indexerSearch = vi.fn(async () => {
+			if (indexerSearch.mock.calls.length >= 3) controller.abort();
+			return { 'current-round': 99, transactions: [] };
+		});
+		const outcome = await trackPending(
+			pending,
+			{
+				pendingInfo: async () => ({}),
+				indexerSearch,
+				indexerLookup: notFound,
+				currentRound: async () => 110,
+				indexerRound: async () => 110
+			} as never,
+			{ intervalMs: 1, signal: controller.signal }
+		);
+		expect(outcome.status).toBe('pending');
+	});
+
+	it('expires once the same response is past lastValid with zero results', async () => {
+		const outcome = await trackPending(
+			pending,
+			{
+				pendingInfo: async () => ({}),
+				indexerSearch: async () => ({ 'current-round': 101, transactions: [] })
+			} as never,
+			{ intervalMs: 1 }
+		);
+		expect(outcome.status).toBe('expired');
+	});
+
+	it('confirms from the search response when it carries the transaction', async () => {
+		const outcome = await trackPending(
+			pending,
+			{
+				pendingInfo: async () => ({}),
+				indexerSearch: async () => ({
+					'current-round': 120,
+					transactions: [{ id: 'A', 'confirmed-round': 98 }]
+				})
+			} as never,
+			{ intervalMs: 1 }
+		);
+		expect(outcome).toEqual({ status: 'confirmed', txIds: ['A'], confirmedRound: 98 });
 	});
 });
