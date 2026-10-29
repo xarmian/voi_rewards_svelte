@@ -5,9 +5,15 @@
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
-	import { trackPending, type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import {
+		createOutcomeHandler,
+		createPendingTracker,
+		type PendingSendEntry,
+		type PendingTracker
+	} from '$lib/chain/pendingSends';
 	import type { FungibleTokenType } from '$lib/types/assets';
 	import { arc200 as Contract } from 'ulujs';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -186,21 +192,86 @@
 		expired: groupOutcomes.filter((o) => o?.status === 'expired').length,
 		rejected: groupOutcomes.filter((o) => o?.status === 'rejected').length
 	};
-	$: if (!open) pendingController?.abort();
-	onDestroy(() => pendingController?.abort());
+	let tracker: PendingTracker | undefined;
+	let trackerWallet: string | undefined;
+	let trackedEntries: PendingSendEntry[] = [];
+	let showCloseConfirm = false;
+	let keepOpenButton: HTMLButtonElement | undefined;
+	$: syncTracker(open, $selectedWallet?.address);
+	$: closeNeedsConfirm =
+		txState === 'sending' || trackedEntries.some((entry) => entry.status === 'pending');
+	$: awaitingEntries = trackedEntries.filter(
+		(entry) => !groupOutcomes.some((outcome) => outcome?.txIds[0] === entry.record.firstTxId)
+	);
+	$: if (!open) {
+		pendingController?.abort();
+		tracker?.stop();
+		showCloseConfirm = false;
+	}
+	onDestroy(() => {
+		pendingController?.abort();
+		tracker?.stop();
+	});
 
-	function recordOutcome(outcome: Outcome, index: number, signal: AbortSignal) {
-		if (signal.aborted) return;
+	function syncTracker(isOpen: boolean, wallet: string | undefined) {
+		if (!isOpen) return;
+		if (wallet !== trackerWallet) {
+			tracker?.stop();
+			tracker = undefined;
+			trackerWallet = wallet;
+			trackedEntries = [];
+		}
+		if (!wallet) return;
+		if (!tracker) {
+			const nextTracker: PendingTracker = createPendingTracker({
+				wallet,
+				deps: trackingDeps,
+				onChange: (entries) => {
+					if (tracker !== nextTracker) return;
+					// The wallet's pending bridge sends belong to BridgeModal.
+					trackedEntries = entries.filter((entry) => entry.record.kind === 'send');
+					hasCompletedTransaction ||= trackedEntries.some((entry) => entry.status === 'confirmed');
+					groupOutcomes = groupOutcomes.map((outcome): TrackedOutcome | undefined => {
+						if (outcome?.status !== 'pending') return outcome;
+						const entry = entries.find((entry) => entry.record.firstTxId === outcome.firstTxId);
+						if (entry?.status === 'confirmed') {
+							return {
+								status: 'confirmed',
+								txIds: outcome.txIds,
+								confirmedRound: entry.confirmedRound ?? 0
+							};
+						}
+						if (entry?.status === 'expired') return { status: 'expired', txIds: outcome.txIds };
+						return outcome;
+					});
+				}
+			});
+			tracker = nextTracker;
+		}
+		tracker.resume();
+	}
+
+	async function requestClose() {
+		if (!closeNeedsConfirm) {
+			handleClose();
+			return;
+		}
+		showCloseConfirm = true;
+		await tick();
+		keepOpenButton?.focus();
+	}
+
+	function handleCloseKeydown(event: KeyboardEvent) {
+		if (open && closeNeedsConfirm && event.key === 'Escape') {
+			event.preventDefault();
+			void requestClose();
+		}
+	}
+
+	function recordOutcome(outcome: Outcome, index: number) {
 		groupOutcomes[index] = outcome;
 		groupOutcomes = [...groupOutcomes];
 		hasCompletedTransaction ||= outcome.status !== 'rejected';
-		if (outcome.status === 'pending') {
-			void trackPending(outcome, trackingDeps, { signal }).then((tracked) => {
-				if (signal.aborted) return;
-				groupOutcomes[index] = tracked;
-				groupOutcomes = [...groupOutcomes];
-			});
-		}
 	}
 	let showTokenSelect = false;
 	let showNoteMenu = false;
@@ -596,6 +667,10 @@
 			error = 'Please connect your wallet first';
 			return;
 		}
+		const sender = $selectedWallet.address;
+		const senderTracker = tracker;
+		if (!senderTracker) return;
+		const symbol = selectedToken.symbol;
 
 		const invalidRecipients = recipients.filter(
 			(r) => !r.address || !algosdk.isValidAddress(r.address)
@@ -752,9 +827,26 @@
 			});
 
 			groupOutcomes = new Array(signedGroups.length).fill(undefined);
+			const attemptRecipients = recipientsByGroup.map((group) =>
+				group.map((recipient) => ({ address: recipient.address!, amount: recipient.amount }))
+			);
 			await sendGroups(signedGroups, {
 				...sendDeps,
-				onOutcome: (outcome, index) => recordOutcome(outcome, index, controller.signal)
+				onOutcome: createOutcomeHandler({
+					tracker: senderTracker,
+					record: (outcome, index) => ({
+						kind: 'send',
+						wallet: sender,
+						txIds: outcome.txIds,
+						firstTxId: outcome.firstTxId,
+						lastValid: outcome.lastValid,
+						recipients: attemptRecipients[index],
+						symbol,
+						createdAt: Date.now()
+					}),
+					signal: controller.signal,
+					onOutcome: recordOutcome
+				})
 			});
 			if (controller.signal.aborted) return;
 			showResults = true;
@@ -785,7 +877,6 @@
 		currentTxnGroup = 0;
 		totalTxnGroups = 0;
 		transactionGroups = [];
-		hasCompletedTransaction = false;
 	}
 
 	function clearAllRecipients() {
@@ -863,10 +954,13 @@
 	}
 
 	function handleClose() {
+		tracker?.stop();
+		showCloseConfirm = false;
 		if (hasCompletedTransaction) {
 			onTokenSent();
 		}
 		resetState();
+		hasCompletedTransaction = false;
 		open = false;
 	}
 
@@ -933,10 +1027,44 @@
 
 <Modal
 	bind:open
+	dismissable={!closeNeedsConfirm}
 	size="lg"
 	on:close={handleClose}
 	class="overflow-visible max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)]"
 >
+	{#if closeNeedsConfirm}
+		<button
+			type="button"
+			aria-label="Close"
+			class="absolute top-3 end-2.5 z-10 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600"
+			on:click={requestClose}><span aria-hidden="true" class="text-xl leading-5">×</span></button
+		>
+	{/if}
+	{#if showCloseConfirm}
+		<div
+			class="rounded-lg border border-amber-300 dark:border-amber-700 p-4 mt-6 space-y-3"
+			role="alert"
+		>
+			<p class="text-sm text-gray-900 dark:text-white">
+				This send may still land on chain. It stays tracked, and you'll see it here when you reopen
+				this window.
+			</p>
+			<div class="flex gap-3">
+				<button
+					type="button"
+					bind:this={keepOpenButton}
+					on:click={() => (showCloseConfirm = false)}
+					class="rounded-lg px-4 py-2 bg-blue-700 text-white hover:bg-blue-800">Keep open</button
+				>
+				<button
+					type="button"
+					on:click={handleClose}
+					class="rounded-lg px-4 py-2 bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white"
+					>Close anyway</button
+				>
+			</div>
+		</div>
+	{/if}
 	<div
 		class="w-full sm:max-w-3xl mx-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-6rem)]"
 	>
@@ -1019,6 +1147,56 @@
 				</div>
 			</div>
 		</div>
+
+		{#if awaitingEntries.length > 0}
+			<section
+				aria-label="Awaiting confirmation"
+				aria-live="polite"
+				class="mb-6 space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm"
+			>
+				<h4 class="font-medium text-gray-900 dark:text-white">Awaiting confirmation</h4>
+				{#each awaitingEntries as entry (entry.record.firstTxId)}
+					<div class="space-y-2">
+						<p class="text-gray-900 dark:text-white">
+							{entry.status === 'pending'
+								? 'Sent, awaiting confirmation'
+								: entry.status === 'confirmed'
+									? 'Confirmed'
+									: 'Not confirmed (expired before landing)'}
+						</p>
+						<p class="text-gray-700 dark:text-gray-300">
+							{entry.record.recipients.length} recipient{entry.record.recipients.length === 1
+								? ''
+								: 's'} · {parseFloat(
+								entry.record.recipients
+									.reduce((total, recipient) => total + Number(recipient.amount), 0)
+									.toPrecision(15)
+							)}
+							{entry.record.symbol}
+						</p>
+						{#each entry.record.txIds as txId}
+							<div
+								class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-md font-mono"
+							>
+								<a
+									href={`https://block.voi.network/explorer/transaction/${txId}`}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 break-all"
+									title={txId}>{txId}</a
+								>
+								<CopyComponent
+									ariaLabel="Copy transaction ID"
+									text={txId}
+									toastMessage="Transaction ID copied"
+									failureMessage="Failed to copy transaction ID"
+								/>
+							</div>
+						{/each}
+					</div>
+				{/each}
+			</section>
+		{/if}
 
 		{#if !showResults}
 			<div class="flex flex-col flex-1 min-h-0">
@@ -1333,7 +1511,7 @@
 							</div>
 						</div>
 						<div class="flex gap-3 w-full sm:w-auto">
-							<Button color="alternative" class="flex-1 sm:flex-none" on:click={handleClose}
+							<Button color="alternative" class="flex-1 sm:flex-none" on:click={requestClose}
 								>Cancel</Button
 							>
 							<Button
@@ -1504,7 +1682,7 @@
 				</div>
 
 				<div class="flex justify-center gap-3">
-					<Button color="alternative" on:click={handleClose}>Close</Button>
+					<Button color="alternative" on:click={requestClose}>Close</Button>
 					{#if retryList.length > 0}
 						<Button color="red" on:click={handleRetryFailedTransactions}>
 							<i class="fas fa-redo mr-2"></i>
@@ -1528,6 +1706,7 @@
 {/if}
 
 <svelte:window
+	on:keydown={handleCloseKeydown}
 	on:click={(e) => {
 		const setNotesButton = document.querySelector('[data-set-notes-button]');
 		const setNotesMenu = document.querySelector('[data-set-notes-menu]');

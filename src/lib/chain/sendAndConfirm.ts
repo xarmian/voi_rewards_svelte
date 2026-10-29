@@ -19,7 +19,7 @@ export type SendDependencies = {
 	waitForConfirmation(txId: string): Promise<{ 'confirmed-round'?: number }>;
 };
 
-type TrackingDependencies = {
+export type TrackingDependencies = {
 	// Positive evidence only: any node reporting a confirmed round is proof it landed.
 	pendingInfo(txId: string): Promise<{ 'confirmed-round'?: number }>;
 	// GET /v2/transactions?txid=…: the round and the result come from the same response, so
