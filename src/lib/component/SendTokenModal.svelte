@@ -1013,6 +1013,8 @@
 	}
 
 	function handleTokenChange(newToken: FungibleTokenType) {
+		// A list left open when the send started must not switch the token mid-send.
+		if (isSending) return;
 		// If selecting VOI, ensure we use the latest balance
 		if (isNativeToken(newToken)) {
 			selectedToken = {
