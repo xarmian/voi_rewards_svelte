@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Card, Tooltip, Button, Spinner, Badge, Tabs, TabItem, Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
+	import { Button as DsButton } from '$lib/ds';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
 	import { fade, slide } from 'svelte/transition';
 	import type { PageData } from './$types';
@@ -97,9 +98,11 @@
 	// Enhanced UI state
 	let viewMode: 'table' | 'heatmap' | 'galaxy' | 'comparison' | 'mobile' = 'table';
 	let commandPaletteOpen = false;
+	let commandPaletteShortcut = '';
 
 	let watchlistOpen = false;
 	let comparisonTokens: UniqueToken[] = [];
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retained with the out-of-scope advanced views.
 	let selectedTokens: UniqueToken[] = [];
 	let allTokens: UniqueToken[] = [];
 	let isMobile = false;
@@ -121,6 +124,7 @@
 	}
 
 	onMount(() => {
+		commandPaletteShortcut = /Mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 		loadAllTokens();
 
 		// Responsive handling
@@ -143,23 +147,6 @@
 			}
 		} catch (error) {
 			console.error('Failed to load tokens:', error);
-		}
-	}
-
-	// Enhanced event handlers
-	function handleCommandPaletteAction(event: CustomEvent<any>) {
-		const { type, data } = event.detail;
-
-		switch (type) {
-			case 'filter':
-				// Filter functionality removed - using simple search instead
-				break;
-			case 'watchlist':
-				watchlistOpen = true;
-				break;
-			case 'naturalLanguage':
-				// Natural language queries not implemented in this version
-				break;
 		}
 	}
 
@@ -1343,6 +1330,30 @@
 
 					<!-- Right Side Controls -->
 					<div class="flex items-center gap-3">
+						<DsButton
+							variant="ghost"
+							size="sm"
+							aria-haspopup="dialog"
+							onclick={() => (commandPaletteOpen = true)}
+						>
+							<svg
+								class="h-4 w-4"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" />
+							</svg>
+							Search
+							{#if commandPaletteShortcut}
+								<kbd
+									class="hidden rounded-ds-sm border border-line bg-surface-2 px-2 text-label text-ink-muted md:inline"
+									>{commandPaletteShortcut}</kbd
+								>
+							{/if}
+						</DsButton>
 						<TokenSelector {selectedToken} {allTokens} on:tokenSelect={handleTokenSelect} />
 
 						<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}>
@@ -2185,19 +2196,12 @@
 		</div>
 	</div>
 </div>
+<CommandPalette
+	bind:open={commandPaletteOpen}
+	onselect={(token) => handleTokenSelect(new CustomEvent('tokenSelect', { detail: token }))}
+/>
 {#if showAdvancedFeatures}
 	<!-- Enhanced Components -->
-	<!-- Command Palette -->
-	<CommandPalette
-		bind:open={commandPaletteOpen}
-		{selectedTokens}
-		on:tokenSelect={handleTokenSelect}
-		on:compare={handleTokenComparison}
-		on:watchlist
-		on:action={handleCommandPaletteAction}
-		on:close={() => (commandPaletteOpen = false)}
-	/>
-
 	<!-- Watchlist Manager -->
 	<WatchlistManager
 		bind:open={watchlistOpen}
