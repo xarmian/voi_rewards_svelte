@@ -193,17 +193,15 @@ it('refetches rows once for a lagging previous epoch', async () => {
 		`${config.proposalApiBaseUrl}?start=2026-10-14&end=2026-10-20`
 	]);
 });
-it('serves quests metadata without any upstream request or hero chrome', async () => {
-	const result = await run('quests.voirewards.com');
-	expect(result).toEqual({
-		page: 'quests',
-		pageMetaTags: {
-			title: 'Voi Testnet Quests',
-			description: 'Get Your Quest On, with the Voi Testnet Network',
-			imageUrl: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png'
-		}
+it('returns the dashboard shape for the quests host without a special case', async () => {
+	const result = dashboard(await run('quests.voirewards.com'));
+	expect(result).toMatchObject({
+		page: 'dashboard',
+		chrome: 'hero',
+		headline: { state: 'ready' },
+		rewards: { state: 'ready' }
 	});
-	expect(fetcher).not.toHaveBeenCalled();
+	expect(fetcher).toHaveBeenCalled();
 });
 it('starts all critical upstreams and stake history before releasing any response, with deadline signals', async () => {
 	const releases: (() => void)[] = [];
