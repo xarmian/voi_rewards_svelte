@@ -227,7 +227,28 @@ describe('buildWalletKeyregTxn', () => {
 		const txn = buildWalletKeyregTxn({ params, sender: address, offline: true });
 		expect(txn.fee).toBe(1000);
 		expect(txn.flatFee).toBe(true);
-		expect(txn.nonParticipation).toBe(true);
+	});
+
+	// TASK-78: nonpart on the wire would make the account permanently non-participating.
+	it('builds offline as a keyreg with no keys and no nonParticipation flag', () => {
+		const txn = buildWalletKeyregTxn({ params, sender: address, offline: true });
+		expect(txn.nonParticipation).toBe(false);
+		const wire = txn.get_obj_for_encoding() as unknown as Record<string, unknown>;
+		expect(wire.type).toBe('keyreg');
+		for (const field of [
+			'nonpart',
+			'votekey',
+			'selkey',
+			'sprfkey',
+			'votefst',
+			'votelst',
+			'votekd'
+		]) {
+			expect(wire).not.toHaveProperty(field);
+		}
+		const decoded = algosdk.decodeUnsignedTransaction(txn.toByte());
+		expect(decoded.nonParticipation).toBeFalsy();
+		expect(decoded.voteKey).toBeUndefined();
 	});
 
 	it('raises a URI fee below the suggested minimum to that minimum', () => {

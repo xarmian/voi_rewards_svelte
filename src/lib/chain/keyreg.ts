@@ -270,10 +270,11 @@ export function keyregFee(fee: number | null | undefined, minFee: number | undef
 // makes algosdk treat `fee` as per-byte (TASK-67: 396000 online, 212000 offline).
 export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transaction {
 	const minFee = keyregFee(null, input.params.minFee);
+	// Offline is a keyreg with no keys. Never set nonParticipation: it marks the account
+	// permanently non-participating, so it can never go online again (TASK-78).
 	if (input.offline) {
 		return algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
 			from: input.sender,
-			nonParticipation: true,
 			suggestedParams: { ...input.params, fee: minFee, flatFee: true }
 		});
 	}
