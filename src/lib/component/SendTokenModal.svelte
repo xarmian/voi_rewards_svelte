@@ -73,7 +73,9 @@
 		  };
 	export let onTokenSent: () => void;
 
+	type SendToken = typeof token;
 	let selectedToken = token;
+	let sentToken: SendToken | null = null;
 	let missingIconIds = new Set<string>();
 	$: selectedIconId = isNativeToken(selectedToken) ? '0' : String(selectedToken.id ?? '');
 	let isInitialLoad = true;
@@ -183,7 +185,7 @@
 						: sum,
 				0
 			),
-			selectedToken.decimals
+			(sentToken ?? selectedToken).decimals
 		)
 	);
 	$: statusCounts = {
@@ -432,24 +434,26 @@
 	}
 
 	async function buildVSATransaction(
+		token: SendToken,
+		sender: string,
 		recipientAddress: string,
 		amount: number,
 		suggestedParams: algosdk.SuggestedParams,
 		noteText?: string
 	): Promise<algosdk.Transaction> {
-		if (!$selectedWallet?.address) {
+		if (!sender) {
 			throw new Error('Wallet not connected');
 		}
 
 		// VSA assets require asset transfer transaction
-		if (!selectedToken.id || selectedToken.id === '0') {
+		if (!token.id || token.id === '0') {
 			throw new Error('Invalid asset ID for VSA transaction');
 		}
 
 		return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-			from: $selectedWallet.address,
+			from: sender,
 			to: recipientAddress,
-			assetIndex: Number(selectedToken.id),
+			assetIndex: Number(token.id),
 			amount: Math.floor(amount),
 			note: noteText ? new TextEncoder().encode(noteText) : undefined,
 			suggestedParams
@@ -457,18 +461,20 @@
 	}
 
 	async function buildARC200Transaction(
+		token: SendToken,
+		sender: string,
 		recipientAddress: string,
 		amount: number,
 		index: number,
 		noteText?: string
 	): Promise<algosdk.Transaction[]> {
-		if (!$selectedWallet?.address) {
+		if (!sender) {
 			throw new Error('Wallet not connected');
 		}
 
-		const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer, {
+		const contract = new Contract(Number(token.id), algodClient, algodIndexer, {
 			acc: {
-				addr: $selectedWallet.address,
+				addr: sender,
 				sk: new Uint8Array()
 			}
 		});
@@ -561,16 +567,18 @@
 	}
 
 	async function buildVOITransaction(
+		token: SendToken,
+		sender: string,
 		recipientAddress: string,
 		amount: number,
 		suggestedParams: algosdk.SuggestedParams,
 		noteText?: string
 	): Promise<algosdk.Transaction> {
-		if (!$selectedWallet?.address) {
+		if (!sender) {
 			throw new Error('Wallet not connected');
 		}
 		return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-			from: $selectedWallet.address,
+			from: sender,
 			to: recipientAddress,
 			amount: Math.floor(amount),
 			note: noteText ? new TextEncoder().encode(noteText) : undefined,
@@ -667,10 +675,11 @@
 			error = 'Please connect your wallet first';
 			return;
 		}
+		const token = selectedToken;
 		const sender = $selectedWallet.address;
 		const senderTracker = tracker;
 		if (!senderTracker) return;
-		const symbol = selectedToken.symbol;
+		const symbol = token.symbol;
 
 		const invalidRecipients = recipients.filter(
 			(r) => !r.address || !algosdk.isValidAddress(r.address)
@@ -686,6 +695,7 @@
 		const sendRecipients = recipients.map((recipient) => ({ ...recipient }));
 		try {
 			isSending = true;
+			sentToken = token;
 			txState = 'building';
 			error = null;
 			notice = null;
@@ -694,15 +704,15 @@
 			recipientsByGroup = [];
 			currentTxnGroup = 0;
 
-			if (isARC200Token(selectedToken)) {
+			if (isARC200Token(token)) {
 				// Prepare transaction requests
 				const txRequests = sendRecipients
 					.filter((r) => r.address && r.amount)
 					.map((recipient) => ({
 						address: recipient.address!,
 						amount: Math.floor(
-							Number(enforceDecimals(recipient.amount, selectedToken.decimals)) *
-								Math.pow(10, selectedToken.decimals)
+							Number(enforceDecimals(recipient.amount, token.decimals)) *
+								Math.pow(10, token.decimals)
 						),
 						note: recipient.note
 					}));
@@ -711,7 +721,7 @@
 				const txResults = await processWithRateLimit(
 					txRequests,
 					async (req, index) => {
-						return buildARC200Transaction(req.address, req.amount, index, req.note);
+						return buildARC200Transaction(token, sender, req.address, req.amount, index, req.note);
 					},
 					5, // Process 5 at a time
 					(completed, total) => {
@@ -738,13 +748,14 @@
 
 					// Convert amount to raw units with proper decimal precision
 					const rawAmount = Math.floor(
-						Number(enforceDecimals(recipient.amount, selectedToken.decimals)) *
-							Math.pow(10, selectedToken.decimals)
+						Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals)
 					);
 
 					let txn;
-					if (isNativeToken(selectedToken)) {
+					if (isNativeToken(token)) {
 						txn = await buildVOITransaction(
+							token,
+							sender,
 							recipient.address,
 							rawAmount,
 							suggestedParams,
@@ -752,6 +763,8 @@
 						);
 					} else {
 						txn = await buildVSATransaction(
+							token,
+							sender,
 							recipient.address,
 							rawAmount,
 							suggestedParams,
@@ -863,6 +876,7 @@
 
 	function resetState() {
 		pendingController?.abort();
+		sentToken = null;
 		groupOutcomes = [];
 		recipientsByGroup = [];
 		txState = 'idle';
@@ -999,6 +1013,8 @@
 	}
 
 	function handleTokenChange(newToken: FungibleTokenType) {
+		// A list left open when the send started must not switch the token mid-send.
+		if (isSending) return;
 		// If selecting VOI, ensure we use the latest balance
 		if (isNativeToken(newToken)) {
 			selectedToken = {
@@ -1078,8 +1094,11 @@
 					>
 						<button
 							type="button"
-							class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2"
-							on:click={() => (showTokenSelect = !showTokenSelect)}
+							class="w-64 px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+							disabled={isSending}
+							on:click={() => {
+								if (!isSending) showTokenSelect = !showTokenSelect;
+							}}
 						>
 							{#if selectedIconId && !missingIconIds.has(selectedIconId) && !isIconMissing(selectedIconId)}
 								<img
@@ -1629,7 +1648,7 @@
 						</h4>
 						<p class="text-green-600 dark:text-green-400 mb-4">
 							Confirmed: {confirmedTotal}
-							{selectedToken.symbol}
+							{(sentToken ?? selectedToken).symbol}
 						</p>
 						<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
 							Groups: {statusCounts.confirmed} confirmed, {statusCounts.pending} awaiting confirmation,
