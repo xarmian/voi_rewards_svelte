@@ -21,6 +21,9 @@
 	let active = $state(0);
 	let mostPoolsRequested = false;
 	let disposed = false;
+	// TASK-74 r1: Enter pressed while the latest query is in flight waits for its rows,
+	// instead of selecting a row from the previous query.
+	let selectWhenReady = false;
 
 	let searching = $derived(query.trim().length > 0);
 	let recentRows = $derived(searching ? [] : recents.slice(0, 5));
@@ -58,9 +61,12 @@
 			onResult(result) {
 				pending = false;
 				failed = result.status === 'error';
-				if (result.status === 'success') {
-					results = result.data;
-					active = 0;
+				// TASK-74 r1: rows from an older query are never left selectable next to an error.
+				results = result.status === 'success' ? result.data : [];
+				active = 0;
+				if (selectWhenReady) {
+					selectWhenReady = false;
+					if (results.length) select(0);
 				}
 			}
 		}
@@ -70,9 +76,17 @@
 		query = value;
 		active = 0;
 		failed = false;
-		pending = value.trim().length > 0;
-		if (pending) search.search(value.trim());
-		else search.cancel();
+		selectWhenReady = false;
+		const q = value.trim();
+		// /api/tokens rejects * (a PostgREST wildcard); no symbol contains one.
+		if (!q || q.includes('*')) {
+			search.cancel();
+			pending = false;
+			if (q) results = [];
+			return;
+		}
+		pending = true;
+		search.search(q);
 	}
 
 	async function loadMostPools() {
@@ -144,6 +158,7 @@
 		open = false;
 		search.cancel();
 		pending = false;
+		selectWhenReady = false;
 	}
 
 	function close() {
@@ -181,7 +196,13 @@
 	}
 
 	function navigate(event: KeyboardEvent) {
-		if (event.isComposing || event.defaultPrevented) return;
+		// keyCode 229: Safari's composition-commit keydown reports isComposing false.
+		if (event.isComposing || event.keyCode === 229 || event.defaultPrevented) return;
+		if (event.key === 'Enter' && searching && pending) {
+			event.preventDefault();
+			selectWhenReady = true;
+			return;
+		}
 		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 			event.preventDefault();
 			active = Math.max(
@@ -227,6 +248,7 @@
 				aria-activedescendant={activeId}
 				aria-autocomplete="list"
 				autocomplete="off"
+				maxlength="64"
 				spellcheck="false"
 				autocapitalize="none"
 				placeholder="Search tokens"
