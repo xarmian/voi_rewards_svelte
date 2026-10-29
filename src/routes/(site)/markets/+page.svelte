@@ -873,7 +873,7 @@
 				<MarketsPanel
 					{voiUsdStatus} {voiUsdAsOf} {tokenAnalytics} {sortedMarketData} {searchQuery} onSearchQueryChange={(query) => (searchQuery = query)}
 					{filterMarkets} {sortColumn} {sortDirection} {sortData} {selectedTradingPairId} onRowClick={handleMarketRowClick}
-					{marketDataError} {refreshData} {isRefreshing} on:click
+					{marketDataError} {refreshData} {isRefreshing}
 				/>
 			</section>
 		</div>
