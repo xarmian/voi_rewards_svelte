@@ -23,3 +23,24 @@ export async function fetchWithTimeout(
 		signal.removeEventListener('abort', onAbort);
 	}
 }
+
+/** Bound the entire operation, including response body reads. */
+export async function withDeadline<T>(
+	run: (signal: AbortSignal) => Promise<T>,
+	timeoutMs: number
+): Promise<T> {
+	const controller = new AbortController();
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const deadline = new Promise<never>((_, reject) => {
+		timer = setTimeout(() => {
+			const reason = new DOMException('Request deadline exceeded', 'TimeoutError');
+			reject(reason);
+			controller.abort(reason);
+		}, timeoutMs);
+	});
+	try {
+		return await Promise.race([deadline, run(controller.signal)]);
+	} finally {
+		clearTimeout(timer);
+	}
+}

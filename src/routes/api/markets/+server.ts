@@ -1,4 +1,5 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
+import { withDeadline } from '$lib/server/fetchWithTimeout';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { supabasePrivateClient } from '$lib/server/supabase';
@@ -20,6 +21,9 @@ import {
 	marketAggregates
 } from '$lib/server/markets/rows';
 
+// Measured circulating-supply upstream latency: 0.12-0.27 s.
+const SUPPLY_TIMEOUT_MS = 3000;
+
 export const GET: RequestHandler = async ({ url, fetch }) => {
 	try {
 		// Get tokenId parameter from URL (numeric token ID)
@@ -35,7 +39,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		}
 
 		// Circulating supply depends on nothing else: start it now, await it where the response is built (TASK-27)
-		const supplyPromise = fetchCirculatingSupply().catch((error) => {
+		const supplyPromise = withDeadline(
+			(signal) => fetchCirculatingSupply({ signal }),
+			SUPPLY_TIMEOUT_MS
+		).catch((error) => {
 			console.error('Failed to fetch circulating supply:', error);
 			// TASK-55: this upstream fails on prod; its supply fallback must not disable markets caching.
 			return { circulatingSupply: '0', percentDistributed: '0' };

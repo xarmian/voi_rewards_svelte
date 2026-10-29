@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { fetchWithTimeout } from './fetchWithTimeout';
+import { fetchWithTimeout, withDeadline } from './fetchWithTimeout';
 
 afterEach(() => vi.useRealTimers());
 it('bounds even a fetch that ignores abort, aborts its signal, and strips helper options', async () => {
@@ -35,5 +35,37 @@ it('returns the response and clears the timer on success', async () => {
 	expect(await fetchWithTimeout('/ok', { timeoutMs: 4000, fetch: async () => response })).toBe(
 		response
 	);
+	expect(vi.getTimerCount()).toBe(0);
+});
+
+it('withDeadline bounds a run that ignores abort and rejects with the signal reason', async () => {
+	vi.useFakeTimers();
+	const run = vi.fn<(signal: AbortSignal) => Promise<never>>(() => new Promise(() => {}));
+	const pending = withDeadline(run, 3000);
+	const rejected = expect(pending).rejects.toMatchObject({
+		name: 'TimeoutError',
+		message: 'Request deadline exceeded'
+	});
+	const signal = run.mock.calls[0][0];
+	await vi.advanceTimersByTimeAsync(2999);
+	expect(signal.aborted).toBe(false);
+	await vi.advanceTimersByTimeAsync(1);
+	await rejected;
+	expect(signal.aborted).toBe(true);
+	await expect(pending).rejects.toBe(signal.reason);
+	expect(vi.getTimerCount()).toBe(0);
+});
+
+it('withDeadline returns a fast result and clears the timer', async () => {
+	vi.useFakeTimers();
+	const value = { circulatingSupply: '10' };
+	await expect(withDeadline(async () => value, 3000)).resolves.toBe(value);
+	expect(vi.getTimerCount()).toBe(0);
+});
+
+it('withDeadline passes through a run rejection and clears the timer', async () => {
+	vi.useFakeTimers();
+	const error = new Error('supply unavailable');
+	await expect(withDeadline(() => Promise.reject(error), 3000)).rejects.toBe(error);
 	expect(vi.getTimerCount()).toBe(0);
 });

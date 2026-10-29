@@ -6,8 +6,12 @@ export interface CirculatingSupplyData {
 	distributingAccounts: string[];
 }
 
-export async function fetchCirculatingSupply(): Promise<CirculatingSupplyData> {
-	const response = await fetch('https://circulating.voi.network/api/circulating-supply');
+export async function fetchCirculatingSupply(options?: {
+	signal?: AbortSignal;
+}): Promise<CirculatingSupplyData> {
+	const response = await fetch('https://circulating.voi.network/api/circulating-supply', {
+		signal: options?.signal
+	});
 	if (!response.ok) {
 		throw new Error('Failed to fetch circulating supply data');
 	}
