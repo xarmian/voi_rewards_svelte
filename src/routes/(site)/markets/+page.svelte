@@ -1,4 +1,25 @@
 <script lang="ts">
+	import {
+		formatNumber,
+		formatPrice,
+		normalizePair,
+		formatCurrency,
+		formatPercentage
+	} from '$lib/markets/format';
+	import {
+		weightedAveragePrice as getWeightedAveragePrice,
+		displayPrice as getDisplayPrice,
+		circulatingMarketCap as getCirculatingMarketCap,
+		tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
+		fullyDilutedMarketCap as getFullyDilutedMarketCap,
+		sortMarkets,
+		filterMarkets as getFilteredMarkets
+	} from '$lib/markets/derive';
+	import {
+		createVoiUsdReference,
+		fetchTokenChartData as loadTokenChartData,
+		fetchVOIChartData as loadVOIChartData
+	} from '$lib/markets/chartData';
 	import { Button, Spinner, Badge, Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { Button as DsButton } from '$lib/ds';
@@ -35,20 +56,6 @@
 		getDefaultResolution
 	} from '$lib/utils/chart-adapters';
 
-	interface MarketData {
-		price: number | null;
-		volume_24h: number | null;
-		tvl: number | null;
-		price_change_percentage_24h: number | null;
-		exchange: string;
-		pair: string;
-		type: string;
-		network: string;
-		url: string | null;
-		pool_url: string | null;
-		lastUpdated: Date;
-		trading_pair_id: number;
-	}
 
 	export let data: PageData;
 	let { marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } = data;
@@ -63,8 +70,8 @@
 	let realCirculatingSupply = circulatingSupply || { circulatingSupply: 0, percentDistributed: 0 };
 
 	// Cache to prevent duplicate API requests
-	let voiPriceHistoryCache: any = null;
-	let voiPriceHistoryPromise: Promise<any> | null = null;
+	const voiUsdReference = createVoiUsdReference((url) => fetch(url));
+	const getVoiUsdReferenceData = voiUsdReference.get;
 	let serverDataToken: string | null = null;
 
 	// Initialize selectedToken from page load data
@@ -125,18 +132,7 @@
 
 	// Simple search function for markets
 	function filterMarkets(query: string) {
-		if (!query.trim()) {
-			filteredMarketData = realMarketData;
-			return;
-		}
-
-		const searchTerm = query.toLowerCase();
-		filteredMarketData = realMarketData.filter(
-			(market) =>
-				market.pair.toLowerCase().includes(searchTerm) ||
-				market.exchange.toLowerCase().includes(searchTerm) ||
-				market.network.toLowerCase().includes(searchTerm)
-		);
+		filteredMarketData = getFilteredMarkets(realMarketData, query);
 	}
 
 	// Fetch token info when token changes (but not for VOI)
@@ -344,8 +340,7 @@
 		// Reset server data tracking and cache when user manually selects a token
 		serverDataToken = null;
 		// Clear cache when switching tokens to ensure fresh data
-		voiPriceHistoryCache = null;
-		voiPriceHistoryPromise = null;
+		voiUsdReference.reset();
 		selectedPool = null; // Reset pool selection when token changes
 
 		// If switching to VOI, do exactly what the Reset button was doing
@@ -437,146 +432,19 @@
 	};
 
 	// Reactive sorted data - sort filtered data by TVL descending
-	$: sortedMarketData = [...filteredMarketData].sort((a, b) => {
-		const aValue = a[sortColumn as keyof typeof a];
-		const bValue = b[sortColumn as keyof typeof b];
-
-		if (aValue === null || aValue === undefined) return 1;
-		if (bValue === null || bValue === undefined) return -1;
-
-		const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-		return sortDirection === 'asc' ? comparison : -comparison;
-	});
-
-	// Format number with commas and specified decimal places
-	const formatNumber = (num: number | null | undefined, decimals: number = 2): string => {
-		if (num === null || num === undefined) return '-';
-		const n = Number(num);
-		return n.toLocaleString('en-US', {
-			minimumFractionDigits: decimals,
-			maximumFractionDigits: decimals
-		});
-	};
-
-	// Format price with 5 decimal places
-	const formatPrice = (num: number | null | undefined): string => {
-		if (num === null || num === undefined || num === 0) return '-';
-		return `$${formatNumber(num, 5)}`;
-	};
-
-	// Normalize token symbol - remove lowercase 'w' prefix (e.g., wVOI -> VOI, wUNIT -> UNIT)
-	const normalizeSymbol = (symbol: string): string => {
-		if (
-			symbol &&
-			symbol.length > 1 &&
-			symbol.startsWith('w') &&
-			symbol[1] === symbol[1].toUpperCase()
-		) {
-			return symbol.slice(1);
-		}
-		return symbol;
-	};
-
-	// Normalize pair name (e.g., "wUNIT/wVOI" -> "UNIT/VOI")
-	const normalizePair = (pair: string): string => {
-		if (!pair) return pair;
-		const [base, quote] = pair.split('/');
-		return `${normalizeSymbol(base)}/${normalizeSymbol(quote)}`;
-	};
-
-	// Format currency with $ symbol and 2 decimal places (for volume/TVL)
-	const formatCurrency = (num: number | null | undefined): string => {
-		if (num === null || num === undefined) return '-';
-		return `$${formatNumber(num, 2)}`;
-	};
-
-	// Format percentage
-	const formatPercentage = (num: number | null | undefined): string => {
-		if (num === null || num === undefined) return '-';
-		const formatted = formatNumber(num, 2);
-		if (formatted === '-') return '-';
-		const sign = Number(num) > 0 ? '+' : '';
-		return `${sign}${formatted}%`;
-	};
+	$: sortedMarketData = sortMarkets(filteredMarketData, sortColumn, sortDirection);
 
 	// Calculate volume-weighted average price
-	$: weightedAveragePrice = (() => {
-		if (!Array.isArray(realMarketData) || realMarketData.length === 0) return 0;
-
-		// Filter out obviously wrong prices only for VOI
-		let filteredMarkets = realMarketData.filter((m) => m.price != null && m.price > 0);
-
-		// For VOI only, filter out inflated prices
-		if ((selectedToken?.symbol || 'VOI') === 'VOI') {
-			filteredMarkets = filteredMarkets.filter((m) => m.price! < 0.01); // Allow up to 1 cent for VOI
-		}
-
-		const marketsWithPriceAndVolume = filteredMarkets.filter(
-			(m) => m.price != null && m.price > 0 && m.volume_24h != null && m.volume_24h > 0
-		);
-
-		if (marketsWithPriceAndVolume.length === 0) {
-			// If no markets have both price and volume, use any valid prices
-			if (filteredMarkets.length > 0) {
-				// Use median price to avoid outliers
-				const prices = filteredMarkets.map((m) => m.price || 0).sort((a, b) => a - b);
-				return prices[Math.floor(prices.length / 2)];
-			}
-			return 0;
-		}
-
-		const totalWeightedPrice = marketsWithPriceAndVolume.reduce(
-			(sum: number, market: MarketData) => sum + market.price! * market.volume_24h!,
-			0
-		);
-
-		const totalVolume = marketsWithPriceAndVolume.reduce(
-			(sum: number, market: MarketData) => sum + market.volume_24h!,
-			0
-		);
-
-		const price = totalVolume > 0 ? totalWeightedPrice / totalVolume : 0;
-		return price;
-	})();
+	$: weightedAveragePrice = getWeightedAveragePrice(realMarketData, selectedToken);
 
 	// Fallback display price from priceHistory when markets have no price
-	$: displayPrice = (() => {
-		// First try weighted average price from market data
-		if (weightedAveragePrice && weightedAveragePrice > 0) {
-			return weightedAveragePrice;
-		}
-
-		// Then try aggregated price from server
-		if (aggregates && aggregates.weightedAveragePrice && aggregates.weightedAveragePrice > 0) {
-			return aggregates.weightedAveragePrice;
-		}
-
-		// Finally fall back to price history
-		if (Array.isArray(priceHistory) && priceHistory.length) {
-			const lastPrice = priceHistory[priceHistory.length - 1]?.value;
-			if (lastPrice && lastPrice > 0) {
-				return lastPrice;
-			}
-		}
-
-		return 0;
-	})();
+	$: displayPrice = getDisplayPrice(weightedAveragePrice, aggregates, priceHistory);
 
 	// Calculate market caps
 	// VOI: use circulating supply from server; Others: use totalSupply from tokenInfo (FDV)
-	$: circulatingMarketCap =
-		(selectedToken?.symbol || 'VOI') === 'VOI'
-			? weightedAveragePrice * Number(circulatingSupply.circulatingSupply)
-			: 0;
-	$: tokenTotalSupplyAdjusted =
-		tokenInfo?.totalSupply != null && tokenInfo?.decimals != null
-			? tokenInfo.totalSupply / Math.pow(10, tokenInfo.decimals)
-			: null;
-	$: fullyDilutedMarketCap = tokenTotalSupplyAdjusted
-		? weightedAveragePrice * tokenTotalSupplyAdjusted
-		: (selectedToken?.symbol || 'VOI') === 'VOI'
-			? weightedAveragePrice * 10_000_000_000
-			: 0;
+	$: circulatingMarketCap = getCirculatingMarketCap(selectedToken, weightedAveragePrice, circulatingSupply);
+	$: tokenTotalSupplyAdjusted = getTokenTotalSupplyAdjusted(tokenInfo);
+	$: fullyDilutedMarketCap = getFullyDilutedMarketCap(tokenTotalSupplyAdjusted, weightedAveragePrice, selectedToken);
 
 	let isRefreshing = false;
 	async function refreshData() {
@@ -678,36 +546,6 @@
 		chartSettingsInitToken = selectedToken.symbol;
 	}
 
-	// Fetch VOI USD reference data with promise-based caching to prevent duplicate requests
-	async function getVoiUsdReferenceData() {
-		if (voiPriceHistoryCache) {
-			console.log('Using cached VOI USD reference data');
-			return voiPriceHistoryCache;
-		}
-
-		if (voiPriceHistoryPromise) {
-			console.log('VOI USD request already in progress, waiting for result');
-			return await voiPriceHistoryPromise;
-		}
-
-		console.log('Fetching VOI USD reference data (not cached)');
-		voiPriceHistoryPromise = fetch(`/api/price-history?period=24h&token=VOI`)
-			.then((response) => response.json())
-			.then((voiUsdData) => {
-				if (voiUsdData && Array.isArray(voiUsdData) && voiUsdData.length > 0) {
-					voiPriceHistoryCache = voiUsdData;
-					return voiUsdData;
-				}
-				return null;
-			})
-			.finally(() => {
-				// Clear the promise once complete so future calls can make new requests if needed
-				voiPriceHistoryPromise = null;
-			});
-
-		return await voiPriceHistoryPromise;
-	}
-
 	// Fetch chart data for selected token paired with VOI or USD
 	async function fetchTokenChartData(
 		tokenId: number,
@@ -720,72 +558,22 @@
 		tokenChartError = '';
 
 		try {
-			let chartData: OHLCVData[] = [];
-			let volumeData: VolumeData[] = [];
-
-			if (quoteCurrency === 'USD') {
-				// For USD, we need to convert VOI-quoted data to USD
-				// First get VOI-quoted data
-				const voiResponse = await fetch(
-					`/api/ohlcv?baseTokenId=${tokenId}&quoteTokenId=390001&resolution=${resolution}&limit=240`
-				);
-				const voiData = await voiResponse.json();
-
-				if (voiData.candles && voiData.candles.length > 0) {
-					// Get VOI USD reference data for conversion (with caching)
-					const voiUsdData = await getVoiUsdReferenceData();
-
-					if (voiUsdData && Array.isArray(voiUsdData) && voiUsdData.length > 0) {
-						// Convert VOI prices to USD using the conversion utility
-						const { convertVoiQuotedCandlesToUsd, convertVoiQuotedVolumesToUsd } = await import(
-							'$lib/utils/price-conversion'
-						);
-						chartData = convertVoiQuotedCandlesToUsd(voiData.candles, voiUsdData);
-						volumeData = voiData.volumes
-							? convertVoiQuotedVolumesToUsd(voiData.volumes, voiUsdData)
-							: [];
-					} else {
-						// Fallback to VOI data if USD conversion fails
-						chartData = voiData.candles;
-						volumeData = voiData.volumes || [];
-					}
-				}
-			} else {
-				// For VOI, try wVOI first (390001), then fall back to native VOI (0)
-				const wvoiResponse = await fetch(
-					`/api/ohlcv?baseTokenId=${tokenId}&quoteTokenId=390001&resolution=${resolution}&limit=240`
-				);
-				const wvoiData = await wvoiResponse.json();
-
-				if (wvoiData.candles && wvoiData.candles.length > 0) {
-					chartData = wvoiData.candles;
-					volumeData = wvoiData.volumes || [];
-				} else {
-					// Fall back to native VOI as quote token
-					const voiResponse = await fetch(
-						`/api/ohlcv?baseTokenId=${tokenId}&quoteTokenId=0&resolution=${resolution}&limit=240`
-					);
-					const voiData = await voiResponse.json();
-
-					if (voiData.candles && voiData.candles.length > 0) {
-						chartData = voiData.candles;
-						volumeData = voiData.volumes || [];
-					}
-				}
-			}
-
-			if (chartData.length > 0) {
-				tokenChartData = chartData;
-				tokenChartVolumes = volumeData;
+			const result = await loadTokenChartData(
+				fetch,
+				getVoiUsdReferenceData,
+				tokenId,
+				resolution,
+				quoteCurrency
+			);
+			if (!result) return;
+			if (result.data) {
+				tokenChartData = result.data;
+				tokenChartVolumes = result.volumes;
 				showTokenChart = true;
 			} else {
-				tokenChartError = 'No chart data available for this token';
+				tokenChartError = result.error;
 				showTokenChart = false;
 			}
-		} catch (error) {
-			console.error('Error fetching token chart data:', error);
-			tokenChartError = 'Failed to load chart data';
-			showTokenChart = false;
 		} finally {
 			tokenChartLoading = false;
 		}
@@ -800,63 +588,15 @@
 		tokenChartError = '';
 
 		try {
-			// Fetch VOI/aUSDC OHLCV data from MIMIR
-			const voiPair = createVOITokenPair();
-			const params = new URLSearchParams({
-				baseTokenId: voiPair.baseTokenId.toString(),
-				quoteTokenId: voiPair.quoteTokenId.toString(),
-				resolution,
-				limit: '240'
-			});
-
-			const response = await fetch(`/api/ohlcv?${params}`);
-			const data = await response.json();
-
-			if (data.error) {
-				throw new Error(data.error);
-			}
-
-			if (data.candles && data.candles.length > 0) {
-				// aUSDC is pegged to USD, so VOI/aUSDC price ≈ VOI/USD
-				tokenChartData = data.candles;
-				tokenChartVolumes = data.volumes || [];
+			const result = await loadVOIChartData(fetch, resolution, quoteCurrency);
+			if (result.data) {
+				tokenChartData = result.data;
+				tokenChartVolumes = result.volumes;
 				showTokenChart = true;
 			} else {
-				// Fallback: try to get price-history data if no OHLCV available
-				const period = resolution === '1d' || resolution === '4h' ? '7d' : '24h';
-				const fallbackResponse = await fetch(`/api/price-history?period=${period}&token=VOI`);
-				const fallbackData = await fallbackResponse.json();
-
-				if (Array.isArray(fallbackData) && fallbackData.length > 0) {
-					// Convert to pseudo-OHLCV format
-					tokenChartData = fallbackData.map((point: any) => {
-						const t = point.time;
-						const time =
-							typeof t === 'number'
-								? t
-								: typeof t === 'string' && /^\d+$/.test(t)
-									? parseInt(t, 10)
-									: Math.floor(new Date(t).getTime() / 1000);
-						return {
-							time,
-							open: point.value,
-							high: point.value,
-							low: point.value,
-							close: point.value,
-							volume: 0
-						};
-					});
-					tokenChartVolumes = [];
-					showTokenChart = true;
-				} else {
-					tokenChartError = 'No chart data available for VOI';
-					showTokenChart = false;
-				}
+				tokenChartError = result.error;
+				showTokenChart = false;
 			}
-		} catch (error) {
-			console.error('Error fetching VOI chart data:', error);
-			tokenChartError = 'Failed to load VOI chart data';
-			showTokenChart = false;
 		} finally {
 			tokenChartLoading = false;
 		}
