@@ -312,7 +312,7 @@
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
 
-			// For going offline, we use a key registration transaction with nonParticipation set to true
+			// Going offline is a key registration with no keys (never nonParticipation; see TASK-78)
 			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
 
 			transactionStatus = 'signing';
