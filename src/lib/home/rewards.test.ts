@@ -5,6 +5,8 @@ import {
 	filterProposer,
 	rewardsCSV,
 	rewardRows,
+	rewardsClock,
+	showAfterFavouritesChange,
 	totalBlocksFor,
 	type EpochResponse
 } from './rewards';
@@ -23,6 +25,27 @@ const options = {
 	now: new Date('2026-10-25T02:38:45Z'),
 	price: 0.000127
 };
+test('empty favourites returns to All; nonempty favourites preserves the selected view', () => {
+	assert.equal(showAfterFavouritesChange('favourites', 0), 'all');
+	assert.equal(showAfterFavouritesChange('all', 0), 'all');
+	assert.equal(showAfterFavouritesChange('favourites', 1), 'favourites');
+	assert.equal(showAfterFavouritesChange('all', 1), 'all');
+});
+test('rewards clock preserves the server timestamp and falls back for missing or invalid values', () => {
+	const now = options.now.getTime();
+	assert.equal(rewardsClock('2026-10-24T00:00:00Z', now).toISOString(), '2026-10-24T00:00:00.000Z');
+	assert.equal(rewardsClock(undefined, now).getTime(), now);
+	assert.equal(rewardsClock('not-a-date', now).getTime(), now);
+});
+test('an invalid server timestamp still produces numeric reward and USD estimates', () => {
+	const [row] = rewardRows(response, {
+		...options,
+		now: rewardsClock('not-a-date', options.now.getTime())
+	});
+	assert.equal(typeof row.est, 'number');
+	assert.equal(typeof row.usd, 'number');
+	assert.deepEqual(row, rewardRows(response, options)[0]);
+});
 test('epoch 104 snapshot reward, share and USD', () => {
 	const [row] = rewardRows(response, options);
 	assert.equal(row.addr, addr);

@@ -1,5 +1,14 @@
 import { blocksForEpoch } from './headline';
 
+export function showAfterFavouritesChange(show: string, favouriteCount: number): string {
+	return favouriteCount === 0 ? 'all' : show;
+}
+
+export function rewardsClock(maxTimestamp: string | undefined, now: number): Date {
+	const clock = new Date(maxTimestamp ?? now);
+	return Number.isNaN(clock.getTime()) ? new Date(now) : clock;
+}
+
 export type EpochResponse = {
 	data: {
 		proposer: string;

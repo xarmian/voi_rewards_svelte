@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Button, Card, Chip, DataTable, EpochStepper, Tabs, type Column } from '$lib/ds';
 	import type { SortState } from '$lib/ds/DataTable/types';
@@ -7,7 +7,16 @@
 	import { comma, pct, shortAddr, usd } from '$lib/ds/format';
 	import { epochRange } from '$lib/epochs';
 	import { rewardsRefreshMode } from '$lib/home/headline';
-	import { filterProposer, rewardRows, rewardsCSV, type RewardRow } from '$lib/home/rewards';
+	import {
+		filterProposer,
+		rewardRows,
+		rewardsCSV,
+		rewardsClock,
+		showAfterFavouritesChange,
+		type EpochResponse,
+		type RewardRow
+	} from '$lib/home/rewards';
+	import { createNameResolver } from '$lib/home/names';
 	import type { DashboardData } from '$lib/server/home';
 	import { getTokensByEpoch } from '$lib/utils';
 	import { getEnvoiNames } from '$lib/utils/envoi';
@@ -40,8 +49,9 @@
 	let asOf = $state(initial.state === 'stale' ? initial.asOf : undefined);
 	let dataState = $state<'ready' | 'loading' | 'stale' | 'error'>(initial.state);
 	let clock = $state(
-		new Date(
-			initial.state === 'error' ? Date.now() : (initial.value.data.max_timestamp ?? Date.now())
+		rewardsClock(
+			initial.state === 'error' ? undefined : initial.value.data.max_timestamp,
+			Date.now()
 		)
 	);
 	let priceValue = $state<number | null>(null);
@@ -56,7 +66,7 @@
 	let lastRequested = initialEpoch;
 	let hasSelectedEpoch = false;
 	let requestId = 0;
-	const namesRequested = new Set<string>();
+	const nameResolver = createNameResolver(getEnvoiNames);
 	let allRows = $derived.by(() => {
 		if (!response) return [];
 		const source = new Map(response.data.map((row) => [row.proposer, row]));
@@ -90,6 +100,13 @@
 				: 'No blocks yet this epoch'
 	);
 
+	onMount(() => resolveNames(response));
+	$effect(() => {
+		const count = $favorites.length;
+		untrack(() => {
+			show = showAfterFavouritesChange(show, count);
+		});
+	});
 	$effect(() => {
 		let active = true;
 		priceValue = null;
@@ -115,9 +132,10 @@
 		epoch = initialEpoch;
 		response = initial.value.data;
 		pool = initial.value.params.block_reward_pool;
-		clock = new Date(initial.value.data.max_timestamp ?? Date.now());
+		clock = rewardsClock(initial.value.data.max_timestamp, Date.now());
 		dataState = initial.state;
 		asOf = initial.state === 'stale' ? initial.asOf : undefined;
+		resolveNames(initial.value.data);
 	});
 	$effect(() => {
 		const selected = epoch;
@@ -155,34 +173,18 @@
 			clock = new Date();
 			asOf = undefined;
 			dataState = 'ready';
+			resolveNames(data);
 		} catch {
 			if (request === requestId) dataState = 'error';
 		}
 	}
-	// DataTable owns sorting and expansion. Resolve only links it actually renders,
-	// including newly revealed rows, without coupling to its private expansion state.
-	function resolveVisibleNames(node: HTMLElement) {
-		let active = true;
-		function resolve() {
-			const addresses = [...node.querySelectorAll<HTMLAnchorElement>('a[data-proposer]')]
-				.map((link) => link.dataset.proposer!)
-				.filter((addr) => !namesRequested.has(addr));
-			if (!addresses.length) return;
-			addresses.forEach((addr) => namesRequested.add(addr));
-			void getEnvoiNames(addresses).then((found) => {
-				if (active)
-					names = { ...names, ...Object.fromEntries(found.map((row) => [row.address, row.name])) };
-			});
-		}
-		const observer = new MutationObserver(resolve);
-		observer.observe(node, { childList: true, subtree: true });
-		resolve();
-		return {
-			destroy() {
-				active = false;
-				observer.disconnect();
-			}
-		};
+	function resolveNames(data: EpochResponse | null) {
+		if (!data) return;
+		// Rows render before names arrive. Names belong to addresses, so late results
+		// from an earlier epoch can safely join this page's cache.
+		void nameResolver.resolve(data.data.map((row) => row.proposer)).then((found) => {
+			names = { ...names, ...found };
+		});
 	}
 	function download() {
 		const url = URL.createObjectURL(
@@ -341,7 +343,7 @@
 			aria-busy={dataState === 'loading'}>Refresh</Button
 		>
 	</div>
-	<div use:resolveVisibleNames>
+	<div>
 		<DataTable
 			{columns}
 			{rows}

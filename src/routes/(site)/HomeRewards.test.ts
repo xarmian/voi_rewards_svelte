@@ -447,6 +447,24 @@ afterEach(() => {
 	favorites.reset();
 	nicknames.reset();
 });
+test('SSR falls back to the current clock for an invalid server timestamp', () => {
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date(initial.value.data.max_timestamp!));
+		assert.equal(
+			html(false, {
+				...initial,
+				value: {
+					...initial.value,
+					data: { ...initial.value.data, max_timestamp: 'not-a-date' }
+				}
+			}),
+			html()
+		);
+	} finally {
+		vi.useRealTimers();
+	}
+});
 test.each([false, true])(
 	'SSR shows 15 linked proposers, row controls, and pending USD (pending=%s)',
 	(pending) => {
