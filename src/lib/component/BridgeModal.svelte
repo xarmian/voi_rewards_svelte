@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Modal } from 'flowbite-svelte';
-	import { createEventDispatcher, onDestroy } from 'svelte';
+	import { createEventDispatcher, onDestroy, tick } from 'svelte';
 	import { selectedWallet, signTransactions, connectedWallets } from 'avm-wallet-svelte';
 	import QRCode from 'qrcode';
 	import algosdk from 'algosdk';
@@ -9,7 +9,12 @@
 	import { getNFD, searchNFDomains } from '$lib/utils/nfd';
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
-	import { sendAndConfirm, trackPending, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import {
+		createPendingTracker,
+		type PendingSendEntry,
+		type PendingTracker
+	} from '$lib/chain/pendingSends';
 	import BridgeAnimation from './BridgeAnimation.svelte';
 	import confetti from 'canvas-confetti';
 
@@ -89,7 +94,61 @@
 				transactions: { id?: string; 'confirmed-round'?: number }[];
 			}
 	};
-	$: if (!show) pendingController?.abort();
+	let tracker: PendingTracker | undefined;
+	let trackerWallet: string | undefined;
+	let trackedEntries: PendingSendEntry[] = [];
+	let showCloseConfirm = false;
+	let keepOpenButton: HTMLButtonElement | undefined;
+	$: syncTracker(show, $selectedWallet?.address);
+	$: closeNeedsConfirm =
+		bridgeStatus === 'submitting' ||
+		bridgeStatus === 'pending' ||
+		trackedEntries.some((entry) => entry.status === 'pending');
+	$: restoredBridgeEntries = trackedEntries.filter((entry) => entry.record.kind === 'bridge');
+	$: if (!show) {
+		pendingController?.abort();
+		tracker?.stop();
+		showCloseConfirm = false;
+	}
+
+	function syncTracker(isOpen: boolean, wallet: string | undefined) {
+		if (!isOpen) return;
+		if (wallet !== trackerWallet) {
+			tracker?.stop();
+			tracker = undefined;
+			trackerWallet = wallet;
+			trackedEntries = [];
+		}
+		if (!wallet) return;
+		if (!tracker) {
+			const nextTracker: PendingTracker = createPendingTracker({
+				wallet,
+				deps: trackingDeps,
+				onChange: (entries) => {
+					if (tracker === nextTracker) trackedEntries = entries;
+				}
+			});
+			tracker = nextTracker;
+		}
+		tracker.resume();
+	}
+
+	async function requestClose() {
+		if (!closeNeedsConfirm) {
+			closeModal();
+			return;
+		}
+		showCloseConfirm = true;
+		await tick();
+		keepOpenButton?.focus();
+	}
+
+	function handleCloseKeydown(event: KeyboardEvent) {
+		if (show && closeNeedsConfirm && event.key === 'Escape') {
+			event.preventDefault();
+			void requestClose();
+		}
+	}
 	let isMonitoringAlgorand = false;
 	let monitoringDots = '';
 	let dotsInterval: number | undefined;
@@ -165,6 +224,7 @@
 
 	onDestroy(() => {
 		pendingController?.abort();
+		tracker?.stop();
 		unsub();
 		unsubConnectedWallets();
 		if (searchTimeout) {
@@ -286,6 +346,11 @@
 	async function handleSubmit() {
 		if (bridgeStatus !== 'idle') return;
 		if (isVoiToAlgorand) {
+			const sender = $selectedWallet?.address;
+			const senderTracker = tracker;
+			const destination = algorandDestinationAddress;
+			const enteredAmount = amount;
+			const symbol = selectedToken.symbol;
 			const note = {
 				destinationNetwork,
 				destinationAddress,
@@ -305,7 +370,7 @@
 				bridgeStatus = 'signing';
 				bridgeError = null;
 
-				if (!$selectedWallet?.address) {
+				if (!sender || !senderTracker) {
 					throw new Error('No wallet connected');
 				}
 
@@ -318,7 +383,7 @@
 				if (selectedToken.voiAssetId === '0') {
 					// Payment transaction for VOI
 					txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-						from: $selectedWallet.address,
+						from: sender,
 						to: BRIDGE_ADDRESS,
 						amount: amountInAtomicUnits,
 						note: new TextEncoder().encode(noteString),
@@ -327,7 +392,7 @@
 				} else {
 					// ASA transfer for other tokens
 					txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-						from: $selectedWallet.address,
+						from: sender,
 						to: BRIDGE_ADDRESS,
 						amount: amountInAtomicUnits,
 						assetIndex: parseInt(selectedToken.voiAssetId),
@@ -353,13 +418,27 @@
 				if (controller.signal.aborted) return;
 				bridgeStatus = 'submitting';
 				let outcome: TrackedOutcome = await sendAndConfirm(signedTxns, sendDeps);
+				// Save before checking the send's signal: the wait can return after close.
+				const tracking =
+					outcome.status === 'pending'
+						? senderTracker.add({
+								kind: 'bridge',
+								wallet: sender,
+								txIds: outcome.txIds,
+								firstTxId: outcome.firstTxId,
+								lastValid: outcome.lastValid,
+								recipients: [{ address: destination, amount: enteredAmount }],
+								symbol,
+								createdAt: Date.now()
+							})
+						: undefined;
 				if (controller.signal.aborted) return;
 				bridgeDetails = { sourceTxId: outcome.txIds[0] };
 
-				if (outcome.status === 'pending') {
+				if (tracking) {
 					bridgeStatus = 'pending';
-					outcome = await trackPending(outcome, trackingDeps, { signal: controller.signal });
-					if (controller.signal.aborted) return;
+					outcome = await tracking;
+					if (controller.signal.aborted || outcome.status === 'pending') return;
 				}
 				if (outcome.status === 'rejected' || outcome.status === 'expired') {
 					bridgeStatus = 'error';
@@ -592,6 +671,8 @@
 	}
 
 	function closeModal() {
+		tracker?.stop();
+		showCloseConfirm = false;
 		show = false;
 		algorandDestinationAddress = '';
 		voiDestinationAddress = '';
@@ -1090,14 +1171,51 @@
 	}
 </script>
 
+<svelte:window on:keydown={handleCloseKeydown} />
+
 <Modal
 	bind:open={show}
+	dismissable={!closeNeedsConfirm}
+	on:close={resetBridgeState}
 	size="md"
 	autoclose={false}
 	class="w-full max-h-[95vh] md:max-h-[90vh] overflow-visible"
 	bodyClass="p-2 md:p-4 flex-1 overflow-y-auto overscroll-contain"
 	backdropClass="!fixed inset-0 bg-gray-900/50 dark:bg-gray-900/80"
 >
+	{#if closeNeedsConfirm}
+		<button
+			type="button"
+			aria-label="Close"
+			class="absolute top-3 end-2.5 z-10 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600"
+			on:click={requestClose}><span aria-hidden="true" class="text-xl leading-5">×</span></button
+		>
+	{/if}
+	{#if showCloseConfirm}
+		<div
+			class="rounded-lg border border-amber-300 dark:border-amber-700 p-4 mt-6 space-y-3"
+			role="alert"
+		>
+			<p class="text-sm text-gray-900 dark:text-white">
+				This bridge may still land on chain. It stays tracked, and you'll see it here when you
+				reopen this window.
+			</p>
+			<div class="flex gap-3">
+				<button
+					type="button"
+					bind:this={keepOpenButton}
+					on:click={() => (showCloseConfirm = false)}
+					class="rounded-lg px-4 py-2 bg-blue-700 text-white hover:bg-blue-800">Keep open</button
+				>
+				<button
+					type="button"
+					on:click={closeModal}
+					class="rounded-lg px-4 py-2 bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white"
+					>Close anyway</button
+				>
+			</div>
+		</div>
+	{/if}
 	<div class="flex flex-col h-full">
 		<!-- Fixed Header -->
 		<div class="px-3 py-3 md:px-6 md:py-4 border-b border-gray-200 dark:border-gray-700">
@@ -1208,6 +1326,41 @@
 		<div class="flex-1 overflow-y-auto px-6 py-4">
 			{#if bridgeStatus === 'idle'}
 				<div class="space-y-6">
+					{#if restoredBridgeEntries.length > 0}
+						<section
+							aria-label="Awaiting confirmation"
+							aria-live="polite"
+							class="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm"
+						>
+							<h4 class="font-medium text-gray-900 dark:text-white">Awaiting confirmation</h4>
+							{#each restoredBridgeEntries as entry (entry.record.firstTxId)}
+								<div class="space-y-2">
+									<p class="text-gray-900 dark:text-white">
+										{entry.status === 'pending'
+											? 'Sent, awaiting confirmation'
+											: entry.status === 'confirmed'
+												? 'Confirmed on Voi; the bridge service completes the transfer'
+												: 'Not confirmed (expired before landing)'}
+									</p>
+									{#each entry.record.recipients as recipient}
+										<p class="text-gray-700 dark:text-gray-300 break-all">
+											{recipient.amount}
+											{entry.record.symbol} to {recipient.address}
+										</p>
+									{/each}
+									{#each entry.record.txIds as txId}
+										<a
+											href={`https://block.voi.network/explorer/transaction/${txId}`}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="block text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 break-all"
+											title={txId}>{txId}</a
+										>
+									{/each}
+								</div>
+							{/each}
+						</section>
+					{/if}
 					<!-- Bridge Direction Selection -->
 					<div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
 						<div class="relative w-full md:w-1/2 group">
@@ -2060,7 +2213,7 @@
 			{#if bridgeStatus === 'idle'}
 				<div class="flex justify-end space-x-3 md:space-x-4">
 					<button
-						on:click={closeModal}
+						on:click={requestClose}
 						class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
 					>
 						Cancel
@@ -2100,14 +2253,14 @@
 							Bridge Again
 						</button>
 						<button
-							on:click={closeModal}
+							on:click={requestClose}
 							class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
 						>
 							Close
 						</button>
 					{:else if bridgeStatus === 'bridging' || bridgeStatus === 'pending' || bridgeStatus === 'submitting' || bridgeStatus === 'signing'}
 						<button
-							on:click={closeModal}
+							on:click={requestClose}
 							class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
 						>
 							Close
