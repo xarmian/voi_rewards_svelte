@@ -125,7 +125,9 @@
 				wallet,
 				deps: trackingDeps,
 				onChange: (entries) => {
-					if (tracker === nextTracker) trackedEntries = entries;
+					// The wallet's pending token sends belong to SendTokenModal.
+					if (tracker === nextTracker)
+						trackedEntries = entries.filter((entry) => entry.record.kind === 'bridge');
 				}
 			});
 			tracker = nextTracker;
@@ -1176,7 +1178,6 @@
 <Modal
 	bind:open={show}
 	dismissable={!closeNeedsConfirm}
-	on:close={resetBridgeState}
 	size="md"
 	autoclose={false}
 	class="w-full max-h-[95vh] md:max-h-[90vh] overflow-visible"

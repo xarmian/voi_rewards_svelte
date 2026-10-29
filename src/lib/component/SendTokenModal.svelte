@@ -228,8 +228,9 @@
 				deps: trackingDeps,
 				onChange: (entries) => {
 					if (tracker !== nextTracker) return;
-					trackedEntries = entries;
-					hasCompletedTransaction ||= entries.some((entry) => entry.status === 'confirmed');
+					// The wallet's pending bridge sends belong to BridgeModal.
+					trackedEntries = entries.filter((entry) => entry.record.kind === 'send');
+					hasCompletedTransaction ||= trackedEntries.some((entry) => entry.status === 'confirmed');
 					groupOutcomes = groupOutcomes.map((outcome): TrackedOutcome | undefined => {
 						if (outcome?.status !== 'pending') return outcome;
 						const entry = entries.find((entry) => entry.record.firstTxId === outcome.firstTxId);
@@ -1166,9 +1167,10 @@
 						<p class="text-gray-700 dark:text-gray-300">
 							{entry.record.recipients.length} recipient{entry.record.recipients.length === 1
 								? ''
-								: 's'} · {entry.record.recipients.reduce(
-								(total, recipient) => total + Number(recipient.amount),
-								0
+								: 's'} · {parseFloat(
+								entry.record.recipients
+									.reduce((total, recipient) => total + Number(recipient.amount), 0)
+									.toPrecision(15)
 							)}
 							{entry.record.symbol}
 						</p>
