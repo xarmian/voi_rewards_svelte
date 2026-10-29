@@ -5,9 +5,9 @@ const address = 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ';
 
 describe('resolveWalletName', () => {
 	it('resolves a known name and lowercases the request URL', async () => {
-		const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-			Response.json({ results: [{ name: 'shelly.of.voi', address }] })
-		);
+		const fetcher = vi
+			.fn<typeof fetch>()
+			.mockResolvedValue(Response.json({ results: [{ name: 'shelly.of.voi', address }] }));
 
 		expect(await resolveWalletName('Shelly.Of.Voi', fetcher)).toEqual({ kind: 'address', address });
 		expect(fetcher).toHaveBeenCalledOnce();
@@ -49,9 +49,9 @@ describe('resolveWalletName', () => {
 	});
 
 	it('returns unavailable for a non-JSON response', async () => {
-		expect(
-			await resolveWalletName('shelly.of.voi', async () => new Response('not JSON'))
-		).toEqual({ kind: 'unavailable' });
+		expect(await resolveWalletName('shelly.of.voi', async () => new Response('not JSON'))).toEqual({
+			kind: 'unavailable'
+		});
 	});
 
 	it.each([

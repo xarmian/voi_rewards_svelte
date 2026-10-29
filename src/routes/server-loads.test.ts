@@ -310,9 +310,9 @@ describe('TASK-32 wallet loads', () => {
 		['shelly.of.voi/extra', '?epoch=5', `/wallet/${address}/extra?epoch=5`]
 	])('redirects %s to its address before lockvest runs', async (id, search, location) => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
-		const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-			Response.json({ results: [{ name: 'shelly.of.voi', address }] })
-		);
+		const fetcher = vi
+			.fn<typeof fetch>()
+			.mockResolvedValue(Response.json({ results: [{ name: 'shelly.of.voi', address }] }));
 		await expect(
 			load({
 				params: { id },
@@ -338,9 +338,9 @@ describe('TASK-32 wallet loads', () => {
 		}
 	])('returns $status before lockvest runs', async ({ apiStatus, status, message }) => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
-		const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-			Response.json({ results: [{ address: null }] }, { status: apiStatus })
-		);
+		const fetcher = vi
+			.fn<typeof fetch>()
+			.mockResolvedValue(Response.json({ results: [{ address: null }] }, { status: apiStatus }));
 		await expect(
 			load({
 				params: { id: 'shelly.of.voi' },
