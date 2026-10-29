@@ -86,6 +86,51 @@ afterEach(() => {
 });
 
 describe('TASK-29 markets response caching', () => {
+	it.each(['/api/markets?tokenId=123', '/api/markets'])(
+		'returns the cached supply fallback after a stalled supply deadline for %s',
+		async (path) => {
+			vi.useFakeTimers();
+			mocks.from.mockImplementation(() => query([]));
+			mocks.supply.mockImplementation(() => new Promise(() => {}));
+			const pending = marketsGET(event(path));
+			await vi.advanceTimersByTimeAsync(3001);
+			const response = await pending;
+			expect(response.status).toBe(200);
+			expect(await response.json()).toMatchObject({
+				circulatingSupply: { circulatingSupply: 0, percentDistributed: 0 }
+			});
+			expect(response.headers.get('Cache-Control')).toBe(minuteCache);
+			expect(mocks.supply).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
+			expect(mocks.supply.mock.calls[0][0].signal.aborted).toBe(true);
+		}
+	);
+
+	it('bounds a circulating supply body that stalls after the headers arrive', async () => {
+		vi.useFakeTimers();
+		mocks.from.mockImplementation(() => query([]));
+		const { fetchCirculatingSupply } =
+			await vi.importActual<typeof import('$lib/utils/voi')>('$lib/utils/voi');
+		mocks.supply.mockImplementation(fetchCirculatingSupply);
+		const body = vi.fn(() => new Promise(() => {}));
+		const upstream = Response.json({});
+		vi.spyOn(upstream, 'json').mockImplementation(body);
+		const fetcher = vi.fn<typeof fetch>().mockResolvedValue(upstream);
+		vi.stubGlobal('fetch', fetcher);
+		const pending = marketsGET(event('/api/markets?tokenId=123'));
+		await vi.advanceTimersByTimeAsync(2999);
+		expect(body).toHaveBeenCalledOnce();
+		expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(false);
+		await vi.advanceTimersByTimeAsync(2);
+		const response = await pending;
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({
+			circulatingSupply: { circulatingSupply: 0, percentDistributed: 0 }
+		});
+		expect(response.headers.get('Cache-Control')).toBe(minuteCache);
+		expect(fetcher.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+		expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+	});
+
 	it.each(['ok', 'stale'])('caches a complete result with %s VOI/USD status', async (status) => {
 		mocks.from.mockImplementationOnce(() => query([]));
 		mocks.from.mockImplementationOnce(() => query([pool]));
