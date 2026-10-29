@@ -13,8 +13,19 @@ const rows = {
 function body(url: string) {
 	if (url.includes('/api/markets'))
 		return {
-			aggregates: { weightedAveragePrice: 0.000127 },
-			marketData: [{ price_change_percentage_24h: -1.01, market_cap: 265986 }]
+			aggregates: { weightedAveragePrice: 0.000127, totalVolume: 63.6, totalTvl: 14719.1 },
+			marketData: [
+				{
+					exchange: 'Uniswap',
+					pair: 'aVOI/USDC',
+					network: 'Base',
+					trading_pair_id: 'uni',
+					price: 0.000129,
+					tvl: 7765,
+					price_change_percentage_24h: -1.01,
+					market_cap: 265986
+				}
+			]
 		};
 	if (url.includes('/api/mimir')) return { data: 152 };
 	if (url.includes('/api/epochs'))
@@ -362,3 +373,71 @@ it('does not start a lag correction when processing the base response exhausts t
 	expect(result.headline.state).toBe('error');
 	expect(fetcher.mock.calls.filter(([url]) => String(url).includes('?start'))).toHaveLength(1);
 });
+
+it('one markets request feeds both independent streams', async () => {
+	const result = dashboard(await run());
+	expect(fetcher.mock.calls.filter(([url]) => String(url).includes('/api/markets'))).toHaveLength(
+		1
+	);
+	expect((await result.price).state).toBe('ready');
+	expect(await result.markets).toMatchObject({
+		state: 'ready',
+		value: {
+			rows: [{ exchange: 'Uniswap', price: 0.000129, tvl: 7765 }],
+			volume24h: 63.6,
+			liquidity: 14719.1
+		}
+	});
+});
+it('an unresponsive markets request does not hold the critical load and resolves both streams to error', async () => {
+	fetcher.mockImplementation(async (input) =>
+		String(input).includes('/api/markets')
+			? new Promise(() => {})
+			: Response.json(body(String(input)))
+	);
+	const pending = run();
+	await vi.advanceTimersByTimeAsync(0);
+	const result = dashboard(await pending);
+	await vi.advanceTimersByTimeAsync(STREAM_TIMEOUT_MS);
+	expect(await result.markets).toMatchObject({ state: 'error' });
+	expect(await result.price).toMatchObject({ state: 'error' });
+});
+it('empty pools yield empty markets with missing aggregates and no price', async () => {
+	fetcher.mockImplementation(async (input) =>
+		Response.json(
+			String(input).includes('/api/markets')
+				? { marketData: [], aggregates: { totalVolume: 0, totalTvl: 0, weightedAveragePrice: 0 } }
+				: body(String(input))
+		)
+	);
+	const result = dashboard(await run());
+	expect(await result.markets).toMatchObject({
+		state: 'ready',
+		value: { rows: [], volume24h: null, liquidity: null }
+	});
+	expect((await result.price).state).toBe('error');
+});
+it.each(['103', '0', '999999', 'abc', '103.5'])(
+	'SSR epoch=%s affects only rewards',
+	async (query) => {
+		const result = dashboard(
+			await load({ fetch: fetcher, url: new URL(`https://voirewards.com/?epoch=${query}`) })
+		);
+		const selected = query === '103' ? 103 : 104;
+		expect(result.rewardsEpoch).toBe(selected);
+		expect(result.rewards).toMatchObject({
+			state: 'ready',
+			value: { rangeId: selected === 103 ? '20261014-20261020' : '20261021-20261027' }
+		});
+		expect(result.headline).toMatchObject({ state: 'ready', value: { epoch: 104 } });
+		expect(result.currentStake).toEqual({ state: 'ready', value: 729891544.76 });
+		expect((await result.price).state).toBe('ready');
+		expect((await result.markets).state).toBe('ready');
+		const requested = fetcher.mock.calls
+			.filter(([url]) => String(url).includes('?start'))
+			.map(([url]) => String(url));
+		expect(requested.filter((url) => url.includes('start=2026-10-14'))).toHaveLength(
+			selected === 103 ? 1 : 0
+		);
+	}
+);
