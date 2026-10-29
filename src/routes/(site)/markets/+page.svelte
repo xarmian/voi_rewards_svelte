@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Card, Tooltip, Button, Spinner, Badge, Tabs, TabItem, Alert } from 'flowbite-svelte';
+	import { Button, Spinner, Badge, Alert } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { Button as DsButton } from '$lib/ds';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
-	import { fade, slide } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -12,12 +12,8 @@
 	import PriceChart from '$lib/components/PriceChart.svelte';
 	import TokenSelector from '$lib/components/TokenSelector.svelte';
 	import { ariaSortFor } from '$lib/a11y/keyboard';
-	import TokenMetricsBar from '$lib/components/TokenMetricsBar.svelte';
-	import PoolDetails from '$lib/components/PoolDetails.svelte';
 	// Enhanced components (keep only used ones for now)
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
-	import WatchlistManager from '$lib/components/WatchlistManager.svelte';
-	import { TOKENS } from '$lib/utils/tokens';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type {
 		TokenPair,
@@ -96,17 +92,10 @@
 	let tokenInfoLoading = false; // For VOI market data compatibility
 
 	// Enhanced UI state
-	let viewMode: 'table' | 'heatmap' | 'galaxy' | 'comparison' | 'mobile' = 'table';
 	let commandPaletteOpen = false;
 	let commandPaletteShortcut = '';
 
-	let watchlistOpen = false;
-	let comparisonTokens: UniqueToken[] = [];
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Retained with the out-of-scope advanced views.
-	let selectedTokens: UniqueToken[] = [];
 	let allTokens: UniqueToken[] = [];
-	let isMobile = false;
-	let showAdvancedFeatures = false;
 
 	// Simple search functionality
 	let searchQuery = '';
@@ -115,27 +104,11 @@
 	// Track user-initiated token clearing to prevent URL re-initialization
 	let _userClearedToken = false;
 
-	// Detect mobile device
-	$: if (browser) {
-		isMobile = window.innerWidth < 768;
-		if (isMobile && viewMode !== 'mobile') {
-			viewMode = 'mobile';
-		}
-	}
 
 	onMount(() => {
 		commandPaletteShortcut = /Mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 		loadAllTokens();
 
-		// Responsive handling
-		const handleResize = () => {
-			isMobile = window.innerWidth < 768;
-		};
-		window.addEventListener('resize', handleResize);
-
-		return () => {
-			window.removeEventListener('resize', handleResize);
-		};
 	});
 
 	async function loadAllTokens() {
@@ -164,12 +137,6 @@
 				market.exchange.toLowerCase().includes(searchTerm) ||
 				market.network.toLowerCase().includes(searchTerm)
 		);
-	}
-
-	function handleTokenComparison(tokens: UniqueToken[]) {
-		comparisonTokens = tokens;
-		selectedTokens = tokens; // Keep selectedTokens in sync
-		viewMode = 'comparison';
 	}
 
 	// Fetch token info when token changes (but not for VOI)
@@ -379,7 +346,6 @@
 		// Clear cache when switching tokens to ensure fresh data
 		voiPriceHistoryCache = null;
 		voiPriceHistoryPromise = null;
-		selectedTokens = [event.detail]; // Update selectedTokens array
 		selectedPool = null; // Reset pool selection when token changes
 
 		// If switching to VOI, do exactly what the Reset button was doing
@@ -392,7 +358,6 @@
 				type: 'VOI',
 				poolCount: 0
 			};
-			selectedTokens = [selectedToken]; // Update selectedTokens
 			selectedPool = null;
 
 			if (browser) {
@@ -642,24 +607,6 @@
 	let selectedTradingPairId: number | null = null;
 	let selectedMarket: { exchange: string; pair: string; trading_pair_id: number } | null = null;
 
-	async function handleMarketClick(market: MarketData) {
-		if (selectedTradingPairId === market.trading_pair_id) {
-			selectedTradingPairId = null;
-			selectedMarket = null;
-		} else {
-			selectedTradingPairId = market.trading_pair_id;
-			selectedMarket = {
-				exchange: market.exchange,
-				pair: market.pair,
-				trading_pair_id: market.trading_pair_id
-			};
-		}
-		const response = await fetch(
-			`/api/price-history?trading_pair_id=${selectedTradingPairId}&period=${selectedPeriod}&token=${selectedToken?.symbol || 'VOI'}`
-		);
-		priceHistory = await response.json();
-	}
-
 	// Click market row: load pool chart normalized to USD when possible
 	async function handleMarketRowClick(market: any) {
 		selectedTradingPairId = market.trading_pair_id;
@@ -695,31 +642,6 @@
 			priceHistory = (candles || []).map((c: any) => ({ time: c.time, value: c.close }));
 		} catch (e) {
 			console.warn('Failed to load market OHLCV:', e);
-		}
-	}
-
-	// Fallback: clicking a pair when server markets are empty
-	async function handlePairClick(pair: TokenPair) {
-		selectedTradingPairId = null;
-		selectedMarket = {
-			exchange: 'DEX',
-			pair: `${pair.baseSymbol}/${pair.quoteSymbol}`,
-			trading_pair_id: pair.poolId ?? 0
-		};
-		const params = new URLSearchParams({
-			baseTokenId: String(pair.baseTokenId),
-			quoteTokenId: String(pair.quoteTokenId),
-			resolution: chartSettings.resolution || '1h',
-			limit: '240'
-		});
-		try {
-			const res = await fetch(`/api/ohlcv?${params.toString()}`);
-			const json = await res.json();
-			if (json?.candles) {
-				priceHistory = json.candles.map((c: any) => ({ time: c.time, value: c.close }));
-			}
-		} catch (e) {
-			console.warn('Failed to load pair OHLCV:', e);
 		}
 	}
 
@@ -1794,405 +1716,7 @@
 				</div>
 			</section>
 
-			<!-- Main Content Area - Clean Views -->
-			{#if viewMode === 'heatmap'}
-				<!-- Token Performance Heatmap -->
-				<div transition:fade={{ duration: 200 }}>
-					<TokenHeatmap
-						tokens={allTokens}
-						loading={isLoading}
-						on:tokenSelect={handleTokenSelect}
-						on:tokenHover
-						on:compare={handleTokenComparison}
-					/>
-				</div>
-			{:else if viewMode === 'galaxy'}
-				<!-- 3D Token Galaxy Visualization -->
-				<div
-					class="h-[600px] bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
-					transition:fade={{ duration: 200 }}
-				>
-					<TokenGalaxy
-						tokens={allTokens}
-						{selectedToken}
-						loading={isLoading}
-						on:tokenSelect={handleTokenSelect}
-						on:tokenHover
-					/>
-				</div>
-			{:else if viewMode === 'comparison'}
-				<!-- Token Comparison Interface -->
-				<div transition:fade={{ duration: 200 }}>
-					{#if comparisonTokens.length > 0}
-						<TokenComparison
-							tokens={comparisonTokens}
-							on:close={() => (viewMode = 'heatmap')}
-							on:addToken={() => (commandPaletteOpen = true)}
-							on:removeToken={(e) => {
-								comparisonTokens = comparisonTokens.filter((t) => t.id !== e.detail.id);
-								selectedTokens = comparisonTokens;
-							}}
-							on:export
-						/>
 
-						<!-- Radar Chart for Multi-dimensional Analysis -->
-						{#if comparisonTokens.length > 1}
-							<div class="mt-6">
-								<MetricsRadar
-									tokens={allTokens}
-									selectedTokens={comparisonTokens}
-									on:tokenSelect={handleTokenSelect}
-									on:tokenHover
-									on:metricSelect
-								/>
-							</div>
-						{/if}
-					{:else}
-						<!-- Empty Comparison State -->
-						<div
-							class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center"
-						>
-							<div class="max-w-md mx-auto">
-								<i class="fas fa-balance-scale text-4xl text-gray-400 mb-4"></i>
-								<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-									Start Token Comparison
-								</h3>
-								<p class="text-gray-600 dark:text-gray-400 mb-6">
-									Select tokens from other views or use the search to add them for comparison
-									analysis.
-								</p>
-								<div class="flex flex-col sm:flex-row gap-3 justify-center">
-									<Button color="purple" on:click={() => (commandPaletteOpen = true)}>
-										<i class="fas fa-search mr-2"></i>
-										Search Tokens
-									</Button>
-									<Button color="alternative" on:click={() => (viewMode = 'heatmap')}>
-										<i class="fas fa-th mr-2"></i>
-										Browse Heatmap
-									</Button>
-								</div>
-							</div>
-						</div>
-					{/if}
-				</div>
-			{:else if showAdvancedFeatures}
-				<!-- Enhanced Table View (hidden when advanced features off) -->
-				<div
-					class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
-					transition:fade={{ duration: 200 }}
-				>
-					<!-- Table Header -->
-					<div
-						class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600"
-					>
-						<div class="flex items-center justify-between">
-							<div>
-								<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Token Markets</h2>
-								<p class="text-sm text-gray-600 dark:text-gray-400">
-									{realMarketData.length} trading pairs • Updated {new Date().toLocaleTimeString()}
-								</p>
-							</div>
-							<Button color="alternative" size="sm" disabled={isRefreshing} on:click={refreshData}>
-								<i class="fas fa-sync-alt {isRefreshing ? 'animate-spin' : ''} mr-2"></i>
-								Refresh
-							</Button>
-						</div>
-					</div>
-
-					<!-- Table Content -->
-					<div class="overflow-x-auto">
-						{#if isRefreshing || fetchingMarketData}
-							<div class="flex items-center justify-center py-12">
-								<div class="text-center">
-									<Spinner size="8" class="mb-3" />
-									<p class="text-gray-600 dark:text-gray-400 text-sm">
-										{fetchingMarketData ? 'Loading market data...' : 'Refreshing data...'}
-									</p>
-								</div>
-							</div>
-						{:else if realMarketData.length > 0}
-							<div transition:fade={{ duration: 300 }}>
-								<table class="w-full">
-									<thead
-										class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600"
-									>
-										<tr>
-											<th
-												class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-												on:click={() => sortData('pair')}
-											>
-												Token Pair
-												{#if sortColumn === 'pair'}
-													<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-												{/if}
-											</th>
-											<th
-												class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-												on:click={() => sortData('price')}
-											>
-												Price
-												{#if sortColumn === 'price'}
-													<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-												{/if}
-											</th>
-											<th
-												class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-												on:click={() => sortData('price_change_percentage_24h')}
-											>
-												24h Change
-												{#if sortColumn === 'price_change_percentage_24h'}
-													<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-												{/if}
-											</th>
-											<th
-												class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-												on:click={() => sortData('volume_24h')}
-											>
-												24h Volume
-												{#if sortColumn === 'volume_24h'}
-													<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-												{/if}
-											</th>
-											<th
-												class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-												on:click={() => sortData('exchange')}
-											>
-												Exchange
-												{#if sortColumn === 'exchange'}
-													<i class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"></i>
-												{/if}
-											</th>
-											<th
-												class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-											>
-												Actions
-											</th>
-										</tr>
-									</thead>
-									<tbody
-										class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"
-									>
-										{#each sortedMarketData.slice(0, 50) as market, i}
-											<tr
-												class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-												on:click={() => handleMarketClick(market)}
-											>
-												<!-- Token Pair -->
-												<td class="px-6 py-4 whitespace-nowrap">
-													<div class="flex items-center">
-														<div class="flex items-center -space-x-2 mr-3">
-															<!-- First token icon -->
-															<div
-																class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white dark:border-gray-800"
-															>
-																{normalizeSymbol(market.pair.split('/')[0]).slice(0, 2)}
-															</div>
-															<!-- Second token icon -->
-															<div
-																class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-green-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white dark:border-gray-800"
-															>
-																{normalizeSymbol(market.pair.split('/')[1]).slice(0, 2)}
-															</div>
-														</div>
-														<div>
-															<div class="font-medium">
-																{#if market.pool_url}
-																	<a
-																		href={market.pool_url}
-																		target="_blank"
-																		rel="noopener noreferrer"
-																		class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
-																		on:click|stopPropagation
-																	>
-																		{normalizePair(market.pair)}
-																		<i class="fas fa-external-link-alt text-xs opacity-50"></i>
-																	</a>
-																{:else}
-																	<span class="text-gray-900 dark:text-white"
-																		>{normalizePair(market.pair)}</span
-																	>
-																{/if}
-															</div>
-															<div class="text-sm text-gray-500 dark:text-gray-400">
-																{market.network} • {market.exchange}
-															</div>
-														</div>
-													</div>
-												</td>
-
-												<!-- Price -->
-												<td class="px-6 py-4 whitespace-nowrap">
-													<div class="text-sm font-medium text-gray-900 dark:text-white">
-														{formatPrice(market.price)}
-													</div>
-												</td>
-
-												<!-- 24h Change -->
-												<td class="px-6 py-4 whitespace-nowrap">
-													<div class="flex items-center">
-														<span
-															class="text-sm font-medium {(market.price_change_percentage_24h ??
-																0) > 0
-																? 'text-green-600 dark:text-green-400'
-																: (market.price_change_percentage_24h ?? 0) < 0
-																	? 'text-red-600 dark:text-red-400'
-																	: 'text-gray-600 dark:text-gray-400'}"
-														>
-															{#if (market.price_change_percentage_24h ?? 0) > 0}
-																<i class="fas fa-arrow-up mr-1"></i>
-															{:else if (market.price_change_percentage_24h ?? 0) < 0}
-																<i class="fas fa-arrow-down mr-1"></i>
-															{/if}
-															{formatPercentage(market.price_change_percentage_24h)}
-														</span>
-													</div>
-												</td>
-
-												<!-- 24h Volume -->
-												<td class="px-6 py-4 whitespace-nowrap">
-													<div class="text-sm text-gray-900 dark:text-white">
-														{formatCurrency(market.volume_24h)}
-													</div>
-												</td>
-
-												<!-- Exchange -->
-												<td class="px-6 py-4 whitespace-nowrap">
-													<div class="flex items-center">
-														<Badge
-															class="text-xs {market.exchange === 'humble'
-																? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-																: market.exchange === 'nomadex'
-																	? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-																	: market.exchange === 'Humble'
-																		? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-																		: market.exchange === 'Nomadex'
-																			? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-																			: market.exchange === 'Tinyman' ||
-																				  market.exchange.startsWith('Tinyman')
-																				? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-																				: market.exchange === 'PactFi'
-																					? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-																					: market.exchange === 'Uniswap'
-																						? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300'
-																						: market.exchange === 'MEXC'
-																							? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
-																							: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300'}"
-														>
-															{market.exchange === 'humble'
-																? 'Humble'
-																: market.exchange === 'nomadex'
-																	? 'Nomadex'
-																	: market.exchange}
-														</Badge>
-													</div>
-												</td>
-
-												<!-- Actions -->
-												<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-													<div class="flex items-center gap-2">
-														{#if market.pool_url}
-															<a
-																href={market.pool_url}
-																target="_blank"
-																rel="noopener noreferrer"
-																class="inline-flex items-center px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-																on:click|stopPropagation
-															>
-																<i class="fas fa-external-link-alt"></i>
-															</a>
-														{/if}
-														<button
-															type="button"
-															class="inline-flex items-center px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-															on:click|stopPropagation={(e) => {
-																e.stopPropagation();
-																const token = {
-																	id: market.trading_pair_id,
-																	symbol: normalizeSymbol(market.pair.split('/')[0]),
-																	type: 'UNKNOWN',
-																	decimals: 6,
-																	poolCount: 1
-																};
-																if (!comparisonTokens.find((t) => t.id === token.id)) {
-																	comparisonTokens = [...comparisonTokens, token];
-																	selectedTokens = comparisonTokens;
-																}
-															}}
-														>
-															<i class="fas fa-plus"></i>
-														</button>
-													</div>
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-							</div>
-						{:else if marketDataError}
-							<div class="text-center py-12">
-								<p class="text-gray-600 dark:text-gray-400 mb-3">Couldn't load markets for this token.</p>
-								<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}>Retry</Button>
-							</div>
-						{:else if fallbackPairs.length > 0}
-							<!-- Fallback pairs listing when markets API returns none -->
-							<table class="w-full">
-								<thead
-									class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600"
-								>
-									<tr>
-										<th
-											class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-											>Token Pair</th
-										>
-										<th
-											class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-											>Pool</th
-										>
-										<th
-											class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-											>Action</th
-										>
-									</tr>
-								</thead>
-								<tbody
-									class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"
-								>
-									{#each fallbackPairs as pair}
-										<tr
-											class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-											on:click={() => handlePairClick(pair)}
-										>
-											<td class="px-6 py-4 whitespace-nowrap">
-												<div class="font-medium text-gray-900 dark:text-white">
-													{pair.baseSymbol}/{pair.quoteSymbol}
-												</div>
-											</td>
-											<td
-												class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400"
-											>
-												ID {pair.poolId}
-											</td>
-											<td class="px-6 py-4 whitespace-nowrap text-sm">
-												<Button size="xs" color="alternative">Load Chart</Button>
-											</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						{:else}
-							<div class="text-center py-12">
-								<i class="fas fa-chart-bar text-4xl text-gray-400 mb-4"></i>
-								<h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-									No Market Data
-								</h3>
-								<p class="text-gray-600 dark:text-gray-400">
-									No trading pairs found. Try refreshing or adjusting your filters.
-								</p>
-							</div>
-						{/if}
-					</div>
-				</div>
-			{/if}
 		</div>
 	</div>
 </div>
@@ -2200,23 +1724,6 @@
 	bind:open={commandPaletteOpen}
 	onselect={(token) => handleTokenSelect(new CustomEvent('tokenSelect', { detail: token }))}
 />
-{#if showAdvancedFeatures}
-	<!-- Enhanced Components -->
-	<!-- Watchlist Manager -->
-	<WatchlistManager
-		bind:open={watchlistOpen}
-		on:tokenSelect={handleTokenSelect}
-		on:compare={handleTokenComparison}
-		on:alert={(e) => {
-			if (Notification.permission === 'granted') {
-				new Notification(`${e.detail.token.symbol} Alert`, {
-					body: `Price ${e.detail.condition} ${e.detail.value}`,
-					icon: '/favicon.ico'
-				});
-			}
-		}}
-	/>
-{/if}
 
 <style>
 	/* Enhanced styles for the new components */
@@ -2238,16 +1745,6 @@
 			padding-left: 1rem;
 			padding-right: 1rem;
 		}
-	}
-
-	/* Custom scrollbars for better mobile experience */
-	.mobile-scroll {
-		scrollbar-width: none;
-		-ms-overflow-style: none;
-	}
-
-	.mobile-scroll::-webkit-scrollbar {
-		display: none;
 	}
 
 	/* Improved focus indicators for accessibility */
