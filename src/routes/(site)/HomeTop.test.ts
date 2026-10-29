@@ -7,6 +7,12 @@ function fixture(pending = false): DashboardData {
 	return {
 		page: 'dashboard',
 		chrome: 'hero',
+		currentEpoch: 104,
+		rewardsEpoch: 104,
+		markets: Promise.resolve({
+			state: 'ready',
+			value: { rows: [], volume24h: null, liquidity: null, asOf: '2026-10-25T02:38:45Z' }
+		}),
 		headline: {
 			state: 'ready',
 			value: {
@@ -41,9 +47,8 @@ function fixture(pending = false): DashboardData {
 		rewards: {
 			state: 'ready',
 			value: {
-				dates: [],
 				rangeId: '20261021-20261027',
-				data: {},
+				data: { data: [], num_blocks: 126874, num_blocks_ballast: 0 },
 				params: {
 					block_reward_pool: 2236808,
 					total_blocks: 126874,
@@ -91,41 +96,4 @@ it('shows a retry alert for a failed headline without a zero APR', () => {
 	expect(body).toMatch(/<button[^>]*>[\s\S]*?Retry/);
 	expect(body).not.toContain('0%');
 	expect(body).not.toContain('Staking currently earns');
-});
-
-// Keep this legacy consumer's initialization under test without importing wallet widgets.
-vi.mock('./RewardsTable.svelte', () => ({ default: vi.fn() }));
-import Dashboard from './Dashboard.svelte';
-import RewardsTable from './RewardsTable.svelte';
-import { get } from 'svelte/store';
-import { rewardParams } from '../../stores/dataTable';
-
-it('initializes the legacy table parameters and rows synchronously during SSR', () => {
-	const initial = fixture().rewards;
-	if (initial.state === 'error') throw new Error('Expected rows');
-	const rows = [{ proposer: 'fixture-wallet', block_count: 126874, health_rewards: 0 }];
-	const params = {
-		block_reward_pool: 2236808,
-		total_blocks: 126874,
-		reward_per_block: 10.3507,
-		total_blocks_projected: 216102
-	};
-	Object.assign(initial.value, {
-		params,
-		data: { data: rows, num_blocks: 126874, num_blocks_ballast: 0 },
-		dates: [{ id: '20261021-20261027', desc: '2026-10-21 to 2026-10-27', epoch: 104 }]
-	});
-	rewardParams.set({
-		block_reward_pool: 0,
-		total_blocks: 0,
-		reward_per_block: 0,
-		total_blocks_projected: 0
-	});
-	const { body } = render(Dashboard, { props: { initial } });
-	expect(get(rewardParams)).toEqual(params);
-	expect(body).toContain('2026-10-21 to 2026-10-27');
-	expect(RewardsTable).toHaveBeenCalledWith(
-		expect.anything(),
-		expect.objectContaining({ items: rows })
-	);
 });

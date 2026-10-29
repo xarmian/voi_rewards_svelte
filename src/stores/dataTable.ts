@@ -8,13 +8,6 @@ export interface RewardParams {
 	total_blocks_projected: number;
 }
 
-export const rewardParams = writable<RewardParams>({
-	block_reward_pool: 0,
-	total_blocks: 0,
-	reward_per_block: 0,
-	total_blocks_projected: 0
-});
-
 export interface DateRange {
 	id: string;
 	desc: string;

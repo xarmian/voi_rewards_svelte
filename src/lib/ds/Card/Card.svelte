@@ -50,7 +50,7 @@
 			{#if title}<svelte:element this={`h${headingLevel}`} id={headingId} class="text-h2"
 					>{title}</svelte:element
 				>{/if}
-			{#if actions}<div class="ml-auto">{@render actions()}</div>{/if}
+			{#if actions}<div class="ml-auto min-w-0 max-w-full">{@render actions()}</div>{/if}
 		</div>
 	{/if}
 	{@render children()}

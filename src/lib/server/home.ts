@@ -2,7 +2,10 @@ import { config } from '$lib/config';
 import { epochAt, epochRange } from '$lib/epochs';
 import { blocksForEpoch, deriveHeadline, finite, type Epoch } from '$lib/home/headline';
 import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
-import { buildDateRanges, type DateRange, type RewardParams } from '../../stores/dataTable';
+import type { RewardParams } from '../../stores/dataTable';
+import type { EpochResponse } from '$lib/home/rewards';
+import { marketsSummary, topMarkets, type Markets } from '$lib/home/markets';
+import { readEpoch } from '$lib/ds/EpochStepper/url';
 import { fetchWithTimeout } from './fetchWithTimeout';
 
 export const CRITICAL_TIMEOUT_MS = 4000;
@@ -37,7 +40,10 @@ export type DashboardData = {
 	/** The selected epoch's live online stake (epoch-detail), the value /analytics shows. */
 	currentStake: Loaded<number | null>;
 	onlineStake: Promise<Loaded<{ date: string; stake: number }[]>>;
-	rewards: Loaded<{ rangeId: string; dates: DateRange[]; data: unknown; params: RewardParams }>;
+	currentEpoch: number;
+	rewardsEpoch: number;
+	rewards: Loaded<{ rangeId: string; data: EpochResponse; params: RewardParams }>;
+	markets: Promise<Loaded<Markets>>;
 	price: Promise<Loaded<Price>>;
 	onlineCount: Promise<Loaded<number>>;
 };
@@ -47,12 +53,7 @@ export type HomeData =
 			page: 'quests';
 			pageMetaTags: { title: string; description: string; imageUrl: string };
 	  };
-export type RewardRows = {
-	data: Record<string, unknown>[];
-	num_blocks: number;
-	num_blocks_ballast: number;
-	max_timestamp: string;
-};
+export type RewardRows = EpochResponse;
 const ready = <T>(value: T): Loaded<T> => ({ state: 'ready', value });
 const failure = (message: string): { state: 'error'; message: string } => ({
 	state: 'error',
@@ -107,10 +108,16 @@ export async function loadHome(
 		}
 	}
 	const requestedEpoch = epochAt(now);
-	const fetchRows = (epoch: number, timeoutMs = CRITICAL_TIMEOUT_MS) => {
+	const rowRequests = new Map<number, Promise<Loaded<RewardRows>>>();
+	const fetchRows = (
+		epoch: number,
+		timeoutMs = CRITICAL_TIMEOUT_MS
+	): Promise<Loaded<RewardRows>> => {
+		const existing = rowRequests.get(epoch);
+		if (existing) return existing;
 		if (timeoutMs <= 0) return Promise.resolve(failure('Unable to load epoch rewards.'));
 		const range = epochRange(epoch);
-		return read(
+		const request = read(
 			`${config.proposalApiBaseUrl}?start=${range.start.toISOString().slice(0, 10)}&end=${range.end.toISOString().slice(0, 10)}`,
 			(value) => {
 				const rows = record(value);
@@ -120,6 +127,8 @@ export async function loadHome(
 			},
 			timeoutMs
 		);
+		rowRequests.set(epoch, request);
+		return request;
 	};
 	// Start all independent critical reads before awaiting any of them.
 	const basePromise = read(config.proposalApiBaseUrl, (value) => {
@@ -133,6 +142,8 @@ export async function loadHome(
 		return timestamp;
 	});
 	const rowsPromise = fetchRows(requestedEpoch);
+	// Start a shared-link epoch alongside the headline reads, within the same deadline.
+	void fetchRows(readEpoch(url, 1, requestedEpoch));
 	const previousRowsPromise =
 		now.getTime() - epochRange(requestedEpoch).start.getTime() < 24 * 60 * 60 * 1000
 			? fetchRows(requestedEpoch - 1)
@@ -173,23 +184,38 @@ export async function loadHome(
 		},
 		STAKE_TIMEOUT_MS
 	);
-	const price = read(
+	const marketResponse = read(
 		'/api/markets?token=VOI',
 		(value) => {
 			const data = record(value);
-			const aggregates = record(data.aggregates);
-			const price = finite(aggregates.weightedAveragePrice);
-			if (price === null || price <= 0) throw new Error('Missing price');
-			const first =
-				Array.isArray(data.marketData) && data.marketData.length ? record(data.marketData[0]) : {};
-			return {
-				price,
-				change24h: finite(first.price_change_percentage_24h),
-				mcap: finite(aggregates.marketCap ?? first.market_cap)
-			};
+			return { marketData: list(data.marketData), aggregates: record(data.aggregates) };
 		},
 		STREAM_TIMEOUT_MS
 	);
+	const markets: DashboardData['markets'] = marketResponse.then((loaded) => {
+		if (loaded.state === 'error') return loaded;
+		return ready({
+			rows: topMarkets(loaded.value),
+			...marketsSummary(loaded.value),
+			asOf: now.toISOString()
+		});
+	});
+	const price: DashboardData['price'] = marketResponse.then((loaded) => {
+		if (loaded.state === 'error') return loaded;
+		const { marketData, aggregates } = loaded.value;
+		const price = finite(aggregates.weightedAveragePrice);
+		if (!marketData.length || price === null || price <= 0)
+			return failure('No market price available.');
+		const first =
+			marketData[0] && typeof marketData[0] === 'object'
+				? (marketData[0] as Record<string, unknown>)
+				: {};
+		return ready({
+			price,
+			change24h: finite(first.price_change_percentage_24h),
+			mcap: finite(aggregates.marketCap ?? first.market_cap)
+		});
+	});
 	const onlineCount = read(
 		'/api/mimir?action=get_online_account_count',
 		(value) => {
@@ -214,21 +240,31 @@ export async function loadHome(
 					: fetchRows(epoch, CRITICAL_TIMEOUT_MS - (Date.now() - startedAt));
 		return { epoch, rows: await selectedRows };
 	});
-	const [base, selected, epochs] = await Promise.all([basePromise, selectedPromise, epochsPromise]);
+	const rewardsPromise = basePromise.then(async (base) => {
+		const current =
+			base.state === 'error'
+				? requestedEpoch
+				: Math.min(requestedEpoch, epochAt(new Date(base.value)));
+		const epoch = readEpoch(url, 1, current);
+		return { epoch, rows: await fetchRows(epoch, CRITICAL_TIMEOUT_MS - (Date.now() - startedAt)) };
+	});
+	const [base, selected, epochs, selectedRewards] = await Promise.all([
+		basePromise,
+		selectedPromise,
+		epochsPromise,
+		rewardsPromise
+	]);
 	const { epoch, rows } = selected;
 	let rewards: DashboardData['rewards'] = failure('Unable to load epoch rewards.');
-	let headline: DashboardData['headline'] = failure('Unable to load the epoch headline.');
-	if (base.state !== 'error' && rows.state !== 'error') {
-		const range = epochRange(epoch);
-		const pool = await getTokensByEpoch(epoch);
-		const blocks = blocksForEpoch(epoch, rows.value);
+	if (base.state !== 'error' && selectedRewards.rows.state !== 'error') {
+		const range = epochRange(selectedRewards.epoch);
+		const pool = await getTokensByEpoch(selectedRewards.epoch);
+		const blocks = blocksForEpoch(selectedRewards.epoch, selectedRewards.rows.value);
 		const projection = extrapolateRewardPerBlock(blocks, pool, range.id);
 		rewards = ready({
 			rangeId: range.id,
-			dates: buildDateRanges(new Date(base.value)),
-			data: rows.value,
-			// The legacy table reads a store synchronously during SSR. Carry these
-			// alongside the untouched upstream payload, even when epoch-detail fails.
+			data: selectedRewards.rows.value,
+			// getTokensByEpoch is async; carry the arithmetic inputs for synchronous SSR.
 			params: {
 				block_reward_pool: pool,
 				total_blocks: blocks,
@@ -236,6 +272,13 @@ export async function loadHome(
 				total_blocks_projected: projection.projectedTotalBlocks
 			}
 		});
+	}
+	let headline: DashboardData['headline'] = failure('Unable to load the epoch headline.');
+	if (base.state !== 'error' && rows.state !== 'error') {
+		const range = epochRange(epoch);
+		const pool = await getTokensByEpoch(epoch);
+		const blocks = blocksForEpoch(epoch, rows.value);
+		const projection = extrapolateRewardPerBlock(blocks, pool, range.id);
 		if (epochs.state !== 'error' && epochs.value.some((row) => row.epoch_number === epoch)) {
 			headline = ready(
 				deriveHeadline(
@@ -274,6 +317,9 @@ export async function loadHome(
 	return {
 		page: 'dashboard',
 		chrome: 'hero',
+		currentEpoch: epoch,
+		rewardsEpoch: selectedRewards.epoch,
+		markets,
 		headline,
 		rewards,
 		aprHistory,
