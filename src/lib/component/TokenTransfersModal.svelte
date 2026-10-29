@@ -5,9 +5,14 @@
 	import {
 		fetchTokenTransfers,
 		fetchCurrentPoolBalance as getCurrentPoolBalance,
-		isLPToken,
 		type Transfer
 	} from '$lib/services/tokenTransfers';
+	import {
+		calculateLPStatistics as getLPStatistics,
+		calculateRunningBalance,
+		formatChange,
+		isLPToken
+	} from '$lib/tokens/lpStats';
 	import { A, Tooltip } from 'flowbite-svelte';
 
 	export let open = false;
@@ -187,200 +192,27 @@
 		return undefined;
 	}
 
-	function calculateRunningBalance(transfer: Transfer, index: number): string {
-		// Start with current balance in decimal form
-		let runningBalance = Number(token.balance) / Math.pow(10, token.decimals);
-
-		// Go through all newer transactions (from 0 to current index-1)
-		// and reverse their effects to get the historical balance
-		for (let i = 0; i < index; i++) {
-			const t = filteredTransfers[i];
-			const amount = Number(t.amount);
-
-			// When going backwards in time:
-			// 1. If we received money after this point, we need to subtract it to get the historical balance
-			// 2. If we sent money after this point, we need to add it back to get the historical balance
-			// 3. If we paid fees after this point, we need to add them back to get the historical balance
-			if (t.type === 'fee') {
-				runningBalance += amount; // Add back fees that were paid after this point
-			} else if (t.to === walletId) {
-				runningBalance -= amount; // Subtract money we received after this point
-			} else if (t.from === walletId) {
-				runningBalance += amount; // Add back money we sent after this point
-			}
-		}
-
-		return runningBalance.toFixed(token.decimals);
-	}
-
-	function formatChange(transfer: Transfer): string {
-		// Amount is already in decimal form
-		const amount = Number(transfer.amount);
-		if (transfer.type === 'fee') {
-			return `-${amount.toFixed(token.decimals)}`; // Fees are always negative
-		}
-		if (transfer.to === walletId) {
-			return `+${amount.toFixed(token.decimals)}`;
-		}
-		if (transfer.from === walletId) {
-			return `-${amount.toFixed(token.decimals)}`;
-		}
-		return amount.toFixed(token.decimals);
-	}
-
 	function calculateLPStatistics() {
 		if (!isLPToken(token) || !token.poolInfo) return;
-
-		try {
-			// Reset totals
-			totalTokenAAdded = 0;
-			totalTokenBAdded = 0;
-			totalTokenARemoved = 0;
-			totalTokenBRemoved = 0;
-
-			// Process all transfers to calculate totals
-			for (const transfer of transfers) {
-				if (transfer.isLpExchange && transfer.exchangedTokens) {
-					const { tokenA, tokenB } = transfer.exchangedTokens;
-
-					if (transfer.lpExchangeType === 'add') {
-						// Adding liquidity - user provided these tokens
-						if (tokenA && tokenA.amount !== 'Unknown') {
-							try {
-								const amount = parseFloat(tokenA.amount);
-								totalTokenAAdded += amount;
-							} catch (e) {
-								console.error('Error parsing tokenA amount:', tokenA.amount, e);
-							}
-						}
-						if (tokenB && tokenB.amount !== 'Unknown') {
-							try {
-								const amount = parseFloat(tokenB.amount);
-								totalTokenBAdded += amount;
-							} catch (e) {
-								console.error('Error parsing tokenB amount:', tokenB.amount, e);
-							}
-						}
-					} else if (transfer.lpExchangeType === 'remove') {
-						// Removing liquidity - user received these tokens back
-						if (tokenA && tokenA.amount !== 'Unknown') {
-							try {
-								const amount = parseFloat(tokenA.amount);
-								totalTokenARemoved += amount;
-							} catch (e) {
-								console.error('Error parsing tokenA amount:', tokenA.amount, e);
-							}
-						}
-						if (tokenB && tokenB.amount !== 'Unknown') {
-							try {
-								const amount = parseFloat(tokenB.amount);
-								totalTokenBRemoved += amount;
-							} catch (e) {
-								console.error('Error parsing tokenB amount:', tokenB.amount, e);
-							}
-						}
-					}
-				}
-			}
-
-			// If we don't have currentPoolBalance but we have token.poolInfo, calculate it
-			if (!currentPoolBalance && isLPToken(token) && token.poolInfo) {
-				fetchCurrentPoolBalance();
-			}
-
-			// Calculate profit/loss if we have current pool balance
-			if (currentPoolBalance) {
-				// Net contribution (what user put in minus what they took out)
-				const netContributionA = totalTokenAAdded - totalTokenARemoved;
-				const netContributionB = totalTokenBAdded - totalTokenBRemoved;
-
-				// Current value minus net contribution = profit/loss
-				profitLossA = currentPoolBalance.tokenA - netContributionA;
-				profitLossB = currentPoolBalance.tokenB - netContributionB;
-
-				// Calculate total profit/loss (including tokens already removed)
-				// Total P/L = Current value + Total removed - Total added
-				totalProfitLossA = currentPoolBalance.tokenA + totalTokenARemoved - totalTokenAAdded;
-				totalProfitLossB = currentPoolBalance.tokenB + totalTokenBRemoved - totalTokenBAdded;
-
-				// Calculate percentage profit/loss
-				if (netContributionA > 0) {
-					profitLossPercentA = (profitLossA / netContributionA) * 100;
-				} else {
-					profitLossPercentA = 0;
-				}
-
-				if (netContributionB > 0) {
-					profitLossPercentB = (profitLossB / netContributionB) * 100;
-				} else {
-					profitLossPercentB = 0;
-				}
-
-				// Calculate the ratio between token A and token B in the pool
-				// This ratio represents the current exchange rate between the tokens
-				let exchangeRateAtoB = 0;
-				let exchangeRateBtoA = 0;
-
-				if (currentPoolBalance.tokenA > 0 && currentPoolBalance.tokenB > 0) {
-					exchangeRateAtoB = currentPoolBalance.tokenB / currentPoolBalance.tokenA;
-					exchangeRateBtoA = currentPoolBalance.tokenA / currentPoolBalance.tokenB;
-
-					// Calculate total P/L converted to token A
-					// This is: P/L in token A + (P/L in token B converted to token A)
-					totalProfitLossInA = totalProfitLossA + totalProfitLossB * exchangeRateBtoA;
-
-					// Calculate total P/L converted to token B
-					// This is: P/L in token B + (P/L in token A converted to token B)
-					totalProfitLossInB = totalProfitLossB + totalProfitLossA * exchangeRateAtoB;
-
-					// Calculate percentage profit/loss for the converted values
-					const totalInvestedInA = totalTokenAAdded + totalTokenBAdded * exchangeRateBtoA;
-					const totalInvestedInB = totalTokenBAdded + totalTokenAAdded * exchangeRateAtoB;
-
-					if (totalInvestedInA > 0) {
-						totalProfitLossPercentInA = (totalProfitLossInA / totalInvestedInA) * 100;
-					}
-
-					if (totalInvestedInB > 0) {
-						totalProfitLossPercentInB = (totalProfitLossInB / totalInvestedInB) * 100;
-					}
-				}
-			}
-		} catch (error) {
-			console.error('Error calculating LP statistics:', error);
-		}
-	}
-
-	// Calculate user's share of the pool
-	function calculateUserPoolShare(): number {
-		if (!isLPToken(token) || !token.poolInfo) return 0;
-
-		try {
-			// User's LP token balance in decimal form
-			const userLpBalance = Number(token.balance) / Math.pow(10, token.decimals);
-
-			// Total supply of LP tokens
-			let totalSupply;
-
-			// For Humble pools, the totalSupply is already in decimal form
-			if (token.poolInfo.provider === 'humble') {
-				totalSupply = Number(token.poolInfo.totalSupply);
-			} else {
-				// For other providers, we need to divide by 10^decimals
-				totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, token.decimals);
-			}
-
-			// Calculate user's share as a decimal (0-1)
-			if (totalSupply > 0 && userLpBalance > 0) {
-				const share = userLpBalance / totalSupply;
-				return share;
-			}
-
-			return 0;
-		} catch (error) {
-			console.error('Error calculating user pool share:', error);
-			return 0;
-		}
+		if (!currentPoolBalance) fetchCurrentPoolBalance();
+		const stats = getLPStatistics(transfers, token, currentPoolBalance);
+		if (!stats) return;
+		if (stats.totalTokenAAdded !== undefined) totalTokenAAdded = stats.totalTokenAAdded;
+		if (stats.totalTokenBAdded !== undefined) totalTokenBAdded = stats.totalTokenBAdded;
+		if (stats.totalTokenARemoved !== undefined) totalTokenARemoved = stats.totalTokenARemoved;
+		if (stats.totalTokenBRemoved !== undefined) totalTokenBRemoved = stats.totalTokenBRemoved;
+		if (stats.profitLossA !== undefined) profitLossA = stats.profitLossA;
+		if (stats.profitLossB !== undefined) profitLossB = stats.profitLossB;
+		if (stats.profitLossPercentA !== undefined) profitLossPercentA = stats.profitLossPercentA;
+		if (stats.profitLossPercentB !== undefined) profitLossPercentB = stats.profitLossPercentB;
+		if (stats.totalProfitLossA !== undefined) totalProfitLossA = stats.totalProfitLossA;
+		if (stats.totalProfitLossB !== undefined) totalProfitLossB = stats.totalProfitLossB;
+		if (stats.totalProfitLossInA !== undefined) totalProfitLossInA = stats.totalProfitLossInA;
+		if (stats.totalProfitLossInB !== undefined) totalProfitLossInB = stats.totalProfitLossInB;
+		if (stats.totalProfitLossPercentInA !== undefined)
+			totalProfitLossPercentInA = stats.totalProfitLossPercentInA;
+		if (stats.totalProfitLossPercentInB !== undefined)
+			totalProfitLossPercentInB = stats.totalProfitLossPercentInB;
 	}
 
 	function formatNumber(value: number, decimals: number): string {
@@ -1024,7 +856,7 @@
 													<span
 														class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
 													>
-														{formatChange(transfer)}
+														{formatChange(transfer, token, walletId)}
 														{token.symbol}
 													</span>
 													{#if token.type === 'native' && transfer.type === 'payment' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
@@ -1037,7 +869,12 @@
 													{/if}
 												</div>
 												<div class="text-xs text-gray-500 dark:text-gray-400">
-													Balance: {calculateRunningBalance(transfer, index)}
+													Balance: {calculateRunningBalance(
+														index,
+														token,
+														filteredTransfers,
+														walletId
+													)}
 													{token.symbol}
 												</div>
 											</div>
@@ -1161,7 +998,7 @@
 												<span
 													class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
 												>
-													{formatChange(transfer)}
+													{formatChange(transfer, token, walletId)}
 													{token.symbol}
 												</span>
 												{#if token.type === 'native' && transfer.type === 'payment' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
@@ -1172,7 +1009,12 @@
 												{/if}
 											</div>
 											<div class="text-xs text-gray-500 dark:text-gray-400">
-												Balance: {calculateRunningBalance(transfer, index)}
+												Balance: {calculateRunningBalance(
+													index,
+													token,
+													filteredTransfers,
+													walletId
+												)}
 												{token.symbol}
 											</div>
 										</div>

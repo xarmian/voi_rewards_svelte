@@ -1,3 +1,4 @@
+import { calculateUserPoolShare, isLPToken } from '$lib/tokens/lpStats';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the moved upstream payload handling. */
 import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 import { algodIndexer } from '$lib/utils/algod';
@@ -41,10 +42,6 @@ export interface Transfer {
 		};
 	};
 	groupId?: string;
-}
-
-export function isLPToken(token: FungibleTokenType | LPToken): token is LPToken {
-	return 'poolInfo' in token && token.poolInfo !== undefined;
 }
 
 interface FetchTokenTransfersOptions {
@@ -564,38 +561,6 @@ export async function fetchTokenTransfers({
 		return { transfers: newTransfers, nextToken, hasMore };
 	} finally {
 		onPagination?.({ nextToken, hasMore });
-	}
-}
-
-// Calculate user's share of the pool
-function calculateUserPoolShare(token: FungibleTokenType | LPToken): number {
-	if (!isLPToken(token) || !token.poolInfo) return 0;
-
-	try {
-		// User's LP token balance in decimal form
-		const userLpBalance = Number(token.balance) / Math.pow(10, token.decimals);
-
-		// Total supply of LP tokens
-		let totalSupply;
-
-		// For Humble pools, the totalSupply is already in decimal form
-		if (token.poolInfo.provider === 'humble') {
-			totalSupply = Number(token.poolInfo.totalSupply);
-		} else {
-			// For other providers, we need to divide by 10^decimals
-			totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, token.decimals);
-		}
-
-		// Calculate user's share as a decimal (0-1)
-		if (totalSupply > 0 && userLpBalance > 0) {
-			const share = userLpBalance / totalSupply;
-			return share;
-		}
-
-		return 0;
-	} catch (error) {
-		console.error('Error calculating user pool share:', error);
-		return 0;
 	}
 }
 
