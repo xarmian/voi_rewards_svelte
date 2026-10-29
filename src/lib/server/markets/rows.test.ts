@@ -121,29 +121,145 @@ describe('composeDexMarketRow', () => {
 });
 
 describe('market row processing', () => {
-	it('counts repeated pool volume and TVL once, retaining the existing weighted-price behavior', () => {
+	const source = { network: 'Voi', exchange: 'humble' };
+
+	it('counts repeated pools once for volume, TVL, and weighted price', () => {
 		expect(
 			JSON.stringify(
 				marketAggregates([
-					{ trading_pair_id: 1, volume_24h: 10, tvl: 100, price: 2 },
-					{ trading_pair_id: 1, volume_24h: 10, tvl: 100, price: 2 },
-					{ trading_pair_id: 2, volume_24h: 30, tvl: 200, price: 4 }
+					{
+						...source,
+						trading_pair_id: 1,
+						volume_24h: 10,
+						tvl: 100,
+						price: 2
+					},
+					{
+						...source,
+						trading_pair_id: 1,
+						volume_24h: 10,
+						tvl: 100,
+						price: 2
+					},
+					{
+						...source,
+						trading_pair_id: 2,
+						volume_24h: 30,
+						tvl: 200,
+						price: 4
+					}
 				])
 			)
-		).toBe(JSON.stringify({ totalVolume: 40, totalTvl: 300, weightedAveragePrice: 4 }));
+		).toBe(JSON.stringify({ totalVolume: 40, totalTvl: 300, weightedAveragePrice: 3.5 }));
+	});
+
+	it.each([
+		{ network: 'Algorand', exchange: 'humble' },
+		{ network: 'Voi', exchange: 'nomadex' }
+	])('counts the same pool id separately for source %j', (otherSource) => {
+		expect(
+			marketAggregates([
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 10,
+					tvl: 100,
+					price: 2
+				},
+				{ ...otherSource, trading_pair_id: 1, volume_24h: 30, tvl: 200, price: 4 }
+			])
+		).toEqual({ totalVolume: 40, totalTvl: 300, weightedAveragePrice: 3.5 });
+	});
+
+	it('keeps a constant weighted price when duplicate pools are included', () => {
+		expect(
+			marketAggregates([
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 10,
+					tvl: 100,
+					price: 4
+				},
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 10,
+					tvl: 100,
+					price: 4
+				},
+				{
+					...source,
+					trading_pair_id: 2,
+					volume_24h: 30,
+					tvl: 200,
+					price: 4
+				}
+			]).weightedAveragePrice
+		).toBe(4);
+	});
+
+	it('uses the first occurrence of a pool for all aggregates', () => {
+		expect(
+			marketAggregates([
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 10,
+					tvl: 100,
+					price: 2
+				},
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 90,
+					tvl: 900,
+					price: 8
+				},
+				{
+					...source,
+					trading_pair_id: 2,
+					volume_24h: 30,
+					tvl: 200,
+					price: 4
+				}
+			])
+		).toEqual({ totalVolume: 40, totalTvl: 300, weightedAveragePrice: 3.5 });
 	});
 
 	it('treats a null price as zero in the weighted average', () => {
 		expect(
 			marketAggregates([
-				{ trading_pair_id: 1, volume_24h: 10, tvl: null, price: null },
-				{ trading_pair_id: 2, volume_24h: 30, tvl: 200, price: 4 }
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 10,
+					tvl: null,
+					price: null
+				},
+				{
+					...source,
+					trading_pair_id: 2,
+					volume_24h: 30,
+					tvl: 200,
+					price: 4
+				}
 			])
 		).toEqual({ totalVolume: 40, totalTvl: 200, weightedAveragePrice: 3 });
 	});
 
 	it('returns zero weighted price when total volume is zero', () => {
-		expect(marketAggregates([{ trading_pair_id: 1, volume_24h: 0, tvl: 100, price: 4 }])).toEqual({
+		expect(
+			marketAggregates([
+				{
+					...source,
+					trading_pair_id: 1,
+					volume_24h: 0,
+					tvl: 100,
+					price: 4
+				}
+			])
+		).toEqual({
 			totalVolume: 0,
 			totalTvl: 100,
 			weightedAveragePrice: 0
