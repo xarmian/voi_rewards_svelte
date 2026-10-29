@@ -8,7 +8,8 @@
 	import { onMount } from 'svelte';
 	import { getNFD, searchNFDomains } from '$lib/utils/nfd';
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
-	import { algodClient } from '$lib/utils/algod';
+	import { algodClient, algodIndexer } from '$lib/utils/algod';
+	import { sendAndConfirm, trackPending, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import BridgeAnimation from './BridgeAnimation.svelte';
 	import confetti from 'canvas-confetti';
 
@@ -37,7 +38,14 @@
 		}
 	};
 
-	type BridgeStatus = 'idle' | 'signing' | 'submitting' | 'bridging' | 'completed' | 'error';
+	type BridgeStatus =
+		| 'idle'
+		| 'signing'
+		| 'submitting'
+		| 'pending'
+		| 'bridging'
+		| 'completed'
+		| 'error';
 	type BridgeDetails = {
 		sourceTxId: string;
 		destinationTxId?: string;
@@ -68,6 +76,20 @@
 	let bridgeDetails: BridgeDetails | null = null;
 	let bridgeMonitorInterval: number | undefined;
 	let bridgeError: string | null = null;
+	let pendingController: AbortController | undefined;
+	const sendDeps = {
+		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
+		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
+	};
+	const trackingDeps = {
+		pendingInfo: (txId: string) => algodClient.pendingTransactionInformation(txId).do(),
+		indexerSearch: async (txId: string) =>
+			(await algodIndexer.searchForTransactions().txid(txId).do()) as {
+				'current-round': number;
+				transactions: { id?: string; 'confirmed-round'?: number }[];
+			}
+	};
+	$: if (!show) pendingController?.abort();
 	let isMonitoringAlgorand = false;
 	let monitoringDots = '';
 	let dotsInterval: number | undefined;
@@ -142,6 +164,7 @@
 	});
 
 	onDestroy(() => {
+		pendingController?.abort();
 		unsub();
 		unsubConnectedWallets();
 		if (searchTimeout) {
@@ -261,6 +284,7 @@
 	}
 
 	async function handleSubmit() {
+		if (bridgeStatus !== 'idle') return;
 		if (isVoiToAlgorand) {
 			const note = {
 				destinationNetwork,
@@ -274,6 +298,9 @@
 
 			const noteString = `aramid-transfer/v1:j${JSON.stringify(note)}`;
 
+			pendingController?.abort();
+			const controller = new AbortController();
+			pendingController = controller;
 			try {
 				bridgeStatus = 'signing';
 				bridgeError = null;
@@ -284,6 +311,7 @@
 
 				// Get suggested params for the transaction
 				const params = await algodClient.getTransactionParams().do();
+				if (controller.signal.aborted) return;
 
 				// Create the transaction based on token type
 				let txn;
@@ -312,7 +340,9 @@
 				let signedTxns;
 				try {
 					signedTxns = await signTransactions([[txn]]);
+					if (!signedTxns) throw new Error('Transaction signing was rejected');
 				} catch (error) {
+					if (controller.signal.aborted) return;
 					// User rejected or signing failed
 					bridgeStatus = 'error';
 					bridgeError =
@@ -320,35 +350,31 @@
 					return;
 				}
 
-				// Submit transaction
+				if (controller.signal.aborted) return;
 				bridgeStatus = 'submitting';
-				let txId;
-				try {
-					const response = await algodClient.sendRawTransaction(signedTxns).do();
-					txId = response.txId;
-				} catch (error) {
+				let outcome: TrackedOutcome = await sendAndConfirm(signedTxns, sendDeps);
+				if (controller.signal.aborted) return;
+				bridgeDetails = { sourceTxId: outcome.txIds[0] };
+
+				if (outcome.status === 'pending') {
+					bridgeStatus = 'pending';
+					outcome = await trackPending(outcome, trackingDeps, { signal: controller.signal });
+					if (controller.signal.aborted) return;
+				}
+				if (outcome.status === 'rejected' || outcome.status === 'expired') {
 					bridgeStatus = 'error';
 					bridgeError =
-						error instanceof Error ? error.message : 'Failed to submit transaction to network';
+						outcome.status === 'rejected'
+							? outcome.error
+							: 'Transaction not confirmed; safe to retry.';
 					return;
 				}
-
-				// Wait for confirmation
-				try {
-					await algosdk.waitForConfirmation(algodClient, txId, 4);
-				} catch (error) {
-					bridgeStatus = 'error';
-					bridgeError = error instanceof Error ? error.message : 'Transaction failed to confirm';
-					return;
+				if (outcome.status === 'confirmed') {
+					bridgeStatus = 'bridging';
+					startBridgeMonitoring(outcome.txIds[0]);
 				}
-
-				// Update bridge status and start monitoring
-				bridgeStatus = 'bridging';
-				bridgeDetails = { sourceTxId: txId };
-
-				// Start monitoring for the destination transaction
-				startBridgeMonitoring(txId);
 			} catch (error) {
+				if (controller.signal.aborted) return;
 				console.error('Error creating bridge transaction:', error);
 				bridgeStatus = 'error';
 				bridgeError = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -543,6 +569,7 @@
 	});
 
 	function resetBridgeState() {
+		pendingController?.abort();
 		bridgeStatus = 'idle';
 		bridgeDetails = null;
 		bridgeError = null;
@@ -1931,6 +1958,13 @@
 									{isVoiToAlgorand ? 'VOI Network' : 'Algorand'}
 								</span> network...
 							</p>
+						{:else if bridgeStatus === 'pending'}
+							<h4 class="text-lg font-medium text-gray-900 dark:text-white" aria-live="polite">
+								Sent, awaiting confirmation
+							</h4>
+							<p class="text-sm text-gray-500 dark:text-gray-400">
+								Checking the network for confirmation. Keep this transaction ID for your records.
+							</p>
 						{:else if bridgeStatus === 'bridging' || bridgeStatus === 'completed'}
 							<h4 class="text-lg font-medium text-gray-900 dark:text-white">
 								{bridgeStatus === 'bridging' ? 'Bridging in Progress' : 'Bridge Complete'}
@@ -2071,7 +2105,7 @@
 						>
 							Close
 						</button>
-					{:else if bridgeStatus === 'bridging'}
+					{:else if bridgeStatus === 'bridging' || bridgeStatus === 'pending' || bridgeStatus === 'submitting' || bridgeStatus === 'signing'}
 						<button
 							on:click={closeModal}
 							class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"

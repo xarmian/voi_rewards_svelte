@@ -5,6 +5,9 @@
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
+	import { onDestroy } from 'svelte';
+	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
+	import { trackPending, type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import type { FungibleTokenType } from '$lib/types/assets';
 	import { arc200 as Contract } from 'ulujs';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -136,19 +139,69 @@
 	let isSending = false;
 	let txState: 'idle' | 'building' | 'awaiting' | 'sending' = 'idle';
 	let error: string | null = null;
-	let success = false;
-	let transactionId: string | null = null;
+	let showResults = false;
 	let currentTxnGroup = 0;
 	let totalTxnGroups = 0;
 	let transactionGroups: algosdk.Transaction[][] = [];
-	let transactionIds: string[] = [];
 	let showAmountMenu = false;
 	let amountToDistribute = '';
 	let hasCompletedTransaction = false;
 	let showImportModal = false;
 	let showCombineOptions = false;
-	let failedRecipients: Recipient[] = [];
-	let showRetryButton = false;
+	let groupOutcomes: (TrackedOutcome | undefined)[] = [];
+	let recipientsByGroup: Recipient[][] = [];
+	let pendingController: AbortController | undefined;
+	const sendDeps = {
+		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
+		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
+	};
+	const trackingDeps = {
+		pendingInfo: (txId: string) => algodClient.pendingTransactionInformation(txId).do(),
+		indexerSearch: async (txId: string) =>
+			(await algodIndexer.searchForTransactions().txid(txId).do()) as {
+				'current-round': number;
+				transactions: { id?: string; 'confirmed-round'?: number }[];
+			}
+	};
+	$: retryList = retryRecipients(groupOutcomes, recipientsByGroup);
+	$: confirmedTotal = Number(
+		enforceDecimals(
+			groupOutcomes.reduce(
+				(sum, outcome, index) =>
+					outcome?.status === 'confirmed'
+						? sum +
+							recipientsByGroup[index].reduce(
+								(total, recipient) => total + Number(recipient.amount),
+								0
+							)
+						: sum,
+				0
+			),
+			selectedToken.decimals
+		)
+	);
+	$: statusCounts = {
+		confirmed: groupOutcomes.filter((o) => o?.status === 'confirmed').length,
+		pending: groupOutcomes.filter((o) => o?.status === 'pending').length,
+		expired: groupOutcomes.filter((o) => o?.status === 'expired').length,
+		rejected: groupOutcomes.filter((o) => o?.status === 'rejected').length
+	};
+	$: if (!open) pendingController?.abort();
+	onDestroy(() => pendingController?.abort());
+
+	function recordOutcome(outcome: Outcome, index: number, signal: AbortSignal) {
+		if (signal.aborted) return;
+		groupOutcomes[index] = outcome;
+		groupOutcomes = [...groupOutcomes];
+		hasCompletedTransaction ||= outcome.status !== 'rejected';
+		if (outcome.status === 'pending') {
+			void trackPending(outcome, trackingDeps, { signal }).then((tracked) => {
+				if (signal.aborted) return;
+				groupOutcomes[index] = tracked;
+				groupOutcomes = [...groupOutcomes];
+			});
+		}
+	}
 	let showTokenSelect = false;
 	let showNoteMenu = false;
 	let noteForAll = '';
@@ -456,19 +509,21 @@
 
 	// Helper function to create optimized transaction groups
 	function createOptimizedGroups(
-		allTransactions: algosdk.Transaction[][]
+		allTransactions: algosdk.Transaction[][],
+		groupRecipients: Recipient[]
 	): algosdk.Transaction[][] {
 		// First, separate all transactions into payments and non-payments, maintaining the relationship
 		const txPairs: {
 			payment: algosdk.Transaction | null;
 			nonPayment: algosdk.Transaction | null;
+			recipient: Recipient;
 		}[] = [];
 
-		allTransactions.forEach((txSet) => {
+		allTransactions.forEach((txSet, index) => {
 			const payment = txSet.find((tx) => tx.type === 'pay') || null;
 			const nonPayment = txSet.find((tx) => tx.type !== 'pay') || null;
 			// Add pair regardless of transaction types
-			txPairs.push({ payment, nonPayment });
+			txPairs.push({ payment, nonPayment, recipient: groupRecipients[index] });
 		});
 
 		// Initialize result array for groups
@@ -528,6 +583,7 @@
 					);
 				}
 				groups.push(algosdk.assignGroupID(batchTransactions));
+				recipientsByGroup.push(currentBatch.map((pair) => pair.recipient));
 			}
 		}
 
@@ -535,6 +591,7 @@
 	}
 
 	async function handleSend() {
+		if (isSending) return;
 		if (!$selectedWallet?.address) {
 			error = 'Please connect your wallet first';
 			return;
@@ -548,18 +605,23 @@
 			return;
 		}
 
+		pendingController?.abort();
+		const controller = new AbortController();
+		pendingController = controller;
+		const sendRecipients = recipients.map((recipient) => ({ ...recipient }));
 		try {
 			isSending = true;
 			txState = 'building';
 			error = null;
 			notice = null;
 			transactionGroups = [];
-			transactionIds = [];
+			groupOutcomes = [];
+			recipientsByGroup = [];
 			currentTxnGroup = 0;
 
 			if (isARC200Token(selectedToken)) {
 				// Prepare transaction requests
-				const txRequests = recipients
+				const txRequests = sendRecipients
 					.filter((r) => r.address && r.amount)
 					.map((recipient) => ({
 						address: recipient.address!,
@@ -585,14 +647,18 @@
 				);
 
 				// Create optimized groups from all transactions
-				const allGroups = createOptimizedGroups(txResults);
+				const allGroups = createOptimizedGroups(
+					txResults,
+					sendRecipients.filter((r) => r.address && r.amount)
+				);
 				transactionGroups = allGroups;
 			} else {
 				// Handle non-ARC200 tokens (native VOI and VSA)
 				const suggestedParams = await algodClient.getTransactionParams().do();
 				let currentGroup: algosdk.Transaction[] = [];
+				let currentRecipients: Recipient[] = [];
 
-				for (const recipient of recipients) {
+				for (const recipient of sendRecipients) {
 					if (!recipient.address || !recipient.amount) continue;
 
 					// Convert amount to raw units with proper decimal precision
@@ -621,14 +687,18 @@
 
 					if (currentGroup.length >= MAX_TXN_PER_GROUP) {
 						transactionGroups.push(algosdk.assignGroupID(currentGroup));
+						recipientsByGroup.push(currentRecipients);
+						currentRecipients = [];
 						currentGroup = [];
 					}
 					currentGroup.push(txn);
+					currentRecipients.push(recipient);
 				}
 
 				// Add any remaining transactions as the final group
 				if (currentGroup.length > 0) {
 					transactionGroups.push(algosdk.assignGroupID(currentGroup));
+					recipientsByGroup.push(currentRecipients);
 				}
 			}
 
@@ -647,6 +717,7 @@
 			// Process each batch of groups
 			txState = 'awaiting';
 			for (const batchTransactions of signingBatches) {
+				if (controller.signal.aborted) return;
 				currentTxnGroup = currentBatch;
 
 				// Sign all transactions in this batch (up to 16 groups) at once
@@ -658,9 +729,11 @@
 				currentBatch++;
 			}
 
+			if (controller.signal.aborted) return;
+
 			// Then send all transactions
 			txState = 'sending';
-			const sendPromises = allSignedTransactions.flatMap((signedBatch, batchIndex) => {
+			const signedGroups = allSignedTransactions.flatMap((signedBatch, batchIndex) => {
 				// Split the signed transactions back into their original groups
 				const groups: Uint8Array[][] = [];
 				let txIndex = 0;
@@ -675,71 +748,20 @@
 					txIndex += groupSize;
 				}
 
-				// Create send promises for each group
-				return groups.map(async (signedGroup, groupIndex) => {
-					const overallGroupIndex = batchIndex * MAX_GROUPS_PER_SIGNING + groupIndex;
-					try {
-						const response = await algodClient.sendRawTransaction(signedGroup).do();
-						const confirmedTxn = await algosdk.waitForConfirmation(algodClient, response.txId, 4);
-
-						// Get all transaction IDs from the signing group
-						const txIds = signedGroup.map((stxn) => {
-							const decoded = algosdk.decodeSignedTransaction(stxn);
-							return decoded.txn.txID();
-						});
-
-						return {
-							success: true,
-							txIds,
-							confirmedTxn,
-							batchIndex,
-							groupIndex: overallGroupIndex
-						};
-					} catch (err) {
-						return {
-							success: false,
-							txIds: [],
-							error: err instanceof Error ? err.message : 'Unknown error occurred',
-							batchIndex,
-							groupIndex: overallGroupIndex
-						};
-					}
-				});
+				return groups;
 			});
 
-			const results = await Promise.all(sendPromises);
-
-			// Process results and collect successful/failed transactions
-			const successfulTxns = results.filter((r) => r.success).flatMap((r) => r.txIds);
-			const failedTxns = results.filter((r) => !r.success);
-
-			if (failedTxns.length > 0) {
-				// Store failed recipients for potential retry
-				failedRecipients = failedTxns.map((f) => recipients[f.groupIndex ?? 0]);
-				showRetryButton = true;
-
-				// Some transactions failed
-				if (successfulTxns.length > 0) {
-					// Partial success - some txns went through
-					transactionIds = successfulTxns;
-					error = `${failedTxns.length} transaction group(s) failed. Group(s) ${failedTxns.map((f) => (f.groupIndex ?? 0) + 1).join(', ')} failed with error: ${failedTxns[0].error}`;
-					success = true; // Still show success screen but with error message
-				} else {
-					// All transactions failed
-					throw new Error(`All transactions failed. First error: ${failedTxns[0].error}`);
-				}
-			} else {
-				// All transactions succeeded
-				transactionIds = successfulTxns;
-				success = true;
-				showRetryButton = false;
-				failedRecipients = [];
-			}
-
-			transactionId = transactionIds.join(',');
-			hasCompletedTransaction = true;
+			groupOutcomes = new Array(signedGroups.length).fill(undefined);
+			await sendGroups(signedGroups, {
+				...sendDeps,
+				onOutcome: (outcome, index) => recordOutcome(outcome, index, controller.signal)
+			});
+			if (controller.signal.aborted) return;
+			showResults = true;
+			isSending = false;
 			txState = 'idle';
 		} catch (err) {
+			if (controller.signal.aborted) return;
 			console.error('Error sending tokens:', err);
 			error = err instanceof Error ? err.message : 'Failed to send tokens. Please try again.';
 			isSending = false;
@@ -748,22 +770,22 @@
 	}
 
 	function resetState() {
+		pendingController?.abort();
+		groupOutcomes = [];
+		recipientsByGroup = [];
+		txState = 'idle';
 		recipients = [
 			{ address: null, amount: '', note: '', info: null, isLoading: false, isValid: false }
 		];
 		error = null;
 		notice = null;
-		success = false;
+		showResults = false;
 		isSending = false;
-		transactionId = null;
 		noteForAll = '';
 		currentTxnGroup = 0;
 		totalTxnGroups = 0;
 		transactionGroups = [];
-		transactionIds = [];
 		hasCompletedTransaction = false;
-		failedRecipients = [];
-		showRetryButton = false;
 	}
 
 	function clearAllRecipients() {
@@ -876,13 +898,10 @@
 	}
 
 	function handleRetryFailedTransactions() {
+		const toRetry = retryRecipients(groupOutcomes, recipientsByGroup);
+		if (toRetry.length === 0) return;
 		resetState();
-		// Populate the recipients list with failed transactions
-		recipients = failedRecipients;
-		// Reset failed recipients list
-		failedRecipients = [];
-		showRetryButton = false;
-		success = false;
+		recipients = toRetry;
 	}
 
 	function handleTokenChange(newToken: FungibleTokenType) {
@@ -1001,7 +1020,7 @@
 			</div>
 		</div>
 
-		{#if !success}
+		{#if !showResults}
 			<div class="flex flex-col flex-1 min-h-0">
 				<div class="flex-none">
 					<div class="flex flex-wrap gap-2 items-center justify-between mb-6">
@@ -1403,69 +1422,93 @@
 				<div
 					class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-green-200 dark:border-green-800 p-6"
 				>
-					<div class="flex items-center justify-center mb-4">
-						<div
-							class="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center"
-						>
-							<svg
-								class="h-6 w-6 text-green-600 dark:text-green-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
+					{#if statusCounts.confirmed === groupOutcomes.length}
+						<div class="flex items-center justify-center mb-4">
+							<div
+								class="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center"
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M5 13l4 4L19 7"
-								></path>
-							</svg>
+								<svg
+									class="h-6 w-6 text-green-600 dark:text-green-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M5 13l4 4L19 7"
+									></path>
+								</svg>
+							</div>
 						</div>
-					</div>
-					<div class="text-center">
+					{/if}
+					<div class="text-center" aria-live="polite">
 						<h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-							Transaction Successful
+							{statusCounts.confirmed === groupOutcomes.length
+								? 'Transaction Successful'
+								: 'Transfer status'}
 						</h4>
 						<p class="text-green-600 dark:text-green-400 mb-4">
-							Successfully sent {totalAmount}
+							Confirmed: {confirmedTotal}
 							{selectedToken.symbol}
 						</p>
-						<div class="text-sm">
-							<p class="text-gray-600 dark:text-gray-400 mb-2">
-								Transaction ID{transactionIds.length > 1 ? 's' : ''}:
-							</p>
-							<div class="flex flex-col items-center max-h-48 overflow-y-auto space-y-2 p-2">
-								{#each transactionIds as txId}
-									<div
-										class="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-md font-mono w-full"
-									>
-										<a
-											href={`https://block.voi.network/explorer/transaction/${txId}`}
-											target="_blank"
-											class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 truncate"
-											title={txId}
-										>
-											{txId.slice(0, 8)}...{txId.slice(-8)}
-										</a>
-										<CopyComponent
-											ariaLabel="Copy transaction ID"
-											text={txId}
-											toastMessage="Transaction ID copied"
-											failureMessage="Failed to copy transaction ID"
-										/>
+						<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+							Groups: {statusCounts.confirmed} confirmed, {statusCounts.pending} awaiting confirmation,
+							{statusCounts.expired} expired, {statusCounts.rejected} rejected
+						</p>
+						<div class="text-sm space-y-4 max-h-48 overflow-y-auto">
+							{#each groupOutcomes as outcome, index}
+								{#if outcome}
+									<div>
+										<p class="text-gray-900 dark:text-white mb-2">
+											Group {index + 1}:
+											{#if outcome.status === 'confirmed'}
+												Confirmed
+											{:else if outcome.status === 'pending'}
+												Sent, awaiting confirmation
+											{:else if outcome.status === 'expired'}
+												Not confirmed (expired before landing): safe to retry
+											{:else}
+												Rejected: {outcome.error}
+											{/if}
+										</p>
+										{#each outcome.txIds as txId}
+											<div
+												class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-md font-mono"
+											>
+												<a
+													href={`https://block.voi.network/explorer/transaction/${txId}`}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 break-all"
+													title={txId}
+												>
+													{outcome.status === 'pending'
+														? txId
+														: `${txId.slice(0, 8)}...${txId.slice(-8)}`}
+												</a>
+												<CopyComponent
+													ariaLabel="Copy transaction ID"
+													text={txId}
+													toastMessage="Transaction ID copied"
+													failureMessage="Failed to copy transaction ID"
+												/>
+											</div>
+										{/each}
 									</div>
-								{/each}
-							</div>
+								{/if}
+							{/each}
 						</div>
 					</div>
 				</div>
 
 				<div class="flex justify-center gap-3">
 					<Button color="alternative" on:click={handleClose}>Close</Button>
-					{#if showRetryButton}
+					{#if retryList.length > 0}
 						<Button color="red" on:click={handleRetryFailedTransactions}>
 							<i class="fas fa-redo mr-2"></i>
-							Retry Failed Transactions
+							Retry rejected or expired transactions
 						</Button>
 					{/if}
 				</div>
