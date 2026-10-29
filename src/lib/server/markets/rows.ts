@@ -182,30 +182,33 @@ export function legacyMarketRows(marketData: unknown[] | null) {
 
 export function marketAggregates(
 	processedMarketData: {
+		network: string;
+		exchange: string;
 		trading_pair_id: number;
 		volume_24h?: number | null;
 		tvl?: number | null;
 		price?: number | null;
 	}[]
 ) {
-	// Calculate aggregates - avoid double counting by tracking unique pools
-	const uniquePools = new Set<number>();
-	const aggregates = processedMarketData.reduce(
+	// Pool IDs belong to a network and exchange; keep the first row for each source-qualified pool.
+	const uniquePools = new Set<string>();
+	const uniqueMarkets = processedMarketData.filter((market) => {
+		const poolKey = JSON.stringify([market.network, market.exchange, market.trading_pair_id]);
+		if (uniquePools.has(poolKey)) return false;
+		uniquePools.add(poolKey);
+		return true;
+	});
+	const aggregates = uniqueMarkets.reduce(
 		(acc, market) => {
-			// Only count each pool once (by trading_pair_id/poolId)
-			const poolId = market.trading_pair_id;
-			if (!uniquePools.has(poolId)) {
-				uniquePools.add(poolId);
-				acc.totalVolume = (acc.totalVolume || 0) + (market.volume_24h || 0);
-				acc.totalTvl = (acc.totalTvl || 0) + (market.tvl || 0);
-			}
+			acc.totalVolume = (acc.totalVolume || 0) + (market.volume_24h || 0);
+			acc.totalTvl = (acc.totalTvl || 0) + (market.tvl || 0);
 			return acc;
 		},
 		{ totalVolume: 0, totalTvl: 0 }
 	);
 
 	// Calculate volume-weighted average price
-	const weightedAveragePrice = processedMarketData.reduce((acc, market) => {
+	const weightedAveragePrice = uniqueMarkets.reduce((acc, market) => {
 		const volume = market.volume_24h || 0;
 		const totalVolume = aggregates.totalVolume;
 		if (totalVolume === 0) return acc;
