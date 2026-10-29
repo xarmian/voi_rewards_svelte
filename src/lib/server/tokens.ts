@@ -37,7 +37,15 @@ export function uniqueTokens(pools: PoolCatalog[], query: string): UniqueToken[]
 		};
 	}
 
+	// TASK-74: the icon host has no image for ASA ids whose ARC200 wrapper shares the symbol
+	// (302190 and 302189 404; 395614 and 413153 exist), so icons come from the lowest non-ASA id.
+	const iconIds = new Map<string, number>();
+
 	function addToken(token: UniqueToken) {
+		if (token.type !== 'ASA') {
+			const iconId = iconIds.get(token.symbol);
+			if (iconId === undefined || token.id < iconId) iconIds.set(token.symbol, token.id);
+		}
 		const current = tokenMap.get(token.symbol);
 		const preferred =
 			!current ||
@@ -72,7 +80,12 @@ export function uniqueTokens(pools: PoolCatalog[], query: string): UniqueToken[]
 	});
 
 	// Convert to array and filter by query if provided
-	let tokens = Array.from(tokenMap.values());
+	let tokens = Array.from(tokenMap.values(), (token) => {
+		const iconId = iconIds.get(token.symbol);
+		return token.type === 'ASA' && iconId !== undefined
+			? { ...token, imageUrl: getTokenImageUrl(iconId, token.symbol) }
+			: token;
+	});
 
 	if (query) {
 		tokens = tokens.filter((token) => token.symbol.toLowerCase().includes(query.toLowerCase()));

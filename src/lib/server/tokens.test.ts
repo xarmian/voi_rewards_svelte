@@ -34,10 +34,18 @@ describe('uniqueTokens', () => {
 					decimals: 6,
 					type: 'ASA',
 					poolCount: 2,
-					imageUrl: 'https://asset-verification.nautilus.sh/icons/302190.png'
+					// The icon host has no 302190.png; the ARC200 wrapper's icon stands in.
+					imageUrl: 'https://asset-verification.nautilus.sh/icons/395614.png'
 				}
 			]);
 		}
+	});
+
+	it('keeps an ASA-only symbol on its own icon', () => {
+		const pools = [pool({ token_a_id: 302190, token_a_type: 'ASA' })];
+		expect(uniqueTokens(pools, 'usdc')[0].imageUrl).toBe(
+			'https://asset-verification.nautilus.sh/icons/302190.png'
+		);
 	});
 
 	it('prefers ASA even when the other type has a lower id, then the lowest ASA id', () => {
@@ -47,7 +55,12 @@ describe('uniqueTokens', () => {
 			pool({ token_a_id: 30, token_a_type: 'ASA' })
 		];
 		for (const rows of [pools, [...pools].reverse()]) {
-			expect(uniqueTokens(rows, 'usdc')[0]).toMatchObject({ id: 30, type: 'ASA', poolCount: 3 });
+			expect(uniqueTokens(rows, 'usdc')[0]).toMatchObject({
+				id: 30,
+				type: 'ASA',
+				poolCount: 3,
+				imageUrl: 'https://asset-verification.nautilus.sh/icons/1.png'
+			});
 		}
 	});
 

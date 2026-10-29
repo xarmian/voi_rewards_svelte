@@ -1349,7 +1349,7 @@
 							Search
 							{#if commandPaletteShortcut}
 								<kbd
-									class="hidden rounded-ds-sm border border-line bg-surface-2 px-2 text-label text-ink-muted md:inline"
+									class="hidden whitespace-nowrap rounded-ds-sm border border-line bg-surface-2 px-2 text-label text-ink-muted md:inline"
 									>{commandPaletteShortcut}</kbd
 								>
 							{/if}

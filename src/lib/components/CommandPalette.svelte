@@ -322,8 +322,9 @@
 	dialog {
 		touch-action: pan-y;
 	}
+	/* A dark scrim in both themes: --c-ink turns near-white in dark mode (TASK-74). */
 	dialog::backdrop {
-		background: rgb(var(--c-ink) / 0.4);
+		background: rgba(20, 0, 60, 0.45);
 	}
 	kbd {
 		border: 1px solid rgb(var(--c-line));
