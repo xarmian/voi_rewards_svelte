@@ -264,14 +264,18 @@ describe('TASK-32 relay rewards', () => {
 });
 
 describe('TASK-32 wallet loads', () => {
+	const address = 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ';
+	const url = new URL(`https://example.test/wallet/${address}`);
+
 	it('returns the lockvest owner and tracks wallet invalidation on the server', async () => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
 		mocks.lockvest.mockResolvedValue({ global_owner: 'OWNER' });
 		const depends = vi.fn();
-		expect(await load({ params: { id: 'CONTRACT' }, depends } as never)).toEqual({
+		const fetcher = vi.fn<typeof fetch>();
+		expect(await load({ params: { id: address }, depends, url, fetch: fetcher } as never)).toEqual({
 			parentWalletId: 'OWNER'
 		});
-		expect(mocks.lockvest).toHaveBeenCalledWith('CONTRACT');
+		expect(mocks.lockvest).toHaveBeenCalledWith(address);
 		expect(depends).toHaveBeenCalledWith('wallet:id');
 	});
 
@@ -279,17 +283,72 @@ describe('TASK-32 wallet loads', () => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
 		const error = new Error('lookup failed');
 		mocks.lockvest.mockRejectedValue(error);
-		expect(await load({ params: { id: 'CONTRACT' }, depends: vi.fn() } as never)).toEqual({
-			parentWalletId: null
-		});
+		expect(
+			await load({ params: { id: address }, depends: vi.fn(), url, fetch: vi.fn() } as never)
+		).toEqual({ parentWalletId: null });
 		expect(console.error).toHaveBeenCalledWith('Lockvest lookup failed:', error);
 	});
 
 	it('returns null without a lookup when no wallet is in the URL', async () => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
-		expect(await load({ params: { id: '' }, depends: vi.fn() } as never)).toEqual({
-			parentWalletId: null
-		});
+		expect(
+			await load({ params: { id: '' }, depends: vi.fn(), url, fetch: vi.fn() } as never)
+		).toEqual({ parentWalletId: null });
+		expect(mocks.lockvest).not.toHaveBeenCalled();
+	});
+
+	it('passes a valid address to lockvest without fetching name resolution', async () => {
+		const { load } = await import('./(site)/wallet/[...id]/+page.server');
+		const fetcher = vi.fn<typeof fetch>();
+		await load({ params: { id: address }, depends: vi.fn(), url, fetch: fetcher } as never);
+		expect(fetcher).not.toHaveBeenCalled();
+		expect(mocks.lockvest).toHaveBeenCalledWith(address);
+	});
+
+	it.each([
+		['shelly.of.voi', '', `/wallet/${address}`],
+		['shelly.of.voi/extra', '?epoch=5', `/wallet/${address}/extra?epoch=5`]
+	])('redirects %s to its address before lockvest runs', async (id, search, location) => {
+		const { load } = await import('./(site)/wallet/[...id]/+page.server');
+		const fetcher = vi
+			.fn<typeof fetch>()
+			.mockResolvedValue(Response.json({ results: [{ name: 'shelly.of.voi', address }] }));
+		await expect(
+			load({
+				params: { id },
+				depends: vi.fn(),
+				url: new URL(`https://example.test/wallet/${id}${search}`),
+				fetch: fetcher
+			} as never)
+		).rejects.toMatchObject({ status: 307, location });
+		expect(fetcher.mock.calls[0][0]).toBe('https://api.envoi.sh/api/address/shelly.of.voi');
+		expect(mocks.lockvest).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{
+			apiStatus: 200,
+			status: 404,
+			message: 'No wallet found for "shelly.of.voi"'
+		},
+		{
+			apiStatus: 500,
+			status: 503,
+			message: 'The enVoi name service is unavailable. Try again in a moment.'
+		}
+	])('returns $status before lockvest runs', async ({ apiStatus, status, message }) => {
+		const { load } = await import('./(site)/wallet/[...id]/+page.server');
+		const fetcher = vi
+			.fn<typeof fetch>()
+			.mockResolvedValue(Response.json({ results: [{ address: null }] }, { status: apiStatus }));
+		await expect(
+			load({
+				params: { id: 'shelly.of.voi' },
+				depends: vi.fn(),
+				url: new URL('https://example.test/wallet/shelly.of.voi'),
+				fetch: fetcher
+			} as never)
+		).rejects.toMatchObject({ status, body: { message } });
 		expect(mocks.lockvest).not.toHaveBeenCalled();
 	});
 
