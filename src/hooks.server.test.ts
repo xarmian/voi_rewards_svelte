@@ -205,7 +205,8 @@ test('fast validation leaves no deadline timer', async () => {
 
 test.each([
 	new Error('getUser failed'),
-	Object.assign(new Error('not a DOMException'), { name: 'TimeoutError' })
+	Object.assign(new Error('not a DOMException'), { name: 'TimeoutError' }),
+	new DOMException('an upstream timeout, not the deadline', 'TimeoutError')
 ])('a thrown getUser error propagates: %s', async (error) => {
 	getSession.mockResolvedValue({ data: { session } });
 	getUser.mockRejectedValue(error);
@@ -264,4 +265,34 @@ test('custom fetch receives the deadline TimeoutError after a getUser stall', as
 	expect(signal.reason.name).toBe('TimeoutError');
 	expect(inFlightSignal.aborted).toBe(true);
 	expect(inFlightSignal.reason).toBe(signal.reason);
+});
+
+test('after the deadline, only auth requests are aborted; data queries keep their own signal', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockImplementation(() => new Promise<never>(() => {}));
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+
+	const result = event.locals.safeGetSession();
+	await vi.advanceTimersByTimeAsync(3000);
+	expect(await result).toEqual({ session: null, user: null });
+
+	await fetch('https://example.invalid/rest/v1/items?select=*');
+	expect(fetchMock.mock.calls[0][1]).toBeUndefined();
+	const caller = new AbortController();
+	const init = { signal: caller.signal, method: 'GET' };
+	await fetch(new URL('https://example.invalid/rest/v1/items'), init);
+	expect(fetchMock.mock.calls[1][1]).toBe(init);
+	expect(caller.signal.aborted).toBe(false);
+
+	await fetch(new URL('https://example.invalid/auth/v1/user'));
+	await fetch(new Request('https://example.invalid/auth/v1/token?grant_type=refresh_token'));
+	for (const call of fetchMock.mock.calls.slice(2)) {
+		expect(call[1]!.signal!.aborted).toBe(true);
+		expect(call[1]!.signal!.reason.name).toBe('TimeoutError');
+	}
 });
