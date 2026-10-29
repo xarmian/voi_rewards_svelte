@@ -47,12 +47,7 @@ export type DashboardData = {
 	price: Promise<Loaded<Price>>;
 	onlineCount: Promise<Loaded<number>>;
 };
-export type HomeData =
-	| DashboardData
-	| {
-			page: 'quests';
-			pageMetaTags: { title: string; description: string; imageUrl: string };
-	  };
+export type HomeData = DashboardData;
 export type RewardRows = EpochResponse;
 const ready = <T>(value: T): Loaded<T> => ({ state: 'ready', value });
 const failure = (message: string): { state: 'error'; message: string } => ({
@@ -75,15 +70,6 @@ export async function loadHome(
 	now = new Date()
 ): Promise<HomeData> {
 	const startedAt = Date.now();
-	if (url.hostname === 'quests.voirewards.com')
-		return {
-			page: 'quests',
-			pageMetaTags: {
-				title: 'Voi Testnet Quests',
-				description: 'Get Your Quest On, with the Voi Testnet Network',
-				imageUrl: 'https://voirewards.com/logos/Voi_Logo_White_on_Purple_Background.png'
-			}
-		};
 	async function read<T>(
 		url: string,
 		parse: (value: unknown) => T,
