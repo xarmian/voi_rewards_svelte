@@ -30,7 +30,12 @@ const corsHeaders = {
 };
 
 export function createHandler(deps: HandlerDeps) {
-	const timers = deps.timers ?? { setTimeout, clearTimeout };
+	// Call the globals unbound: Deno 1 (the edge runtime) throws 'Illegal invocation' when a timer
+	// runs with a foreign `this`, which made every deadline reject at once in prod (TASK-47).
+	const timers = deps.timers ?? {
+		setTimeout: (callback: () => void, delay: number) => setTimeout(callback, delay),
+		clearTimeout: (id: ReturnType<typeof setTimeout>) => clearTimeout(id)
+	};
 	const encoder = new TextEncoder();
 	const expectedAuthorization = encoder.encode(`Bearer ${deps.serviceRoleKey}`);
 

@@ -28,34 +28,6 @@ import { createHandler, type MarketSnapshot } from './handler.ts';
 }
 */
 
-interface HumblePool {
-	ticker_id: string;
-	base_currency: string;
-	base_currency_id: string;
-	target_currency: string;
-	target_currency_id: string;
-	pool_id: string;
-	last_price: string;
-	base_volume: string;
-	target_volume: string;
-	liquidity_in_usd: string;
-	update_datetime: string;
-	high: string;
-	low: string;
-	base_volume_24h: string;
-	target_volume_24h: string;
-	base_volume_7d: string;
-	target_volume_7d: string;
-	base_volume_30d: string;
-	target_volume_30d: string;
-	base_volume_1y: string;
-	target_volume_1y: string;
-	base_volume_all: string;
-	target_volume_all: string;
-	base_price: string;
-	target_price: string;
-}
-
 interface PactPoolResponse {
 	id: number;
 	on_chain_id: string;
@@ -232,62 +204,6 @@ async function fetchMEXCData(): Promise<MarketSnapshot | null> {
   ...
 ]
 */
-async function fetchHumbleData(): Promise<MarketSnapshot | null> {
-	try {
-		console.log('here1');
-		const POOL_ID = 395553;
-		const response = await fetch('https://mainnet-idx.nautilus.sh/integrations/coingecko/tickers');
-
-		if (!response.ok) {
-			throw new Error(`Failed to fetch Humble pool data: ${response.statusText}`);
-		}
-
-		console.log('here2');
-		const data = await response.json();
-
-		// data is an array of pools
-		const pool: HumblePool = data.filter((p: HumblePool) => p.pool_id === POOL_ID.toString())[0];
-
-		console.log('here3');
-		if (!pool) {
-			throw new Error(`Could not find Humble pool with ID ${POOL_ID}`);
-		}
-
-		// Parse balances and calculate price (USDC per VOI)
-		const price = 1 / parseFloat(pool.last_price);
-
-		console.log('here4');
-		// Get 24h volume in VOI and convert to USDC
-		const volume24h = parseFloat(pool.base_volume_24h);
-
-		// Get TVL in VOI and convert to USDC
-		const tvl = parseFloat(pool.liquidity_in_usd);
-
-		console.log('here5');
-		// Fetch historical price and calculate price change
-		const historicalPrice = await fetchHistoricalPrice(2); // Humble trading_pair_id = 2
-		const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
-		const priceChangePercentage24h =
-			historicalPrice !== null && historicalPrice !== 0
-				? ((price - historicalPrice) / historicalPrice) * 100
-				: undefined;
-
-		console.log('here6');
-		return {
-			trading_pair_id: 2, // Humble VOI/USDC pair
-			price: price,
-			volume_24h: volume24h,
-			tvl: tvl,
-			high_24h: undefined,
-			low_24h: undefined,
-			price_change_24h: priceChange24h,
-			price_change_percentage_24h: priceChangePercentage24h
-		};
-	} catch (error) {
-		console.error('Error fetching Humble data:', error);
-		return null;
-	}
-}
 
 async function fetchTinymanData(): Promise<MarketSnapshot | null> {
 	try {
@@ -525,7 +441,6 @@ serve(
 	createHandler({
 		sources: [
 			// { name: 'MEXC', fetch: fetchMEXCData },
-			{ name: 'Humble', fetch: fetchHumbleData },
 			{ name: 'Tinyman', fetch: fetchTinymanData },
 			{ name: 'PactFi', fetch: fetchPactFiData },
 			{ name: 'Uniswap', fetch: fetchUniswapData }
