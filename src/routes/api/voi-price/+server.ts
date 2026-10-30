@@ -34,9 +34,9 @@ export const GET: RequestHandler = async () => {
 		if (error) throw error;
 
 		if (data && data.length > 0) {
-			// Get the most recent price
-			const latestPrice = data[data.length - 1];
-			cachedPrice = Number(latestPrice.value || 0);
+			// Get the most recent price. A bucket holding only null-volume snapshots has a null value.
+			const latestPrice = data.findLast((point: { value: number | null }) => point.value !== null);
+			cachedPrice = Number(latestPrice?.value || 0);
 			lastFetched = new Date();
 
 			console.log('VOI price from price history:', cachedPrice);
