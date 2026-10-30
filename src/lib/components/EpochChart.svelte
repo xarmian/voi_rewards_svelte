@@ -3,7 +3,7 @@
 	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import * as echarts from 'echarts';
+	import { echarts } from '$lib/echarts';
 	import type { EChartsOption } from 'echarts';
 
 	export let mergedData: any[] = [];

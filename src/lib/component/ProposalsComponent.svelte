@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { browser } from '$app/environment';
-	import * as echarts from 'echarts';
+	import { echarts } from '$lib/echarts';
 	import type { EChartsOption } from 'echarts';
 	import { format, PeriodType } from 'svelte-ux';
 	import { Spinner } from 'flowbite-svelte';

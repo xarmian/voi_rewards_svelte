@@ -5,7 +5,7 @@
 	import { getEpochChartUpdates, type EpochChartInputs } from '$lib/utils/epochChartUpdates';
 	import { formatNumber } from '$lib/utils';
 	import { escapeHtml } from '$lib/utils/escapeHtml';
-	import * as echarts from 'echarts';
+	import { echarts } from '$lib/echarts';
 	import type { EChartsOption } from 'echarts';
 	import TransactionCountsChart from './TransactionCountsChart.svelte';
 

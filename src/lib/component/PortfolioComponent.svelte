@@ -12,15 +12,12 @@
 	import { config } from '$lib/config';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
-	import SendTokenModal from './SendTokenModal.svelte';
 	import { selectedWallet } from 'avm-wallet-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { fade } from 'svelte/transition';
 	import ConsensusDetails from './ConsensusDetails.svelte';
-	import TokenTransfersModal from './TokenTransfersModal.svelte';
 	import StakingComponent from './ui/StakingComponent.svelte';
-	import BridgeModal from './BridgeModal.svelte';
 	import { fetchFungibleTokens } from '$lib/services/accounts';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
 	import { signTransactions } from 'avm-wallet-svelte';
@@ -90,6 +87,9 @@
 	let voteKeyExpiryDate: Date | undefined;
 	let showVoiTransfersModal = false;
 	let showBridgeModal = false;
+	let SendTokenModal: typeof import('./SendTokenModal.svelte').default | null = null;
+	let TokenTransfersModal: typeof import('./TokenTransfersModal.svelte').default | null = null;
+	let BridgeModal: typeof import('./BridgeModal.svelte').default | null = null;
 
 	// Claimable tokens summary variables
 	let claimableTokensSummary: Array<{
@@ -128,6 +128,33 @@
 	function handleTokenSent() {
 		refreshPortfolio();
 		refreshTokens();
+	}
+
+	async function openSendVoiModal() {
+		try {
+			SendTokenModal ??= (await import('./SendTokenModal.svelte')).default;
+			showSendVoiModal = true;
+		} catch (error) {
+			console.error('Failed to load SendTokenModal:', error);
+		}
+	}
+
+	async function openVoiTransfersModal() {
+		try {
+			TokenTransfersModal ??= (await import('./TokenTransfersModal.svelte')).default;
+			showVoiTransfersModal = true;
+		} catch (error) {
+			console.error('Failed to load TokenTransfersModal:', error);
+		}
+	}
+
+	async function openBridgeModal() {
+		try {
+			BridgeModal ??= (await import('./BridgeModal.svelte')).default;
+			showBridgeModal = true;
+		} catch (error) {
+			console.error('Failed to load BridgeModal:', error);
+		}
 	}
 
 	$: {
@@ -895,7 +922,7 @@
 						</h4>
 						<div class="flex items-center gap-2">
 							<button
-								on:click={() => (showSendVoiModal = true)}
+								on:click={openSendVoiModal}
 								class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-600"
 								disabled={!canSignTransactions}
 								title={!canSignTransactions ? 'Connect wallet to send tokens' : 'Send VOI'}
@@ -904,7 +931,7 @@
 								Send
 							</button>
 							<button
-								on:click={() => (showBridgeModal = true)}
+								on:click={openBridgeModal}
 								class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-600"
 								title={!canSignTransactions ? 'Connect wallet to bridge tokens' : 'Bridge VOI'}
 							>
@@ -921,7 +948,7 @@
 									{(accountBalance / 1e6).toLocaleString()} VOI
 								</span>
 								<button
-									on:click={() => (showVoiTransfersModal = true)}
+									on:click={openVoiTransfersModal}
 									class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
 									title="View VOI transaction history"
 								>
@@ -1413,7 +1440,8 @@
 
 <!-- Send VOI Modal -->
 {#if typeof walletAddress === 'string' && showSendVoiModal}
-	<SendTokenModal
+	<svelte:component
+		this={SendTokenModal}
 		bind:open={showSendVoiModal}
 		token={{
 			type: 'native',
@@ -1429,7 +1457,8 @@
 
 <!-- VOI Transfers Modal -->
 {#if typeof walletAddress === 'string' && showVoiTransfersModal}
-	<TokenTransfersModal
+	<svelte:component
+		this={TokenTransfersModal}
 		bind:open={showVoiTransfersModal}
 		token={{
 			id: '0',
@@ -1448,5 +1477,10 @@
 
 <!-- Bridge Modal -->
 {#if typeof walletAddress === 'string' && showBridgeModal}
-	<BridgeModal bind:show={showBridgeModal} tokenKey="VOI" {canSignTransactions} />
+	<svelte:component
+		this={BridgeModal}
+		bind:show={showBridgeModal}
+		tokenKey="VOI"
+		{canSignTransactions}
+	/>
 {/if}
