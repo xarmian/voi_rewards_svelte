@@ -94,8 +94,14 @@ test('successful sources return balance tokens without partial enrichment', asyn
 
 function lpPool(provider = 'humble'): PoolInfo {
 	return {
-		poolId: '123', tokAId: '0', tokBId: '456', poolBalA: provider === 'nomadex' ? '' : '1000000',
-		poolBalB: provider === 'nomadex' ? '' : '1000000', supply: provider === 'nomadex' ? '' : '10000000', tvl: 20, provider
+		poolId: '123',
+		tokAId: '0',
+		tokBId: '456',
+		poolBalA: provider === 'nomadex' ? '' : '1000000',
+		poolBalB: provider === 'nomadex' ? '' : '1000000',
+		supply: provider === 'nomadex' ? '' : '10000000',
+		tvl: 20,
+		provider
 	};
 }
 

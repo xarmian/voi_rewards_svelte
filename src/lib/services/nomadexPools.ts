@@ -1,0 +1,82 @@
+// Immutable metadata from the Nomadex proxy snapshot proxy-frozen.json, captured 2026-10-30.
+// The proxy was frozen on 2025-08-01; reserves, supply, APR and volume are deliberately excluded.
+export type NomadexAssetType = 0 | 1 | 2; // native VOI, ASA, ARC200
+
+export interface NomadexPoolMetadata {
+	id: number;
+	alphaId: number;
+	alphaType: NomadexAssetType;
+	betaId: number;
+	betaType: NomadexAssetType;
+}
+
+export const nomadexPools: readonly NomadexPoolMetadata[] = [
+	{ id: 411756, alphaId: 0, alphaType: 0, betaId: 302190, betaType: 1 },
+	{ id: 411789, alphaId: 0, alphaType: 0, betaId: 302189, betaType: 1 },
+	{ id: 411796, alphaId: 0, alphaType: 0, betaId: 300279, betaType: 2 },
+	{ id: 411803, alphaId: 0, alphaType: 0, betaId: 302228, betaType: 1 },
+	{ id: 412687, alphaId: 0, alphaType: 0, betaId: 412682, betaType: 2 },
+	{ id: 412835, alphaId: 0, alphaType: 0, betaId: 302222, betaType: 2 },
+	{ id: 425106, alphaId: 412682, alphaType: 2, betaId: 300279, betaType: 2 },
+	{ id: 429995, alphaId: 0, alphaType: 0, betaId: 420069, betaType: 2 },
+	{ id: 444612, alphaId: 0, alphaType: 0, betaId: 401384, betaType: 2 },
+	{ id: 445385, alphaId: 0, alphaType: 0, betaId: 445119, betaType: 2 },
+	{ id: 599807, alphaId: 302190, alphaType: 1, betaId: 420069, betaType: 2 },
+	{ id: 623247, alphaId: 0, alphaType: 0, betaId: 420024, betaType: 2 },
+	{ id: 626294, alphaId: 420069, alphaType: 2, betaId: 412682, betaType: 2 },
+	{ id: 670599, alphaId: 420024, alphaType: 2, betaId: 300279, betaType: 2 },
+	{ id: 671490, alphaId: 420024, alphaType: 2, betaId: 412682, betaType: 2 },
+	{ id: 671700, alphaId: 420069, alphaType: 2, betaId: 420024, betaType: 2 },
+	{ id: 746285, alphaId: 0, alphaType: 0, betaId: 419674, betaType: 2 },
+	{ id: 746327, alphaId: 412682, alphaType: 2, betaId: 419674, betaType: 2 },
+	{ id: 746378, alphaId: 419674, alphaType: 2, betaId: 300279, betaType: 2 },
+	{ id: 746410, alphaId: 420069, alphaType: 2, betaId: 419674, betaType: 2 },
+	{ id: 750051, alphaId: 0, alphaType: 0, betaId: 750046, betaType: 2 },
+	{ id: 844171, alphaId: 0, alphaType: 0, betaId: 404004, betaType: 2 },
+	{ id: 919439, alphaId: 0, alphaType: 0, betaId: 799127, betaType: 2 },
+	{ id: 8290966, alphaId: 0, alphaType: 0, betaId: 416000, betaType: 2 },
+	{ id: 8290979, alphaId: 0, alphaType: 0, betaId: 411311, betaType: 2 },
+	{ id: 8345343, alphaId: 0, alphaType: 0, betaId: 410419, betaType: 2 },
+	{ id: 8345349, alphaId: 0, alphaType: 0, betaId: 410419, betaType: 2 },
+	{ id: 8345355, alphaId: 0, alphaType: 0, betaId: 410419, betaType: 2 },
+	{ id: 8357709, alphaId: 410419, alphaType: 2, betaId: 420069, betaType: 2 },
+	{ id: 8357736, alphaId: 420069, alphaType: 2, betaId: 410419, betaType: 2 },
+	{ id: 8359161, alphaId: 412682, alphaType: 2, betaId: 410419, betaType: 2 },
+	{ id: 39939241, alphaId: 411311, alphaType: 2, betaId: 416000, betaType: 2 },
+	{ id: 39939249, alphaId: 411311, alphaType: 2, betaId: 416000, betaType: 2 },
+	{ id: 39939376, alphaId: 416000, alphaType: 2, betaId: 411311, betaType: 2 },
+	{ id: 40063110, alphaId: 0, alphaType: 0, betaId: 420019, betaType: 2 },
+	{ id: 40176866, alphaId: 0, alphaType: 0, betaId: 302193, betaType: 1 },
+	{ id: 40176894, alphaId: 0, alphaType: 0, betaId: 40152648, betaType: 1 },
+	{ id: 40176945, alphaId: 0, alphaType: 0, betaId: 40152679, betaType: 1 },
+	{ id: 40215993, alphaId: 0, alphaType: 0, betaId: 40152643, betaType: 1 },
+	{ id: 40219923, alphaId: 302189, alphaType: 1, betaId: 401384, betaType: 2 },
+	{ id: 40279062, alphaId: 302190, alphaType: 1, betaId: 302189, betaType: 1 },
+	{ id: 40322833, alphaId: 40152679, alphaType: 1, betaId: 40153415, betaType: 2 },
+	{ id: 40355278, alphaId: 40152679, alphaType: 1, betaId: 300279, betaType: 2 },
+	{ id: 40397217, alphaId: 40152648, alphaType: 1, betaId: 302190, betaType: 1 },
+	{ id: 40448245, alphaId: 0, alphaType: 0, betaId: 410811, betaType: 2 },
+	{ id: 41228825, alphaId: 302190, alphaType: 1, betaId: 410111, betaType: 2 },
+	{ id: 41242862, alphaId: 41242358, alphaType: 1, betaId: 410811, betaType: 2 },
+	{ id: 41243735, alphaId: 0, alphaType: 0, betaId: 419879, betaType: 2 },
+	{ id: 41258832, alphaId: 0, alphaType: 0, betaId: 41242358, betaType: 1 },
+	{ id: 41267520, alphaId: 41242358, alphaType: 1, betaId: 410111, betaType: 2 },
+	{ id: 41267540, alphaId: 41242358, alphaType: 1, betaId: 412682, betaType: 2 },
+	{ id: 41277642, alphaId: 41242358, alphaType: 1, betaId: 410419, betaType: 2 },
+	{ id: 41283725, alphaId: 41242358, alphaType: 1, betaId: 420069, betaType: 2 },
+	{ id: 41284273, alphaId: 41242358, alphaType: 1, betaId: 302190, betaType: 1 },
+	{ id: 41285575, alphaId: 41242358, alphaType: 1, betaId: 302222, betaType: 2 },
+	{ id: 41285988, alphaId: 41242358, alphaType: 1, betaId: 300279, betaType: 2 },
+	{ id: 45099231, alphaId: 0, alphaType: 0, betaId: 410111, betaType: 2 },
+	{ id: 45100068, alphaId: 40152679, alphaType: 1, betaId: 410111, betaType: 2 },
+	{ id: 47160809, alphaId: 0, alphaType: 0, betaId: 47155831, betaType: 1 },
+	{ id: 47165570, alphaId: 302190, alphaType: 1, betaId: 47138068, betaType: 2 },
+	{ id: 47166025, alphaId: 0, alphaType: 0, betaId: 47138068, betaType: 2 },
+	{ id: 47424539, alphaId: 47138068, alphaType: 2, betaId: 300279, betaType: 2 },
+	{ id: 47424655, alphaId: 47138068, alphaType: 2, betaId: 420069, betaType: 2 },
+	{ id: 47511507, alphaId: 47138068, alphaType: 2, betaId: 410811, betaType: 2 },
+	{ id: 47578347, alphaId: 0, alphaType: 0, betaId: 798948, betaType: 2 },
+	{ id: 48787612, alphaId: 0, alphaType: 0, betaId: 48146090, betaType: 1 },
+	{ id: 48787678, alphaId: 302190, alphaType: 1, betaId: 48146090, betaType: 1 },
+	{ id: 48974083, alphaId: 0, alphaType: 0, betaId: 48968653, betaType: 1 }
+];

@@ -1,5 +1,6 @@
 import { requireAccountInfo } from '$lib/stores/accounts';
 import type { PoolInfo } from '$lib/services/lp';
+import { nomadexPools, type NomadexAssetType } from '$lib/services/nomadexPools';
 import type { FungibleTokenType, TokenApproval, ARC200Token } from '$lib/types/assets';
 import algosdk from 'algosdk';
 
@@ -66,6 +67,81 @@ export async function fetchFungibleTokens(
 	if (!walletAddress) return { tokens: [], partial: false };
 
 	let partial = false;
+	async function readEscrowArc200Balance(contractId: number, escrow: string): Promise<string> {
+		const response = await fetchFn(
+			`https://voi-mainnet-mimirapi.voirewards.com/arc200/balances?contractId=${contractId}&accountId=${escrow}`
+		);
+		if (!response.ok) throw new Error(`ARC200 balance HTTP ${response.status}`);
+		const data: { balances?: { balance?: string }[] } = await response.json();
+		const balance = data.balances?.[0]?.balance;
+		if (typeof balance !== 'string' || !/^-?\d+$/.test(balance)) {
+			throw new Error('Missing or invalid escrow ARC200 balance');
+		}
+		return balance;
+	}
+
+	async function enrichNomadexPool(pool: PoolInfo) {
+		const escrow = algosdk.getApplicationAddress(Number(pool.poolId));
+		if (!pool.supply) {
+			try {
+				// Nomadex records the circulating LP supply as a negative balance at its escrow.
+				const supply = -BigInt(await readEscrowArc200Balance(Number(pool.poolId), escrow));
+				if (supply < 0n) throw new Error('Invalid Nomadex circulating supply');
+				pool.supply = supply.toString();
+			} catch (error) {
+				partial = true;
+				console.warn('Failed to fetch Nomadex LP supply:', pool.poolId, error);
+			}
+		}
+
+		if (!pool.poolBalA || !pool.poolBalB) {
+			const metadata = nomadexPools.find((entry) => entry.id.toString() === pool.poolId);
+			if (!metadata) {
+				partial = true;
+				return;
+			}
+			let escrowInfo: ReturnType<typeof requireAccountInfo> | undefined;
+			const readReserve = async (tokenId: number, tokenType: NomadexAssetType): Promise<string> => {
+				try {
+					let balance: string;
+					if (tokenType === 2) {
+						balance = await readEscrowArc200Balance(tokenId, escrow);
+					} else {
+						// Share the account response between native VOI and ASA reserve reads.
+						escrowInfo ??= requireAccountInfo(escrow);
+						const account = await escrowInfo;
+						if (tokenType === 0) {
+							balance = account.amount.toString();
+						} else {
+							// algosdk v2 returns raw JSON holdings with the REST field `asset-id`.
+							const assets = account.assets as unknown as
+								| { 'asset-id': number | bigint; amount: number | bigint }[]
+								| undefined;
+							const holding = assets?.find((asset) => Number(asset['asset-id']) === tokenId);
+							balance = (holding?.amount ?? 0).toString();
+						}
+					}
+					if (!/^\d+$/.test(balance)) throw new Error('Invalid Nomadex reserve');
+					return balance;
+				} catch (error) {
+					partial = true;
+					console.warn('Failed to fetch Nomadex reserve:', pool.poolId, tokenId, error);
+					return '';
+				}
+			};
+			[pool.poolBalA, pool.poolBalB] = await Promise.all([
+				pool.poolBalA || readReserve(metadata.alphaId, metadata.alphaType),
+				pool.poolBalB || readReserve(metadata.betaId, metadata.betaType)
+			]);
+		}
+		pool.tvl =
+			pool.tokAId === '0'
+				? Number(pool.poolBalA) * 2
+				: pool.tokBId === '0'
+					? Number(pool.poolBalB) * 2
+					: 0;
+	}
+
 	async function fetchApprovals(url: string) {
 		try {
 			const response = await fetchFn(url);
@@ -141,12 +217,24 @@ export async function fetchFungibleTokens(
 		for (const asset of unifiedAssetsData.balances) {
 			const tokenId = asset.contractId.toString();
 			const pool = poolsMap.get(tokenId);
+			if (
+				pool?.provider === 'nomadex' &&
+				asset.assetType === 'arc200' &&
+				Number(asset.balance) > 0
+			) {
+				await enrichNomadexPool(pool);
+			}
 
-			// Calculate value - prefer USD value from API, fallback to pool calculation
+			// Nomadex uses live reserves; other tokens prefer the API's USD value.
 			let tokenValue = 0;
 			let tokenUsdValue = 0;
 
-			if (asset.usdValue != null && asset.usdValue !== 'null' && asset.usdValue !== '') {
+			if (
+				pool?.provider !== 'nomadex' &&
+				asset.usdValue != null &&
+				asset.usdValue !== 'null' &&
+				asset.usdValue !== ''
+			) {
 				let usdValuePerToken = parseFloat(asset.usdValue);
 				if (!Number.isFinite(usdValuePerToken)) {
 					usdValuePerToken = 0;
@@ -165,32 +253,11 @@ export async function fetchFungibleTokens(
 					tokenValue = 0;
 				}
 			} else if (pool && asset.assetType === 'arc200') {
-				// For Nomadex pools, update the supply with escrow balance before calculation
-				if (pool.provider === 'nomadex') {
-					const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
-					try {
-						const escrowArc200Response = await fetchFn(
-							`https://voi-mainnet-mimirapi.voirewards.com/arc200/balances?contractId=${pool.poolId}&accountId=${poolEscrowAddr}`
-						);
-						if (escrowArc200Response.ok) {
-							const escrowArc200Data = await escrowArc200Response.json();
-							if (escrowArc200Data.balances && escrowArc200Data.balances.length > 0) {
-								const escrowLpBalance = escrowArc200Data.balances[0].balance;
-								// Circulating supply = max supply - escrow balance
-								const circulatingSupply = Number(escrowLpBalance) * -1;
-								pool.supply = circulatingSupply.toString();
-							}
-						} else {
-							partial = true;
-						}
-					} catch (err) {
-						partial = true;
-						console.warn('Failed to fetch nomadex pool escrow info for supply calculation:', err);
-					}
-				}
-
 				// Calculate value from pool data for ARC200 tokens
-				const poolValue = calculateTokenValueFromPool(asset, pool);
+				const poolValue =
+					pool.provider === 'nomadex' && Number(asset.balance) === 0
+						? 0
+						: calculateTokenValueFromPool(asset, pool);
 				if (poolValue === null || !Number.isFinite(poolValue)) {
 					partial = true;
 				} else {
@@ -260,25 +327,12 @@ export async function fetchFungibleTokens(
 				const tokenAInfo = getTokenInfo(pool.tokAId, tokenADetails, pool.symbolA);
 				const tokenBInfo = getTokenInfo(pool.tokBId, tokenBDetails, pool.symbolB);
 
-				let tvlBalance = 0;
 				let poolName = '';
 
 				if (pool.provider === 'nomadex') {
 					poolName = `${tokenAInfo.name}/${tokenBInfo.name} LP`;
-					const poolEscrowAddr = algosdk.getApplicationAddress(Number(pool.poolId));
-					try {
-						const poolEscrowInfo = await requireAccountInfo(poolEscrowAddr);
-						tvlBalance = ((poolEscrowInfo.amount as number) * 2) / Math.pow(10, 6);
-
-						// Supply calculation moved to before value calculation
-					} catch (err) {
-						partial = true;
-						console.warn('Failed to fetch nomadex pool escrow info:', err);
-						tvlBalance = pool.tvl;
-					}
 				} else {
 					// Humble pools
-					tvlBalance = pool.tvl;
 					poolName = `${pool.symbolA}/${pool.symbolB} LP`;
 				}
 
@@ -499,6 +553,13 @@ export async function fetchFungibleTokens(
 
 function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo): number | null {
 	try {
+		// Unknown live reserves or supply must not produce a Nomadex valuation.
+		if (
+			pool.provider === 'nomadex' &&
+			![pool.poolBalA, pool.poolBalB, pool.supply].every((value) => /^\d+$/.test(value))
+		) {
+			return null;
+		}
 		// For LP tokens, calculate value based on user's share of the pool
 		const userLpBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
 		const totalLpSupply = Number(pool.supply) / Math.pow(10, 6); // pool.supply needs to be converted from micro units
