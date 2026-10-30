@@ -286,7 +286,7 @@ function nomadexSources(
 	return { fetchFn, calls };
 }
 
-function mockEscrow(amount = 26303164359, assets: { 'asset-id': number; amount: number }[] = []) {
+function mockEscrow(amount = 26303164359, assets: Record<string, number>[] = []) {
 	return vi.spyOn(algodClient, 'accountInformation').mockImplementation(
 		() =>
 			({
@@ -324,6 +324,14 @@ test('missing Mimir VOI/ASA pool reads both reserves from one escrow account res
 	assert.ok(Math.abs(result.tokens[0].value - 196000 / 115.371457) < 1e-9);
 	assert.equal(accountRead.mock.calls.length, 1);
 	assert.equal(result.partial, false);
+});
+
+test('an ASA reserve is read from a camelCase holding too (algosdk v3 models)', async () => {
+	// algosdk 2.10 returns raw REST JSON (`asset-id`, measured 10-30 on the 48787612 escrow); v3 returns `assetId`.
+	mockEscrow(98000000000, [{ assetId: 48146090, amount: 24000000 }]);
+	const { fetchFn } = nomadexSources(48787612);
+	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools, fetch: fetchFn });
+	assert.equal(result.tokens[0].poolInfo?.tokBBalance, '24000000');
 });
 
 test('Nomadex LP valuation uses live reserves even if the asset API provides a USD quote', async () => {

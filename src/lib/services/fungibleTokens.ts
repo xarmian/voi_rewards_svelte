@@ -113,11 +113,17 @@ export async function fetchFungibleTokens(
 						if (tokenType === 0) {
 							balance = account.amount.toString();
 						} else {
-							// algosdk v2 returns raw JSON holdings with the REST field `asset-id`.
+							// algosdk 2.10 returns raw REST JSON (`asset-id`); v3 models use `assetId`.
 							const assets = account.assets as unknown as
-								| { 'asset-id': number | bigint; amount: number | bigint }[]
+								| {
+										'asset-id'?: number | bigint;
+										assetId?: number | bigint;
+										amount: number | bigint;
+								  }[]
 								| undefined;
-							const holding = assets?.find((asset) => Number(asset['asset-id']) === tokenId);
+							const holding = assets?.find(
+								(asset) => Number(asset['asset-id'] ?? asset.assetId) === tokenId
+							);
 							balance = (holding?.amount ?? 0).toString();
 						}
 					}
