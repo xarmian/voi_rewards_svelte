@@ -51,10 +51,24 @@ describe('normalizePairs', () => {
 	});
 
 	it('drops duplicate pool ids with the first row winning', () => {
-		const pairs = normalizePairs([pool, { ...pool, exchange: 'nomadex' }], [10]);
+		const pairs = normalizePairs([pool, { ...pool, exchange: 'other' }], [10]);
 		expect(pairs).toHaveLength(1);
 		expect(pairs[0].exchange).toBe('humble');
 	});
+
+	it.each(['nomadex', 'Nomadex'])(
+		'drops pools of the retired exchange %s (TASK-88)',
+		(exchange) => {
+			const pairs = normalizePairs(
+				[
+					{ ...pool, exchange },
+					{ ...pool, pool_id: 99 }
+				],
+				[10]
+			);
+			expect(pairs.map((pair) => pair.exchange)).toEqual(['humble']);
+		}
+	);
 
 	it('defaults the exchange to DEX', () => {
 		expect(normalizePairs([{ ...pool, exchange: '' }], [10])[0].exchange).toBe('DEX');

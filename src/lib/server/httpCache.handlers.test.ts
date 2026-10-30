@@ -219,6 +219,37 @@ describe('TASK-29 markets response caching', () => {
 		expect(response.headers.has('Cache-Control')).toBe(false);
 	});
 
+	it('drops a retired exchange from every merged market source (TASK-88)', async () => {
+		mocks.from.mockImplementationOnce(() => query([]));
+		mocks.from.mockImplementationOnce(() =>
+			query([
+				pool,
+				{ ...pool, pool_id: (pool as { pool_id: number }).pool_id + 1, exchange: 'nomadex' }
+			])
+		);
+		mocks.from.mockImplementationOnce(() => query({ algo_asset_id: 456 }));
+		mocks.vestige.mockResolvedValue([
+			{
+				exchange: 'Nomadex',
+				network: 'Algorand',
+				trading_pair_id: 999,
+				price: 1,
+				volume_24h: 5,
+				tvl: 5
+			}
+		]);
+		const fetcher = vi
+			.fn()
+			.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+		const response = await marketsGET(event('/api/markets?tokenId=123', fetcher));
+		expect(response.status).toBe(200);
+		const { marketData } = await response.json();
+		expect(marketData).toHaveLength(1);
+		expect(
+			marketData.map((market: { exchange: string }) => market.exchange.toLowerCase())
+		).not.toContain('nomadex');
+	});
+
 	it('does not cache a Vestige throw', async () => {
 		mocks.from.mockImplementationOnce(() => query([]));
 		mocks.from.mockImplementationOnce(() => query([pool]));

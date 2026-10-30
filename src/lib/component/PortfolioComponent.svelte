@@ -147,7 +147,12 @@
 		}
 	}
 
-	$: if ($voiPrice.price > 0 && lastTokenPrice <= 0 && fungibleTokens.length > 0 && !isLoadingTokens) {
+	$: if (
+		$voiPrice.price > 0 &&
+		lastTokenPrice <= 0 &&
+		fungibleTokens.length > 0 &&
+		!isLoadingTokens
+	) {
 		refreshTokens();
 	}
 
@@ -213,10 +218,7 @@
 		try {
 			// First load essential account info
 			isLoadingPortfolio = true;
-			await Promise.all([
-				fetchAccountDetails(),
-				fetchVoiPrice()
-			]);
+			await Promise.all([fetchAccountDetails(), fetchVoiPrice()]);
 			if (walletAddress !== requestedWallet) return;
 			isLoadingPortfolio = false;
 
@@ -764,9 +766,13 @@
 				{/if}
 			</p>
 			{#if tokensError && fungibleTokens.length === 0}
-				<p class="text-xs text-gray-500 dark:text-gray-400">Excludes token balances (unavailable).</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Excludes token balances (unavailable).
+				</p>
 			{:else if $voiPrice.price <= 0 && $voiPrice.error && fungibleTokens.length > 0}
-				<p class="text-xs text-gray-500 dark:text-gray-400">Excludes token values (VOI price unavailable).</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Excludes token values (VOI price unavailable).
+				</p>
 			{/if}
 		</div>
 	</div>
@@ -1193,7 +1199,11 @@
 					<div class="text-gray-500 dark:text-gray-400 text-center py-4">
 						{#if tokensError && fungibleTokens.length === 0}
 							Token balances unavailable.
-							<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
+							<button
+								type="button"
+								class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+								on:click={() => refreshTokens()}>Retry</button
+							>
 						{:else}
 							No LP tokens found in this account.
 						{/if}
@@ -1237,20 +1247,6 @@
 						Looking for Tokens? Check out these exchanges:
 					</p>
 					<div class="flex gap-2">
-						<a
-							href="https://voi.nomadex.app"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-						>
-							<img
-								src="/icons/nomadex_icon.ico"
-								alt="Nomadex"
-								class="w-4 h-4 mr-1.5"
-								on:error={handleIconError}
-							/>
-							Nomadex
-						</a>
 						<a
 							href="https://voi.humble.sh"
 							target="_blank"
@@ -1313,11 +1309,17 @@
 		{#if tokensError && fungibleTokens.length > 0}
 			<div class="mt-4 text-sm text-gray-500 dark:text-gray-400" role="status">
 				Couldn't refresh token balances; showing the last loaded values.
-				<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
+				<button
+					type="button"
+					class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+					on:click={() => refreshTokens()}>Retry</button
+				>
 			</div>
 		{/if}
 		{#if tokensPartial}
-			<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Some pool or approval details are unavailable.</p>
+			<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+				Some pool or approval details are unavailable.
+			</p>
 		{/if}
 
 		<!-- Combined Tokens Grid -->
@@ -1329,7 +1331,11 @@
 			{:else if tokensError && fungibleTokens.length === 0}
 				<div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3" role="status">
 					Token balances unavailable.
-					<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => refreshTokens()}>Retry</button>
+					<button
+						type="button"
+						class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+						on:click={() => refreshTokens()}>Retry</button
+					>
 				</div>
 			{:else}
 				{#each sortTokens(filterTokens([...asaTokens.map( (t) => ({ ...t, tokenType: 'vsa' as const }) ), ...fungibleTokens

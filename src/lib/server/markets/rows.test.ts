@@ -155,7 +155,7 @@ describe('market row processing', () => {
 
 	it.each([
 		{ network: 'Algorand', exchange: 'humble' },
-		{ network: 'Voi', exchange: 'nomadex' }
+		{ network: 'Voi', exchange: 'pactfi' }
 	])('counts the same pool id separately for source %j', (otherSource) => {
 		expect(
 			marketAggregates([
@@ -303,6 +303,14 @@ describe('market row processing', () => {
 		}
 		const rows = legacyMarketRows([legacy(1, 10), legacy(2, 30)]);
 		expect(rows.map((row) => row.trading_pair_id)).toEqual([2, 1]);
+		// TASK-88: a retired exchange's trading pair is dropped even with the most volume.
+		const nomadex = {
+			...legacy(3, 50),
+			exchange: { name: 'Nomadex', type: 'DEX', network: 'Voi' }
+		};
+		expect(legacyMarketRows([legacy(1, 10), nomadex]).map((row) => row.trading_pair_id)).toEqual([
+			1
+		]);
 		expect(JSON.stringify(rows[0])).toBe(
 			JSON.stringify({
 				trading_pair_id: 2,

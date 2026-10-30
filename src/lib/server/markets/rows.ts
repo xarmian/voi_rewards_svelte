@@ -2,6 +2,7 @@ import { pairWindow, type PoolAggregate, type latestSwapRow } from '$lib/server/
 import type { MarketPair } from './pairs';
 import { norm } from './priceMap';
 import { getPoolUrl } from './poolUrls';
+import { isRetiredExchange } from '$lib/markets/retired';
 
 export interface MarketSnapshot {
 	price: number;
@@ -177,6 +178,7 @@ export function legacyMarketRows(marketData: unknown[] | null) {
 				lastUpdated: new Date(latestSnapshot.timestamp).toLocaleString()
 			};
 		})
+		.filter((row) => !isRetiredExchange(row.exchange))
 		.sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
 }
 

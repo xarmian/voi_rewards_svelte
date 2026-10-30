@@ -70,16 +70,6 @@ export const apps: AppInfo[] = [
 		hide_on_ios: true
 	},
 	{
-		id: 'nomadex',
-		name: 'Nomadex',
-		description: 'DEX',
-		logoPath: '/logos/nomadex.png',
-		url: 'https://voi.nomadex.app',
-		category: 'defi',
-		featured: true,
-		hide_on_ios: true
-	},
-	{
 		id: 'highforge',
 		name: 'Highforge',
 		description: 'NFT Mint & Shuffle',

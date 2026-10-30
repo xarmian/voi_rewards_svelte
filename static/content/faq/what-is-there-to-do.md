@@ -27,7 +27,6 @@ Visit the following applications to explore the Voi ecosystem:
 **DEX**
 
 - [HumbleSwap DEX](https://voi.humble.sh)
-- [Nomadex DEX](https://nomadex.io) - Coming Soon
 
 **NFTs**
 

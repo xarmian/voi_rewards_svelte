@@ -49,7 +49,7 @@ export async function fetchCrossChainSnapshots(
 			}
 		});
 
-		// Filter out Voi network exchanges (Humble, Nomadex) since we get those from MIMIR
+		// Filter out Voi network exchanges since we get those from MIMIR (Nomadex is retired: TASK-88)
 		// Also exclude MEXC (trading_pair_id = 1) which is no longer active
 		return Array.from(latestSnapshots.values())
 			.filter(

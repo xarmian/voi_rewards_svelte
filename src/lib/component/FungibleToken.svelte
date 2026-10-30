@@ -784,30 +784,29 @@
 				<div>{token.id}</div>
 			</a>
 			{#if isLPToken(token)}
-				<span class="text-gray-400">|</span>
-				<a
-					href={token.poolInfo.provider === 'humble'
-						? `https://voi.humble.sh/#/pool/add?poolId=${token.poolId}`
-						: `https://voi.nomadex.app/liquidity/${token.poolId}/add`}
-					target="_blank"
-					class="flex flex-col items-center group"
-					rel="noopener noreferrer"
-				>
-					<i class="fa-solid fa-circle-plus text-green-500 group-hover:text-green-600"></i>
-					<span class="text-green-500 group-hover:text-green-600">Liquidity</span>
-				</a>
-				<span class="text-gray-400">|</span>
-				<a
-					href={token.poolInfo.provider === 'humble'
-						? `https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}`
-						: `https://voi.nomadex.app/liquidity/${token.poolId}/remove`}
-					target="_blank"
-					class="flex flex-col items-center group"
-					rel="noopener noreferrer"
-				>
-					<i class="fa-solid fa-circle-minus text-red-500 group-hover:text-red-600"></i>
-					<span class="text-red-500 group-hover:text-red-600">Liquidity</span>
-				</a>
+				<!-- TASK-88: Nomadex has shut down, so its pools get no liquidity links. -->
+				{#if token.poolInfo.provider === 'humble'}
+					<span class="text-gray-400">|</span>
+					<a
+						href={`https://voi.humble.sh/#/pool/add?poolId=${token.poolId}`}
+						target="_blank"
+						class="flex flex-col items-center group"
+						rel="noopener noreferrer"
+					>
+						<i class="fa-solid fa-circle-plus text-green-500 group-hover:text-green-600"></i>
+						<span class="text-green-500 group-hover:text-green-600">Liquidity</span>
+					</a>
+					<span class="text-gray-400">|</span>
+					<a
+						href={`https://voi.humble.sh/#/pool/remove?poolId=${token.poolId}`}
+						target="_blank"
+						class="flex flex-col items-center group"
+						rel="noopener noreferrer"
+					>
+						<i class="fa-solid fa-circle-minus text-red-500 group-hover:text-red-600"></i>
+						<span class="text-red-500 group-hover:text-red-600">Liquidity</span>
+					</a>
+				{/if}
 			{:else if token.poolId}
 				<span class="text-gray-400">|</span>
 				<a
@@ -871,20 +870,6 @@
 						<img
 							src="/icons/humble_icon.png"
 							alt="Humble"
-							class="w-full h-full rounded object-cover"
-						/>
-					</div>
-				</a>
-			{:else if token.poolInfo.provider === 'nomadex'}
-				<a
-					href={`https://voi.nomadex.app/${token.poolInfo.tokAType}/${token.poolInfo.tokAId}/${token.poolInfo.tokBType}/${token.poolInfo.tokBId}`}
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<div class="w-6 h-6 rounded backdrop-blur-sm">
-						<img
-							src="/icons/nomadex_icon.ico"
-							alt="Nomadex"
 							class="w-full h-full rounded object-cover"
 						/>
 					</div>

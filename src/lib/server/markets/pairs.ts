@@ -1,9 +1,12 @@
+import { isRetiredExchange } from '$lib/markets/retired';
+
 export type MarketPair = ReturnType<typeof normalizePairs>[number];
 
 export function normalizePairs(poolRows: unknown[] | null, equivalentIds: number[]) {
 	// Deduplicate pools by pool_id (same pool might match multiple equivalent token IDs)
 	const seenPoolIds = new Set<number>();
 	const pools = (poolRows || []).filter((pool: any) => {
+		if (isRetiredExchange(pool.exchange)) return false;
 		if (seenPoolIds.has(pool.pool_id)) return false;
 		seenPoolIds.add(pool.pool_id);
 		return true;

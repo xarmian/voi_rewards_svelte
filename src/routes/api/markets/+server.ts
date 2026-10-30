@@ -14,6 +14,7 @@ import type { VoiUsdStatus } from '$lib/server/voiUsdReference';
 import { fetchCrossChainSnapshots, fetchAlgoAssetId } from '$lib/server/markets/sources';
 import { normalizePairs } from '$lib/server/markets/pairs';
 import { latestSwapsByPool, resolveSymbolUsd, vestigePriceMap } from '$lib/server/markets/priceMap';
+import { isRetiredExchange } from '$lib/markets/retired';
 import {
 	composeDexMarketRow,
 	legacyMarketRows,
@@ -157,7 +158,9 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			}
 
 			// 7) Combine VOI DEX markets with cross-chain snapshots and Vestige markets
-			marketData = [...voiDexMarkets, ...crossChainSnapshots, ...vestigeMarkets];
+			marketData = [...voiDexMarkets, ...crossChainSnapshots, ...vestigeMarkets].filter(
+				(market) => !isRetiredExchange(market.exchange)
+			);
 		} else {
 			// Legacy: general list using platform snapshots
 			// Exclude MEXC (id = 1) which is no longer active

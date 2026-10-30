@@ -124,42 +124,6 @@
 		loading = false;
 	}
 
-	async function getNomadexPoints() {
-		try {
-			const url = `https://api.nomadex.app/actions.csv?address=${wallet}`;
-			const response = await fetch(url);
-			const csvData = await response.text();
-			const parsedData = parseCSV(csvData);
-
-			// filter parsedData for wallet (address)
-			const data = parsedData.filter((row) => row.address === wallet);
-
-			for (let i = 0; i < project.quests.length; i++) {
-				const quest = project.quests[i];
-				const row = data.filter((row) => row.action === quest.name);
-
-				if (row.length > 0) {
-					if (quest.name == 'swap') {
-						let uniqueDates = new Set();
-						row.forEach((entry) => {
-							let date = new Date(Number(entry.timestamp)).toISOString().split('T')[0];
-							uniqueDates.add(date);
-						});
-						quest.earned = uniqueDates.size;
-					} else {
-						quest.earned = 1;
-					}
-				} else {
-					quest.earned = 0;
-				}
-			}
-
-			loading = false;
-		} catch (error) {
-			console.error('Failed to fetch points:', error);
-		}
-	}
-
 	async function getNFTNavigatorPoints() {
 		const { data, error } = await supabasePublicClient
 			.from('actions')
@@ -602,9 +566,6 @@
 		switch (project.title) {
 			case 'Voi Network':
 				getNodePoints();
-				break;
-			case 'Nomadex':
-				getNomadexPoints();
 				break;
 			case 'NFT Navigator':
 				getNFTNavigatorPoints();
