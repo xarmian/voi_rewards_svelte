@@ -153,7 +153,23 @@ describe('TASK-29 markets response caching', () => {
 		expect(supplyFallback.headers.get('Cache-Control')).toBe(minuteCache);
 	});
 
-	it('caches genuine empty pools and the legacy empty market list', async () => {
+	it('serves VOI markets from Mimir when no tokenId is given (TASK-89)', async () => {
+		const tables: string[] = [];
+		mocks.from.mockImplementation((table: string) => {
+			tables.push(table);
+			return query(table === 'pool_catalog' ? [pool] : []);
+		});
+		const fetcher = vi
+			.fn()
+			.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+		const response = await marketsGET(event('/api/markets?token=VOI', fetcher));
+		expect(response.status).toBe(200);
+		expect((await response.json()).marketData).toHaveLength(1);
+		expect(tables).toContain('pool_catalog');
+		expect(tables).not.toContain('trading_pairs');
+	});
+
+	it('caches genuine empty pools and the default empty market list', async () => {
 		mocks.from.mockImplementation(() => query([]));
 		for (const path of ['/api/markets?tokenId=123', '/api/markets']) {
 			const response = await marketsGET(event(path));

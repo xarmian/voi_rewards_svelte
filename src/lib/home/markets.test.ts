@@ -73,3 +73,25 @@ test('summary uses positive finite aggregates only', () => {
 		);
 	}
 });
+
+test('the table hides dust pools under the TVL floor; the summary totals still count them (TASK-89)', () => {
+	const dust = (id: string, tvl: number) => ({
+		...rows[2],
+		pair: `wVOI/${id}`,
+		tvl,
+		trading_pair_id: id
+	});
+	// Measured 10-30: pool TVLs run 117, 91 then 22, 21, 14...; the floor sits in that gap.
+	const marketData = [dust('node', 91), dust('flch', 50), dust('iat', 49.99), dust('abtc', 22)];
+	assert.deepEqual(
+		topMarkets({ marketData }, 10).map((row) => row.trading_pair_id),
+		['node', 'flch']
+	);
+	assert.deepEqual(
+		marketsSummary({ marketData, aggregates: { totalVolume: 1, totalTvl: 212.99 } }),
+		{
+			volume24h: 1,
+			liquidity: 212.99
+		}
+	);
+});
