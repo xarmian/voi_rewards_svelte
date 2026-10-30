@@ -30,7 +30,12 @@ const corsHeaders = {
 };
 
 export function createHandler(deps: HandlerDeps) {
-	const timers = deps.timers ?? { setTimeout, clearTimeout };
+	// Call the globals unbound: Deno 1 (the edge runtime) throws 'Illegal invocation' when a timer
+	// runs with a foreign `this`, which made every deadline reject at once in prod (TASK-47).
+	const timers = deps.timers ?? {
+		setTimeout: (callback: () => void, delay: number) => setTimeout(callback, delay),
+		clearTimeout: (id: ReturnType<typeof setTimeout>) => clearTimeout(id)
+	};
 	const encoder = new TextEncoder();
 	const expectedAuthorization = encoder.encode(`Bearer ${deps.serviceRoleKey}`);
 
@@ -77,9 +82,17 @@ export function createHandler(deps: HandlerDeps) {
 			);
 			const snapshots = results.filter((data): data is MarketSnapshot => data !== null);
 
-			if (snapshots.length > 0) {
-				await deps.insert(snapshots);
+			if (snapshots.length === 0) {
+				// Every source failing is an outage; a 200 here hid the 10-30 prod incident (TASK-47).
+				const error = 'No market source returned data';
+				deps.logger.error(error);
+				return new Response(JSON.stringify({ success: false, error, snapshots_count: 0 }), {
+					headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+					status: 502
+				});
 			}
+
+			await deps.insert(snapshots);
 
 			return new Response(
 				JSON.stringify({

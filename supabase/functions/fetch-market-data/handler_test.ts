@@ -68,19 +68,78 @@ Deno.test('source deadline inserts completed snapshots when one source never set
 		assertEquals(inserts, [[snapshot, other]]);
 		assertEquals(logs.length, 1);
 		assertStringIncludes(logs[0], 'stalled Uniswap');
+		assertStringIncludes(logs[0], 'timed out');
 	} finally {
 		clearTimeout(watchdog);
 	}
 });
 
-Deno.test('all sources null returns 200 without inserting', async () => {
-	const { handler, inserts } = setup({
-		sources: [{ name: 'empty', fetch: () => Promise.resolve(null) }]
+// TASK-47 prod incident (10-30): on Deno 1 the default deadline threw 'Illegal invocation' and was
+// already rejected, so any source still pending on the network lost the race and yielded null.
+// Immediately-resolving fakes hid it; these sources settle on a later macrotask, like real fetches.
+Deno.test('healthy async sources with the default timers insert their snapshots', async () => {
+	const later = (row: MarketSnapshot) =>
+		new Promise<MarketSnapshot>((resolve) => setTimeout(() => resolve(row), 5));
+	const other = { ...snapshot, trading_pair_id: 5 };
+	const { handler, inserts, logs } = setup({
+		sources: [
+			{ name: 'Tinyman', fetch: () => later(snapshot) },
+			{ name: 'PactFi', fetch: () => later(other) }
+		]
 	});
 	const response = await handler(request());
-	assertEquals(response.status, 200);
-	assertEquals(await response.json(), { success: true, snapshots_count: 0 });
+	assertEquals(await response.json(), { success: true, snapshots_count: 2 });
+	assertEquals(inserts, [[snapshot, other]]);
+	assertEquals(logs, []);
+});
+
+// Deno 1's timers reject a foreign `this`; the handler must call them unbound.
+Deno.test('the default deadline works with timers that reject a method-style call', async () => {
+	const realSetTimeout = globalThis.setTimeout;
+	const realClearTimeout = globalThis.clearTimeout;
+	function strict<T extends (...args: never[]) => unknown>(fn: T): T {
+		return function (this: unknown, ...args: Parameters<T>) {
+			if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+			return fn(...args);
+		} as T;
+	}
+	try {
+		globalThis.setTimeout = strict(realSetTimeout) as typeof setTimeout;
+		globalThis.clearTimeout = strict(realClearTimeout) as typeof clearTimeout;
+		const { handler, logs } = setup({
+			sources: [
+				{
+					name: 'Tinyman',
+					fetch: () =>
+						new Promise<MarketSnapshot>((resolve) => realSetTimeout(() => resolve(snapshot), 5))
+				}
+			]
+		});
+		assertEquals(await (await handler(request())).json(), { success: true, snapshots_count: 1 });
+		assertEquals(logs, []);
+	} finally {
+		globalThis.setTimeout = realSetTimeout;
+		globalThis.clearTimeout = realClearTimeout;
+	}
+});
+
+// TASK-47: zero rows from every source is an outage, not a success; the cron's HTTP status must show it.
+Deno.test('all sources empty returns 502 and logs it, without inserting', async () => {
+	const { handler, inserts, logs } = setup({
+		sources: [
+			{ name: 'empty', fetch: () => Promise.resolve(null) },
+			{ name: 'broken', fetch: () => Promise.reject(new Error('down')) }
+		]
+	});
+	const response = await handler(request());
+	assertEquals(response.status, 502);
+	assertEquals(await response.json(), {
+		success: false,
+		error: 'No market source returned data',
+		snapshots_count: 0
+	});
 	assertEquals(inserts, []);
+	assertStringIncludes(logs[logs.length - 1], 'No market source returned data');
 });
 
 Deno.test('insert error returns 500 with the existing error response', async () => {
