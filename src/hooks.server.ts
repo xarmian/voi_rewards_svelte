@@ -21,9 +21,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 				if (!requestUrl(input).startsWith(AUTH_URL_PREFIX)) {
 					return globalThis.fetch(input, init);
 				}
+				// TASK-86: a Request input carries its own signal; init.signal would otherwise replace it.
+				const callerSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
 				return globalThis.fetch(input, {
 					...init,
-					signal: init?.signal ? AbortSignal.any([init.signal, authAbort.signal]) : authAbort.signal
+					signal: callerSignal
+						? AbortSignal.any([callerSignal, authAbort.signal])
+						: authAbort.signal
 				});
 			}
 		},
