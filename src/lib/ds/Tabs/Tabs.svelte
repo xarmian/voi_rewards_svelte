@@ -17,8 +17,6 @@
 
 <script lang="ts" generics="V extends string">
 	import { trackScrollLeft } from './scroll';
-	// As in DataTable, the pinned ESLint parser does not register Svelte generics.
-	/* global V */
 	type Props =
 		| (NavProps & { options?: never; value?: never; onchange?: never })
 		| (SegmentedProps<V> & { items?: never; current?: never; onHero?: never });
