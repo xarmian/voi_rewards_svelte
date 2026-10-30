@@ -385,8 +385,8 @@
 													</td>
 													<td class="text-right"
 														>{(data.props.questData?.quest_data?.[quest.id] ?? 0) *
-															(data.props.questList.find((q) => q.id === quest.id)?.reward ?? 0) ??
-															0}</td
+															(data.props.questList.find((q) => q.id === quest.id)?.reward ??
+																0)}</td
 													>
 												</tr>
 											{/each}
