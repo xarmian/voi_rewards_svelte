@@ -120,14 +120,7 @@ export function composeDexMarketRow(
 		type: 'DEX',
 		network: 'Voi',
 		url: null,
-		pool_url: getPoolUrl(
-			pair.exchange,
-			pair.poolId,
-			pair.tokenAId,
-			pair.tokenAType,
-			pair.tokenBId,
-			pair.tokenBType
-		),
+		pool_url: getPoolUrl(pair.exchange, pair.poolId),
 		base_token_id: pair.baseTokenId,
 		quote_token_id: pair.quoteTokenId,
 		base_decimals: pair.baseDecimals,

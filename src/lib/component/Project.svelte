@@ -599,25 +599,6 @@
 				break;
 		}
 	}
-
-	function parseCSV(csvData: string): Array<Record<string, string>> {
-		const lines = csvData.split('\n');
-		const result: Array<Record<string, string>> = [];
-		const headers = lines[0].split(',');
-
-		for (let i = 1; i < lines.length; i++) {
-			const obj: Record<string, string> = {};
-			const currentline = lines[i].split(',');
-
-			for (let j = 0; j < headers.length; j++) {
-				obj[headers[j]] = currentline[j];
-			}
-
-			result.push(obj);
-		}
-
-		return result;
-	}
 </script>
 
 <div class="dark:text-white p-8 sm:rounded-lg my-4">
