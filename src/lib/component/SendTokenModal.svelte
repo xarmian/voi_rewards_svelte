@@ -20,6 +20,7 @@
 	import ImportRecipientsModal from './ImportRecipientsModal.svelte';
 	import RecipientRow from './RecipientRow.svelte';
 	import type { Recipient } from '$lib/types/recipients';
+	import { rowKeys } from '$lib/utils/rowKeys';
 
 	// Constants for Algorand transaction limits
 	const MAX_TXN_PER_GROUP = 16;
@@ -28,6 +29,8 @@
 	export let tokens: FungibleTokenType[];
 
 	$: availableTokens = tokens.filter((t) => !isLPToken(t)) as FungibleTokenType[];
+	// Indexer pages aren't deduped and a token without an id falls back to '0' (native VOI).
+	$: tokenKeys = rowKeys(availableTokens, (t) => String(t.id ?? '0'));
 
 	// Helper function to check if a token is an LP token
 	function isLPToken(token: FungibleTokenType) {
@@ -1123,7 +1126,7 @@
 							<div
 								class="absolute left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto"
 							>
-								{#each availableTokens as token (token.id ?? '0')}
+								{#each availableTokens as token, i (tokenKeys[i])}
 									{@const iconId = isNativeToken(token) ? '0' : String(token.id ?? '')}
 									<button
 										class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"

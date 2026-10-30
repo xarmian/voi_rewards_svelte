@@ -53,16 +53,22 @@ describe('rowKeys', () => {
 	});
 });
 
-// Wiring: both data-keyed report lists must key through rowKeys, by index.
-describe('report lists key through rowKeys', () => {
-	const read = (f: string) => readFileSync(new URL(`./${f}`, import.meta.url), 'utf8');
+// Wiring: every keyed {#each} over external data whose key isn't unique by construction must
+// key through rowKeys, by index (the TASK-38 keyed-each population: 70 keyed, these 5 at risk).
+describe('external-data lists key through rowKeys', () => {
+	const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+	const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	it.each([
-		['TransparencyReport.svelte', 'data.community_ecosystem_payments', 'paymentKeys'],
-		['GrantsReport.svelte', 'data.grants_submitted_in_progress', 'grantKeys']
-	])('%s', (file, list, keys) => {
+		// file, collection, index name, keys variable, how keys is declared
+		['components/reports/TransparencyReport.svelte', 'data.community_ecosystem_payments', 'i', 'paymentKeys', 'const paymentKeys = $derived('],
+		['components/reports/GrantsReport.svelte', 'data.grants_submitted_in_progress', 'i', 'grantKeys', 'const grantKeys = $derived('],
+		['component/SendTokenModal.svelte', 'availableTokens', 'i', 'tokenKeys', '$: tokenKeys = rowKeys('],
+		['ds/DataTable/DataTable.svelte', 'shown', 'index', 'shownKeys', 'const shownKeys = $derived('],
+		['../routes/(site)/directory/[...category]/+page.svelte', 'filteredProjects', 'i', 'projectKeys', '$: projectKeys = rowKeys(']
+	])('%s', (file, list, index, keys, decl) => {
 		const src = read(file);
-		expect(src).toContain(`{#each ${list} as `);
-		expect(src).toMatch(new RegExp(`\\{#each ${list.replace('.', '\\.')} as \\w+, i \\(${keys}\\[i\\]\\)\\}`));
-		expect(src).toMatch(new RegExp(`const ${keys} = \\$derived\\(\\s*rowKeys\\(${list.replace('.', '\\.')},`));
+		expect(src).toMatch(new RegExp(`\\{#each ${esc(list)} as \\w+, ${index} \\(${keys}\\[${index}\\]\\)\\}`));
+		expect(src).toContain(decl);
+		expect(src).toMatch(new RegExp(`${esc(keys)} = (\\$derived\\(\\s*)?rowKeys\\(\\s*${esc(list)},`));
 	});
 });

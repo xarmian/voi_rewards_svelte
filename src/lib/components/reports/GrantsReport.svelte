@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { GrantsData } from '$lib/types/reports.types';
-	import { rowKeys } from './rowKeys';
+	import { rowKeys } from '$lib/utils/rowKeys';
 
 	let {
 		data,

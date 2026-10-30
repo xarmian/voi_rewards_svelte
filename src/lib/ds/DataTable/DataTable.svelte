@@ -9,6 +9,7 @@
 	import type { DataState } from '../types';
 	import RowMenu from './RowMenu.svelte';
 	import { tableId, detailsId } from './ids';
+	import { rowKeys } from '../../utils/rowKeys';
 	import { cellText, focusColumnIndex, sortRows, visibleRows } from './sort';
 	import type { Column, SortState } from './types';
 
@@ -101,6 +102,9 @@
 		return column && sort ? sortRows(rows, column, sort.dir) : rows;
 	});
 	let shown = $derived(visibleRows(sorted, limit, expanded));
+	// Render keys only: rowKey comes from caller data, and a repeat would throw in production.
+	// Expansion and focus state stay on rowKey(row).
+	const shownKeys = $derived(rowKeys(shown, rowKey));
 	let hiddenCount = $derived(limit === undefined ? 0 : Math.max(0, rows.length - limit));
 	let labelSpan = $derived.by(() => {
 		if (!totals) return 0;
@@ -247,7 +251,7 @@
 			{:else if dataState === 'empty' || rows.length === 0}
 				<tr><td {colspan} class="{padding} text-ink-muted">{emptyText}</td></tr>
 			{:else}
-				{#each shown as row, index (rowKey(row))}
+				{#each shown as row, index (shownKeys[index])}
 					{@const key = rowKey(row)}
 					{@const isExpanded = expandedKeys.includes(key)}
 					{@const targetId = detailsId(resolvedId, key)}
