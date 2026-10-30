@@ -445,3 +445,47 @@ test('Humble LP valuation and card supply units are unchanged', async () => {
 	assert.equal(result.tokens[0].poolInfo?.totalSupply, 10000000000000);
 	assert.equal(result.partial, false);
 });
+
+test('a Humble LP resolves its tokens from balances and a token links to its Humble pool', async () => {
+	// TASK-33: Humble ids were numbers, so these string lookups never matched and an
+	// 18-decimal side fell back to 6 decimals, with APR NaN.
+	vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+		new URL(String(input)).searchParams.get('exchange') === 'nomadex'
+			? Response.json({ pools: [] })
+			: Response.json({
+					pools: [
+						{
+							poolId: 777,
+							tokenA: { id: 390001, type: 'ARC200', symbol: 'wVOI', balance: '5000000', decimals: 6 },
+							tokenB: { id: 401384, type: 'ARC200', symbol: 'ROCKET', balance: '9000000000000000000', decimals: 18 },
+							exchange: 'humble',
+							escrowAddress: 'ESCROW',
+							outstandingLpAmount: '1000000'
+						}
+					]
+				})
+	);
+	const held = [
+		{ name: 'Humble LP', symbol: 'HLP', balance: '100000', decimals: 6, imageUrl: '', usdValue: null, verified: 0, accountId: 'wallet', assetType: 'arc200', contractId: 777 },
+		{ name: 'Rocket', symbol: 'ROCKET', balance: '1000000000000000000', decimals: 18, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 401384 }
+	];
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools,
+		fetch: async (input) =>
+			new URL(String(input)).pathname === '/account/assets'
+				? Response.json({ balances: held, 'next-token': null, 'total-count': 2, 'current-round': 100 })
+				: Response.json({ approvals: [] })
+	});
+	const lp = result.tokens.find((token) => token.id === '777');
+	assert.deepEqual(
+		{
+			tokAId: lp?.poolInfo?.tokAId,
+			tokBId: lp?.poolInfo?.tokBId,
+			tokBSymbol: lp?.poolInfo?.tokBSymbol,
+			tokBDecimals: lp?.poolInfo?.tokBDecimals,
+			apr: lp?.poolInfo?.apr
+		},
+		{ tokAId: '0', tokBId: '401384', tokBSymbol: 'ROCKET', tokBDecimals: 18, apr: 0 }
+	);
+	assert.equal(result.tokens.find((token) => token.id === '401384')?.poolId, '777');
+});

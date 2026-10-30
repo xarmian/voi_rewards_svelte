@@ -22,33 +22,31 @@ interface NomadexLivePool {
 }
 
 interface HumblePoolResponse {
-	currentRound: number;
+	'current-round': number;
 	pools: HumblePoolInfo[];
 }
 
-interface HumblePoolInfo {
-	contractId: number;
-	providerId: string;
-	poolId: string;
-	tokAId: string;
-	tokBId: string;
-	symbolA: string;
-	symbolB: string;
-	poolBalA: string;
-	poolBalB: string;
-	tvlA: string;
-	tvlB: string;
-	volA: string;
-	volB: string;
-	apr: string;
-	supply: string;
-	deleted: number;
-	tokADecimals: number;
-	tokBDecimals: number;
-	tvl: number;
-	creator: string;
-	mintRound: number;
+interface HumblePoolToken {
+	id: number;
+	type: string;
+	symbol: string;
+	balance: string;
+	decimals: number;
+	volume24h?: string;
 }
+
+/** Mimir /dex/pools as served (checked live 2026-10-30, TASK-33). It has no APR. */
+interface HumblePoolInfo {
+	poolId: number;
+	tokenA: HumblePoolToken;
+	tokenB: HumblePoolToken;
+	exchange: string;
+	escrowAddress: string;
+	outstandingLpAmount: string;
+}
+
+// wVOI (390001) stands in for VOI, which consumers key as '0'.
+const humbleTokenId = (id: number) => (id === 390001 ? '0' : id.toString());
 
 /** Get Humble pools and enrich immutable Nomadex metadata with live Mimir state. */
 export const getLiquidityPools = async (fetchFn: typeof fetch = fetch) => {
@@ -69,14 +67,13 @@ export const getLiquidityPools = async (fetchFn: typeof fetch = fetch) => {
 
 	const humblePools: PoolInfo[] = humbleData.pools.map((pool) => ({
 		poolId: pool.poolId.toString(),
-		tokAId: pool.tokenA.id === 390001 ? 0 : pool.tokenA.id,
-		tokBId: pool.tokenB.id === 390001 ? 0 : pool.tokenB.id,
+		tokAId: humbleTokenId(pool.tokenA.id),
+		tokBId: humbleTokenId(pool.tokenB.id),
 		poolBalA: pool.tokenA.balance,
 		poolBalB: pool.tokenB.balance,
 		supply: pool.outstandingLpAmount,
 		provider: pool.exchange,
 		tvl: 0,
-		apr: Number(pool.apr),
 		symbolA: pool.tokenA.id === 390001 ? 'VOI' : pool.tokenA.symbol,
 		symbolB: pool.tokenB.id === 390001 ? 'VOI' : pool.tokenB.symbol
 	}));

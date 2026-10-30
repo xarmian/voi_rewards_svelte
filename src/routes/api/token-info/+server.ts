@@ -93,7 +93,8 @@ export const GET: RequestHandler = async ({ url }) => {
 					imageUrl: null,
 					type: 'VOI',
 					equivalents: equivalents.ids,
-					totalSupply: totalSupply.value
+					totalSupply: totalSupply.value,
+					algoAssetId: null
 				};
 			} else {
 				// Try ARC200 contracts first
@@ -146,7 +147,8 @@ export const GET: RequestHandler = async ({ url }) => {
 							imageUrl: null,
 							type: 'ASA',
 							equivalents: equivalents.ids,
-							totalSupply: totalSupply.value
+							totalSupply: totalSupply.value,
+							algoAssetId: null
 						};
 					} else {
 						return json({ info: null });
@@ -169,7 +171,8 @@ export const GET: RequestHandler = async ({ url }) => {
 					imageUrl: null,
 					type: 'VOI',
 					equivalents: equivalents.ids,
-					totalSupply: totalSupply.value
+					totalSupply: totalSupply.value,
+					algoAssetId: null
 				};
 			} else {
 				// Case-insensitive match on symbol in ARC200 contracts
@@ -198,7 +201,8 @@ export const GET: RequestHandler = async ({ url }) => {
 					imageUrl: row.image_url || null,
 					type: 'ARC200',
 					equivalents: equivalents.ids,
-					totalSupply: totalSupply.value
+					totalSupply: totalSupply.value,
+					algoAssetId: null
 				};
 			}
 		} else {
