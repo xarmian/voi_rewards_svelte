@@ -15,7 +15,9 @@
 	import type { FAQItem } from '$lib/faqData.js';
 
 	export let data;
-	const { faqData, highlightedFAQ: initialHighlightedFAQ, lastFivePosts, recentFAQs } = data;
+	const { faqData, highlightedFAQ: initialHighlightedFAQ, recentFAQs } = data;
+	// TASK-26 r1: each load returns a new posts promise; follow it across client navigation.
+	$: lastFivePosts = data.lastFivePosts;
 
 	let selectedCategory = 'All';
 	let expandAll = false;
