@@ -364,6 +364,25 @@ describe('TASK-29 analytics response caching', () => {
 		}
 	);
 
+	it('leaves a retired exchange out of token analytics totals (TASK-88)', async () => {
+		mocks.from.mockImplementation((table: string) =>
+			query(
+				table === 'pool_catalog'
+					? [
+							pool,
+							{ ...pool, pool_id: (pool as { pool_id: number }).pool_id + 1, exchange: 'nomadex' }
+						]
+					: []
+			)
+		);
+		mocks.rpc.mockResolvedValue({ data: [], error: null });
+		const response = await tokenGET(event('/api/token-analytics?tokenId=0'));
+		expect(response.status).toBe(200);
+		expect(mocks.rpc).toHaveBeenCalledWith('get_pool_aggregates', {
+			p_pool_ids: [(pool as { pool_id: number }).pool_id]
+		});
+	});
+
 	it('does not cache a 500 caused by malformed aggregate data', async () => {
 		mocks.rpc.mockResolvedValue({ data: [{ pool_id: 1, sides: null }], error: null });
 		const response = await tokenGET(event('/api/token-analytics?tokenId=0'));
