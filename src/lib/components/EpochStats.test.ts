@@ -39,6 +39,26 @@ async function flush() {
 
 afterEach(() => vi.restoreAllMocks());
 
+it('connects every hover explanation to a named keyboard trigger', () => {
+	const source = readFileSync(new URL('./EpochStats.svelte', import.meta.url), 'utf8');
+	const tooltips = [...source.matchAll(/<div\s+([^>]*group-hover:visible[^>]*)>/g)];
+	expect(tooltips).toHaveLength(6);
+	const ids = new Set<string>();
+	for (const [, attributes] of tooltips) {
+		expect(attributes).toContain('group-focus-within:visible');
+		expect(attributes).toContain('role="tooltip"');
+		const id = attributes.match(/id="([^"]+)"/)?.[1];
+		expect(id).toBeTruthy();
+		ids.add(id!);
+		const button = [...source.matchAll(/<button\s+([^>]+)>/g)].find(([, attrs]) =>
+			attrs.includes(`aria-describedby="${id}"`)
+		);
+		expect(button?.[1]).toMatch(/aria-label="About [^"]+"/);
+		expect(button?.[1]).toContain('on:keydown=');
+	}
+	expect(ids.size).toBe(6);
+});
+
 it.each(['/api/markets?token=VOI', '/api/price-history?period=7d', '/api/mimir'])(
 	'isolates %s rejection while assigning epochs and finishing loading',
 	async (failed) => {

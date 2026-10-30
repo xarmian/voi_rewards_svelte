@@ -923,7 +923,9 @@
 			<div class="mb-5">
 				<div class="flex items-end justify-center gap-3">
 					<div class="flex flex-col items-center">
-						<label class="text-sm text-gray-600 dark:text-gray-400 mb-2"> Monthly node cost </label>
+						<label for="monthly-node-cost" class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+							Monthly node cost
+						</label>
 						<div class="flex items-center gap-2">
 							<button
 								class="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xl font-bold transition-colors"
@@ -941,6 +943,7 @@
 								>
 								<input
 									type="number"
+									id="monthly-node-cost"
 									bind:value={nodeCost}
 									min="0"
 									step="1"

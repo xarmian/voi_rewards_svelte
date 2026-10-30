@@ -1,5 +1,6 @@
 <script lang="ts">
 	export let showModal: boolean;
+	export let labelledby: string | undefined = undefined;
 	export let size: 'sm' | 'md' | 'lg' | 'xl' = 'md';
 
 	let dialog: HTMLDialogElement;
@@ -28,6 +29,7 @@
 
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 <dialog
+	aria-labelledby={labelledby}
 	bind:this={dialog}
 	on:close={() => (showModal = false)}
 	on:click|self={closeModal}

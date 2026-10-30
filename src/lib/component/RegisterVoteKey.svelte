@@ -447,12 +447,13 @@
 	}
 </script>
 
-<Modal bind:showModal size="xl">
+<Modal bind:showModal size="xl" labelledby="register-participation-key-title">
 	<div slot="header" class="flex items-center justify-between w-full">
 		<div class="flex items-center gap-2">
 			<i class="fas fa-key text-blue-500"></i>
-			<span class="text-lg font-semibold text-gray-900 dark:text-white"
-				>Register Participation Key</span
+			<span
+				id="register-participation-key-title"
+				class="text-lg font-semibold text-gray-900 dark:text-white">Register Participation Key</span
 			>
 		</div>
 		<div class="flex items-center gap-2">
