@@ -6,7 +6,7 @@ import { isRetiredExchange } from '$lib/markets/retired';
 
 export interface MarketSnapshot {
 	price: number;
-	volume_24h: number;
+	volume_24h: number | null;
 	tvl: number | null;
 	high_24h: number | null;
 	low_24h: number | null;

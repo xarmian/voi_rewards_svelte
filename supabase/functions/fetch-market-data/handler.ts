@@ -66,6 +66,10 @@ export function createHandler(deps: HandlerDeps) {
 					});
 					try {
 						return await Promise.race([source.fetch(), deadline]);
+					} catch (error) {
+						// One failing source must not discard the others' snapshots.
+						deps.logger.error(`Source ${source.name} failed:`, error);
+						return null;
 					} finally {
 						if (timeoutId !== undefined) timers.clearTimeout(timeoutId);
 					}

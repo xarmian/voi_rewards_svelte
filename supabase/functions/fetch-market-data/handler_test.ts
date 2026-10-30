@@ -90,14 +90,20 @@ Deno.test('insert error returns 500 with the existing error response', async () 
 	assertEquals(await response.json(), { success: false, error: 'insert failed' });
 });
 
-Deno.test('source rejection preserves the existing 500 response', async () => {
-	const { handler, inserts } = setup({
-		sources: [{ name: 'broken', fetch: () => Promise.reject('failure') }]
+Deno.test('source rejection is logged and the other sources still insert', async () => {
+	const { handler, inserts, logs } = setup({
+		sources: [
+			{ name: 'Tinyman', fetch: () => Promise.resolve(snapshot) },
+			{ name: 'broken', fetch: () => Promise.reject(new Error('failure')) }
+		]
 	});
 	const response = await handler(request());
-	assertEquals(response.status, 500);
-	assertEquals(await response.json(), { success: false, error: 'Unknown error occurred' });
-	assertEquals(inserts, []);
+	assertEquals(response.status, 200);
+	assertEquals(await response.json(), { success: true, snapshots_count: 1 });
+	assertEquals(inserts, [[snapshot]]);
+	assertEquals(logs.length, 1);
+	assertStringIncludes(logs[0], 'broken');
+	assertStringIncludes(logs[0], 'failure');
 });
 
 Deno.test('auth off accepts an anon bearer and runs sources', async () => {

@@ -15,13 +15,14 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		if (error) throw error;
 
-		// Map bucket_time to time in data
-		const mappedData = data.map(
-			({ bucket_time, value }: { bucket_time: string; value: number }) => ({
+		// Map bucket_time to time in data. A bucket whose snapshots all have null volume
+		// (Uniswap) has no volume-weighted price, so it is dropped rather than charted as null.
+		const mappedData = data
+			.filter(({ value }: { value: number | null }) => value !== null)
+			.map(({ bucket_time, value }: { bucket_time: string; value: number }) => ({
 				time: bucket_time,
 				value
-			})
-		);
+			}));
 
 		return json(mappedData, {
 			headers: publicCache(
