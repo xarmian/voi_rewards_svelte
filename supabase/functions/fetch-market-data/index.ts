@@ -1,11 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { ethers } from 'https://esm.sh/ethers@6.9.0';
-
-const corsHeaders = {
-	'Access-Control-Allow-Origin': '*',
-	'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-};
+import { createHandler, type MarketSnapshot } from './handler.ts';
 
 /*interface NautilusPool {
   contractId: number;
@@ -58,29 +54,6 @@ interface HumblePool {
 	target_volume_all: string;
 	base_price: string;
 	target_price: string;
-}
-
-interface MarketSnapshot {
-	trading_pair_id: number;
-	price: number;
-	volume_24h: number;
-	tvl?: number;
-	high_24h?: number;
-	low_24h?: number;
-	price_change_24h?: number;
-	price_change_percentage_24h?: number;
-}
-
-interface SwapEvent {
-	args: {
-		amount0: bigint;
-		amount1: bigint;
-		sender: string;
-		recipient: string;
-		sqrtPriceX96: bigint;
-		liquidity: bigint;
-		tick: number;
-	};
 }
 
 interface PactPoolResponse {
@@ -159,6 +132,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Constants
+const SOURCE_TIMEOUT_MS = 10_000;
 const MEXC_ACCOUNT = 'CVYHPHOWCIOCVTS4QEUFPFROILQBVFR6HKSJKPTDWN4TDQ7QYAWPKMCVCM';
 const ALGOD_SERVER_VOI = 'https://mainnet-api.voi.nodely.dev';
 
@@ -167,8 +141,7 @@ const IUniswapV3PoolABI = [
 	'function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
 	'function liquidity() external view returns (uint128)',
 	'function token0() external view returns (address)',
-	'function token1() external view returns (address)',
-	'event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)'
+	'function token1() external view returns (address)'
 ];
 
 // Helper function to fetch historical price data
@@ -457,18 +430,10 @@ async function fetchUniswapData(): Promise<MarketSnapshot | null> {
 	try {
 		const POOL_ADDRESS = '0x11DeE17647b8cC8d1b6897D8f3CdFB50d6A11685';
 		const BASE_RPC = 'https://mainnet.base.org';
-		const CHUNK_SIZE = 9000; // Stay under 10k limit with some buffer
 
 		// Initialize provider and contract
 		const provider = new ethers.JsonRpcProvider(BASE_RPC);
 		const poolContract = new ethers.Contract(POOL_ADDRESS, IUniswapV3PoolABI, provider);
-
-		// Get current block
-		const currentBlock = await provider.getBlockNumber();
-
-		// Calculate block from ~24 hours ago (assuming 2 second block time on Base)
-		const blocksIn24Hours = Math.floor((24 * 60 * 60) / 2);
-		const fromBlock = currentBlock - blocksIn24Hours;
 
 		// Fetch pool data
 		const [slot0, token0, token1] = await Promise.all([
@@ -476,23 +441,6 @@ async function fetchUniswapData(): Promise<MarketSnapshot | null> {
 			poolContract.token0(),
 			poolContract.token1()
 		]);
-
-		// Fetch swap events in chunks
-		const swapEvents: SwapEvent[] = [];
-		let startBlock = fromBlock;
-		while (startBlock < currentBlock) {
-			const endBlock = Math.min(startBlock + CHUNK_SIZE, currentBlock);
-			const events = (await poolContract.queryFilter(
-				poolContract.filters.Swap(),
-				startBlock,
-				endBlock
-			)) as SwapEvent[];
-			swapEvents.push(...events);
-			startBlock = endBlock + 1;
-
-			// Add a small delay between requests to avoid rate limiting
-			await new Promise((resolve) => setTimeout(resolve, 100));
-		}
 
 		// Get token contracts to fetch decimals and balances
 		const token0Contract = new ethers.Contract(
@@ -530,28 +478,6 @@ async function fetchUniswapData(): Promise<MarketSnapshot | null> {
 		const priceDenominator = sqrtPriceX96 * sqrtPriceX96 * decimalAdjustment;
 		const price = Number(priceNumerator) / Number(priceDenominator);
 
-		// Calculate 24h volume
-		let volume24h = 0;
-		for (const event of swapEvents) {
-			// Convert amounts to proper decimals using BigInt arithmetic
-			const amount0BigInt = BigInt(event.args?.amount0?.toString() || '0');
-			const amount1BigInt = BigInt(event.args?.amount1?.toString() || '0');
-
-			// Convert to decimal values using BigInt division
-			const amount0Decimal = Number(amount0BigInt) / Math.pow(10, Number(decimals0));
-			const amount1Decimal = Number(amount1BigInt) / Math.pow(10, Number(decimals1));
-
-			// If amount0 is negative, it means token0 (USDC) is being swapped out
-			// If amount0 is positive, it means token0 (USDC) is being swapped in
-			if (amount0BigInt < BigInt(0)) {
-				// USDC being swapped out - use absolute USDC amount
-				volume24h += Math.abs(amount0Decimal);
-			} else {
-				// VOI being swapped out - convert VOI to USDC value
-				volume24h += Math.abs(amount1Decimal) * price;
-			}
-		}
-
 		// Calculate TVL in USDC using actual token balances
 		// Convert everything to BigInt first to avoid precision loss
 		const balance0BigInt = BigInt(balance0.toString());
@@ -582,7 +508,7 @@ async function fetchUniswapData(): Promise<MarketSnapshot | null> {
 		return {
 			trading_pair_id: 22, // Uniswap VOI/USDC pair
 			price: price,
-			volume_24h: volume24h,
+			volume_24h: null, // Swap volume is unavailable from this RPC.
 			tvl: tvl,
 			high_24h: undefined,
 			low_24h: undefined,
@@ -595,55 +521,22 @@ async function fetchUniswapData(): Promise<MarketSnapshot | null> {
 	}
 }
 
-serve(async (req: Request) => {
-	// Handle CORS preflight requests
-	if (req.method === 'OPTIONS') {
-		return new Response('ok', { headers: corsHeaders });
-	}
-
-	try {
-		// Fetch data from all sources in parallel
-		const [humbleData, tinymanData, pactfiData, uniswapData] = await Promise.all([
-			// fetchMEXCData(),
-			fetchHumbleData(),
-			fetchTinymanData(),
-			fetchPactFiData(),
-			fetchUniswapData()
-		]);
-
-		// Filter out null results and prepare for insertion
-		const snapshots = [humbleData, tinymanData, pactfiData, uniswapData].filter(
-			(data): data is MarketSnapshot => data !== null
-		);
-
-		if (snapshots.length > 0) {
-			// Insert all snapshots
+serve(
+	createHandler({
+		sources: [
+			// { name: 'MEXC', fetch: fetchMEXCData },
+			{ name: 'Humble', fetch: fetchHumbleData },
+			{ name: 'Tinyman', fetch: fetchTinymanData },
+			{ name: 'PactFi', fetch: fetchPactFiData },
+			{ name: 'Uniswap', fetch: fetchUniswapData }
+		],
+		insert: async (snapshots) => {
 			const { error } = await supabase.from('market_snapshots').insert(snapshots);
-
 			if (error) throw error;
-		}
-
-		return new Response(
-			JSON.stringify({
-				success: true,
-				snapshots_count: snapshots.length
-			}),
-			{
-				headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-				status: 200
-			}
-		);
-	} catch (error) {
-		console.error('Error in fetch-market-data function:', error);
-		return new Response(
-			JSON.stringify({
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error occurred'
-			}),
-			{
-				headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-				status: 500
-			}
-		);
-	}
-});
+		},
+		requireServiceRole: Deno.env.get('REQUIRE_SERVICE_ROLE') === '1',
+		serviceRoleKey: supabaseServiceKey,
+		sourceTimeoutMs: SOURCE_TIMEOUT_MS,
+		logger: console
+	})
+);

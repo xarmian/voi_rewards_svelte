@@ -261,7 +261,11 @@
 							>{formatCurrency(market.tvl)}</td
 						>
 						<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-							>{market.volume_24h ? formatCurrency(market.volume_24h) : '-'}</td
+							>{market.volume_24h === null
+								? '—'
+								: market.volume_24h
+									? formatCurrency(market.volume_24h)
+									: '-'}</td
 						>
 						<td class="px-6 py-3 whitespace-nowrap text-sm">
 							<span
