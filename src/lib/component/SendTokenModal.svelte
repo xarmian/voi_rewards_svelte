@@ -901,7 +901,9 @@
 		notice = null;
 	}
 
-	function hasDuplicateRecipients(): boolean {
+	// recipients is a parameter so the legacy-mode template expressions that call this
+	// name it and re-run when it changes (svelte >=5.34.4; TASK-38 trail).
+	function hasDuplicateRecipients(recipients: Recipient[]): boolean {
 		const addresses = recipients.filter((r) => r.address).map((r) => r.address);
 		return addresses.length !== new Set(addresses).size;
 	}
@@ -1226,10 +1228,10 @@
 							<div class="relative" use:clickOutside={() => (showCombineOptions = false)}>
 								<Button
 									size="xs"
-									color={hasDuplicateRecipients() ? 'blue' : 'light'}
+									color={hasDuplicateRecipients(recipients) ? 'blue' : 'light'}
 									on:click={() => (showCombineOptions = !showCombineOptions)}
-									disabled={recipients.length <= 1 || !hasDuplicateRecipients()}
-									class={hasDuplicateRecipients() ? 'animate-pulse' : ''}
+									disabled={recipients.length <= 1 || !hasDuplicateRecipients(recipients)}
+									class={hasDuplicateRecipients(recipients) ? 'animate-pulse' : ''}
 								>
 									<i class="fas fa-compress-alt mr-1"></i>
 									Combine

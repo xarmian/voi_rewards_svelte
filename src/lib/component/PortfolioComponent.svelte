@@ -442,7 +442,13 @@
 		return 'assetId' in token ? 'vsa' : 'arc200';
 	}
 
-	function sortTokens(tokens: any[]): any[] {
+	// The sort and filter state are parameters, not closure reads: a legacy-mode template
+	// re-runs only on the variables its expression names (svelte >=5.34.4; TASK-38 trail).
+	function sortTokens(
+		tokens: any[],
+		selectedTokenSort: string,
+		tokenSortDirection: 'asc' | 'desc'
+	): any[] {
 		return [...tokens].sort((a, b) => {
 			const aDetails = asaDetails.find((d) => d.id === a.assetId);
 			const bDetails = asaDetails.find((d) => d.id === b.assetId);
@@ -476,7 +482,7 @@
 		});
 	}
 
-	function filterTokens(tokens: any[]): any[] {
+	function filterTokens(tokens: any[], selectedTokenType: string, tokenSearchQuery: string): any[] {
 		return tokens.filter((token) => {
 			const details = asaDetails.find((d) => d.id === token.assetId);
 			const name = (details?.name || token.name || '').toLowerCase();
@@ -1380,7 +1386,7 @@
 								const currentUniqueId = getUniqueId(t);
 								// Check if this unique ID appears earlier in the array
 								return !arr.slice(0, i).some((item) => getUniqueId(item) === currentUniqueId);
-							} ))) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId || token.id}` : `arc200-${token.id}`)}
+							} ), selectedTokenType, tokenSearchQuery), selectedTokenSort, tokenSortDirection) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId || token.id}` : `arc200-${token.id}`)}
 					{@const details =
 						'assetId' in token ? asaDetails.find((d) => d.id === token.assetId) : null}
 					{@const tokenId = details ? details.id.toString() : token.id}
@@ -1419,7 +1425,7 @@
 					{/if}
 				{/each}
 
-				{#if filterTokens( [...asaTokens, ...fungibleTokens.filter((t) => !isLPToken(t))] ).length === 0}
+				{#if filterTokens( [...asaTokens, ...fungibleTokens.filter((t) => !isLPToken(t))], selectedTokenType, tokenSearchQuery ).length === 0}
 					<div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3">
 						No tokens found matching your criteria.
 					</div>
