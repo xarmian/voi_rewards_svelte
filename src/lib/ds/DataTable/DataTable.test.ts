@@ -156,6 +156,54 @@ describe('DataTable SSR', () => {
 		assert.ok((contentText(body).match(/—/g) ?? []).length >= 2);
 	});
 
+	test('totals render as a tfoot summary after every row, outside sorting (TASK-98)', () => {
+		const totals = { label: 'Total (2)', values: { blocks: '11', reward: '100' } };
+		const body = html({
+			totals,
+			sort: { key: 'blocks', dir: 'asc' },
+			limit: 1,
+			moreLabel: (n: number) => `See ${n} more`,
+			favourite: { pressed: () => false, ontoggle: () => {} }
+		});
+		assert.ok(body.indexOf('</tbody>') < body.indexOf('<tfoot'));
+		const foot = body.match(/<tfoot\b[\s\S]*?<\/tfoot>/)?.[0] ?? '';
+		// Favourite plus the leading Proposer column.
+		assert.match(foot, /<th scope="row" colspan="2"[^>]*>\s*Total \(2\)/);
+		assert.match(foot, /<td[^>]*text-end num[^>]*>11<\/td>/);
+		assert.match(foot, /<td[^>]*hidden md:table-cell[^>]*><\/td>/);
+		assert.match(foot, /<td[^>]*hidden lg:table-cell[^>]*>100<\/td>/);
+		// Below lg the hidden Reward total shows in the label cell instead.
+		assert.match(foot, /<span class="block font-normal lg:hidden">[\s\S]*Reward[\s\S]*100/);
+		assert.doesNotMatch(foot, /<button|<a\b/);
+	});
+	test('totals refuse a label with no cell or a hideable column inside it (TASK-98 r1)', () => {
+		assert.throws(
+			() => html({ totals: { label: 'Total', values: { name: 'x' } } }),
+			/leading priority 1/
+		);
+		const leadingShare = [columns[2], columns[0], columns[1]];
+		assert.throws(
+			() => html({ columns: leadingShare, totals: { label: 'Total', values: { blocks: '11' } } }),
+			/leading priority 1/
+		);
+		assert.match(
+			html({
+				totals: { label: 'Total', values: { name: 'x' } },
+				favourite: { pressed: () => false, ontoggle: () => {} }
+			}),
+			/<th scope="row" colspan="1"/
+		);
+	});
+	test('totals are omitted while loading, on error and with no rows', () => {
+		const totals = { label: 'Total', values: { blocks: '0' } };
+		for (const extra of [
+			{ state: 'loading' },
+			{ state: 'error' },
+			{ state: 'empty' },
+			{ rows: [] }
+		])
+			assert.doesNotMatch(html({ totals, ...extra }), /<tfoot/);
+	});
 	test('loading uses five static skeleton rows and suppresses data', () => {
 		const body = html({ state: 'loading' });
 		assert.match(body, /<table[^>]*aria-busy="true"/);

@@ -107,6 +107,45 @@ export function filterProposer(
 	].some((value) => value?.toLowerCase().includes(term));
 }
 
+/** Every row matching the search and the All/Favourites view, across all pages. */
+export function filterRewardRows<
+	R extends RewardRow & {
+		name?: string;
+		nickname?: string;
+		nodes?: { node_name: string | null }[];
+	}
+>(
+	rows: R[],
+	{ query, show, favourites }: { query: string; show: string; favourites: string[] }
+): R[] {
+	return rows.filter(
+		(row) => filterProposer(row, query) && (show !== 'favourites' || favourites.includes(row.addr))
+	);
+}
+
+export type RewardTotals = {
+	accounts: number;
+	blocks: number;
+	est: number | null;
+	usd: number | null;
+};
+
+/** Sums for the footer row (TASK-98); null for no rows. A total is missing if any row's is. */
+export function rewardTotals(rows: RewardRow[]): RewardTotals | null {
+	if (!rows.length) return null;
+	const sum = (pick: (row: RewardRow) => number | null) =>
+		rows.reduce<number | null>((total, row) => {
+			const value = pick(row);
+			return total === null || value === null ? null : total + value;
+		}, 0);
+	return {
+		accounts: rows.length,
+		blocks: rows.reduce((total, row) => total + row.blocks, 0),
+		est: sum((row) => row.est),
+		usd: sum((row) => row.usd)
+	};
+}
+
 export function rewardsCSV(rows: RewardRow[]): string {
 	return 'account,block_rewards\n' + rows.map((row) => [row.addr, row.est].join(',')).join('\n');
 }

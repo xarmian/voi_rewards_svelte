@@ -8,8 +8,9 @@
 	import { epochRange } from '$lib/epochs';
 	import { rewardsRefreshMode } from '$lib/home/headline';
 	import {
-		filterProposer,
+		filterRewardRows,
 		rewardRows,
+		rewardTotals,
 		rewardsCSV,
 		rewardsClock,
 		showAfterFavouritesChange,
@@ -90,12 +91,17 @@
 			})
 		);
 	});
-	let rows = $derived(
-		allRows.filter(
-			(row) =>
-				filterProposer(row, query) && (show !== 'favourites' || $favorites.includes(row.addr))
-		)
-	);
+	let rows = $derived(filterRewardRows(allRows, { query, show, favourites: $favorites }));
+	// Footer totals follow the filter across every page (TASK-98).
+	let totals = $derived.by(() => {
+		const sums = rewardTotals(rows);
+		return sums
+			? {
+					label: `Total (${comma(sums.accounts)} ${sums.accounts === 1 ? 'account' : 'accounts'})`,
+					values: { blocks: comma(sums.blocks), est: comma(sums.est), usd: usd(sums.usd) }
+				}
+			: undefined;
+	});
 	let topShare = $derived(allRows[0]?.share ?? 0);
 	let emptyText = $derived(
 		query
@@ -442,6 +448,7 @@
 			state={dataState === 'ready' && !rows.length ? 'empty' : dataState}
 			{asOf}
 			{emptyText}
+			{totals}
 			onretry={() => loadEpoch(epoch)}
 		/>
 	</div>

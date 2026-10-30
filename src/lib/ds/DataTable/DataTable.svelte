@@ -34,6 +34,7 @@
 		asOf,
 		emptyText = 'No data',
 		stickyHeader = true,
+		totals,
 		id
 	}: {
 		columns: Column<T>[];
@@ -63,6 +64,10 @@
 		asOf?: Date | number | string;
 		emptyText?: string;
 		stickyHeader?: boolean;
+		/** A summary row in <tfoot>, after every row and outside sorting. Values are
+		 * formatted text keyed by column key; the label spans the leading columns that have
+		 * no value, so keep those priority 1. Omitted while loading, on error or with no rows. */
+		totals?: { label: string; values: Record<string, string> };
 		/** Defaults to ds-table- + slug(caption). Keep captions unique on a page or pass id. */
 		id?: string;
 	} = $props();
@@ -97,6 +102,21 @@
 	});
 	let shown = $derived(visibleRows(sorted, limit, expanded));
 	let hiddenCount = $derived(limit === undefined ? 0 : Math.max(0, rows.length - limit));
+	let labelSpan = $derived.by(() => {
+		if (!totals) return 0;
+		const first = columns.findIndex((column) => column.key in totals.values);
+		const span = first === -1 ? columns.length : first;
+		// The label needs a cell, and a hideable column inside its colspan would misalign
+		// the footer at narrow widths (TASK-98 r1).
+		if (
+			span + Number(Boolean(favourite)) === 0 ||
+			columns.slice(0, span).some((c) => c.priority > 1)
+		)
+			throw new Error(
+				'DataTable totals need a leading priority 1 column (or favourite) for the label.'
+			);
+		return span;
+	});
 
 	function name(row: T): string {
 		if (!rowName) throw new Error('DataTable requires rowName for row controls.');
@@ -332,6 +352,32 @@
 				{/if}
 			{/if}
 		</tbody>
+		{#if totals && dataState !== 'loading' && dataState !== 'empty' && rows.length > 0}
+			<tfoot class="border-t border-edge font-bold">
+				<tr>
+					<th
+						scope="row"
+						colspan={Number(Boolean(favourite)) + labelSpan}
+						class="{padding} text-start"
+					>
+						{totals.label}
+						{#each hiddenColumns.filter((column) => column.key in totals.values) as column (column.key)}
+							<span class="block font-normal {column.priority === 3 ? 'lg:hidden' : 'md:hidden'}"
+								><span class="text-micro text-ink-muted">{column.header}</span>
+								<span class="num">{totals.values[column.key]}</span></span
+							>
+						{/each}
+					</th>
+					{#each columns.slice(labelSpan) as column (column.key)}
+						<td class="{padding} {visibility(column)} {alignment(column)} break-words"
+							>{totals.values[column.key] ?? ''}</td
+						>
+					{/each}
+					{#if rowActions}<td class={padding}></td>{/if}
+					{#if disclosure}<td class="{padding} {disclosureClass}"></td>{/if}
+				</tr>
+			</tfoot>
+		{/if}
 	{/if}
 </table>
 {#if dataState === 'error'}<InlineAlert message="Unable to load {caption}." {onretry} />{/if}

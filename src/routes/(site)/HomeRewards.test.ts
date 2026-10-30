@@ -481,8 +481,10 @@ test.each([false, true])(
 		assert.match(body, /role="group" aria-label="Epoch"/);
 		assert.match(body, /<button[^>]*aria-label="Next epoch"[^>]*disabled/);
 		assert.doesNotMatch(body, /\$0|<dialog[^>]*\bopen\b/);
+		// Row cells only; the TASK-98 footer has its own USD cell.
+		const tbody = body.match(/<tbody\b[\s\S]*?<\/tbody>/)?.[0] ?? '';
 		const usdCells =
-			body.match(/<td[^>]*class="[^"]*hidden lg:table-cell[^>]*>[\s\S]*?<\/td>/g) ?? [];
+			tbody.match(/<td[^>]*class="[^"]*hidden lg:table-cell[^>]*>[\s\S]*?<\/td>/g) ?? [];
 		assert.equal(usdCells.length, 15);
 		for (const cell of usdCells) assert.match(cell, />\s*—\s*<\/td>/);
 		noNestedControls(body);
@@ -562,4 +564,15 @@ test('nickname forms are keyed by address, with their own initial value', () => 
 		assert.match(body, new RegExp(`Nickname for ${address}`));
 		assert.doesNotMatch(body, /<dialog[^>]*\bopen\b/);
 	}
+});
+test('the footer totals every proposer, not just the 15 shown (TASK-98)', () => {
+	const body = html();
+	const foot = body.match(/<tfoot\b[\s\S]*?<\/tfoot>/)?.[0] ?? '';
+	assert.ok(body.indexOf('</tbody>') < body.indexOf('<tfoot'), 'tfoot follows the rows');
+	assert.match(foot, /<th scope="row" colspan="3"[^>]*>\s*Total \(97 accounts\)/);
+	const blocks = data.reduce((sum, row) => sum + row.block_count, 0);
+	assert.match(foot, new RegExp(`<td[^>]*num[^>]*>${blocks.toLocaleString('en-US')}</td>`));
+	// Est. VOI is shown and the USD total waits for the price, like the rows.
+	assert.match(foot, /<td[^>]*hidden md:table-cell[^>]*num[^>]*>[\d,]+<\/td>/);
+	assert.match(foot, /<td[^>]*hidden lg:table-cell[^>]*>—<\/td>/);
 });
