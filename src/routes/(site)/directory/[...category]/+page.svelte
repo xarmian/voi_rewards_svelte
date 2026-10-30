@@ -114,6 +114,7 @@
 					<input
 						type="text"
 						placeholder="Search projects..."
+						aria-label="Search projects"
 						bind:value={searchTerm}
 						class="w-full pl-12 pr-4 py-3 rounded-2xl bg-white/50 dark:bg-gray-900/50
                    border border-violet-100/50 dark:border-violet-400/10

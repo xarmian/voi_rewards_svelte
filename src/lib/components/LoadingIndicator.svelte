@@ -2,8 +2,13 @@
 	import { isLoading } from '$lib/stores/loadingStore';
 </script>
 
+<div role="status" class="sr-only">{$isLoading ? 'Loading' : ''}</div>
+
 {#if $isLoading}
-	<div class="fixed top-0 left-0 right-0 z-50 h-1 bg-blue-500 animate-pulse"></div>
+	<div
+		aria-hidden="true"
+		class="fixed top-0 left-0 right-0 z-50 h-1 bg-blue-500 animate-pulse"
+	></div>
 {/if}
 
 <style>
