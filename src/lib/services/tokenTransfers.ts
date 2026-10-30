@@ -1,7 +1,7 @@
-import { calculateUserPoolShare, isLPToken } from '$lib/tokens/lpStats';
+import { calculateUserPoolAmounts, calculateUserPoolShare, isLPToken } from '$lib/tokens/lpStats';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the moved upstream payload handling. */
 import type { FungibleTokenType, LPToken } from '$lib/types/assets';
-import { algodIndexer } from '$lib/utils/algod';
+import { algodClient, algodIndexer } from '$lib/utils/algod';
 import { getEnvoiNames } from '$lib/utils/envoi';
 import {
 	decodeBase64Log,
@@ -209,6 +209,14 @@ export async function fetchTokenTransfers({
 			'tokBDecimals' in token.poolInfo
 		) {
 			const poolInfo = token.poolInfo as LPToken['poolInfo'];
+			// Humble events list amounts in contract order (TASK-97); null when it is unknown.
+			let humbleReversed: boolean | null = false;
+			if (poolInfo.provider === 'humble' && newTransfers.length > 0) {
+				humbleReversed = await humbleContractOrderReversed(poolInfo).catch((error) => {
+					console.error('Error reading Humble pool token order:', error);
+					return null;
+				});
+			}
 			// Process each transfer to find potential atomic group transactions
 			for (let i = 0; i < newTransfers.length; i++) {
 				const transfer = newTransfers[i];
@@ -236,11 +244,10 @@ export async function fetchTokenTransfers({
 							// Determine if this is Humble's format (needs special handling)
 							isHumbleFormat = selector === '192a776c' || selector === '151f7c75';
 
-							// Only swap tokens for specific DEXes, NOT for Humble
-							// Humble's format should NOT have tokens swapped
+							// No format needs a swap by itself; a Humble pool's contract order
+							// decides (humbleReversed, TASK-97).
 							needsTokenSwap = false;
 
-							// Note: For Humble DEX, the token order is already correct
 							// - '192a776c' is the Deposit selector (Add Liquidity)
 							// - '151f7c75' is the Withdraw selector (Remove Liquidity)
 
@@ -360,7 +367,11 @@ export async function fetchTokenTransfers({
 						}
 
 						// If we found a Deposit or Withdraw event, update the transfer with LP exchange details
-						if ((isDeposit || isWithdraw) && (tokenAAmount !== null || tokenBAmount !== null)) {
+						if (
+							(isDeposit || isWithdraw) &&
+							(tokenAAmount !== null || tokenBAmount !== null) &&
+							humbleReversed !== null
+						) {
 							transfer.isLpExchange = true;
 
 							// SIMPLIFIED APPROACH: Use token transfer direction to determine operation type
@@ -375,8 +386,11 @@ export async function fetchTokenTransfers({
 								transfer.lpExchangeType = isDeposit ? 'add' : 'remove';
 							}
 
-							// Only swap tokens for specific DEXes, NOT for Humble
-							if (needsTokenSwap && tokenAAmount !== null && tokenBAmount !== null) {
+							if (
+								(needsTokenSwap || humbleReversed) &&
+								tokenAAmount !== null &&
+								tokenBAmount !== null
+							) {
 								// Swap token A and B
 								[tokenAAmount, tokenBAmount] = [tokenBAmount, tokenAAmount];
 							}
@@ -569,87 +583,29 @@ export function fetchCurrentPoolBalance(
 	currentPoolBalance: { tokenA: number; tokenB: number } | null
 ) {
 	if (!isLPToken(token) || !token.poolInfo || currentPoolBalance) return;
-	const poolInfo = token.poolInfo;
+	// Humble reserves are base units like Nomadex's (TASK-97).
+	if (!(calculateUserPoolShare(token) > 0)) return;
+	return calculateUserPoolAmounts(token);
+}
 
-	try {
-		// Calculate user's share of the pool
-		const userShare = calculateUserPoolShare(token);
-
-		if (!(userShare > 0)) return;
-		// For Humble pools, we might need to fetch the latest pool data
-		if (poolInfo.provider === 'humble' && poolInfo.poolId) {
-			return fetchHumbleBalance(userShare);
-		}
-		return fallbackBalance(userShare);
-	} catch (error) {
-		console.error('Error fetching current pool balance:', error);
-	}
-	async function fetchHumbleBalance(userShare: number) {
-		try {
-			// Fetch the latest pool data from Humble API
-			const response = await fetch(
-				`https://mainnet-idx.algonode.cloud/v2/accounts/${poolInfo.poolId}`
-			);
-			const data = await response.json();
-
-			if (data && data.account) {
-				// Extract the token balances from the account assets
-				const assets = data.account.assets || [];
-
-				// Find the token A and token B assets
-				const tokenAAsset = assets.find(
-					(asset: any) => asset['asset-id'].toString() === poolInfo.tokAId
-				);
-				const tokenBAsset = assets.find(
-					(asset: any) => asset['asset-id'].toString() === poolInfo.tokBId
-				);
-
-				if (tokenAAsset && tokenBAsset) {
-					// Calculate the user's share of each token
-					// For Humble, the asset amounts are in raw form and need to be divided by 10^decimals
-					const tokenAAmount =
-						userShare * (Number(tokenAAsset.amount) / Math.pow(10, poolInfo.tokADecimals));
-					const tokenBAmount =
-						userShare * (Number(tokenBAsset.amount) / Math.pow(10, poolInfo.tokBDecimals));
-
-					// Update the current pool balance
-					// For Humble pools, multiply by 10^6 to correct the value
-					return {
-						tokenA: tokenAAmount * Math.pow(10, 6),
-						tokenB: tokenBAmount * Math.pow(10, 6)
-					};
-				}
-			}
-		} catch (error) {
-			console.error('Error fetching Humble pool data:', error);
-		}
-		try {
-			return fallbackBalance(userShare);
-		} catch (error) {
-			console.error('Error fetching current pool balance:', error);
-		}
-	}
-
-	function fallbackBalance(userShare: number) {
-		// IMPORTANT: For Humble pools, tokABalance and tokBBalance are already in decimal form
-		// For other providers, we need to divide by 10^decimals
-		let tokenAAmount, tokenBAmount;
-
-		if (poolInfo.provider === 'humble') {
-			// For Humble pools, multiply by 10^6 to correct the value
-			tokenAAmount = userShare * Number(poolInfo.tokABalance) * Math.pow(10, 6);
-			tokenBAmount = userShare * Number(poolInfo.tokBBalance) * Math.pow(10, 6);
-		} else {
-			tokenAAmount =
-				userShare * (Number(poolInfo.tokABalance) / Math.pow(10, poolInfo.tokADecimals));
-			tokenBAmount =
-				userShare * (Number(poolInfo.tokBBalance) / Math.pow(10, poolInfo.tokBDecimals));
-		}
-
-		// Create currentPoolBalance object
-		return {
-			tokenA: tokenAAmount,
-			tokenB: tokenBAmount
-		};
-	}
+/**
+ * Whether a Humble pool contract lists its tokens in the reverse of poolInfo's order.
+ * Its events carry amounts in contract order, and Mimir's pool order is arbitrary
+ * (TASK-97). Global key 0x00 starts with the tokA and tokB ids as uint64s.
+ */
+async function humbleContractOrderReversed(poolInfo: LPToken['poolInfo']): Promise<boolean> {
+	const app = await algodClient.getApplicationByID(Number(poolInfo.poolId)).do();
+	const state: { key: string; value: { bytes?: string } }[] = app.params?.['global-state'] ?? [];
+	const entry = state.find((kv) => kv.key === 'AA==');
+	const bytes = entry?.value.bytes ? Buffer.from(entry.value.bytes, 'base64') : null;
+	if (!bytes || bytes.length < 16) throw new Error(`No token ids in pool ${poolInfo.poolId}`);
+	// Mimir keys wVOI (390001) as VOI ('0').
+	const id = (offset: number) => {
+		const value = bytes.readBigUInt64BE(offset).toString();
+		return value === '390001' ? '0' : value;
+	};
+	const [contractA, contractB] = [id(0), id(8)];
+	if (contractA === poolInfo.tokAId && contractB === poolInfo.tokBId) return false;
+	if (contractA === poolInfo.tokBId && contractB === poolInfo.tokAId) return true;
+	throw new Error(`Pool ${poolInfo.poolId} tokens ${contractA}/${contractB} do not match`);
 }

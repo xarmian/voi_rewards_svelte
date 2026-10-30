@@ -12,6 +12,9 @@ export interface PoolInfo {
 	apr?: number;
 	symbolA?: string;
 	symbolB?: string;
+	/** Side decimals, when the source reports them (Mimir's Humble pools do). */
+	decimalsA?: number;
+	decimalsB?: number;
 }
 
 interface NomadexLivePool {
@@ -75,7 +78,9 @@ export const getLiquidityPools = async (fetchFn: typeof fetch = fetch) => {
 		provider: pool.exchange,
 		tvl: 0,
 		symbolA: pool.tokenA.id === 390001 ? 'VOI' : pool.tokenA.symbol,
-		symbolB: pool.tokenB.id === 390001 ? 'VOI' : pool.tokenB.symbol
+		symbolB: pool.tokenB.id === 390001 ? 'VOI' : pool.tokenB.symbol,
+		decimalsA: pool.tokenA.decimals,
+		decimalsB: pool.tokenB.decimals
 	}));
 
 	const livePools = new Map(nomadexData.map((pool) => [pool.poolId, pool]));

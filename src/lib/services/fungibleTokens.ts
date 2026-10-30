@@ -25,6 +25,24 @@ interface UnifiedAssetsResponse {
 	'current-round': number;
 }
 
+// An LP side's display info. The pool's own decimals win over the holder's balances,
+// which only cover tokens the holder also holds (TASK-97).
+function getTokenInfo(
+	tokenId: string,
+	tokenDetails: UnifiedAssetBalance | undefined,
+	fallbackSymbol?: string,
+	poolDecimals?: number
+) {
+	if (tokenId === '0') return { symbol: 'VOI', name: 'Voi', decimals: 6 };
+	if (tokenId === '390001') return { symbol: 'wVOI', name: 'Wrapped Voi', decimals: 6 };
+	const fallback = fallbackSymbol || 'Unknown';
+	return {
+		symbol: tokenDetails ? tokenDetails.symbol : fallback,
+		name: tokenDetails ? tokenDetails.name : fallback,
+		decimals: poolDecimals ?? tokenDetails?.decimals ?? 6
+	};
+}
+
 async function fetchAllAssetBalances(walletAddress: string, fetchFn: typeof fetch): Promise<UnifiedAssetsResponse> {
 	const baseUrl = `https://voi-mainnet-mimirapi.nftnavigator.xyz/account/assets`;
 	const allBalances: UnifiedAssetBalance[] = [];
@@ -297,41 +315,8 @@ export async function fetchFungibleTokens(
 					(b) => b.contractId.toString() === pool.tokBId
 				);
 
-				// Handle special cases for VOI (ID 0 or 390001)
-				const getTokenInfo = (
-					tokenId: string,
-					tokenDetails: UnifiedAssetBalance | undefined,
-					fallbackSymbol?: string
-				) => {
-					if (tokenId === '0') {
-						return {
-							symbol: 'VOI',
-							name: 'Voi',
-							decimals: 6
-						};
-					} else if (tokenId === '390001') {
-						return {
-							symbol: 'wVOI',
-							name: 'Wrapped Voi',
-							decimals: 6
-						};
-					} else if (tokenDetails) {
-						return {
-							symbol: tokenDetails.symbol,
-							name: tokenDetails.name,
-							decimals: tokenDetails.decimals
-						};
-					} else {
-						return {
-							symbol: fallbackSymbol || 'Unknown',
-							name: fallbackSymbol || 'Unknown',
-							decimals: 6
-						};
-					}
-				};
-
-				const tokenAInfo = getTokenInfo(pool.tokAId, tokenADetails, pool.symbolA);
-				const tokenBInfo = getTokenInfo(pool.tokBId, tokenBDetails, pool.symbolB);
+				const tokenAInfo = getTokenInfo(pool.tokAId, tokenADetails, pool.symbolA, pool.decimalsA);
+				const tokenBInfo = getTokenInfo(pool.tokBId, tokenBDetails, pool.symbolB, pool.decimalsB);
 
 				let poolName = '';
 
@@ -363,7 +348,7 @@ export async function fetchFungibleTokens(
 						tokBSymbol: tokenBInfo.symbol,
 						tokABalance: pool.poolBalA,
 						tokBBalance: pool.poolBalB,
-						totalSupply: Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
+						totalSupply: Number(pool.supply),
 						poolId: pool.poolId,
 						apr: pool.apr ?? 0,
 						tokADecimals: tokenAInfo.decimals,
@@ -391,9 +376,11 @@ export async function fetchFungibleTokens(
 					outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
 				};
 
-				// Find if this token is tradeable in any pool. An emptied pool (LP supply 0)
-				// can't trade, and a token may sit in one beside a live pool (TASK-33).
+				// Find a Humble pool to trade this token in (the link goes to humble.sh, TASK-97).
+				// An emptied pool (LP supply 0) can't trade, and a token may sit in one beside
+				// a live pool (TASK-33).
 				for (const pool of liquidityPools) {
+					if (pool.provider !== 'humble') continue;
 					if (pool.supply !== '' && Number(pool.supply) === 0) continue;
 					if (pool.tokAId === tokenId || pool.tokBId === tokenId) {
 						regularToken.poolId = pool.poolId;
@@ -453,41 +440,18 @@ export async function fetchFungibleTokens(
 								(b) => b.contractId.toString() === pool.tokBId
 							);
 
-							// Handle special cases for VOI (ID 0 or 390001)
-							const getTokenInfo = (
-								tokenId: string,
-								tokenDetails: UnifiedAssetBalance | undefined,
-								fallbackSymbol?: string
-							) => {
-								if (tokenId === '0') {
-									return {
-										symbol: 'VOI',
-										name: 'Voi',
-										decimals: 6
-									};
-								} else if (tokenId === '390001') {
-									return {
-										symbol: 'wVOI',
-										name: 'Wrapped Voi',
-										decimals: 6
-									};
-								} else if (tokenDetails) {
-									return {
-										symbol: tokenDetails.symbol,
-										name: tokenDetails.name,
-										decimals: tokenDetails.decimals
-									};
-								} else {
-									return {
-										symbol: fallbackSymbol || 'Unknown',
-										name: fallbackSymbol || 'Unknown',
-										decimals: 6
-									};
-								}
-							};
-
-							const tokenAInfo = getTokenInfo(pool.tokAId, tokenADetails, pool.symbolA);
-							const tokenBInfo = getTokenInfo(pool.tokBId, tokenBDetails, pool.symbolB);
+							const tokenAInfo = getTokenInfo(
+								pool.tokAId,
+								tokenADetails,
+								pool.symbolA,
+								pool.decimalsA
+							);
+							const tokenBInfo = getTokenInfo(
+								pool.tokBId,
+								tokenBDetails,
+								pool.symbolB,
+								pool.decimalsB
+							);
 
 							const poolName =
 								pool.provider === 'nomadex'
@@ -515,8 +479,7 @@ export async function fetchFungibleTokens(
 									tokBSymbol: tokenBInfo.symbol,
 									tokABalance: pool.poolBalA,
 									tokBBalance: pool.poolBalB,
-									totalSupply:
-										Number(pool.supply) * (pool.provider === 'humble' ? Math.pow(10, 6) : 1),
+									totalSupply: Number(pool.supply),
 									poolId: pool.poolId,
 									apr: pool.apr ?? 0,
 									tokADecimals: tokenAInfo.decimals,

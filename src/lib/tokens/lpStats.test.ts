@@ -4,6 +4,7 @@ import type { Transfer } from '$lib/services/tokenTransfers';
 import {
 	calculateLPStatistics,
 	calculateUserPoolShare,
+	calculateUserPoolAmounts,
 	calculateRunningBalance,
 	formatChange
 } from './lpStats';
@@ -100,7 +101,50 @@ describe('LP statistics', () => {
 		expect(calculateUserPoolShare(token)).toBe(0.1);
 		expect(
 			calculateUserPoolShare({ ...token, poolInfo: { ...token.poolInfo, provider: 'humble' } })
-		).toBe(0.001);
+		).toBe(0.1);
+	});
+	// TASK-97: Mimir serves Humble supply and reserves in base units, like Nomadex. Live
+	// 2026-10-30, pool 40180060 (wVOI 6 / aBTC 8 decimals); truth was 57,897.54 VOI and
+	// 0.000176 aBTC, while prod showed 0.017602 aBTC (100x) and 0.00% of pool.
+	it('values a Humble LP with an 8-decimal side from base-unit reserves', () => {
+		const abtc: LPToken = {
+			...token,
+			balance: 31238745,
+			decimals: 6,
+			poolInfo: {
+				...token.poolInfo,
+				provider: 'humble',
+				tokABalance: '87625948837',
+				tokBBalance: '26640',
+				totalSupply: 47278775,
+				tokADecimals: 6,
+				tokBDecimals: 8
+			}
+		};
+		expect(calculateUserPoolShare(abtc)).toBeCloseTo(31238745 / 47278775, 12);
+		const amounts = calculateUserPoolAmounts(abtc);
+		expect(amounts.tokenA).toBeCloseTo(57897.54, 2);
+		expect(amounts.tokenB).toBeCloseTo(0.000176, 6);
+	});
+	it('values an 18-decimal side and returns zeros for an unheld LP', () => {
+		const rocket: LPToken = {
+			...token,
+			balance: Number('69536883434672898'),
+			decimals: 6,
+			poolInfo: {
+				...token.poolInfo,
+				provider: 'humble',
+				tokABalance: '5771393685',
+				tokBBalance: '98706807154814757062881206',
+				totalSupply: Number('695368834346728981'),
+				tokADecimals: 6,
+				tokBDecimals: 18
+			}
+		};
+		const amounts = calculateUserPoolAmounts(rocket);
+		expect(amounts.tokenA).toBeCloseTo(577.1393685, 4);
+		expect(amounts.tokenB).toBeCloseTo(9870680.715, 1);
+		expect(calculateUserPoolAmounts({ ...rocket, balance: 0 })).toEqual({ tokenA: 0, tokenB: 0 });
 	});
 	it('reverses newer received, sent and fee amounts and formats their signs', () => {
 		const sent = { ...transfer, from: 'wallet', to: 'other', amount: '0.3' };

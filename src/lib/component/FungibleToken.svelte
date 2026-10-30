@@ -1,51 +1,3 @@
-<script context="module" lang="ts">
-	// Helper function to calculate user's share of a token in the pool
-	function calculateUserTokenShare(token: LPToken, tokenType: 'A' | 'B'): number {
-		try {
-			// User's LP token balance in decimal form
-			const userLpBalance = Number(token.balance) / Math.pow(10, token.decimals);
-
-			// Total supply of LP tokens
-			let totalSupply;
-
-			// For Humble pools, the totalSupply is already in decimal form
-			if (token.poolInfo.provider === 'humble') {
-				totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, 6);
-			} else {
-				// For other providers, we need to divide by 10^decimals
-				totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, token.decimals);
-			}
-
-			if (totalSupply <= 0 || userLpBalance <= 0) return 0;
-
-			// Calculate user's share as a decimal (0-1)
-			const userShare = userLpBalance / totalSupply;
-
-			// Get the token balance from the pool
-			const tokenBalance =
-				tokenType === 'A' ? Number(token.poolInfo.tokABalance) : Number(token.poolInfo.tokBBalance);
-
-			// Get the token decimals
-			const tokenDecimals =
-				tokenType === 'A' ? token.poolInfo.tokADecimals : token.poolInfo.tokBDecimals;
-
-			// For Humble, the balance is already in decimal form
-			// For other providers, we need to divide by 10^decimals
-			let result;
-			if (token.poolInfo.provider === 'humble') {
-				result = userShare * tokenBalance;
-			} else {
-				result = userShare * (tokenBalance / Math.pow(10, tokenDecimals));
-			}
-
-			return result;
-		} catch (error) {
-			console.error(`Error calculating token ${tokenType} share:`, error);
-			return 0;
-		}
-	}
-</script>
-
 <script lang="ts">
 	import type { FungibleTokenType, LPToken, TokenApproval } from '$lib/types/assets';
 	import { createEventDispatcher, onMount } from 'svelte';
@@ -55,6 +7,7 @@
 	import TokenTransfersModal from './TokenTransfersModal.svelte';
 	import ManageApprovalsModal from './ManageApprovalsModal.svelte';
 	import { getEnvoiNames } from '$lib/utils/envoi';
+	import { calculateUserPoolAmounts, calculateUserPoolShare } from '$lib/tokens/lpStats';
 	import { algodClient } from '$lib/utils/algod';
 	import { selectedWallet } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
@@ -223,10 +176,9 @@
 		);
 	}
 
-	$: poolShare =
-		isLPToken(token) && token.poolInfo
-			? Number(token.balance) / Number(token.poolInfo.totalSupply)
-			: null;
+	$: poolShare = isLPToken(token) && token.poolInfo ? calculateUserPoolShare(token) : null;
+	// Humble reserves are base units like Nomadex's (TASK-97).
+	$: poolAmounts = calculateUserPoolAmounts(token);
 	// An unknown APR shows nothing, never "NaN%" (TASK-33).
 	$: apr =
 		isLPToken(token) && token.poolInfo && Number.isFinite(Number(token.poolInfo.apr))
@@ -650,25 +602,13 @@
 							<div>
 								<p class="text-gray-500 dark:text-gray-400">{token.poolInfo.tokASymbol} Amount</p>
 								<p class="text-gray-700 dark:text-gray-200">
-									{formatNumber(
-										(poolShare || 0) *
-											(token.poolInfo.provider === 'humble'
-												? Number(token.poolInfo.tokABalance)
-												: Number(token.poolInfo.tokABalance) /
-													Math.pow(10, token.poolInfo.tokADecimals))
-									)}
+									{formatNumber(poolAmounts.tokenA)}
 								</p>
 							</div>
 							<div>
 								<p class="text-gray-500 dark:text-gray-400">{token.poolInfo.tokBSymbol} Amount</p>
 								<p class="text-gray-700 dark:text-gray-200">
-									{formatNumber(
-										(poolShare || 0) *
-											(token.poolInfo.provider === 'humble'
-												? Number(token.poolInfo.tokBBalance)
-												: Number(token.poolInfo.tokBBalance) /
-													Math.pow(10, token.poolInfo.tokBDecimals))
-									)}
+									{formatNumber(poolAmounts.tokenB)}
 								</p>
 							</div>
 							<div class="col-span-2">
@@ -866,7 +806,7 @@
 		<div class="absolute bottom-3 left-3">
 			{#if token.poolInfo.provider === 'humble'}
 				<a
-					href="https://voi.humble.sh/#/swap?poolId=${token.poolId}"
+					href={`https://voi.humble.sh/#/swap?poolId=${token.poolId}`}
 					target="_blank"
 					rel="noopener noreferrer"
 				>
@@ -909,12 +849,7 @@
 		bind:open={showTransfersModal}
 		{token}
 		{walletId}
-		currentPoolBalance={isLPToken(token) && token.poolInfo
-			? {
-					tokenA: calculateUserTokenShare(token, 'A'),
-					tokenB: calculateUserTokenShare(token, 'B')
-				}
-			: null}
+		currentPoolBalance={isLPToken(token) && token.poolInfo ? poolAmounts : null}
 	/>
 {/if}
 

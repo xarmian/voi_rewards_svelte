@@ -200,34 +200,26 @@ export function calculateLPStatistics(
 	return stats;
 }
 
-// Calculate user's share of the pool
+// User's share of the pool (0-1). Balance and supply are both LP base units, for
+// Humble as for Nomadex (TASK-97).
 export function calculateUserPoolShare(token: FungibleTokenType | LPToken): number {
 	if (!isLPToken(token) || !token.poolInfo) return 0;
+	const balance = Number(token.balance);
+	const totalSupply = Number(token.poolInfo.totalSupply);
+	return totalSupply > 0 && balance > 0 ? balance / totalSupply : 0;
+}
 
-	try {
-		// User's LP token balance in decimal form
-		const userLpBalance = Number(token.balance) / Math.pow(10, token.decimals);
-
-		// Total supply of LP tokens
-		let totalSupply;
-
-		// For Humble pools, the totalSupply is already in decimal form
-		if (token.poolInfo.provider === 'humble') {
-			totalSupply = Number(token.poolInfo.totalSupply);
-		} else {
-			// For other providers, we need to divide by 10^decimals
-			totalSupply = Number(token.poolInfo.totalSupply) / Math.pow(10, token.decimals);
-		}
-
-		// Calculate user's share as a decimal (0-1)
-		if (totalSupply > 0 && userLpBalance > 0) {
-			const share = userLpBalance / totalSupply;
-			return share;
-		}
-
-		return 0;
-	} catch (error) {
-		console.error('Error calculating user pool share:', error);
-		return 0;
-	}
+// The user's share of each pool reserve in whole tokens. Reserves are base units.
+export function calculateUserPoolAmounts(token: FungibleTokenType | LPToken): {
+	tokenA: number;
+	tokenB: number;
+} {
+	const share = calculateUserPoolShare(token);
+	if (!isLPToken(token) || !(share > 0)) return { tokenA: 0, tokenB: 0 };
+	const { tokABalance, tokBBalance, tokADecimals, tokBDecimals } = token.poolInfo;
+	const amount = (reserve: string, decimals: number) => {
+		const value = (share * Number(reserve)) / Math.pow(10, decimals);
+		return Number.isFinite(value) ? value : 0;
+	};
+	return { tokenA: amount(tokABalance, tokADecimals), tokenB: amount(tokBBalance, tokBDecimals) };
 }
