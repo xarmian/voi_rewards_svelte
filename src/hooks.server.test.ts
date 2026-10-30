@@ -242,6 +242,64 @@ test('custom fetch forwards options and combines the caller signal', async () =>
 	expect(signal!.aborted).toBe(false);
 });
 
+test('custom fetch keeps a Request input signal when init has none (TASK-86)', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockImplementation(() => new Promise<never>(() => {}));
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+
+	const before = new AbortController();
+	await fetch(new Request('https://example.invalid/auth/v1/user', { signal: before.signal }));
+	const beforeSignal = fetchMock.mock.calls[0][1]!.signal!;
+	expect(beforeSignal.aborted).toBe(false);
+	const reason = new Error('caller cancelled');
+	before.abort(reason);
+	expect(beforeSignal.aborted).toBe(true);
+	expect(beforeSignal.reason).toBe(reason);
+
+	const result = event.locals.safeGetSession();
+	await vi.advanceTimersByTimeAsync(3000);
+	expect(await result).toEqual({ session: null, user: null });
+
+	// The caller's own abort, already raised, outranks the later deadline.
+	const after = new AbortController();
+	const afterReason = new Error('caller cancelled after');
+	after.abort(afterReason);
+	await fetch(new Request('https://example.invalid/auth/v1/user', { signal: after.signal }));
+	const afterSignal = fetchMock.mock.calls[1][1]!.signal!;
+	expect(afterSignal.aborted).toBe(true);
+	expect(afterSignal.reason).toBe(afterReason);
+});
+
+test('custom fetch: an explicit init.signal null drops the Request signal but keeps the deadline (TASK-86 r1)', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockImplementation(() => new Promise<never>(() => {}));
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+
+	const caller = new AbortController();
+	await fetch(new Request('https://example.invalid/auth/v1/user', { signal: caller.signal }), {
+		signal: null
+	});
+	const signal = fetchMock.mock.calls[0][1]!.signal!;
+	caller.abort(new Error('caller cancelled'));
+	expect(signal.aborted).toBe(false);
+
+	const result = event.locals.safeGetSession();
+	await vi.advanceTimersByTimeAsync(3000);
+	expect(await result).toEqual({ session: null, user: null });
+	expect(signal.aborted).toBe(true);
+	expect(signal.reason.name).toBe('TimeoutError');
+});
+
 test('custom fetch receives the deadline TimeoutError after a getUser stall', async () => {
 	vi.useFakeTimers();
 	getSession.mockResolvedValue({ data: { session } });
