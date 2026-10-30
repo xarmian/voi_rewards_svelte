@@ -6,6 +6,7 @@
 	import type { IProject } from '$lib/data/types';
 	import ProjectCard from '$lib/components/ecosystem/ProjectCard.svelte';
 	import Share from '$lib/component/ui/Share.svelte';
+	import { rowKeys } from '$lib/utils/rowKeys';
 
 	export let data;
 
@@ -34,6 +35,8 @@
 	}
 
 	$: activeProjects = projects.filter((project) => project.status === 'active');
+	// Supabase rows; nothing in the repo guarantees id is unique, and a repeat would throw.
+	$: projectKeys = rowKeys(filteredProjects, (project) => String(project.id));
 	$: view = directoryView({
 		status,
 		total: activeProjects.length,
@@ -177,7 +180,7 @@
 			<!-- Projects Grid -->
 			{#if view === 'list'}
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-					{#each filteredProjects as project (project.id)}
+					{#each filteredProjects as project, i (projectKeys[i])}
 						<ProjectCard {project} on:categoryClick={handleCategoryClick} />
 					{/each}
 				</div>

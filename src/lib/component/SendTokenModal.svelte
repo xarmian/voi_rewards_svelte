@@ -20,6 +20,7 @@
 	import ImportRecipientsModal from './ImportRecipientsModal.svelte';
 	import RecipientRow from './RecipientRow.svelte';
 	import type { Recipient } from '$lib/types/recipients';
+	import { rowKeys } from '$lib/utils/rowKeys';
 
 	// Constants for Algorand transaction limits
 	const MAX_TXN_PER_GROUP = 16;
@@ -28,6 +29,8 @@
 	export let tokens: FungibleTokenType[];
 
 	$: availableTokens = tokens.filter((t) => !isLPToken(t)) as FungibleTokenType[];
+	// Indexer pages aren't deduped and a token without an id falls back to '0' (native VOI).
+	$: tokenKeys = rowKeys(availableTokens, (t) => String(t.id ?? '0'));
 
 	// Helper function to check if a token is an LP token
 	function isLPToken(token: FungibleTokenType) {
@@ -901,7 +904,9 @@
 		notice = null;
 	}
 
-	function hasDuplicateRecipients(): boolean {
+	// recipients is a parameter so the legacy-mode template expressions that call this
+	// name it and re-run when it changes (svelte >=5.34.4; TASK-38 trail).
+	function hasDuplicateRecipients(recipients: Recipient[]): boolean {
 		const addresses = recipients.filter((r) => r.address).map((r) => r.address);
 		return addresses.length !== new Set(addresses).size;
 	}
@@ -1121,7 +1126,7 @@
 							<div
 								class="absolute left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto"
 							>
-								{#each availableTokens as token (token.id ?? '0')}
+								{#each availableTokens as token, i (tokenKeys[i])}
 									{@const iconId = isNativeToken(token) ? '0' : String(token.id ?? '')}
 									<button
 										class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
@@ -1226,10 +1231,10 @@
 							<div class="relative" use:clickOutside={() => (showCombineOptions = false)}>
 								<Button
 									size="xs"
-									color={hasDuplicateRecipients() ? 'blue' : 'light'}
+									color={hasDuplicateRecipients(recipients) ? 'blue' : 'light'}
 									on:click={() => (showCombineOptions = !showCombineOptions)}
-									disabled={recipients.length <= 1 || !hasDuplicateRecipients()}
-									class={hasDuplicateRecipients() ? 'animate-pulse' : ''}
+									disabled={recipients.length <= 1 || !hasDuplicateRecipients(recipients)}
+									class={hasDuplicateRecipients(recipients) ? 'animate-pulse' : ''}
 								>
 									<i class="fas fa-compress-alt mr-1"></i>
 									Combine

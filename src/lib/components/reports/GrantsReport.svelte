@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { GrantsData } from '$lib/types/reports.types';
+	import { rowKeys } from '$lib/utils/rowKeys';
 
 	let {
 		data,
@@ -8,6 +9,8 @@
 		data: GrantsData;
 		formatNum: (val: string, prefix?: string) => string;
 	} = $props();
+
+	const grantKeys = $derived(rowKeys(data.grants_submitted_in_progress, (g) => g.proposal_name));
 </script>
 
 <!-- Monthly Snapshot -->
@@ -81,7 +84,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.grants_submitted_in_progress as grant (grant.proposal_name)}
+					{#each data.grants_submitted_in_progress as grant, i (grantKeys[i])}
 						<tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
 							<td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
 								{grant.proposal_name}
