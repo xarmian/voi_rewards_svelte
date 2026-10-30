@@ -489,3 +489,28 @@ test('a Humble LP resolves its tokens from balances and a token links to its Hum
 	);
 	assert.equal(result.tokens.find((token) => token.id === '401384')?.poolId, '777');
 });
+
+test('a token in an emptied Humble pool and a live one links to the live pool', async () => {
+	// Live 2026-10-30: GM (300279) is in 395555 (LP supply 0) and 395554 (TASK-33 r1).
+	const gm = { id: 300279, type: 'ARC200', symbol: 'GM', decimals: 2 };
+	const wvoi = { id: 390001, type: 'ARC200', symbol: 'wVOI', decimals: 6 };
+	vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+		new URL(String(input)).searchParams.get('exchange') === 'nomadex'
+			? Response.json({ pools: [] })
+			: Response.json({
+					pools: [
+						{ poolId: 395555, tokenA: { ...gm, balance: '0' }, tokenB: { ...wvoi, balance: '0' }, exchange: 'humble', escrowAddress: 'A', outstandingLpAmount: '0' },
+						{ poolId: 395554, tokenA: { ...wvoi, balance: '5' }, tokenB: { ...gm, balance: '7' }, exchange: 'humble', escrowAddress: 'B', outstandingLpAmount: '6949611087' }
+					]
+				})
+	);
+	const held = [{ name: 'GM', symbol: 'GM', balance: '100', decimals: 2, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 300279 }];
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools,
+		fetch: async (input) =>
+			new URL(String(input)).pathname === '/account/assets'
+				? Response.json({ balances: held, 'next-token': null, 'total-count': 1, 'current-round': 100 })
+				: Response.json({ approvals: [] })
+	});
+	assert.equal(result.tokens.find((token) => token.id === '300279')?.poolId, '395554');
+});

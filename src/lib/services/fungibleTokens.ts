@@ -391,8 +391,10 @@ export async function fetchFungibleTokens(
 					outgoingApprovals: outgoingApprovalsMap.get(tokenId) || []
 				};
 
-				// Find if this token is tradeable in any pool
+				// Find if this token is tradeable in any pool. An emptied pool (LP supply 0)
+				// can't trade, and a token may sit in one beside a live pool (TASK-33).
 				for (const pool of liquidityPools) {
+					if (pool.supply !== '' && Number(pool.supply) === 0) continue;
 					if (pool.tokAId === tokenId || pool.tokBId === tokenId) {
 						regularToken.poolId = pool.poolId;
 						break;
