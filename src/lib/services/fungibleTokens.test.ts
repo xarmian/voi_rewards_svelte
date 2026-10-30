@@ -435,15 +435,74 @@ test('unheld Nomadex pools do not trigger per-pool reads', async () => {
 	);
 });
 
-test('Humble LP valuation and card supply units are unchanged', async () => {
+test('Humble LP valuation is unchanged and its card supply stays in base units', async () => {
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools: async () => [lpPool()],
 		fetch: fakeFetch()
 	});
 	assert.equal(result.tokens[0].value, 4);
 	assert.equal(result.tokens[0].usdValue, 0.0008);
-	assert.equal(result.tokens[0].poolInfo?.totalSupply, 10000000000000);
+	// TASK-97: was supply x 1e6, which put the pool share 1e6 too low ("0.00% of pool").
+	assert.equal(result.tokens[0].poolInfo?.totalSupply, 10000000);
 	assert.equal(result.partial, false);
+});
+
+test('a Humble LP takes side decimals from the pool when the holder lacks the token', async () => {
+	// TASK-97: only the holder's own balances supplied decimals, so an unheld 8-decimal
+	// side fell back to 6.
+	vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+		new URL(String(input)).searchParams.get('exchange') === 'nomadex'
+			? Response.json({ pools: [] })
+			: Response.json({
+					pools: [
+						{
+							poolId: 40180060,
+							tokenA: { id: 390001, type: 'ARC200', symbol: 'wVOI', balance: '87625948837', decimals: 6 },
+							tokenB: { id: 40153368, type: 'ARC200', symbol: 'aBTC', balance: '26640', decimals: 8 },
+							exchange: 'humble',
+							escrowAddress: 'ESCROW',
+							outstandingLpAmount: '47278775'
+						}
+					]
+				})
+	);
+	const held = [
+		{ name: 'Humble LP', symbol: 'HLP', balance: '31238745', decimals: 6, imageUrl: '', usdValue: null, verified: 0, accountId: 'wallet', assetType: 'arc200', contractId: 40180060 }
+	];
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools,
+		fetch: async (input) =>
+			new URL(String(input)).pathname === '/account/assets'
+				? Response.json({ balances: held, 'next-token': null, 'total-count': 1, 'current-round': 100 })
+				: Response.json({ approvals: [] })
+	});
+	const lp = result.tokens.find((token) => token.id === '40180060');
+	assert.deepEqual(
+		{
+			tokADecimals: lp?.poolInfo?.tokADecimals,
+			tokBDecimals: lp?.poolInfo?.tokBDecimals,
+			tokBSymbol: lp?.poolInfo?.tokBSymbol,
+			totalSupply: lp?.poolInfo?.totalSupply
+		},
+		{ tokADecimals: 6, tokBDecimals: 8, tokBSymbol: 'aBTC', totalSupply: 47278775 }
+	);
+});
+
+test('a token only in a Nomadex pool gets no Humble swap link', async () => {
+	// TASK-97: the first pool holding the token won, so a Nomadex pool id reached humble.sh.
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [{ ...lpPool('nomadex'), poolId: '999', tokBId: '777' }],
+		fetch: async (input) =>
+			new URL(String(input)).pathname === '/account/assets'
+				? Response.json({
+						balances: [{ name: 'T', symbol: 'T', balance: '1', decimals: 0, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 777 }],
+						'next-token': null,
+						'total-count': 1,
+						'current-round': 100
+					})
+				: Response.json({ approvals: [] })
+	});
+	assert.equal(result.tokens.find((token) => token.id === '777')?.poolId, undefined);
 });
 
 test('a Humble LP resolves its tokens from balances and a token links to its Humble pool', async () => {

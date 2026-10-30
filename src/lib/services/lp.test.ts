@@ -103,6 +103,8 @@ test('Humble pools map to string token ids (wVOI as 0) and carry no APR', async 
 		provider: 'humble',
 		tvl: 0,
 		symbolA: 'VOI',
-		symbolB: 'OTHER'
+		symbolB: 'OTHER',
+		decimalsA: 6,
+		decimalsB: 18
 	});
 });
