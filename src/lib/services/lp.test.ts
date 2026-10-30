@@ -14,11 +14,12 @@ const livePool = {
 function mockPools(failure?: '500' | 'reject') {
 	const humble = {
 		poolId: 123,
-		tokenA: { id: 390001, symbol: 'wVOI', balance: '1000000' },
-		tokenB: { id: 456, symbol: 'OTHER', balance: '2000000' },
+		// The live Mimir shape (checked 2026-10-30, TASK-33): no apr field.
+		tokenA: { id: 390001, type: 'ARC200', symbol: 'wVOI', balance: '1000000', decimals: 6 },
+		tokenB: { id: 456, type: 'ARC200', symbol: 'OTHER', balance: '2000000', decimals: 18 },
 		outstandingLpAmount: '9000000',
 		exchange: 'humble',
-		apr: '12.5'
+		escrowAddress: 'ESCROW'
 	};
 	const fetchFn = vi.fn<typeof fetch>(async (input) => {
 		const url = new URL(String(input));
@@ -89,19 +90,18 @@ for (const failure of ['500', 'reject'] as const) {
 	});
 }
 
-test('Humble mapping and units are unchanged', async () => {
+test('Humble pools map to string token ids (wVOI as 0) and carry no APR', async () => {
 	mockPools();
 	const pools = await getLiquidityPools();
 	expect(pools.find((pool) => pool.provider === 'humble')).toEqual({
 		poolId: '123',
-		tokAId: 0,
-		tokBId: 456,
+		tokAId: '0',
+		tokBId: '456',
 		poolBalA: '1000000',
 		poolBalB: '2000000',
 		supply: '9000000',
 		provider: 'humble',
 		tvl: 0,
-		apr: 12.5,
 		symbolA: 'VOI',
 		symbolB: 'OTHER'
 	});

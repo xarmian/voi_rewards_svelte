@@ -227,7 +227,11 @@
 		isLPToken(token) && token.poolInfo
 			? Number(token.balance) / Number(token.poolInfo.totalSupply)
 			: null;
-	$: apr = isLPToken(token) && token.poolInfo ? Number(token.poolInfo.apr) : null;
+	// An unknown APR shows nothing, never "NaN%" (TASK-33).
+	$: apr =
+		isLPToken(token) && token.poolInfo && Number.isFinite(Number(token.poolInfo.apr))
+			? Number(token.poolInfo.apr)
+			: null;
 
 	// Calculate display value based on token type
 	$: displayValue = token.value || 0;

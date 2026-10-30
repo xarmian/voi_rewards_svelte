@@ -9,6 +9,7 @@
 		"preview": "node scripts/generateFaqData.js && vite preview",
 		"precheck": "node scripts/generateFaqData.js",
 		"check": "node scripts/contrast-check.mjs && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:changed": "scripts/check-changed.sh",
 		"test": "vitest run",
 		"test:unit": "vitest run",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

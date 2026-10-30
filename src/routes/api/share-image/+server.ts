@@ -5,7 +5,8 @@ import sharp from 'sharp';
 import { readFileSync } from 'fs';
 
 // Load Arial Bold font - we'll use a fallback if not available
-let fontData: ArrayBuffer;
+// satori takes either; readFileSync gives a Buffer.
+let fontData: Buffer | ArrayBuffer;
 
 try {
 	// Try to load Arial Bold from system fonts (macOS path)
@@ -16,7 +17,7 @@ try {
 	fontData = new ArrayBuffer(0); // Will be loaded dynamically
 }
 
-async function loadFont(): Promise<ArrayBuffer> {
+async function loadFont(): Promise<Buffer | ArrayBuffer> {
 	if (fontData.byteLength > 0) {
 		return fontData;
 	}
