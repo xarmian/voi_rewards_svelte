@@ -1,3 +1,4 @@
+import { withDeadline, UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -20,13 +21,16 @@ interface EpochResponse {
 
 export const GET: RequestHandler = async () => {
 	try {
-		const response = await fetch(
-			'https://api.voirewards.com/proposers/index_main_3.php?action=epoch-detail'
-		);
-		if (!response.ok) {
-			throw new Error('Failed to fetch epoch data');
-		}
-		const data: EpochResponse = await response.json();
+		const data: EpochResponse = await withDeadline(async (signal) => {
+			const response = await fetch(
+				'https://api.voirewards.com/proposers/index_main_3.php?action=epoch-detail',
+				{ signal }
+			);
+			if (!response.ok) {
+				throw new Error('Failed to fetch epoch data');
+			}
+			return response.json();
+		}, UPSTREAM_TIMEOUT_MS);
 		return json(
 			{
 				...data,

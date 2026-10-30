@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
@@ -46,11 +47,13 @@ interface PoolAnalytics {
 // Get pool data using the get_arc200_pools function
 async function getPoolData(poolId: number): Promise<any> {
 	try {
-		const { data, error } = await supabaseMimirClient.rpc('get_arc200_pools', {
-			params: {
-				poolId: poolId
-			}
-		});
+		const { data, error } = await supabaseMimirClient
+			.rpc('get_arc200_pools', {
+				params: {
+					poolId: poolId
+				}
+			})
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (error) {
 			console.error('Error calling get_arc200_pools:', error);

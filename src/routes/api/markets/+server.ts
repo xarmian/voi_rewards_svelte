@@ -1,5 +1,5 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
-import { withDeadline } from '$lib/server/fetchWithTimeout';
+import { withDeadline, fetchWithTimeout, UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { fetchCirculatingSupply } from '$lib/utils/voi';
@@ -70,7 +70,11 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		const orConditions = equivalentIds
 			.flatMap((id) => [`token_a_id.eq.${id}`, `token_b_id.eq.${id}`])
 			.join(',');
-		const poolsRes = await supabaseMimirClient.from('pool_catalog').select('*').or(orConditions);
+		const poolsRes = await supabaseMimirClient
+			.from('pool_catalog')
+			.select('*')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
+			.or(orConditions);
 		if (poolsRes.error) throw poolsRes.error;
 
 		const pairs = normalizePairs(poolsRes.data, equivalentIds);
@@ -99,7 +103,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			// VOI USD reference - get from price history which uses proper sources
 			(async () => {
 				try {
-					const refRes = await fetch(`${url.origin}/api/price-history?period=24h&token=VOI`);
+					const refRes = await fetchWithTimeout(
+						`${url.origin}/api/price-history?period=24h&token=VOI`,
+						{ fetch, timeoutMs: 3000 }
+					);
 					return resolveVoiUsd(refRes.ok ? await refRes.json() : null);
 				} catch {
 					return { voiUsd: null, status: 'unavailable' as const, asOf: null };
@@ -137,10 +144,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		try {
 			if (algoAssetId) {
 				const priceMapForVestige = vestigePriceMap(symbolUsd);
-				vestigeMarkets = await fetchVestigeMarketsForAsset(
-					algoAssetId,
-					priceMapForVestige,
-					onFailure
+				vestigeMarkets = await withDeadline(
+					(signal) =>
+						fetchVestigeMarketsForAsset(algoAssetId, priceMapForVestige, onFailure, signal),
+					4000
 				);
 			} else {
 				console.log(`Token ${tokenId} has no algo_asset_id, skipping Vestige markets`);

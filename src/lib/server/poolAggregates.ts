@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 // TASK-52, C11, P06: consume Mimir aggregates without downloading individual swaps.
 export interface PoolSide {
 	base_token_id: number;
@@ -34,7 +35,12 @@ export interface PoolAggregate {
 }
 
 export async function fetchPoolAggregates(
-	client: { rpc: (fn: string, args: object) => PromiseLike<{ data: unknown; error: unknown }> },
+	client: {
+		rpc: (
+			fn: string,
+			args: object
+		) => { abortSignal(signal: AbortSignal): PromiseLike<{ data: unknown; error: unknown }> };
+	},
 	poolIds: number[]
 ): Promise<Map<number, PoolAggregate>> {
 	const ids = [...new Set(poolIds)];
@@ -44,7 +50,9 @@ export async function fetchPoolAggregates(
 	}
 	const results = await Promise.all(
 		chunks.map(async (p_pool_ids) => {
-			const { data, error } = await client.rpc('get_pool_aggregates', { p_pool_ids });
+			const { data, error } = await client
+				.rpc('get_pool_aggregates', { p_pool_ids })
+				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 			if (error) throw error;
 			return (data || []) as PoolAggregate[];
 		})

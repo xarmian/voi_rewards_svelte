@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { pgrstQuote, validateTokenSearch } from '$lib/server/validate';
@@ -19,7 +20,10 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Fetch all pool data to extract unique tokens
-		let poolQuery = supabaseMimirClient.from('pool_catalog').select('*');
+		let poolQuery = supabaseMimirClient
+			.from('pool_catalog')
+			.select('*')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (query) {
 			// Search by either token_a_symbol or token_b_symbol

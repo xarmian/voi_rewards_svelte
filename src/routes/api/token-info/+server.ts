@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
@@ -28,6 +29,7 @@ async function getTokenTotalSupply(
 		const { data: arc200Data, error: arc200Error } = await supabaseMimirClient
 			.from('arc200_contracts')
 			.select('total_supply')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.eq('contract_id', tokenId)
 			.single();
 
@@ -41,6 +43,7 @@ async function getTokenTotalSupply(
 		const { data: assetData, error: assetError } = await supabaseMimirClient
 			.from('asset')
 			.select('params')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.eq('index', tokenId)
 			.single();
 
@@ -97,6 +100,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				const { data: arc200Data, error: arc200Error } = await supabaseMimirClient
 					.from('arc200_contracts')
 					.select('contract_id, symbol, decimals, image_url, algo_asset_id')
+					.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 					.eq('contract_id', targetTokenId)
 					.single();
 
@@ -123,6 +127,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					const { data: assetData, error: assetError } = await supabaseMimirClient
 						.from('asset')
 						.select('params')
+						.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 						.eq('index', targetTokenId)
 						.single();
 
@@ -171,6 +176,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				const { data, error } = await supabaseMimirClient
 					.from('arc200_contracts')
 					.select('contract_id, symbol, decimals, image_url')
+					.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 					.ilike('symbol', symbol)
 					.limit(1);
 

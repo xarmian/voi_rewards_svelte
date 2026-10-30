@@ -1,3 +1,5 @@
+export const UPSTREAM_TIMEOUT_MS = 5000;
+
 /** Bound the caller's wait even when a fetch implementation ignores cancellation. */
 export async function fetchWithTimeout(
 	input: RequestInfo | URL,

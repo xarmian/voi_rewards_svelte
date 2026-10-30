@@ -9,12 +9,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/mimir', () => ({
-	mimirClient: { from: mocks.from, rpc: mocks.rpc }
+	mimirClient: {
+		from: mocks.from,
+		rpc: (...args: unknown[]) => ({ abortSignal: () => mocks.rpc(...args) })
+	}
 }));
 vi.mock('$lib/supabase', () => ({ supabasePublicClient: { from: mocks.from } }));
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: vi.fn().mockResolvedValue(100) }));
 vi.mock('$lib/server/supabase', () => ({
-	supabasePrivateClient: { from: mocks.from, rpc: mocks.rpc }
+	supabasePrivateClient: {
+		from: mocks.from,
+		rpc: (...args: unknown[]) => ({ abortSignal: () => mocks.rpc(...args) })
+	}
 }));
 vi.mock('$env/static/public', () => ({
 	PUBLIC_MIMIR_URL: 'https://mimir.invalid',
@@ -48,6 +54,7 @@ function query(data: unknown, error: unknown = null) {
 	const result = Promise.resolve({ data, error });
 	const builder = {
 		select: () => builder,
+		abortSignal: () => builder,
 		gte: () => builder,
 		lte: () => builder,
 		returns: () => result,

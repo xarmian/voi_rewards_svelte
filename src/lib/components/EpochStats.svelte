@@ -84,51 +84,48 @@
 				if (!lifecycle.disposed) dark = theme.current === 'dark';
 			})
 		);
-		const fetchData = async () => {
-			try {
-				const [epochsResponse, marketsResponse, priceHistoryResponse, onlineAccountsResponse] =
-					await Promise.all([
-						fetch('/api/epochs'),
-						fetch('/api/markets?token=VOI'),
-						fetch('/api/price-history?period=7d'),
-						fetch('/api/mimir')
-					]);
+		async function read(url: string) {
+			const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+			if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+			const data = await response.json();
+			if (data && typeof data === 'object' && 'error' in data) throw new Error(data.error);
+			return data;
+		}
 
-				const epochsData = await epochsResponse.json();
-				const marketsData = await marketsResponse.json();
-				const priceHistoryData = await priceHistoryResponse.json();
-				const onlineAccountsData = await onlineAccountsResponse.json();
-
-				if ('error' in epochsData) {
-					throw new Error(epochsData.error);
-				}
-
-				epochs = epochsData.epochs;
-				currentEpoch = epochsData.current_epoch;
-				onlineAccountCount = onlineAccountsData.data;
-
-				if (marketsData.aggregates) {
-					currentPrice = marketsData.aggregates.weightedAveragePrice;
-					// Volume-sorted; a Mimir pool row has no change without a 24h price window (TASK-89).
-					const withChange = marketsData.marketData.find(
-						(market: { price_change_percentage_24h?: number | null }) =>
-							Number.isFinite(market?.price_change_percentage_24h)
-					);
-					if (withChange) {
-						priceChange24h = withChange.price_change_percentage_24h ?? null;
+		const fetchData = () =>
+			Promise.allSettled([
+				(async () => {
+					try {
+						const data = await read('/api/epochs');
+						epochs = data.epochs;
+						currentEpoch = data.current_epoch;
+					} catch (e) {
+						error = e instanceof Error ? e.message : 'Failed to load data';
+					} finally {
+						loading = false;
 					}
-				}
-
-				if (Array.isArray(priceHistoryData)) {
-					priceHistory = priceHistoryData;
-				}
-
-				loading = false;
-			} catch (e) {
-				error = e instanceof Error ? e.message : 'Failed to load data';
-				loading = false;
-			}
-		};
+				})(),
+				(async () => {
+					const marketsData = await read('/api/markets?token=VOI');
+					if (marketsData.aggregates) {
+						currentPrice = marketsData.aggregates.weightedAveragePrice;
+						// Volume-sorted; a Mimir pool row has no change without a 24h price window (TASK-89).
+						const withChange = marketsData.marketData.find(
+							(market: { price_change_percentage_24h?: number | null }) =>
+								Number.isFinite(market?.price_change_percentage_24h)
+						);
+						if (withChange) priceChange24h = withChange.price_change_percentage_24h ?? null;
+					}
+				})(),
+				(async () => {
+					const data = await read('/api/price-history?period=7d');
+					if (Array.isArray(data)) priceHistory = data;
+				})(),
+				(async () => {
+					const data = await read('/api/mimir');
+					onlineAccountCount = data.data;
+				})()
+			]);
 
 		fetchData();
 		fetchTransactionCounts(txPeriod);

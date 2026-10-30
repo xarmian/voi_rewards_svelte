@@ -63,13 +63,18 @@ const NETWORK_ID = 0; // Algorand mainnet
 /**
  * Fetch all protocols from Vestige API
  */
-export async function fetchVestigeProtocols(onFailure?: () => void): Promise<VestigeProtocol[]> {
+export async function fetchVestigeProtocols(
+	onFailure?: () => void,
+	signal?: AbortSignal
+): Promise<VestigeProtocol[]> {
 	if (protocolsCache) {
 		return protocolsCache;
 	}
 
 	try {
-		const response = await fetch(`${VESTIGE_API_BASE}/protocols?network_id=${NETWORK_ID}`);
+		const response = await fetch(`${VESTIGE_API_BASE}/protocols?network_id=${NETWORK_ID}`, {
+			signal
+		});
 		if (!response.ok) {
 			throw new Error(`Vestige protocols API error: ${response.status}`);
 		}
@@ -89,15 +94,18 @@ export async function fetchVestigeProtocols(onFailure?: () => void): Promise<Ves
  */
 export async function fetchVestigePoolsByAsset(
 	assetId: number,
-	onFailure?: () => void
+	onFailure?: () => void,
+	signal?: AbortSignal
 ): Promise<VestigePool[]> {
 	try {
 		const [pools1Response, pools2Response] = await Promise.allSettled([
 			fetch(
-				`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_1_id=${assetId}&limit=50&offset=0&order_dir=desc`
+				`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_1_id=${assetId}&limit=50&offset=0&order_dir=desc`,
+				{ signal }
 			),
 			fetch(
-				`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_2_id=${assetId}&limit=50&offset=0&order_dir=desc`
+				`${VESTIGE_API_BASE}/pools?network_id=${NETWORK_ID}&asset_2_id=${assetId}&limit=50&offset=0&order_dir=desc`,
+				{ signal }
 			)
 		]);
 
@@ -137,14 +145,16 @@ export async function fetchVestigePoolsByAsset(
  */
 export async function fetchVestigeAssets(
 	assetIds: number[],
-	onFailure?: () => void
+	onFailure?: () => void,
+	signal?: AbortSignal
 ): Promise<VestigeAsset[]> {
 	if (assetIds.length === 0) return [];
 
 	try {
 		const idsParam = assetIds.join(',');
 		const response = await fetch(
-			`${VESTIGE_API_BASE}/assets?asset_ids=${idsParam}&network_id=${NETWORK_ID}`
+			`${VESTIGE_API_BASE}/assets?asset_ids=${idsParam}&network_id=${NETWORK_ID}`,
+			{ signal }
 		);
 
 		if (!response.ok) {
@@ -163,8 +173,12 @@ export async function fetchVestigeAssets(
 /**
  * Get protocol name by ID
  */
-export async function getProtocolName(protocolId: number, onFailure?: () => void): Promise<string> {
-	const protocols = await fetchVestigeProtocols(onFailure);
+export async function getProtocolName(
+	protocolId: number,
+	onFailure?: () => void,
+	signal?: AbortSignal
+): Promise<string> {
+	const protocols = await fetchVestigeProtocols(onFailure, signal);
 	const protocol = protocols.find((p) => p.id === protocolId);
 
 	if (!protocol) {
@@ -184,9 +198,10 @@ export async function getProtocolName(protocolId: number, onFailure?: () => void
  */
 export async function getProtocolUrl(
 	protocolId: number,
-	onFailure?: () => void
+	onFailure?: () => void,
+	signal?: AbortSignal
 ): Promise<string | null> {
-	const protocols = await fetchVestigeProtocols(onFailure);
+	const protocols = await fetchVestigeProtocols(onFailure, signal);
 	const protocol = protocols.find((p) => p.id === protocolId);
 	return protocol?.url || null;
 }
@@ -199,7 +214,8 @@ export async function convertVestigePoolToMarket(
 	targetAssetId: number,
 	assets: VestigeAsset[],
 	priceMap?: Map<string, number>, // Optional USD prices for assets
-	onFailure?: () => void
+	onFailure?: () => void,
+	signal?: AbortSignal
 ): Promise<any> {
 	// Get asset information
 	const asset1 = assets.find((a) => a.id === pool.asset_1_id);
@@ -226,8 +242,8 @@ export async function convertVestigePoolToMarket(
 	const exchangeRate = baseAmount > 0 && quoteAmount > 0 ? quoteAmount / baseAmount : 0;
 
 	// Get protocol information
-	const exchangeName = await getProtocolName(pool.protocol_id, onFailure);
-	const protocolUrl = await getProtocolUrl(pool.protocol_id, onFailure);
+	const exchangeName = await getProtocolName(pool.protocol_id, onFailure, signal);
+	const protocolUrl = await getProtocolUrl(pool.protocol_id, onFailure, signal);
 
 	// Get USD prices from the provided price map
 	const baseUsdPrice = priceMap?.get(baseAsset.ticker) || 0;
@@ -316,11 +332,12 @@ export async function convertVestigePoolToMarket(
 export async function fetchVestigeMarketsForAsset(
 	assetId: number,
 	priceMap?: Map<string, number>,
-	onFailure?: () => void
+	onFailure?: () => void,
+	signal?: AbortSignal
 ): Promise<any[]> {
 	try {
 		// Fetch pools for this asset
-		const pools = await fetchVestigePoolsByAsset(assetId, onFailure);
+		const pools = await fetchVestigePoolsByAsset(assetId, onFailure, signal);
 
 		if (pools.length === 0) {
 			return [];
@@ -334,11 +351,13 @@ export async function fetchVestigeMarketsForAsset(
 		});
 
 		// Fetch asset details
-		const assets = await fetchVestigeAssets(Array.from(allAssetIds), onFailure);
+		const assets = await fetchVestigeAssets(Array.from(allAssetIds), onFailure, signal);
 
 		// Convert pools to market format
 		const markets = await Promise.all(
-			pools.map((pool) => convertVestigePoolToMarket(pool, assetId, assets, priceMap, onFailure))
+			pools.map((pool) =>
+				convertVestigePoolToMarket(pool, assetId, assets, priceMap, onFailure, signal)
+			)
 		);
 
 		// Filter out null results and markets with zero/unrealistic prices

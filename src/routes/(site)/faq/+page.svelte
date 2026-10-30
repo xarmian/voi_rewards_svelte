@@ -15,7 +15,9 @@
 	import type { FAQItem } from '$lib/faqData.js';
 
 	export let data;
-	const { faqData, highlightedFAQ: initialHighlightedFAQ, lastFivePosts, recentFAQs } = data;
+	const { faqData, highlightedFAQ: initialHighlightedFAQ, recentFAQs } = data;
+	// TASK-26 r1: each load returns a new posts promise; follow it across client navigation.
+	$: lastFivePosts = data.lastFivePosts;
 
 	let selectedCategory = 'All';
 	let expandAll = false;
@@ -324,23 +326,25 @@
 				</header>
 				<div class="p-4">
 					<ul class="space-y-2">
-						{#each lastFivePosts as post}
-							<li>
-								<a
-									href={post.link}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="block hover:bg-gray-100 dark:hover:bg-gray-700 p-3 rounded-lg transition-colors"
-								>
-									<h3 class="text-lg font-semibold text-purple-600 dark:text-purple-400">
-										{post.title}
-									</h3>
-									<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-										Published {formatDate(post.pubDate)}
-									</p>
-								</a>
-							</li>
-						{/each}
+						{#await lastFivePosts then posts}
+							{#each posts as post}
+								<li>
+									<a
+										href={post.link}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="block hover:bg-gray-100 dark:hover:bg-gray-700 p-3 rounded-lg transition-colors"
+									>
+										<h3 class="text-lg font-semibold text-purple-600 dark:text-purple-400">
+											{post.title}
+										</h3>
+										<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+											Published {formatDate(post.pubDate)}
+										</p>
+									</a>
+								</li>
+							{/each}
+						{/await}
 					</ul>
 					<a
 						href="https://medium.com/@voifoundation"
@@ -375,23 +379,25 @@
 			</header>
 			<div class="p-4">
 				<ul class="space-y-4">
-					{#each lastFivePosts as post}
-						<li>
-							<a
-								href={post.link}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="block hover:bg-gray-100 dark:hover:bg-gray-700 p-3 rounded-lg transition-colors"
-							>
-								<h3 class="text-lg font-semibold text-purple-600 dark:text-purple-400">
-									{post.title}
-								</h3>
-								<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-									Published {formatDate(post.pubDate)}
-								</p>
-							</a>
-						</li>
-					{/each}
+					{#await lastFivePosts then posts}
+						{#each posts as post}
+							<li>
+								<a
+									href={post.link}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="block hover:bg-gray-100 dark:hover:bg-gray-700 p-3 rounded-lg transition-colors"
+								>
+									<h3 class="text-lg font-semibold text-purple-600 dark:text-purple-400">
+										{post.title}
+									</h3>
+									<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+										Published {formatDate(post.pubDate)}
+									</p>
+								</a>
+							</li>
+						{/each}
+					{/await}
 				</ul>
 				<a
 					href="https://medium.com/@voifoundation"

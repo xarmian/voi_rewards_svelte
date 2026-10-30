@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -26,10 +27,12 @@ export const GET: RequestHandler = async () => {
 		}
 
 		// Get VOI price from price history (which uses proper market data)
-		const { data, error } = await supabasePrivateClient.rpc('get_price_history', {
-			p_period: '24h',
-			p_trading_pair_id: null
-		});
+		const { data, error } = await supabasePrivateClient
+			.rpc('get_price_history', {
+				p_period: '24h',
+				p_trading_pair_id: null
+			})
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (error) throw error;
 
