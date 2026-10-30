@@ -34,6 +34,11 @@
 	let epochs: EpochData[] = [];
 	let currentEpoch: number;
 	let loading = true;
+	let dismissedTooltip: string | null = null;
+
+	function dismissTooltip(event: KeyboardEvent, id: string) {
+		if (event.key === 'Escape') dismissedTooltip = id;
+	}
 	let error: string | null = null;
 	let aprChartDiv: HTMLElement;
 	let stakeChartDiv: HTMLElement;
@@ -601,7 +606,12 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
 							<div class="group absolute top-2 right-2">
 								<button
-									aria-label="Current Price"
+									type="button"
+									aria-label="About Current Price"
+									aria-describedby="epoch-price-tooltip"
+									on:keydown={(event) => dismissTooltip(event, 'epoch-price-tooltip')}
+									on:focus={() => (dismissedTooltip = null)}
+									on:blur={() => (dismissedTooltip = null)}
 									class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
 								>
 									<svg
@@ -618,7 +628,10 @@
 									</svg>
 								</button>
 								<div
-									class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
+									id="epoch-price-tooltip"
+									role="tooltip"
+									hidden={dismissedTooltip === 'epoch-price-tooltip'}
+									class="invisible group-hover:visible group-focus-within:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
 								>
 									Volume-weighted average price across all markets
 								</div>
@@ -638,7 +651,12 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
 							<div class="group absolute top-2 right-2">
 								<button
-									aria-label="Current Block Reward APR"
+									type="button"
+									aria-label="About Current Block Reward APR"
+									aria-describedby="epoch-apr-tooltip"
+									on:keydown={(event) => dismissTooltip(event, 'epoch-apr-tooltip')}
+									on:focus={() => (dismissedTooltip = null)}
+									on:blur={() => (dismissedTooltip = null)}
 									class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
 								>
 									<svg
@@ -655,7 +673,10 @@
 									</svg>
 								</button>
 								<div
-									class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
+									id="epoch-apr-tooltip"
+									role="tooltip"
+									hidden={dismissedTooltip === 'epoch-apr-tooltip'}
+									class="invisible group-hover:visible group-focus-within:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
 								>
 									Annual Percentage Rate based on current epoch rewards and eligible stake
 								</div>
@@ -668,7 +689,12 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
 							<div class="group absolute top-2 right-2">
 								<button
-									aria-label="Current Epoch Reward"
+									type="button"
+									aria-label="About Current Epoch Reward"
+									aria-describedby="epoch-reward-tooltip"
+									on:keydown={(event) => dismissTooltip(event, 'epoch-reward-tooltip')}
+									on:focus={() => (dismissedTooltip = null)}
+									on:blur={() => (dismissedTooltip = null)}
 									class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
 								>
 									<svg
@@ -685,7 +711,10 @@
 									</svg>
 								</button>
 								<div
-									class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
+									id="epoch-reward-tooltip"
+									role="tooltip"
+									hidden={dismissedTooltip === 'epoch-reward-tooltip'}
+									class="invisible group-hover:visible group-focus-within:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
 								>
 									Total VOI to be distributed as rewards in the current epoch
 								</div>
@@ -698,7 +727,12 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
 							<div class="group absolute top-2 right-2">
 								<button
-									aria-label="Current Online Stake"
+									type="button"
+									aria-label="About Current Online Stake"
+									aria-describedby="epoch-online-stake-tooltip"
+									on:keydown={(event) => dismissTooltip(event, 'epoch-online-stake-tooltip')}
+									on:focus={() => (dismissedTooltip = null)}
+									on:blur={() => (dismissedTooltip = null)}
 									class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
 								>
 									<svg
@@ -715,7 +749,10 @@
 									</svg>
 								</button>
 								<div
-									class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
+									id="epoch-online-stake-tooltip"
+									role="tooltip"
+									hidden={dismissedTooltip === 'epoch-online-stake-tooltip'}
+									class="invisible group-hover:visible group-focus-within:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
 								>
 									Total amount of VOI staked in online accounts
 								</div>
@@ -728,7 +765,12 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
 							<div class="group absolute top-2 right-2">
 								<button
-									aria-label="Current Eligible Stake"
+									type="button"
+									aria-label="About Current Eligible Stake"
+									aria-describedby="epoch-eligible-stake-tooltip"
+									on:keydown={(event) => dismissTooltip(event, 'epoch-eligible-stake-tooltip')}
+									on:focus={() => (dismissedTooltip = null)}
+									on:blur={() => (dismissedTooltip = null)}
 									class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
 								>
 									<svg
@@ -745,7 +787,10 @@
 									</svg>
 								</button>
 								<div
-									class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
+									id="epoch-eligible-stake-tooltip"
+									role="tooltip"
+									hidden={dismissedTooltip === 'epoch-eligible-stake-tooltip'}
+									class="invisible group-hover:visible group-focus-within:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
 								>
 									Amount of online stake eligible for rewards (excludes ballast and caps Block
 									Authority stake)
@@ -759,7 +804,13 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
 							<div class="group absolute top-2 right-2">
 								<button
-									aria-label="Current Participating Accounts"
+									type="button"
+									aria-label="About Current Participating Accounts"
+									aria-describedby="epoch-participating-accounts-tooltip"
+									on:keydown={(event) =>
+										dismissTooltip(event, 'epoch-participating-accounts-tooltip')}
+									on:focus={() => (dismissedTooltip = null)}
+									on:blur={() => (dismissedTooltip = null)}
 									class="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 transition-colors duration-200"
 								>
 									<svg
@@ -776,7 +827,10 @@
 									</svg>
 								</button>
 								<div
-									class="invisible group-hover:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
+									id="epoch-participating-accounts-tooltip"
+									role="tooltip"
+									hidden={dismissedTooltip === 'epoch-participating-accounts-tooltip'}
+									class="invisible group-hover:visible group-focus-within:visible absolute z-10 w-64 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-lg p-3 right-0 mt-2 border border-gray-200 dark:border-gray-700"
 								>
 									Number of accounts participating in block rewards
 								</div>

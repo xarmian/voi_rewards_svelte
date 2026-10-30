@@ -17,15 +17,12 @@
 </script>
 
 <div class="card-wrapper">
-	<a
-		href={project.url}
-		target="_blank"
-		rel="noopener noreferrer"
+	<div
 		class="card bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-xl block relative"
 	>
 		{#if project.new}
 			<div
-				class="absolute top-4 right-4 px-3 py-1 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs font-medium rounded-full shadow-lg shadow-green-500/20 z-10"
+				class="absolute top-4 right-4 px-3 py-1 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs font-medium rounded-full shadow-lg shadow-green-500/20 z-10 pointer-events-none"
 			>
 				New
 			</div>
@@ -115,11 +112,20 @@
 						<h2
 							class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 dark:from-violet-300 dark:via-fuchsia-300 dark:to-pink-300"
 						>
-							{project.title}
+							{#if project.url}
+								<a
+									href={project.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="stretched-link">{project.title}</a
+								>
+							{:else}
+								{project.title}
+							{/if}
 						</h2>
 						<button
 							on:click|stopPropagation|preventDefault={handleCategoryClick}
-							class="px-4 py-1.5 text-sm font-medium
+							class="relative z-10 px-4 py-1.5 text-sm font-medium
                             bg-gradient-to-r from-violet-500/10 via-fuchsia-500/10 to-pink-500/10 dark:from-violet-400/10 dark:via-fuchsia-400/10 dark:to-pink-400/10
                             hover:from-violet-500/20 hover:via-fuchsia-500/20 hover:to-pink-500/20 dark:hover:from-violet-400/20 dark:hover:via-fuchsia-400/20 dark:hover:to-pink-400/20
                             text-violet-700 dark:text-violet-200
@@ -137,10 +143,11 @@
 
 			<div class="flex space-x-6">
 				{#if project.url}
-					<button
-						on:click|stopPropagation={() =>
-							window.open(project.url, '_blank', 'noopener,noreferrer')}
-						class="group flex items-center space-x-2 text-violet-600 dark:text-violet-300 transition-colors duration-300"
+					<a
+						href={project.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="relative z-10 group flex items-center space-x-2 text-violet-600 dark:text-violet-300 transition-colors duration-300"
 					>
 						<i
 							class="fas fa-globe text-lg transition-transform duration-300 group-hover:scale-110 group-hover:text-pink-500 dark:group-hover:text-pink-400"
@@ -149,13 +156,14 @@
 							class="font-medium relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-gradient-to-r after:from-violet-500 after:to-pink-500 after:transition-all after:duration-300 group-hover:after:w-full"
 							>Website</span
 						>
-					</button>
+					</a>
 				{/if}
 				{#if project.twitter}
-					<button
-						on:click|stopPropagation={() =>
-							window.open(project.twitter, '_blank', 'noopener,noreferrer')}
-						class="group flex items-center space-x-2 text-violet-600 dark:text-violet-300 transition-colors duration-300"
+					<a
+						href={project.twitter}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="relative z-10 group flex items-center space-x-2 text-violet-600 dark:text-violet-300 transition-colors duration-300"
 					>
 						<i
 							class="fab fa-x-twitter text-lg transition-transform duration-300 group-hover:scale-110 group-hover:text-pink-500 dark:group-hover:text-pink-400"
@@ -164,14 +172,21 @@
 							class="font-medium relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-gradient-to-r after:from-violet-500 after:to-pink-500 after:transition-all after:duration-300 group-hover:after:w-full"
 							>Twitter</span
 						>
-					</button>
+					</a>
 				{/if}
 			</div>
 		</div>
-	</a>
+	</div>
 </div>
 
 <style>
+	.stretched-link::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+	}
+
 	.card-wrapper {
 		display: grid;
 		transition: transform 0.3s ease-in-out;
