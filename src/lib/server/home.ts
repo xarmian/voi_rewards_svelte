@@ -196,9 +196,16 @@ export async function loadHome(
 			marketData[0] && typeof marketData[0] === 'object'
 				? (marketData[0] as Record<string, unknown>)
 				: {};
+		// Rows are volume-sorted; a Mimir pool row has no change without a 24h price window (TASK-89).
+		const withChange = marketData.find(
+			(row) =>
+				!!row &&
+				typeof row === 'object' &&
+				finite((row as Record<string, unknown>).price_change_percentage_24h) !== null
+		) as Record<string, unknown> | undefined;
 		return ready({
 			price,
-			change24h: finite(first.price_change_percentage_24h),
+			change24h: finite(withChange?.price_change_percentage_24h),
 			mcap: finite(aggregates.marketCap ?? first.market_cap)
 		});
 	});

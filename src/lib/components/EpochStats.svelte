@@ -109,9 +109,13 @@
 
 				if (marketsData.aggregates) {
 					currentPrice = marketsData.aggregates.weightedAveragePrice;
-					const firstMarket = marketsData.marketData[0];
-					if (firstMarket) {
-						priceChange24h = firstMarket.price_change_percentage_24h;
+					// Volume-sorted; a Mimir pool row has no change without a 24h price window (TASK-89).
+					const withChange = marketsData.marketData.find(
+						(market: { price_change_percentage_24h?: number | null }) =>
+							Number.isFinite(market?.price_change_percentage_24h)
+					);
+					if (withChange) {
+						priceChange24h = withChange.price_change_percentage_24h ?? null;
 					}
 				}
 

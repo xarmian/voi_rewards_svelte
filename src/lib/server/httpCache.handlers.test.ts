@@ -167,6 +167,7 @@ describe('TASK-29 markets response caching', () => {
 		expect((await response.json()).marketData).toHaveLength(1);
 		expect(tables).toContain('pool_catalog');
 		expect(tables).not.toContain('trading_pairs');
+		expect(response.headers.get('Cache-Control')).toBe(minuteCache);
 	});
 
 	it('caches genuine empty pools and the default empty market list', async () => {
