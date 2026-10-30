@@ -176,6 +176,24 @@ describe('DataTable SSR', () => {
 		assert.match(foot, /<span class="block font-normal lg:hidden">[\s\S]*Reward[\s\S]*100/);
 		assert.doesNotMatch(foot, /<button|<a\b/);
 	});
+	test('totals refuse a label with no cell or a hideable column inside it (TASK-98 r1)', () => {
+		assert.throws(
+			() => html({ totals: { label: 'Total', values: { name: 'x' } } }),
+			/leading priority 1/
+		);
+		const leadingShare = [columns[2], columns[0], columns[1]];
+		assert.throws(
+			() => html({ columns: leadingShare, totals: { label: 'Total', values: { blocks: '11' } } }),
+			/leading priority 1/
+		);
+		assert.match(
+			html({
+				totals: { label: 'Total', values: { name: 'x' } },
+				favourite: { pressed: () => false, ontoggle: () => {} }
+			}),
+			/<th scope="row" colspan="1"/
+		);
+	});
 	test('totals are omitted while loading, on error and with no rows', () => {
 		const totals = { label: 'Total', values: { blocks: '0' } };
 		for (const extra of [

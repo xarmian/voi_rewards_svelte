@@ -103,8 +103,19 @@
 	let shown = $derived(visibleRows(sorted, limit, expanded));
 	let hiddenCount = $derived(limit === undefined ? 0 : Math.max(0, rows.length - limit));
 	let labelSpan = $derived.by(() => {
-		const first = columns.findIndex((column) => totals && column.key in totals.values);
-		return first === -1 ? columns.length : first;
+		if (!totals) return 0;
+		const first = columns.findIndex((column) => column.key in totals.values);
+		const span = first === -1 ? columns.length : first;
+		// The label needs a cell, and a hideable column inside its colspan would misalign
+		// the footer at narrow widths (TASK-98 r1).
+		if (
+			span + Number(Boolean(favourite)) === 0 ||
+			columns.slice(0, span).some((c) => c.priority > 1)
+		)
+			throw new Error(
+				'DataTable totals need a leading priority 1 column (or favourite) for the label.'
+			);
+		return span;
 	});
 
 	function name(row: T): string {
