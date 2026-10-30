@@ -275,6 +275,31 @@ test('custom fetch keeps a Request input signal when init has none (TASK-86)', a
 	expect(afterSignal.reason).toBe(afterReason);
 });
 
+test('custom fetch: an explicit init.signal null drops the Request signal but keeps the deadline (TASK-86 r1)', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockImplementation(() => new Promise<never>(() => {}));
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+
+	const caller = new AbortController();
+	await fetch(new Request('https://example.invalid/auth/v1/user', { signal: caller.signal }), {
+		signal: null
+	});
+	const signal = fetchMock.mock.calls[0][1]!.signal!;
+	caller.abort(new Error('caller cancelled'));
+	expect(signal.aborted).toBe(false);
+
+	const result = event.locals.safeGetSession();
+	await vi.advanceTimersByTimeAsync(3000);
+	expect(await result).toEqual({ session: null, user: null });
+	expect(signal.aborted).toBe(true);
+	expect(signal.reason.name).toBe('TimeoutError');
+});
+
 test('custom fetch receives the deadline TimeoutError after a getUser stall', async () => {
 	vi.useFakeTimers();
 	getSession.mockResolvedValue({ data: { session } });

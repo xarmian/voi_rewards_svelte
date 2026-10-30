@@ -22,7 +22,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 					return globalThis.fetch(input, init);
 				}
 				// TASK-86: a Request input carries its own signal; init.signal would otherwise replace it.
-				const callerSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+				// As in fetch, an explicit null drops the Request's signal; only undefined falls back to it.
+				const callerSignal =
+					init?.signal !== undefined
+						? init.signal
+						: input instanceof Request
+							? input.signal
+							: undefined;
 				return globalThis.fetch(input, {
 					...init,
 					signal: callerSignal
