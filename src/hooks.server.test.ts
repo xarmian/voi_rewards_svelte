@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createServerClient, type CookieMethodsServer } from '@supabase/ssr';
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -150,4 +150,149 @@ test('getUser error returns a null session and user for every consumer', async (
 	});
 	expect(getSession).toHaveBeenCalledTimes(1);
 	expect(getUser).toHaveBeenCalledTimes(1);
+});
+
+afterEach(() => {
+	vi.useRealTimers();
+	vi.unstubAllGlobals();
+});
+
+test.each(['getUser', 'getSession'] as const)(
+	'%s stall: validation stays pending until 3000 ms and shares the signed-out result',
+	async (stalledCall) => {
+		vi.useFakeTimers();
+		getSession.mockResolvedValue({ data: { session } });
+		if (stalledCall === 'getUser') {
+			getUser.mockImplementation(() => new Promise<never>(() => {}));
+		} else {
+			getSession.mockImplementation(() => new Promise<never>(() => {}));
+		}
+		const event = request(true);
+		await handle({ event, resolve: async () => new Response() });
+		const first = event.locals.safeGetSession();
+		const second = event.locals.safeGetSession();
+		expect(second).toBe(first);
+		const settled = vi.fn();
+		void first.then(settled);
+
+		await vi.advanceTimersByTimeAsync(2999);
+		expect(settled).not.toHaveBeenCalled();
+		expect(getSession).toHaveBeenCalledTimes(1);
+		expect(getUser).toHaveBeenCalledTimes(stalledCall === 'getUser' ? 1 : 0);
+
+		await vi.advanceTimersByTimeAsync(1);
+		const results = await Promise.all([first, second]);
+		expect(results).toEqual([
+			{ session: null, user: null },
+			{ session: null, user: null }
+		]);
+		expect(results[1]).toBe(results[0]);
+		expect(event.locals.safeGetSession()).toBe(first);
+		expect(await event.locals.getUser()).toBeNull();
+		expect(getSession).toHaveBeenCalledTimes(1);
+		expect(getUser).toHaveBeenCalledTimes(stalledCall === 'getUser' ? 1 : 0);
+	}
+);
+
+test('fast validation leaves no deadline timer', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	expect(await event.locals.safeGetSession()).toEqual({ session, user });
+	expect(vi.getTimerCount()).toBe(0);
+});
+
+test.each([
+	new Error('getUser failed'),
+	Object.assign(new Error('not a DOMException'), { name: 'TimeoutError' }),
+	new DOMException('an upstream timeout, not the deadline', 'TimeoutError')
+])('a thrown getUser error propagates: %s', async (error) => {
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockRejectedValue(error);
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	await expect(event.locals.safeGetSession()).rejects.toBe(error);
+});
+
+test('custom fetch forwards options and combines the caller signal', async () => {
+	await handle({ event: request(true), resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+
+	await fetch('https://example.invalid/auth/v1/user');
+	const signal = fetchMock.mock.calls[0][1]?.signal;
+	expect(signal).toBeInstanceOf(AbortSignal);
+	expect(signal!.aborted).toBe(false);
+
+	const caller = new AbortController();
+	const init = { signal: caller.signal, method: 'POST', headers: { 'x-test': 'value' } };
+	await fetch('https://example.invalid/auth/v1/token', init);
+	expect(fetchMock).toHaveBeenLastCalledWith('https://example.invalid/auth/v1/token', {
+		...init,
+		signal: expect.any(AbortSignal)
+	});
+	const combined = fetchMock.mock.calls[1][1]!.signal!;
+	expect(combined.aborted).toBe(false);
+	const reason = new Error('caller cancelled');
+	caller.abort(reason);
+	expect(combined.aborted).toBe(true);
+	expect(combined.reason).toBe(reason);
+	expect(signal!.aborted).toBe(false);
+});
+
+test('custom fetch receives the deadline TimeoutError after a getUser stall', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockImplementation(() => new Promise<never>(() => {}));
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+	await fetch('https://example.invalid/auth/v1/user');
+	const inFlightSignal = fetchMock.mock.calls[0][1]!.signal!;
+	expect(inFlightSignal.aborted).toBe(false);
+
+	const result = event.locals.safeGetSession();
+	await vi.advanceTimersByTimeAsync(3000);
+	expect(await result).toEqual({ session: null, user: null });
+	await fetch('https://example.invalid/auth/v1/user');
+	const signal = fetchMock.mock.calls[1][1]!.signal!;
+	expect(signal.aborted).toBe(true);
+	expect(signal.reason).toBeInstanceOf(DOMException);
+	expect(signal.reason.name).toBe('TimeoutError');
+	expect(inFlightSignal.aborted).toBe(true);
+	expect(inFlightSignal.reason).toBe(signal.reason);
+});
+
+test('after the deadline, only auth requests are aborted; data queries keep their own signal', async () => {
+	vi.useFakeTimers();
+	getSession.mockResolvedValue({ data: { session } });
+	getUser.mockImplementation(() => new Promise<never>(() => {}));
+	const event = request(true);
+	await handle({ event, resolve: async () => new Response() });
+	const fetch = vi.mocked(createServerClient).mock.calls[0][2].global!.fetch!;
+	const fetchMock = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response());
+	vi.stubGlobal('fetch', fetchMock);
+
+	const result = event.locals.safeGetSession();
+	await vi.advanceTimersByTimeAsync(3000);
+	expect(await result).toEqual({ session: null, user: null });
+
+	await fetch('https://example.invalid/rest/v1/items?select=*');
+	expect(fetchMock.mock.calls[0][1]).toBeUndefined();
+	const caller = new AbortController();
+	const init = { signal: caller.signal, method: 'GET' };
+	await fetch(new URL('https://example.invalid/rest/v1/items'), init);
+	expect(fetchMock.mock.calls[1][1]).toBe(init);
+	expect(caller.signal.aborted).toBe(false);
+
+	await fetch(new URL('https://example.invalid/auth/v1/user'));
+	await fetch(new Request('https://example.invalid/auth/v1/token?grant_type=refresh_token'));
+	for (const call of fetchMock.mock.calls.slice(2)) {
+		expect(call[1]!.signal!.aborted).toBe(true);
+		expect(call[1]!.signal!.reason.name).toBe('TimeoutError');
+	}
 });
