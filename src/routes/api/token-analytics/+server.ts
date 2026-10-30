@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { isRetiredExchange } from '$lib/markets/retired';
 import { json, type RequestHandler } from '@sveltejs/kit';
@@ -56,6 +57,7 @@ async function getTokenInfo(tokenId: number): Promise<{
 		const { data: arc200Data, error: arc200Error } = await supabaseMimirClient
 			.from('arc200_contracts')
 			.select('symbol, decimals, image_url')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.eq('contract_id', tokenId)
 			.maybeSingle();
 
@@ -72,6 +74,7 @@ async function getTokenInfo(tokenId: number): Promise<{
 		const { data: assetData, error: assetError } = await supabaseMimirClient
 			.from('asset')
 			.select('params')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.eq('index', tokenId)
 			.maybeSingle();
 
@@ -129,6 +132,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			const { data: pools, error } = await supabaseMimirClient
 				.from('pool_catalog')
 				.select('pool_id, token_a_id, token_b_id, exchange')
+				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 				.or(`token_a_id.in.(${allIds.join(',')}),token_b_id.in.(${allIds.join(',')})`);
 			if (error) throw error;
 			aggregates = await fetchPoolAggregates(

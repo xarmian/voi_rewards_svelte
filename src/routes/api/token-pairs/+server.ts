@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { pgrstQuote, validateTokenPairFilters, validateTokenPairIds } from '$lib/server/validate';
@@ -19,7 +20,11 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Fetch token pairs from MIMIR pool_catalog
-		let poolQuery = supabaseMimirClient.from('pool_catalog').select('*').limit(limit);
+		let poolQuery = supabaseMimirClient
+			.from('pool_catalog')
+			.select('*')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
+			.limit(limit);
 
 		// If tokenId or tokenSymbol is provided, get all pools containing that token
 		if (tokenId) {
@@ -180,6 +185,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		const { data, error } = await supabaseMimirClient
 			.from('pool_catalog')
 			.select('*')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.or(
 				`and(token_a_id.eq.${baseTokenId},token_b_id.eq.${quoteTokenId}),and(token_a_id.eq.${quoteTokenId},token_b_id.eq.${baseTokenId})`
 			)

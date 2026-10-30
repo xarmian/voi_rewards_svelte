@@ -23,7 +23,8 @@ function mockQuery(
 	error: { code: string } | null = null
 ) {
 	const or = vi.fn().mockResolvedValue({ data, error });
-	const select = vi.fn().mockReturnValue({ or });
+	const builder = { or, abortSignal: () => builder };
+	const select = vi.fn().mockReturnValue(builder);
 	mocks.from.mockReturnValue({ select });
 	return { select, or };
 }

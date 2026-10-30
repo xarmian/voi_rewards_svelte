@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { supabasePrivateClient } from '$lib/server/supabase';
 import type { MimirClient } from '$lib/tokens/equivalents';
 
@@ -31,6 +32,7 @@ export async function fetchCrossChainSnapshots(
                     )
                 `
 			)
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.order('timestamp', { ascending: false })
 			.limit(50); // Get recent snapshots
 
@@ -92,6 +94,7 @@ export async function fetchAlgoAssetId(
 		const { data: tokenData, error: tokenError } = await supabaseMimirClient
 			.from('arc200_contracts')
 			.select('algo_asset_id')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.eq('contract_id', tokenId)
 			.single();
 		if (tokenError && tokenError.code !== 'PGRST116') onFailure();

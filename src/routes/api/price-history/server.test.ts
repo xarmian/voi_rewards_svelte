@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const rpc = vi.hoisted(() => vi.fn());
-vi.mock('$lib/server/supabase', () => ({ supabasePrivateClient: { rpc } }));
+vi.mock('$lib/server/supabase', () => ({
+	supabasePrivateClient: {
+		rpc: (...args: unknown[]) => ({ abortSignal: () => rpc(...args) })
+	}
+}));
 
 import { GET } from './+server';
 

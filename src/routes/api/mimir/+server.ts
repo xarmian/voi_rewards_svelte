@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import { json } from '@sveltejs/kit';
@@ -12,7 +13,9 @@ export async function GET({ url }: RequestEvent) {
 		}
 		const { action, params } = validation;
 
-		const { data, error } = await supabaseMimirClient.rpc(action, params);
+		const { data, error } = await supabaseMimirClient
+			.rpc(action, params)
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (error) {
 			console.error('Error:', error);

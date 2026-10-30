@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
@@ -25,6 +26,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		const { data, error } = await supabaseMimirClient
 			.from('arc200_contracts')
 			.select('contract_id, symbol, decimals, total_supply')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.in('contract_id', tokenIds);
 
 		if (error) {

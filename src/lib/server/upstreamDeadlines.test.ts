@@ -68,7 +68,10 @@ function query(site: string, data: unknown) {
 	return builder;
 }
 
-const event = (path: string, fetcher: typeof fetch = vi.fn<typeof fetch>().mockResolvedValue(Response.json([]))) =>
+const event = (
+	path: string,
+	fetcher: typeof fetch = vi.fn<typeof fetch>().mockResolvedValue(Response.json([]))
+) =>
 	({
 		url: new URL(path, 'https://example.test'),
 		fetch: fetcher,
@@ -91,7 +94,9 @@ beforeEach(() => {
 	vi.spyOn(console, 'log').mockImplementation(() => {});
 	signals.length = 0;
 	stalled = '';
-	mocks.from.mockImplementation((site: string) => query(site, site === 'pool_catalog' ? [pool] : []));
+	mocks.from.mockImplementation((site: string) =>
+		query(site, site === 'pool_catalog' ? [pool] : [])
+	);
 	mocks.rpc.mockImplementation((site: string) =>
 		query(site, site === 'get_arc200_pools' ? { pools: [{ tokenA: {}, tokenB: {} }] } : [])
 	);
@@ -122,54 +127,73 @@ it.each([
 	['pool aggregates', poolAnalytics, '/api/pool-analytics?poolId=1', 'get_pool_aggregates', 200],
 	['price history', history, '/api/price-history', 'get_price_history', 500],
 	['voi price', price, '/api/voi-price', 'get_price_history', 200]
-] as const)('%s settles through its existing error path within 5100ms', async (_, handler, path, site, status) => {
-	stalled = site;
-	let response: Response | undefined;
-	const pending = Promise.resolve(handler(event(path))).then((value) => { response = value; });
-	await vi.advanceTimersByTimeAsync(5100);
-	expect(response, 'handler must settle by its deadline').toBeDefined();
-	await pending;
-	expect(response!.status).toBe(status);
-	expect(response!.headers.has('cache-control')).toBe(false);
-	const recorded = signals.filter((entry) => entry.site === site);
-	expect(recorded.length).toBeGreaterThan(0);
-	for (const { signal } of recorded) {
-		expect(signal).toBeInstanceOf(AbortSignal);
-		expect(signal.aborted).toBe(true);
-	}
-	expect(AbortSignal.timeout).toHaveBeenCalledWith(5000);
-	const body = await response!.json();
-	if (status >= 400) expect(body.error).toBeTruthy();
-	if (path.includes('analytics') && status === 200) expect(body.partial).toBe(true);
-});
-
-it.each([
-	['epochs', epochs, '/api/epochs', 5000, 500],
-	['medium', medium, '/api/medium-posts', 3000, 200]
-] as const)('%s bounds stalled headers AND bodies even when abort is ignored', async (_, handler, path, timeout, status) => {
-	for (const stage of ['headers', 'body']) {
-		const upstream = Response.json({});
-		const body = vi.fn(() => new Promise<never>(() => {}));
-		vi.spyOn(upstream, path.includes('epochs') ? 'json' : 'text').mockImplementation(body);
-		const fetcher = vi.fn<typeof fetch>().mockImplementation(() => stage === 'headers' ? new Promise(() => {}) : Promise.resolve(upstream));
-		vi.stubGlobal('fetch', fetcher);
+] as const)(
+	'%s settles through its existing error path within 5100ms',
+	async (_, handler, path, site, status) => {
+		stalled = site;
 		let response: Response | undefined;
-		const pending = Promise.resolve(handler(event(path, fetcher))).then((value) => { response = value; });
-		await vi.advanceTimersByTimeAsync(timeout - 1);
-		expect(response).toBeUndefined();
-		if (stage === 'body') expect(body).toHaveBeenCalledOnce();
-		await vi.advanceTimersByTimeAsync(101);
+		const pending = Promise.resolve(handler(event(path))).then((value) => {
+			response = value;
+		});
+		await vi.advanceTimersByTimeAsync(5100);
 		expect(response, 'handler must settle by its deadline').toBeDefined();
 		await pending;
 		expect(response!.status).toBe(status);
 		expect(response!.headers.has('cache-control')).toBe(false);
-		expect(await response!.json()).toEqual(status === 500 ? { error: 'Failed to fetch epoch data' } : []);
-		expect(fetcher.mock.calls[0][1].signal.aborted).toBe(true);
+		const recorded = signals.filter((entry) => entry.site === site);
+		expect(recorded.length).toBeGreaterThan(0);
+		for (const { signal } of recorded) {
+			expect(signal).toBeInstanceOf(AbortSignal);
+			expect(signal.aborted).toBe(true);
+		}
+		expect(AbortSignal.timeout).toHaveBeenCalledWith(5000);
+		const body = await response!.json();
+		if (status >= 400) expect(body.error).toBeTruthy();
+		if (path.includes('analytics') && status === 200) expect(body.partial).toBe(true);
 	}
-});
+);
+
+it.each([
+	['epochs', epochs, '/api/epochs', 5000, 500],
+	['medium', medium, '/api/medium-posts', 3000, 200]
+] as const)(
+	'%s bounds stalled headers AND bodies even when abort is ignored',
+	async (_, handler, path, timeout, status) => {
+		for (const stage of ['headers', 'body']) {
+			const upstream = Response.json({});
+			const body = vi.fn(() => new Promise<never>(() => {}));
+			vi.spyOn(upstream, path.includes('epochs') ? 'json' : 'text').mockImplementation(body);
+			const fetcher = vi
+				.fn<typeof fetch>()
+				.mockImplementation(() =>
+					stage === 'headers' ? new Promise(() => {}) : Promise.resolve(upstream)
+				);
+			vi.stubGlobal('fetch', fetcher);
+			let response: Response | undefined;
+			const pending = Promise.resolve(handler(event(path, fetcher))).then((value) => {
+				response = value;
+			});
+			await vi.advanceTimersByTimeAsync(timeout - 1);
+			expect(response).toBeUndefined();
+			if (stage === 'body') expect(body).toHaveBeenCalledOnce();
+			await vi.advanceTimersByTimeAsync(101);
+			expect(response, 'handler must settle by its deadline').toBeDefined();
+			await pending;
+			expect(response!.status).toBe(status);
+			expect(response!.headers.has('cache-control')).toBe(false);
+			expect(await response!.json()).toEqual(
+				status === 500 ? { error: 'Failed to fetch epoch data' } : []
+			);
+			expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+		}
+	}
+);
 
 it('medium does not parse a non-ok response as a feed or cache it', async () => {
-	const response = new Response('<rss><channel><item><title>one</title></item><item><title>two</title></item></channel></rss>', { status: 503 });
+	const response = new Response(
+		'<rss><channel><item><title>one</title></item><item><title>two</title></item></channel></rss>',
+		{ status: 503 }
+	);
 	const read = vi.spyOn(response, 'text');
 	const result = await medium(event('/api/medium-posts', vi.fn().mockResolvedValue(response)));
 	expect(await result.json()).toEqual([]);
@@ -180,43 +204,64 @@ it('medium does not parse a non-ok response as a feed or cache it', async () => 
 it('markets bounds a stalled price-history self-fetch and keeps its unavailable fallback', async () => {
 	let response: Response | undefined;
 	const fetcher = vi.fn<typeof fetch>(() => new Promise(() => {}));
-	Promise.resolve(markets(event('/api/markets', fetcher))).then((value) => { response = value; });
+	Promise.resolve(markets(event('/api/markets', fetcher))).then((value) => {
+		response = value;
+	});
 	await vi.advanceTimersByTimeAsync(3100);
 	expect(response).toBeDefined();
 	expect(response!.status).toBe(200);
 	expect(await response!.json()).toMatchObject({ voiUsdStatus: 'unavailable' });
 	expect(response!.headers.has('cache-control')).toBe(false);
-	expect(fetcher.mock.calls[0][1].signal.aborted).toBe(true);
+	expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
 });
 
 it.each(['pools', 'assets', 'protocols'])(
-	'markets gives the entire Vestige chain one 4000ms budget when %s stalls', async (stage) => {
+	'markets gives the entire Vestige chain one 4000ms budget when %s stalls',
+	async (stage) => {
 		const calls: AbortSignal[] = [];
-		vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
-			calls.push(init?.signal as AbortSignal);
-			if (input.includes(`/${stage}?`)) {
-				const response = Response.json({});
-				vi.spyOn(response, 'json').mockImplementation(() => new Promise(() => {}));
-				return response;
-			}
-			// Spend some of the same budget at each preceding stage.
-			await new Promise((resolve) => setTimeout(resolve, 1200));
-			if (input.includes('/pools?')) return Response.json({ results: [{
-				id: 99, asset_1_id: 456, asset_2_id: 789,
-				asset_1_supply: 10, asset_2_supply: 10, protocol_id: 0
-			}] });
-			return Response.json([
-				{ id: 456, ticker: 'USDC', decimals: 0 },
-				{ id: 789, ticker: 'USDT', decimals: 0 }
-			]);
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (input: string, init?: RequestInit) => {
+				calls.push(init?.signal as AbortSignal);
+				if (input.includes(`/${stage}?`)) {
+					const response = Response.json({});
+					vi.spyOn(response, 'json').mockImplementation(() => new Promise(() => {}));
+					return response;
+				}
+				// Spend some of the same budget at each preceding stage.
+				await new Promise((resolve) => setTimeout(resolve, 1200));
+				if (input.includes('/pools?'))
+					return Response.json({
+						results: [
+							{
+								id: 99,
+								asset_1_id: 456,
+								asset_2_id: 789,
+								asset_1_supply: 10,
+								asset_2_supply: 10,
+								protocol_id: 0
+							}
+						]
+					});
+				return Response.json([
+					{ id: 456, ticker: 'USDC', decimals: 0 },
+					{ id: 789, ticker: 'USDT', decimals: 0 }
+				]);
+			})
+		);
 		let response: Response | undefined;
-		const reference = vi.fn().mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
-		Promise.resolve(markets(event('/api/markets', reference))).then((value) => { response = value; });
+		const reference = vi
+			.fn()
+			.mockResolvedValue(Response.json([{ time: new Date().toISOString(), value: 0.01 }]));
+		Promise.resolve(markets(event('/api/markets', reference))).then((value) => {
+			response = value;
+		});
 		await vi.advanceTimersByTimeAsync(4100);
 		expect(response, 'the chain shares a single deadline').toBeDefined();
 		expect(response!.status).toBe(200);
-		expect(await response!.json()).toMatchObject({ marketData: [expect.objectContaining({ trading_pair_id: 1 })] });
+		expect(await response!.json()).toMatchObject({
+			marketData: [expect.objectContaining({ trading_pair_id: 1 })]
+		});
 		expect(response!.headers.has('cache-control')).toBe(false);
 		expect(calls.length).toBeGreaterThan(0);
 		expect(new Set(calls).size).toBe(1);

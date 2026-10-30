@@ -6,18 +6,29 @@ import { afterEach, expect, it, vi } from 'vitest';
 // Follow component/consensusData.test.ts: exercise onMount assignments without a browser.
 function mount(fetcher: typeof fetch) {
 	const source = readFileSync(new URL('./EpochStats.svelte', import.meta.url), 'utf8');
-	const script = source.split('<script lang="ts">')[1].split('</script>')[0].replace(/^\s*import .*;$/gm, '');
+	const script = source
+		.split('<script lang="ts">')[1]
+		.split('</script>')[0]
+		.replace(/^\s*import .*;$/gm, '');
 	let onMount: () => void = () => {};
 	const context = createContext({
-		fetch: fetcher, AbortSignal, console: { error() {} },
-		onMount: (callback: () => void) => { onMount = callback; },
-		theme: { current: 'light' }, onThemeChange() {},
+		fetch: fetcher,
+		AbortSignal,
+		console: { error() {} },
+		onMount: (callback: () => void) => {
+			onMount = callback;
+		},
+		theme: { current: 'light' },
+		onThemeChange() {},
 		createChartLifecycle: () => ({ add() {}, disposed: false }),
 		window: { addEventListener() {} }
 	});
-	runInContext(ts.transpileModule(script, {
-		compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
-	}).outputText, context);
+	runInContext(
+		ts.transpileModule(script, {
+			compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
+		}).outputText,
+		context
+	);
 	onMount();
 	return (code: string) => runInContext(code, context);
 }
@@ -29,12 +40,17 @@ async function flush() {
 afterEach(() => vi.restoreAllMocks());
 
 it.each(['/api/markets?token=VOI', '/api/price-history?period=7d', '/api/mimir'])(
-	'isolates %s rejection while assigning epochs and finishing loading', async (failed) => {
+	'isolates %s rejection while assigning epochs and finishing loading',
+	async (failed) => {
 		const fetcher = vi.fn<typeof fetch>(async (url) => {
 			if (url === failed) throw new Error('unavailable');
-			return Response.json(url === '/api/epochs'
-				? { epochs: [{ epoch_number: 7 }], current_epoch: 7 }
-				: url === '/api/mimir' ? { data: 42 } : []);
+			return Response.json(
+				url === '/api/epochs'
+					? { epochs: [{ epoch_number: 7 }], current_epoch: 7 }
+					: url === '/api/mimir'
+						? { data: 42 }
+						: []
+			);
 		});
 		const run = mount(fetcher);
 		await flush();
@@ -49,9 +65,13 @@ it.each(['/api/markets?token=VOI', '/api/price-history?period=7d', '/api/mimir']
 );
 
 it('epochs settling clears loading without waiting on the other panels', async () => {
-	const run = mount(vi.fn<typeof fetch>((url) => url === '/api/epochs'
-		? Promise.resolve(Response.json({ epochs: [{ epoch_number: 7 }], current_epoch: 7 }))
-		: new Promise(() => {})));
+	const run = mount(
+		vi.fn<typeof fetch>((url) =>
+			url === '/api/epochs'
+				? Promise.resolve(Response.json({ epochs: [{ epoch_number: 7 }], current_epoch: 7 }))
+				: new Promise(() => {})
+		)
+	);
 	await flush();
 	expect(run('epochs[0]?.epoch_number')).toBe(7);
 	expect(run('loading')).toBe(false);
@@ -59,13 +79,24 @@ it('epochs settling clears loading without waiting on the other panels', async (
 });
 
 it.each(['reject', 'http error', 'payload error', 'non-json'])(
-	'only an epochs %s sets the component error', async (failure) => {
-		const run = mount(vi.fn<typeof fetch>(async (url) => {
-			if (url !== '/api/epochs') return Response.json({ data: 42, aggregates: { weightedAveragePrice: 0.01 }, marketData: [] });
-			if (failure === 'reject') throw new Error('epochs unavailable');
-			if (failure === 'non-json') return new Response('broken');
-			return Response.json({ error: 'epochs unavailable' }, { status: failure === 'http error' ? 500 : 200 });
-		}));
+	'only an epochs %s sets the component error',
+	async (failure) => {
+		const run = mount(
+			vi.fn<typeof fetch>(async (url) => {
+				if (url !== '/api/epochs')
+					return Response.json({
+						data: 42,
+						aggregates: { weightedAveragePrice: 0.01 },
+						marketData: []
+					});
+				if (failure === 'reject') throw new Error('epochs unavailable');
+				if (failure === 'non-json') return new Response('broken');
+				return Response.json(
+					{ error: 'epochs unavailable' },
+					{ status: failure === 'http error' ? 500 : 200 }
+				);
+			})
+		);
 		await flush();
 		expect(run('error')).toBeTruthy();
 		expect(run('loading')).toBe(false);

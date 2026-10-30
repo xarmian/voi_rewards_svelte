@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mimirClient } from '$lib/mimir';
 
@@ -25,6 +26,7 @@ export async function getTokenEquivalents(
 		const { data, error } = await client
 			.from('arc200_contracts')
 			.select('contract_id, token_id')
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			.or(`contract_id.eq.${tokenId},token_id.eq.${tokenId}`);
 
 		if (error) throw error;

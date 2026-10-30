@@ -298,11 +298,12 @@ test('fetchPoolAggregates dedupes 250 ids into parallel chunks of at most 100', 
 			assert.equal(fn, 'get_pool_aggregates');
 			const chunk = (args as { p_pool_ids: number[] }).p_pool_ids;
 			calls.push(chunk);
-			return new Promise<{ data: unknown; error: unknown }>((resolve) => {
+			const result = new Promise<{ data: unknown; error: unknown }>((resolve) => {
 				pending.push(() =>
 					resolve({ data: chunk.map((id) => ({ ...aggregates[2], pool_id: id })), error: null })
 				);
 			});
+			return { abortSignal: () => result };
 		}
 	};
 	const result = fetchPoolAggregates(client, [...ids, ...ids]);
@@ -323,7 +324,9 @@ test('fetchPoolAggregates throws on any RPC error', async () => {
 	await assert.rejects(
 		fetchPoolAggregates(
 			{
-				rpc: async () => ({ data: [], error: ++calls === 2 ? error : null })
+				rpc: () => ({
+					abortSignal: async () => ({ data: [], error: ++calls === 2 ? error : null })
+				})
 			},
 			Array.from({ length: 101 }, (_, i) => i)
 		),
@@ -332,7 +335,7 @@ test('fetchPoolAggregates throws on any RPC error', async () => {
 });
 
 test('fetchPoolAggregates skips RPC for no pool ids', async () => {
-	const result = await fetchPoolAggregates({ rpc: async () => assert.fail('unexpected RPC') }, []);
+	const result = await fetchPoolAggregates({ rpc: () => assert.fail('unexpected RPC') }, []);
 	assert.equal(result.size, 0);
 });
 

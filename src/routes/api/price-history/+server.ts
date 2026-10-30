@@ -1,3 +1,4 @@
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -8,10 +9,12 @@ export const GET: RequestHandler = async ({ url }) => {
 	const tradingPairId = url.searchParams.get('trading_pair_id');
 
 	try {
-		const { data, error } = await supabasePrivateClient.rpc('get_price_history', {
-			p_period: period,
-			p_trading_pair_id: tradingPairId === 'null' ? null : tradingPairId
-		});
+		const { data, error } = await supabasePrivateClient
+			.rpc('get_price_history', {
+				p_period: period,
+				p_trading_pair_id: tradingPairId === 'null' ? null : tradingPairId
+			})
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (error) throw error;
 

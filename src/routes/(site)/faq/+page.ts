@@ -1,3 +1,4 @@
+import { browser } from '$app/environment';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ url, fetch, data }) => {
@@ -21,8 +22,19 @@ export const load: PageLoad = async ({ url, fetch, data }) => {
 		}
 	}
 
-	const mediumPostsResponse = await fetch('/api/medium-posts');
-	const lastFivePosts = await mediumPostsResponse.json();
+	// Universal load reruns during hydration; only start this optional request in the browser.
+	const lastFivePosts = browser
+		? (async () => {
+				try {
+					const response = await fetch('/api/medium-posts');
+					if (!response.ok) return [];
+					const posts = await response.json();
+					return Array.isArray(posts) ? posts : [];
+				} catch {
+					return [];
+				}
+			})()
+		: Promise.resolve([]);
 
 	const recentFAQs = faqData.filter((item) => item.recent === 'true').slice(0, 3);
 
