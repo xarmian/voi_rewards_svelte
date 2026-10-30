@@ -31,7 +31,16 @@
 			<div class="space-y-6">
 				<div class="flex flex-col space-y-6">
 					{#if project.logo}
-						<div class="relative group isolate">
+						<!-- Mirror of the title link above the stretched overlay, so the logo keeps its hover effects (TASK-40). -->
+						<svelte:element
+							this={project.url ? 'a' : 'div'}
+							href={project.url || undefined}
+							target={project.url ? '_blank' : undefined}
+							rel={project.url ? 'noopener noreferrer' : undefined}
+							tabindex={project.url ? -1 : undefined}
+							aria-hidden={project.url ? 'true' : undefined}
+							class="relative z-[2] block group isolate"
+						>
 							<!-- Ambient glow effect -->
 							<div
 								class="absolute inset-0 bg-gradient-to-br from-violet-500/30 via-fuchsia-500/30 to-pink-500/30 opacity-0 group-hover:opacity-100 -z-10 blur-3xl transition-all duration-500 ease-out"
@@ -70,9 +79,18 @@
 									/>
 								</div>
 							</div>
-						</div>
+						</svelte:element>
 					{:else}
-						<div class="relative group isolate">
+						<!-- Mirror of the title link above the stretched overlay, so the logo keeps its hover effects (TASK-40). -->
+						<svelte:element
+							this={project.url ? 'a' : 'div'}
+							href={project.url || undefined}
+							target={project.url ? '_blank' : undefined}
+							rel={project.url ? 'noopener noreferrer' : undefined}
+							tabindex={project.url ? -1 : undefined}
+							aria-hidden={project.url ? 'true' : undefined}
+							class="relative z-[2] block group isolate"
+						>
 							<!-- Ambient glow effect -->
 							<div
 								class="absolute inset-0 bg-gradient-to-br from-violet-500/40 via-fuchsia-500/40 to-pink-500/40 opacity-0 group-hover:opacity-100 -z-10 blur-3xl transition-all duration-500 ease-out"
@@ -105,7 +123,7 @@
 									{project.title[0]}
 								</span>
 							</div>
-						</div>
+						</svelte:element>
 					{/if}
 
 					<div class="flex items-center justify-between">

@@ -422,7 +422,10 @@
 {/if}
 
 <style>
+	/* Each item is now first in its own wrapper, so Flowbite's group-first top border would double
+	   the list's divide-y line (TASK-40). */
 	.faq-item:not(:first-child) :global(h2 > button) {
+		border-top-width: 0;
 		border-top-left-radius: 0;
 		border-top-right-radius: 0;
 	}
