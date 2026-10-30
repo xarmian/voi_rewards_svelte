@@ -2,6 +2,7 @@ import { pairWindow, type PoolAggregate, type latestSwapRow } from '$lib/server/
 import type { MarketPair } from './pairs';
 import { norm } from './priceMap';
 import { getPoolUrl } from './poolUrls';
+import { isRetiredExchange } from '$lib/markets/retired';
 
 export interface MarketSnapshot {
 	price: number;
@@ -119,14 +120,7 @@ export function composeDexMarketRow(
 		type: 'DEX',
 		network: 'Voi',
 		url: null,
-		pool_url: getPoolUrl(
-			pair.exchange,
-			pair.poolId,
-			pair.tokenAId,
-			pair.tokenAType,
-			pair.tokenBId,
-			pair.tokenBType
-		),
+		pool_url: getPoolUrl(pair.exchange, pair.poolId),
 		base_token_id: pair.baseTokenId,
 		quote_token_id: pair.quoteTokenId,
 		base_decimals: pair.baseDecimals,
@@ -177,6 +171,7 @@ export function legacyMarketRows(marketData: unknown[] | null) {
 				lastUpdated: new Date(latestSnapshot.timestamp).toLocaleString()
 			};
 		})
+		.filter((row) => !isRetiredExchange(row.exchange))
 		.sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
 }
 

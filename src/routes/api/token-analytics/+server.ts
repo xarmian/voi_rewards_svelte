@@ -1,4 +1,5 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
+import { isRetiredExchange } from '$lib/markets/retired';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import { getTokenEquivalents } from '$lib/tokens/equivalents';
@@ -127,12 +128,15 @@ export const GET: RequestHandler = async ({ url }) => {
 		try {
 			const { data: pools, error } = await supabaseMimirClient
 				.from('pool_catalog')
-				.select('pool_id, token_a_id, token_b_id')
+				.select('pool_id, token_a_id, token_b_id, exchange')
 				.or(`token_a_id.in.(${allIds.join(',')}),token_b_id.in.(${allIds.join(',')})`);
 			if (error) throw error;
 			aggregates = await fetchPoolAggregates(
 				supabaseMimirClient,
-				(pools || []).map((pool) => pool.pool_id)
+				// TASK-88: a retired exchange's pools don't count toward the token's totals.
+				(pools || [])
+					.filter((pool) => !isRetiredExchange(pool.exchange))
+					.map((pool) => pool.pool_id)
 			);
 		} catch (error) {
 			partialReasons.push('aggregates');

@@ -40,19 +40,6 @@ interface NautilusPool {
 	mintRound: number;
 }
 
-interface NomadexPool {
-	id: number;
-	alphaId: number;
-	alphaType: number;
-	betaId: number;
-	betaType: number;
-	swapFee: string;
-	balances: string[];
-	volume: string[];
-	apr: number;
-	online: boolean;
-}
-
 interface MarketSnapshot {
 	trading_pair_id: number;
 	price: number;
@@ -285,65 +272,6 @@ async function fetchHumbleData(): Promise<MarketSnapshot[]> {
 	}
 }
 
-async function fetchNomadexData(): Promise<MarketSnapshot | null> {
-	try {
-		const NOMADEX_EXCHANGE_ID = 3;
-		const POOL_ID = 411756; // VOI/USDC pool ID
-
-		// Fetch pool data from Nomadex API
-		const response = await fetch('https://voimain-analytics.nomadex.app/pools');
-		if (!response.ok) {
-			throw new Error(`Failed to fetch Nomadex data: ${response.statusText}`);
-		}
-
-		const pools = await response.json();
-		const pool = pools.find((p: NomadexPool) => p.id === POOL_ID);
-
-		if (!pool) {
-			throw new Error(`Could not find pool with ID ${POOL_ID}`);
-		}
-
-		// Get or create trading pair ID
-		const poolUrl = `https://app.nomadex.app/pool/${POOL_ID}`;
-		const tradingPair = await getOrCreateTradingPair(NOMADEX_EXCHANGE_ID, 'aUSDC', 'VOI', poolUrl);
-
-		// Convert balances from microunits
-		const voiBalance = Number(pool.balances[0]) / 1e6; // VOI is alpha (index 0)
-		const usdcBalance = Number(pool.balances[1]) / 1e6; // USDC is beta (index 1)
-
-		// Calculate price (USDC per VOI)
-		const price = usdcBalance / voiBalance;
-
-		// Get TVL in VOI (alpha token balance * 2 since it's a balanced pool)
-		const tvl = voiBalance * 2;
-
-		// Get 24h volume in VOI (alpha token volume), default to 0 if undefined
-		const volume24h = Number(pool.volume[0]) / 1e6 || 0;
-
-		// Fetch historical price for this pair
-		const historicalPrice = await fetchHistoricalPrice(tradingPair.id);
-		const priceChange24h = historicalPrice !== null ? price - historicalPrice : undefined;
-		const priceChangePercentage24h =
-			historicalPrice !== null && historicalPrice !== 0
-				? ((price - historicalPrice) / historicalPrice) * 100
-				: undefined;
-
-		return {
-			trading_pair_id: tradingPair.id,
-			price: price,
-			volume_24h: volume24h,
-			tvl: tvl,
-			high_24h: undefined,
-			low_24h: undefined,
-			price_change_24h: priceChange24h,
-			price_change_percentage_24h: priceChangePercentage24h
-		};
-	} catch (error) {
-		console.error('Error fetching Nomadex data:', error);
-		return null;
-	}
-}
-
 async function fetchTinymanData(): Promise<MarketSnapshot | null> {
 	try {
 		const TINYMAN_EXCHANGE_ID = 4;
@@ -476,10 +404,9 @@ serve(async (req: Request) => {
 
 	try {
 		// Fetch data from all sources in parallel
-		const [mexcData, humbleData, nomadexData, tinymanData, pactfiData] = await Promise.all([
+		const [mexcData, humbleData, tinymanData, pactfiData] = await Promise.all([
 			fetchMEXCData(),
 			fetchHumbleData(),
-			fetchNomadexData(),
 			fetchTinymanData(),
 			fetchPactFiData()
 		]);
@@ -488,7 +415,6 @@ serve(async (req: Request) => {
 		const snapshots = [
 			//mexcData,
 			...(Array.isArray(humbleData) ? humbleData : [humbleData])
-			//nomadexData,
 			//tinymanData,
 			//pactfiData
 		].filter((data): data is MarketSnapshot => data !== null);

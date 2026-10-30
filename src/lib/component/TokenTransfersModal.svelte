@@ -178,18 +178,6 @@
 
 		if (token.poolInfo.provider === 'humble') {
 			return `https://voi.humble.sh/#/pool/details?poolId=${token.poolInfo.poolId}`;
-		} else if (token.poolInfo.provider === 'nomadex') {
-			// Check if we have tokAType and tokBType
-			if (
-				token.poolInfo.tokAType &&
-				token.poolInfo.tokBType &&
-				token.poolInfo.tokAId &&
-				token.poolInfo.tokBId
-			) {
-				return `https://voi.nomadex.app/${token.poolInfo.tokAType}/${token.poolInfo.tokAId}/${token.poolInfo.tokBType}/${token.poolInfo.tokBId}`;
-			} else {
-				return `https://voi.nomadex.app/liquidity/${token.poolInfo.poolId}`;
-			}
 		}
 
 		return undefined;
