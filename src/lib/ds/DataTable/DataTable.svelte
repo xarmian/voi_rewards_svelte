@@ -28,6 +28,7 @@
 		favourite,
 		expandable = false,
 		detail,
+		ondetails,
 		state: dataState = 'ready',
 		onretry,
 		asOf,
@@ -54,6 +55,9 @@
 		favourite?: { pressed: (row: T) => boolean; ontoggle: (row: T) => void };
 		expandable?: boolean;
 		detail?: Snippet<[T]>;
+		/** Called when a row's details open or close. Every detail is rendered while hidden,
+		 * so this is where a caller starts lazy work for one row. */
+		ondetails?: (row: T, open: boolean) => void;
 		state?: DataState;
 		onretry?: () => void;
 		asOf?: Date | number | string;
@@ -127,10 +131,10 @@
 		announcement = `Sorted by ${column.header}, ${sort.dir === 'desc' ? 'descending' : 'ascending'}`;
 		closeMenu(false);
 	}
-	function toggleDetails(key: string) {
-		expandedKeys = expandedKeys.includes(key)
-			? expandedKeys.filter((item) => item !== key)
-			: [...expandedKeys, key];
+	function toggleDetails(row: T, key: string) {
+		const open = !expandedKeys.includes(key);
+		expandedKeys = open ? [...expandedKeys, key] : expandedKeys.filter((item) => item !== key);
+		ondetails?.(row, open);
 	}
 	async function toggleMore() {
 		const firstNewIndex = shown.length;
@@ -291,7 +295,7 @@
 									aria-expanded={isExpanded}
 									aria-controls={targetId}
 									class="text-accent"
-									onclick={() => toggleDetails(key)}
+									onclick={() => toggleDetails(row, key)}
 									><span aria-hidden="true">{isExpanded ? '−' : '+'}</span><span class="sr-only"
 										>Details for {name(row)}</span
 									></button

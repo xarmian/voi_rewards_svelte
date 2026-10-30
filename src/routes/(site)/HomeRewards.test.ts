@@ -471,7 +471,7 @@ test.each([false, true])(
 		const body = html(pending);
 		assert.equal((body.match(/<table\b/g) ?? []).length, 1);
 		assert.match(body, /<caption[^>]*>Who's earning this epoch<\/caption>/);
-		assert.equal((body.match(/<a[^>]*href="\/wallet\//g) ?? []).length, 15);
+		assert.equal((body.match(/<a[^>]*href="\/wallet\/[^"]*" data-proposer=/g) ?? []).length, 15);
 		assert.match(body, /<button[^>]*aria-expanded="false"[^>]*>See all 97 proposers<\/button>/);
 		assert.equal((body.match(/aria-sort=/g) ?? []).length, 1);
 		assert.match(body, /<th[^>]*aria-sort="descending"[^>]*>\s*<button[^>]*>Blocks/);
@@ -499,6 +499,50 @@ test('toolbar keeps labelled search, CSV, Refresh, and conditional favourites', 
 	assert.match(body, /role="group" aria-label="Show"/);
 	assert.match(body, />All<\/button>/);
 	assert.match(body, />Favourites<\/button>/);
+});
+test('row details restore the address actions, balance, full-epoch reward, APR and enVoi name', () => {
+	// TASK-96: #63 dropped the removed RewardsTable's expanded row (45157c9^ ~:470-560).
+	const [first, second] = data;
+	const named = {
+		...initial,
+		value: {
+			...initial.value,
+			data: {
+				...initial.value.data,
+				data: [{ ...first, nfd: 'alpha.voi' }, ...data.slice(1)]
+			}
+		}
+	};
+	const body = html(false, named);
+	const details = (addr: string) => {
+		const match = body.match(
+			new RegExp(`<tr id="home-rewards-details-${addr.toLowerCase()}"[^>]*>([\\s\\S]*?)</tr>`)
+		);
+		assert.ok(match, `details row for ${addr}`);
+		assert.match(match[0], /^<tr[^>]*\bhidden\b/);
+		return match[1];
+	};
+	const row = details(first.proposer);
+	assert.match(row, new RegExp(`>${first.proposer}<`));
+	assert.match(row, /<button[^>]*type="button"[^>]*>Copy address<\/button>/);
+	assert.match(row, new RegExp(`<a[^>]*href="/wallet/${first.proposer}"[^>]*>Open wallet</a>`));
+	const explorer = row.match(
+		new RegExp(
+			`<a[^>]*href="https://block.voi.network/explorer/account/${first.proposer}/transactions"[^>]*>View in explorer`
+		)
+	);
+	assert.ok(explorer, 'explorer link');
+	assert.match(explorer[0], /target="_blank"/);
+	assert.match(explorer[0], /rel="noopener noreferrer"/);
+	assert.match(row, /<dt[^>]*>Account balance<\/dt>\s*<dd[^>]*>—<\/dd>/);
+	assert.match(row, /<dt[^>]*>Est. reward \(full epoch\)<\/dt>\s*<dd[^>]*>775,973.54 VOI<\/dd>/);
+	assert.match(row, /<dt[^>]*>Est. APR<\/dt>\s*<dd[^>]*>—<\/dd>/);
+	assert.match(
+		row,
+		/<dt[^>]*>enVoi name<\/dt>\s*<dd[^>]*><a[^>]*href="https:\/\/app.envoi.sh\/#\/alpha.voi"[^>]*>alpha.voi<\/a>/
+	);
+	assert.doesNotMatch(details(second.proposer), /enVoi name/);
+	noNestedControls(body);
 });
 test('failed initial data has a retry alert without row data', () => {
 	const body = html(true, { state: 'error', message: 'Failed' });
