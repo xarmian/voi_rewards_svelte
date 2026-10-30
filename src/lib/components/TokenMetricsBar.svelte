@@ -146,7 +146,7 @@
 
 			// Use pool analytics data when available, fallback to legacy logic
 			const currentPrice = latestCandle?.close || poolMarketData?.price || 0;
-			const volume24h = poolAnalytics?.volume?.volume24h || poolMarketData?.volume_24h || 0;
+			const volume24h = poolAnalytics?.volume?.volume24h || (poolMarketData?.volume_24h ?? null);
 			const poolTvl = poolAnalytics?.liquidity?.totalTvlUsd || poolMarketData?.tvl || 0;
 
 			// Calculate fully diluted market cap using token analytics if available
@@ -307,7 +307,7 @@
 					24h Volume
 				</div>
 				<div class="text-lg font-bold text-gray-900 dark:text-white">
-					{formatCurrency(tokenMetrics.volume24h)}
+					{tokenMetrics.volume24h === null ? '—' : formatCurrency(tokenMetrics.volume24h)}
 				</div>
 			</div>
 
