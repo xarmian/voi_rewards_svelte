@@ -1,3 +1,5 @@
+import { nomadexPools } from './nomadexPools';
+
 export interface PoolInfo {
 	poolId: string;
 	tokAId: string;
@@ -12,17 +14,11 @@ export interface PoolInfo {
 	symbolB?: string;
 }
 
-interface NomadexPoolInfo {
-	id: number;
-	alphaId: number;
-	alphaType: number;
-	betaId: number;
-	betaType: number;
-	swapFee: string;
-	balances: string[]; // Array with [alpha_balance, beta_balance]
-	volume: number[];
-	apr: number;
-	online: boolean;
+interface NomadexLivePool {
+	poolId: number;
+	tokenA: { id: number; balance: string; symbol: string };
+	tokenB: { id: number; balance: string; symbol: string };
+	outstandingLpAmount: string;
 }
 
 interface HumblePoolResponse {
@@ -54,59 +50,67 @@ interface HumblePoolInfo {
 	mintRound: number;
 }
 
-/**
- * Get all liquidity pools from both Nautilus API (humble) and Nomadex API (nomadex)
- * @returns {Promise<any>}
- */
-export const getLiquidityPools = async () => {
-	const pools: PoolInfo[] = [];
+/** Get Humble pools and enrich immutable Nomadex metadata with live Mimir state. */
+export const getLiquidityPools = async (fetchFn: typeof fetch = fetch) => {
+	const [nautilusResponse, nomadexData] = await Promise.all([
+		fetchFn('https://voi-mainnet-mimirapi.voirewards.com/dex/pools?tokenId=390001'),
+		fetchFn('https://voi-mainnet-mimirapi.voirewards.com/dex/pools?exchange=nomadex&limit=500')
+			.then(async (response) => {
+				if (!response.ok) throw new Error(`Nomadex pools HTTP ${response.status}`);
+				const data: { pools: NomadexLivePool[] } = await response.json();
+				return data.pools;
+			})
+			.catch((error) => {
+				console.warn('Failed to fetch live Nomadex pools; using escrow reads for held LPs:', error);
+				return [] as NomadexLivePool[];
+			})
+	]);
+	const humbleData: HumblePoolResponse = await nautilusResponse.json();
 
-	await Promise.all([
-		fetch('https://voi-mainnet-mimirapi.voirewards.com/dex/pools?tokenId=390001'),
-		fetch('https://api.voirewards.com/nomadex/index.php')
-	]).then(async ([nautilusResponse, nomadexResponse]) => {
-		const humbleData: HumblePoolResponse = await nautilusResponse.json();
-		const nomadexData: NomadexPoolInfo[] = await nomadexResponse.json();
+	const humblePools: PoolInfo[] = humbleData.pools.map((pool) => ({
+		poolId: pool.poolId.toString(),
+		tokAId: pool.tokenA.id === 390001 ? 0 : pool.tokenA.id,
+		tokBId: pool.tokenB.id === 390001 ? 0 : pool.tokenB.id,
+		poolBalA: pool.tokenA.balance,
+		poolBalB: pool.tokenB.balance,
+		supply: pool.outstandingLpAmount,
+		provider: pool.exchange,
+		tvl: 0,
+		apr: Number(pool.apr),
+		symbolA: pool.tokenA.id === 390001 ? 'VOI' : pool.tokenA.symbol,
+		symbolB: pool.tokenB.id === 390001 ? 'VOI' : pool.tokenB.symbol
+	}));
 
-		// convert humbleData to PoolInfo
-		const humblePools: PoolInfo[] = humbleData.pools.map((pool) => ({
-			poolId: pool.poolId.toString(),
-			tokAId: pool.tokenA.id === 390001 ? 0 : pool.tokenA.id,
-			tokBId: pool.tokenB.id === 390001 ? 0 : pool.tokenB.id,
-			poolBalA: pool.tokenA.balance,
-			poolBalB: pool.tokenB.balance,
-			supply: pool.outstandingLpAmount,
-			provider: pool.exchange,
-			tvl: 0,
-			apr: Number(pool.apr),
-			symbolA: pool.tokenA.id === 390001 ? 'VOI' : pool.tokenA.symbol,
-			symbolB: pool.tokenB.id === 390001 ? 'VOI' : pool.tokenB.symbol
-		}));
+	const livePools = new Map(nomadexData.map((pool) => [pool.poolId, pool]));
+	const enrichedNomadexPools: PoolInfo[] = nomadexPools.map((pool) => {
+		const livePool = livePools.get(pool.id);
+		const sides = [livePool?.tokenA, livePool?.tokenB];
+		const alpha = sides.find((token) => token?.id === pool.alphaId);
+		const beta = sides.find((token) => token?.id === pool.betaId);
+		const poolBalA = alpha?.balance ?? '';
+		const poolBalB = beta?.balance ?? '';
 
-		// convert nomadexData to PoolInfo
-		const nomadexPools: PoolInfo[] = nomadexData.map((pool) => ({
+		return {
 			poolId: pool.id.toString(),
 			tokAId: pool.alphaId.toString(),
 			tokBId: pool.betaId.toString(),
-			poolBalA: pool.balances[0] || '0',
-			poolBalB: pool.balances[1] || '0',
-			supply: '100000000000000', // Nomadex pools have a total supply of 100,000,000,000,000 with 6 decimals
+			poolBalA,
+			poolBalB,
+			supply: livePool?.outstandingLpAmount ?? '',
 			provider: 'nomadex',
 			tvl:
-				pool.alphaId === 0
-					? Number(pool.balances[0] || '0') * 2
-					: pool.betaId === 0
-						? Number(pool.balances[1] || '0') * 2
+				pool.alphaType === 0
+					? Number(poolBalA) * 2
+					: pool.betaType === 0
+						? Number(poolBalB) * 2
 						: 0,
-			apr: pool.apr
-		}));
-
-		// merge the two arrays
-		pools.push(...humblePools);
-		pools.push(...nomadexPools);
+			apr: 0,
+			symbolA: alpha?.symbol,
+			symbolB: beta?.symbol
+		};
 	});
 
-	return pools;
+	return [...humblePools, ...enrichedNomadexPools];
 };
 
 export default getLiquidityPools;
