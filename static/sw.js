@@ -10,10 +10,22 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
 	event.waitUntil(
 		(async () => {
-			const subscription = await self.registration.pushManager.getSubscription();
-			if (subscription) await subscription.unsubscribe();
-			for (const key of await caches.keys()) await caches.delete(key);
-			await self.registration.unregister();
+			// Cleanup is best effort; unregistering is the point, so it runs whatever fails before it.
+			try {
+				try {
+					const subscription = await self.registration.pushManager.getSubscription();
+					if (subscription) await subscription.unsubscribe();
+				} catch {
+					// No push support, or the subscription is already gone.
+				}
+				try {
+					for (const key of await caches.keys()) await caches.delete(key);
+				} catch {
+					// Storage unavailable; the registration still goes.
+				}
+			} finally {
+				await self.registration.unregister();
+			}
 		})()
 	);
 });
