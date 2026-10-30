@@ -182,22 +182,22 @@
 					{/each}
 				</div>
 			{:else}
-				<div
-					class="flex flex-col items-center justify-center py-16 text-center"
-					role={view === 'loading' ? 'status' : view === 'error' ? 'alert' : undefined}
-				>
+				<!-- Each state is its own element, so an alert is inserted with its text (TASK-41). -->
+				<div class="flex flex-col items-center justify-center py-16 text-center">
 					{#if view === 'loading'}
-						<div
-							class="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-violet-500/20 to-pink-500/20 dark:from-violet-400/10 dark:to-pink-400/10 flex items-center justify-center"
-						>
-							<i
-								class="fas fa-spinner-third animate-spin text-2xl text-violet-500 dark:text-violet-400"
-								aria-hidden="true"
-							></i>
+						<div role="status" class="flex flex-col items-center">
+							<div
+								class="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-violet-500/20 to-pink-500/20 dark:from-violet-400/10 dark:to-pink-400/10 flex items-center justify-center"
+							>
+								<i
+									class="fas fa-spinner-third animate-spin text-2xl text-violet-500 dark:text-violet-400"
+									aria-hidden="true"
+								></i>
+							</div>
+							<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">Loading projects…</p>
 						</div>
-						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">Loading projects…</p>
 					{:else if view === 'error'}
-						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">
+						<p role="alert" class="text-2xl font-medium text-gray-600 dark:text-gray-300">
 							We couldn't load the directory.
 						</p>
 						<button
