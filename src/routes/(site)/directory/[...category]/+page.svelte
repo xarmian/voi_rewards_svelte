@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { fetchProjects } from '../../phase2/[...slug]/projects';
+	import { directoryView, fetchDirectoryProjects } from '../projects';
 	import type { IProject } from '$lib/data/types';
 	import ProjectCard from '$lib/components/ecosystem/ProjectCard.svelte';
 	import Share from '$lib/component/ui/Share.svelte';
@@ -10,6 +10,7 @@
 	export let data;
 
 	let projects: IProject[] = [];
+	let status: 'loading' | 'ok' | 'error' = 'loading';
 	let filteredProjects: IProject[] = [];
 	let searchTerm = '';
 	let selectedCategory = data.category;
@@ -17,16 +18,32 @@
 	// primary sorting for categories
 	const categorySort = ['Wallets', 'DEXes', 'NFTs', 'Infrastructure', 'Tools'];
 
-	onMount(async () => {
-		projects = await fetchProjects();
-		filteredProjects = projects;
+	onMount(() => {
+		loadProjects();
+	});
+
+	async function loadProjects() {
+		status = 'loading';
+		const result = await fetchDirectoryProjects();
+		if (result.ok) {
+			projects = result.projects;
+			status = 'ok';
+		} else {
+			status = 'error';
+		}
+	}
+
+	$: activeProjects = projects.filter((project) => project.status === 'active');
+	$: view = directoryView({
+		status,
+		total: activeProjects.length,
+		shown: filteredProjects.length
 	});
 
 	$: {
-		filteredProjects = projects
+		filteredProjects = activeProjects
 			.filter(
 				(project) =>
-					project.status === 'active' &&
 					(project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
 						project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
 						project.category.toLowerCase().includes(searchTerm.toLowerCase())) &&
@@ -44,10 +61,13 @@
 			});
 	}
 
-	$: categories = [
-		'All',
-		...new Set(projects.filter((p) => p.status === 'active').map((p) => p.category))
-	];
+	$: categories = ['All', ...new Set(activeProjects.map((p) => p.category))];
+
+	function clearFilters() {
+		searchTerm = '';
+		selectedCategory = 'All';
+		updateURL('All');
+	}
 
 	function handleCategoryClick(event: CustomEvent<string>) {
 		selectedCategory = event.detail;
@@ -155,22 +175,59 @@
 			</div>
 
 			<!-- Projects Grid -->
-			{#if filteredProjects.length > 0}
+			{#if view === 'list'}
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 					{#each filteredProjects as project (project.id)}
 						<ProjectCard {project} on:categoryClick={handleCategoryClick} />
 					{/each}
 				</div>
 			{:else}
-				<div class="flex flex-col items-center justify-center py-16 text-center">
-					<div
-						class="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-violet-500/20 to-pink-500/20 dark:from-violet-400/10 dark:to-pink-400/10 flex items-center justify-center"
-					>
-						<i
-							class="fas fa-spinner-third animate-spin text-2xl text-violet-500 dark:text-violet-400"
-						></i>
-					</div>
-					<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">Projects Loading...</p>
+				<div
+					class="flex flex-col items-center justify-center py-16 text-center"
+					role={view === 'loading' ? 'status' : view === 'error' ? 'alert' : undefined}
+				>
+					{#if view === 'loading'}
+						<div
+							class="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-violet-500/20 to-pink-500/20 dark:from-violet-400/10 dark:to-pink-400/10 flex items-center justify-center"
+						>
+							<i
+								class="fas fa-spinner-third animate-spin text-2xl text-violet-500 dark:text-violet-400"
+								aria-hidden="true"
+							></i>
+						</div>
+						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">Loading projects…</p>
+					{:else if view === 'error'}
+						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">
+							We couldn't load the directory.
+						</p>
+						<button
+							type="button"
+							class="mt-6 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-violet-100/50 dark:border-violet-400/10 hover:bg-violet-50 dark:hover:bg-violet-900/30"
+							on:click={loadProjects}
+						>
+							Retry
+						</button>
+					{:else if view === 'empty'}
+						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">
+							No projects are listed yet.
+						</p>
+					{:else if view === 'no-match'}
+						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">No matches</p>
+						<p class="mt-2 text-gray-600 dark:text-gray-300">
+							{#if searchTerm}Search: "{searchTerm}"{/if}
+							{#if searchTerm && selectedCategory !== 'All'}
+								·
+							{/if}
+							{#if selectedCategory !== 'All'}Category: {selectedCategory}{/if}
+						</p>
+						<button
+							type="button"
+							class="mt-6 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-violet-100/50 dark:border-violet-400/10 hover:bg-violet-50 dark:hover:bg-violet-900/30"
+							on:click={clearFilters}
+						>
+							Clear filters
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
