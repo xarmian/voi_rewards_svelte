@@ -103,9 +103,9 @@ Deno.test('the default deadline works with timers that reject a method-style cal
 			return fn(...args);
 		} as T;
 	}
-	globalThis.setTimeout = strict(realSetTimeout) as typeof setTimeout;
-	globalThis.clearTimeout = strict(realClearTimeout) as typeof clearTimeout;
 	try {
+		globalThis.setTimeout = strict(realSetTimeout) as typeof setTimeout;
+		globalThis.clearTimeout = strict(realClearTimeout) as typeof clearTimeout;
 		const { handler, logs } = setup({
 			sources: [
 				{
@@ -123,14 +123,23 @@ Deno.test('the default deadline works with timers that reject a method-style cal
 	}
 });
 
-Deno.test('all sources null returns 200 without inserting', async () => {
-	const { handler, inserts } = setup({
-		sources: [{ name: 'empty', fetch: () => Promise.resolve(null) }]
+// TASK-47: zero rows from every source is an outage, not a success; the cron's HTTP status must show it.
+Deno.test('all sources empty returns 502 and logs it, without inserting', async () => {
+	const { handler, inserts, logs } = setup({
+		sources: [
+			{ name: 'empty', fetch: () => Promise.resolve(null) },
+			{ name: 'broken', fetch: () => Promise.reject(new Error('down')) }
+		]
 	});
 	const response = await handler(request());
-	assertEquals(response.status, 200);
-	assertEquals(await response.json(), { success: true, snapshots_count: 0 });
+	assertEquals(response.status, 502);
+	assertEquals(await response.json(), {
+		success: false,
+		error: 'No market source returned data',
+		snapshots_count: 0
+	});
 	assertEquals(inserts, []);
+	assertStringIncludes(logs[logs.length - 1], 'No market source returned data');
 });
 
 Deno.test('insert error returns 500 with the existing error response', async () => {
