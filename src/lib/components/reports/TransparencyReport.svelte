@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TransparencyData } from '$lib/types/reports.types';
+	import { rowKeys } from './rowKeys';
 
 	let {
 		data,
@@ -8,6 +9,10 @@
 		data: TransparencyData;
 		formatNum: (val: string, prefix?: string) => string;
 	} = $props();
+
+	const paymentKeys = $derived(
+		rowKeys(data.community_ecosystem_payments, (p) => `${p.recipient}|${p.date}`)
+	);
 </script>
 
 <!-- Token Supply Summary -->
@@ -182,7 +187,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.community_ecosystem_payments as payment (payment.recipient + payment.date)}
+					{#each data.community_ecosystem_payments as payment, i (paymentKeys[i])}
 						<tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
 							<td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
 								{payment.recipient}
