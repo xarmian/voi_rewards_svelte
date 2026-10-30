@@ -19,6 +19,10 @@ type Response = {
 const positive = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isFinite(value) && value > 0;
 
+// Dust pools stay out of the table but still count in the summary totals (TASK-89). Measured
+// 10-30: Voi pool TVLs run ... 117, 91, then 22, 21, 14 ...; $50 sits in that gap.
+export const MARKET_TABLE_MIN_TVL_USD = 50;
+
 export function topMarkets(res: Response, n = 4): MarketRow[] {
 	const seen = new Set<string | number>();
 	return (res.marketData ?? [])
@@ -28,6 +32,7 @@ export function topMarkets(res: Response, n = 4): MarketRow[] {
 			return (
 				positive(row.price) &&
 				positive(row.tvl) &&
+				row.tvl >= MARKET_TABLE_MIN_TVL_USD &&
 				typeof row.exchange === 'string' &&
 				typeof row.pair === 'string' &&
 				typeof row.network === 'string' &&

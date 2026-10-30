@@ -387,6 +387,22 @@ it('one markets request feeds both independent streams', async () => {
 		}
 	});
 });
+it('the 24h change comes from the highest-volume row that has one (TASK-89)', async () => {
+	// A Mimir pool row has a null change when its pool has no 24h price window.
+	fetcher.mockImplementation(async (input) => {
+		const url = String(input);
+		if (!url.includes('/api/markets')) return Response.json(body(url));
+		const markets = body(url) as { marketData: Record<string, unknown>[] };
+		const noWindow = {
+			...markets.marketData[0],
+			trading_pair_id: 'pool',
+			price_change_percentage_24h: null
+		};
+		return Response.json({ ...markets, marketData: [noWindow, ...markets.marketData] });
+	});
+	const result = dashboard(await run());
+	expect(await result.price).toMatchObject({ state: 'ready', value: { change24h: -1.01 } });
+});
 it('an unresponsive markets request does not hold the critical load and resolves both streams to error', async () => {
 	fetcher.mockImplementation(async (input) =>
 		String(input).includes('/api/markets')

@@ -2,13 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from '../__fixtures__/poolAggregates.json';
 import { latestSwapRow, type PoolAggregate } from '$lib/server/poolAggregates';
 import type { MarketPair } from './pairs';
-import {
-	composeDexMarketRow,
-	legacyMarketRows,
-	marketAggregates,
-	sortByVolume,
-	type RawTradingPair
-} from './rows';
+import { composeDexMarketRow, marketAggregates, sortByVolume } from './rows';
 
 const pair: MarketPair = {
 	baseTokenId: 0,
@@ -273,62 +267,5 @@ describe('market row processing', () => {
 		expect(sorted).not.toBe(rows);
 		expect(sorted[0]).toBe(rows[1]);
 		expect(rows.map((row) => row.volume_24h)).toEqual([1, 3, null]);
-	});
-
-	it('maps legacy snapshots and sorts by descending volume', () => {
-		function legacy(id: number, volume: number): RawTradingPair {
-			return {
-				id,
-				exchange_id: 7,
-				base_token: 'VOI',
-				quote_token: 'USDC',
-				contract_address: null,
-				pool_url: 'https://example.test/pool',
-				created_at: fixture.now,
-				updated_at: fixture.now,
-				exchange: { name: 'legacy', type: 'DEX', network: 'Algorand' },
-				market_snapshots: [
-					{
-						price: 2,
-						volume_24h: volume,
-						tvl: 100,
-						high_24h: 3,
-						low_24h: 1,
-						price_change_24h: 1,
-						price_change_percentage_24h: 100,
-						timestamp: fixture.now
-					}
-				]
-			};
-		}
-		const rows = legacyMarketRows([legacy(1, 10), legacy(2, 30)]);
-		expect(rows.map((row) => row.trading_pair_id)).toEqual([2, 1]);
-		// TASK-88: a retired exchange's trading pair is dropped even with the most volume.
-		const nomadex = {
-			...legacy(3, 50),
-			exchange: { name: 'Nomadex', type: 'DEX', network: 'Voi' }
-		};
-		expect(legacyMarketRows([legacy(1, 10), nomadex]).map((row) => row.trading_pair_id)).toEqual([
-			1
-		]);
-		expect(JSON.stringify(rows[0])).toBe(
-			JSON.stringify({
-				trading_pair_id: 2,
-				exchange: 'legacy',
-				pair: 'USDC/VOI',
-				type: 'DEX',
-				network: 'Algorand',
-				url: null,
-				pool_url: 'https://example.test/pool',
-				price: 2,
-				volume_24h: 30,
-				tvl: 100,
-				high_24h: 3,
-				low_24h: 1,
-				price_change_24h: 1,
-				price_change_percentage_24h: 100,
-				lastUpdated: new Date(fixture.now).toLocaleString()
-			})
-		);
 	});
 });

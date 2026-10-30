@@ -2,37 +2,6 @@ import { pairWindow, type PoolAggregate, type latestSwapRow } from '$lib/server/
 import type { MarketPair } from './pairs';
 import { norm } from './priceMap';
 import { getPoolUrl } from './poolUrls';
-import { isRetiredExchange } from '$lib/markets/retired';
-
-export interface MarketSnapshot {
-	price: number;
-	volume_24h: number | null;
-	tvl: number | null;
-	high_24h: number | null;
-	low_24h: number | null;
-	price_change_24h: number | null;
-	price_change_percentage_24h: number | null;
-	timestamp: string;
-}
-
-export interface Exchange {
-	name: string;
-	type: string;
-	network: string;
-}
-
-export interface RawTradingPair {
-	id: number;
-	exchange_id: number;
-	base_token: string;
-	quote_token: string;
-	contract_address: string | null;
-	pool_url: string | null;
-	created_at: string;
-	updated_at: string;
-	market_snapshots: MarketSnapshot[];
-	exchange: Exchange;
-}
 
 export function composeDexMarketRow(
 	pair: MarketPair,
@@ -147,32 +116,6 @@ export function sortByVolume(marketData: unknown[] | null) {
 	return (marketData || [])
 		.map((m: any) => m)
 		.sort((a: any, b: any) => (b.volume_24h || 0) - (a.volume_24h || 0));
-}
-
-export function legacyMarketRows(marketData: unknown[] | null) {
-	return ((marketData || []) as unknown as RawTradingPair[])
-		.map((market) => {
-			const latestSnapshot = (market as any).market_snapshots?.[0] || {};
-			return {
-				trading_pair_id: (market as any).id,
-				exchange: (market as any).exchange.name,
-				pair: `${(market as any).quote_token}/${(market as any).base_token}`,
-				type: (market as any).exchange.type,
-				network: (market as any).exchange.network,
-				url: null,
-				pool_url: (market as any).pool_url,
-				price: latestSnapshot.price,
-				volume_24h: latestSnapshot.volume_24h,
-				tvl: latestSnapshot.tvl,
-				high_24h: latestSnapshot.high_24h,
-				low_24h: latestSnapshot.low_24h,
-				price_change_24h: latestSnapshot.price_change_24h,
-				price_change_percentage_24h: latestSnapshot.price_change_percentage_24h,
-				lastUpdated: new Date(latestSnapshot.timestamp).toLocaleString()
-			};
-		})
-		.filter((row) => !isRetiredExchange(row.exchange))
-		.sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
 }
 
 export function marketAggregates(
