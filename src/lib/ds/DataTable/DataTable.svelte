@@ -1,6 +1,4 @@
 <script lang="ts" generics="T">
-	// The pinned ESLint parser does not register Svelte's generics attribute.
-	/* global T */
 	import { tick, type Snippet } from 'svelte';
 	import Button from '../Button/Button.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
