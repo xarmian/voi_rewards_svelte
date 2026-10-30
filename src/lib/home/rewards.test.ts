@@ -55,6 +55,13 @@ test('epoch 104 snapshot reward, share and USD', () => {
 	assert.ok(Math.abs(row.est! - 455635) < 1);
 	assert.ok(Math.abs(row.usd! - 57.87) < 0.01);
 });
+test('full-epoch estimate is the pool times the current block share, floored to microVOI', () => {
+	// The removed RewardsTable's epoch_block_rewards (45157c9^ ~:177), TASK-96.
+	assert.equal(rewardRows(response, options)[0].epochEst, 775973.543137);
+	assert.equal(rewardRows(response, { ...options, pool: null })[0].epochEst, null);
+	assert.equal(rewardRows(response, { ...options, pool: 0 })[0].epochEst, null);
+	assert.equal(rewardRows({ ...response, num_blocks: 0 }, options)[0].epochEst, null);
+});
 test('ranks sort by blocks, preserve ties and exclude ballast addresses', () => {
 	const rows = rewardRows(
 		{

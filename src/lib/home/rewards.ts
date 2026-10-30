@@ -28,6 +28,8 @@ export type RewardRow = {
 	blocks: number;
 	share: number | null;
 	est: number | null;
+	/** The full pool times the row's current block share: the old table's full-epoch estimate. */
+	epochEst: number | null;
 	usd: number | null;
 };
 export const totalBlocksFor = blocksForEpoch;
@@ -75,12 +77,18 @@ export function rewardRows(
 		.sort((a, b) => b.block_count - a.block_count)
 		.map((row, index) => {
 			const est = perBlock === null ? null : finite(row.block_count * perBlock);
+			// Same flooring as the removed RewardsTable's epoch_block_rewards (TASK-96).
+			const epochEst =
+				validTotal && pool !== null && pool > 0
+					? finite(Math.floor(Math.floor((pool / total) * row.block_count * 1e7) / 10) / 1e6)
+					: null;
 			return {
 				addr: row.proposer,
 				rank: index + 1,
 				blocks: row.block_count,
 				share: validTotal ? finite(row.block_count / total) : null,
 				est,
+				epochEst,
 				usd: est !== null && price !== null && price > 0 ? finite(est * price) : null
 			};
 		});

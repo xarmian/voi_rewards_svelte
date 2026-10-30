@@ -4,7 +4,7 @@
 	import { Button, Card, Chip, DataTable, EpochStepper, Tabs, type Column } from '$lib/ds';
 	import type { SortState } from '$lib/ds/DataTable/types';
 	import { sortRows } from '$lib/ds/DataTable/sort';
-	import { comma, pct, shortAddr, usd } from '$lib/ds/format';
+	import { MISSING, comma, pct, shortAddr, usd } from '$lib/ds/format';
 	import { epochRange } from '$lib/epochs';
 	import { rewardsRefreshMode } from '$lib/home/headline';
 	import {
@@ -16,6 +16,7 @@
 		type EpochResponse,
 		type RewardRow
 	} from '$lib/home/rewards';
+	import { estApr, fetchBalance } from '$lib/home/balance';
 	import { createNameResolver } from '$lib/home/names';
 	import type { DashboardData } from '$lib/server/home';
 	import { getTokensByEpoch } from '$lib/utils';
@@ -62,6 +63,10 @@
 	let sort = $state<SortState>({ key: 'blocks', dir: 'desc' });
 	let editing = $state<string | null>(null);
 	let announcement = $state('');
+	let balances = $state<Record<string, number | 'loading' | 'error'>>({});
+	// Balances load when a row's details first open (TASK-96), not for every rendered row.
+	const openDetails = new Set<string>();
+	let balanceGeneration = 0;
 	let appliedInitial = initial;
 	let lastRequested = initialEpoch;
 	let hasSelectedEpoch = false;
@@ -201,6 +206,38 @@
 		link.remove();
 		setTimeout(() => URL.revokeObjectURL(url), 0);
 	}
+	function loadBalance(addr: string) {
+		const generation = balanceGeneration;
+		balances[addr] = 'loading';
+		fetchBalance(addr).then(
+			(balance) => {
+				if (generation === balanceGeneration) balances[addr] = balance;
+			},
+			() => {
+				if (generation === balanceGeneration) balances[addr] = 'error';
+			}
+		);
+	}
+	function ondetails(row: Row, open: boolean) {
+		if (!open) {
+			openDetails.delete(row.addr);
+			return;
+		}
+		openDetails.add(row.addr);
+		const balance = balances[row.addr];
+		if (balance === undefined || balance === 'error') loadBalance(row.addr);
+	}
+	function refreshBalances() {
+		// A late response from before the refresh must not overwrite the new read.
+		balanceGeneration++;
+		balances = {};
+		for (const addr of openDetails) loadBalance(addr);
+	}
+	function balanceText(balance: number | 'loading' | 'error' | undefined) {
+		if (balance === 'loading') return 'Loading…';
+		if (balance === 'error') return 'Unavailable';
+		return balance === undefined ? MISSING : `${comma(balance, 2)} VOI`;
+	}
 	async function copyAddress(addr: string) {
 		try {
 			await navigator.clipboard.writeText(addr);
@@ -270,7 +307,43 @@
 {/snippet}
 {#snippet estimate(row: Row)}{comma(row.est)}{/snippet}
 {#snippet dollars(row: Row)}{usd(row.usd)}{/snippet}
-{#snippet detail(row: Row)}<p class="break-all text-label text-ink-muted">{row.addr}</p>{/snippet}
+{#snippet detail(row: Row)}
+	{@const balance = balances[row.addr]}
+	<div class="space-y-3">
+		<p class="break-all text-label text-ink-muted">{row.addr}</p>
+		<div class="flex flex-wrap gap-2">
+			<Button variant="soft" size="sm" onclick={() => copyAddress(row.addr)}>Copy address</Button>
+			<Button variant="soft" size="sm" href="/wallet/{row.addr}">Open wallet</Button>
+			<Button
+				variant="soft"
+				size="sm"
+				href="https://block.voi.network/explorer/account/{row.addr}/transactions"
+				target="_blank"
+				rel="noopener noreferrer"
+				>View in explorer<span class="sr-only"> (opens in a new tab)</span></Button
+			>
+		</div>
+		<dl class="grid gap-x-4 gap-y-2 sm:grid-cols-[auto_1fr]">
+			<dt class="text-micro text-ink-muted">Account balance</dt>
+			<dd class="num" aria-busy={balance === 'loading'}>{balanceText(balance)}</dd>
+			<dt class="text-micro text-ink-muted">Est. reward (full epoch)</dt>
+			<dd class="num">{row.epochEst === null ? MISSING : `${comma(row.epochEst, 2)} VOI`}</dd>
+			<dt class="text-micro text-ink-muted">Est. APR</dt>
+			<dd class="num">{pct(estApr(row.epochEst, typeof balance === 'number' ? balance : null))}</dd>
+			{#if row.name}
+				<dt class="text-micro text-ink-muted">enVoi name</dt>
+				<dd>
+					<a
+						href="https://app.envoi.sh/#/{row.name}"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="break-all text-accent underline">{row.name}</a
+					>
+				</dd>
+			{/if}
+		</dl>
+	</div>
+{/snippet}
 {#snippet rowActions(row: Row)}
 	<button
 		type="button"
@@ -338,7 +411,10 @@
 		>
 		<Button
 			variant="soft"
-			onclick={() => loadEpoch(epoch, true)}
+			onclick={() => {
+				refreshBalances();
+				void loadEpoch(epoch, true);
+			}}
 			disabled={dataState === 'loading'}
 			aria-busy={dataState === 'loading'}>Refresh</Button
 		>
@@ -357,6 +433,7 @@
 			moreLabel={() => `See all ${rows.length} proposers`}
 			expandable
 			{detail}
+			{ondetails}
 			{rowActions}
 			favourite={{
 				pressed: (r) => $favorites.includes(r.addr),

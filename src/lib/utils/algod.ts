@@ -1,8 +1,9 @@
 import algosdk from 'algosdk';
+import { ALGOD_SERVER } from './algodServer';
 
 // Algorand node settings
 // const server = 'https://testnet-api.voi.nodly.io';
-const server = 'https://mainnet-api.voi.nodely.dev';
+const server = ALGOD_SERVER;
 const port = '443';
 const token = '';
 
