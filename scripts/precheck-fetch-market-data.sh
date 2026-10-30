@@ -47,7 +47,8 @@ for line in open(sys.argv[1]):
     if "market_snapshots" in path:
         total += len(json.loads(body))
 print(total)' "$INSERTS" 2>/dev/null)
-COUNT=$(printf '%s' "$RESPONSE" | python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("snapshots_count", 0))' 2>/dev/null)
+# A count only counts on a success response.
+COUNT=$(printf '%s' "$RESPONSE" | python3 -I -c 'import json, sys; r = json.load(sys.stdin); print(r.get("snapshots_count", 0) if r.get("success") is True else 0)' 2>/dev/null)
 
 echo "deno@$DENO_MAJOR response: $RESPONSE"
 echo "rows received by the stub: ${ROWS:-0}"
