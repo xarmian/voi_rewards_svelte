@@ -3,6 +3,8 @@ import { test, vi } from 'vitest';
 import { extrapolateRewardPerBlock } from '$lib/utils';
 import {
 	filterProposer,
+	filterRewardRows,
+	rewardTotals,
 	rewardsCSV,
 	rewardRows,
 	rewardsClock,
@@ -138,4 +140,38 @@ test('CSV exports exactly the supplied filtered rows and unrounded estimates', (
 	assert.equal(rewardsCSV(rows), `account,block_rewards\n${addr},${rows[0].est}`);
 	assert.equal(rewardsCSV([]), 'account,block_rewards\n');
 	assert.equal(rewardsCSV([{ ...rows[0], est: null }]), `account,block_rewards\n${addr},`);
+});
+
+// TASK-98: the footer sums every row the filters match, across all pages, not the 15 shown.
+const many: EpochResponse = {
+	...response,
+	data: Array.from({ length: 20 }, (_, i) => ({ proposer: `ADDR${i}`, block_count: 100 + i }))
+};
+test('totals follow a search filter that spans more than one page', () => {
+	const rows = rewardRows(many, options);
+	const shown = filterRewardRows(rows, { query: 'addr1', show: 'all', favourites: [] });
+	// ADDR1 and ADDR10..ADDR19.
+	assert.equal(shown.length, 11);
+	const totals = rewardTotals(shown);
+	assert.equal(totals?.accounts, 11);
+	assert.equal(totals?.blocks, 101 + 1145);
+	const est = shown.reduce((sum, row) => sum + row.est!, 0);
+	assert.ok(Math.abs(totals!.est! - est) < 1e-9);
+	assert.ok(Math.abs(totals!.usd! - est * options.price) < 1e-9);
+});
+test('totals follow the favourites view, beyond the first 15 rows', () => {
+	const rows = rewardRows(many, options);
+	const favourites = rows.slice(2, 19).map((row) => row.addr);
+	const shown = filterRewardRows(rows, { query: '', show: 'favourites', favourites });
+	assert.equal(shown.length, 17);
+	// Sorted by blocks descending, slice(2, 19) is 117 down to 101.
+	assert.equal(rewardTotals(shown)?.blocks, 1853);
+	assert.equal(filterRewardRows(rows, { query: '', show: 'all', favourites }).length, 20);
+});
+test('an empty filter result has no totals, and a missing estimate stays missing', () => {
+	assert.equal(rewardTotals([]), null);
+	const unpriced = rewardTotals(rewardRows(many, { ...options, pool: null }));
+	assert.equal(unpriced?.blocks, 20 * 100 + 190);
+	assert.equal(unpriced?.est, null);
+	assert.equal(unpriced?.usd, null);
 });
