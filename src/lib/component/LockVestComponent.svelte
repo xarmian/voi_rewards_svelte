@@ -232,6 +232,7 @@
 		} else {
 			loadSequence++;
 			isLoading = false;
+			error = null;
 			contracts = [];
 			failedCount = 0;
 		}
