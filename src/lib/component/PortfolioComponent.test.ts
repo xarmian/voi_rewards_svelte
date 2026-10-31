@@ -14,6 +14,7 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 	const error = vi.fn();
 	const context = createContext({
 		$voiPrice: { price: 0 },
+		browser: false,
 		console: { error },
 		loadComponent
 	});
