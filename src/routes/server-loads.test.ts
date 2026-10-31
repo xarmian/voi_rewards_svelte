@@ -31,6 +31,8 @@ function query() {
 		gte: vi.fn(() => builder),
 		lte: vi.fn(() => builder),
 		returns: () => builder,
+		// TASK-92: the loads bound each query; the real builder returns itself.
+		abortSignal: () => builder,
 		single: () => builder,
 		then: (yes: (value: unknown) => unknown, no: (reason: unknown) => unknown) => {
 			started();

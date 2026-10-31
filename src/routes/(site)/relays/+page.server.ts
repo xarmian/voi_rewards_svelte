@@ -1,5 +1,6 @@
 import { supabasePublicClient } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 
 interface WeekRange {
 	start: string;
@@ -60,6 +61,7 @@ export const load: PageServerLoad = async () => {
 		.select('peer_date')
 		.order('peer_date', { ascending: false })
 		.limit(1)
+		.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 		.single();
 
 	if (maxDateError) {

@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { supabasePrivateClient } from '$lib/server/supabase';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 
 export async function GET({ url }) {
 	const wallet = url.searchParams.get('wallet');
@@ -13,7 +14,8 @@ export async function GET({ url }) {
 			.from('addresses')
 			.select('address')
 			.eq('address', wallet)
-			.eq('disconnected', false);
+			.eq('disconnected', false)
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (error) {
 			throw error;

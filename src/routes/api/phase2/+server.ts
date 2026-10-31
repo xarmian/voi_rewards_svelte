@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { validatePhase2Pagination } from '$lib/server/validate';
 import { supabasePublicClient } from '$lib/supabase';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
@@ -40,10 +41,13 @@ export async function GET({ url }) {
 		if (fetchAll) {
 			if (combine || csv) {
 				// First get total count
-				const { count } = await supabasePublicClient
+				const { count, error: countError } = await supabasePublicClient
 					.from('vr_phase2')
 					.select('*', { count: 'exact', head: true })
-					.not('blacklisted', 'is', true);
+					.not('blacklisted', 'is', true)
+					.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
+				// TASK-92: a failed or timed-out count is an error, not an empty export.
+				if (countError) throw countError;
 
 				if (!count) {
 					return csv
@@ -69,7 +73,8 @@ export async function GET({ url }) {
 						.select('address, airdrop_amount')
 						.not('blacklisted', 'is', true)
 						.order('address', { ascending: true })
-						.range(i * DEFAULT_PAGE_SIZE, (i + 1) * DEFAULT_PAGE_SIZE - 1);
+						.range(i * DEFAULT_PAGE_SIZE, (i + 1) * DEFAULT_PAGE_SIZE - 1)
+						.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 					if (error) throw error;
 
@@ -116,7 +121,8 @@ export async function GET({ url }) {
 				.select('address, airdrop_amount', { count: 'exact' })
 				.not('blacklisted', 'is', true)
 				.order('address', { ascending: true })
-				.range((page - 1) * pageSize, page * pageSize - 1);
+				.range((page - 1) * pageSize, page * pageSize - 1)
+				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 			if (allError) {
 				throw allError;
@@ -149,9 +155,12 @@ export async function GET({ url }) {
 				.select('airdrop_amount')
 				.eq('address', wallet)
 				.not('blacklisted', 'is', true)
-				.single();
+				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
+				.maybeSingle();
 
-			if (questError) {
+			// TASK-92: maybeSingle gives no row as null data; any error (failure, timeout, more than one row) is a 500.
+			if (questError) throw questError;
+			if (!questData) {
 				return json(
 					{ error: 'Address not found' },
 					{

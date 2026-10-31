@@ -1,6 +1,7 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json } from '@sveltejs/kit';
 import { supabasePublicClient } from '$lib/supabase';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import type { PeerRecord } from '$lib/types';
 import { getTokensByEpoch } from '$lib/utils';
 import { getCurrentEpoch } from '$lib/utils/epoch-utils';
@@ -81,8 +82,12 @@ export async function GET({ url }: RequestEvent) {
 					.gte('peer_date', startStr)
 					.lte('peer_date', endStr)
 					.order('host_name')
+					.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 					.returns<PeerRecord[]>(),
-				supabasePublicClient.from('vr_relay_wallets').select('host_prefix, wallet_address')
+				supabasePublicClient
+					.from('vr_relay_wallets')
+					.select('host_prefix, wallet_address')
+					.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 			]);
 
 		if (queryError) throw queryError;
