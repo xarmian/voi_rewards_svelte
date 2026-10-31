@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { getLockContractByAddress } from '$lib/services/lockvest';
 	import { fade } from 'svelte/transition';
@@ -229,7 +230,8 @@
 		//stopCountdown();
 	});
 
-	$: if (address) {
+	// TASK-109: browser only. A server render must not write module-level stores or call upstream on every request.
+	$: if (browser && address) {
 		loadStakingContract();
 	}
 

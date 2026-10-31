@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import QuestCard from './QuestCard.svelte';
 
@@ -561,7 +562,8 @@
 		}
 	}
 
-	$: if (wallet) {
+	// TASK-109: browser only. A server render must not write module-level stores or call upstream on every request.
+	$: if (browser && wallet) {
 		loading = true;
 		switch (project.title) {
 			case 'Voi Network':

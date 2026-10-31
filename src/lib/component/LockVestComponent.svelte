@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import LockContract from './LockContract.svelte';
 
 	import { algodClient } from '$lib/utils/algod';
@@ -216,7 +217,9 @@
 
 	$: {
 		if (childAccounts && childAccounts.length > 0) {
-			loadContractDetails();
+			// TASK-109: browser only. A server render must not write module-level stores or call upstream on every
+			// request; it keeps the loading state.
+			if (browser) loadContractDetails();
 		} else {
 			isLoading = false;
 			contracts = [];

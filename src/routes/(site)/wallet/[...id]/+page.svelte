@@ -304,7 +304,8 @@
 	}
 
 	$: {
-		if (walletId) {
+		// TASK-109: browser only. A server render must not write module-level stores or call upstream on every request.
+		if (browser && walletId) {
 			initializeWallet();
 		}
 	}

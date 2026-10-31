@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import type { NFTToken } from '../types/assets';
 	import { resolveEnvoiToken } from '../utils/envoi';
 
@@ -319,7 +320,8 @@
 	}
 
 	$: {
-		if (walletAddress) {
+		// TASK-109: browser only. A server render must not call upstream on every request.
+		if (browser && walletAddress) {
 			refreshNFTs();
 		}
 	}
