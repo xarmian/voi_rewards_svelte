@@ -20,6 +20,8 @@
 	export let canSignTransactions = false;
 	export let walletId: string | undefined;
 	export let fungibleTokens: FungibleTokenType[];
+	// TASK-108: the VOI price has not loaded yet, so a null usdValue is pending, not unavailable.
+	export let priceLoading = false;
 	let showOptOutModal = false;
 	let showSendModal = false;
 	let showTransfersModal = false;
@@ -372,7 +374,9 @@
 								<p class="text-gray-700 dark:text-gray-200">{formatNumber(displayValue, 3)} VOI</p>
 								<p class="text-gray-600 dark:text-gray-300 text-xs">
 									{token.usdValue === null
-										? 'USD unavailable'
+										? priceLoading
+											? '… USD'
+											: 'USD unavailable'
 										: `$${formatNumber(token.usdValue || 0, 4)} USD`}
 								</p>
 							</div>
@@ -387,7 +391,9 @@
 						</p>
 						<p class="text-gray-600 dark:text-gray-300">
 							Value: {formatNumber(displayValue, 3)} VOI / {token.usdValue === null
-								? 'USD unavailable'
+								? priceLoading
+									? '… USD'
+									: 'USD unavailable'
 								: `$${formatNumber(token.usdValue || 0, 4)} USD`}
 						</p>
 					{/if}
