@@ -40,12 +40,10 @@ export const GET: RequestHandler = async ({ url }) => {
 			return json({ error: 'baseTokenId is required and must be a valid number' }, { status: 400 });
 		}
 
-		// Handle USD quote equivalent
+		// quote=USD means aUSDC, the pair createVOITokenPair uses (TASK-49)
 		let finalQuoteTokenId = quoteTokenId;
 		if (isNaN(quoteTokenId) && quote?.toUpperCase() === 'USD') {
-			// You may want to configure a specific USD equivalent token ID
-			// For now, we'll use a default value (this should be configured in your environment)
-			finalQuoteTokenId = 390001; // Example USDC token ID - adjust as needed
+			finalQuoteTokenId = AUSDC_TOKEN_IDS[0];
 		}
 
 		if (isNaN(finalQuoteTokenId)) {
