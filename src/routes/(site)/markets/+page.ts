@@ -55,7 +55,8 @@ export const load: PageLoad = async ({ fetch, url }) => {
 
 	const [marketData, priceHistory, tokenAnalytics] = await Promise.all([
 		marketDataPromise,
-		fetchJson(`/api/price-history?period=24h&token=${tokenSymbolResolved}`),
+		// TASK-92: the chart and the price fallback take [], so a failed price history no longer fails the page.
+		fetchJson(`/api/price-history?period=24h&token=${tokenSymbolResolved}`).catch(() => []),
 		tokenAnalyticsPromise
 	]);
 

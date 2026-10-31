@@ -5,6 +5,7 @@ import {
 	type VrQuest
 } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { fetchProjects } from '../../phase2/[...slug]/projects';
 
 export const load = (async ({ params }) => {
@@ -16,12 +17,21 @@ export const load = (async ({ params }) => {
 		fetchProjects(),
 		wallet.length > 0
 			? Promise.all([
-					supabasePublicClient.from('leaderboard').select('*').eq('wallet', wallet),
-					supabasePublicClient.from('vr_phase2').select('*').eq('address', wallet),
+					supabasePublicClient
+						.from('leaderboard')
+						.select('*')
+						.eq('wallet', wallet)
+						.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)),
+					supabasePublicClient
+						.from('vr_phase2')
+						.select('*')
+						.eq('address', wallet)
+						.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)),
 					supabasePublicClient
 						.from('vr_quests')
 						.select('*')
 						.or('status.is.null,status.neq.inactive')
+						.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 				])
 			: Promise.resolve(null)
 	]);

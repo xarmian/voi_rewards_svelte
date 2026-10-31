@@ -1,6 +1,7 @@
 import { supabasePublicClient } from '$lib/supabase';
 import type { VRPhase2 } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 
 export const load = (async () => {
 	const [{ data, error }, { count, error: countError }] = await Promise.all([
@@ -8,8 +9,12 @@ export const load = (async () => {
 			.from('vr_phase2')
 			.select('*')
 			.order('total_quest_points', { ascending: false })
-			.limit(50),
-		supabasePublicClient.from('vr_phase2').select('count', { count: 'exact' })
+			.limit(50)
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)),
+		supabasePublicClient
+			.from('vr_phase2')
+			.select('count', { count: 'exact' })
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 	]);
 
 	if (error || countError) {

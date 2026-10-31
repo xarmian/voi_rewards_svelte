@@ -1,6 +1,7 @@
 import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
+import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import type {
 	Resolution,
 	OHLCVRequest,
@@ -135,7 +136,8 @@ export const GET: RequestHandler = async ({ url }) => {
 			.gte('bucket_start', startTime.toISOString())
 			.lt('bucket_start', endTime.toISOString())
 			.order('bucket_start', { ascending: true })
-			.limit(Math.min(limit, 2000));
+			.limit(Math.min(limit, 2000))
+			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
 		if (error) {
 			return json({ error: `Failed to fetch OHLCV data: ${error.message}` }, { status: 500 });
