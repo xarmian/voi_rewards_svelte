@@ -19,17 +19,28 @@ import { fetchProjects } from '../../routes/(site)/phase2/[...slug]/projects';
 
 const WALLET = 'A'.repeat(58);
 let stalled = '';
-// A single-row read on any site resolves with no row.
-let noRow = false;
+// How many rows a single-row read matches. postgrest-js: .single() errors with PGRST116 on none or many;
+// .maybeSingle() gives null data on none and errors with PGRST116 on many.
+let rows: 'one' | 'none' | 'many' = 'one';
 // A query on this site resolves at once with an error (not a stall).
 let failed = '';
-let failedCode: string | undefined;
 const signals: Array<{ site: string; signal: AbortSignal }> = [];
+
+function singleResult(single: 'single' | 'maybe' | null) {
+	if (!single) return null;
+	const pgrst116 = (n: number) => ({
+		data: null,
+		error: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned', details: `The result contains ${n} rows` }
+	});
+	if (rows === 'many') return pgrst116(2);
+	if (rows === 'none') return single === 'single' ? pgrst116(0) : { data: null, error: null };
+	return { data: { airdrop_amount: 7, peer_date: '2024-11-05' }, error: null };
+}
 
 // Like postgrest-js without throwOnError: aborting fetch resolves a result with error.
 function query(site: string) {
 	let signal: AbortSignal | undefined;
-	let single = false;
+	let single: 'single' | 'maybe' | null = null;
 	const builder: Record<string, unknown> = {
 		abortSignal: (value: AbortSignal) => {
 			signal = value;
@@ -37,28 +48,24 @@ function query(site: string) {
 			return builder;
 		},
 		single: () => {
-			single = true;
+			single = 'single';
 			return builder;
 		},
 		maybeSingle: () => {
-			single = true;
+			single = 'maybe';
 			return builder;
 		},
 		then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
 			const result =
 				site === failed
-					? Promise.resolve({ data: null, count: null, error: { code: failedCode, message: 'upstream failed' } })
+					? Promise.resolve({ data: null, count: null, error: { message: 'upstream failed' } })
 					: site === stalled
 					? new Promise((done) => {
 							const abort = () => done({ data: null, error: { message: 'upstream aborted' } });
 							if (signal?.aborted) abort();
 							else signal?.addEventListener('abort', abort, { once: true });
 						})
-					: Promise.resolve(
-							single && noRow
-								? { data: null, error: null }
-								: { data: single ? { airdrop_amount: 7, peer_date: '2024-11-05' } : [], count: 3, error: null }
-						);
+					: Promise.resolve(singleResult(single) ?? { data: [], count: 3, error: null });
 			return result.then(resolve, reject);
 		}
 	};
@@ -94,9 +101,8 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => {});
 	signals.length = 0;
 	stalled = '';
-	noRow = false;
+	rows = 'one';
 	failed = '';
-	failedCode = undefined;
 	mocks.from.mockImplementation((site: string) => query(site));
 	vi.stubGlobal('fetch', vi.fn<typeof fetch>(() => new Promise(() => {})));
 });
@@ -135,17 +141,21 @@ it.each([
 
 it.each([
 	['a failed count is a 500, not an empty CSV', '/api/phase2?fetchAll=true&csv=true'],
-	['a failed wallet query is a 500, not "Address not found"', `/api/phase2?wallet=${WALLET}`],
-	['more than one row (PGRST116) is a 500, not "Address not found"', `/api/phase2?wallet=${WALLET}`, 'PGRST116']
-])('phase2: %s', async (_, path, code?: string) => {
+	['a failed wallet query is a 500, not "Address not found"', `/api/phase2?wallet=${WALLET}`]
+])('phase2: %s', async (_, path) => {
 	failed = 'vr_phase2';
-	failedCode = code;
 	const response = await phase2(event(path) as never);
 	expect(response.status).toBe(500);
 });
 
+it('phase2: more than one row is a 500, not "Address not found"', async () => {
+	rows = 'many';
+	const response = await phase2(event(`/api/phase2?wallet=${WALLET}`) as never);
+	expect(response.status).toBe(500);
+});
+
 it('phase2 still answers 404 for an address with no row', async () => {
-	noRow = true;
+	rows = 'none';
 	const response = await phase2(event(`/api/phase2?wallet=${WALLET}`) as never);
 	expect(response.status).toBe(404);
 });
