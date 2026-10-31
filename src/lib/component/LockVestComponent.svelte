@@ -25,7 +25,13 @@
 	let showRegisterVoteKey = false;
 	let consensusData: { [key: string]: any } = {};
 
+	// TASK-111: a reload can start while an earlier one is in flight; only the latest may write.
+	let loadSequence = 0;
+	// Contracts whose reads failed: counted and shown, not dropped silently.
+	let failedCount = 0;
+
 	async function loadContractDetails() {
+		const sequence = ++loadSequence;
 		isLoading = true;
 		error = null;
 
@@ -174,12 +180,15 @@
 
 			// Wait for all promises to resolve and filter out any null results
 			const results = await Promise.all(contractPromises);
+			if (sequence !== loadSequence) return;
 			contracts = results.filter((contract) => contract !== null) as ContractDetails[];
+			failedCount = results.length - contracts.length;
 		} catch (err) {
+			if (sequence !== loadSequence) return;
 			console.error('Error loading contracts:', err);
 			error = 'Failed to load contract data';
 		} finally {
-			isLoading = false;
+			if (sequence === loadSequence) isLoading = false;
 		}
 	}
 
@@ -221,8 +230,11 @@
 			// request; it keeps the loading state.
 			if (browser) loadContractDetails();
 		} else {
+			loadSequence++;
 			isLoading = false;
+			error = null;
 			contracts = [];
+			failedCount = 0;
 		}
 	}
 </script>
@@ -250,11 +262,29 @@
 		>
 			<p class="text-red-600 dark:text-red-400">{error}</p>
 		</div>
+	{:else if contracts.length === 0 && failedCount > 0}
+		<div
+			class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+		>
+			<p class="text-red-600 dark:text-red-400">
+				{failedCount === 1 ? '1 contract' : `${failedCount} contracts`} could not be loaded
+			</p>
+		</div>
 	{:else if contracts.length === 0}
 		<div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
 			<p class="text-gray-600 dark:text-gray-400">No Lock+Vest contracts found for this wallet</p>
 		</div>
 	{:else}
+		{#if failedCount > 0}
+			<div
+				class="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
+			>
+				<p class="text-yellow-800 dark:text-yellow-300">
+					{failedCount} of {failedCount + contracts.length} contracts could not be loaded; the totals
+					exclude them.
+				</p>
+			</div>
+		{/if}
 		<!-- Summary Stats -->
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
