@@ -162,7 +162,7 @@ it('phase2 still answers 404 for an address with no row', async () => {
 
 it('leaderboard returns its error data by the deadline when vr_phase2 stalls', async () => {
 	stalled = 'vr_phase2';
-	const { outcome } = await settle(() => Promise.resolve(leaderboardLoad(event('/leaderboard') as never)));
+	const { outcome } = await settle(() => Promise.resolve(leaderboardLoad()));
 	expect(outcome?.value).toMatchObject({ status: 500 });
 	expectAborted('vr_phase2');
 });
