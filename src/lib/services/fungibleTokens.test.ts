@@ -314,6 +314,21 @@ test('red control: pool 411756 values one LP and shows live reserves instead of 
 	assert.equal(accountRead.mock.calls.length, 0);
 });
 
+test('TASK-91 a pool-valued token has a null USD value without a VOI price, not $0', async () => {
+	mockEscrow();
+	const priced = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools,
+		fetch: nomadexSources(411756).fetchFn
+	});
+	assert.ok(Math.abs((priced.tokens[0].usdValue ?? NaN) - priced.tokens[0].value * 0.0002) < 1e-12);
+	const unpriced = await fetchFungibleTokens('wallet', 0, {
+		getLiquidityPools,
+		fetch: nomadexSources(411756).fetchFn
+	});
+	assert.equal(unpriced.tokens[0].usdValue, null);
+	assert.ok(unpriced.tokens[0].value > 0);
+});
+
 test('missing Mimir VOI/ASA pool reads both reserves from one escrow account response', async () => {
 	const accountRead = mockEscrow(98000000000, [{ 'asset-id': 48146090, amount: 24000000 }]);
 	const { fetchFn } = nomadexSources(48787612);

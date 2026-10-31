@@ -371,7 +371,9 @@
 								<p class="text-gray-500 dark:text-gray-400 text-xs uppercase">Value</p>
 								<p class="text-gray-700 dark:text-gray-200">{formatNumber(displayValue, 3)} VOI</p>
 								<p class="text-gray-600 dark:text-gray-300 text-xs">
-									${formatNumber(token.usdValue || 0, 4)} USD
+									{token.usdValue === null
+										? 'USD unavailable'
+										: `$${formatNumber(token.usdValue || 0, 4)} USD`}
 								</p>
 							</div>
 						</div>
@@ -384,7 +386,9 @@
 							{token.symbol}
 						</p>
 						<p class="text-gray-600 dark:text-gray-300">
-							Value: {formatNumber(displayValue, 3)} VOI / ${formatNumber(token.usdValue || 0, 4)} USD
+							Value: {formatNumber(displayValue, 3)} VOI / {token.usdValue === null
+								? 'USD unavailable'
+								: `$${formatNumber(token.usdValue || 0, 4)} USD`}
 						</p>
 					{/if}
 				</div>

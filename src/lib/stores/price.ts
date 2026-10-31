@@ -8,6 +8,7 @@ interface PriceData {
 
 export const voiPrice = writable<PriceData>({ price: 0, lastUpdated: null, error: null });
 
+// TASK-91: matches /api/voi-price's CDN cache (CACHE_TTL['voi-price'].sMaxAge = 60 s); polling faster sees no new data.
 export const VOI_PRICE_TTL_MS = 60_000;
 let fetchedAt: number | null = null;
 let inFlight: Promise<void> | null = null;
@@ -34,17 +35,17 @@ export async function fetchVoiPriceWith(
 	const sequence = ++requestSequence;
 	inFlight = Promise.resolve().then(async () => {
 		try {
-			const response = await fetchFn(
-				'https://voi-mainnet-mimirapi.voirewards.com/dex/pools?poolId=395553'
-			);
+			// TASK-91: the same cross-venue VWAP as /api/markets voiUsd, so the site shows one VOI price.
+			const response = await fetchFn('/api/voi-price');
 			if (!response.ok) throw new Error('Failed to fetch VOI price');
 			const data = await response.json();
-			if (!data?.pools?.length) throw new Error('No VOI price data available');
-			const pool = data.pools[0];
-			const price = pool.tokenB.balance / pool.tokenA.balance;
-			if (!Number.isFinite(price) || price <= 0) throw new Error('Invalid VOI price');
+			const price = Number(data?.price);
+			// The endpoint answers price 0 when it has no data: that is unavailable, never $0.
+			if (!Number.isFinite(price) || price <= 0) throw new Error('VOI price unavailable');
+			const lastUpdated = new Date(data.lastUpdated);
 			// TASK-30: an older request cannot replace a newer price or error.
-			if (sequence === requestSequence) updateVoiPrice(price, new Date(pool.lastUpdated));
+			if (sequence === requestSequence)
+				updateVoiPrice(price, Number.isFinite(lastUpdated.getTime()) ? lastUpdated : new Date());
 		} catch (error) {
 			console.error('Error fetching VOI price:', error);
 			if (sequence === requestSequence) {
