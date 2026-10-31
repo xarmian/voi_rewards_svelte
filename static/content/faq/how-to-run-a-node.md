@@ -15,15 +15,11 @@ There are several ways to set up a Voi node:
   - [Voi Swarm Guide](https://voinetwork.github.io/voi-swarm)
   - For troubleshooting: [Voi Swarm Issues](https://github.com/VoiNetwork/voi-swarm/issues)
 
-- **FUNC (Recommended for Linux, Windows, and MacOS)**: Funk's Ultimate Node Controller (FUNC)
+- **FUNC (Recommended for Windows users; also runs on Linux and macOS)**: Funk's Ultimate Node Controller (FUNC), with a web management interface and installers for each platform.
 
   - [FUNC Guide](https://github.com/GalaxyPay/func)
   - [FUNC Release Notes](https://github.com/GalaxyPay/func/releases)
-
-- **Aust's One-Click Node (Recommended for Windows users)**: Easy setup for Windows.
-
-  - [Aust's One-Click Node Guide](https://github.com/AustP/austs-one-click-node)
-  - For troubleshooting: [A1CN Issues](https://github.com/AustP/austs-one-click-node/issues)
+  - For troubleshooting: [FUNC Issues](https://github.com/GalaxyPay/func/issues)
 
 - **Manual Setup**: For advanced users who prefer more control.
   - [Official Voi Technical Documentation](https://docs.voi.network/)
@@ -60,7 +56,7 @@ After setup:
 If you encounter issues:
 
 - For Voi Swarm: Check the [Voi Swarm Issues](https://github.com/VoiNetwork/voi-swarm/issues) page
-- For Aust's One-Click Node: Refer to the [A1CN Issues](https://github.com/AustP/austs-one-click-node/issues) page
+- For FUNC: Refer to the [FUNC Issues](https://github.com/GalaxyPay/func/issues) page
 - For general help: Join the [Voi Discord](https://discord.gg/vnFbrJrHeW) and ask in the #node-runners channel
 
 ### 6. Advanced Topics
