@@ -42,13 +42,15 @@
 	let canSignTransactions = false;
 	let totalValue: number = 0;
 	let totalUsdValue = 0;
-	// TASK-108: the totals are 0 until the first recomputeTotals, and a token list fetched before the price
-	// landed has no VOI-derived USD; both are loading, not $0 or unavailable.
+	// TASK-108: the totals are 0 until the first recomputeTotals and partial until the first token list lands,
+	// and a token list fetched before the price landed has no VOI-derived USD until its re-fetch settles; all of
+	// that is loading, not $0 or unavailable. A failed re-fetch leaves those values unavailable.
 	let totalsReady = false;
 	let tokensPrice = 0;
 	$: usdPending =
 		!$voiPrice.error &&
-		($voiPrice.price <= 0 || (fungibleTokens.length > 0 && tokensPrice <= 0));
+		($voiPrice.price <= 0 || (isLoadingTokens && fungibleTokens.length > 0 && tokensPrice <= 0));
+	$: totalsPending = !totalsReady || (isLoadingTokens && fungibleTokens.length === 0);
 
 	interface Transaction {
 		'payment-transaction'?: {
@@ -806,12 +808,12 @@
 		<div class="text-right">
 			<p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
 			<p class="text-2xl font-bold text-gray-900 dark:text-white">
-				{totalsReady ? formatNumber(totalValue) : '…'} VOI
+				{totalsPending ? '…' : formatNumber(totalValue)} VOI
 			</p>
 			<p class="text-sm font-bold text-gray-900 dark:text-white">
 				{#if $voiPrice.price <= 0 && $voiPrice.error}
 					USD price unavailable
-				{:else if !totalsReady || usdPending}
+				{:else if totalsPending || usdPending}
 					… USD
 				{:else}
 					${formatNumber(totalUsdValue)} USD
