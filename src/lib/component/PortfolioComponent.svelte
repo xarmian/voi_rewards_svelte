@@ -15,6 +15,7 @@
 	import { selectedWallet } from 'avm-wallet-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 	import { fade } from 'svelte/transition';
 	import ConsensusDetails from './ConsensusDetails.svelte';
 	import StakingComponent from './ui/StakingComponent.svelte';
@@ -41,6 +42,13 @@
 	let canSignTransactions = false;
 	let totalValue: number = 0;
 	let totalUsdValue = 0;
+	// TASK-108: the totals are 0 until the first recomputeTotals, and a token list fetched before the price
+	// landed has no VOI-derived USD; both are loading, not $0 or unavailable.
+	let totalsReady = false;
+	let tokensPrice = 0;
+	$: usdPending =
+		!$voiPrice.error &&
+		($voiPrice.price <= 0 || (fungibleTokens.length > 0 && tokensPrice <= 0));
 
 	interface Transaction {
 		'payment-transaction'?: {
@@ -158,7 +166,9 @@
 	}
 
 	$: {
-		if (walletAddress && walletAddress !== lastInitializedWallet) {
+		// TASK-108: browser only. On the server the relative /api/voi-price fetch fails and its error stays in the
+		// module-level store for every later render.
+		if (browser && walletAddress && walletAddress !== lastInitializedWallet) {
 			lastInitializedWallet = walletAddress;
 			canSignTransactions =
 				$selectedWallet?.address === walletAddress &&
@@ -166,6 +176,8 @@
 				$selectedWallet?.app !== 'Watch';
 			fungibleTokens = [];
 			lastTokenPrice = 0;
+			tokensPrice = 0;
+			totalsReady = false;
 			tokensError = null;
 			tokensPartial = false;
 			totalValue = 0;
@@ -202,6 +214,7 @@
 			}, 0) +
 			// Add VOI balance USD value if VOI price is available
 			($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
+		totalsReady = true;
 	}
 
 	async function refreshPortfolio() {
@@ -225,6 +238,7 @@
 			const { tokens, partial } = await fetchFungibleTokens(requestedWallet, lastTokenPrice);
 			if (walletAddress !== requestedWallet) return;
 			fungibleTokens = tokens;
+			tokensPrice = lastTokenPrice;
 			tokensError = null;
 			tokensPartial = partial;
 			recomputeTotals();
@@ -257,6 +271,7 @@
 				const { tokens, partial } = await fetchFungibleTokens(requestedWallet, lastTokenPrice);
 				if (walletAddress !== requestedWallet) return;
 				fungibleTokens = tokens;
+				tokensPrice = lastTokenPrice;
 				tokensError = null;
 				tokensPartial = partial;
 			} catch (error) {
@@ -790,10 +805,14 @@
 		</div>
 		<div class="text-right">
 			<p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
-			<p class="text-2xl font-bold text-gray-900 dark:text-white">{formatNumber(totalValue)} VOI</p>
+			<p class="text-2xl font-bold text-gray-900 dark:text-white">
+				{totalsReady ? formatNumber(totalValue) : '…'} VOI
+			</p>
 			<p class="text-sm font-bold text-gray-900 dark:text-white">
 				{#if $voiPrice.price <= 0 && $voiPrice.error}
 					USD price unavailable
+				{:else if !totalsReady || usdPending}
+					… USD
 				{:else}
 					${formatNumber(totalUsdValue)} USD
 				{/if}
@@ -1226,6 +1245,7 @@
 						{canSignTransactions}
 						walletId={walletAddress}
 						{fungibleTokens}
+						priceLoading={usdPending}
 					/>
 				{/each}
 				{#if fungibleTokens.filter((token) => isLPToken(token) && showZeroBalancesCondition(token)).length === 0}
@@ -1420,6 +1440,7 @@
 								{canSignTransactions}
 								walletId={walletAddress}
 								{fungibleTokens}
+								priceLoading={usdPending}
 							/>
 						</div>
 					{/if}
