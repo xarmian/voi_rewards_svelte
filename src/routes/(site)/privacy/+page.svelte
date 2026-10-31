@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 
 	// Update the last modified date when the policy is updated
-	const lastUpdated = '2025-03-07';
+	const lastUpdated = '2026-10-31';
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-8 prose dark:prose-invert">
@@ -47,17 +47,16 @@
 			<li>Analyzing usage patterns and improving our Site</li>
 			<li>Personalizing user experience</li>
 			<li>Communicating with you about updates or inquiries</li>
-			<li>Displaying relevant advertising through Google Ads</li>
 			<li>Detecting and preventing fraud</li>
 		</ul>
 	</section>
 
 	<section class="mb-8">
-		<h2 class="text-2xl font-semibold mb-4">Ads and Analytics</h2>
+		<h2 class="text-2xl font-semibold mb-4">Analytics</h2>
 		<p>
-			We may use Ads and Analytics to serve advertisements and analyze traffic. These services may
-			use cookies and other tracking technologies to collect and track information about your
-			browsing behavior.
+			We use Google Analytics on most pages of this Site to measure traffic and understand how the
+			Site is used. Google Analytics sets cookies and collects information about your visit, such
+			as the pages you view, your browser and device type, and the referring site.
 		</p>
 	</section>
 
