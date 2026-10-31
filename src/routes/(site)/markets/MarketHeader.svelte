@@ -115,7 +115,7 @@
 				<div>
 					<div class="flex items-center gap-3 mb-1">
 						<h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-							{selectedToken?.symbol || 'VOI' || 'VOI'}
+							{selectedToken?.symbol || 'VOI'}
 						</h1>
 						<Badge class="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
 							{realMarketData.length} Markets
