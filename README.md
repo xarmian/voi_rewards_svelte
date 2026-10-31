@@ -23,6 +23,6 @@ npm run dev
 Vercel runs `scripts/vercel-ignore.sh` before every build (`vercel.json` `ignoreCommand`) to save build minutes:
 
 - **Production (main):** builds unless the merge changed only docs or tests (`*.md` outside `src/` and `static/`, `*.test.ts`, `tests/`, `.github/`, `scripts/` other than `generateFaqData.js` and the ignore script). If the previous deployment's SHA is missing or the diff fails, it builds.
-- **Previews (other branches):** build only when the commit message contains `[preview]`. Add it to the last commit you want a preview of, e.g. `git commit --allow-empty -m "chore: [preview]"`. Squash merges drop it.
+- **Previews (other branches):** build only when the commit message contains `[preview]`. Add it to the last commit you want a preview of, e.g. `git commit --allow-empty -m "chore: [preview]"`. Squash merges drop it. The tag matches anywhere in the message, so a commit that only mentions `[preview]` in prose also builds.
 
 Test the rules with `bash scripts/vercel-ignore.test.sh`.
