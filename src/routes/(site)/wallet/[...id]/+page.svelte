@@ -241,6 +241,9 @@
 				console.error('Lockvest lookup failed:', error);
 			}
 
+			// TASK-111: build the list, then assign it once. One assignment per child re-ran every consumer
+			// (LockVestComponent reloaded all contracts so far, 39 times for 39 contracts).
+			const children: Account[] = [];
 			await Promise.all(
 				lockAccounts.map(async (account: LockContract) => {
 					const childAccountInfo = await getAccountInfo(account.contractAddress);
@@ -253,24 +256,22 @@
 					const childShareOfTotalStake = childBalance / Number(supply['online-money']);
 					const childExpectedBlocksPerDay = blocksPerDay * childShareOfTotalStake;
 
-					childAccounts = [
-						...childAccounts,
-						{
-							contractId: account.contractId,
-							address: account.contractAddress,
-							isParticipating: childAccountInfo?.status === 'Online',
-							balance: childBalance / 1e6,
-							blocksProduced24h: 0,
-							expectedBlocksPerDay: childExpectedBlocksPerDay,
-							expectedBlocksPerWeek: childExpectedBlocksPerDay * 7,
-							expectedBlocksPerMonth: childExpectedBlocksPerDay * 30.44,
-							estimatedRewardsPerDay: childWeeklyReward / 7,
-							estimatedRewardsPerWeek: childWeeklyReward,
-							estimatedRewardsPerMonth: childMonthlyReward
-						}
-					].sort((a, b) => b.balance - a.balance);
+					children.push({
+						contractId: account.contractId,
+						address: account.contractAddress,
+						isParticipating: childAccountInfo?.status === 'Online',
+						balance: childBalance / 1e6,
+						blocksProduced24h: 0,
+						expectedBlocksPerDay: childExpectedBlocksPerDay,
+						expectedBlocksPerWeek: childExpectedBlocksPerDay * 7,
+						expectedBlocksPerMonth: childExpectedBlocksPerDay * 30.44,
+						estimatedRewardsPerDay: childWeeklyReward / 7,
+						estimatedRewardsPerWeek: childWeeklyReward,
+						estimatedRewardsPerMonth: childMonthlyReward
+					});
 				})
 			);
+			childAccounts = children.sort((a, b) => b.balance - a.balance);
 		} catch (error) {
 			console.error('Error updating account info:', error);
 		}
