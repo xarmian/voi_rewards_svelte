@@ -251,7 +251,7 @@ export async function fetchFungibleTokens(
 
 			// Nomadex uses live reserves; other tokens prefer the API's USD value.
 			let tokenValue = 0;
-			let tokenUsdValue = 0;
+			let tokenUsdValue: number | null = 0;
 
 			if (
 				pool?.provider !== 'nomadex' &&
@@ -289,11 +289,8 @@ export async function fetchFungibleTokens(
 				}
 
 				// Calculate USD value for LP tokens
-				if (voiPriceUSD > 0) {
-					tokenUsdValue = tokenValue * voiPriceUSD;
-				} else {
-					tokenUsdValue = 0;
-				}
+				// TASK-91: without a VOI price the USD value is unknown (null, shown as unavailable), not $0.
+				tokenUsdValue = voiPriceUSD > 0 ? tokenValue * voiPriceUSD : null;
 			} else if (asset.assetType === 'asa' && asset.contractId === 302190) {
 				// Special handling for aUSDC - 1:1 with USD
 				const usdcAmount = Number(asset.balance) / Math.pow(10, asset.decimals);

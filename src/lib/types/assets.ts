@@ -7,7 +7,8 @@ export interface FungibleTokenType {
 	verified: boolean;
 	imageUrl: string;
 	value: number;
-	usdValue?: number;
+	// null: priced in VOI and the VOI price is unavailable (TASK-91)
+	usdValue?: number | null;
 	poolId?: string;
 	type?: 'vsa' | 'arc200' | 'native';
 	poolInfo?: {
