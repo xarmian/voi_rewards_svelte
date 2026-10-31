@@ -7,10 +7,11 @@
 			totalVolume: number;
 			totalTvl: number;
 		};
+		// TASK-107: null when the circulating-supply upstream failed.
 		circulatingSupply: {
 			circulatingSupply: number;
 			percentDistributed: number;
-		};
+		} | null;
 	}
 
 	let marketData: MarketData | null = null;
@@ -31,9 +32,9 @@
 	});
 
 	// Calculate market cap
-	$: marketCap = marketData
+	$: marketCap = marketData?.circulatingSupply
 		? marketData.aggregates.weightedAveragePrice * marketData.circulatingSupply.circulatingSupply
-		: 0;
+		: null;
 
 	// Format as USD with 2 decimal places
 	const formatUSD = (value: number) => {
@@ -85,7 +86,7 @@
 			>
 				<div class="text-xs uppercase tracking-wider text-purple-200 mb-1">Market Cap</div>
 				<div class="text-lg font-bold text-white">
-					{formatMarketCap(marketCap)}
+					{marketCap === null ? '—' : formatMarketCap(marketCap)}
 				</div>
 			</div>
 		</div>

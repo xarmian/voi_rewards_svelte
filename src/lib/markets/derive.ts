@@ -84,11 +84,13 @@ export function displayPrice(
 export function circulatingMarketCap(
 	selectedToken: SelectedToken,
 	weightedAveragePrice: number,
-	circulatingSupply: { circulatingSupply: number }
-) {
-	return (selectedToken?.symbol || 'VOI') === 'VOI'
+	circulatingSupply: { circulatingSupply: number } | null | undefined
+): number | null {
+	if ((selectedToken?.symbol || 'VOI') !== 'VOI') return 0;
+	// TASK-107: an unknown supply means an unknown market cap, not $0.
+	return circulatingSupply
 		? weightedAveragePrice * Number(circulatingSupply.circulatingSupply)
-		: 0;
+		: null;
 }
 
 export function tokenTotalSupplyAdjusted(

@@ -101,7 +101,10 @@
 			// VOI aggregated metrics
 			const totalVolume = aggregates.totalVolume || 0;
 			const totalTvl = aggregates.totalTvl || 0;
-			const marketCap = weightedAveragePrice * Number(circulatingSupply.circulatingSupply || 0);
+			// TASK-107: a null supply (upstream failed) is an unknown market cap, rendered '-'.
+			const marketCap = circulatingSupply?.circulatingSupply
+				? weightedAveragePrice * Number(circulatingSupply.circulatingSupply)
+				: null;
 			const fullyDilutedMarketCap = weightedAveragePrice * 10_000_000_000;
 
 			// Calculate 24h change from market data

@@ -70,6 +70,12 @@ describe('market prices and supply', () => {
 		expect(circulatingMarketCap(token, 2, { circulatingSupply: 123 })).toBe(0);
 	});
 
+	it('returns null for VOI when the circulating supply is unknown (TASK-107)', () => {
+		expect(circulatingMarketCap(voi, 2, null)).toBeNull();
+		expect(circulatingMarketCap(null, 2, undefined)).toBeNull();
+		expect(circulatingMarketCap(token, 2, null)).toBe(0);
+	});
+
 	it('adjusts token total supply by decimals and uses weighted price for FDV', () => {
 		const supply = tokenTotalSupplyAdjusted({ totalSupply: 12300, decimals: 2 });
 		expect(supply).toBe(123);

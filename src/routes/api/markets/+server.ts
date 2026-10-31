@@ -40,15 +40,16 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			SUPPLY_TIMEOUT_MS
 		).catch((error) => {
 			console.error('Failed to fetch circulating supply:', error);
-			// TASK-55: this upstream fails on prod; its supply fallback must not disable markets caching.
-			return { circulatingSupply: '0', percentDistributed: '0' };
+			// TASK-55: this upstream has failed on prod; its supply fallback must not disable markets caching.
+			return null;
 		});
+		// TASK-107: an unknown supply is null, never 0, so consumers render "—" rather than a $0 market cap.
 		const supplyResponse = async () => {
-			const { circulatingSupply, percentDistributed } = await supplyPromise;
-			return {
-				circulatingSupply: parseFloat(circulatingSupply),
-				percentDistributed: parseFloat(percentDistributed)
-			};
+			const supply = await supplyPromise;
+			if (!supply) return null;
+			const circulatingSupply = parseFloat(supply.circulatingSupply);
+			if (!Number.isFinite(circulatingSupply)) return null;
+			return { circulatingSupply, percentDistributed: parseFloat(supply.percentDistributed) };
 		};
 
 		// Build markets from MIMIR data plus cross-chain snapshots
