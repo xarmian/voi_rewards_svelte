@@ -19,9 +19,11 @@ import { fetchProjects } from '../../routes/(site)/phase2/[...slug]/projects';
 
 const WALLET = 'A'.repeat(58);
 let stalled = '';
-let singleError: { code?: string; message: string } | null = null;
+// A single-row read on any site resolves with no row.
+let noRow = false;
 // A query on this site resolves at once with an error (not a stall).
 let failed = '';
+let failedCode: string | undefined;
 const signals: Array<{ site: string; signal: AbortSignal }> = [];
 
 // Like postgrest-js without throwOnError: aborting fetch resolves a result with error.
@@ -38,10 +40,14 @@ function query(site: string) {
 			single = true;
 			return builder;
 		},
+		maybeSingle: () => {
+			single = true;
+			return builder;
+		},
 		then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
 			const result =
 				site === failed
-					? Promise.resolve({ data: null, count: null, error: { message: 'upstream failed' } })
+					? Promise.resolve({ data: null, count: null, error: { code: failedCode, message: 'upstream failed' } })
 					: site === stalled
 					? new Promise((done) => {
 							const abort = () => done({ data: null, error: { message: 'upstream aborted' } });
@@ -49,8 +55,8 @@ function query(site: string) {
 							else signal?.addEventListener('abort', abort, { once: true });
 						})
 					: Promise.resolve(
-							single && singleError
-								? { data: null, error: singleError }
+							single && noRow
+								? { data: null, error: null }
 								: { data: single ? { airdrop_amount: 7, peer_date: '2024-11-05' } : [], count: 3, error: null }
 						);
 			return result.then(resolve, reject);
@@ -88,8 +94,9 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => {});
 	signals.length = 0;
 	stalled = '';
-	singleError = null;
+	noRow = false;
 	failed = '';
+	failedCode = undefined;
 	mocks.from.mockImplementation((site: string) => query(site));
 	vi.stubGlobal('fetch', vi.fn<typeof fetch>(() => new Promise(() => {})));
 });
@@ -128,15 +135,17 @@ it.each([
 
 it.each([
 	['a failed count is a 500, not an empty CSV', '/api/phase2?fetchAll=true&csv=true'],
-	['a failed wallet query is a 500, not "Address not found"', `/api/phase2?wallet=${WALLET}`]
-])('phase2: %s', async (_, path) => {
+	['a failed wallet query is a 500, not "Address not found"', `/api/phase2?wallet=${WALLET}`],
+	['more than one row (PGRST116) is a 500, not "Address not found"', `/api/phase2?wallet=${WALLET}`, 'PGRST116']
+])('phase2: %s', async (_, path, code?: string) => {
 	failed = 'vr_phase2';
+	failedCode = code;
 	const response = await phase2(event(path) as never);
 	expect(response.status).toBe(500);
 });
 
 it('phase2 still answers 404 for an address with no row', async () => {
-	singleError = { code: 'PGRST116', message: 'no rows' };
+	noRow = true;
 	const response = await phase2(event(`/api/phase2?wallet=${WALLET}`) as never);
 	expect(response.status).toBe(404);
 });

@@ -156,11 +156,11 @@ export async function GET({ url }) {
 				.eq('address', wallet)
 				.not('blacklisted', 'is', true)
 				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
-				.single();
+				.maybeSingle();
 
-			// TASK-92: only "no rows" (PGRST116 from .single()) is not-found; a failed or timed-out query is a 500.
-			if (questError && questError.code !== 'PGRST116') throw questError;
-			if (questError) {
+			// TASK-92: maybeSingle gives no row as null data; any error (failure, timeout, more than one row) is a 500.
+			if (questError) throw questError;
+			if (!questData) {
 				return json(
 					{ error: 'Address not found' },
 					{
