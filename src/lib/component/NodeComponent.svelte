@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { Badge, Card, Spinner } from 'flowbite-svelte';
 	import { config } from '../config';
 	import InfoButton from './ui/InfoButton.svelte';
@@ -36,7 +37,8 @@
 	const EPOCHS_PER_YEAR = 52;
 	let nodeRequestId = 0;
 
-	$: if (walletId) {
+	// TASK-109: browser only. A server render must not write module-level stores or call upstream on every request.
+	$: if (browser && walletId) {
 		fetchNodeData();
 	}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import { algodIndexer } from '$lib/utils/algod';
 	import { dataTable } from '../../stores/dataTable';
@@ -146,7 +147,8 @@
 
 	// Add a reactive statement to reload data when walletAddress changes
 	$: {
-		if (walletAddress) {
+		// TASK-109: browser only. A server render must not write module-level stores or call upstream on every request.
+		if (browser && walletAddress) {
 			isLoading = true;
 			Promise.all([loadTransactions(), loadEpochData()])
 				.then(([newTransactions, newEpochData]) => {
