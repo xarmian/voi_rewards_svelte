@@ -18,7 +18,6 @@
 	} from '$lib/chain/keyreg';
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
-	import OneClickInstructions from './node-instructions/OneClickInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
 	import { goto } from '$app/navigation';
 	import { createEventDispatcher, onMount } from 'svelte';
@@ -32,7 +31,7 @@
 	export let isOnline = false;
 	export let onSuccess: (forceRefresh?: boolean) => void;
 
-	type NodeType = 'voi-swarm' | 'one-click' | 'func' | 'other';
+	type NodeType = 'voi-swarm' | 'func' | 'other';
 
 	let selectedNode: NodeType = 'other';
 	let firstRound = '';
@@ -82,10 +81,6 @@
 		'voi-swarm': {
 			title: 'Voi Swarm Node',
 			description: 'Easy-to-use Docker container for running a Voi node'
-		},
-		'one-click': {
-			title: "Aust's One-Click Node",
-			description: 'Simple one-click installation for Voi nodes'
 		},
 		func: {
 			title: "Funk's Ultimate Node Controller (FUNC)",
@@ -510,8 +505,6 @@
 
 			{#if selectedNode === 'voi-swarm'}
 				<VoiSwarmInstructions {walletAddress} />
-			{:else if selectedNode === 'one-click'}
-				<OneClickInstructions {walletAddress} {parentWalletAddress} />
 			{:else if selectedNode === 'func'}
 				<FuncInstructions {walletAddress} />
 			{/if}

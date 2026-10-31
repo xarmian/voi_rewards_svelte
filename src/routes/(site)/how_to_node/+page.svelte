@@ -16,16 +16,12 @@
 					url: 'https://voinetwork.github.io/voi-swarm'
 				},
 				{
-					text: "Funk's Ultimate Node Controller (FUNC)",
+					text: "Funk's Ultimate Node Controller (*FUNC*) for Windows, macOS and Linux",
 					url: 'https://github.com/GalaxyPay/func'
 				},
 				{
 					text: 'Guide to Setting up a *Participation Node* on Ubuntu by D13',
 					url: 'https://d13.co/posts/set-up-voi-participation-node/'
-				},
-				{
-					text: 'Guide to Setting up an *Aust One-Click Node* on Windows',
-					url: 'https://github.com/AustP/austs-one-click-node'
 				},
 				{
 					text: 'Guide to Setting up a Participation Node on *Docker*',
