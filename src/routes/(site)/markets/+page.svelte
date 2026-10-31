@@ -44,7 +44,9 @@
 	// Use page data as primary source - don't let reactive statements override
 	let realMarketData = Array.isArray(marketData) ? marketData : [];
 	let fallbackPairs = Array.isArray(tokenPairs) ? tokenPairs : [];
-	let realCirculatingSupply = circulatingSupply || { circulatingSupply: 0, percentDistributed: 0 };
+	// TASK-107: null when the supply upstream failed; KeyMetrics renders it as "—".
+	let realCirculatingSupply: { circulatingSupply: number; percentDistributed: number } | null =
+		circulatingSupply ?? null;
 
 	// Cache to prevent duplicate API requests
 	const voiUsdReference = createVoiUsdReference((url) => fetch(url));
@@ -417,7 +419,7 @@
 
 	// Calculate market caps
 	// VOI: use circulating supply from server; Others: use totalSupply from tokenInfo (FDV)
-	$: circulatingMarketCap = getCirculatingMarketCap(selectedToken, weightedAveragePrice, circulatingSupply);
+	$: circulatingMarketCap = getCirculatingMarketCap(selectedToken, weightedAveragePrice, realCirculatingSupply);
 	$: tokenTotalSupplyAdjusted = getTokenTotalSupplyAdjusted(tokenInfo);
 	$: fullyDilutedMarketCap = getFullyDilutedMarketCap(tokenTotalSupplyAdjusted, weightedAveragePrice, selectedToken);
 

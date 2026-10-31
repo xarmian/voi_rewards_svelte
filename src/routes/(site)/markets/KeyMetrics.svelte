@@ -2,17 +2,17 @@
 	import { fade } from 'svelte/transition';
 	import { formatCurrency, formatNumber } from '$lib/markets/format';
 	import type { UniqueToken } from '../../api/tokens/+server';
-	import type { PageData } from './$types';
 
 	interface Props {
 		selectedToken: UniqueToken | null;
 		fetchingMarketData: boolean;
 		totalVolume24h: number | null;
 		totalTvlAll: number | null;
-		circulatingMarketCap: number;
+		circulatingMarketCap: number | null;
 		tokenTotalSupplyAdjusted: number | null;
 		fullyDilutedMarketCap: number;
-		realCirculatingSupply: NonNullable<PageData['circulatingSupply']>;
+		// TASK-107: null when the circulating-supply upstream failed; rendered as "—".
+		realCirculatingSupply: { circulatingSupply: number; percentDistributed: number } | null;
 		activeMarketsCount: number | null;
 		realMarketData: { exchange: string }[];
 	}
@@ -85,7 +85,9 @@
 				<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-28"></div>
 			{:else}
 				{(selectedToken?.symbol || 'VOI') === 'VOI'
-					? formatCurrency(circulatingMarketCap)
+					? circulatingMarketCap === null
+						? '—'
+						: formatCurrency(circulatingMarketCap)
 					: tokenTotalSupplyAdjusted != null
 						? formatCurrency(fullyDilutedMarketCap)
 						: '-'}
@@ -93,7 +95,9 @@
 		</div>
 		<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
 			{#if (selectedToken?.symbol || 'VOI') === 'VOI'}
-				Circulating: {formatNumber(realCirculatingSupply.circulatingSupply, 0)}
+				Circulating: {realCirculatingSupply
+					? formatNumber(realCirculatingSupply.circulatingSupply, 0)
+					: '—'}
 			{:else}
 				Total Supply: {tokenTotalSupplyAdjusted != null
 					? formatNumber(tokenTotalSupplyAdjusted, 0)

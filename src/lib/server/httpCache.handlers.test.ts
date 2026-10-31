@@ -104,7 +104,7 @@ describe('TASK-29 markets response caching', () => {
 			const response = await pending;
 			expect(response.status).toBe(200);
 			expect(await response.json()).toMatchObject({
-				circulatingSupply: { circulatingSupply: 0, percentDistributed: 0 }
+				circulatingSupply: null
 			});
 			expect(response.headers.get('Cache-Control')).toBe(minuteCache);
 			expect(mocks.supply).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
@@ -131,7 +131,7 @@ describe('TASK-29 markets response caching', () => {
 		const response = await pending;
 		expect(response.status).toBe(200);
 		expect(await response.json()).toMatchObject({
-			circulatingSupply: { circulatingSupply: 0, percentDistributed: 0 }
+			circulatingSupply: null
 		});
 		expect(response.headers.get('Cache-Control')).toBe(minuteCache);
 		expect(fetcher.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
@@ -155,9 +155,33 @@ describe('TASK-29 markets response caching', () => {
 		expect(supplyFallback.status).toBe(200);
 		expect(await supplyFallback.json()).toMatchObject({
 			voiUsdStatus: status,
-			circulatingSupply: { circulatingSupply: 0, percentDistributed: 0 }
+			circulatingSupply: null
 		});
 		expect(supplyFallback.headers.get('Cache-Control')).toBe(minuteCache);
+	});
+
+	it.each([
+		['a non-numeric supply', { circulatingSupply: 'n/a', percentDistributed: '1' }],
+		['a missing supply', {}]
+	])('returns a null supply, never 0, for %s (TASK-107)', async (_label, upstream) => {
+		mocks.from.mockImplementation(() => query([]));
+		mocks.supply.mockResolvedValue(upstream);
+		const response = await marketsGET(event('/api/markets?tokenId=123'));
+		expect(response.status).toBe(200);
+		expect((await response.json()).circulatingSupply).toBeNull();
+	});
+
+	it('passes a numeric supply through as numbers (TASK-107)', async () => {
+		mocks.from.mockImplementation(() => query([]));
+		mocks.supply.mockResolvedValue({
+			circulatingSupply: '2096469368.67',
+			percentDistributed: '13.34'
+		});
+		const response = await marketsGET(event('/api/markets?tokenId=123'));
+		expect((await response.json()).circulatingSupply).toEqual({
+			circulatingSupply: 2096469368.67,
+			percentDistributed: 13.34
+		});
 	});
 
 	it('serves VOI markets from Mimir when no tokenId is given (TASK-89)', async () => {
