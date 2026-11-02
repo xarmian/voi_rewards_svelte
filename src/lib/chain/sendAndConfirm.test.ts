@@ -365,7 +365,7 @@ describe('trackPending', () => {
 		expect(await trackPending(pending, d)).toEqual({ status: 'expired', txIds: pending.txIds });
 	});
 
-	it('reads a fresh probe BEFORE the search in each pass', async () => {
+	it('finishes a fresh probe BEFORE the search in each pass, with pending-info read meanwhile', async () => {
 		const calls: string[] = [];
 		const d = deps();
 		d.algodRound.mockImplementation(async () => {
@@ -387,14 +387,16 @@ describe('trackPending', () => {
 		const tracking = trackPending(pending, d, { intervalMs: 1 });
 		await vi.advanceTimersByTimeAsync(1);
 		expect((await tracking).status).toBe('expired');
+		// Positive evidence (pending info) is read while the probe runs; the search is issued only
+		// after the probe (algod round, then the exact block) has finished, in every pass.
 		expect(calls).toEqual([
 			'algod',
-			'block',
 			'pending',
+			'block',
 			'search',
 			'algod',
-			'block',
 			'pending',
+			'block',
 			'search'
 		]);
 	});
