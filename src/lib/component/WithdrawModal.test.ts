@@ -77,3 +77,15 @@ test('WithdrawModal does not report a resumed withdrawal with a made-up amount',
 		'A resumed withdrawal has no typed amount; the confirmed text must not print 0.00'
 	).toMatch(/\{#if withdrawAmountVOI\}[\s\S]*\{:else\}[\s\S]*Your withdrawal has been confirmed/);
 });
+
+test('WithdrawModal remembers a withdrawal before it starts waiting on it', () => {
+	const body = source.match(/async function settleWithdrawal[\s\S]*?\n\t\}\n/)?.[0];
+	expect(body, 'settleWithdrawal must exist').toBeDefined();
+	const remembered = body?.indexOf('rememberPendingWithdrawal(') ?? -1;
+	const polled = body?.indexOf('await awaitWithdrawalConfirmation(') ?? -1;
+	expect(remembered, 'settleWithdrawal must remember the withdrawal').toBeGreaterThanOrEqual(0);
+	expect(
+		remembered,
+		'The record must exist before polling, so a modal destroyed mid-wait cannot offer a second withdrawal'
+	).toBeLessThan(polled);
+});
