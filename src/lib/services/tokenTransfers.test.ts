@@ -215,6 +215,45 @@ describe('fetchTokenTransfers', () => {
 			{ amount: '0.01', type: 'fee', to_name: 'Fee Sink' }
 		]);
 	});
+	it.each(['vsa', 'native'] as const)(
+		'retains the original %s cursor when the page fails',
+		async (type) => {
+			const onPagination = vi.fn();
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			if (type === 'vsa') {
+				query.do.mockResolvedValueOnce({
+					'next-token': 'advanced',
+					transactions: [{ ...transaction, 'tx-type': 'axfer' }]
+				});
+			} else {
+				query.do
+					.mockResolvedValueOnce({ 'next-token': 'advanced', transactions: [] })
+					.mockRejectedValueOnce(new Error('page two unavailable'));
+			}
+			try {
+				await expect(
+					fetchTokenTransfers({
+						token: { ...token, type },
+						walletId: 'wallet',
+						append: true,
+						nextToken: 'original',
+						hasMore: false,
+						onPagination
+					})
+				).rejects.toThrow(unavailable);
+				expect(onPagination).toHaveBeenCalledExactlyOnceWith({
+					nextToken: 'original',
+					hasMore: false
+				});
+				if (type === 'native') {
+					expect(query.do).toHaveBeenCalledTimes(2);
+					expect(query.nextToken.mock.calls.slice(-2)).toEqual([['original'], ['advanced']]);
+				}
+			} finally {
+				logged.mockRestore();
+			}
+		}
+	);
 	it('passes through VSA pagination and scales asset transfers', async () => {
 		query.do.mockResolvedValue({
 			'next-token': 'next',

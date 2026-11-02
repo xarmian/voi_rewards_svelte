@@ -118,6 +118,75 @@ describe('trackPending', () => {
 		};
 	}
 
+	it('returns positive pendingInfo evidence while the expiry probe is still hung', async () => {
+		const d = deps();
+		const probe = Promise.withResolvers<number>();
+		d.algodRound.mockReturnValue(probe.promise);
+		d.pendingInfo.mockResolvedValue({ 'confirmed-round': 99 });
+		const settled = vi.fn();
+		const tracking = trackPending(pending, d).then(settled);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(settled).toHaveBeenCalledWith({
+			status: 'confirmed',
+			txIds: pending.txIds,
+			confirmedRound: 99
+		});
+		expect(d.indexerSearch).not.toHaveBeenCalled();
+		probe.resolve(101);
+		await tracking;
+		await vi.advanceTimersByTimeAsync(0);
+		expect(vi.getTimerCount()).toBe(0);
+	});
+	it('treats a timed out probe as false and stays pending', async () => {
+		const d = deps();
+		const controller = new AbortController();
+		d.algodRound.mockReturnValue(new Promise(() => {}));
+		const settled = vi.fn();
+		const tracking = trackPending(pending, d, { intervalMs: 1000, signal: controller.signal }).then(
+			settled
+		);
+		await vi.advanceTimersByTimeAsync(9999);
+		expect(d.indexerSearch).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(1);
+		expect(d.indexerSearch).toHaveBeenCalledOnce();
+		expect(settled).not.toHaveBeenCalled();
+		controller.abort();
+		await tracking;
+		expect(settled).toHaveBeenCalledWith(pending);
+		expect(vi.getTimerCount()).toBe(0);
+	});
+	it('waits for the fresh probe to settle before searching', async () => {
+		const order: string[] = [];
+		const block = Promise.withResolvers<boolean>();
+		const d = deps();
+		d.algodRound.mockImplementation(async () => {
+			order.push('algod');
+			return 101;
+		});
+		d.pendingInfo.mockImplementation(async () => {
+			order.push('pending');
+			return {};
+		});
+		d.indexerHasBlock.mockImplementation(async () => {
+			order.push('block');
+			const result = await block.promise;
+			order.push('probe settled');
+			return result;
+		});
+		d.indexerSearch.mockImplementation(async () => {
+			order.push('search');
+			return { 'current-round': 101, transactions: [] };
+		});
+		const tracking = trackPending(pending, d);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(order).toEqual(['algod', 'pending', 'block']);
+		expect(d.indexerSearch).not.toHaveBeenCalled();
+		block.resolve(true);
+		expect(await tracking).toMatchObject({ status: 'expired' });
+		expect(order).toEqual(['algod', 'pending', 'block', 'probe settled', 'search']);
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
 	it('confirms on a later algod poll', async () => {
 		const d = deps();
 		d.pendingInfo.mockResolvedValueOnce({}).mockResolvedValue({ 'confirmed-round': 99 });

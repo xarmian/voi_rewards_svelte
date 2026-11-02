@@ -136,44 +136,35 @@ describe('destination confirmation', () => {
 });
 
 describe('Algorand deposit', () => {
-	it('initializes the starting round from health, then queries deposits from that round', async () => {
-		const deps = {
-			getJson: vi
-				.fn()
-				.mockResolvedValueOnce({ round: '12345' })
-				.mockResolvedValueOnce({ transactions: [deposit()] })
-		};
-		const state = { startRound: null as number | null };
-		expect(await checkAlgorandDeposit(deps, indexer, state, depositExpected, signal)).toEqual({
-			done: false
-		});
-		expect(state.startRound).toBe(12345);
-		expect(deps.getJson).toHaveBeenNthCalledWith(1, `${indexer}/health`, signal);
-		expect(await checkAlgorandDeposit(deps, indexer, state, depositExpected, signal)).toEqual({
+	const afterTime = '2026-11-02T12:34:26.789Z';
+	it('finds the first matching deposit without ever requesting health', async () => {
+		const deps = fake({ transactions: [deposit()] });
+		expect(await checkAlgorandDeposit(deps, depositExpected, afterTime, signal)).toEqual({
 			done: true,
 			tx: { id: 'DEPOSIT' }
 		});
-		expect(deps.getJson).toHaveBeenNthCalledWith(
-			2,
-			`${indexer}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=12345&limit=10`,
-			signal
-		);
+		const urls = deps.getJson.mock.calls.map(([url]) => url);
+		expect(urls).toEqual([
+			`https://mainnet-idx.4160.nodely.dev/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&after-time=${encodeURIComponent(afterTime)}&limit=10`
+		]);
+		expect(urls.some((url) => url.includes('/health'))).toBe(false);
+		expect(deps.getJson).toHaveBeenCalledWith(urls[0], signal);
 	});
-	it.each([undefined, 'bad', Infinity, -Infinity, NaN])(
-		'rejects a non-finite health round %s',
-		async (round) => {
-			const state = { startRound: null };
-			await expect(
-				checkAlgorandDeposit(fake({ round }), indexer, state, depositExpected, signal)
-			).rejects.toThrow('Unexpected indexer response');
-			expect(state.startRound).toBeNull();
-		}
-	);
+	it('returns not done for a non-matching list', async () => {
+		expect(
+			await checkAlgorandDeposit(
+				fake({ transactions: [null, {}, { ...deposit(), sender: 'OTHER' }] }),
+				depositExpected,
+				afterTime,
+				signal
+			)
+		).toEqual({ done: false });
+	});
 	it.each([null, {}, { transactions: null }, { transactions: {} }])(
 		'rejects unreadable transaction response %#',
 		async (response) => {
 			await expect(
-				checkAlgorandDeposit(fake(response), indexer, { startRound: 123 }, depositExpected, signal)
+				checkAlgorandDeposit(fake(response), depositExpected, afterTime, signal)
 			).rejects.toThrow('Unexpected indexer response');
 		}
 	);
@@ -181,26 +172,22 @@ describe('Algorand deposit', () => {
 		expect(
 			await checkAlgorandDeposit(
 				fake({ transactions: [{ ...deposit(), id: undefined }, deposit()] }),
-				indexer,
-				{ startRound: 123 },
 				depositExpected,
+				afterTime,
 				signal
 			)
 		).toEqual({ done: true, tx: { id: 'DEPOSIT' } });
 	});
-	it('propagates health and transaction errors', async () => {
-		for (const startRound of [null, 123]) {
-			const error = new Error('offline');
-			await expect(
-				checkAlgorandDeposit(
-					{ getJson: vi.fn().mockRejectedValue(error) },
-					indexer,
-					{ startRound },
-					depositExpected,
-					signal
-				)
-			).rejects.toBe(error);
-		}
+	it('propagates transaction errors', async () => {
+		const error = new Error('offline');
+		await expect(
+			checkAlgorandDeposit(
+				{ getJson: vi.fn().mockRejectedValue(error) },
+				depositExpected,
+				afterTime,
+				signal
+			)
+		).rejects.toBe(error);
 	});
 	it.each([
 		{ assetId: 124 },
@@ -212,9 +199,8 @@ describe('Algorand deposit', () => {
 		expect(
 			await checkAlgorandDeposit(
 				fake({ transactions: [deposit()] }),
-				indexer,
-				{ startRound: 123 },
 				{ ...depositExpected, ...change },
+				afterTime,
 				signal
 			)
 		).toEqual({ done: false });
