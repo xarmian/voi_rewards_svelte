@@ -70,6 +70,28 @@ test.each(['', '-1', 'abc', '1e-7', '0', '0.0000001'])(
 	}
 );
 
+test('rejects a send whose exact base-unit total exceeds the balance even when floats round under it', async () => {
+	const { decimalToBaseUnits, sumBaseUnits } = await import('../chain/baseUnits');
+	// Exact total is 9007199254740994 base units; Number() sums them to 9007199254.740993.
+	const run = componentFunctions(['handleSend', 'withinBalance'], {
+		decimalToBaseUnits,
+		sumBaseUnits,
+		algosdk,
+		$selectedWallet: { address: algosdk.generateAccount().addr },
+		selectedToken: { decimals: 6, symbol: 'VOI', balance: 9007199254740993 },
+		tracker: {},
+		recipients: ['9007199254.740993', '0.000001'].map((value) => ({
+			address: algosdk.generateAccount().addr,
+			amount: value
+		})),
+		isSending: false,
+		error: null
+	});
+	await run('handleSend()');
+	expect(run('error')).toBe('Total exceeds your available VOI balance');
+	expect(run('isSending')).toBe(false);
+});
+
 const suggestedParams = {
 	fee: 1000,
 	flatFee: true,

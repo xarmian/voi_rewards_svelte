@@ -7,7 +7,7 @@
 	import algosdk from 'algosdk';
 	import { onDestroy, tick } from 'svelte';
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
-	import { decimalToBaseUnits } from '$lib/chain/baseUnits';
+	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import {
 		createOutcomeHandler,
@@ -306,7 +306,20 @@
 			selectedToken.decimals
 		)
 	);
-	$: isValidTotalAmount = totalAmount > 0 && totalAmount <= maxAmount;
+	$: isValidTotalAmount = withinBalance(recipients, selectedToken);
+
+	// The exact base-unit total must be positive and not exceed the balance; floats drift.
+	function withinBalance(rows: Recipient[], token: SendToken): boolean {
+		try {
+			const total = sumBaseUnits(
+				rows.map((r) => r.amount),
+				token.decimals
+			);
+			return total > 0n && total <= BigInt(Math.floor(token.balance));
+		} catch {
+			return false;
+		}
+	}
 	$: canSubmit =
 		recipients.every((r) => {
 			// Basic validation for all token types
@@ -696,6 +709,10 @@
 		});
 		if (invalidAmountIndex >= 0) {
 			error = `Invalid amount for recipient ${invalidAmountIndex + 1}`;
+			return;
+		}
+		if (!withinBalance(recipients, token)) {
+			error = `Total exceeds your available ${token.symbol} balance`;
 			return;
 		}
 

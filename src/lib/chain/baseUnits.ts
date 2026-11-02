@@ -11,3 +11,11 @@ export function decimalToBaseUnits(value: string, decimals: number): bigint {
 	const [whole, fraction = ''] = trimmed.split('.');
 	return BigInt(`${whole || '0'}${fraction.slice(0, decimals).padEnd(decimals, '0')}`);
 }
+
+/** Exact total of typed decimal strings in base units. Blank rows count as zero; invalid ones throw. */
+export function sumBaseUnits(values: string[], decimals: number): bigint {
+	return values.reduce(
+		(sum, value) => (value.trim() === '' ? sum : sum + decimalToBaseUnits(value, decimals)),
+		0n
+	);
+}

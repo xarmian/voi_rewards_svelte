@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { decimalToBaseUnits } from './baseUnits';
+import { decimalToBaseUnits, sumBaseUnits } from './baseUnits';
+
+describe('sumBaseUnits', () => {
+	it('sums exactly where floating point drifts', () => {
+		expect(sumBaseUnits(['0.1', '0.2'], 6)).toBe(300000n);
+		expect(sumBaseUnits(['9007199254.740993', '0.000001'], 6)).toBe(9007199254740994n);
+	});
+
+	it('truncates each amount to the token decimals before summing', () => {
+		expect(sumBaseUnits(['0.1234567', '0.0000009'], 6)).toBe(123456n);
+	});
+
+	it('counts blank rows as zero and an empty list as zero', () => {
+		expect(sumBaseUnits(['1', '', '  '], 2)).toBe(100n);
+		expect(sumBaseUnits([], 6)).toBe(0n);
+	});
+
+	it('throws on an invalid amount', () => {
+		expect(() => sumBaseUnits(['1', '1e3'], 6)).toThrow(/^Invalid amount/);
+	});
+});
 
 describe('decimalToBaseUnits', () => {
 	it.each([
