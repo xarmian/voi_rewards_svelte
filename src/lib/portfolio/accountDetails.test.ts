@@ -1,0 +1,201 @@
+import { describe, expect, test, vi } from 'vitest';
+import {
+	loadAccountDetails,
+	snapshotFromAlgodAccount,
+	totalRewardsMicroVoi,
+	type RewardsTransaction
+} from './accountDetails';
+
+const rawAccount = {
+	amount: 121614513500,
+	status: 'Online',
+	'min-balance': 100000,
+	'pending-rewards': 1234567,
+	rewards: 9876543,
+	round: 10000000,
+	participation: { 'vote-last-valid': 11000000 }
+};
+const snapshot = {
+	balance: 121614513500,
+	status: 'Online',
+	minBalance: 100000,
+	pendingRewards: 1234567,
+	round: 10000000,
+	voteLastValid: 11000000
+};
+const transactions: RewardsTransaction[] = [
+	{ sender: 'rewards', 'confirmed-round': 1520000, 'payment-transaction': { amount: 2000000 } }
+];
+
+function dependencies() {
+	return {
+		fetchAccount: vi.fn().mockResolvedValue(rawAccount),
+		lookupCreatedAt: vi.fn().mockResolvedValue(1700000000),
+		fetchRewardsTransactions: vi.fn().mockResolvedValue(transactions)
+	};
+}
+
+describe('loadAccountDetails', () => {
+	test('keeps the real algod balance when both indexer lookups fail', async () => {
+		const deps = dependencies();
+		deps.lookupCreatedAt.mockRejectedValue(new Error('fetch failed'));
+		deps.fetchRewardsTransactions.mockRejectedValue(new Error('fetch failed'));
+
+		const result = await loadAccountDetails('wallet', deps);
+
+		expect(result.account).toEqual({ status: 'loaded', value: snapshot });
+		for (const part of [result.createdAt, result.rewards]) {
+			expect(part).toEqual({ status: 'unavailable', error: 'fetch failed' });
+			expect(part).not.toHaveProperty('value');
+		}
+	});
+
+	test('keeps indexer history when algod fails, without a snapshot or balance', async () => {
+		const deps = dependencies();
+		deps.fetchAccount.mockRejectedValue(new Error('algod down'));
+
+		const result = await loadAccountDetails('wallet', deps);
+
+		expect(result.account).toEqual({ status: 'unavailable', error: 'algod down' });
+		expect(result.account).not.toHaveProperty('value');
+		expect(result.account).not.toHaveProperty('balance');
+		expect(result.createdAt).toEqual({ status: 'loaded', value: 1700000000 });
+		expect(result.rewards).toEqual({ status: 'loaded', value: transactions });
+	});
+
+	test('resolves with three unavailable parts when everything fails', async () => {
+		const deps = dependencies();
+		for (const dependency of Object.values(deps)) {
+			dependency.mockRejectedValue(new Error('offline'));
+		}
+		await expect(loadAccountDetails('wallet', deps)).resolves.toEqual({
+			account: { status: 'unavailable', error: 'offline' },
+			createdAt: { status: 'unavailable', error: 'offline' },
+			rewards: { status: 'unavailable', error: 'offline' }
+		});
+	});
+
+	test('starts all three requests before any of them resolves', async () => {
+		const account = Promise.withResolvers<Record<string, unknown>>();
+		const createdAt = Promise.withResolvers<number>();
+		const rewards = Promise.withResolvers<RewardsTransaction[]>();
+		const deps = {
+			fetchAccount: vi.fn(() => account.promise),
+			lookupCreatedAt: vi.fn(() => createdAt.promise),
+			fetchRewardsTransactions: vi.fn(() => rewards.promise)
+		};
+
+		const loading = loadAccountDetails('wallet', deps);
+		for (const dependency of Object.values(deps)) {
+			expect(dependency).toHaveBeenCalledExactlyOnceWith('wallet');
+		}
+		account.resolve(rawAccount);
+		createdAt.resolve(1700000000);
+		rewards.resolve(transactions);
+		await expect(loading).resolves.toEqual({
+			account: { status: 'loaded', value: snapshot },
+			createdAt: { status: 'loaded', value: 1700000000 },
+			rewards: { status: 'loaded', value: transactions }
+		});
+	});
+
+	test('uses String for a non-Error rejection', async () => {
+		const deps = dependencies();
+		deps.lookupCreatedAt.mockRejectedValue(503);
+		expect((await loadAccountDetails('wallet', deps)).createdAt).toEqual({
+			status: 'unavailable',
+			error: '503'
+		});
+	});
+
+	test('settles synchronous dependency throws independently', async () => {
+		const deps = dependencies();
+		deps.fetchAccount.mockImplementation(() => {
+			throw new Error('synchronous failure');
+		});
+		const result = await loadAccountDetails('wallet', deps);
+		expect(result.account).toEqual({ status: 'unavailable', error: 'synchronous failure' });
+		expect(result.createdAt.status).toBe('loaded');
+		expect(result.rewards.status).toBe('loaded');
+	});
+
+	test('makes malformed algod data unavailable instead of returning NaN', async () => {
+		const deps = dependencies();
+		deps.fetchAccount.mockResolvedValue({ ...rawAccount, amount: 'abc' });
+		const result = await loadAccountDetails('wallet', deps);
+		expect(result.account).toEqual({
+			status: 'unavailable',
+			error: expect.stringMatching(/^Invalid account/)
+		});
+		expect(result.account).not.toHaveProperty('value');
+		expect(result.createdAt.status).toBe('loaded');
+		expect(result.rewards.status).toBe('loaded');
+	});
+});
+
+describe('snapshotFromAlgodAccount', () => {
+	test('maps the raw kebab-case algod fields, including pending rather than accrued rewards', () => {
+		expect(snapshotFromAlgodAccount(rawAccount)).toEqual(snapshot);
+	});
+
+	test('omits voteLastValid without participation', () => {
+		const { participation: _participation, ...offline } = rawAccount;
+		expect(snapshotFromAlgodAccount({ ...offline, status: 'Offline' })).toEqual({
+			balance: snapshot.balance,
+			status: 'Offline',
+			minBalance: snapshot.minBalance,
+			pendingRewards: snapshot.pendingRewards,
+			round: snapshot.round
+		});
+	});
+
+	test.each([
+		['missing amount', { amount: undefined }],
+		['negative amount', { amount: -1 }],
+		['NaN amount', { amount: NaN }],
+		['infinite amount', { amount: Infinity }],
+		['string amount', { amount: '100' }],
+		['empty status', { status: '' }],
+		['missing status', { status: undefined }],
+		['missing minimum balance', { 'min-balance': undefined }],
+		['string minimum balance', { 'min-balance': '100' }],
+		['NaN minimum balance', { 'min-balance': NaN }],
+		['missing pending rewards', { 'pending-rewards': undefined }],
+		['string pending rewards', { 'pending-rewards': '100' }],
+		['infinite pending rewards', { 'pending-rewards': Infinity }],
+		['non-numeric round', { round: '100' }],
+		['NaN round', { round: NaN }]
+	])('rejects %s', (_label, fields) => {
+		expect(() => snapshotFromAlgodAccount({ ...rawAccount, ...fields })).toThrow(
+			/^Invalid account/
+		);
+	});
+
+	test('accepts real zero balances and rewards', () => {
+		expect(
+			snapshotFromAlgodAccount({
+				...rawAccount,
+				amount: 0,
+				'min-balance': 0,
+				'pending-rewards': 0
+			})
+		).toMatchObject({ balance: 0, minBalance: 0, pendingRewards: 0 });
+	});
+});
+
+describe('totalRewardsMicroVoi', () => {
+	test('skips rounds before 1520000 and non-payments, summing payment amounts', () => {
+		expect(
+			totalRewardsMicroVoi([
+				{ sender: 'r', 'confirmed-round': 1519999, 'payment-transaction': { amount: 999 } },
+				{ sender: 'r', 'confirmed-round': 1520000, 'payment-transaction': { amount: 100 } },
+				{ sender: 'r', 'confirmed-round': 1520001 },
+				{ sender: 'r', 'confirmed-round': 1520002, 'payment-transaction': { amount: 200 } }
+			])
+		).toBe(300);
+	});
+
+	test('returns zero for a successfully loaded empty history', () => {
+		expect(totalRewardsMicroVoi([])).toBe(0);
+	});
+});
