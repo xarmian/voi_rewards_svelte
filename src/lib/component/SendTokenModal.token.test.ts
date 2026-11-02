@@ -8,13 +8,9 @@ function body(name: string) {
 	return match![0];
 }
 
-test('tokenKey distinguishes native tokens and token type/id pairs', () => {
-	const key = body('tokenKey');
-	expect(key, 'Native tokens must share the native key').toMatch(
-		/isNativeToken\(\w+\)[^]*?['"]native['"]/
-	);
-	expect(key, 'Asset keys must include both type and id').toMatch(
-		/`\$\{\w+\.type\}:\$\{\w+\.id\}`/
+test('tokenKey is imported from the shared recipient lookup module', () => {
+	expect(source, 'Use the shared token key for both recipient lookup paths').toMatch(
+		/import\s*\{[^}]*\btokenKey\b[^}]*\}\s*from\s*['"]\$lib\/chain\/recipientInfo['"]/
 	);
 });
 

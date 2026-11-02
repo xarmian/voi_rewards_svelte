@@ -1,5 +1,14 @@
 import { describe, expect, test, vi } from 'vitest';
-import { loadRecipientInfo, type RecipientInfoDeps } from './recipientInfo';
+import { loadRecipientInfo, tokenKey, type RecipientInfoDeps } from './recipientInfo';
+
+test.each([
+	[{ type: 'native' }, 'native'],
+	[{ type: 'native', id: '0' }, 'native'],
+	[{ type: 'vsa', id: 7 }, 'vsa:7'],
+	[{ type: 'arc200', id: '7' }, 'arc200:7']
+] as const)('tokenKey identifies %j as %s', (token, key) => {
+	expect(tokenKey(token)).toBe(key);
+});
 
 const rawAccount = {
 	amount: 123456789,

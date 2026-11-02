@@ -34,7 +34,7 @@ test('recipient checks apply completed lookups by address', () => {
 		/recipients\.indexOf\(/
 	);
 	expect(lookup!.slice(awaitLookup), 'Apply results to current waiting rows by address').toMatch(
-		/applyRecipientLookup\(recipients, address, result\)/
+		/applyRecipientLookup\(recipients, address, ticket, result\)/
 	);
 });
 
