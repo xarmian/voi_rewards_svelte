@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, test, vi } from 'vitest';
+import { applyRecipientLookup } from '../chain/recipientInfo';
 
 const components = ['RecipientRow.svelte', 'SendTokenModal.svelte'];
 
@@ -24,14 +25,18 @@ function recipientLookup(file: string, loadRecipientInfo: ReturnType<typeof vi.f
 		selectedToken: { type: 'native' },
 		isNativeToken: () => true,
 		loadRecipientInfo,
+		applyRecipientLookup,
 		onError,
 		error: 'current error',
 		notice: 'current notice'
 	});
 	runInContext(
-		ts.transpileModule(body, {
-			compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
-		}).outputText,
+		ts.transpileModule(
+			[source.match(/\tfunction tokenKey\([^]*?\n\t\}/)?.[0], body].filter(Boolean).join('\n'),
+			{
+				compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
+			}
+		).outputText,
 		context
 	);
 	return {
@@ -58,7 +63,7 @@ test.each(components)('%s stops loading and clears errors when the row is cleare
 
 test('SendTokenModal applies a result to its row after an earlier row is removed', async () => {
 	const pending = Promise.withResolvers<unknown>();
-	const { recipient, run, lookup } = recipientLookup(
+	const { run, lookup } = recipientLookup(
 		'SendTokenModal.svelte',
 		vi.fn().mockReturnValue(pending.promise)
 	);
@@ -68,10 +73,10 @@ test('SendTokenModal applies a result to its row after an earlier row is removed
 	const info = { balance: 456 };
 	pending.resolve({ status: 'loaded', info });
 	await loading;
-	expect(recipient).toMatchObject({ isValid: true, info, isLoading: false });
+	expect(run('recipients[0]')).toMatchObject({ isValid: true, info, isLoading: false });
 });
 
-test('SendTokenModal drops a result when its row is replaced by one with the same address', async () => {
+test('SendTokenModal applies a result when its row is cloned with the same address', async () => {
 	const pending = Promise.withResolvers<unknown>();
 	const { run, lookup } = recipientLookup(
 		'SendTokenModal.svelte',
@@ -83,9 +88,10 @@ test('SendTokenModal drops a result when its row is replaced by one with the sam
 	await loading;
 	expect(run('recipients[0]')).toEqual({
 		address: 'old',
-		info: null,
-		isValid: false,
-		isLoading: true
+		info: { balance: 999 },
+		isValid: true,
+		isLoading: false,
+		lookupError: null
 	});
 });
 
@@ -122,7 +128,11 @@ for (const file of components) {
 			const info = { balance: 456 };
 			current.resolve({ status: 'loaded', info });
 			await currentLookup;
-			expect(recipient).toMatchObject({ isValid: true, info, isLoading: false });
+			expect(run(file === 'RecipientRow.svelte' ? 'recipient' : 'recipients[0]')).toMatchObject({
+				isValid: true,
+				info,
+				isLoading: false
+			});
 		}
 	);
 }

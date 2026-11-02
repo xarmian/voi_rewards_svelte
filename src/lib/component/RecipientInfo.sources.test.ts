@@ -37,16 +37,28 @@ test.each(components)(
 	}
 );
 
-test.each(components)('$file marks recipients valid only after a loaded result', ({ source }) => {
-	const assignments = [...source.matchAll(/\.isValid\s*=\s*true/g)];
-	expect(assignments, 'Keep the successful recipient validation assignment').toHaveLength(1);
-	for (const assignment of assignments) {
-		expect(
-			source.slice(Math.max(0, assignment.index - 400), assignment.index),
-			'Only a status === loaded branch may mark a recipient valid'
-		).toMatch(/status\s*===\s*['"]loaded['"]/);
+test.each(components)(
+	'$file marks recipients valid only after a loaded result',
+	({ file, source }) => {
+		if (file === 'SendTokenModal.svelte') {
+			expect(source, 'Delegate validity to the tested lookup application helper').toMatch(
+				/import\s*\{[^}]*\bapplyRecipientLookup\b[^}]*\}\s*from\s*['"]\$lib\/chain\/recipientInfo['"]/
+			);
+			expect(source, 'Only the shared helper may mark modal recipients valid').not.toMatch(
+				/\.isValid\s*=\s*true/
+			);
+			return;
+		}
+		const assignments = [...source.matchAll(/\.isValid\s*=\s*true/g)];
+		expect(assignments, 'Keep the successful recipient validation assignment').toHaveLength(1);
+		for (const assignment of assignments) {
+			expect(
+				source.slice(Math.max(0, assignment.index - 400), assignment.index),
+				'Only a status === loaded branch may mark a recipient valid'
+			).toMatch(/status\s*===\s*['"]loaded['"]/);
+		}
 	}
-});
+);
 
 test('RecipientRow offers Retry in the lookup failure branch and guards all recipient values', () => {
 	const template = components[0].source.split('</script>')[1];
@@ -100,14 +112,30 @@ test.each(components)(
 	}
 );
 
-test.each(components)('$file drops stale recipient results before marking valid', ({ source }) => {
-	const body = source.match(/\tasync function fetchRecipientInfo\([^]*?\n\t\}/)?.[0];
-	expect(body).toBeDefined();
-	const lookup = body!.indexOf('await loadRecipientInfo(');
-	const valid = body!.indexOf('.isValid = true');
-	expect(lookup).toBeGreaterThan(-1);
-	expect(valid).toBeGreaterThan(lookup);
-	expect(body!.slice(lookup, valid)).toMatch(
-		/if\s*\([^)]*(?:recipient\.address|recipients\[index\]\?\.address)\s*!==\s*address[^)]*\)\s*(?:\{\s*)?return/
-	);
-});
+test.each(components)(
+	'$file drops stale recipient results before marking valid',
+	({ file, source }) => {
+		const body = source.match(/\tasync function fetchRecipientInfo\([^]*?\n\t\}/)?.[0];
+		expect(body).toBeDefined();
+		const lookup = body!.indexOf('await loadRecipientInfo(');
+		if (file === 'SendTokenModal.svelte') {
+			const apply = body!.indexOf('applyRecipientLookup(');
+			expect(lookup, 'Keep the shared recipient loader').toBeGreaterThan(-1);
+			expect(apply, 'Apply recipient validation through the pure helper').toBeGreaterThan(lookup);
+			expect(
+				body!.slice(lookup, apply),
+				'Drop results for the previous token before applying them'
+			).toMatch(/if\s*\(tokenKey\(selectedToken\)\s*!==\s*\w+\)\s*return/);
+			expect(body, 'Validity is assigned only by applyRecipientLookup').not.toMatch(
+				/\.isValid\s*=\s*true/
+			);
+			return;
+		}
+		const valid = body!.indexOf('.isValid = true');
+		expect(lookup).toBeGreaterThan(-1);
+		expect(valid).toBeGreaterThan(lookup);
+		expect(body!.slice(lookup, valid)).toMatch(
+			/if\s*\([^)]*(?:recipient\.address|recipients\[index\]\?\.address)\s*!==\s*address[^)]*\)\s*(?:\{\s*)?return/
+		);
+	}
+);

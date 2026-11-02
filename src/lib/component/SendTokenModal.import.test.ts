@@ -11,7 +11,7 @@ test('imported recipients wait for a successful check before becoming valid', ()
 	expect(handleImport, 'Normalize imported rows as invalid before checking them').toMatch(
 		/isValid:\s*false/
 	);
-	for (const field of ['info: null', 'lookupError: null', 'isLoading: true']) {
+	for (const field of ['info: null', 'lookupError: null', 'isLoading: Boolean(row.address)']) {
 		expect(handleImport, `Imported rows must start with ${field}`).toContain(field);
 	}
 });
@@ -25,17 +25,16 @@ test('imports use the bounded worker pool with a concurrency limit of four', () 
 	);
 });
 
-test('recipient checks locate the same row by identity before and after loading', () => {
+test('recipient checks apply completed lookups by address', () => {
 	const lookup = source.match(/\tasync function fetchRecipientInfo\([^]*?\n\t\}/)?.[0];
 	expect(lookup, 'Keep one shared recipient check for typed and imported addresses').toBeDefined();
 	const awaitLookup = lookup!.indexOf('await loadRecipientInfo(');
 	expect(awaitLookup, 'Check recipient details with the shared loader').toBeGreaterThan(-1);
-	expect(
-		lookup!.slice(0, awaitLookup),
-		'Resolve the row by identity when starting a check'
-	).toMatch(/recipients\.indexOf\(/);
-	expect(lookup!.slice(awaitLookup), 'Resolve the row again before applying a result').toMatch(
+	expect(lookup, 'Cloning a row must not invalidate its pending lookup').not.toMatch(
 		/recipients\.indexOf\(/
+	);
+	expect(lookup!.slice(awaitLookup), 'Apply results to current waiting rows by address').toMatch(
+		/applyRecipientLookup\(recipients, address, result\)/
 	);
 });
 
