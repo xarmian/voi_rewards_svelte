@@ -10,6 +10,7 @@
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { createTrackingDeps } from '$lib/chain/trackingDeps';
 	import {
 		createPendingTracker,
 		type PendingSendEntry,
@@ -86,14 +87,7 @@
 		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
 		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
 	};
-	const trackingDeps = {
-		pendingInfo: (txId: string) => algodClient.pendingTransactionInformation(txId).do(),
-		indexerSearch: async (txId: string) =>
-			(await algodIndexer.searchForTransactions().txid(txId).do()) as {
-				'current-round': number;
-				transactions: { id?: string; 'confirmed-round'?: number }[];
-			}
-	};
+	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	let tracker: PendingTracker | undefined;
 	let trackerWallet: string | undefined;
 	let trackedEntries: PendingSendEntry[] = [];

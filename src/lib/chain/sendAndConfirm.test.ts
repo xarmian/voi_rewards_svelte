@@ -375,10 +375,12 @@ describe('trackPending review P1s', () => {
 
 	it('keeps a pool error after a successful submit pending, and not retryable', async () => {
 		const controller = new AbortController();
-		const pendingInfo = vi.fn(async () => {
-			if (pendingInfo.mock.calls.length >= 3) controller.abort();
-			return { 'pool-error': 'transaction dropped by this node' };
-		});
+		const pendingInfo = vi.fn(
+			async (): Promise<{ 'confirmed-round'?: number; 'pool-error'?: string }> => {
+				if (pendingInfo.mock.calls.length >= 3) controller.abort();
+				return { 'pool-error': 'transaction dropped by this node' };
+			}
+		);
 		const tracking = trackPending(
 			pending,
 			{

@@ -7,6 +7,7 @@
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
 	import { trackPending } from '$lib/chain/sendAndConfirm';
+	import { createTrackingDeps } from '$lib/chain/trackingDeps';
 	import {
 		clearPendingWithdrawal,
 		getPendingWithdrawal,
@@ -74,14 +75,7 @@
 		// landed, which releases the contract; anything else stays pending.
 		const tracked = await trackPending(
 			{ status: 'pending', txIds: [id], firstTxId: id, lastValid },
-			{
-				pendingInfo,
-				indexerSearch: async (searchId: string) =>
-					(await algodIndexer.searchForTransactions().txid(searchId).do()) as {
-						'current-round': number;
-						transactions: { id?: string; 'confirmed-round'?: number }[];
-					}
-			},
+			createTrackingDeps(algodClient, algodIndexer),
 			{ signal: AbortSignal.timeout(10000) }
 		);
 		if (tracked.status === 'confirmed') {

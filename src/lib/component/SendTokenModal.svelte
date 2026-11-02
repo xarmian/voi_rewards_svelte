@@ -17,6 +17,7 @@
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { createTrackingDeps } from '$lib/chain/trackingDeps';
 	import {
 		createOutcomeHandler,
 		createPendingTracker,
@@ -175,14 +176,7 @@
 		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
 		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
 	};
-	const trackingDeps = {
-		pendingInfo: (txId: string) => algodClient.pendingTransactionInformation(txId).do(),
-		indexerSearch: async (txId: string) =>
-			(await algodIndexer.searchForTransactions().txid(txId).do()) as {
-				'current-round': number;
-				transactions: { id?: string; 'confirmed-round'?: number }[];
-			}
-	};
+	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	$: retryList = retryRecipients(groupOutcomes, recipientsByGroup);
 	$: confirmedTotal = Number(
 		enforceDecimals(

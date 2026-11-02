@@ -1,4 +1,5 @@
 import algosdk from 'algosdk';
+import { indexerCaughtUpPast } from './indexerHealth';
 
 export type PendingOutcome = {
 	status: 'pending';
@@ -22,8 +23,9 @@ export type SendDependencies = {
 export type TrackingDependencies = {
 	// Positive evidence only: any node reporting a confirmed round is proof it landed.
 	pendingInfo(txId: string): Promise<{ 'confirmed-round'?: number }>;
-	// GET /v2/transactions?txid=…: the round and the result come from the same response, so
-	// absence is only proven by the reader that answered (TASK-81 review P1).
+	// Expiry requires fresh algod and exact-block evidence before searching for absence.
+	algodRound(): Promise<number>;
+	indexerHasBlock(round: number): Promise<boolean>;
 	indexerSearch(txId: string): Promise<{
 		'current-round': number;
 		transactions: { id?: string; 'confirmed-round'?: number }[];
@@ -108,6 +110,8 @@ export async function trackPending(
 	if (signal?.aborted) return outcome;
 	async function poll(): Promise<TrackedOutcome> {
 		while (!signal?.aborted) {
+			const caughtUp = await indexerCaughtUpPast(outcome.lastValid, deps);
+			if (signal?.aborted) break;
 			const info = await unknownOnError(() => deps.pendingInfo(outcome.firstTxId));
 			if (signal?.aborted) break;
 			const confirmedRound = info?.['confirmed-round'];
@@ -129,9 +133,9 @@ export async function trackPending(
 						confirmedRound: found['confirmed-round'] ?? 0
 					};
 				}
-				// No transaction can confirm after lastValid, so a reader past it that lacks the txid
-				// proves it never landed.
-				if (search['current-round'] > outcome.lastValid) {
+				// Absence is proof only after algod has passed lastValid and the indexer
+				// returned that exact block before this search (TASK-117).
+				if (caughtUp) {
 					return { status: 'expired', txIds: outcome.txIds };
 				}
 			}
