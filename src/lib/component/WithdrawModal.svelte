@@ -5,6 +5,7 @@
 	import { selectedWallet, signAndSendTransactions } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
 	import { algodClient } from '$lib/utils/algod';
+	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
 
 	export let contract: ContractDetails;
 	export let show = false;
@@ -13,8 +14,10 @@
 	let withdrawAmountVOI: number | null = null;
 	let error: string | null = null;
 	let isLoading = false;
-	let txStatus: 'idle' | 'building' | 'signing' | 'confirming' | 'confirmed' | 'error' = 'idle';
+	let txStatus: 'idle' | 'building' | 'signing' | 'confirming' | 'confirmed' | 'pending' | 'error' =
+		'idle';
 	let txId: string | null = null;
+	let poolError: string | null = null;
 
 	// Convert microVOI to VOI for display
 	$: availableBalanceVOI = microVOIToVOI(contract.availableForWithdrawal);
@@ -29,8 +32,8 @@
 	function handleClose() {
 		if (txStatus !== 'building' && txStatus !== 'signing' && txStatus !== 'confirming') {
 			show = false;
-			// Only trigger refresh on successful withdrawal
-			if (txStatus === 'confirmed') {
+			// A pending withdrawal may still land, so refresh for either submitted outcome.
+			if (txStatus === 'confirmed' || txStatus === 'pending') {
 				onSuccess?.(true);
 			} else {
 				onSuccess?.(false);
@@ -39,6 +42,7 @@
 			txStatus = 'idle';
 			txId = null;
 			error = null;
+			poolError = null;
 			withdrawAmountVOI = null;
 		}
 	}
@@ -131,14 +135,15 @@
 			const result = await signAndSendTransactions([txns]);
 			if (result) {
 				txStatus = 'confirming';
-				// Wait for confirmation
-				try {
-					await algodClient.pendingTransactionInformation(txId).do();
+				const outcome = await awaitWithdrawalConfirmation(txId, {
+					pendingInfo: (id) => algodClient.pendingTransactionInformation(id).do(),
+					pause: (ms) => new Promise((r) => setTimeout(r, ms))
+				});
+				if (outcome.status === 'confirmed') {
 					txStatus = 'confirmed';
-				} catch (err) {
-					console.error('Error confirming transaction:', err);
-					txStatus = 'error';
-					error = 'Transaction failed to confirm';
+				} else {
+					txStatus = 'pending';
+					poolError = outcome.poolError ?? null;
 				}
 			} else {
 				txStatus = 'error';
@@ -192,6 +197,26 @@
 								</a>
 							{/if}
 						</div>
+					</div>
+				{:else if txStatus === 'pending'}
+					<div class="text-center space-y-4">
+						<h3 class="text-lg font-medium text-gray-900 dark:text-white">
+							Withdrawal submitted, not yet confirmed
+						</h3>
+						{#if poolError}
+							<p class="text-sm text-gray-500 dark:text-gray-400">{poolError}</p>
+						{/if}
+						{#if explorerUrl}
+							<a
+								href={explorerUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="mt-4 inline-flex items-center text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
+							>
+								View on Explorer
+								<i class="fas fa-external-link-alt ml-2"></i>
+							</a>
+						{/if}
 					</div>
 				{:else if txStatus === 'error'}
 					<div class="text-center space-y-4">
@@ -311,7 +336,9 @@
 					class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md"
 					disabled={txStatus === 'building' || txStatus === 'signing' || txStatus === 'confirming'}
 				>
-					{txStatus === 'confirmed' || txStatus === 'error' ? 'Close' : 'Cancel'}
+					{txStatus === 'confirmed' || txStatus === 'pending' || txStatus === 'error'
+						? 'Close'
+						: 'Cancel'}
 				</button>
 				{#if txStatus === 'idle'}
 					<button
