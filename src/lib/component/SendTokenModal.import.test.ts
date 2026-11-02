@@ -8,11 +8,13 @@ const handleImport = source.match(
 
 test('imported recipients wait for a successful check before becoming valid', () => {
 	expect(handleImport, 'Keep the import confirmation handler').toBeDefined();
-	expect(handleImport, 'Normalize imported rows as invalid before checking them').toMatch(
+	expect(handleImport).toContain('invalidateRows(importedRecipients)');
+	const invalidation = source.match(/\tfunction invalidateRows\([^]*?\n\t\}/)?.[0];
+	expect(invalidation, 'Normalize imported rows as invalid before checking them').toMatch(
 		/isValid:\s*false/
 	);
 	for (const field of ['info: null', 'lookupError: null', 'isLoading: Boolean(row.address)']) {
-		expect(handleImport, `Imported rows must start with ${field}`).toContain(field);
+		expect(invalidation, `Imported rows must start with ${field}`).toContain(field);
 	}
 });
 

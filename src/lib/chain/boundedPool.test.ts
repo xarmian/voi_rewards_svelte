@@ -55,3 +55,35 @@ test.each([0, -2])('treats limit %s as one worker', async (limit) => {
 	await expect(running).resolves.toBeUndefined();
 	expect(seen).toEqual([0, 1, 2]);
 });
+
+test('processes plain address/ticket work items exactly once with four workers', async () => {
+	const work = Array.from({ length: 7 }, (_, ticket) => ({
+		address: `recipient-${ticket}`,
+		ticket
+	}));
+	const gates = work.map(() => Promise.withResolvers<void>());
+	const seen: typeof work = [];
+	let inFlight = 0;
+	let maxInFlight = 0;
+	const running = runBounded(work, 4, async (item) => {
+		seen.push(item);
+		inFlight++;
+		maxInFlight = Math.max(maxInFlight, inFlight);
+		await gates[item.ticket].promise;
+		inFlight--;
+	});
+
+	expect(seen).toEqual(work.slice(0, 4));
+	gates[1].resolve();
+	await vi.waitFor(() => expect(seen).toEqual(work.slice(0, 5)));
+	expect(inFlight).toBe(4);
+	for (const gate of gates) gate.resolve();
+	await expect(running).resolves.toBeUndefined();
+	expect(maxInFlight).toBe(4);
+	expect(inFlight).toBe(0);
+	expect(seen).toEqual(work);
+	for (const item of work) {
+		expect(Object.getPrototypeOf(item)).toBe(Object.prototype);
+		expect(seen.filter((seenItem) => seenItem === item)).toHaveLength(1);
+	}
+});

@@ -32,10 +32,17 @@ test('recipient lookup drops results for a token that is no longer selected', ()
 
 test('both token selection paths invalidate and recheck addressed rows with four workers', () => {
 	const recheck = body('recheckRecipients');
-	for (const field of ['isValid: false', 'info: null', 'lookupError: null', 'isLoading: true']) {
-		expect(recheck, `Token changes must reset ${field}`).toContain(field);
+	const invalidation = body('invalidateRows');
+	expect(recheck).toContain('invalidateRows(recipients)');
+	for (const field of [
+		'isValid: false',
+		'info: null',
+		'lookupError: null',
+		'isLoading: Boolean(row.address)'
+	]) {
+		expect(invalidation, `Token changes must reset ${field}`).toContain(field);
 	}
-	expect(recheck, 'Leave rows without addresses alone').toMatch(/row\.address\s*\?/);
+	expect(invalidation, 'Queue only addressed rows').toMatch(/if \(row\.address\)/);
 	expect(recheck, 'Recheck recipients with at most four workers').toMatch(
 		/runBounded\([^]*?,\s*4\s*,[^]*?fetchRecipientInfo\(/
 	);
@@ -57,7 +64,7 @@ test('both token selection paths invalidate and recheck addressed rows with four
 });
 
 test('imported rows without addresses do not show a loading indicator', () => {
-	expect(body('handlePasteModalConfirm'), 'Only addressed imports need a lookup').toMatch(
+	expect(body('invalidateRows'), 'Only addressed imports need a lookup').toMatch(
 		/isLoading:\s*Boolean\(row\.address\)/
 	);
 });

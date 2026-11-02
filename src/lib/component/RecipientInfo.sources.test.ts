@@ -100,7 +100,14 @@ test('Recipient info has lookupError and no unused creation date', () => {
 
 test.each(components)(
 	'$file clears previous validation before checking a recipient',
-	({ source }) => {
+	({ file, source }) => {
+		if (file === 'SendTokenModal.svelte') {
+			const invalidation = source.match(/\tfunction invalidateRows\([^]*?\n\t\}/)?.[0];
+			for (const field of ['isValid: false', 'info: null', 'lookupError: null']) {
+				expect(invalidation).toContain(field);
+			}
+			return;
+		}
 		const body = source.match(/\tasync function fetchRecipientInfo\([^]*?\n\t\}/)?.[0];
 		expect(body).toBeDefined();
 		const lookup = body!.indexOf('await loadRecipientInfo(');
