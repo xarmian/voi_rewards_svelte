@@ -1,4 +1,5 @@
 import { snapshotFromAlgodAccount } from '../portfolio/accountDetails';
+import type { Recipient } from '../types/recipients';
 
 export type RecipientTokenKind =
 	| { kind: 'native' }
@@ -8,6 +9,23 @@ export type RecipientTokenKind =
 export type RecipientInfoResult =
 	| { status: 'loaded'; info: { balance: number; hasOptedIn: boolean; assetBalance: number } }
 	| { status: 'unavailable'; error: string };
+
+export function applyRecipientLookup(
+	rows: Recipient[],
+	address: string,
+	result: RecipientInfoResult
+): Recipient[] {
+	return rows.map((row) => {
+		if (row.address !== address || !row.isLoading) return row;
+		return {
+			...row,
+			info: result.status === 'loaded' ? result.info : null,
+			isValid: result.status === 'loaded',
+			lookupError: result.status === 'unavailable' ? result.error : null,
+			isLoading: false
+		};
+	});
+}
 
 export interface RecipientInfoDeps {
 	fetchAccount(address: string): Promise<Record<string, unknown>>;

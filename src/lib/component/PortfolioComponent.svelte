@@ -84,6 +84,7 @@
 	let tokenSearchQuery = '';
 	let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
 	let showSendVoiModal = false;
+	let sendVoiBalance = 0;
 	let lastInitializedWallet: string | undefined;
 	let isLoadingPortfolio = false;
 	let isLoadingLPTokens = false;
@@ -140,6 +141,8 @@
 	}
 
 	async function openSendVoiModal() {
+		if (accountPart.status !== 'loaded') return;
+		sendVoiBalance = accountPart.value.balance;
 		try {
 			SendTokenModal ??= (await import('./SendTokenModal.svelte')).default;
 			showSendVoiModal = true;
@@ -1532,7 +1535,7 @@
 </div>
 
 <!-- Send VOI Modal -->
-{#if typeof walletAddress === 'string' && showSendVoiModal && accountPart.status === 'loaded'}
+{#if typeof walletAddress === 'string' && showSendVoiModal}
 	<svelte:component
 		this={SendTokenModal}
 		bind:open={showSendVoiModal}
@@ -1540,7 +1543,7 @@
 			type: 'native',
 			symbol: 'VOI',
 			decimals: 6,
-			balance: accountBalance,
+			balance: sendVoiBalance,
 			name: 'Voi'
 		}}
 		tokens={fungibleTokens}
