@@ -78,7 +78,7 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 		sumBaseUnits,
 		algosdk,
 		$selectedWallet: { address: algosdk.generateAccount().addr },
-		selectedToken: { decimals: 6, symbol: 'VOI', balance: 9007199254740993 },
+		selectedToken: { decimals: 6, symbol: 'VOI', balance: 9007199254740992 },
 		tracker: {},
 		recipients: ['9007199254.740993', '0.000001'].map((value) => ({
 			address: algosdk.generateAccount().addr,
