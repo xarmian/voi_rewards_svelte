@@ -357,8 +357,22 @@
 		];
 	}
 
+	const LOOKUP_BANNER =
+		"Couldn't check this recipient. Sending is blocked until it can be checked.";
+
+	// The banner follows the rows: raised while any row has a lookup error, and cleared only when it
+	// is the banner itself, so an unrelated message (a send error) is never overwritten or hidden.
+	function syncLookupBanner() {
+		if (recipients.some((r) => r.lookupError)) {
+			error = LOOKUP_BANNER;
+		} else if (error === LOOKUP_BANNER) {
+			error = null;
+		}
+	}
+
 	function removeRecipient(index: number) {
 		recipients = recipients.filter((_, i) => i !== index);
+		syncLookupBanner();
 	}
 
 	async function fetchRecipientInfo(address: string, ticket: number) {
@@ -385,13 +399,7 @@
 		if (!recipients.some((r) => r.address === address && r.isLoading && r.lookupId === ticket))
 			return;
 		recipients = applyRecipientLookup(recipients, address, ticket, result);
-		if (recipients.some((r) => r.lookupError)) {
-			error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
-		} else if (
-			error === "Couldn't check this recipient. Sending is blocked until it can be checked."
-		) {
-			error = null;
-		}
+		syncLookupBanner();
 		if (result.status === 'loaded') {
 			notice = null;
 		} else {
@@ -417,13 +425,7 @@
 			error = errorMessage;
 			return;
 		}
-		if (recipients.some((r) => r.lookupError)) {
-			error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
-		} else if (
-			error === "Couldn't check this recipient. Sending is blocked until it can be checked."
-		) {
-			error = null;
-		}
+		syncLookupBanner();
 	}
 
 	async function buildVSATransaction(
@@ -1010,6 +1012,7 @@
 		recipients = [...recipients];
 
 		error = null;
+		syncLookupBanner();
 		notice = null;
 		await runBounded(work, 4, async ({ address, ticket }) => {
 			await fetchRecipientInfo(address, ticket);

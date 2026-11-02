@@ -7,7 +7,7 @@ const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url),
 const BANNER = "Couldn't check this recipient. Sending is blocked until it can be checked.";
 
 function bannerHarness(recipients: { lookupError?: string | null }[], error: string | null) {
-	const constant = source.match(/\tconst LOOKUP_BANNER = [^;]+;/)?.[0];
+	const constant = source.match(/\tconst LOOKUP_BANNER =\s*[^;]+;/)?.[0];
 	const sync = source.match(/\tfunction syncLookupBanner\([^]*?\n\t\}/)?.[0];
 	expect(constant, 'Keep the banner text in one LOOKUP_BANNER constant').toBeDefined();
 	expect(sync, 'Keep a syncLookupBanner function').toBeDefined();

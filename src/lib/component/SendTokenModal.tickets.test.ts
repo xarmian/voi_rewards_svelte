@@ -56,14 +56,10 @@ test('retrying transactions rechecks the restored rows under the current token',
 });
 
 test.each(['fetchRecipientInfo', 'handleRecipientError'])(
-	'%s keeps current lookup errors and clears only the lookup banner',
+	'%s re-derives the lookup banner through the shared helper',
 	(handler) => {
-		const banner = body(handler);
-		expect(banner, 'Keep the banner while any current row is unavailable').toMatch(
-			/if \(recipients\.some\(\(r\) => r\.lookupError\)\) \{\s*error = "Couldn't check this recipient\. Sending is blocked until it can be checked\."/
-		);
-		expect(banner, 'Compare the exact banner before clearing any error').toMatch(
-			/else if \(\s*error === "Couldn't check this recipient\. Sending is blocked until it can be checked\."\s*\) \{\s*error = null;/
+		expect(body(handler), 'Keep the banner following the current rows').toContain(
+			'syncLookupBanner()'
 		);
 	}
 );

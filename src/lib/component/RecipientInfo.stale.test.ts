@@ -34,7 +34,12 @@ function recipientLookup(file: string, loadRecipientInfo: ReturnType<typeof vi.f
 	});
 	runInContext(
 		ts.transpileModule(
-			[source.match(/\tfunction handleRecipientError\([^]*?\n\t\}/)?.[0], body]
+			[
+				source.match(/\tconst LOOKUP_BANNER =\s*[^;]+;/)?.[0],
+				source.match(/\tfunction syncLookupBanner\([^]*?\n\t\}/)?.[0],
+				source.match(/\tfunction handleRecipientError\([^]*?\n\t\}/)?.[0],
+				body
+			]
 				.filter(Boolean)
 				.join('\n'),
 			{
