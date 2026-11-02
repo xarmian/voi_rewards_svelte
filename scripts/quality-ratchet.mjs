@@ -41,8 +41,8 @@ export function parseSvelteCheck(
 				start.line < 0 ||
 				!Number.isSafeInteger(start?.character) ||
 				start.character < 0 ||
-				(code != null &&
-					(!['number', 'string'].includes(typeof code) || typeof source !== 'string'))
+				(code != null && !['number', 'string'].includes(typeof code)) ||
+				(source != null && typeof source !== 'string')
 			) {
 				throw new Error('Invalid diagnostic fields');
 			}
@@ -52,7 +52,7 @@ export function parseSvelteCheck(
 		const { type, filename, start, message, code, source } = diagnostic;
 		diagnostics.push({
 			file: normalizeFile(filename, repoRoot),
-			identity: code == null ? `message:${message.split(/\r?\n/)[0]}` : `${source}:${code}`,
+			identity: code == null ? `message:${message.split(/\r?\n/)[0]}` : `${source ?? 'ts'}:${code}`,
 			severity: type === 'ERROR' ? 'errors' : 'warnings',
 			line: start.line + 1,
 			column: start.character + 1,

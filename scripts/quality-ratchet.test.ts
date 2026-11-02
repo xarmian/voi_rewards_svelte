@@ -413,6 +413,13 @@ describe('svelte-check machine-verbose output', () => {
 		});
 	});
 
+	it('treats a numeric code with no source as ts, as svelte-check omits source for plain .ts files', () => {
+		const result = parseSvelteCheck(
+			[svelteDiagnostic({ source: undefined }), svelteDiagnostic(), completed].join('\n')
+		);
+		expect(result.counts).toEqual({ 'src/a.ts': counts(2, 0, 'ts:2322') });
+	});
+
 	it('uses the first message line when code is missing and decodes escapes', () => {
 		const message = 'Expected "number"\nbut got "string"';
 		const result = parseSvelteCheck(svelteDiagnostic({ message, code: undefined }));
