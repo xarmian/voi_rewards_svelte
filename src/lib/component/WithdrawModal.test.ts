@@ -89,3 +89,17 @@ test('WithdrawModal remembers a withdrawal before it starts waiting on it', () =
 		'The record must exist before polling, so a modal destroyed mid-wait cannot offer a second withdrawal'
 	).toBeLessThan(polled);
 });
+
+test('WithdrawModal only clears the record of the withdrawal it was waiting on', () => {
+	const body = source.match(/async function settleWithdrawal[\s\S]*?\n\t\}\n/)?.[0] ?? '';
+	const clears = body.match(/clearPendingWithdrawal\([^)]*\)/g) ?? [];
+	expect(clears.length, 'settleWithdrawal must clear on confirmed and on expired').toBeGreaterThan(
+		1
+	);
+	for (const call of clears) {
+		expect(
+			call,
+			'A detached wait must not erase a newer withdrawal: pass the tx id to every clear'
+		).toMatch(/,\s*id\s*\)/);
+	}
+});

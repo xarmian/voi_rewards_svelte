@@ -35,4 +35,12 @@ describe('pending withdrawals', () => {
 		expect(getPendingWithdrawal(1)).toBeUndefined();
 		expect(getPendingWithdrawal(2)).toEqual({ txId: 'TX-B', lastValid: 200 });
 	});
+
+	it('clears only when the recorded tx id matches the one given', () => {
+		rememberPendingWithdrawal(1, { txId: 'TX-NEW', lastValid: 300 });
+		clearPendingWithdrawal(1, 'TX-OLD');
+		expect(getPendingWithdrawal(1)).toEqual({ txId: 'TX-NEW', lastValid: 300 });
+		clearPendingWithdrawal(1, 'TX-NEW');
+		expect(getPendingWithdrawal(1)).toBeUndefined();
+	});
 });
