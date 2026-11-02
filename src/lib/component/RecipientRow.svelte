@@ -115,6 +115,8 @@
 			recipient.address = null;
 			recipient.info = null;
 			recipient.isValid = false;
+			recipient.isLoading = false;
+			recipient.lookupError = null;
 			return;
 		}
 		recipient.address = address;

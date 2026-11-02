@@ -31,7 +31,8 @@
 	let accountPart: Part<AccountSnapshot> | { status: 'loading' } = { status: 'loading' };
 	let createdAtPart: Part<number> | { status: 'loading' } = { status: 'loading' };
 	let rewardsPart: Part<RewardsTransaction[]> | { status: 'loading' } = { status: 'loading' };
-	let accountBalance = 0;
+	$: accountBalance = accountPart.status === 'loaded' ? accountPart.value.balance : 0;
+	let loadGeneration = 0;
 	let accountCreationDate: string | null = null;
 	let accountCreationDateDays: number | null = null;
 	let totalRewards: number = 0;
@@ -53,7 +54,10 @@
 	$: usdPending =
 		!$voiPrice.error &&
 		($voiPrice.price <= 0 || (isLoadingTokens && fungibleTokens.length > 0 && tokensPrice <= 0));
-	$: totalsPending = !totalsReady || (isLoadingTokens && fungibleTokens.length === 0);
+	$: totalsPending =
+		accountPart.status === 'loading' ||
+		!totalsReady ||
+		(isLoadingTokens && fungibleTokens.length === 0);
 
 	let asaTokens: ASAToken[] = [];
 
@@ -319,6 +323,7 @@
 	}
 
 	async function fetchAccountDetails(force = false) {
+		const generation = ++loadGeneration;
 		if (!walletAddress) return;
 		const requestedWallet = walletAddress;
 		accountPart = { status: 'loading' };
@@ -328,10 +333,11 @@
 		voteKeyExpiryDate = undefined;
 		if (totalsReady) recomputeTotals();
 
-		const epochLoading = (async (walletAddress: string) => {
+		const epochLoading = (async () => {
 			// Fetch Envoi name
 			try {
-				const envoiResults = await getEnvoiNames([walletAddress]);
+				const envoiResults = await getEnvoiNames([requestedWallet]);
+				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
 				envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
 				envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
 			} catch (err) {
@@ -342,7 +348,7 @@
 			try {
 				const dates = await dataTable.fetchDateRanges();
 				const epochSummary = await fetch(
-					`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${walletAddress}`
+					`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${requestedWallet}`
 				).then((r) => r.json());
 				const [supplyData] = await Promise.all([getSupplyInfo()]);
 
@@ -362,7 +368,7 @@
 					const { totalBlocksProduced, userBlocksProduced, expectedReward } = calculateEpochRewards(
 						epochData,
 						date.epoch,
-						epochData.proposers[walletAddress],
+						epochData.proposers[requestedWallet],
 						tokens
 					);
 
@@ -376,9 +382,11 @@
 					};
 				});
 
-				epochData = (await Promise.all(epochPromises)).filter(
+				const loadedEpochData = (await Promise.all(epochPromises)).filter(
 					(data): data is NonNullable<typeof data> => data !== null
 				);
+				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
+				epochData = loadedEpochData;
 
 				// Calculate current epoch rewards
 				const now = new Date();
@@ -389,7 +397,7 @@
 			} catch (err) {
 				console.error('Error calculating rewards:', err);
 			}
-		})(requestedWallet);
+		})();
 
 		await loadAccountDetails(
 			requestedWallet,
@@ -405,12 +413,11 @@
 			},
 			{
 				onPart: (part, result) => {
-					if (walletAddress !== requestedWallet) return;
+					if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
 					if (part === 'account') {
 						accountPart = result;
 						if (accountPart.status === 'loaded') {
 							const account = accountPart.value;
-							accountBalance = account.balance;
 							if (account.status === 'Online' && account.voteLastValid !== undefined) {
 								voteKeyExpiry = (account.voteLastValid - account.round) * 3.3; // 3.3 seconds per block
 								voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);

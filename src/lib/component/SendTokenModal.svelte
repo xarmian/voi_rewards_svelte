@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { loadRecipientInfo, type RecipientTokenKind } from '$lib/chain/recipientInfo';
+	import { runBounded } from '$lib/chain/boundedPool';
 	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
@@ -324,7 +325,7 @@
 	$: canSubmit =
 		recipients.every((r) => {
 			// Basic validation for all token types
-			const basicValidation = r.address && r.amount && r.isValid;
+			const basicValidation = r.address && r.amount && r.isValid && r.info !== null;
 			if (!basicValidation) return false;
 
 			// Additional validation for VSA (non-native, non-ARC200 tokens)
@@ -354,8 +355,9 @@
 		recipients = recipients.filter((_, i) => i !== index);
 	}
 
-	async function fetchRecipientInfo(address: string, index: number) {
-		const requestedRecipient = recipients[index];
+	async function fetchRecipientInfo(address: string, row: Recipient) {
+		let index = recipients.indexOf(row);
+		if (index === -1 || recipients[index]?.address !== address) return;
 		recipients[index].isValid = false;
 		recipients[index].info = null;
 		recipients[index].lookupError = null;
@@ -379,8 +381,8 @@
 					};
 				}
 			});
-			if (recipients[index]?.address !== address || recipients[index] !== requestedRecipient)
-				return;
+			index = recipients.indexOf(row);
+			if (index === -1 || recipients[index]?.address !== address) return;
 			if (result.status === 'loaded') {
 				recipients[index].info = result.info;
 				recipients[index].isValid = true;
@@ -395,7 +397,8 @@
 				error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
 			}
 		} finally {
-			if (recipients[index]?.address === address && recipients[index] === requestedRecipient) {
+			index = recipients.indexOf(row);
+			if (index !== -1 && recipients[index]?.address === address) {
 				recipients[index].isLoading = false;
 				recipients = [...recipients]; // Force Svelte reactivity
 			}
@@ -410,14 +413,16 @@
 				...recipients[index],
 				address: null,
 				info: null,
-				isValid: false
+				isValid: false,
+				isLoading: false,
+				lookupError: null
 			};
 			return;
 		}
 		recipients[index].address = address;
 		error = null;
 		notice = null;
-		await fetchRecipientInfo(address, index);
+		await fetchRecipientInfo(address, recipients[index]);
 	}
 
 	function handleRecipientAmountChange(index: number, amount: string) {
@@ -988,13 +993,20 @@
 		open = false;
 	}
 
-	function handlePasteModalConfirm(importedRecipients: Recipient[]) {
+	async function handlePasteModalConfirm(importedRecipients: Recipient[]) {
+		const rows = importedRecipients.map((row) => ({
+			...row,
+			isValid: false,
+			info: null,
+			lookupError: null,
+			isLoading: true
+		}));
 		// If we already have one empty recipient, remove it
 		if (recipients.length === 1 && !recipients[0].address) {
-			recipients = importedRecipients;
+			recipients = rows;
 		} else {
 			// Otherwise append new recipients up to the maximum
-			const combinedRecipients = [...recipients, ...importedRecipients];
+			const combinedRecipients = [...recipients, ...rows];
 			recipients = combinedRecipients;
 		}
 
@@ -1003,6 +1015,9 @@
 
 		error = null;
 		notice = null;
+		await runBounded(rows, 4, async (row) => {
+			if (row.address) await fetchRecipientInfo(row.address, row);
+		});
 	}
 
 	// Helper function to determine if token is native VOI
