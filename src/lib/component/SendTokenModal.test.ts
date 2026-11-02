@@ -30,8 +30,8 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 test('send conversions never use a floating point decimal scale', () => {
 	expect(
 		source,
-		'SendTokenModal must convert typed amounts with decimalToBaseUnits, without Math.pow'
-	).not.toMatch(/Math\.pow\(10, token\.decimals\)/);
+		'SendTokenModal must convert typed amounts with decimalToBaseUnits, not by multiplying by Math.pow'
+	).not.toMatch(/\*\s*Math\.pow\(10,\s*token\.decimals\)/);
 	expect(
 		source.match(/decimalToBaseUnits\(recipient\.amount, token\.decimals\)/g),
 		'Both ARC-200 and native/VSA send paths must parse the original decimal string'

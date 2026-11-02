@@ -7,6 +7,7 @@
 	import algosdk from 'algosdk';
 	import { onDestroy, tick } from 'svelte';
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
+	import { decimalToBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import {
 		createOutcomeHandler,
@@ -285,8 +286,8 @@
 	function enforceDecimals(value: string | number, decimals: number): string {
 		if (!value) return '';
 
-		// Convert to string and remove any existing decimal places
-		const strValue = value.toString();
+		// Preserve typed decimal strings and support existing numeric callers.
+		const strValue = typeof value === 'string' ? value.trim() : value.toString();
 		const [whole, fraction = ''] = strValue.split('.');
 
 		// If no decimals, return the whole number
@@ -440,7 +441,7 @@
 		token: SendToken,
 		sender: string,
 		recipientAddress: string,
-		amount: number,
+		amount: bigint,
 		suggestedParams: algosdk.SuggestedParams,
 		noteText?: string
 	): Promise<algosdk.Transaction> {
@@ -457,7 +458,7 @@
 			from: sender,
 			to: recipientAddress,
 			assetIndex: Number(token.id),
-			amount: Math.floor(amount),
+			amount,
 			note: noteText ? new TextEncoder().encode(noteText) : undefined,
 			suggestedParams
 		});
@@ -467,7 +468,7 @@
 		token: SendToken,
 		sender: string,
 		recipientAddress: string,
-		amount: number,
+		amount: bigint,
 		index: number,
 		noteText?: string
 	): Promise<algosdk.Transaction[]> {
@@ -482,12 +483,7 @@
 			}
 		});
 
-		const resp = await contract.arc200_transfer(
-			recipientAddress,
-			BigInt(Math.floor(amount)),
-			true,
-			false
-		);
+		const resp = await contract.arc200_transfer(recipientAddress, amount, true, false);
 
 		if (!resp.success) {
 			throw new Error('Failed to build ARC-200 transaction');
@@ -573,7 +569,7 @@
 		token: SendToken,
 		sender: string,
 		recipientAddress: string,
-		amount: number,
+		amount: bigint,
 		suggestedParams: algosdk.SuggestedParams,
 		noteText?: string
 	): Promise<algosdk.Transaction> {
@@ -583,7 +579,7 @@
 		return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
 			from: sender,
 			to: recipientAddress,
-			amount: Math.floor(amount),
+			amount,
 			note: noteText ? new TextEncoder().encode(noteText) : undefined,
 			suggestedParams
 		});
@@ -624,11 +620,11 @@
 			const paymentsToProcess = currentBatch.filter((pair) => pair.payment !== null);
 			if (paymentsToProcess.length > 0) {
 				const totalPaymentAmount = paymentsToProcess.reduce(
-					(sum, pair) => sum + (pair.payment ? Number(pair.payment.amount) : 0),
-					0
+					(sum, pair) => sum + BigInt(pair.payment?.amount ?? 0),
+					0n
 				);
 
-				if (totalPaymentAmount > 0) {
+				if (totalPaymentAmount > 0n) {
 					const firstPayment = paymentsToProcess[0].payment!;
 					const combinedPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
 						from: algosdk.encodeAddress(firstPayment.from.publicKey),
@@ -691,6 +687,17 @@
 			error = 'Invalid recipient address(es)';
 			return;
 		}
+		const invalidAmountIndex = recipients.findIndex((r) => {
+			try {
+				return decimalToBaseUnits(r.amount, token.decimals) <= 0n;
+			} catch {
+				return true;
+			}
+		});
+		if (invalidAmountIndex >= 0) {
+			error = `Invalid amount for recipient ${invalidAmountIndex + 1}`;
+			return;
+		}
 
 		pendingController?.abort();
 		const controller = new AbortController();
@@ -713,10 +720,7 @@
 					.filter((r) => r.address && r.amount)
 					.map((recipient) => ({
 						address: recipient.address!,
-						amount: Math.floor(
-							Number(enforceDecimals(recipient.amount, token.decimals)) *
-								Math.pow(10, token.decimals)
-						),
+						amount: decimalToBaseUnits(recipient.amount, token.decimals),
 						note: recipient.note
 					}));
 
@@ -750,9 +754,7 @@
 					if (!recipient.address || !recipient.amount) continue;
 
 					// Convert amount to raw units with proper decimal precision
-					const rawAmount = Math.floor(
-						Number(enforceDecimals(recipient.amount, token.decimals)) * Math.pow(10, token.decimals)
-					);
+					const rawAmount = decimalToBaseUnits(recipient.amount, token.decimals);
 
 					let txn;
 					if (isNativeToken(token)) {
