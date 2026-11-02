@@ -90,20 +90,12 @@ export function matchBridgeDeposit(tx: unknown, expected: ExpectedBridgeDeposit)
 
 export async function checkAlgorandDeposit(
 	deps: BridgeFetchDeps,
-	indexerBase: string,
-	state: { startRound: number | null },
 	expected: ExpectedBridgeDeposit,
+	afterTime: string,
 	signal: AbortSignal
 ): Promise<MonitorResult> {
-	if (state.startRound === null) {
-		const data = await deps.getJson(`${indexerBase}/health`, signal);
-		const round = isObject(data) ? Number(data.round) : NaN;
-		if (!Number.isFinite(round)) throw new Error('Unexpected indexer response');
-		state.startRound = round;
-		return { done: false };
-	}
 	const data = await deps.getJson(
-		`${indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${state.startRound}&limit=10`,
+		`https://mainnet-idx.4160.nodely.dev/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&after-time=${encodeURIComponent(afterTime)}&limit=10`,
 		signal
 	);
 	for (const tx of transactions(data)) {

@@ -536,9 +536,7 @@ export async function fetchTokenTransfers({
 			.nextToken(append && nextToken ? nextToken : '')
 			.do();
 
-		// Store the next token for pagination
-		nextToken = txns['next-token'];
-		hasMore = !!nextToken;
+		const next = txns['next-token'];
 
 		newTransfers = txns.transactions
 			.filter((tx: any) => tx['tx-type'] === 'axfer')
@@ -551,6 +549,8 @@ export async function fetchTokenTransfers({
 				timestamp: tx['round-time'],
 				note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined
 			}));
+		nextToken = next;
+		hasMore = !!next;
 	}
 
 	try {
