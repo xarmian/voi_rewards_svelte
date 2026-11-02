@@ -208,7 +208,7 @@ describe('Algorand deposit', () => {
 		{ amount: 999n },
 		{ destinationAddress: 'OTHER' },
 		{ sourceAddress: 'OTHER' }
-	])('rejects deposits with incorrect expectations %j', async (change) => {
+	])('rejects deposits with incorrect expectations %#', async (change) => {
 		expect(
 			await checkAlgorandDeposit(
 				fake({ transactions: [deposit()] }),

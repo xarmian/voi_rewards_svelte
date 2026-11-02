@@ -11,6 +11,9 @@
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { pollUntil } from '$lib/chain/singleFlightPoll';
+	import { checkDestinationConfirmation, checkAlgorandDeposit } from '$lib/chain/bridgeMonitor';
+	import type { ExpectedBridgeConfirmation } from '$lib/chain/bridgeConfirmation';
 	import {
 		createPendingTracker,
 		type PendingSendEntry,
@@ -80,7 +83,12 @@
 	let isLoadingBalance = false;
 	let bridgeStatus: BridgeStatus = 'idle';
 	let bridgeDetails: BridgeDetails | null = null;
-	let bridgeMonitorInterval: number | undefined;
+	let monitorController: AbortController | undefined;
+	let monitorExpected: ExpectedBridgeConfirmation | undefined;
+	let monitorSourceTxId: string | undefined;
+	let monitorIndexerBase: string | undefined;
+	let monitorState: 'checking' | 'unavailable' | 'timeout' = 'checking';
+	let monitorReview: { expected: bigint; actual: bigint } | null = null;
 	let bridgeError: string | null = null;
 	let pendingController: AbortController | undefined;
 	const sendDeps = {
@@ -148,7 +156,8 @@
 	let isMonitoringAlgorand = false;
 	let monitoringDots = '';
 	let dotsInterval: number | undefined;
-	let startMonitoringRound: number | null = null;
+	let depositState: { startRound: number | null } = { startRound: null };
+	let depositExpected: Parameters<typeof checkAlgorandDeposit>[3] | undefined;
 	let remainingChecks = 3; // Add counter for remaining checks after modal closure
 
 	interface NFDResult {
@@ -484,103 +493,77 @@
 		}
 	}
 
-	async function startBridgeMonitoring(sourceTxId: string) {
-		// Clear any existing intervals
-		if (bridgeMonitorInterval) {
-			clearInterval(bridgeMonitorInterval);
-			bridgeMonitorInterval = undefined;
-		}
+	async function getJson(url: string, signal: AbortSignal): Promise<unknown> {
+		const response = await fetch(url, { signal });
+		if (!response.ok) throw new Error('HTTP ' + response.status);
+		return await response.json();
+	}
+
+	async function startBridgeMonitoring(
+		sourceTxId: string,
+		expected: ExpectedBridgeConfirmation = {
+			sourceTxId,
+			sourceNetwork: isVoiToAlgorand ? 416101 : 416001,
+			bridgeAddress: BRIDGE_ADDRESS,
+			destinationAddress: isVoiToAlgorand ? algorandDestinationAddress : voiDestinationAddress,
+			destinationAssetId: isVoiToAlgorand
+				? selectedToken.algorandAssetId
+				: selectedToken.voiAssetId,
+			destinationAmount
+		},
+		indexerBase = isVoiToAlgorand
+			? 'https://mainnet-idx.4160.nodely.dev'
+			: 'https://mainnet-idx.voi.nodely.dev'
+	) {
+		monitorController?.abort();
+		const controller = new AbortController();
+		monitorController = controller;
+		monitorExpected = expected;
+		monitorSourceTxId = sourceTxId;
+		monitorIndexerBase = indexerBase;
+		monitorState = 'checking';
+		monitorReview = null;
 		if (dotsInterval) {
 			clearInterval(dotsInterval);
 			dotsInterval = undefined;
 		}
 
-		const checkDestinationTx = async () => {
-			try {
-				// Base64 encode the note prefix
-				const notePrefix = 'aramid-confirm/v1:j';
-				const base64NotePrefix = Buffer.from(notePrefix).toString('base64');
-
-				// Search for transactions with the aramid-confirm prefix
-				// Use Voi indexer for Algorand->Voi bridges, and Algorand indexer for Voi->Algorand bridges
-				const indexerUrl = isVoiToAlgorand
-					? 'https://mainnet-idx.4160.nodely.dev'
-					: 'https://mainnet-idx.voi.nodely.dev';
-
-				// Use the correct destination address based on direction
-				const monitorAddress = isVoiToAlgorand ? algorandDestinationAddress : voiDestinationAddress;
-
-				const response = await fetch(
-					`${indexerUrl}/v2/transactions?note-prefix=${encodeURIComponent(base64NotePrefix)}&address=${monitorAddress}&limit=1`
+		const result = await pollUntil<{ id: string }>({
+			intervalMs: 5000,
+			checkTimeoutMs: 15000,
+			deadlineMs: 30 * 60 * 1000,
+			signal: controller.signal,
+			check: async (signal) => {
+				const confirmation = await checkDestinationConfirmation(
+					{ getJson },
+					indexerBase,
+					expected,
+					signal
 				);
-
-				if (!response.ok) {
-					throw new Error('Failed to fetch transactions');
-				}
-
-				const data = await response.json();
-				const transactions = data.transactions || [];
-
-				for (const tx of transactions) {
-					try {
-						const noteString = new TextDecoder().decode(Buffer.from(tx.note, 'base64'));
-						if (!noteString.startsWith(notePrefix)) continue;
-
-						const noteData = JSON.parse(noteString.replace(notePrefix, ''));
-
-						// Check for the correct source network based on direction
-						const expectedSourceNetwork = isVoiToAlgorand ? 416101 : 416001;
-						if (
-							noteData.sourceTxId === sourceTxId &&
-							noteData.sourceNetwork === expectedSourceNetwork
-						) {
-							// Found the confirmation transaction
-							bridgeStatus = 'completed';
-							bridgeDetails = {
-								...bridgeDetails!,
-								destinationTxId: tx.id
-							};
-
-							// Clear both intervals
-							if (bridgeMonitorInterval) {
-								clearInterval(bridgeMonitorInterval);
-								bridgeMonitorInterval = undefined;
-							}
-							if (dotsInterval) {
-								clearInterval(dotsInterval);
-								dotsInterval = undefined;
-							}
-
-							// Trigger celebratory confetti
-							triggerCelebration();
-
-							return;
-						}
-					} catch (e) {
-						console.error('Error parsing note:', e);
-					}
-				}
-			} catch (error) {
-				console.error('Error checking destination transaction:', error);
-				// If there's an error, we might want to stop monitoring
-				if (error instanceof Error && error.message.includes('Failed to fetch')) {
-					if (bridgeMonitorInterval) {
-						clearInterval(bridgeMonitorInterval);
-						bridgeMonitorInterval = undefined;
-					}
-					if (dotsInterval) {
-						clearInterval(dotsInterval);
-						dotsInterval = undefined;
-					}
-				}
+				if (signal.aborted || controller.signal.aborted) return { done: false };
+				if (!confirmation.done && confirmation.review) monitorReview = confirmation.review;
+				return confirmation.done ? { done: true, value: confirmation.tx } : { done: false };
+			},
+			onReport: (report) => {
+				if (!controller.signal.aborted) monitorState = report.status;
 			}
-		};
+		});
+		if (controller.signal.aborted) return;
+		if (result.status === 'done') {
+			bridgeStatus = 'completed';
+			bridgeDetails = { ...bridgeDetails!, destinationTxId: result.value.id };
+			triggerCelebration();
+		} else if (result.status === 'timeout') {
+			monitorState = 'timeout';
+		}
+	}
 
-		// Check immediately and then every 5 seconds
-		await checkDestinationTx();
-		if (!bridgeMonitorInterval) {
-			// Only set if not already set
-			bridgeMonitorInterval = window.setInterval(checkDestinationTx, 5000);
+	function retryMonitoring() {
+		monitorController?.abort();
+		monitorReview = null;
+		monitorState = 'checking';
+		if (monitorExpected && monitorSourceTxId && monitorIndexerBase) {
+			void startBridgeMonitoring(monitorSourceTxId, monitorExpected, monitorIndexerBase);
 		}
 	}
 
@@ -633,11 +616,9 @@
 		shootConfetti();
 	}
 
-	// Clean up interval on component destroy
+	// Clean up monitoring on component destroy
 	onDestroy(() => {
-		if (bridgeMonitorInterval) {
-			clearInterval(bridgeMonitorInterval);
-		}
+		monitorController?.abort();
 		if (dotsInterval) {
 			clearInterval(dotsInterval);
 		}
@@ -648,10 +629,14 @@
 		bridgeStatus = 'idle';
 		bridgeDetails = null;
 		bridgeError = null;
-		startMonitoringRound = null;
-		if (bridgeMonitorInterval) {
-			clearInterval(bridgeMonitorInterval);
-		}
+		monitorState = 'checking';
+		monitorReview = null;
+		monitorExpected = undefined;
+		monitorSourceTxId = undefined;
+		monitorIndexerBase = undefined;
+		depositExpected = undefined;
+		depositState = { startRound: null };
+		monitorController?.abort();
 		if (dotsInterval) {
 			clearInterval(dotsInterval);
 		}
@@ -661,12 +646,11 @@
 		bridgeStatus = 'idle';
 		bridgeError = null;
 		bridgeDetails = null;
-		if (bridgeMonitorInterval) {
-			clearInterval(bridgeMonitorInterval);
-		}
+		monitorController?.abort();
 	}
 
 	function closeModal() {
+		monitorController?.abort();
 		tracker?.stop();
 		showCloseConfirm = false;
 		show = false;
@@ -995,90 +979,71 @@
 				? 'Insufficient balance in source address'
 				: '';
 
-	// Function to monitor Algorand transactions
-	async function monitorAlgorandTransactions() {
-		if (!isVoiToAlgorand) {
-			try {
-				// If modal is closed, decrement remaining checks
-				if (!showQrCode) {
-					remainingChecks--;
-					console.log(`Remaining checks: ${remainingChecks}`);
-				}
-
-				// Get the initial round only once when monitoring starts
-				if (startMonitoringRound === null) {
-					const status = await fetch('https://mainnet-idx.4160.nodely.dev/health');
-					if (!status.ok) {
-						throw new Error('Failed to fetch Algorand status');
+	async function monitorAlgorandTransactions(retry = false) {
+		monitorController?.abort();
+		const controller = new AbortController();
+		monitorController = controller;
+		monitorState = 'checking';
+		monitorReview = null;
+		if (!retry) {
+			depositState = { startRound: null };
+			depositExpected = {
+				assetId: Number(selectedToken.algorandAssetId),
+				bridgeAddress: BRIDGE_ADDRESS,
+				amount: amountInAtomicUnits,
+				destinationAddress: voiDestinationAddress,
+				sourceAddress: algorandSourceAddress || undefined
+			};
+		}
+		if (!depositExpected) return;
+		const expected = depositExpected;
+		const state = depositState;
+		remainingChecks = 3;
+		isMonitoringAlgorand = true;
+		const result = await pollUntil<{ id: string }>({
+			intervalMs: 5000,
+			checkTimeoutMs: 15000,
+			deadlineMs: 60 * 60 * 1000,
+			signal: controller.signal,
+			check: async (signal) => {
+				// Count attempts even when the indexer is unavailable, but finish the third check.
+				const finalCheck = !showQrCode && --remainingChecks <= 0;
+				let found = false;
+				try {
+					const deposit = await checkAlgorandDeposit(
+						{ getJson },
+						'https://mainnet-idx.4160.nodely.dev',
+						state,
+						expected,
+						signal
+					);
+					if (signal.aborted || controller.signal.aborted) return { done: false };
+					if (deposit.done) {
+						found = true;
+						return { done: true, value: deposit.tx };
 					}
-					const statusData = await status.json();
-					startMonitoringRound = Number(statusData.round);
-					console.log('Starting monitoring from round:', startMonitoringRound);
-					return; // Wait for next interval to start checking transactions
+					return { done: false };
+				} finally {
+					if (finalCheck && !found) controller.abort();
 				}
-
-				// Base64 encode the note prefix for aramid-transfer
-				const notePrefix = 'aramid-transfer/v1:j';
-				const base64NotePrefix = Buffer.from(notePrefix).toString('base64');
-
-				// Search for transactions with the aramid-transfer prefix after our start round
-				const response = await fetch(
-					`https://mainnet-idx.4160.nodely.dev/v2/transactions?note-prefix=${encodeURIComponent(base64NotePrefix)}&min-round=${startMonitoringRound}&limit=10`
-				);
-
-				if (!response.ok) {
-					throw new Error('Failed to fetch Algorand transactions');
-				}
-
-				const data = await response.json();
-				const transactions = data.transactions || [];
-
-				for (const tx of transactions) {
-					try {
-						// Decode and parse the note
-						const noteString = new TextDecoder().decode(Buffer.from(tx.note, 'base64'));
-						if (!noteString.startsWith(notePrefix)) continue;
-
-						const noteData = JSON.parse(noteString.replace(notePrefix, ''));
-
-						// Check if this transaction matches our expected parameters
-						if (
-							tx['asset-transfer-transaction']?.['asset-id'] ===
-								Number(selectedToken.algorandAssetId) &&
-							tx['asset-transfer-transaction'].receiver === BRIDGE_ADDRESS &&
-							tx['asset-transfer-transaction'].amount === amountInAtomicUnits &&
-							noteData.destinationAddress === voiDestinationAddress
-						) {
-							// If we have a source address, verify it matches
-							if (algorandSourceAddress && tx.sender !== algorandSourceAddress) {
-								continue;
-							}
-
-							// Found the bridge transaction
-							bridgeStatus = 'bridging';
-							bridgeDetails = {
-								sourceTxId: tx.id
-							};
-
-							// Clear the monitoring intervals
-							if (bridgeMonitorInterval) {
-								clearInterval(bridgeMonitorInterval);
-							}
-							if (dotsInterval) {
-								clearInterval(dotsInterval);
-							}
-
-							// Start monitoring for the Voi confirmation
-							startBridgeMonitoring(tx.id);
-							return;
-						}
-					} catch (error) {
-						console.error('Error parsing transaction note:', error);
-					}
-				}
-			} catch (error) {
-				console.error('Error monitoring Algorand transactions:', error);
+			},
+			onReport: (report) => {
+				if (!controller.signal.aborted) monitorState = report.status;
 			}
+		});
+		if (monitorController !== controller) return;
+		isMonitoringAlgorand = false;
+		if (dotsInterval) {
+			clearInterval(dotsInterval);
+			dotsInterval = undefined;
+		}
+		if (controller.signal.aborted) return;
+		if (result.status === 'done') {
+			bridgeStatus = 'bridging';
+			bridgeDetails = { sourceTxId: result.value.id };
+			void startBridgeMonitoring(result.value.id);
+		} else if (result.status === 'timeout') {
+			monitorState = 'timeout';
 		}
 	}
 
@@ -1089,50 +1054,13 @@
 
 	// Start monitoring when QR code is shown
 	$: if (showQrCode && !isVoiToAlgorand) {
-		isMonitoringAlgorand = true;
-		startMonitoringRound = null; // Reset the starting round
-		remainingChecks = 3; // Reset remaining checks
 		// Start dots animation
 		if (dotsInterval) {
 			clearInterval(dotsInterval);
 		}
 		dotsInterval = window.setInterval(updateDots, 500);
-		// Start monitoring Algorand transactions
-		if (bridgeMonitorInterval) {
-			clearInterval(bridgeMonitorInterval);
-		}
-		bridgeMonitorInterval = window.setInterval(monitorAlgorandTransactions, 5000);
-		monitorAlgorandTransactions(); // Check immediately
+		void monitorAlgorandTransactions();
 	}
-
-	// Handle QR modal closure
-	$: if (!showQrCode && isMonitoringAlgorand) {
-		// If we're still monitoring but modal is closed, start countdown
-		if (remainingChecks > 0) {
-			console.log(`QR modal closed. Will check ${remainingChecks} more times.`);
-		} else {
-			// No more checks remaining, clean up
-			if (bridgeMonitorInterval) {
-				clearInterval(bridgeMonitorInterval);
-				bridgeMonitorInterval = undefined;
-			}
-			if (dotsInterval) {
-				clearInterval(dotsInterval);
-				dotsInterval = undefined;
-			}
-			isMonitoringAlgorand = false;
-			console.log('Monitoring stopped after final checks.');
-		}
-	}
-
-	onDestroy(() => {
-		if (bridgeMonitorInterval) {
-			clearInterval(bridgeMonitorInterval);
-		}
-		if (dotsInterval) {
-			clearInterval(dotsInterval);
-		}
-	});
 
 	function handleOptInQrCodeClose() {
 		showOptInQrCode = false;
@@ -2031,6 +1959,16 @@
 											Monitoring for transaction on Algorand{monitoringDots}
 										</p>
 									{/if}
+									{#if monitorState === 'unavailable'}
+										<p class="text-sm text-gray-600 dark:text-gray-400" role="status">
+											Can't check Algorand right now. We will keep trying.
+										</p>
+										<button
+											type="button"
+											class="text-sm text-blue-600 dark:text-blue-400 underline"
+											on:click={() => monitorAlgorandTransactions(true)}>Retry</button
+										>
+									{/if}
 									<a
 										href={peraWalletUrl}
 										class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
@@ -2117,11 +2055,41 @@
 							<h4 class="text-lg font-medium text-gray-900 dark:text-white">
 								{bridgeStatus === 'bridging' ? 'Bridging in Progress' : 'Bridge Complete'}
 							</h4>
-							<p class="text-sm text-gray-500 dark:text-gray-400">
-								{bridgeStatus === 'bridging'
-									? 'Your tokens are being bridged...'
-									: 'Your tokens have been bridged successfully!'}
-							</p>
+							{#if bridgeStatus === 'bridging'}
+								{#if monitorState === 'unavailable'}
+									<p class="text-sm text-gray-500 dark:text-gray-400" role="status">
+										Can't check the bridge status right now. Your funds are in transit and we will
+										keep trying.
+									</p>
+								{:else if monitorState === 'timeout'}
+									<p class="text-sm text-gray-500 dark:text-gray-400" role="status">
+										We couldn't confirm this bridge from here. Your funds are in transit: check the
+										destination wallet or the explorer link below.
+									</p>
+								{:else}
+									<p class="text-sm text-gray-500 dark:text-gray-400">
+										Your tokens are being bridged...
+									</p>
+								{/if}
+								{#if monitorState === 'unavailable' || monitorState === 'timeout'}
+									<button
+										type="button"
+										class="text-sm text-blue-600 dark:text-blue-400 underline"
+										on:click={retryMonitoring}>Retry</button
+									>
+								{/if}
+								{#if monitorReview}
+									<p class="text-sm text-gray-500 dark:text-gray-400" role="status">
+										A transfer from the bridge arrived but not for the expected amount (expected {monitorReview.expected.toString()},
+										received {monitorReview.actual.toString()}, in the smallest unit). Check your
+										wallet before bridging again.
+									</p>
+								{/if}
+							{:else}
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									Your tokens have been bridged successfully!
+								</p>
+							{/if}
 						{:else if bridgeStatus === 'error'}
 							<h4 class="text-lg font-medium text-red-600 dark:text-red-400">Bridge Error</h4>
 							<p class="text-sm text-red-500 dark:text-red-400">

@@ -18,7 +18,7 @@ describe('BridgeModal monitoring wiring', () => {
 		expect(source).toMatch(/setInterval\(updateDots, 500\)/);
 		for (const name of ['pollUntil', 'checkDestinationConfirmation', 'checkAlgorandDeposit']) {
 			expect(source, `Import ${name}`).toMatch(new RegExp(`import[^;]*\\b${name}\\b[^;]*from`));
-			expect(source, `Call ${name}`).toMatch(new RegExp(`\\b${name}\\(`));
+			expect(source, `Call ${name}`).toMatch(new RegExp(`\\b${name}(?:<[^>]+>)?\\(`));
 		}
 	});
 	it('removes the one-result query and fetch-error stop path', () => {
@@ -33,9 +33,11 @@ describe('BridgeModal monitoring wiring', () => {
 		);
 	});
 	it('aborts monitoring on destruction', () => {
-		expect(source, 'Destroy must abort active requests').toMatch(
-			/onDestroy\(\(\) => \{[^]*?monitorController\?\.abort\(\)/
-		);
+		const callbacks = [...source.matchAll(/onDestroy\(\(\) => \{([^]*?)\n\t\}\);/g)];
+		expect(
+			callbacks.some((callback) => /monitorController\?\.abort\(\)/.test(callback[1])),
+			'Destroy must abort active requests inside its callback'
+		).toBe(true);
 	});
 	it.each([
 		"Can't check the bridge status right now",
