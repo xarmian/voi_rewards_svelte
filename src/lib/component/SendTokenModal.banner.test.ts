@@ -67,3 +67,25 @@ test('the banner is re-derived wherever rows change', () => {
 	const handler = source.match(/\tfunction handleRecipientError\([^]*?\n\t\}/)?.[0] ?? '';
 	expect(handler, 'A row-level success re-derives the banner').toContain('syncLookupBanner()');
 });
+
+test('combining duplicates re-derives the banner after its reset', () => {
+	const combine = source.match(/\tfunction combineRecipients\([^]*?\n\t\}/)?.[0] ?? '';
+	const reset = combine.indexOf('error = null;');
+	expect(reset, 'Combining resets stale messages').toBeGreaterThan(-1);
+	expect(
+		combine.indexOf('syncLookupBanner()'),
+		'A surviving row can still hold a lookup error: re-raise the banner after the reset'
+	).toBeGreaterThan(reset);
+});
+
+test('the helper comment states the precedence it implements', () => {
+	const comment =
+		source.match(/\t\/\/ The banner follows the rows:[^]*?\n\tfunction syncLookupBanner/)?.[0] ??
+		'';
+	expect(comment, 'Say that a lookup failure takes precedence over another message').toMatch(
+		/takes precedence/
+	);
+	expect(comment, 'The old comment promised an unrelated error is never overwritten').not.toMatch(
+		/never overwritten/
+	);
+});
