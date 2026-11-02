@@ -361,15 +361,7 @@
 		recipients = recipients.filter((_, i) => i !== index);
 	}
 
-	async function fetchRecipientInfo(address: string, row: Recipient) {
-		if (row.address !== address) return;
-		row.lookupId = nextLookupId();
-		const ticket = row.lookupId;
-		row.isValid = false;
-		row.info = null;
-		row.lookupError = null;
-		row.isLoading = true;
-		recipients = [...recipients];
+	async function fetchRecipientInfo(address: string, ticket: number) {
 		const checkedToken = selectedToken;
 		const checkedTokenKey = tokenKey(checkedToken);
 		const token: RecipientTokenKind = isNativeToken(checkedToken)
@@ -393,35 +385,19 @@
 		if (!recipients.some((r) => r.address === address && r.isLoading && r.lookupId === ticket))
 			return;
 		recipients = applyRecipientLookup(recipients, address, ticket, result);
-		error = recipients.some((r) => r.lookupError)
-			? "Couldn't check this recipient. Sending is blocked until it can be checked."
-			: null;
+		if (recipients.some((r) => r.lookupError)) {
+			error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
+		} else if (
+			error === "Couldn't check this recipient. Sending is blocked until it can be checked."
+		) {
+			error = null;
+		}
 		if (result.status === 'loaded') {
 			notice = null;
 		} else {
 			console.error('Error fetching recipient info:', result.error);
 		}
 		recipients = [...recipients];
-	}
-
-	async function handleRecipientSelected(address: string, index: number) {
-		if (address === recipients[index].address) return;
-		recipients[index].lookupError = null;
-		if (address === '') {
-			recipients[index] = {
-				...recipients[index],
-				address: null,
-				info: null,
-				isValid: false,
-				isLoading: false,
-				lookupError: null
-			};
-			return;
-		}
-		recipients[index].address = address;
-		error = null;
-		notice = null;
-		await fetchRecipientInfo(address, recipients[index]);
 	}
 
 	function handleRecipientAmountChange(index: number, amount: string) {
@@ -437,7 +413,17 @@
 	}
 
 	function handleRecipientError(errorMessage: string | null) {
-		error = errorMessage;
+		if (errorMessage) {
+			error = errorMessage;
+			return;
+		}
+		if (recipients.some((r) => r.lookupError)) {
+			error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
+		} else if (
+			error === "Couldn't check this recipient. Sending is blocked until it can be checked."
+		) {
+			error = null;
+		}
 	}
 
 	async function buildVSATransaction(
@@ -992,15 +978,25 @@
 		open = false;
 	}
 
+	function invalidateRows(rows: Recipient[]) {
+		const work: { address: string; ticket: number }[] = [];
+		const invalidatedRows = rows.map((row) => {
+			const invalidated = {
+				...row,
+				lookupId: nextLookupId(),
+				isValid: false,
+				info: null,
+				lookupError: null,
+				isLoading: Boolean(row.address)
+			};
+			if (row.address) work.push({ address: row.address, ticket: invalidated.lookupId });
+			return invalidated;
+		});
+		return { rows: invalidatedRows, work };
+	}
+
 	async function handlePasteModalConfirm(importedRecipients: Recipient[]) {
-		const rows = importedRecipients.map((row) => ({
-			...row,
-			lookupId: nextLookupId(),
-			isValid: false,
-			info: null,
-			lookupError: null,
-			isLoading: Boolean(row.address)
-		}));
+		const { rows, work } = invalidateRows(importedRecipients);
 		// If we already have one empty recipient, remove it
 		if (recipients.length === 1 && !recipients[0].address) {
 			recipients = rows;
@@ -1015,8 +1011,8 @@
 
 		error = null;
 		notice = null;
-		await runBounded(rows, 4, async (row) => {
-			if (row.address) await fetchRecipientInfo(row.address, row);
+		await runBounded(work, 4, async ({ address, ticket }) => {
+			await fetchRecipientInfo(address, ticket);
 		});
 	}
 
@@ -1031,20 +1027,10 @@
 	}
 
 	async function recheckRecipients() {
-		recipients = recipients.map((row) =>
-			row.address
-				? {
-						...row,
-						lookupId: nextLookupId(),
-						isValid: false,
-						info: null,
-						lookupError: null,
-						isLoading: true
-					}
-				: row
-		);
-		await runBounded(recipients, 4, async (row) => {
-			if (row.address) await fetchRecipientInfo(row.address, row);
+		const { rows, work } = invalidateRows(recipients);
+		recipients = rows;
+		await runBounded(work, 4, async ({ address, ticket }) => {
+			await fetchRecipientInfo(address, ticket);
 		});
 	}
 
