@@ -1,0 +1,888 @@
+{
+	"eslint": {
+		"src/lib/component/BridgeAnimation.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/BridgeModal.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/CalculatorComponent.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 16,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ClaimableTokenCard.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/EpochComponent.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 4,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/FungibleToken.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"no-loss-of-precision": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ImportRecipientsModal.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 9,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 8,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/LockVestComponent.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/NodeComponent.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 6,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/OptOutModal.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/PortfolioComponent.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 12,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 4,
+				"warnings": 0
+			},
+			"no-case-declarations": {
+				"errors": 6,
+				"warnings": 0
+			},
+			"svelte/no-at-html-tags": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/PortfolioSectionNFT.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"no-case-declarations": {
+				"errors": 6,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/Project.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 4,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ProposalsComponent.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 10,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/QuestCard.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/QuestComponent.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/RecipientRow.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/RegisterVoteKey.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 5,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/SendTokenModal.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/TokenTransfersModal.svelte": {
+			"@typescript-eslint/no-unused-expressions": {
+				"errors": 5,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/WalletSearch.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/WithdrawModal.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/Collection.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"no-unreachable": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 5,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/Modal.svelte": {
+			"svelte/no-unused-svelte-ignore": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/Share.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/StakingComponent.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"svelte/no-at-html-tags": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/TokenCard.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/TokenDetail.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/TokenTransactionHistory.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 4,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/CommandPalette.svelte": {
+			"svelte/no-unused-svelte-ignore": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/EpochChart.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/EpochStats.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 8,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/EpochTable.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/OHLCVChart.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 9,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/PoolDetails.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/PoolSelector.svelte": {
+			"no-undef": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/TokenMetricsBar.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 6,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"no-unreachable": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/TransactionCountsChart.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/ecosystem/ProjectCard.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/wallet/AccountInfo.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/ds/ChartFrame/ChartFrame.svelte": {
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/ds/Header/MobileMenu.svelte": {
+			"svelte/no-unused-svelte-ignore": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/server/markets/pairs.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/server/markets/priceMap.ts": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/server/markets/rows.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 4,
+				"warnings": 0
+			}
+		},
+		"src/lib/server/markets/sources.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/utils/chart-adapters.ts": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"prefer-const": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/utils/vestige.ts": {
+			"@typescript-eslint/no-empty-object-type": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/HomeRewards.svelte": {
+			"svelte/valid-compile": {
+				"errors": 12,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/about/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/directory/[...category]/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/faq/+page.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 6,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/how_to_node/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/leaderboard/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/leaderboard/Leaderboard.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/markets/+page.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 4,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-expressions": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 12,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/markets/+page.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"no-empty": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/phase1/+page.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/phase2/[...slug]/+page.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 4,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/privacy/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/quests/ProjectModal.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/quests/ProjectSlideout.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/quests/QuestsPage.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/relays/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/vanity/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/wallet/[...id]/+page.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"src/routes/+layout.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"no-empty": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/api/markets/+server.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/api/ohlcv/+server.ts": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/api/pool-analytics/+server.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/api/token-analytics/+server.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/api/token-info/+server.ts": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/arc72/+layout.svelte": {
+			"svelte/valid-compile": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/arc72/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"src/routes/arc72/collection/[cid]/+page.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 4,
+				"warnings": 0
+			}
+		},
+		"src/routes/arc72/collection/[cid]/token/[tokenid]/+page.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/arc72/portfolio/[id]/+page.svelte": {
+			"@typescript-eslint/no-explicit-any": {
+				"errors": 4,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"supabase/functions/fetch-market-data-test/index.ts": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"supabase/functions/fetch-market-data/index.ts": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"tailwind.config.js": {
+			"@typescript-eslint/no-require-imports": {
+				"errors": 1,
+				"warnings": 0
+			}
+		}
+	},
+	"svelte-check": {
+		"src/lib/component/CalculatorComponent.svelte": {
+			"svelte:export_let_unused": {
+				"errors": 0,
+				"warnings": 2
+			}
+		},
+		"src/lib/component/Project.svelte": {
+			"ts:2339": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"ts:2538": {
+				"errors": 11,
+				"warnings": 0
+			},
+			"ts:2769": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:7006": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:7053": {
+				"errors": 6,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ProjectBox.svelte": {
+			"ts:7053": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/RegisterVoteKey.svelte": {
+			"ts:7006": {
+				"errors": 5,
+				"warnings": 0
+			}
+		},
+		"src/lib/component/ui/Collection.svelte": {
+			"svelte:a11y_click_events_have_key_events": {
+				"errors": 0,
+				"warnings": 1
+			},
+			"svelte:a11y_missing_attribute": {
+				"errors": 0,
+				"warnings": 3
+			},
+			"svelte:a11y_no_static_element_interactions": {
+				"errors": 0,
+				"warnings": 1
+			}
+		},
+		"src/lib/component/ui/TokenCard.svelte": {
+			"svelte:a11y_no_static_element_interactions": {
+				"errors": 0,
+				"warnings": 1
+			}
+		},
+		"src/lib/component/ui/TokenDetail.svelte": {
+			"svelte:a11y_missing_attribute": {
+				"errors": 0,
+				"warnings": 1
+			}
+		},
+		"src/lib/components/OHLCVChart.svelte": {
+			"svelte:element_invalid_self_closing_tag": {
+				"errors": 0,
+				"warnings": 1
+			},
+			"ts:2322": {
+				"errors": 3,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/TokenMetricsBar.svelte": {
+			"ts:2345": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/TokenSelector.svelte": {
+			"ts:18047": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"ts:2339": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"ts:2345": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/components/TransactionCountsChart.svelte": {
+			"ts:2339": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"ts:2353": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/lib/ds/ChartFrame/ChartFrame.svelte": {
+			"svelte:a11y_no_static_element_interactions": {
+				"errors": 0,
+				"warnings": 1
+			}
+		},
+		"src/routes/(site)/HomeRewards.svelte": {
+			"svelte:state_referenced_locally": {
+				"errors": 0,
+				"warnings": 12
+			}
+		},
+		"src/routes/(site)/faq/+page.svelte": {
+			"css:unknownAtRules": {
+				"errors": 0,
+				"warnings": 1
+			},
+			"ts:18046": {
+				"errors": 3,
+				"warnings": 0
+			},
+			"ts:2345": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/markets/+page.svelte": {
+			"ts:2345": {
+				"errors": 2,
+				"warnings": 0
+			},
+			"ts:2739": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:2741": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/phase1/+page.svelte": {
+			"svelte:a11y_consider_explicit_label": {
+				"errors": 0,
+				"warnings": 1
+			},
+			"ts:2322": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:2532": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/phase2/[...slug]/+page.svelte": {
+			"css:unknownAtRules": {
+				"errors": 0,
+				"warnings": 2
+			},
+			"svelte:css_unused_selector": {
+				"errors": 0,
+				"warnings": 4
+			},
+			"ts:18048": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:7053": {
+				"errors": 4,
+				"warnings": 0
+			}
+		},
+		"src/routes/arc72/+layout.svelte": {
+			"svelte:a11y_click_events_have_key_events": {
+				"errors": 0,
+				"warnings": 1
+			},
+			"svelte:a11y_no_static_element_interactions": {
+				"errors": 0,
+				"warnings": 1
+			}
+		},
+		"src/routes/arc72/collection/[cid]/token/[tokenid]/+page.svelte": {
+			"svelte:a11y_consider_explicit_label": {
+				"errors": 0,
+				"warnings": 1
+			}
+		}
+	}
+}
