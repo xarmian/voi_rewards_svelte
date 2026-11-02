@@ -7,7 +7,7 @@ export function nextLookupId(): number {
 	return ++lookupId;
 }
 
-export function tokenKey(t: { type: string; id?: string | number }): string {
+export function tokenKey(t: { type?: string; id?: string | number }): string {
 	return t.type === 'native' ? 'native' : `${t.type}:${t.id}`;
 }
 
