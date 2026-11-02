@@ -1,6 +1,16 @@
 import { snapshotFromAlgodAccount } from '../portfolio/accountDetails';
 import type { Recipient } from '../types/recipients';
 
+let lookupId = 0;
+
+export function nextLookupId(): number {
+	return ++lookupId;
+}
+
+export function tokenKey(t: { type: string; id?: string | number }): string {
+	return t.type === 'native' ? 'native' : `${t.type}:${t.id}`;
+}
+
 export type RecipientTokenKind =
 	| { kind: 'native' }
 	| { kind: 'vsa'; assetId: number }
@@ -13,10 +23,11 @@ export type RecipientInfoResult =
 export function applyRecipientLookup(
 	rows: Recipient[],
 	address: string,
+	lookupId: number,
 	result: RecipientInfoResult
 ): Recipient[] {
 	return rows.map((row) => {
-		if (row.address !== address || !row.isLoading) return row;
+		if (row.address !== address || !row.isLoading || row.lookupId !== lookupId) return row;
 		return {
 			...row,
 			info: result.status === 'loaded' ? result.info : null,

@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { requireAccountInfo } from '$lib/stores/accounts';
-	import { loadRecipientInfo, type RecipientTokenKind } from '$lib/chain/recipientInfo';
+	import {
+		loadRecipientInfo,
+		nextLookupId,
+		tokenKey,
+		type RecipientTokenKind
+	} from '$lib/chain/recipientInfo';
 	import { Input } from 'flowbite-svelte';
 	import WalletSearch from './WalletSearch.svelte';
 	import type { FungibleTokenType } from '$lib/types/assets';
@@ -68,44 +73,52 @@
 	}
 
 	async function fetchRecipientInfo(address: string) {
+		recipient.lookupId = nextLookupId();
+		const ticket = recipient.lookupId;
+		const checkedToken = selectedToken;
+		const checkedTokenKey = tokenKey(checkedToken);
 		recipient.isValid = false;
 		recipient.info = null;
 		recipient.lookupError = null;
 		recipient.isLoading = true;
-		try {
-			const token: RecipientTokenKind = isNativeToken(selectedToken)
-				? { kind: 'native' }
-				: isARC200Token(selectedToken)
-					? { kind: 'arc200' }
-					: { kind: 'vsa', assetId: Number(selectedToken.id) };
-			const result = await loadRecipientInfo(address, token, {
-				fetchAccount: async (a) =>
-					(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
-				arc200BalanceOf: async (a) => {
-					const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer);
-					const balance = await contract.arc200_balanceOf(a);
-					return {
-						success: balance.success,
-						returnValue: balance.success ? balance.returnValue : undefined
-					};
-				}
-			});
-			if (recipient.address !== address) return;
-			if (result.status === 'loaded') {
-				recipient.info = result.info;
-				recipient.isValid = true;
-				recipient.lookupError = null;
-				onError(null);
-			} else {
-				console.error('Error fetching recipient info:', result.error);
-				recipient.info = null;
-				recipient.isValid = false;
-				recipient.lookupError = result.error;
-				onError("Couldn't check this recipient. Sending is blocked until it can be checked.");
+		const token: RecipientTokenKind = isNativeToken(checkedToken)
+			? { kind: 'native' }
+			: isARC200Token(checkedToken)
+				? { kind: 'arc200' }
+				: { kind: 'vsa', assetId: Number(checkedToken.id) };
+		const result = await loadRecipientInfo(address, token, {
+			fetchAccount: async (a) =>
+				(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+			arc200BalanceOf: async (a) => {
+				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
+				const balance = await contract.arc200_balanceOf(a);
+				return {
+					success: balance.success,
+					returnValue: balance.success ? balance.returnValue : undefined
+				};
 			}
-		} finally {
-			if (recipient.address === address) recipient.isLoading = false;
+		});
+		if (
+			!(
+				recipient.lookupId === ticket &&
+				recipient.address === address &&
+				tokenKey(selectedToken) === checkedTokenKey
+			)
+		)
+			return;
+		if (result.status === 'loaded') {
+			recipient.info = result.info;
+			recipient.isValid = true;
+			recipient.lookupError = null;
+			onError(null);
+		} else {
+			console.error('Error fetching recipient info:', result.error);
+			recipient.info = null;
+			recipient.isValid = false;
+			recipient.lookupError = result.error;
+			onError("Couldn't check this recipient. Sending is blocked until it can be checked.");
 		}
+		recipient.isLoading = false;
 	}
 
 	async function handleRecipientSelected(address: string) {

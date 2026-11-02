@@ -8,6 +8,7 @@ export interface Recipient {
 		assetBalance?: number;
 	} | null;
 	isLoading: boolean;
+	lookupId?: number;
 	isValid: boolean;
 	lookupError?: string | null;
 }

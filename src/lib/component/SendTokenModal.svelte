@@ -3,6 +3,8 @@
 	import {
 		applyRecipientLookup,
 		loadRecipientInfo,
+		nextLookupId,
+		tokenKey,
 		type RecipientTokenKind
 	} from '$lib/chain/recipientInfo';
 	import { runBounded } from '$lib/chain/boundedPool';
@@ -361,6 +363,8 @@
 
 	async function fetchRecipientInfo(address: string, row: Recipient) {
 		if (row.address !== address) return;
+		row.lookupId = nextLookupId();
+		const ticket = row.lookupId;
 		row.isValid = false;
 		row.info = null;
 		row.lookupError = null;
@@ -386,14 +390,16 @@
 			}
 		});
 		if (tokenKey(selectedToken) !== checkedTokenKey) return;
-		if (!recipients.some((r) => r.address === address && r.isLoading)) return;
-		recipients = applyRecipientLookup(recipients, address, result);
+		if (!recipients.some((r) => r.address === address && r.isLoading && r.lookupId === ticket))
+			return;
+		recipients = applyRecipientLookup(recipients, address, ticket, result);
+		error = recipients.some((r) => r.lookupError)
+			? "Couldn't check this recipient. Sending is blocked until it can be checked."
+			: null;
 		if (result.status === 'loaded') {
-			error = null;
 			notice = null;
 		} else {
 			console.error('Error fetching recipient info:', result.error);
-			error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
 		}
 		recipients = [...recipients];
 	}
@@ -989,6 +995,7 @@
 	async function handlePasteModalConfirm(importedRecipients: Recipient[]) {
 		const rows = importedRecipients.map((row) => ({
 			...row,
+			lookupId: nextLookupId(),
 			isValid: false,
 			info: null,
 			lookupError: null,
@@ -1023,13 +1030,18 @@
 		return token.type === 'arc200';
 	}
 
-	function tokenKey(t: SendToken): string {
-		return isNativeToken(t) ? 'native' : `${t.type}:${t.id}`;
-	}
-
 	async function recheckRecipients() {
 		recipients = recipients.map((row) =>
-			row.address ? { ...row, isValid: false, info: null, lookupError: null, isLoading: true } : row
+			row.address
+				? {
+						...row,
+						lookupId: nextLookupId(),
+						isValid: false,
+						info: null,
+						lookupError: null,
+						isLoading: true
+					}
+				: row
 		);
 		await runBounded(recipients, 4, async (row) => {
 			if (row.address) await fetchRecipientInfo(row.address, row);
@@ -1048,6 +1060,7 @@
 		if (toRetry.length === 0) return;
 		resetState();
 		recipients = toRetry;
+		void recheckRecipients();
 	}
 
 	function handleTokenChange(newToken: FungibleTokenType) {
