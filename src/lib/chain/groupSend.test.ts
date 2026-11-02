@@ -50,7 +50,10 @@ describe('group retry safety', () => {
 			a,
 			{
 				pendingInfo: async () => ({}),
-				indexerSearch: async () => ({ 'current-round': 101, transactions: [] })
+				indexerSearch: async () => ({ 'current-round': 101, transactions: [] }),
+				// Expiry needs algod past the last valid round and an indexer that serves that block.
+				algodRound: async () => 101,
+				indexerHasBlock: async () => true
 			},
 			{ intervalMs: 1 }
 		);
