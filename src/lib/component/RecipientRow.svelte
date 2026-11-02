@@ -68,6 +68,9 @@
 	}
 
 	async function fetchRecipientInfo(address: string) {
+		recipient.isValid = false;
+		recipient.info = null;
+		recipient.lookupError = null;
 		recipient.isLoading = true;
 		try {
 			const token: RecipientTokenKind = isNativeToken(selectedToken)
@@ -87,6 +90,7 @@
 					};
 				}
 			});
+			if (recipient.address !== address) return;
 			if (result.status === 'loaded') {
 				recipient.info = result.info;
 				recipient.isValid = true;
@@ -100,7 +104,7 @@
 				onError("Couldn't check this recipient. Sending is blocked until it can be checked.");
 			}
 		} finally {
-			recipient.isLoading = false;
+			if (recipient.address === address) recipient.isLoading = false;
 		}
 	}
 

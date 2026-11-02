@@ -52,27 +52,64 @@ export interface AccountDetailsDeps {
 
 export async function loadAccountDetails(
 	address: string,
-	deps: AccountDetailsDeps
+	deps: AccountDetailsDeps,
+	options: {
+		onPart?: (
+			...part:
+				| ['account', Part<AccountSnapshot>]
+				| ['createdAt', Part<number>]
+				| ['rewards', Part<RewardsTransaction[]>]
+		) => void;
+		timeoutMs?: number;
+	} = {}
 ): Promise<{
 	account: Part<AccountSnapshot>;
 	createdAt: Part<number>;
 	rewards: Part<RewardsTransaction[]>;
 }> {
-	async function settle<T>(lookup: () => Promise<T>): Promise<Part<T>> {
+	const timeoutMs = options.timeoutMs ?? 15000;
+	async function settle<T>(
+		lookup: () => Promise<T>,
+		onPart: (result: Part<T>) => void
+	): Promise<Part<T>> {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let result: Part<T>;
 		try {
-			return { status: 'loaded', value: await lookup() };
+			const timeout = new Promise<never>((_, reject) => {
+				timer = setTimeout(() => {
+					reject(new Error(`timed out after ${timeoutMs / 1000}s`));
+				}, timeoutMs);
+			});
+			result = { status: 'loaded', value: await Promise.race([lookup(), timeout]) };
 		} catch (error) {
-			return {
+			result = {
 				status: 'unavailable',
 				error: error instanceof Error ? error.message : String(error)
 			};
+		} finally {
+			clearTimeout(timer);
 		}
+		try {
+			onPart(result);
+		} catch {
+			// A consumer callback must not interrupt the independent lookups.
+		}
+		return result;
 	}
 
 	const [account, createdAt, rewards] = await Promise.all([
-		settle(async () => snapshotFromAlgodAccount(await deps.fetchAccount(address))),
-		settle(() => deps.lookupCreatedAt(address)),
-		settle(() => deps.fetchRewardsTransactions(address))
+		settle(
+			async () => snapshotFromAlgodAccount(await deps.fetchAccount(address)),
+			(result) => options.onPart?.('account', result)
+		),
+		settle(
+			() => deps.lookupCreatedAt(address),
+			(result) => options.onPart?.('createdAt', result)
+		),
+		settle(
+			() => deps.fetchRewardsTransactions(address),
+			(result) => options.onPart?.('rewards', result)
+		)
 	]);
 	return { account, createdAt, rewards };
 }

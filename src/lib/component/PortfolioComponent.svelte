@@ -48,7 +48,7 @@
 	// and a token list fetched before the price landed has no VOI-derived USD until its re-fetch settles; all of
 	// that is loading, not $0 or unavailable. A failed re-fetch leaves those values unavailable.
 	let totalsReady = false;
-	$: totalsIncomplete = accountPart.status !== 'loaded';
+	$: totalsIncomplete = accountPart.status === 'unavailable';
 	let tokensPrice = 0;
 	$: usdPending =
 		!$voiPrice.error &&
@@ -328,101 +328,115 @@
 		voteKeyExpiryDate = undefined;
 		if (totalsReady) recomputeTotals();
 
-		const details = await loadAccountDetails(requestedWallet, {
-			fetchAccount: async (address) =>
-				(await requireAccountInfo(address, { force })) as unknown as Record<string, unknown>,
-			lookupCreatedAt: async (address) => {
-				const info = await algodIndexer.lookupAccountByID(address).do();
-				const block = await algodIndexer.lookupBlock(info.account['created-at-round']).do();
-				return block.timestamp;
-			},
-			fetchRewardsTransactions: fetchRewardsHistory
-		});
-		if (walletAddress !== requestedWallet) return;
-		accountPart = details.account;
-		createdAtPart = details.createdAt;
-		rewardsPart = details.rewards;
-
-		if (accountPart.status === 'loaded') {
-			const account = accountPart.value;
-			accountBalance = account.balance;
-			if (account.status === 'Online' && account.voteLastValid !== undefined) {
-				voteKeyExpiry = (account.voteLastValid - account.round) * 3.3; // 3.3 seconds per block
-				voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
-			}
-		}
-		if (createdAtPart.status === 'loaded') {
-			accountCreationDate = new Date(createdAtPart.value * 1000).toLocaleDateString();
-			accountCreationDateDays = Math.floor(
-				(new Date().getTime() - new Date(accountCreationDate).getTime()) / (1000 * 60 * 60 * 24)
-			);
-		}
-		if (rewardsPart.status === 'loaded') {
-			rewardsHistory = rewardsPart.value;
-			totalRewards = totalRewardsMicroVoi(rewardsHistory);
-		}
-		if (totalsReady) recomputeTotals();
-
-		// Fetch Envoi name
-		try {
-			const envoiResults = await getEnvoiNames([walletAddress]);
-			envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
-			envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
-		} catch (err) {
-			console.error('Error fetching Envoi name:', err);
-		}
-
-		// Calculate rewards using epoch data
-		try {
-			const dates = await dataTable.fetchDateRanges();
-			const epochSummary = await fetch(
-				`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${walletAddress}`
-			).then((r) => r.json());
-			const [supplyData] = await Promise.all([getSupplyInfo()]);
-
-			if (!supplyData) {
-				throw new Error('Failed to fetch supply data');
+		const epochLoading = (async (walletAddress: string) => {
+			// Fetch Envoi name
+			try {
+				const envoiResults = await getEnvoiNames([walletAddress]);
+				envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
+				envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
+			} catch (err) {
+				console.error('Error fetching Envoi name:', err);
 			}
 
-			const epochPromises = dates.map(async (date: any) => {
-				const [startStr] = date.id.split('-');
-				const formattedDate = `${startStr.slice(0, 4)}-${startStr.slice(4, 6)}-${startStr.slice(6, 8)}T00:00:00Z`;
-				const snapshots = epochSummary.snapshots ? epochSummary.snapshots : epochSummary;
+			// Calculate rewards using epoch data
+			try {
+				const dates = await dataTable.fetchDateRanges();
+				const epochSummary = await fetch(
+					`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${walletAddress}`
+				).then((r) => r.json());
+				const [supplyData] = await Promise.all([getSupplyInfo()]);
 
-				const epochData = snapshots.find((e: any) => e.start_date === formattedDate);
-				if (!epochData) return null;
+				if (!supplyData) {
+					throw new Error('Failed to fetch supply data');
+				}
 
-				const tokens = await getTokensByEpoch(date.epoch);
-				const { totalBlocksProduced, userBlocksProduced, expectedReward } = calculateEpochRewards(
-					epochData,
-					date.epoch,
-					epochData.proposers[walletAddress],
-					tokens
+				const epochPromises = dates.map(async (date: any) => {
+					const [startStr] = date.id.split('-');
+					const formattedDate = `${startStr.slice(0, 4)}-${startStr.slice(4, 6)}-${startStr.slice(6, 8)}T00:00:00Z`;
+					const snapshots = epochSummary.snapshots ? epochSummary.snapshots : epochSummary;
+
+					const epochData = snapshots.find((e: any) => e.start_date === formattedDate);
+					if (!epochData) return null;
+
+					const tokens = await getTokensByEpoch(date.epoch);
+					const { totalBlocksProduced, userBlocksProduced, expectedReward } = calculateEpochRewards(
+						epochData,
+						date.epoch,
+						epochData.proposers[walletAddress],
+						tokens
+					);
+
+					return {
+						epoch: date.epoch,
+						startDate: new Date(epochData.start_date),
+						endDate: new Date(epochData.end_date),
+						expectedReward,
+						totalBlocksProduced,
+						userBlocksProduced
+					};
+				});
+
+				epochData = (await Promise.all(epochPromises)).filter(
+					(data): data is NonNullable<typeof data> => data !== null
 				);
 
-				return {
-					epoch: date.epoch,
-					startDate: new Date(epochData.start_date),
-					endDate: new Date(epochData.end_date),
-					expectedReward,
-					totalBlocksProduced,
-					userBlocksProduced
-				};
-			});
+				// Calculate current epoch rewards
+				const now = new Date();
+				const currentEpoch = epochData.find(
+					(epoch) => now >= epoch.startDate && now <= epoch.endDate
+				);
+				currentEpochRewards = currentEpoch?.expectedReward ?? 0;
+			} catch (err) {
+				console.error('Error calculating rewards:', err);
+			}
+		})(requestedWallet);
 
-			epochData = (await Promise.all(epochPromises)).filter(
-				(data): data is NonNullable<typeof data> => data !== null
-			);
-
-			// Calculate current epoch rewards
-			const now = new Date();
-			const currentEpoch = epochData.find(
-				(epoch) => now >= epoch.startDate && now <= epoch.endDate
-			);
-			currentEpochRewards = currentEpoch?.expectedReward ?? 0;
-		} catch (err) {
-			console.error('Error calculating rewards:', err);
-		}
+		await loadAccountDetails(
+			requestedWallet,
+			{
+				fetchAccount: async (address) =>
+					(await requireAccountInfo(address, { force })) as unknown as Record<string, unknown>,
+				lookupCreatedAt: async (address) => {
+					const info = await algodIndexer.lookupAccountByID(address).do();
+					const block = await algodIndexer.lookupBlock(info.account['created-at-round']).do();
+					return block.timestamp;
+				},
+				fetchRewardsTransactions: fetchRewardsHistory
+			},
+			{
+				onPart: (part, result) => {
+					if (walletAddress !== requestedWallet) return;
+					if (part === 'account') {
+						accountPart = result;
+						if (accountPart.status === 'loaded') {
+							const account = accountPart.value;
+							accountBalance = account.balance;
+							if (account.status === 'Online' && account.voteLastValid !== undefined) {
+								voteKeyExpiry = (account.voteLastValid - account.round) * 3.3; // 3.3 seconds per block
+								voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
+							}
+						}
+						if (totalsReady) recomputeTotals();
+					} else if (part === 'createdAt') {
+						createdAtPart = result;
+						if (createdAtPart.status === 'loaded') {
+							accountCreationDate = new Date(createdAtPart.value * 1000).toLocaleDateString();
+							accountCreationDateDays = Math.floor(
+								(new Date().getTime() - new Date(accountCreationDate).getTime()) /
+									(1000 * 60 * 60 * 24)
+							);
+						}
+					} else {
+						rewardsPart = result;
+						if (rewardsPart.status === 'loaded') {
+							rewardsHistory = rewardsPart.value;
+							totalRewards = totalRewardsMicroVoi(rewardsHistory);
+						}
+					}
+				}
+			}
+		);
+		await epochLoading;
 	}
 
 	function retryAccountDetails() {

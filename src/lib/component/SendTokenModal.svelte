@@ -355,7 +355,12 @@
 	}
 
 	async function fetchRecipientInfo(address: string, index: number) {
+		const requestedRecipient = recipients[index];
+		recipients[index].isValid = false;
+		recipients[index].info = null;
+		recipients[index].lookupError = null;
 		recipients[index].isLoading = true;
+		recipients = [...recipients];
 		try {
 			const token: RecipientTokenKind = isNativeToken(selectedToken)
 				? { kind: 'native' }
@@ -374,6 +379,8 @@
 					};
 				}
 			});
+			if (recipients[index]?.address !== address || recipients[index] !== requestedRecipient)
+				return;
 			if (result.status === 'loaded') {
 				recipients[index].info = result.info;
 				recipients[index].isValid = true;
@@ -388,8 +395,10 @@
 				error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
 			}
 		} finally {
-			recipients[index].isLoading = false;
-			recipients = [...recipients]; // Force Svelte reactivity
+			if (recipients[index]?.address === address && recipients[index] === requestedRecipient) {
+				recipients[index].isLoading = false;
+				recipients = [...recipients]; // Force Svelte reactivity
+			}
 		}
 	}
 
