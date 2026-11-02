@@ -139,8 +139,9 @@ describe('snapshotFromAlgodAccount', () => {
 	});
 
 	test('omits voteLastValid without participation', () => {
-		const { participation: _participation, ...offline } = rawAccount;
-		expect(snapshotFromAlgodAccount({ ...offline, status: 'Offline' })).toEqual({
+		const offline: Record<string, unknown> = { ...rawAccount, status: 'Offline' };
+		delete offline.participation;
+		expect(snapshotFromAlgodAccount(offline)).toEqual({
 			balance: snapshot.balance,
 			status: 'Offline',
 			minBalance: snapshot.minBalance,
