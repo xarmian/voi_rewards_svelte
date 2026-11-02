@@ -39,9 +39,55 @@ function recipientLookup(file: string, loadRecipientInfo: ReturnType<typeof vi.f
 		onError,
 		run: (code: string) => runInContext(code, context),
 		lookup: (address: string) =>
-			runInContext(`fetchRecipientInfo('${address}', 0)`, context) as Promise<void>
+			runInContext(`fetchRecipientInfo('${address}', recipient)`, context) as Promise<void>
 	};
 }
+
+test.each(components)('%s stops loading and clears errors when the row is cleared', (file) => {
+	const source = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8');
+	const handler = source.match(/\tasync function handleRecipientSelected\([^]*?\n\t\}/)?.[0];
+	const clear = handler?.match(/if \(address === ''\) \{([^]*?)\n\t\t\}/)?.[1];
+	expect(clear, `Keep the clear-address branch in ${file}`).toBeDefined();
+	expect(clear, `Clearing ${file} must stop its loading indicator`).toMatch(
+		file === 'RecipientRow.svelte' ? /isLoading\s*=\s*false/ : /isLoading:\s*false/
+	);
+	expect(clear, `Clearing ${file} must remove its lookup error`).toMatch(
+		file === 'RecipientRow.svelte' ? /lookupError\s*=\s*null/ : /lookupError:\s*null/
+	);
+});
+
+test('SendTokenModal applies a result to its row after an earlier row is removed', async () => {
+	const pending = Promise.withResolvers<unknown>();
+	const { recipient, run, lookup } = recipientLookup(
+		'SendTokenModal.svelte',
+		vi.fn().mockReturnValue(pending.promise)
+	);
+	run('recipients.unshift({ address: "earlier" })');
+	const loading = lookup('old');
+	run('recipients.shift()');
+	const info = { balance: 456 };
+	pending.resolve({ status: 'loaded', info });
+	await loading;
+	expect(recipient).toMatchObject({ isValid: true, info, isLoading: false });
+});
+
+test('SendTokenModal drops a result when its row is replaced by one with the same address', async () => {
+	const pending = Promise.withResolvers<unknown>();
+	const { run, lookup } = recipientLookup(
+		'SendTokenModal.svelte',
+		vi.fn().mockReturnValue(pending.promise)
+	);
+	const loading = lookup('old');
+	run('recipients = [{ address: "old", info: null, isValid: false, isLoading: true }]');
+	pending.resolve({ status: 'loaded', info: { balance: 999 } });
+	await loading;
+	expect(run('recipients[0]')).toEqual({
+		address: 'old',
+		info: null,
+		isValid: false,
+		isLoading: true
+	});
+});
 
 for (const file of components) {
 	test.each(['loaded', 'unavailable'])(
