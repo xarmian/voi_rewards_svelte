@@ -127,9 +127,22 @@ function validateBaseline(baseline) {
 	}
 }
 
-export function main(args = process.argv.slice(2)) {
+export function main(args = process.argv.slice(2), deps = {}) {
 	const repoRoot = fileURLToPath(new URL('../', import.meta.url));
 	const baselinePath = resolve(repoRoot, 'scripts/quality-baseline.json');
+	const runCommand =
+		deps.run ??
+		((command, commandArgs, env) =>
+			spawnSync(command, commandArgs, {
+				cwd: repoRoot,
+				env,
+				encoding: 'utf8',
+				maxBuffer: 64 * 1024 * 1024
+			}));
+	const readBaseline = deps.readBaseline ?? (() => readFileSync(baselinePath, 'utf8'));
+	const writeBaseline = deps.writeBaseline ?? ((text) => writeFileSync(baselinePath, text));
+	const log = deps.log ?? console.log;
+	const logError = deps.error ?? console.error;
 	let baseline;
 	const current = {};
 	try {
@@ -138,7 +151,7 @@ export function main(args = process.argv.slice(2)) {
 		}
 		const update = args.includes('--update');
 		try {
-			baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+			baseline = JSON.parse(readBaseline());
 			validateBaseline(baseline);
 		} catch (error) {
 			if (!update || error.code !== 'ENOENT') throw error;
@@ -159,12 +172,7 @@ export function main(args = process.argv.slice(2)) {
 			env[name] = 'x';
 		}
 		const run = (command, commandArgs, expectedStatuses = [0]) => {
-			const result = spawnSync(command, commandArgs, {
-				cwd: repoRoot,
-				env,
-				encoding: 'utf8',
-				maxBuffer: 64 * 1024 * 1024
-			});
+			const result = runCommand(command, commandArgs, env);
 			if (result.error || !expectedStatuses.includes(result.status)) {
 				throw new Error(
 					`${command} ${commandArgs.join(' ')} failed (${result.error?.message ?? result.signal ?? result.status})\n${result.stderr ?? ''}`
@@ -194,11 +202,11 @@ export function main(args = process.argv.slice(2)) {
 		]) {
 			for (const change of changes) {
 				const { tool, file, severity, baseline: before, current: after } = change;
-				console.log(`${label} ${tool} ${file} ${severity} ${before} -> ${after}`);
+				log(`${label} ${tool} ${file} ${severity} ${before} -> ${after}`);
 				if (label === 'RISE') {
 					for (const diagnostic of diagnostics[tool]) {
 						if (diagnostic.file !== file || diagnostic.severity !== severity) continue;
-						console.log(
+						log(
 							`  ${file}:${diagnostic.line}:${diagnostic.column} ${diagnostic.message.split(/\r?\n/)[0]}`
 						);
 					}
@@ -206,26 +214,26 @@ export function main(args = process.argv.slice(2)) {
 			}
 		}
 		if (update) {
-			writeFileSync(baselinePath, serializeBaseline(comparison.nextBaseline));
-			console.log('quality-ratchet: updated; commit scripts/quality-baseline.json');
+			writeBaseline(serializeBaseline(comparison.nextBaseline));
+			log('quality-ratchet: updated; commit scripts/quality-baseline.json');
 			return 0;
 		}
 		if (comparison.failed) return 1;
 		if (comparison.drops.length) {
 			if (args.includes('--frozen')) {
-				console.log(
+				log(
 					'quality-ratchet: committed baseline is stale and must be lowered; run npm run check:ratchet and commit scripts/quality-baseline.json'
 				);
 				return 1;
 			}
-			writeFileSync(baselinePath, serializeBaseline(comparison.nextBaseline));
-			console.log('quality-ratchet: lowered baseline; commit scripts/quality-baseline.json');
+			writeBaseline(serializeBaseline(comparison.nextBaseline));
+			log('quality-ratchet: lowered baseline; commit scripts/quality-baseline.json');
 		} else {
-			console.log('quality-ratchet: equal');
+			log('quality-ratchet: equal');
 		}
 		return 0;
 	} catch (error) {
-		console.error(`quality-ratchet: ${error.message}`);
+		logError(`quality-ratchet: ${error.message}`);
 		return 2;
 	} finally {
 		const summary = tools.map((tool) => {
@@ -233,7 +241,7 @@ export function main(args = process.argv.slice(2)) {
 			const before = totals(baseline?.[tool]);
 			return `${tool} ${now.errors} errors ${now.warnings} warnings (baseline ${before.errors}/${before.warnings})`;
 		});
-		console.log(`quality-ratchet: ${summary.join('; ')}`);
+		log(`quality-ratchet: ${summary.join('; ')}`);
 	}
 }
 

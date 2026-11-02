@@ -25,6 +25,8 @@ Run `npm run check:ratchet` to check svelte-check and ESLint counts per file and
 lowered baseline with the fix. Use `npm run check:ratchet -- --frozen` to fail if a decrease has not
 been committed, or `npm run check:ratchet -- --update` to explicitly accept the current counts,
 including increases, for review in the baseline diff.
+A gate runs `npm run check:ratchet -- --frozen` on the committed tree, so a lowered baseline must be
+committed before the gate passes.
 
 ## Deployments
 
