@@ -28,6 +28,9 @@ export function parseSvelteCheck(
 	let completed = false;
 	for (const line of output.split('\n')) {
 		if (/^\d+ COMPLETED(?:\s|$)/.test(line)) completed = true;
+		if (/^\d+ (ERROR|WARNING)(?:\s|$)/.test(line)) {
+			throw new Error(`Malformed svelte-check diagnostic: ${line}`);
+		}
 		if (!/^\d+ \{/.test(line)) continue;
 		let diagnostic;
 		try {
@@ -81,7 +84,9 @@ export function parseEslint(output, repoRoot) {
 			}
 			diagnostics.push({
 				file,
-				identity: message.ruleId ?? `fatal:${message.message.split(/\r?\n/)[0]}`,
+				identity:
+					message.ruleId ??
+					`${message.fatal ? 'fatal' : 'norule'}:${message.message.split(/\r?\n/)[0]}`,
 				severity: message.fatal || message.severity === 2 ? 'errors' : 'warnings',
 				line: message.line ?? 0,
 				column: message.column ?? 0,

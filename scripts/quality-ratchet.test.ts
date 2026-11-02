@@ -338,18 +338,21 @@ describe('diagnostic identity regressions', () => {
 		expect(deps.writeBaseline).not.toHaveBeenCalled();
 	});
 
-	it.each(['100 {not json}', '100 {}', svelteDiagnostic({ start: null })])(
-		'rejects a malformed diagnostic-looking svelte-check line: %s',
-		(line) => {
-			const { deps, outputs } = mainFixture();
-			outputs['svelte-check'].stdout = `${line}\n${completed}`;
-			expect(main([], deps)).toBe(2);
-			expect(deps.error).toHaveBeenCalledWith(
-				expect.stringContaining('Malformed svelte-check diagnostic')
-			);
-			expect(deps.writeBaseline).not.toHaveBeenCalled();
-		}
-	);
+	it.each([
+		'100 {not json}',
+		'100 {}',
+		svelteDiagnostic({ start: null }),
+		'123 ERROR "src/a.ts" 1:2 "legacy shaped line"',
+		'123 WARNING "src/a.ts" 1:2 "legacy shaped line"'
+	])('rejects a malformed diagnostic-looking svelte-check line: %s', (line) => {
+		const { deps, outputs } = mainFixture();
+		outputs['svelte-check'].stdout = `${line}\n${completed}`;
+		expect(main([], deps)).toBe(2);
+		expect(deps.error).toHaveBeenCalledWith(
+			expect.stringContaining('Malformed svelte-check diagnostic')
+		);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+	});
 
 	it('ignores vite and npm noise and requests machine-verbose after preparation', () => {
 		const { deps, outputs } = mainFixture();
@@ -480,6 +483,21 @@ describe('ESLint JSON output', () => {
 			'/repo'
 		);
 		expect(result.counts).toEqual({ 'src/broken.ts': counts(1, 0, 'fatal:Parsing error') });
+	});
+
+	it('labels a rule-less non-fatal warning norule, not fatal', () => {
+		const result = parseEslint(
+			JSON.stringify([
+				{
+					filePath: '/repo/src/a.ts',
+					messages: [{ ruleId: null, severity: 1, message: 'Unused eslint-disable directive' }]
+				}
+			]),
+			'/repo'
+		);
+		expect(result.counts).toEqual({
+			'src/a.ts': counts(0, 1, 'norule:Unused eslint-disable directive')
+		});
 	});
 
 	it('rejects invalid JSON and invalid result shapes instead of returning zero', () => {
