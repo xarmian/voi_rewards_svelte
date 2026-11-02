@@ -85,3 +85,29 @@ test('Recipient info has lookupError and no unused creation date', () => {
 		/lookupError\?\s*:\s*string\s*\|\s*null/
 	);
 });
+
+test.each(components)(
+	'$file clears previous validation before checking a recipient',
+	({ source }) => {
+		const body = source.match(/\tasync function fetchRecipientInfo\([^]*?\n\t\}/)?.[0];
+		expect(body).toBeDefined();
+		const lookup = body!.indexOf('await loadRecipientInfo(');
+		const beforeLookup = body!.slice(0, lookup);
+		expect(lookup).toBeGreaterThan(-1);
+		expect(beforeLookup).toMatch(/\.isValid\s*=\s*false/);
+		expect(beforeLookup).toMatch(/\.info\s*=\s*null/);
+		expect(beforeLookup).toMatch(/\.lookupError\s*=\s*null/);
+	}
+);
+
+test.each(components)('$file drops stale recipient results before marking valid', ({ source }) => {
+	const body = source.match(/\tasync function fetchRecipientInfo\([^]*?\n\t\}/)?.[0];
+	expect(body).toBeDefined();
+	const lookup = body!.indexOf('await loadRecipientInfo(');
+	const valid = body!.indexOf('.isValid = true');
+	expect(lookup).toBeGreaterThan(-1);
+	expect(valid).toBeGreaterThan(lookup);
+	expect(body!.slice(lookup, valid)).toMatch(
+		/if\s*\([^)]*(?:recipient\.address|recipients\[index\]\?\.address)\s*!==\s*address[^)]*\)\s*(?:\{\s*)?return/
+	);
+});
