@@ -48,10 +48,13 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 	return { run: (code: string) => runInContext(code, context), error };
 }
 
-for (const [label, component, state] of [
-	['Send', 'SendTokenModal', 'showSendVoiModal'],
-	['Bridge', 'BridgeModal', 'showBridgeModal'],
-	['History', 'TokenTransfersModal', 'showVoiTransfersModal']
+// Sending needs a known balance: the Send handler refuses to open until the account part has loaded.
+const loadedAccount = `accountPart = { status: 'loaded', value: { balance: 5_000_000, status: 'Online', minBalance: 100000, pendingRewards: 0, round: 1 } }`;
+
+for (const [label, component, state, setup] of [
+	['Send', 'SendTokenModal', 'showSendVoiModal', loadedAccount],
+	['Bridge', 'BridgeModal', 'showBridgeModal', ''],
+	['History', 'TokenTransfersModal', 'showVoiTransfersModal', '']
 ]) {
 	// Read the actual button binding so an unwired handler cannot make this pass.
 	const handler = source.match(
@@ -62,6 +65,7 @@ for (const [label, component, state] of [
 		const pending = Promise.withResolvers<{ default: object }>();
 		const load = vi.fn(() => pending.promise);
 		const { run } = componentScript(load);
+		if (setup) run(setup);
 		expect(load).not.toHaveBeenCalled();
 		expect(handler).toBeDefined();
 		const first = run(`(${handler})()`);
@@ -82,11 +86,28 @@ for (const [label, component, state] of [
 		const failure = new Error('chunk unavailable');
 		const load = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue({ default: {} });
 		const { run, error } = componentScript(load);
+		if (setup) run(setup);
 		await run(`(${handler})()`);
 		expect(run(state)).toBe(false);
 		expect(error).toHaveBeenCalledWith(expect.any(String), failure);
 		await run(`(${handler})()`);
 		expect(load).toHaveBeenCalledTimes(2);
 		expect(run(state)).toBe(true);
+	});
+}
+
+for (const status of ['loading', 'unavailable']) {
+	test(`Send does not open while the account is ${status}`, async () => {
+		const load = vi.fn().mockResolvedValue({ default: {} });
+		const { run } = componentScript(load);
+		const handler = source.match(/on:click=\{([^}]+)\}[^>]*>\s*<i\b[^>]*><\/i>\s*Send\s*</)?.[1];
+		expect(handler).toBeDefined();
+		run(
+			status === 'loading'
+				? `accountPart = { status: 'loading' }`
+				: `accountPart = { status: 'unavailable', error: 'fetch failed' }`
+		);
+		await run(`(${handler})()`);
+		expect(run('showSendVoiModal'), 'a send needs a known balance').toBe(false);
 	});
 }
