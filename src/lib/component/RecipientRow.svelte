@@ -1,5 +1,11 @@
 <script lang="ts">
 	import { requireAccountInfo } from '$lib/stores/accounts';
+	import {
+		loadRecipientInfo,
+		nextLookupId,
+		tokenKey,
+		type RecipientTokenKind
+	} from '$lib/chain/recipientInfo';
 	import { Input } from 'flowbite-svelte';
 	import WalletSearch from './WalletSearch.svelte';
 	import type { FungibleTokenType } from '$lib/types/assets';
@@ -67,73 +73,63 @@
 	}
 
 	async function fetchRecipientInfo(address: string) {
+		recipient.lookupId = nextLookupId();
+		const ticket = recipient.lookupId;
+		const checkedToken = selectedToken;
+		const checkedTokenKey = tokenKey(checkedToken);
+		recipient.isValid = false;
+		recipient.info = null;
+		recipient.lookupError = null;
 		recipient.isLoading = true;
-		try {
-			let accountInfo;
-			let block;
-			try {
-				[accountInfo, block] = await Promise.all([
-					requireAccountInfo(address, { force: true }),
-					algodIndexer
-						.lookupAccountByID(address)
-						.do()
-						.then((info) => algodIndexer.lookupBlock(info.account['created-at-round']).do())
-				]);
-			} catch (err) {
-				// If account info fails, set defaults
-				accountInfo = { amount: 0, assets: [] };
-				block = { timestamp: Date.now() / 1000 };
+		const token: RecipientTokenKind = isNativeToken(checkedToken)
+			? { kind: 'native' }
+			: isARC200Token(checkedToken)
+				? { kind: 'arc200' }
+				: { kind: 'vsa', assetId: Number(checkedToken.id) };
+		const result = await loadRecipientInfo(address, token, {
+			fetchAccount: async (a) =>
+				(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+			arc200BalanceOf: async (a) => {
+				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
+				const balance = await contract.arc200_balanceOf(a);
+				return {
+					success: balance.success,
+					returnValue: balance.success ? balance.returnValue : undefined
+				};
 			}
-
-			let assetBalance = 0;
-			const hasOptedIn = isARC200Token(selectedToken)
-				? true
-				: (accountInfo.assets?.some((asset: any) => {
-						if (asset['asset-id'] === Number(selectedToken.id)) {
-							assetBalance = asset.amount;
-							return true;
-						}
-						return false;
-					}) ?? false);
-
-			// For ARC-200 tokens, fetch balance using the contract
-			if (isARC200Token(selectedToken)) {
-				try {
-					const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer);
-					const balance = await contract.arc200_balanceOf(address);
-					if (balance.success) {
-						assetBalance = Number(balance.returnValue);
-					}
-				} catch (err) {
-					assetBalance = 0;
-				}
-			}
-
-			recipient.info = {
-				balance: accountInfo.amount as number,
-				createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
-				hasOptedIn,
-				assetBalance
-			};
-
+		});
+		if (
+			!(
+				recipient.lookupId === ticket &&
+				recipient.address === address &&
+				tokenKey(selectedToken) === checkedTokenKey
+			)
+		)
+			return;
+		if (result.status === 'loaded') {
+			recipient.info = result.info;
 			recipient.isValid = true;
+			recipient.lookupError = null;
 			onError(null);
-		} catch (err) {
-			console.error('Error fetching recipient info:', err);
+		} else {
+			console.error('Error fetching recipient info:', result.error);
 			recipient.info = null;
 			recipient.isValid = false;
-			onError('Failed to fetch recipient info. Please try again later.');
-		} finally {
-			recipient.isLoading = false;
+			recipient.lookupError = result.error;
+			onError("Couldn't check this recipient. Sending is blocked until it can be checked.");
 		}
+		recipient.isLoading = false;
 	}
 
 	async function handleRecipientSelected(address: string) {
 		if (address === recipient.address) return;
+		recipient.lookupError = null;
 		if (address === '') {
 			recipient.address = null;
 			recipient.info = null;
 			recipient.isValid = false;
+			recipient.isLoading = false;
+			recipient.lookupError = null;
 			return;
 		}
 		recipient.address = address;
@@ -280,6 +276,17 @@
 									></path>
 								</svg>
 								Loading account details...
+							</div>
+						{:else if !recipient.info && recipient.lookupError}
+							<div class="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+								<span>Couldn't check this recipient.</span>
+								<button
+									type="button"
+									class="underline hover:no-underline"
+									on:click={() => recipient.address && fetchRecipientInfo(recipient.address)}
+								>
+									Retry
+								</button>
 							</div>
 						{:else if recipient.info}
 							<div class="space-y-2">

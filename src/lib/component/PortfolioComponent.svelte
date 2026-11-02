@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+	import { loadAccountDetails, totalRewardsMicroVoi } from '$lib/portfolio/accountDetails';
+	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
 	import PortfolioSectionNFT from './PortfolioSectionNFT.svelte';
 	import FungibleToken from './FungibleToken.svelte';
 	import ClaimableTokenCard from './ClaimableTokenCard.svelte';
@@ -26,12 +28,13 @@
 	export let parentWalletAddress: string | null = null;
 	export let walletAddress: string | undefined = undefined;
 
-	let accountBalance = 0;
+	let accountPart: Part<AccountSnapshot> | { status: 'loading' } = { status: 'loading' };
+	let createdAtPart: Part<number> | { status: 'loading' } = { status: 'loading' };
+	let rewardsPart: Part<RewardsTransaction[]> | { status: 'loading' } = { status: 'loading' };
+	$: accountBalance = accountPart.status === 'loaded' ? accountPart.value.balance : 0;
+	let loadGeneration = 0;
 	let accountCreationDate: string | null = null;
 	let accountCreationDateDays: number | null = null;
-	let accountStatus: string = 'Unknown';
-	let minBalance: number = 0;
-	let pendingRewards: number = 0;
 	let totalRewards: number = 0;
 	let envoiName: string | null = null;
 	let envoiAvatar: string | undefined = undefined;
@@ -46,19 +49,15 @@
 	// and a token list fetched before the price landed has no VOI-derived USD until its re-fetch settles; all of
 	// that is loading, not $0 or unavailable. A failed re-fetch leaves those values unavailable.
 	let totalsReady = false;
+	$: totalsIncomplete = accountPart.status === 'unavailable';
 	let tokensPrice = 0;
 	$: usdPending =
 		!$voiPrice.error &&
 		($voiPrice.price <= 0 || (isLoadingTokens && fungibleTokens.length > 0 && tokensPrice <= 0));
-	$: totalsPending = !totalsReady || (isLoadingTokens && fungibleTokens.length === 0);
-
-	interface Transaction {
-		'payment-transaction'?: {
-			amount: number;
-		};
-		sender: string;
-		'confirmed-round': number;
-	}
+	$: totalsPending =
+		accountPart.status === 'loading' ||
+		!totalsReady ||
+		(isLoadingTokens && fungibleTokens.length === 0);
 
 	let asaTokens: ASAToken[] = [];
 
@@ -85,6 +84,7 @@
 	let tokenSearchQuery = '';
 	let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
 	let showSendVoiModal = false;
+	let sendVoiBalance = 0;
 	let lastInitializedWallet: string | undefined;
 	let isLoadingPortfolio = false;
 	let isLoadingLPTokens = false;
@@ -141,6 +141,8 @@
 	}
 
 	async function openSendVoiModal() {
+		if (accountPart.status !== 'loaded') return;
+		sendVoiBalance = accountPart.value.balance;
 		try {
 			SendTokenModal ??= (await import('./SendTokenModal.svelte')).default;
 			showSendVoiModal = true;
@@ -198,11 +200,12 @@
 	}
 
 	function recomputeTotals() {
+		const voiBalance = accountPart.status === 'loaded' ? accountPart.value.balance / 1e6 : 0;
 		// Recalculate total value
 		totalValue =
 			fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
 			asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
-			accountBalance / 1e6;
+			voiBalance;
 
 		// Calculate total USD value separately
 		totalUsdValue =
@@ -215,7 +218,7 @@
 				return acc;
 			}, 0) +
 			// Add VOI balance USD value if VOI price is available
-			($voiPrice.price > 0 ? (accountBalance / 1e6) * $voiPrice.price : 0);
+			($voiPrice.price > 0 ? voiBalance * $voiPrice.price : 0);
 		totalsReady = true;
 	}
 
@@ -304,68 +307,40 @@
 		}
 	}
 
-	async function fetchRewardsHistory() {
-		if (!walletAddress) return [];
+	async function fetchRewardsHistory(address: string): Promise<RewardsTransaction[]> {
+		// Fetch all rewards transactions
+		const rewardsPromises = REWARDS_ADDRESSES.map((sender) =>
+			algodIndexer
+				.searchForTransactions()
+				.address(address)
+				.addressRole('receiver')
+				.beforeTime(new Date().toISOString())
+				.do()
+				.then((response) =>
+					response.transactions.filter((tx: { sender: string }) => tx.sender === sender)
+				)
+		);
 
-		try {
-			// Fetch all rewards transactions
-			const rewardsPromises = REWARDS_ADDRESSES.map((address) =>
-				algodIndexer
-					.searchForTransactions()
-					.address(walletAddress)
-					.addressRole('receiver')
-					.beforeTime(new Date().toISOString())
-					.do()
-					.then((response) =>
-						response.transactions.filter((tx: { sender: string }) => tx.sender === address)
-					)
-			);
-
-			const allTransactions = await Promise.all(rewardsPromises);
-			return allTransactions.flat() as Transaction[];
-		} catch (err) {
-			console.error('Error fetching rewards history:', err);
-			return [];
-		}
+		const allTransactions = await Promise.all(rewardsPromises);
+		return allTransactions.flat() as RewardsTransaction[];
 	}
 
-	async function fetchAccountDetails() {
+	async function fetchAccountDetails(force = false) {
+		const generation = ++loadGeneration;
 		if (!walletAddress) return;
+		const requestedWallet = walletAddress;
+		accountPart = { status: 'loading' };
+		createdAtPart = { status: 'loading' };
+		rewardsPart = { status: 'loading' };
+		voteKeyExpiry = undefined;
+		voteKeyExpiryDate = undefined;
+		if (totalsReady) recomputeTotals();
 
-		try {
-			// Fetch account information
-			const accountIndexerInfo = await algodIndexer.lookupAccountByID(walletAddress).do();
-			const account = await requireAccountInfo(walletAddress);
-			accountBalance = accountIndexerInfo.account.amount;
-			accountStatus = accountIndexerInfo.account.status || 'Offline';
-			minBalance = accountIndexerInfo.account['min-balance'] || 0;
-
-			// Calculate pending rewards
-			pendingRewards = accountIndexerInfo.account.rewards || 0;
-
-			// Calculate vote key expiry if account is online
-			if (accountStatus === 'Online' && account.participation) {
-				const currentRound = account.round as number;
-				const lastValidRound = (account.participation as unknown as Record<string, number>)[
-					'vote-last-valid'
-				];
-				voteKeyExpiry = (lastValidRound - currentRound) * 3.3; // 3.3 seconds per block
-				voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
-			}
-
-			// Fetch ASA tokens
-
-			const block = await algodIndexer
-				.lookupBlock(accountIndexerInfo.account['created-at-round'])
-				.do();
-			accountCreationDate = new Date(block.timestamp * 1000).toLocaleDateString();
-			accountCreationDateDays = Math.floor(
-				(new Date().getTime() - new Date(accountCreationDate).getTime()) / (1000 * 60 * 60 * 24)
-			);
-
+		const epochLoading = (async () => {
 			// Fetch Envoi name
 			try {
-				const envoiResults = await getEnvoiNames([walletAddress]);
+				const envoiResults = await getEnvoiNames([requestedWallet]);
+				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
 				envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
 				envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
 			} catch (err) {
@@ -376,7 +351,7 @@
 			try {
 				const dates = await dataTable.fetchDateRanges();
 				const epochSummary = await fetch(
-					`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${walletAddress}`
+					`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${requestedWallet}`
 				).then((r) => r.json());
 				const [supplyData] = await Promise.all([getSupplyInfo()]);
 
@@ -396,7 +371,7 @@
 					const { totalBlocksProduced, userBlocksProduced, expectedReward } = calculateEpochRewards(
 						epochData,
 						date.epoch,
-						epochData.proposers[walletAddress],
+						epochData.proposers[requestedWallet],
 						tokens
 					);
 
@@ -410,9 +385,11 @@
 					};
 				});
 
-				epochData = (await Promise.all(epochPromises)).filter(
+				const loadedEpochData = (await Promise.all(epochPromises)).filter(
 					(data): data is NonNullable<typeof data> => data !== null
 				);
+				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
+				epochData = loadedEpochData;
 
 				// Calculate current epoch rewards
 				const now = new Date();
@@ -420,22 +397,60 @@
 					(epoch) => now >= epoch.startDate && now <= epoch.endDate
 				);
 				currentEpochRewards = currentEpoch?.expectedReward ?? 0;
-
-				// Fetch and calculate total historical rewards
-				rewardsHistory = await fetchRewardsHistory();
-				totalRewards = rewardsHistory.reduce((sum, tx: Transaction) => {
-					if (tx['confirmed-round'] < 1520000) return sum;
-					if (tx['payment-transaction']) {
-						return sum + tx['payment-transaction'].amount;
-					}
-					return sum;
-				}, 0);
 			} catch (err) {
 				console.error('Error calculating rewards:', err);
 			}
-		} catch (err) {
-			console.error('Error fetching account details:', err);
-		}
+		})();
+
+		await loadAccountDetails(
+			requestedWallet,
+			{
+				fetchAccount: async (address) =>
+					(await requireAccountInfo(address, { force })) as unknown as Record<string, unknown>,
+				lookupCreatedAt: async (address) => {
+					const info = await algodIndexer.lookupAccountByID(address).do();
+					const block = await algodIndexer.lookupBlock(info.account['created-at-round']).do();
+					return block.timestamp;
+				},
+				fetchRewardsTransactions: fetchRewardsHistory
+			},
+			{
+				onPart: (part, result) => {
+					if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
+					if (part === 'account') {
+						accountPart = result;
+						if (accountPart.status === 'loaded') {
+							const account = accountPart.value;
+							if (account.status === 'Online' && account.voteLastValid !== undefined) {
+								voteKeyExpiry = (account.voteLastValid - account.round) * 3.3; // 3.3 seconds per block
+								voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
+							}
+						}
+						if (totalsReady) recomputeTotals();
+					} else if (part === 'createdAt') {
+						createdAtPart = result;
+						if (createdAtPart.status === 'loaded') {
+							accountCreationDate = new Date(createdAtPart.value * 1000).toLocaleDateString();
+							accountCreationDateDays = Math.floor(
+								(new Date().getTime() - new Date(accountCreationDate).getTime()) /
+									(1000 * 60 * 60 * 24)
+							);
+						}
+					} else {
+						rewardsPart = result;
+						if (rewardsPart.status === 'loaded') {
+							rewardsHistory = rewardsPart.value;
+							totalRewards = totalRewardsMicroVoi(rewardsHistory);
+						}
+					}
+				}
+			}
+		);
+		await epochLoading;
+	}
+
+	function retryAccountDetails() {
+		return fetchAccountDetails(true);
 	}
 
 	function formatNumber(value: number | undefined, decimals: number = 6): string {
@@ -809,6 +824,9 @@
 			<p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
 			<p class="text-2xl font-bold text-gray-900 dark:text-white">
 				{totalsPending ? '…' : formatNumber(totalValue)} VOI
+				{#if totalsIncomplete}
+					<span class="text-xs font-normal">incomplete: VOI balance unavailable</span>
+				{/if}
 			</p>
 			<p class="text-sm font-bold text-gray-900 dark:text-white">
 				{#if $voiPrice.price <= 0 && $voiPrice.error}
@@ -817,6 +835,9 @@
 					… USD
 				{:else}
 					${formatNumber(totalUsdValue)} USD
+					{#if totalsIncomplete}
+						<span class="text-xs font-normal">incomplete: VOI balance unavailable</span>
+					{/if}
 				{/if}
 			</p>
 			{#if tokensError && fungibleTokens.length === 0}
@@ -923,10 +944,10 @@
 					</div>
 				</div>
 				<div class="mt-4 md:mt-0 text-right place-self-end sm:place-self-start">
-					{#if walletAddress && accountStatus}
+					{#if accountPart.status === 'loaded' && walletAddress}
 						<ConsensusDetails
 							{walletAddress}
-							{accountStatus}
+							accountStatus={accountPart.value.status}
 							{accountBalance}
 							{voteKeyExpiry}
 							{voteKeyExpiryDate}
@@ -951,8 +972,12 @@
 							<button
 								on:click={openSendVoiModal}
 								class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-600"
-								disabled={!canSignTransactions}
-								title={!canSignTransactions ? 'Connect wallet to send tokens' : 'Send VOI'}
+								disabled={!canSignTransactions || accountPart.status !== 'loaded'}
+								title={accountPart.status !== 'loaded'
+									? 'Balance unavailable'
+									: !canSignTransactions
+										? 'Connect wallet to send tokens'
+										: 'Send VOI'}
 							>
 								<i class="fas fa-paper-plane"></i>
 								Send
@@ -972,7 +997,14 @@
 							<span class="text-gray-600 dark:text-gray-300">Available Balance</span>
 							<div class="flex items-center gap-3">
 								<span class="text-lg font-semibold text-gray-900 dark:text-white">
-									{(accountBalance / 1e6).toLocaleString()} VOI
+									{#if accountPart.status === 'loaded'}
+										{(accountBalance / 1e6).toLocaleString()} VOI
+									{:else if accountPart.status === 'loading'}
+										…
+									{:else}
+										Balance unavailable
+										<button on:click={retryAccountDetails} class="text-xs underline">Retry</button>
+									{/if}
 								</span>
 								<button
 									on:click={openVoiTransfersModal}
@@ -987,17 +1019,29 @@
 						<div class="flex justify-between items-center">
 							<span class="text-gray-600 dark:text-gray-300">Minimum Balance</span>
 							<span class="text-sm text-gray-500 dark:text-gray-400">
-								{(minBalance / 1e6).toLocaleString()} VOI
+								{#if accountPart.status === 'loaded'}
+									{(accountPart.value.minBalance / 1e6).toLocaleString()} VOI
+								{:else if accountPart.status === 'loading'}
+									…
+								{:else}
+									Minimum balance unavailable
+									<button on:click={retryAccountDetails} class="text-xs underline">Retry</button>
+								{/if}
 							</span>
 						</div>
-						{#if accountCreationDate}
+						{#if createdAtPart.status !== 'loading'}
 							<div
 								class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700"
 							>
 								<span class="text-gray-600 dark:text-gray-300">Account Created</span>
-								<span class="text-sm text-gray-500 dark:text-gray-400"
-									>{accountCreationDate} ({accountCreationDateDays} days ago)</span
-								>
+								<span class="text-sm text-gray-500 dark:text-gray-400">
+									{#if createdAtPart.status === 'loaded'}
+										{accountCreationDate} ({accountCreationDateDays} days ago)
+									{:else}
+										Unavailable (history service is not responding)
+										<button on:click={retryAccountDetails} class="text-xs underline">Retry</button>
+									{/if}
+								</span>
 							</div>
 						{/if}
 					</div>
@@ -1012,26 +1056,49 @@
 						<div class="flex justify-between items-center">
 							<span class="text-gray-600 dark:text-gray-300">Total Earned</span>
 							<span class="text-lg font-semibold text-gray-900 dark:text-white">
-								{(totalRewards / 1e6).toLocaleString()} VOI
+								{#if rewardsPart.status === 'loaded'}
+									{(totalRewards / 1e6).toLocaleString()} VOI
+								{:else if rewardsPart.status === 'loading'}
+									…
+								{:else}
+									Unavailable
+									<button on:click={retryAccountDetails} class="text-xs underline">Retry</button>
+								{/if}
 							</span>
 						</div>
 						<div class="flex justify-between items-center">
 							<span class="text-gray-600 dark:text-gray-300">Current Epoch</span>
 							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{(pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
+								{#if accountPart.status === 'loaded'}
+									{(accountPart.value.pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
+								{:else if accountPart.status === 'loading'}
+									…
+								{:else}
+									Unavailable
+								{/if}
 							</span>
 						</div>
 						<div
 							class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700"
 						>
 							<span class="text-gray-600 dark:text-gray-300">Total Transactions</span>
-							<a
-								href={`/wallet/${walletAddress}#epochs`}
-								on:click={handleEpochsClick}
-								class="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
-							>
-								{rewardsHistory.length}
-							</a>
+							{#if rewardsPart.status === 'loaded'}
+								<a
+									href={`/wallet/${walletAddress}#epochs`}
+									on:click={handleEpochsClick}
+									class="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+								>
+									{rewardsHistory.length}
+								</a>
+							{:else if rewardsPart.status === 'loading'}
+								<span>…</span>
+							{:else}
+								<span
+									>Unavailable <button on:click={retryAccountDetails} class="text-xs underline"
+										>Retry</button
+									></span
+								>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -1393,7 +1460,7 @@
 					>
 				</div>
 			{:else}
-				{#each sortTokens(filterTokens([...asaTokens.map( (t) => ({ ...t, tokenType: 'vsa' as const }) ), ...fungibleTokens
+				{#each sortTokens(filterTokens( [...asaTokens.map( (t) => ({ ...t, tokenType: 'vsa' as const }) ), ...fungibleTokens
 								.filter((t) => !isLPToken(t) && (showZeroBalances || t.balance > 0 || (t.approvals?.length ?? 0) > 0 || (t.outgoingApprovals?.length ?? 0) > 0))
 								.map( (t) => ({ ...t, tokenType: t.type === 'arc200' ? ('arc200' as const) : ('vsa' as const) }) )].filter( (t, i, arr) => {
 								// Get unique identifier based on token type and ID
@@ -1408,7 +1475,7 @@
 								const currentUniqueId = getUniqueId(t);
 								// Check if this unique ID appears earlier in the array
 								return !arr.slice(0, i).some((item) => getUniqueId(item) === currentUniqueId);
-							} ), selectedTokenType, tokenSearchQuery), selectedTokenSort, tokenSortDirection) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId || token.id}` : `arc200-${token.id}`)}
+							} ), selectedTokenType, tokenSearchQuery ), selectedTokenSort, tokenSortDirection) as token (token.tokenType === 'vsa' ? `vsa-${token.assetId || token.id}` : `arc200-${token.id}`)}
 					{@const details =
 						'assetId' in token ? asaDetails.find((d) => d.id === token.assetId) : null}
 					{@const tokenId = details ? details.id.toString() : token.id}
@@ -1448,7 +1515,7 @@
 					{/if}
 				{/each}
 
-				{#if filterTokens( [...asaTokens, ...fungibleTokens.filter((t) => !isLPToken(t))], selectedTokenType, tokenSearchQuery ).length === 0}
+				{#if filterTokens([...asaTokens, ...fungibleTokens.filter((t) => !isLPToken(t))], selectedTokenType, tokenSearchQuery).length === 0}
 					<div class="text-gray-500 dark:text-gray-400 text-center py-4 col-span-3">
 						No tokens found matching your criteria.
 					</div>
@@ -1476,7 +1543,7 @@
 			type: 'native',
 			symbol: 'VOI',
 			decimals: 6,
-			balance: accountBalance,
+			balance: sendVoiBalance,
 			name: 'Voi'
 		}}
 		tokens={fungibleTokens}
@@ -1489,6 +1556,7 @@
 	<svelte:component
 		this={TokenTransfersModal}
 		bind:open={showVoiTransfersModal}
+		balanceUnavailable={accountPart.status !== 'loaded'}
 		token={{
 			id: '0',
 			type: 'native',

@@ -17,6 +17,7 @@
 	import TransferRow from './TransferRow.svelte';
 
 	export let open = false;
+	export let balanceUnavailable = false;
 	export let token: FungibleTokenType | LPToken;
 	export let walletId: string;
 	export let currentPoolBalance: { tokenA: number; tokenB: number } | null = null;
@@ -256,9 +257,13 @@
 						{token.symbol} Transfers
 					</h2>
 					<div class="text-sm text-gray-600 dark:text-gray-300 mt-1">
-						Current Balance: <span class="font-medium"
-							>{token.balance / Math.pow(10, token.decimals)} {token.symbol}</span
-						>
+						Current Balance: <span class="font-medium">
+							{#if balanceUnavailable}
+								Balance unavailable
+							{:else}
+								{token.balance / Math.pow(10, token.decimals)} {token.symbol}
+							{/if}
+						</span>
 					</div>
 				</div>
 				<button

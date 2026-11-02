@@ -150,7 +150,7 @@
 		},
 		"src/lib/component/RecipientRow.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
+				"errors": 2,
 				"warnings": 0
 			}
 		},
@@ -162,11 +162,11 @@
 		},
 		"src/lib/component/SendTokenModal.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
+				"errors": 2,
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
+				"errors": 1,
 				"warnings": 0
 			}
 		},

@@ -1,5 +1,13 @@
 <script lang="ts">
 	import { requireAccountInfo } from '$lib/stores/accounts';
+	import {
+		applyRecipientLookup,
+		loadRecipientInfo,
+		nextLookupId,
+		tokenKey,
+		type RecipientTokenKind
+	} from '$lib/chain/recipientInfo';
+	import { runBounded } from '$lib/chain/boundedPool';
 	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
@@ -134,7 +142,7 @@
 
 	// Update the selected token when the token prop changes
 	$: if (token) {
-		selectedToken = token;
+		syncTokenProp(token);
 	}
 
 	// Update maxAmount when selected token changes
@@ -323,7 +331,7 @@
 	$: canSubmit =
 		recipients.every((r) => {
 			// Basic validation for all token types
-			const basicValidation = r.address && r.amount && r.isValid;
+			const basicValidation = r.address && r.amount && r.isValid && r.info !== null;
 			if (!basicValidation) return false;
 
 			// Additional validation for VSA (non-native, non-ARC200 tokens)
@@ -349,89 +357,56 @@
 		];
 	}
 
+	const LOOKUP_BANNER =
+		"Couldn't check this recipient. Sending is blocked until it can be checked.";
+
+	// The banner follows the rows: while any row has a lookup error it is shown and takes precedence
+	// over another message, because that failure blocks the send. It is cleared only when it is the
+	// banner itself, so an unrelated message is never cleared by this helper.
+	function syncLookupBanner() {
+		if (recipients.some((r) => r.lookupError)) {
+			error = LOOKUP_BANNER;
+		} else if (error === LOOKUP_BANNER) {
+			error = null;
+		}
+	}
+
 	function removeRecipient(index: number) {
 		recipients = recipients.filter((_, i) => i !== index);
+		syncLookupBanner();
 	}
 
-	async function fetchRecipientInfo(address: string, index: number) {
-		recipients[index].isLoading = true;
-		try {
-			let accountInfo;
-			let block;
-			try {
-				[accountInfo, block] = await Promise.all([
-					requireAccountInfo(address, { force: true }),
-					algodIndexer
-						.lookupAccountByID(address)
-						.do()
-						.then((info) => algodIndexer.lookupBlock(info.account['created-at-round']).do())
-				]);
-			} catch (err) {
-				// If account info fails, set defaults
-				accountInfo = { amount: 0, assets: [] };
-				block = { timestamp: Date.now() / 1000 };
+	async function fetchRecipientInfo(address: string, ticket: number) {
+		const checkedToken = selectedToken;
+		const checkedTokenKey = tokenKey(checkedToken);
+		const token: RecipientTokenKind = isNativeToken(checkedToken)
+			? { kind: 'native' }
+			: isARC200Token(checkedToken)
+				? { kind: 'arc200' }
+				: { kind: 'vsa', assetId: Number(checkedToken.id) };
+		const result = await loadRecipientInfo(address, token, {
+			fetchAccount: async (a) =>
+				(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+			arc200BalanceOf: async (a) => {
+				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
+				const balance = await contract.arc200_balanceOf(a);
+				return {
+					success: balance.success,
+					returnValue: balance.success ? balance.returnValue : undefined
+				};
 			}
-
-			let assetBalance = 0;
-			const hasOptedIn = isARC200Token(selectedToken)
-				? true
-				: (accountInfo.assets?.some((asset: any) => {
-						if (asset['asset-id'] === Number(selectedToken.id)) {
-							assetBalance = asset.amount;
-							return true;
-						}
-						return false;
-					}) ?? false);
-
-			// For ARC-200 tokens, fetch balance using the contract
-			if (isARC200Token(selectedToken)) {
-				try {
-					const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer);
-					const balance = await contract.arc200_balanceOf(address);
-					if (balance.success) {
-						assetBalance = Number(balance.returnValue);
-					}
-				} catch (err) {
-					assetBalance = 0;
-				}
-			}
-
-			recipients[index].info = {
-				balance: accountInfo.amount as number,
-				createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
-				hasOptedIn,
-				assetBalance
-			};
-
-			recipients[index].isValid = true;
-			error = null;
-			notice = null;
-		} catch (err) {
-			console.error('Error fetching recipient info:', err);
-			error = 'Failed to fetch recipient info. Please try again later.';
-			recipients[index].info = null;
-			recipients[index].isValid = false;
-		} finally {
-			recipients[index].isLoading = false;
-			recipients = [...recipients]; // Force Svelte reactivity
-		}
-	}
-
-	async function handleRecipientSelected(address: string, index: number) {
-		if (address === recipients[index].address) return;
-		if (address === '') {
-			recipients[index] = {
-				...recipients[index],
-				address: null,
-				info: null,
-				isValid: false
-			};
+		});
+		if (tokenKey(selectedToken) !== checkedTokenKey) return;
+		if (!recipients.some((r) => r.address === address && r.isLoading && r.lookupId === ticket))
 			return;
+		recipients = applyRecipientLookup(recipients, address, ticket, result);
+		syncLookupBanner();
+		if (result.status === 'loaded') {
+			notice = null;
+		} else {
+			console.error('Error fetching recipient info:', result.error);
 		}
-		recipients[index].address = address;
-		error = null;
-		notice = null;
-		await fetchRecipientInfo(address, index);
+		recipients = [...recipients];
 	}
 
 	function handleRecipientAmountChange(index: number, amount: string) {
@@ -447,7 +422,11 @@
 	}
 
 	function handleRecipientError(errorMessage: string | null) {
-		error = errorMessage;
+		if (errorMessage) {
+			error = errorMessage;
+			return;
+		}
+		syncLookupBanner();
 	}
 
 	async function buildVSATransaction(
@@ -963,6 +942,7 @@
 		if (combined.length < recipients.length) {
 			recipients = combined;
 			error = null;
+			syncLookupBanner();
 			notice = null;
 		}
 		showCombineOptions = false;
@@ -1002,13 +982,31 @@
 		open = false;
 	}
 
-	function handlePasteModalConfirm(importedRecipients: Recipient[]) {
+	function invalidateRows(rows: Recipient[]) {
+		const work: { address: string; ticket: number }[] = [];
+		const invalidatedRows = rows.map((row) => {
+			const invalidated = {
+				...row,
+				lookupId: nextLookupId(),
+				isValid: false,
+				info: null,
+				lookupError: null,
+				isLoading: Boolean(row.address)
+			};
+			if (row.address) work.push({ address: row.address, ticket: invalidated.lookupId });
+			return invalidated;
+		});
+		return { rows: invalidatedRows, work };
+	}
+
+	async function handlePasteModalConfirm(importedRecipients: Recipient[]) {
+		const { rows, work } = invalidateRows(importedRecipients);
 		// If we already have one empty recipient, remove it
 		if (recipients.length === 1 && !recipients[0].address) {
-			recipients = importedRecipients;
+			recipients = rows;
 		} else {
 			// Otherwise append new recipients up to the maximum
-			const combinedRecipients = [...recipients, ...importedRecipients];
+			const combinedRecipients = [...recipients, ...rows];
 			recipients = combinedRecipients;
 		}
 
@@ -1016,7 +1014,11 @@
 		recipients = [...recipients];
 
 		error = null;
+		syncLookupBanner();
 		notice = null;
+		await runBounded(work, 4, async ({ address, ticket }) => {
+			await fetchRecipientInfo(address, ticket);
+		});
 	}
 
 	// Helper function to determine if token is native VOI
@@ -1029,16 +1031,33 @@
 		return token.type === 'arc200';
 	}
 
+	async function recheckRecipients() {
+		const { rows, work } = invalidateRows(recipients);
+		recipients = rows;
+		await runBounded(work, 4, async ({ address, ticket }) => {
+			await fetchRecipientInfo(address, ticket);
+		});
+	}
+
+	function syncTokenProp(nextToken: SendToken) {
+		if (isSending) return;
+		const previousKey = tokenKey(selectedToken);
+		selectedToken = nextToken;
+		if (tokenKey(selectedToken) !== previousKey) void recheckRecipients();
+	}
+
 	function handleRetryFailedTransactions() {
 		const toRetry = retryRecipients(groupOutcomes, recipientsByGroup);
 		if (toRetry.length === 0) return;
 		resetState();
 		recipients = toRetry;
+		void recheckRecipients();
 	}
 
 	function handleTokenChange(newToken: FungibleTokenType) {
 		// A list left open when the send started must not switch the token mid-send.
 		if (isSending) return;
+		const previousKey = tokenKey(selectedToken);
 		// If selecting VOI, ensure we use the latest balance
 		if (isNativeToken(newToken)) {
 			selectedToken = {
@@ -1051,6 +1070,7 @@
 		} else {
 			selectedToken = newToken;
 		}
+		if (tokenKey(selectedToken) !== previousKey) void recheckRecipients();
 		error = null;
 		notice = null;
 	}
