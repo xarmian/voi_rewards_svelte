@@ -365,7 +365,7 @@
 					<div class="flex-grow relative">
 						<Input
 							type="number"
-							bind:value={recipient.amount}
+							value={recipient.amount}
 							min="0"
 							max={maxAmount}
 							step={`${1 / Math.pow(10, selectedToken.decimals)}`}
