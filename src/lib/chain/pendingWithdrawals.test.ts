@@ -15,24 +15,24 @@ describe('pending withdrawals', () => {
 		expect(getPendingWithdrawal(1)).toBeUndefined();
 	});
 
-	it('remembers the unresolved tx id per contract', () => {
-		rememberPendingWithdrawal(1, 'TX-A');
-		rememberPendingWithdrawal(2, 'TX-B');
-		expect(getPendingWithdrawal(1)).toBe('TX-A');
-		expect(getPendingWithdrawal(2)).toBe('TX-B');
+	it('remembers the unresolved tx id and its last valid round per contract', () => {
+		rememberPendingWithdrawal(1, { txId: 'TX-A', lastValid: 100 });
+		rememberPendingWithdrawal(2, { txId: 'TX-B', lastValid: 200 });
+		expect(getPendingWithdrawal(1)).toEqual({ txId: 'TX-A', lastValid: 100 });
+		expect(getPendingWithdrawal(2)).toEqual({ txId: 'TX-B', lastValid: 200 });
 	});
 
-	it('keeps the latest tx id when a contract is remembered twice', () => {
-		rememberPendingWithdrawal(1, 'TX-A');
-		rememberPendingWithdrawal(1, 'TX-C');
-		expect(getPendingWithdrawal(1)).toBe('TX-C');
+	it('keeps the latest entry when a contract is remembered twice', () => {
+		rememberPendingWithdrawal(1, { txId: 'TX-A', lastValid: 100 });
+		rememberPendingWithdrawal(1, { txId: 'TX-C', lastValid: 300 });
+		expect(getPendingWithdrawal(1)).toEqual({ txId: 'TX-C', lastValid: 300 });
 	});
 
 	it('clears only the named contract', () => {
-		rememberPendingWithdrawal(1, 'TX-A');
-		rememberPendingWithdrawal(2, 'TX-B');
+		rememberPendingWithdrawal(1, { txId: 'TX-A', lastValid: 100 });
+		rememberPendingWithdrawal(2, { txId: 'TX-B', lastValid: 200 });
 		clearPendingWithdrawal(1);
 		expect(getPendingWithdrawal(1)).toBeUndefined();
-		expect(getPendingWithdrawal(2)).toBe('TX-B');
+		expect(getPendingWithdrawal(2)).toEqual({ txId: 'TX-B', lastValid: 200 });
 	});
 });

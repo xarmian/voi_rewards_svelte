@@ -58,3 +58,22 @@ test('WithdrawModal resumes an unresolved withdrawal instead of offering a secon
 		'clearPendingWithdrawal('
 	);
 });
+
+test('WithdrawModal releases a withdrawal that can no longer land', () => {
+	expect(source, 'An unresolved withdrawal must be checked with trackPending').toMatch(
+		/import\s*\{[^}]*\btrackPending\b[^}]*\}\s*from\s*['"]\$lib\/chain\/sendAndConfirm['"]/
+	);
+	expect(source, 'The last valid round must be remembered with the tx id').toMatch(
+		/rememberPendingWithdrawal\([^)]*lastValid/
+	);
+	expect(source, 'An expired withdrawal must be handled and its record cleared').toMatch(
+		/status === 'expired'[\s\S]*clearPendingWithdrawal\(/
+	);
+});
+
+test('WithdrawModal does not report a resumed withdrawal with a made-up amount', () => {
+	expect(
+		source,
+		'A resumed withdrawal has no typed amount; the confirmed text must not print 0.00'
+	).toMatch(/withdrawAmountVOI\s*\?[\s\S]*Your withdrawal has been confirmed/);
+});
