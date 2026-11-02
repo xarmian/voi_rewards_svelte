@@ -135,7 +135,7 @@ test.each(components)(
 		expect(lookup).toBeGreaterThan(-1);
 		expect(valid).toBeGreaterThan(lookup);
 		expect(body!.slice(lookup, valid)).toMatch(
-			/if\s*\([^)]*(?:recipient\.address|recipients\[index\]\?\.address)\s*!==\s*address[^)]*\)\s*(?:\{\s*)?return/
+			/if\s*\(\s*!\(\s*recipient\.lookupId\s*===\s*ticket\s*&&\s*recipient\.address\s*===\s*address\b[^]*?\)\s*\)\s*return/
 		);
 	}
 );

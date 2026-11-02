@@ -5,7 +5,10 @@ test.each([
 	[{ type: 'native' }, 'native'],
 	[{ type: 'native', id: '0' }, 'native'],
 	[{ type: 'vsa', id: 7 }, 'vsa:7'],
-	[{ type: 'arc200', id: '7' }, 'arc200:7']
+	[{ type: 'arc200', id: '7' }, 'arc200:7'],
+	// FungibleTokenType.type is optional: untyped tokens still get a distinct key per id.
+	[{ id: '7' }, 'undefined:7'],
+	[{ id: '8' }, 'undefined:8']
 ] as const)('tokenKey identifies %j as %s', (token, key) => {
 	expect(tokenKey(token)).toBe(key);
 });

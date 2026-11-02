@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, test, vi } from 'vitest';
-import { applyRecipientLookup } from '../chain/recipientInfo';
+import { applyRecipientLookup, nextLookupId, tokenKey } from '../chain/recipientInfo';
 
 const components = ['RecipientRow.svelte', 'SendTokenModal.svelte'];
 
@@ -26,6 +26,8 @@ function recipientLookup(file: string, loadRecipientInfo: ReturnType<typeof vi.f
 		isNativeToken: () => true,
 		loadRecipientInfo,
 		applyRecipientLookup,
+		nextLookupId,
+		tokenKey,
 		onError,
 		error: 'current error',
 		notice: 'current notice'
@@ -83,11 +85,13 @@ test('SendTokenModal applies a result when its row is cloned with the same addre
 		vi.fn().mockReturnValue(pending.promise)
 	);
 	const loading = lookup('old');
-	run('recipients = [{ address: "old", info: null, isValid: false, isLoading: true }]');
+	// Bulk actions replace rows with spread clones, which keep the lookup ticket.
+	run('recipients = recipients.map((row) => ({ ...row, amount: "1" }))');
 	pending.resolve({ status: 'loaded', info: { balance: 999 } });
 	await loading;
-	expect(run('recipients[0]')).toEqual({
+	expect(run('recipients[0]')).toMatchObject({
 		address: 'old',
+		amount: '1',
 		info: { balance: 999 },
 		isValid: true,
 		isLoading: false,
