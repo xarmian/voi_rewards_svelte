@@ -57,6 +57,9 @@
 
 	async function settleWithdrawal(id: string, lastValid: number) {
 		txStatus = 'confirming';
+		// Remember it before waiting: if this modal is destroyed mid-wait, a reopened one must
+		// resume this withdrawal rather than offer a second.
+		rememberPendingWithdrawal(contract.contractId, { txId: id, lastValid });
 		const outcome = await awaitWithdrawalConfirmation(id, {
 			pendingInfo,
 			pause: (ms) => new Promise((r) => setTimeout(r, ms))
@@ -89,7 +92,6 @@
 			error =
 				'The withdrawal expired before it confirmed and did not go through. You can try again.';
 		} else {
-			rememberPendingWithdrawal(contract.contractId, { txId: id, lastValid });
 			txStatus = 'pending';
 			poolError = outcome.poolError ?? null;
 		}
