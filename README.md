@@ -20,8 +20,10 @@ npm run dev
 
 ### Quality ratchet
 
-Run `npm run check:ratchet` to check svelte-check and ESLint counts per file and severity against
-`scripts/quality-baseline.json`. Increases fail; fixes lower the baseline automatically. Commit the
+Run `npm run check:ratchet` to check svelte-check and ESLint counts per file, diagnostic identity
+and severity against `scripts/quality-baseline.json`. Identity uses the ESLint rule or svelte-check
+source and code, with the first message line as a fallback. Moving a diagnostic does not change its
+count. Increases fail; fixes lower the baseline automatically. Commit the
 lowered baseline with the fix. Use `npm run check:ratchet -- --frozen` to fail if a decrease has not
 been committed, or `npm run check:ratchet -- --update` to explicitly accept the current counts,
 including increases, for review in the baseline diff.

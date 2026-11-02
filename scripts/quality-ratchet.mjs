@@ -8,29 +8,55 @@ const severities = ['errors', 'warnings'];
 
 function countDiagnostics(diagnostics) {
 	const counts = {};
-	for (const { file, severity } of diagnostics) {
-		counts[file] ??= { errors: 0, warnings: 0 };
-		counts[file][severity]++;
+	for (const { file, identity, severity } of diagnostics) {
+		counts[file] ??= {};
+		counts[file][identity] ??= { errors: 0, warnings: 0 };
+		counts[file][identity][severity]++;
 	}
 	return counts;
 }
 
-export function parseSvelteCheck(output) {
+function normalizeFile(file, repoRoot) {
+	return relative(repoRoot, resolve(repoRoot, file.replaceAll('\\', '/'))).replaceAll('\\', '/');
+}
+
+export function parseSvelteCheck(
+	output,
+	repoRoot = fileURLToPath(new URL('../', import.meta.url))
+) {
 	const diagnostics = [];
 	let completed = false;
 	for (const line of output.split('\n')) {
 		if (/^\d+ COMPLETED(?:\s|$)/.test(line)) completed = true;
-		if (!/^\d+ (ERROR|WARNING) /.test(line)) continue;
-		const match = line.match(
-			/^\d+ (ERROR|WARNING) ("(?:\\.|[^"\\])*") (\d+):(\d+) ("(?:\\.|[^"\\])*")\r?$/
-		);
-		if (!match) throw new Error(`Malformed svelte-check diagnostic: ${line}`);
+		if (!/^\d+ \{/.test(line)) continue;
+		let diagnostic;
+		try {
+			diagnostic = JSON.parse(line.slice(line.indexOf(' ') + 1));
+			const { type, filename, start, message, code, source } = diagnostic;
+			if (
+				!['ERROR', 'WARNING'].includes(type) ||
+				typeof filename !== 'string' ||
+				typeof message !== 'string' ||
+				!Number.isSafeInteger(start?.line) ||
+				start.line < 0 ||
+				!Number.isSafeInteger(start?.character) ||
+				start.character < 0 ||
+				(code != null &&
+					(!['number', 'string'].includes(typeof code) || typeof source !== 'string'))
+			) {
+				throw new Error('Invalid diagnostic fields');
+			}
+		} catch {
+			throw new Error(`Malformed svelte-check diagnostic: ${line}`);
+		}
+		const { type, filename, start, message, code, source } = diagnostic;
 		diagnostics.push({
-			file: JSON.parse(match[2]).replaceAll('\\', '/'),
-			severity: match[1] === 'ERROR' ? 'errors' : 'warnings',
-			line: Number(match[3]),
-			column: Number(match[4]),
-			message: JSON.parse(match[5])
+			file: normalizeFile(filename, repoRoot),
+			identity: code == null ? `message:${message.split(/\r?\n/)[0]}` : `${source}:${code}`,
+			severity: type === 'ERROR' ? 'errors' : 'warnings',
+			line: start.line + 1,
+			column: start.character + 1,
+			message
 		});
 	}
 	return { completed, counts: countDiagnostics(diagnostics), diagnostics };
@@ -44,13 +70,18 @@ export function parseEslint(output, repoRoot) {
 		if (typeof result.filePath !== 'string' || !Array.isArray(result.messages)) {
 			throw new Error('Invalid ESLint JSON result');
 		}
-		const file = relative(repoRoot, resolve(repoRoot, result.filePath)).replaceAll('\\', '/');
+		const file = normalizeFile(result.filePath, repoRoot);
 		for (const message of result.messages) {
-			if (![1, 2].includes(message.severity) || typeof message.message !== 'string') {
+			if (
+				![1, 2].includes(message.severity) ||
+				typeof message.message !== 'string' ||
+				(message.ruleId !== null && typeof message.ruleId !== 'string')
+			) {
 				throw new Error(`Invalid ESLint diagnostic for ${file}`);
 			}
 			diagnostics.push({
 				file,
+				identity: message.ruleId ?? `fatal:${message.message.split(/\r?\n/)[0]}`,
 				severity: message.fatal || message.severity === 2 ? 'errors' : 'warnings',
 				line: message.line ?? 0,
 				column: message.column ?? 0,
@@ -62,20 +93,19 @@ export function parseEslint(output, repoRoot) {
 }
 
 export function buildBaseline(counts) {
-	return Object.fromEntries(
-		[...tools].sort().map((tool) => [
-			tool,
-			Object.fromEntries(
-				Object.keys(counts[tool])
-					.sort()
-					.filter((file) => severities.some((severity) => counts[tool][file][severity] > 0))
-					.map((file) => [
-						file,
-						{ errors: counts[tool][file].errors, warnings: counts[tool][file].warnings }
-					])
-			)
-		])
-	);
+	const baseline = {};
+	for (const tool of [...tools].sort()) {
+		baseline[tool] = {};
+		for (const file of Object.keys(counts[tool]).sort()) {
+			const identities = {};
+			for (const identity of Object.keys(counts[tool][file]).sort()) {
+				const { errors, warnings } = counts[tool][file][identity];
+				if (errors || warnings) identities[identity] = { errors, warnings };
+			}
+			if (Object.keys(identities).length) baseline[tool][file] = identities;
+		}
+	}
+	return baseline;
 }
 
 export function compareCounts(baseline, current) {
@@ -84,12 +114,20 @@ export function compareCounts(baseline, current) {
 	for (const tool of tools) {
 		const files = [...new Set([...Object.keys(baseline[tool]), ...Object.keys(current[tool])])];
 		for (const file of files.sort()) {
-			for (const severity of severities) {
-				const before = baseline[tool][file]?.[severity] ?? 0;
-				const after = current[tool][file]?.[severity] ?? 0;
-				const change = { tool, file, severity, baseline: before, current: after };
-				if (after > before) rises.push(change);
-				if (after < before) drops.push(change);
+			const identities = [
+				...new Set([
+					...Object.keys(baseline[tool][file] ?? {}),
+					...Object.keys(current[tool][file] ?? {})
+				])
+			];
+			for (const identity of identities.sort()) {
+				for (const severity of severities) {
+					const before = baseline[tool][file]?.[identity]?.[severity] ?? 0;
+					const after = current[tool][file]?.[identity]?.[severity] ?? 0;
+					const change = { tool, file, identity, severity, baseline: before, current: after };
+					if (after > before) rises.push(change);
+					if (after < before) drops.push(change);
+				}
 			}
 		}
 	}
@@ -102,25 +140,43 @@ export function serializeBaseline(counts) {
 
 function totals(counts) {
 	if (!counts) return { errors: 'unknown', warnings: 'unknown' };
-	return Object.values(counts).reduce(
-		(total, file) => ({
-			errors: total.errors + file.errors,
-			warnings: total.warnings + file.warnings
-		}),
-		{ errors: 0, warnings: 0 }
-	);
+	return Object.values(counts)
+		.flatMap((identities) => Object.values(identities))
+		.reduce(
+			(total, counts) => ({
+				errors: total.errors + counts.errors,
+				warnings: total.warnings + counts.warnings
+			}),
+			{ errors: 0, warnings: 0 }
+		);
+}
+
+function isObject(value) {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function validateBaseline(baseline) {
+	if (!isObject(baseline)) throw new Error('Invalid baseline: expected an object');
 	for (const tool of tools) {
 		const files = baseline?.[tool];
-		if (!files || typeof files !== 'object' || Array.isArray(files)) {
+		if (!isObject(files)) {
 			throw new Error(`Invalid baseline for ${tool}`);
 		}
-		for (const [file, counts] of Object.entries(files)) {
-			for (const severity of severities) {
-				if (!Number.isSafeInteger(counts?.[severity]) || counts[severity] < 0) {
-					throw new Error(`Invalid baseline count: ${tool} ${file} ${severity}`);
+		for (const [file, identities] of Object.entries(files)) {
+			if (!isObject(identities)) throw new Error(`Invalid baseline identities: ${tool} ${file}`);
+			if (severities.some((severity) => typeof identities[severity] === 'number')) {
+				throw new Error(
+					`Old baseline format: ${tool} ${file}; expected diagnostic identity objects`
+				);
+			}
+			for (const [identity, counts] of Object.entries(identities)) {
+				if (!isObject(counts)) {
+					throw new Error(`Invalid baseline counts: ${tool} ${file} ${identity}`);
+				}
+				for (const severity of severities) {
+					if (!Number.isSafeInteger(counts[severity]) || counts[severity] < 0) {
+						throw new Error(`Invalid baseline count: ${tool} ${file} ${identity} ${severity}`);
+					}
 				}
 			}
 		}
@@ -151,8 +207,9 @@ export function main(args = process.argv.slice(2), deps = {}) {
 		}
 		const update = args.includes('--update');
 		try {
-			baseline = JSON.parse(readBaseline());
-			validateBaseline(baseline);
+			const parsed = JSON.parse(readBaseline());
+			validateBaseline(parsed);
+			baseline = parsed;
 		} catch (error) {
 			if (!update || error.code !== 'ENOENT') throw error;
 			baseline = { 'svelte-check': {}, eslint: {} };
@@ -183,7 +240,12 @@ export function main(args = process.argv.slice(2), deps = {}) {
 		run(process.execPath, ['scripts/generateFaqData.js']);
 		run('npx', ['svelte-kit', 'sync']);
 		const svelte = parseSvelteCheck(
-			run('npx', ['svelte-check', '--tsconfig', './tsconfig.json', '--output', 'machine'], [0, 1])
+			run(
+				'npx',
+				['svelte-check', '--tsconfig', './tsconfig.json', '--output', 'machine-verbose'],
+				[0, 1]
+			),
+			repoRoot
 		);
 		if (!svelte.completed) throw new Error('svelte-check did not complete: missing COMPLETED line');
 		current['svelte-check'] = svelte.counts;
@@ -201,11 +263,17 @@ export function main(args = process.argv.slice(2), deps = {}) {
 			['DROP', comparison.drops]
 		]) {
 			for (const change of changes) {
-				const { tool, file, severity, baseline: before, current: after } = change;
-				log(`${label} ${tool} ${file} ${severity} ${before} -> ${after}`);
+				const { tool, file, identity, severity, baseline: before, current: after } = change;
+				log(`${label} ${tool} ${file} ${identity} ${severity} ${before} -> ${after}`);
 				if (label === 'RISE') {
 					for (const diagnostic of diagnostics[tool]) {
-						if (diagnostic.file !== file || diagnostic.severity !== severity) continue;
+						if (
+							diagnostic.file !== file ||
+							diagnostic.identity !== identity ||
+							diagnostic.severity !== severity
+						) {
+							continue;
+						}
 						log(
 							`  ${file}:${diagnostic.line}:${diagnostic.column} ${diagnostic.message.split(/\r?\n/)[0]}`
 						);
