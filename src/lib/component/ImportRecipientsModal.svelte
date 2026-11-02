@@ -984,7 +984,7 @@
 
 				if (arc200DistributionType !== 'equal') {
 					if (arc200DistributionType === 'per-holder') {
-						amount = amountValue;
+						amount = String(amountValue);
 					} else if (arc200DistributionType === 'proportional' && totalTokenAmount > 0) {
 						// Calculate proportional amount based on holder's percentage of total
 						const percentage = holderBalance / totalTokenAmount;
@@ -1093,7 +1093,7 @@
 
 				if (amountType !== 'none') {
 					if (amountType === 'per-holder') {
-						amount = amountValue;
+						amount = String(amountValue);
 					} else if (amountType === 'per-nft') {
 						amount = (Number(amountValue) * count).toString();
 					} else if (amountType === 'total-pool') {
