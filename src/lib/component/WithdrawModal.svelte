@@ -6,6 +6,11 @@
 	import algosdk from 'algosdk';
 	import { algodClient } from '$lib/utils/algod';
 	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
+	import {
+		clearPendingWithdrawal,
+		getPendingWithdrawal,
+		rememberPendingWithdrawal
+	} from '$lib/chain/pendingWithdrawals';
 
 	export let contract: ContractDetails;
 	export let show = false;
@@ -44,6 +49,32 @@
 			error = null;
 			poolError = null;
 			withdrawAmountVOI = null;
+		}
+	}
+
+	async function settleWithdrawal(id: string) {
+		txStatus = 'confirming';
+		const outcome = await awaitWithdrawalConfirmation(id, {
+			pendingInfo: (info) => algodClient.pendingTransactionInformation(info).do(),
+			pause: (ms) => new Promise((r) => setTimeout(r, ms))
+		});
+		if (outcome.status === 'confirmed') {
+			clearPendingWithdrawal(contract.contractId);
+			txStatus = 'confirmed';
+		} else {
+			rememberPendingWithdrawal(contract.contractId, id);
+			txStatus = 'pending';
+			poolError = outcome.poolError ?? null;
+		}
+	}
+
+	// A withdrawal from an earlier open of this modal may still land: wait on it rather than
+	// offering a second one for the same contract.
+	$: if (show && txStatus === 'idle') {
+		const earlier = getPendingWithdrawal(contract.contractId);
+		if (earlier) {
+			txId = earlier;
+			void settleWithdrawal(earlier);
 		}
 	}
 
@@ -134,17 +165,7 @@
 
 			const result = await signAndSendTransactions([txns]);
 			if (result) {
-				txStatus = 'confirming';
-				const outcome = await awaitWithdrawalConfirmation(txId, {
-					pendingInfo: (id) => algodClient.pendingTransactionInformation(id).do(),
-					pause: (ms) => new Promise((r) => setTimeout(r, ms))
-				});
-				if (outcome.status === 'confirmed') {
-					txStatus = 'confirmed';
-				} else {
-					txStatus = 'pending';
-					poolError = outcome.poolError ?? null;
-				}
+				await settleWithdrawal(txId);
 			} else {
 				txStatus = 'error';
 				error = 'Failed to process withdrawal';
