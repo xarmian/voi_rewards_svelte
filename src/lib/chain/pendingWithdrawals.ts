@@ -15,6 +15,9 @@ export function getPendingWithdrawal(contractId: number): PendingWithdrawal | un
 	return unresolved.get(contractId);
 }
 
-export function clearPendingWithdrawal(contractId: number): void {
+// With a txId, clears only if that transaction is still the recorded one, so a wait that
+// outlived its modal cannot erase the record of a newer withdrawal.
+export function clearPendingWithdrawal(contractId: number, txId?: string): void {
+	if (txId !== undefined && unresolved.get(contractId)?.txId !== txId) return;
 	unresolved.delete(contractId);
 }

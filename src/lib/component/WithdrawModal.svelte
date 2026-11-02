@@ -56,16 +56,17 @@
 	const pendingInfo = (id: string) => algodClient.pendingTransactionInformation(id).do();
 
 	async function settleWithdrawal(id: string, lastValid: number) {
+		const contractId = contract.contractId;
 		txStatus = 'confirming';
 		// Remember it before waiting: if this modal is destroyed mid-wait, a reopened one must
 		// resume this withdrawal rather than offer a second.
-		rememberPendingWithdrawal(contract.contractId, { txId: id, lastValid });
+		rememberPendingWithdrawal(contractId, { txId: id, lastValid });
 		const outcome = await awaitWithdrawalConfirmation(id, {
 			pendingInfo,
 			pause: (ms) => new Promise((r) => setTimeout(r, ms))
 		});
 		if (outcome.status === 'confirmed') {
-			clearPendingWithdrawal(contract.contractId);
+			clearPendingWithdrawal(contractId, id);
 			txStatus = 'confirmed';
 			return;
 		}
@@ -84,10 +85,10 @@
 			{ signal: AbortSignal.timeout(10000) }
 		);
 		if (tracked.status === 'confirmed') {
-			clearPendingWithdrawal(contract.contractId);
+			clearPendingWithdrawal(contractId, id);
 			txStatus = 'confirmed';
 		} else if (tracked.status === 'expired') {
-			clearPendingWithdrawal(contract.contractId);
+			clearPendingWithdrawal(contractId, id);
 			txStatus = 'error';
 			error =
 				'The withdrawal expired before it confirmed and did not go through. You can try again.';
