@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
 	clearPendingWithdrawal,
 	getPendingWithdrawal,
-	rememberPendingWithdrawal
+	rememberPendingWithdrawal,
+	resetPendingWithdrawals
 } from './pendingWithdrawals';
 
 describe('pending withdrawals', () => {
 	beforeEach(() => {
-		clearPendingWithdrawal(1);
-		clearPendingWithdrawal(2);
+		resetPendingWithdrawals();
 	});
 
 	it('returns nothing for a contract with no unresolved withdrawal', () => {
@@ -31,7 +31,7 @@ describe('pending withdrawals', () => {
 	it('clears only the named contract', () => {
 		rememberPendingWithdrawal(1, { txId: 'TX-A', lastValid: 100 });
 		rememberPendingWithdrawal(2, { txId: 'TX-B', lastValid: 200 });
-		clearPendingWithdrawal(1);
+		clearPendingWithdrawal(1, 'TX-A');
 		expect(getPendingWithdrawal(1)).toBeUndefined();
 		expect(getPendingWithdrawal(2)).toEqual({ txId: 'TX-B', lastValid: 200 });
 	});
@@ -42,5 +42,13 @@ describe('pending withdrawals', () => {
 		expect(getPendingWithdrawal(1)).toEqual({ txId: 'TX-NEW', lastValid: 300 });
 		clearPendingWithdrawal(1, 'TX-NEW');
 		expect(getPendingWithdrawal(1)).toBeUndefined();
+	});
+
+	it('resets every contract', () => {
+		rememberPendingWithdrawal(1, { txId: 'TX-A', lastValid: 100 });
+		rememberPendingWithdrawal(2, { txId: 'TX-B', lastValid: 200 });
+		resetPendingWithdrawals();
+		expect(getPendingWithdrawal(1)).toBeUndefined();
+		expect(getPendingWithdrawal(2)).toBeUndefined();
 	});
 });
