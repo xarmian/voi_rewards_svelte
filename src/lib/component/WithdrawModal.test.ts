@@ -75,5 +75,5 @@ test('WithdrawModal does not report a resumed withdrawal with a made-up amount',
 	expect(
 		source,
 		'A resumed withdrawal has no typed amount; the confirmed text must not print 0.00'
-	).toMatch(/withdrawAmountVOI\s*\?[\s\S]*Your withdrawal has been confirmed/);
+	).toMatch(/\{#if withdrawAmountVOI\}[\s\S]*\{:else\}[\s\S]*Your withdrawal has been confirmed/);
 });

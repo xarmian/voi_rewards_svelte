@@ -4,8 +4,9 @@
 	import { abi, CONTRACT } from 'ulujs';
 	import { selectedWallet, signAndSendTransactions } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
-	import { algodClient } from '$lib/utils/algod';
+	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
+	import { trackPending } from '$lib/chain/sendAndConfirm';
 	import {
 		clearPendingWithdrawal,
 		getPendingWithdrawal,
@@ -52,17 +53,43 @@
 		}
 	}
 
-	async function settleWithdrawal(id: string) {
+	const pendingInfo = (id: string) => algodClient.pendingTransactionInformation(id).do();
+
+	async function settleWithdrawal(id: string, lastValid: number) {
 		txStatus = 'confirming';
 		const outcome = await awaitWithdrawalConfirmation(id, {
-			pendingInfo: (info) => algodClient.pendingTransactionInformation(info).do(),
+			pendingInfo,
 			pause: (ms) => new Promise((r) => setTimeout(r, ms))
 		});
 		if (outcome.status === 'confirmed') {
 			clearPendingWithdrawal(contract.contractId);
 			txStatus = 'confirmed';
+			return;
+		}
+		// Not confirmed yet: a reader past lastValid that lacks the transaction proves it never
+		// landed, which releases the contract; anything else stays pending.
+		const tracked = await trackPending(
+			{ status: 'pending', txIds: [id], firstTxId: id, lastValid },
+			{
+				pendingInfo,
+				indexerSearch: async (searchId: string) =>
+					(await algodIndexer.searchForTransactions().txid(searchId).do()) as {
+						'current-round': number;
+						transactions: { id?: string; 'confirmed-round'?: number }[];
+					}
+			},
+			{ signal: AbortSignal.timeout(10000) }
+		);
+		if (tracked.status === 'confirmed') {
+			clearPendingWithdrawal(contract.contractId);
+			txStatus = 'confirmed';
+		} else if (tracked.status === 'expired') {
+			clearPendingWithdrawal(contract.contractId);
+			txStatus = 'error';
+			error =
+				'The withdrawal expired before it confirmed and did not go through. You can try again.';
 		} else {
-			rememberPendingWithdrawal(contract.contractId, id);
+			rememberPendingWithdrawal(contract.contractId, { txId: id, lastValid });
 			txStatus = 'pending';
 			poolError = outcome.poolError ?? null;
 		}
@@ -73,8 +100,8 @@
 	$: if (show && txStatus === 'idle') {
 		const earlier = getPendingWithdrawal(contract.contractId);
 		if (earlier) {
-			txId = earlier;
-			void settleWithdrawal(earlier);
+			txId = earlier.txId;
+			void settleWithdrawal(earlier.txId, earlier.lastValid);
 		}
 	}
 
@@ -165,7 +192,7 @@
 
 			const result = await signAndSendTransactions([txns]);
 			if (result) {
-				await settleWithdrawal(txId);
+				await settleWithdrawal(txId, Number(txns[1].lastRound));
 			} else {
 				txStatus = 'error';
 				error = 'Failed to process withdrawal';
@@ -204,7 +231,11 @@
 								Withdrawal Successful
 							</h3>
 							<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-								Your withdrawal of {formattedWithdrawAmount} VOI has been confirmed.
+								{#if withdrawAmountVOI}
+									Your withdrawal of {formattedWithdrawAmount} VOI has been confirmed.
+								{:else}
+									Your withdrawal has been confirmed.
+								{/if}
 							</p>
 							{#if explorerUrl}
 								<a
