@@ -360,8 +360,9 @@
 	const LOOKUP_BANNER =
 		"Couldn't check this recipient. Sending is blocked until it can be checked.";
 
-	// The banner follows the rows: raised while any row has a lookup error, and cleared only when it
-	// is the banner itself, so an unrelated message (a send error) is never overwritten or hidden.
+	// The banner follows the rows: while any row has a lookup error it is shown and takes precedence
+	// over another message, because that failure blocks the send. It is cleared only when it is the
+	// banner itself, so an unrelated message is never cleared by this helper.
 	function syncLookupBanner() {
 		if (recipients.some((r) => r.lookupError)) {
 			error = LOOKUP_BANNER;
@@ -941,6 +942,7 @@
 		if (combined.length < recipients.length) {
 			recipients = combined;
 			error = null;
+			syncLookupBanner();
 			notice = null;
 		}
 		showCombineOptions = false;
