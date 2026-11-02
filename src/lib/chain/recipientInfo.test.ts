@@ -98,7 +98,7 @@ describe('loadRecipientInfo', () => {
 	});
 
 	test.each(['42', 0n])(
-		'loads a successful ARC-200 balance %j as a number',
+		'loads a successful ARC-200 balance %s as a number',
 		async (returnValue) => {
 			const deps = dependencies();
 			deps.arc200BalanceOf.mockResolvedValue({ success: true, returnValue });

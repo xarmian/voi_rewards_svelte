@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { requireAccountInfo } from '$lib/stores/accounts';
+	import { loadRecipientInfo, type RecipientTokenKind } from '$lib/chain/recipientInfo';
 	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
@@ -356,61 +357,36 @@
 	async function fetchRecipientInfo(address: string, index: number) {
 		recipients[index].isLoading = true;
 		try {
-			let accountInfo;
-			let block;
-			try {
-				[accountInfo, block] = await Promise.all([
-					requireAccountInfo(address, { force: true }),
-					algodIndexer
-						.lookupAccountByID(address)
-						.do()
-						.then((info) => algodIndexer.lookupBlock(info.account['created-at-round']).do())
-				]);
-			} catch (err) {
-				// If account info fails, set defaults
-				accountInfo = { amount: 0, assets: [] };
-				block = { timestamp: Date.now() / 1000 };
-			}
-
-			let assetBalance = 0;
-			const hasOptedIn = isARC200Token(selectedToken)
-				? true
-				: (accountInfo.assets?.some((asset: any) => {
-						if (asset['asset-id'] === Number(selectedToken.id)) {
-							assetBalance = asset.amount;
-							return true;
-						}
-						return false;
-					}) ?? false);
-
-			// For ARC-200 tokens, fetch balance using the contract
-			if (isARC200Token(selectedToken)) {
-				try {
+			const token: RecipientTokenKind = isNativeToken(selectedToken)
+				? { kind: 'native' }
+				: isARC200Token(selectedToken)
+					? { kind: 'arc200' }
+					: { kind: 'vsa', assetId: Number(selectedToken.id) };
+			const result = await loadRecipientInfo(address, token, {
+				fetchAccount: async (a) =>
+					(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+				arc200BalanceOf: async (a) => {
 					const contract = new Contract(Number(selectedToken.id), algodClient, algodIndexer);
-					const balance = await contract.arc200_balanceOf(address);
-					if (balance.success) {
-						assetBalance = Number(balance.returnValue);
-					}
-				} catch (err) {
-					assetBalance = 0;
+					const balance = await contract.arc200_balanceOf(a);
+					return {
+						success: balance.success,
+						returnValue: balance.success ? balance.returnValue : undefined
+					};
 				}
+			});
+			if (result.status === 'loaded') {
+				recipients[index].info = result.info;
+				recipients[index].isValid = true;
+				recipients[index].lookupError = null;
+				error = null;
+				notice = null;
+			} else {
+				console.error('Error fetching recipient info:', result.error);
+				recipients[index].info = null;
+				recipients[index].isValid = false;
+				recipients[index].lookupError = result.error;
+				error = "Couldn't check this recipient. Sending is blocked until it can be checked.";
 			}
-
-			recipients[index].info = {
-				balance: accountInfo.amount as number,
-				createdAt: new Date(block.timestamp * 1000).toLocaleDateString(),
-				hasOptedIn,
-				assetBalance
-			};
-
-			recipients[index].isValid = true;
-			error = null;
-			notice = null;
-		} catch (err) {
-			console.error('Error fetching recipient info:', err);
-			error = 'Failed to fetch recipient info. Please try again later.';
-			recipients[index].info = null;
-			recipients[index].isValid = false;
 		} finally {
 			recipients[index].isLoading = false;
 			recipients = [...recipients]; // Force Svelte reactivity
@@ -419,6 +395,7 @@
 
 	async function handleRecipientSelected(address: string, index: number) {
 		if (address === recipients[index].address) return;
+		recipients[index].lookupError = null;
 		if (address === '') {
 			recipients[index] = {
 				...recipients[index],

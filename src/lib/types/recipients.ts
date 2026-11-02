@@ -4,10 +4,10 @@ export interface Recipient {
 	note?: string;
 	info: {
 		balance: number;
-		createdAt: string;
 		hasOptedIn: boolean;
 		assetBalance?: number;
 	} | null;
 	isLoading: boolean;
 	isValid: boolean;
+	lookupError?: string | null;
 }

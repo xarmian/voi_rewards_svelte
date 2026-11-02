@@ -60,7 +60,7 @@ test('RecipientRow offers Retry in the lookup failure branch and guards all reci
 	expect(failure, 'Render an explicit lookup failure branch before the info branch').toBeDefined();
 	expect(failure).toContain("Couldn't check this recipient.");
 	expect(failure, 'Retry must check the selected recipient again').toMatch(
-		/<button\b[^>]*on:click=\{\(\) => fetchRecipientInfo\(recipient\.address\)\}[^>]*>\s*Retry\s*<\/button>/
+		/<button\b[^>]*on:click=\{\(\) => recipient\.address && fetchRecipientInfo\(recipient\.address\)\}[^>]*>\s*Retry\s*<\/button>/
 	);
 	expect(failure, 'A failed lookup must not show balances or an opt-in badge').not.toMatch(
 		/recipient\.info\.|Balance:|Opted In/
