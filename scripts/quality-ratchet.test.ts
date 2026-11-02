@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	main,
 	parseSvelteCheck,
 	parseEslint,
 	compareCounts,
@@ -8,6 +9,208 @@ import {
 
 const empty = () => ({ 'svelte-check': {}, eslint: {} });
 const counts = (errors: number, warnings = 0) => ({ errors, warnings });
+
+// An ignored injection must fail safely rather than launch tools against the working tree.
+vi.mock('node:child_process', () => ({
+	spawnSync: () => {
+		throw new Error('Tests must use the injected run');
+	}
+}));
+
+type RunResult = {
+	status: number | null;
+	stdout: string;
+	stderr: string;
+	error?: Error;
+	signal: string | null;
+};
+
+function mainFixture(baseline = empty()) {
+	let baselineText = JSON.stringify(baseline);
+	const outputs: Record<string, RunResult> = {
+		'svelte-check': {
+			status: 0,
+			stdout: '100 COMPLETED 0 FILES 0 ERRORS 0 WARNINGS 0 FILES_WITH_PROBLEMS',
+			stderr: '',
+			signal: null
+		},
+		eslint: { status: 0, stdout: '[]', stderr: '', signal: null }
+	};
+	const deps = {
+		run: vi.fn((command: string, args: string[], env: NodeJS.ProcessEnv) => {
+			expect(env).toBeDefined();
+			if (command === 'npx' && outputs[args[0]]) return outputs[args[0]];
+			return { status: 0, stdout: '', stderr: '', signal: null };
+		}),
+		readBaseline: vi.fn(() => baselineText),
+		writeBaseline: vi.fn((text: string) => {
+			baselineText = text;
+		}),
+		log: vi.fn(),
+		error: vi.fn()
+	};
+	return { deps, outputs };
+}
+
+describe('main exit decisions', () => {
+	afterEach(() => vi.unstubAllEnvs());
+
+	it('returns 0 without writing for equal counts', () => {
+		const { deps } = mainFixture();
+		expect(main([], deps)).toBe(0);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.log).toHaveBeenCalledWith('quality-ratchet: equal');
+	});
+
+	it('returns 1 without writing and logs RISE for an increase', () => {
+		const { deps, outputs } = mainFixture();
+		outputs.eslint.status = 1;
+		outputs.eslint.stdout = JSON.stringify([
+			{ filePath: 'src/a.ts', messages: [{ severity: 2, message: 'error' }] }
+		]);
+		expect(main([], deps)).toBe(1);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.log).toHaveBeenCalledWith('RISE eslint src/a.ts errors 0 -> 1');
+	});
+
+	it('returns 0 and writes the lowered baseline for a drop', () => {
+		const { deps } = mainFixture({ ...empty(), eslint: { 'src/a.ts': counts(1) } });
+		expect(main([], deps)).toBe(0);
+		expect(deps.writeBaseline).toHaveBeenCalledTimes(1);
+		expect(JSON.parse(deps.readBaseline())).toEqual(empty());
+	});
+
+	it('returns 1 without writing for a drop with --frozen', () => {
+		const { deps } = mainFixture({ ...empty(), eslint: { 'src/a.ts': counts(1) } });
+		expect(main(['--frozen'], deps)).toBe(1);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+	});
+
+	it('returns 0 and writes current counts for a rise with --update', () => {
+		const { deps, outputs } = mainFixture();
+		outputs['svelte-check'].status = 1;
+		outputs['svelte-check'].stdout =
+			'100 ERROR "src/a.ts" 1:2 "error"\n101 COMPLETED 1 FILES 1 ERRORS 0 WARNINGS 1 FILES_WITH_PROBLEMS';
+		expect(main(['--update'], deps)).toBe(0);
+		expect(deps.writeBaseline).toHaveBeenCalledTimes(1);
+		expect(JSON.parse(deps.readBaseline())).toEqual({
+			...empty(),
+			'svelte-check': { 'src/a.ts': counts(1) }
+		});
+	});
+
+	it('returns 2 without writing or reporting zero when svelte-check lacks COMPLETED', () => {
+		const { deps, outputs } = mainFixture();
+		outputs['svelte-check'].stdout = '';
+		expect(main([], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith(expect.stringContaining('missing COMPLETED'));
+		expect(deps.log).toHaveBeenCalledWith(
+			expect.stringContaining('svelte-check unknown errors unknown warnings')
+		);
+	});
+
+	it.each([2, 3, null])('returns 2 without writing for svelte-check status %s', (status) => {
+		const { deps, outputs } = mainFixture();
+		outputs['svelte-check'].status = status;
+		expect(main([], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith(expect.stringContaining('svelte-check'));
+	});
+
+	it.each(['tool crashed', '{}', '[{}]'])(
+		'returns 2 without writing for invalid ESLint JSON results: %s',
+		(stdout) => {
+			const { deps, outputs } = mainFixture();
+			outputs.eslint.stdout = stdout;
+			expect(main([], deps)).toBe(2);
+			expect(deps.writeBaseline).not.toHaveBeenCalled();
+			expect(deps.error).toHaveBeenCalledWith(
+				expect.stringContaining('ESLint did not produce valid completed JSON results')
+			);
+			expect(deps.log).toHaveBeenCalledWith(
+				expect.stringContaining('eslint unknown errors unknown warnings')
+			);
+		}
+	);
+
+	it('returns 2 without writing for ESLint status 2 even with valid JSON', () => {
+		const { deps, outputs } = mainFixture();
+		outputs.eslint.status = 2;
+		expect(main([], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith(
+			expect.stringContaining('eslint . --format json failed')
+		);
+	});
+
+	it('returns 2 without writing when run returns a spawn error', () => {
+		const { deps, outputs } = mainFixture();
+		outputs['svelte-check'].error = new Error('spawn failed');
+		expect(main([], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith(expect.stringContaining('spawn failed'));
+	});
+
+	it('returns 2 without writing for an unknown argument', () => {
+		const { deps } = mainFixture();
+		expect(main(['--unknown'], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith('quality-ratchet: Unknown argument: --unknown');
+		expect(deps.run).not.toHaveBeenCalled();
+	});
+
+	it.each([-1, 1.5])('returns 2 without writing for invalid baseline count %s', (count) => {
+		const { deps } = mainFixture({ ...empty(), eslint: { 'src/a.ts': counts(count) } });
+		expect(main([], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith(
+			'quality-ratchet: Invalid baseline count: eslint src/a.ts errors'
+		);
+		expect(deps.run).not.toHaveBeenCalled();
+	});
+
+	it('returns 0 and writes a missing baseline with --update', () => {
+		const { deps } = mainFixture();
+		deps.readBaseline.mockImplementationOnce(() => {
+			throw Object.assign(new Error('baseline missing'), { code: 'ENOENT' });
+		});
+		expect(main(['--update'], deps)).toBe(0);
+		expect(deps.writeBaseline).toHaveBeenCalledTimes(1);
+		expect(JSON.parse(deps.readBaseline())).toEqual(empty());
+	});
+
+	it('returns 2 without writing for a missing baseline without --update', () => {
+		const { deps } = mainFixture();
+		deps.readBaseline.mockImplementationOnce(() => {
+			throw Object.assign(new Error('baseline missing'), { code: 'ENOENT' });
+		});
+		expect(main([], deps)).toBe(2);
+		expect(deps.writeBaseline).not.toHaveBeenCalled();
+		expect(deps.error).toHaveBeenCalledWith('quality-ratchet: baseline missing');
+		expect(deps.run).not.toHaveBeenCalled();
+	});
+
+	it('forces all seven environment variables to x for every command', () => {
+		const forcedEnv = {
+			PUBLIC_SUPABASE_URL: 'x',
+			PUBLIC_SUPABASE_ANON_KEY: 'x',
+			PUBLIC_MIMIR_URL: 'x',
+			PUBLIC_MIMIR_ANON_KEY: 'x',
+			PUBLIC_WALLETCONNECT_PROJECT_ID: 'x',
+			PUBLIC_DS_GALLERY: 'x',
+			PRIVATE_SUPABASE_ROLE_KEY: 'x'
+		};
+		for (const name of Object.keys(forcedEnv)) vi.stubEnv(name, 'inherited');
+		const { deps } = mainFixture();
+		expect(main([], deps)).toBe(0);
+		expect(deps.run).toHaveBeenCalledTimes(4);
+		for (const [, , env] of deps.run.mock.calls) {
+			for (const name of Object.keys(forcedEnv)) expect(env[name]).toBe('x');
+		}
+		for (const name of Object.keys(forcedEnv)) expect(process.env[name]).toBe('inherited');
+	});
+});
 
 describe('svelte-check machine output', () => {
 	it('counts errors and warnings per file and ignores other lines', () => {
