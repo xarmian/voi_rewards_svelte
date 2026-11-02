@@ -43,3 +43,18 @@ test('WithdrawModal renders pending without claiming success or confirmation', (
 	);
 	expect(pendingBranch, 'Pool errors must never be rendered as raw HTML').not.toMatch(/\{@html\b/);
 });
+
+test('WithdrawModal resumes an unresolved withdrawal instead of offering a second one', () => {
+	expect(source, 'WithdrawModal must import the pending-withdrawal registry').toMatch(
+		/from\s*['"]\$lib\/chain\/pendingWithdrawals['"]/
+	);
+	expect(source, 'An unresolved withdrawal must be remembered for its contract').toContain(
+		'rememberPendingWithdrawal('
+	);
+	expect(source, 'A reopened modal must look up an unresolved withdrawal').toContain(
+		'getPendingWithdrawal('
+	);
+	expect(source, 'A confirmed withdrawal must clear the unresolved record').toContain(
+		'clearPendingWithdrawal('
+	);
+});
