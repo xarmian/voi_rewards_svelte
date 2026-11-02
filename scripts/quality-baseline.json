@@ -1,0 +1,402 @@
+{
+	"eslint": {
+		"src/lib/component/BridgeAnimation.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/component/BridgeModal.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/lib/component/CalculatorComponent.svelte": {
+			"errors": 21,
+			"warnings": 0
+		},
+		"src/lib/component/ClaimableTokenCard.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/component/EpochComponent.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/component/FungibleToken.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/component/ImportRecipientsModal.svelte": {
+			"errors": 17,
+			"warnings": 0
+		},
+		"src/lib/component/LockVestComponent.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/component/NodeComponent.svelte": {
+			"errors": 9,
+			"warnings": 0
+		},
+		"src/lib/component/OptOutModal.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/component/PortfolioComponent.svelte": {
+			"errors": 24,
+			"warnings": 0
+		},
+		"src/lib/component/PortfolioSectionNFT.svelte": {
+			"errors": 9,
+			"warnings": 0
+		},
+		"src/lib/component/Project.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/component/ProposalsComponent.svelte": {
+			"errors": 10,
+			"warnings": 0
+		},
+		"src/lib/component/QuestCard.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/component/QuestComponent.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/lib/component/RecipientRow.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/lib/component/RegisterVoteKey.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/component/SendTokenModal.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/component/TokenTransfersModal.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/component/WalletSearch.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/lib/component/WithdrawModal.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/component/ui/Collection.svelte": {
+			"errors": 12,
+			"warnings": 0
+		},
+		"src/lib/component/ui/Modal.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/component/ui/Share.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/component/ui/StakingComponent.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/lib/component/ui/TokenCard.svelte": {
+			"errors": 4,
+			"warnings": 0
+		},
+		"src/lib/component/ui/TokenDetail.svelte": {
+			"errors": 6,
+			"warnings": 0
+		},
+		"src/lib/component/ui/TokenTransactionHistory.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/components/CommandPalette.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/components/EpochChart.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/components/EpochStats.svelte": {
+			"errors": 9,
+			"warnings": 0
+		},
+		"src/lib/components/EpochTable.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/components/OHLCVChart.svelte": {
+			"errors": 12,
+			"warnings": 0
+		},
+		"src/lib/components/PoolDetails.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/lib/components/PoolSelector.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/components/TokenMetricsBar.svelte": {
+			"errors": 10,
+			"warnings": 0
+		},
+		"src/lib/components/TransactionCountsChart.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/components/ecosystem/ProjectCard.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/components/wallet/AccountInfo.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/ds/ChartFrame/ChartFrame.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/ds/Header/MobileMenu.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/server/markets/pairs.ts": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/server/markets/priceMap.ts": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/server/markets/rows.ts": {
+			"errors": 4,
+			"warnings": 0
+		},
+		"src/lib/server/markets/sources.ts": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/utils/chart-adapters.ts": {
+			"errors": 4,
+			"warnings": 0
+		},
+		"src/lib/utils/vestige.ts": {
+			"errors": 4,
+			"warnings": 0
+		},
+		"src/routes/(site)/HomeRewards.svelte": {
+			"errors": 12,
+			"warnings": 0
+		},
+		"src/routes/(site)/about/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/directory/[...category]/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/faq/+page.svelte": {
+			"errors": 7,
+			"warnings": 0
+		},
+		"src/routes/(site)/how_to_node/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/leaderboard/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/leaderboard/Leaderboard.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/markets/+page.svelte": {
+			"errors": 17,
+			"warnings": 0
+		},
+		"src/routes/(site)/markets/+page.ts": {
+			"errors": 4,
+			"warnings": 0
+		},
+		"src/routes/(site)/phase1/+page.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/routes/(site)/phase2/[...slug]/+page.svelte": {
+			"errors": 7,
+			"warnings": 0
+		},
+		"src/routes/(site)/privacy/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/quests/ProjectModal.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/quests/ProjectSlideout.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/quests/QuestsPage.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/relays/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/vanity/+page.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/(site)/wallet/[...id]/+page.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/routes/+layout.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/routes/api/markets/+server.ts": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/routes/api/ohlcv/+server.ts": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/api/pool-analytics/+server.ts": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/routes/api/token-analytics/+server.ts": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/routes/api/token-info/+server.ts": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/routes/arc72/+layout.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/routes/arc72/+page.svelte": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"src/routes/arc72/collection/[cid]/+page.svelte": {
+			"errors": 6,
+			"warnings": 0
+		},
+		"src/routes/arc72/collection/[cid]/token/[tokenid]/+page.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/routes/arc72/portfolio/[id]/+page.svelte": {
+			"errors": 7,
+			"warnings": 0
+		},
+		"supabase/functions/fetch-market-data-test/index.ts": {
+			"errors": 3,
+			"warnings": 0
+		},
+		"supabase/functions/fetch-market-data/index.ts": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"tailwind.config.js": {
+			"errors": 1,
+			"warnings": 0
+		}
+	},
+	"svelte-check": {
+		"src/lib/component/CalculatorComponent.svelte": {
+			"errors": 0,
+			"warnings": 2
+		},
+		"src/lib/component/Project.svelte": {
+			"errors": 22,
+			"warnings": 0
+		},
+		"src/lib/component/ProjectBox.svelte": {
+			"errors": 2,
+			"warnings": 0
+		},
+		"src/lib/component/RegisterVoteKey.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/component/ui/Collection.svelte": {
+			"errors": 0,
+			"warnings": 5
+		},
+		"src/lib/component/ui/TokenCard.svelte": {
+			"errors": 0,
+			"warnings": 1
+		},
+		"src/lib/component/ui/TokenDetail.svelte": {
+			"errors": 0,
+			"warnings": 1
+		},
+		"src/lib/components/OHLCVChart.svelte": {
+			"errors": 3,
+			"warnings": 1
+		},
+		"src/lib/components/TokenMetricsBar.svelte": {
+			"errors": 1,
+			"warnings": 0
+		},
+		"src/lib/components/TokenSelector.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/lib/components/TransactionCountsChart.svelte": {
+			"errors": 4,
+			"warnings": 0
+		},
+		"src/lib/ds/ChartFrame/ChartFrame.svelte": {
+			"errors": 0,
+			"warnings": 1
+		},
+		"src/routes/(site)/HomeRewards.svelte": {
+			"errors": 0,
+			"warnings": 12
+		},
+		"src/routes/(site)/faq/+page.svelte": {
+			"errors": 4,
+			"warnings": 1
+		},
+		"src/routes/(site)/markets/+page.svelte": {
+			"errors": 5,
+			"warnings": 0
+		},
+		"src/routes/(site)/phase1/+page.svelte": {
+			"errors": 3,
+			"warnings": 1
+		},
+		"src/routes/(site)/phase2/[...slug]/+page.svelte": {
+			"errors": 5,
+			"warnings": 6
+		},
+		"src/routes/arc72/+layout.svelte": {
+			"errors": 0,
+			"warnings": 2
+		},
+		"src/routes/arc72/collection/[cid]/token/[tokenid]/+page.svelte": {
+			"errors": 0,
+			"warnings": 1
+		}
+	}
+}

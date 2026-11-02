@@ -23,7 +23,7 @@ commit() { # commit <path>...: touch each path and commit; prints the new sha
 
 base=$(commit src/app.ts README.md)
 code=$(commit src/routes/+page.svelte)
-docs=$(commit README.md src/lib/x.test.ts tests/e2e.spec.ts .github/workflows/ci.yml scripts/check-changed.sh)
+docs=$(commit README.md src/lib/x.test.ts tests/e2e.spec.ts .github/workflows/ci.yml scripts/quality-ratchet.mjs)
 faq=$(commit static/content/faq/a.md)
 gen=$(commit scripts/generateFaqData.js)
 self=$(commit scripts/vercel-ignore.sh)

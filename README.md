@@ -18,6 +18,14 @@ npm i
 npm run dev
 ```
 
+### Quality ratchet
+
+Run `npm run check:ratchet` to check svelte-check and ESLint counts per file and severity against
+`scripts/quality-baseline.json`. Increases fail; fixes lower the baseline automatically. Commit the
+lowered baseline with the fix. Use `npm run check:ratchet -- --frozen` to fail if a decrease has not
+been committed, or `npm run check:ratchet -- --update` to explicitly accept the current counts,
+including increases, for review in the baseline diff.
+
 ## Deployments
 
 Vercel runs `scripts/vercel-ignore.sh` before every build (`vercel.json` `ignoreCommand`) to save build minutes:
