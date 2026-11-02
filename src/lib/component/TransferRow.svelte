@@ -65,6 +65,9 @@
 								{transfer.lpExchangeType === 'add' ? 'Add Liquidity' : 'Remove Liquidity'}
 							</span>
 						{/if}
+						{#if transfer.lpLabelUnavailable}
+							<span class="text-xs text-gray-500 dark:text-gray-400">Label unavailable</span>
+						{/if}
 					</div>
 					<div class="text-xs text-gray-500 dark:text-gray-400">
 						{formatTimestamp(transfer.timestamp)}
@@ -153,6 +156,9 @@
 						>
 							Inner
 						</span>
+					{/if}
+					{#if transfer.lpLabelUnavailable}
+						<span class="text-xs text-gray-500 dark:text-gray-400">Label unavailable</span>
 					{/if}
 				</div>
 				<div class="text-xs text-gray-500 dark:text-gray-400">

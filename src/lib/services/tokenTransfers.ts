@@ -13,6 +13,13 @@ import {
 	decodeAltWithdrawEvent
 } from '$lib/chain/arc200Events';
 
+export class TransfersUnavailableError extends Error {
+	constructor(cause: unknown) {
+		super("Couldn't load transfers right now. The history service isn't responding.", { cause });
+		this.name = 'TransfersUnavailableError';
+	}
+}
+
 export interface Transfer {
 	contractid?: string;
 	from: string;
@@ -29,6 +36,7 @@ export interface Transfer {
 	fee?: number;
 	isLpExchange?: boolean;
 	lpExchangeType?: 'add' | 'remove';
+	lpLabelUnavailable?: boolean;
 	exchangedTokens?: {
 		tokenA?: {
 			id: string;
@@ -185,6 +193,9 @@ export async function fetchTokenTransfers({
 		const response = await fetch(
 			`/api/mimir?action=get_arc200_transfers&p_contractid=${token.id}&p_user=${walletId}&p_limit=${limit}&p_offset=${offset}`
 		);
+		if (!response.ok) {
+			throw new Error(`History service returned HTTP ${response.status}`);
+		}
 		const result = await response.json();
 
 		if (result.error) {
@@ -503,6 +514,7 @@ export async function fetchTokenTransfers({
 						}
 					}
 				} catch (err) {
+					transfer.lpLabelUnavailable = true;
 					console.error('Error processing LP transaction:', err);
 				}
 			}
@@ -573,6 +585,9 @@ export async function fetchTokenTransfers({
 		});
 
 		return { transfers: newTransfers, nextToken, hasMore };
+	} catch (err) {
+		console.error('Error fetching token transfers:', err);
+		throw new TransfersUnavailableError(err);
 	} finally {
 		onPagination?.({ nextToken, hasMore });
 	}
