@@ -31,6 +31,9 @@
 	let accountPart: Part<AccountSnapshot> | { status: 'loading' } = { status: 'loading' };
 	let createdAtPart: Part<number> | { status: 'loading' } = { status: 'loading' };
 	let rewardsPart: Part<RewardsTransaction[]> | { status: 'loading' } = { status: 'loading' };
+	let epochPart: { status: 'loading' } | { status: 'loaded' } | { status: 'unavailable' } = {
+		status: 'loading'
+	};
 	$: accountBalance = accountPart.status === 'loaded' ? accountPart.value.balance : 0;
 	let loadGeneration = 0;
 	let accountCreationDate: string | null = null;
@@ -332,6 +335,8 @@
 		accountPart = { status: 'loading' };
 		createdAtPart = { status: 'loading' };
 		rewardsPart = { status: 'loading' };
+		epochPart = { status: 'loading' };
+		currentEpochRewards = 0;
 		voteKeyExpiry = undefined;
 		voteKeyExpiryDate = undefined;
 		if (totalsReady) recomputeTotals();
@@ -397,8 +402,11 @@
 					(epoch) => now >= epoch.startDate && now <= epoch.endDate
 				);
 				currentEpochRewards = currentEpoch?.expectedReward ?? 0;
+				epochPart = { status: 'loaded' };
 			} catch (err) {
 				console.error('Error calculating rewards:', err);
+				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
+				epochPart = { status: 'unavailable' };
 			}
 		})();
 
@@ -1080,12 +1088,13 @@
 						<div class="flex justify-between items-center">
 							<span class="text-gray-600 dark:text-gray-300">Current Epoch</span>
 							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{#if accountPart.status === 'loaded'}
+								{#if accountPart.status === 'loaded' && epochPart.status === 'loaded'}
 									{(accountPart.value.pendingRewards / 1e6 + currentEpochRewards).toLocaleString()} VOI
-								{:else if accountPart.status === 'loading'}
+								{:else if accountPart.status === 'loading' || epochPart.status === 'loading'}
 									…
 								{:else}
 									Unavailable
+									<button on:click={retryAccountDetails} class="text-xs underline">Retry</button>
 								{/if}
 							</span>
 						</div>
