@@ -75,3 +75,26 @@ test('editing clears selection and drops an in-flight result for its old ticket'
 	expect(recipient).toEqual(before);
 	expect(onError).toHaveBeenCalledOnce();
 });
+
+test('keeps edited field text independent from the cleared receiver', () => {
+	expect(source).toMatch(/bind:searchText=\{recipientText\}/);
+	const recipient = {
+		address: 'old',
+		info: null,
+		isValid: false,
+		lookupError: null,
+		isLoading: false,
+		lookupId: 0
+	};
+	const context = createContext({
+		recipient,
+		recipientText: 'new.voi',
+		selectedAddress: 'old',
+		nextLookupId,
+		onError: vi.fn()
+	});
+	runInContext(ts.transpileModule(fn('handleRecipientEdit'), {}).outputText, context);
+	runInContext('handleRecipientEdit()', context);
+	expect(runInContext('recipientText', context)).toBe('new.voi');
+	expect(runInContext('selectedAddress', context)).toBeNull();
+});

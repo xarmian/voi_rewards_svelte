@@ -44,3 +44,17 @@ test('does not invalidate unchanged selected text or require an onEdit callback'
 	runInContext('onEdit = undefined; searchText = "bob.voi"; handleInput()', context);
 	expect(runInContext('selectedText', context)).toBeNull();
 });
+
+test('uses the current input event value before checking for an edit', () => {
+	const onEdit = vi.fn();
+	const context = createContext({
+		selectedText: 'alice.voi',
+		searchText: 'alice.voi',
+		onEdit,
+		debouncedSearch: vi.fn()
+	});
+	runInContext(ts.transpileModule(fn('handleInput'), {}).outputText, context);
+	runInContext('handleInput({ currentTarget: { value: "bob.voi" } })', context);
+	expect(onEdit).toHaveBeenCalledOnce();
+	expect(runInContext('searchText', context)).toBe('bob.voi');
+});

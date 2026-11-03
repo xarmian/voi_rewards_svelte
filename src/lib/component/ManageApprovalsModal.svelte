@@ -6,6 +6,7 @@
 	import { signTransactions } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
 	import WalletSearch from './WalletSearch.svelte';
+	import ResolvedAddress from './ResolvedAddress.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -22,6 +23,7 @@
 	let isRefreshing = false;
 
 	let spenderAddress = '';
+	let spenderText = '';
 	let approvalAmount = '';
 	let outgoingApprovals: TokenApproval[] = [];
 	let refreshTrigger = 0; // Used to trigger re-fetches
@@ -132,6 +134,7 @@
 			approvalSuccess = true;
 			successTxId = result.txId;
 			spenderAddress = '';
+			spenderText = '';
 			approvalAmount = '';
 			hasChanges = true;
 
@@ -265,12 +268,16 @@
 								<WalletSearch
 									inputId="spender"
 									onSubmit={handleSpenderSelected}
+									onEdit={() => (spenderAddress = '')}
 									loadPreviousValue={false}
 									storeAddress={false}
 									clearOnSubmit={false}
 									hideSubmitButton={true}
-									searchText={spenderAddress}
+									bind:searchText={spenderText}
 								/>
+								{#if algosdk.isValidAddress(spenderAddress)}
+									<ResolvedAddress address={spenderAddress} name={spenderText} />
+								{/if}
 							</div>
 
 							<div>
@@ -304,7 +311,10 @@
 							<button
 								on:click={handleCreateApproval}
 								class="w-full px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-								disabled={isApproving || !canSignTransactions || !spenderAddress || !approvalAmount}
+								disabled={isApproving ||
+									!canSignTransactions ||
+									!algosdk.isValidAddress(spenderAddress) ||
+									!approvalAmount}
 							>
 								{#if isApproving}
 									<div

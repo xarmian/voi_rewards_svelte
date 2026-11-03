@@ -20,6 +20,14 @@
 		type PendingTracker
 	} from '$lib/chain/pendingSends';
 	import BridgeAnimation from './BridgeAnimation.svelte';
+	import ResolvedAddress from './ResolvedAddress.svelte';
+	import {
+		emptyDestination,
+		editDestination,
+		selectDestinationName,
+		unresolvedName,
+		type DestinationState
+	} from '$lib/chain/destinationSelection';
 	import confetti from 'canvas-confetti';
 
 	interface BridgeToken {
@@ -69,8 +77,10 @@
 
 	const dispatch = createEventDispatcher();
 	let selectedDirection: 'voi-to-algorand' | 'algorand-to-voi' = 'voi-to-algorand';
-	let algorandDestinationAddress = '';
-	let voiDestinationAddress = '';
+	let algorandDestination: DestinationState = { ...emptyDestination };
+	let voiDestination: DestinationState = { ...emptyDestination };
+	const nfdRules = { kind: 'nfd' as const, isValidAddress: algosdk.isValidAddress };
+	const envoiRules = { kind: 'envoi' as const, isValidAddress: algosdk.isValidAddress };
 	let amount = '';
 	let qrCodeDataUrl = '';
 	let peraWalletUrl = '';
@@ -193,7 +203,7 @@
 	let isSearching = false;
 	let showSearchResults = false;
 	let searchTimeout: number | undefined;
-	let isValidDestination = false;
+	$: isValidDestination = Boolean(destinationAddress);
 	let resolvedName: ResolvedName | null = null;
 	let selectedSearchIndex = -1;
 	let searchInputRef: HTMLInputElement;
@@ -210,7 +220,7 @@
 	let sourceSearchResults: (NFDResult | ResolvedName)[] = [];
 	let selectedSourceSearchIndex = -1;
 
-	$: destinationAddress = isVoiToAlgorand ? algorandDestinationAddress : voiDestinationAddress;
+	$: destinationAddress = (isVoiToAlgorand ? algorandDestination : voiDestination).address ?? '';
 	$: isVoiToAlgorand = selectedDirection === 'voi-to-algorand';
 	$: destinationNetwork = isVoiToAlgorand ? 416001 : 416101;
 	$: amountInAtomicUnits = Math.floor(Number(amount) * 1e6);
@@ -246,105 +256,112 @@
 		}
 	});
 
-	// Handle input changes
+	// Keep the visible selection and the receiver together, including across asynchronous searches.
 	async function handleInput(input: string) {
-		if (searchTimeout) {
-			clearTimeout(searchTimeout);
-		}
+		if (searchTimeout) clearTimeout(searchTimeout);
+		const direction = isVoiToAlgorand;
+		const rules = direction ? nfdRules : envoiRules;
+		const state = input
+			? editDestination(direction ? algorandDestination : voiDestination, input, rules)
+			: { ...emptyDestination };
+		if (direction) algorandDestination = state;
+		else voiDestination = state;
+		const isCurrent = () =>
+			direction === isVoiToAlgorand && state === (direction ? algorandDestination : voiDestination);
+		resolvedName = null;
+		searchResults = [];
+		showSearchResults = false;
+		selectedSearchIndex = -1;
+		isSearching = false;
 
-		// Update the appropriate address based on direction
-		if (isVoiToAlgorand) {
-			algorandDestinationAddress = input;
-		} else {
-			voiDestinationAddress = input;
-		}
-
-		// Check if input is a valid address
-		if (algosdk.isValidAddress(input)) {
-			isValidDestination = true;
-			showSearchResults = false;
-
-			// Try to resolve name based on direction
-			if (isVoiToAlgorand) {
-				// Try to resolve NFD for this address
-				const nfdResults = await getNFD([input]);
-				if (nfdResults.length > 0) {
-					const searchResult = await searchNFDomains(nfdResults[0].replacementValue);
-					resolvedName = searchResult[0]
-						? {
-								name: searchResult[0].name,
-								address: searchResult[0].owner,
-								avatar: getAvatarUrl(searchResult[0]) || undefined
-							}
+		if (state.address) {
+			try {
+				if (direction) {
+					const names = await getNFD([input]);
+					if (!isCurrent()) return;
+					if (names.length > 0) {
+						const results = await searchNFDomains(names[0].replacementValue);
+						if (!isCurrent()) return;
+						resolvedName = results[0]
+							? {
+									name: results[0].name,
+									address: input,
+									avatar: getAvatarUrl(results[0]) || undefined
+								}
+							: null;
+					}
+				} else {
+					const names = await getEnvoiNames([input]);
+					if (!isCurrent()) return;
+					resolvedName = names[0]
+						? { name: names[0].name, address: input, avatar: names[0].metadata.avatar || undefined }
 						: null;
-				} else {
-					resolvedName = null;
 				}
-			} else {
-				// Try to resolve Envoi name for this address
-				const envoiResults = await getEnvoiNames([input]);
-				if (envoiResults.length > 0) {
-					resolvedName = {
-						name: envoiResults[0].name,
-						address: envoiResults[0].address,
-						avatar: envoiResults[0].metadata.avatar || undefined
-					};
-				} else {
-					resolvedName = null;
+				if (resolvedName) {
+					if (direction) algorandDestination = { ...state, name: resolvedName.name };
+					else voiDestination = { ...state, name: resolvedName.name };
 				}
+			} catch (error) {
+				console.error('Error looking up destination name:', error);
 			}
 			return;
 		}
-
-		// Not an address, so handle as name search
-		isValidDestination = false;
-		resolvedName = null;
-
-		if (input.length < 2) {
-			searchResults = [];
-			showSearchResults = false;
-			return;
-		}
+		if (state.error || input.length < 2) return;
 
 		searchTimeout = window.setTimeout(async () => {
+			if (!isCurrent()) return;
 			isSearching = true;
 			try {
-				if (isVoiToAlgorand) {
-					const results = await searchNFDomains(input);
-					searchResults = results;
-				} else {
-					const results = await searchEnvoi(input);
-					searchResults = results.map((result) => ({
-						name: result.name,
-						address: result.address,
-						avatar: result.metadata.avatar || undefined
-					}));
-				}
+				const results = direction
+					? await searchNFDomains(input)
+					: (await searchEnvoi(input)).map((result) => ({
+							name: result.name,
+							address: result.address,
+							avatar: result.metadata.avatar || undefined
+						}));
+				if (!isCurrent()) return;
+				searchResults = results;
 				showSearchResults = true;
+				if (results.length === 0) {
+					if (direction) algorandDestination = unresolvedName(state, rules);
+					else voiDestination = unresolvedName(state, rules);
+				}
 			} catch (error) {
+				if (!isCurrent()) return;
 				console.error('Error searching names:', error);
-				searchResults = [];
+				const failed = { ...state, error: 'Could not resolve this name. Please try again.' };
+				if (direction) algorandDestination = failed;
+				else voiDestination = failed;
 			} finally {
-				isSearching = false;
+				// Only the current query may stop its loading indicator.
+				if (
+					direction === isVoiToAlgorand &&
+					input === (direction ? algorandDestination : voiDestination).text
+				) {
+					isSearching = false;
+				}
 			}
 		}, 300);
 	}
 
 	function selectSearchResult(result: (typeof searchResults)[0]) {
 		if ('owner' in result) {
-			// NFD result
-			algorandDestinationAddress = result.owner;
-			resolvedName = {
-				name: result.name,
-				address: result.owner,
-				avatar: getAvatarUrl(result) || undefined
-			};
+			algorandDestination = selectDestinationName(
+				algorandDestination,
+				{ name: result.name, address: result.owner },
+				nfdRules
+			);
+			resolvedName = algorandDestination.address
+				? {
+						name: result.name,
+						address: algorandDestination.address,
+						avatar: getAvatarUrl(result) || undefined
+					}
+				: null;
 		} else {
-			// Envoi result
-			voiDestinationAddress = result.address;
-			resolvedName = result;
+			voiDestination = selectDestinationName(voiDestination, result, envoiRules);
+			resolvedName = voiDestination.address ? result : null;
 		}
-		isValidDestination = true;
 		showSearchResults = false;
 	}
 
@@ -358,11 +375,11 @@
 	}
 
 	async function handleSubmit() {
-		if (bridgeStatus !== 'idle') return;
+		if (bridgeStatus !== 'idle' || !algosdk.isValidAddress(destinationAddress)) return;
 		if (isVoiToAlgorand) {
 			const sender = $selectedWallet?.address;
 			const senderTracker = tracker;
-			const destination = algorandDestinationAddress;
+			const destination = destinationAddress;
 			const enteredAmount = amount;
 			const symbol = selectedToken.symbol;
 			const note = {
@@ -477,7 +494,7 @@
 			// Generate QR code for Algorand to VOI transfer
 			const note = {
 				destinationNetwork,
-				destinationAddress: voiDestinationAddress,
+				destinationAddress,
 				destinationToken: selectedToken.voiAssetId,
 				feeAmount,
 				destinationAmount,
@@ -492,7 +509,9 @@
 			peraWalletUrl = peraUrl;
 
 			try {
-				qrCodeDataUrl = await QRCode.toDataURL(peraUrl);
+				const dataUrl = await QRCode.toDataURL(peraUrl);
+				if (destinationAddress !== note.destinationAddress || isVoiToAlgorand) return;
+				qrCodeDataUrl = dataUrl;
 				showQrCode = true;
 			} catch (err) {
 				console.error('Error generating QR code:', err);
@@ -514,7 +533,7 @@
 			sourceTxId,
 			sourceNetwork: isVoiToAlgorand ? 416101 : 416001,
 			bridgeAddress: BRIDGE_ADDRESS,
-			destinationAddress: isVoiToAlgorand ? algorandDestinationAddress : voiDestinationAddress,
+			destinationAddress,
 			destinationAssetId: isVoiToAlgorand
 				? selectedToken.algorandAssetId
 				: selectedToken.voiAssetId,
@@ -636,6 +655,14 @@
 	});
 
 	function resetBridgeState() {
+		algorandDestination = { ...emptyDestination };
+		voiDestination = { ...emptyDestination };
+		resolvedName = null;
+		searchResults = [];
+		showSearchResults = false;
+		showConnectedWallets = false;
+		selectedSearchIndex = -1;
+		isSearching = false;
 		depositController?.abort();
 		qrMonitorActive = false;
 		pendingController?.abort();
@@ -656,6 +683,14 @@
 	}
 
 	function goBack() {
+		algorandDestination = { ...emptyDestination };
+		voiDestination = { ...emptyDestination };
+		resolvedName = null;
+		searchResults = [];
+		showSearchResults = false;
+		showConnectedWallets = false;
+		selectedSearchIndex = -1;
+		isSearching = false;
 		depositSessions.clear();
 		qrMonitorKey = undefined;
 		depositController?.abort();
@@ -667,6 +702,14 @@
 	}
 
 	function closeModal() {
+		algorandDestination = { ...emptyDestination };
+		voiDestination = { ...emptyDestination };
+		resolvedName = null;
+		searchResults = [];
+		showSearchResults = false;
+		showConnectedWallets = false;
+		selectedSearchIndex = -1;
+		isSearching = false;
 		depositController?.abort();
 		qrMonitorActive = false;
 		monitorController?.abort();
@@ -674,8 +717,6 @@
 		showCloseConfirm = false;
 		show = false;
 		showQrCode = false;
-		algorandDestinationAddress = '';
-		voiDestinationAddress = '';
 		searchResults = [];
 		showSearchResults = false;
 		isMonitoringAlgorand = false;
@@ -796,19 +837,8 @@
 				if (selectedSearchIndex >= 0) {
 					if (showConnectedWallets) {
 						const address = uniqueConnectedWallets[selectedSearchIndex];
-						voiDestinationAddress = address;
-						isValidDestination = true;
+						void handleInput(address);
 						showConnectedWallets = false;
-						// Try to resolve Envoi name
-						getEnvoiNames([address]).then((results) => {
-							if (results.length > 0) {
-								resolvedName = {
-									name: results[0].name,
-									address: results[0].address,
-									avatar: results[0].metadata.avatar || undefined
-								};
-							}
-						});
 					} else {
 						selectSearchResult(searchResults[selectedSearchIndex]);
 					}
@@ -822,19 +852,15 @@
 		}
 	}
 
-	// Reset search state when direction changes
+	// An address selected for one direction must be selected again after switching chains.
 	$: if (selectedDirection) {
+		algorandDestination = { ...emptyDestination };
+		voiDestination = { ...emptyDestination };
 		showSearchResults = false;
+		showConnectedWallets = false;
+		searchResults = [];
 		selectedSearchIndex = -1;
 		resolvedName = null;
-		isValidDestination = false;
-
-		// Clear the destination address that's no longer relevant
-		if (isVoiToAlgorand) {
-			voiDestinationAddress = '';
-		} else {
-			algorandDestinationAddress = '';
-		}
 	}
 
 	function getInitials(text: string): string {
@@ -1003,7 +1029,7 @@
 		const key = JSON.stringify([
 			amountInAtomicUnits,
 			destinationAmount,
-			voiDestinationAddress,
+			destinationAddress,
 			selectedToken.algorandAssetId,
 			selectedToken.voiAssetId,
 			algorandSourceAddress
@@ -1023,7 +1049,7 @@
 				destination: {
 					sourceNetwork: 416001,
 					bridgeAddress: BRIDGE_ADDRESS,
-					destinationAddress: voiDestinationAddress,
+					destinationAddress,
 					destinationAssetId: selectedToken.voiAssetId,
 					destinationAmount
 				},
@@ -1031,7 +1057,7 @@
 					assetId: Number(selectedToken.algorandAssetId),
 					bridgeAddress: BRIDGE_ADDRESS,
 					amount: amountInAtomicUnits,
-					destinationAddress: voiDestinationAddress,
+					destinationAddress,
 					sourceAddress: algorandSourceAddress || undefined
 				}
 			};
@@ -1264,10 +1290,9 @@
 													showTokenSelector = false;
 													// Reset form state when token changes
 													amount = '';
-													algorandDestinationAddress = '';
-													voiDestinationAddress = '';
+													algorandDestination = { ...emptyDestination };
+													voiDestination = { ...emptyDestination };
 													resolvedName = null;
-													isValidDestination = false;
 													showSearchResults = false;
 													searchResults = [];
 													algorandSourceAddress = '';
@@ -1612,12 +1637,12 @@
 								<div class="relative">
 									<input
 										type="text"
-										bind:value={voiDestinationAddress}
+										bind:value={algorandDestination.text}
 										bind:this={searchInputRef}
 										on:input={(e) => handleInput(e.currentTarget.value)}
 										on:keydown={handleKeydown}
 										on:focus={() => {
-											if (!voiDestinationAddress) {
+											if (!algorandDestination.text) {
 												showConnectedWallets = true;
 												showSearchResults = false;
 											}
@@ -1625,18 +1650,15 @@
 										class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
 										placeholder={`Enter address or search ${isVoiToAlgorand ? 'NFDomains' : 'Envoi names'}...`}
 										class:border-green-500={isValidDestination}
-										class:border-red-500={destinationAddress && !isValidDestination}
+										class:border-red-500={Boolean(algorandDestination.error)}
 									/>
-									{#if voiDestinationAddress}
+									{#if algorandDestination.text}
 										<button
 											type="button"
 											class="absolute inset-y-0 right-0 pr-3 flex items-center"
 											aria-label="Clear input"
 											on:click={() => {
-												voiDestinationAddress = '';
-												resolvedName = null;
-												isValidDestination = false;
-												showSearchResults = false;
+												void handleInput('');
 											}}
 										>
 											<svg
@@ -1706,6 +1728,18 @@
 											{/each}
 										</ul>
 									</div>
+								{/if}
+
+								{#if algorandDestination.address}
+									<ResolvedAddress
+										address={algorandDestination.address}
+										name={algorandDestination.name}
+									/>
+								{/if}
+								{#if algorandDestination.error}
+									<p class="text-sm text-red-600 dark:text-red-400" role="alert">
+										{algorandDestination.error}
+									</p>
 								{/if}
 
 								{#if resolvedName}
@@ -1780,12 +1814,12 @@
 								<div class="relative">
 									<input
 										type="text"
-										bind:value={voiDestinationAddress}
+										bind:value={voiDestination.text}
 										bind:this={searchInputRef}
 										on:input={(e) => handleInput(e.currentTarget.value)}
 										on:keydown={handleKeydown}
 										on:focus={() => {
-											if (!voiDestinationAddress) {
+											if (!voiDestination.text) {
 												showConnectedWallets = true;
 												showSearchResults = false;
 											}
@@ -1793,18 +1827,15 @@
 										class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
 										placeholder="Enter address or search Envoi names..."
 										class:border-green-500={isValidDestination}
-										class:border-red-500={destinationAddress && !isValidDestination}
+										class:border-red-500={Boolean(voiDestination.error)}
 									/>
-									{#if voiDestinationAddress}
+									{#if voiDestination.text}
 										<button
 											type="button"
 											class="absolute inset-y-0 right-0 pr-3 flex items-center"
 											aria-label="Clear input"
 											on:click={() => {
-												voiDestinationAddress = '';
-												resolvedName = null;
-												isValidDestination = false;
-												showSearchResults = false;
+												void handleInput('');
 												showConnectedWallets = true;
 											}}
 										>
@@ -1825,7 +1856,7 @@
 									{/if}
 								</div>
 
-								{#if showConnectedWallets && uniqueConnectedWallets.length > 0 && !voiDestinationAddress}
+								{#if showConnectedWallets && uniqueConnectedWallets.length > 0 && !voiDestination.text}
 									<div
 										bind:this={searchDropdownRef}
 										class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
@@ -1836,19 +1867,8 @@
 													<button
 														class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
 														on:click={() => {
-															voiDestinationAddress = address;
-															isValidDestination = true;
+															void handleInput(address);
 															showConnectedWallets = false;
-															// Try to resolve Envoi name
-															getEnvoiNames([address]).then((results) => {
-																if (results.length > 0) {
-																	resolvedName = {
-																		name: results[0].name,
-																		address: results[0].address,
-																		avatar: results[0].metadata.avatar || undefined
-																	};
-																}
-															});
 														}}
 													>
 														<div
@@ -1932,6 +1952,15 @@
 									</div>
 								{/if}
 
+								{#if voiDestination.address}
+									<ResolvedAddress address={voiDestination.address} name={voiDestination.name} />
+								{/if}
+								{#if voiDestination.error}
+									<p class="text-sm text-red-600 dark:text-red-400" role="alert">
+										{voiDestination.error}
+									</p>
+								{/if}
+
 								{#if resolvedName}
 									<div class="mt-2 flex items-center space-x-2">
 										<div
@@ -2005,6 +2034,15 @@
 								You will receive: {displayDestinationAmount.toFixed(6)}
 								{isVoiToAlgorand ? selectedToken.bridgedSymbol : selectedToken.symbol}
 							</p>
+							{#if destinationAddress}
+								<div class="text-sm text-gray-500 dark:text-gray-400">
+									To:
+									<ResolvedAddress
+										address={destinationAddress}
+										name={(isVoiToAlgorand ? algorandDestination : voiDestination).name}
+									/>
+								</div>
+							{/if}
 						</div>
 					</div>
 					{#if !isVoiToAlgorand}
@@ -2273,10 +2311,9 @@
 							on:click={() => {
 								resetBridgeState();
 								amount = '';
-								algorandDestinationAddress = '';
-								voiDestinationAddress = '';
+								algorandDestination = { ...emptyDestination };
+								voiDestination = { ...emptyDestination };
 								resolvedName = null;
-								isValidDestination = false;
 								showSearchResults = false;
 								searchResults = [];
 								// Also reset source address state if it exists

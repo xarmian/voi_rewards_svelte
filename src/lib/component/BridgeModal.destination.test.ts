@@ -87,3 +87,31 @@ test('picking an NFD makes the screen and bridge receiver agree', async () => {
 	expect(runInContext('algorandDestination.text', context)).toBe('chosen.algo');
 	expect(runInContext('algorandDestination.text', context)).not.toBe('typed query');
 });
+
+test('does not show a QR generated for a destination edited while generation was pending', async () => {
+	const pending = Promise.withResolvers<string>();
+	const address = algosdk.encodeAddress(new Uint8Array(32));
+	const context = createContext({
+		bridgeStatus: 'idle',
+		isVoiToAlgorand: false,
+		destinationAddress: address,
+		algosdk,
+		destinationNetwork: 416101,
+		selectedToken: { voiAssetId: '0', algorandAssetId: '123' },
+		feeAmount: 1,
+		destinationAmount: 999,
+		amountInAtomicUnits: 1000,
+		BRIDGE_ADDRESS: 'BRIDGE',
+		QRCode: { toDataURL: () => pending.promise },
+		showQrCode: false,
+		qrCodeDataUrl: '',
+		peraWalletUrl: ''
+	});
+	runInContext(ts.transpileModule(fn('handleSubmit'), {}).outputText, context);
+	const submit = runInContext('handleSubmit()', context);
+	runInContext('destinationAddress = ""', context);
+	pending.resolve('generated-qr');
+	await submit;
+	expect(runInContext('showQrCode', context)).toBe(false);
+	expect(runInContext('qrCodeDataUrl', context)).toBe('');
+});

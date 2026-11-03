@@ -16,6 +16,8 @@
 	import { connectedWallets } from 'avm-wallet-svelte';
 
 	export let searchText = '';
+	export let onEdit: (() => void) | undefined = undefined;
+	let selectedText: string | null = null;
 	let addressList: EnvoiSearchResult[] = [];
 	let selectedAddressIndex = -1;
 	let windowDefined = false;
@@ -65,7 +67,12 @@
 	}, 300);
 
 	// Function to handle text input changes
-	function handleInput() {
+	function handleInput(event?: Event) {
+		if (event) searchText = (event.currentTarget as HTMLInputElement).value;
+		if (selectedText !== null && searchText !== selectedText) {
+			selectedText = null;
+			onEdit?.();
+		}
 		if (searchText.length === 58) {
 			handleSubmit();
 			return;
@@ -107,6 +114,7 @@
 			searchText = result.name;
 		}
 
+		selectedText = searchText;
 		onSubmit(addr, selectedAddressIndex);
 		addressList = [];
 		if (clearOnSubmit) {
