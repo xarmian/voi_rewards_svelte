@@ -64,7 +64,7 @@ test('WithdrawModal releases a withdrawal that can no longer land', () => {
 		/import\s*\{[^}]*\btrackPending\b[^}]*\}\s*from\s*['"]\$lib\/chain\/sendAndConfirm['"]/
 	);
 	expect(source, 'The stored last valid round must be used when resuming').toMatch(
-		/trackWithdrawal\(earlier\.txId, earlier\.lastValid\)/
+		/trackWithdrawal\(earlier\.txId, earlier\.lastValid, wallet\)/
 	);
 	expect(source, 'An expired withdrawal must be handled and its record cleared').toMatch(
 		/status === 'expired'[\s\S]*clearPendingWithdrawal\(/
@@ -97,4 +97,32 @@ test('WithdrawModal only clears the record of the withdrawal it was waiting on',
 			'A detached wait must not erase a newer withdrawal: pass the tx id to every clear'
 		).toMatch(/,\s*id\s*\)/);
 	}
+});
+
+test('WithdrawModal keys every withdrawal read by the wallet captured at submit', () => {
+	const live = source
+		.split('\n')
+		.filter((line) => line.includes('$selectedWallet') && !line.includes('import '));
+	expect(live.map((line) => line.trim())).toEqual([
+		'$: activeWallet = flowWallet ?? $selectedWallet?.address;',
+		'const wallet = $selectedWallet?.address;'
+	]);
+	expect(source).toMatch(/let flowWallet: string \| undefined;/);
+	expect(source).toMatch(/flowWallet = wallet;/);
+});
+
+test('WithdrawModal tracks the withdrawal under the wallet that signed it', () => {
+	expect(source).toMatch(
+		/async function trackWithdrawal\(id: string, lastValid: number, wallet: string\)/
+	);
+	expect(source).toContain('await trackWithdrawal(outcome.txId, outcome.lastValid, wallet);');
+	expect(source).toContain('void trackWithdrawal(earlier.txId, earlier.lastValid, wallet);');
+});
+
+test('WithdrawModal releases the captured wallet only when the flow ends', () => {
+	const close = source.slice(source.indexOf('function handleClose()'));
+	expect(close.slice(0, close.indexOf('\n\t}\n'))).toContain('flowWallet = undefined;');
+	const withdraw = source.slice(source.indexOf('async function handleWithdraw()'));
+	const body = withdraw.slice(0, withdraw.indexOf('\n\t}\n'));
+	expect(body).toMatch(/status === 'not-recorded'[\s\S]*?flowWallet = undefined;/);
 });

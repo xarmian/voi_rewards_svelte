@@ -36,6 +36,10 @@
 		"This withdrawal's valid window has ended, but the history service has not yet confirmed whether it landed. We keep checking, and you can withdraw again as soon as that is known.";
 	let recordTick = 0;
 	let withdrawOffered = false;
+	// The wallet captured when a withdrawal is submitted. Everything below reads this, never the live
+	// selection, so switching accounts mid-flow cannot move the hold to another wallet's key.
+	let flowWallet: string | undefined;
+	$: activeWallet = flowWallet ?? $selectedWallet?.address;
 
 	const sendDeps = {
 		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
@@ -47,13 +51,13 @@
 		void recordTick;
 		withdrawOffered = canOfferWithdraw({
 			status: show ? txStatus : 'closed',
-			wallet: $selectedWallet?.address,
+			wallet: activeWallet,
 			contractId: contract.contractId
 		});
 	}
 
 	function handleStorage(event: StorageEvent) {
-		const wallet = $selectedWallet?.address;
+		const wallet = activeWallet;
 		if (wallet && event.key === pendingWithdrawalStorageKey(wallet, contract.contractId))
 			recordTick++;
 	}
@@ -83,6 +87,7 @@
 			trackController?.abort();
 			clearInterval(waitTimer);
 			show = false;
+			flowWallet = undefined;
 			// A pending withdrawal may still land, so refresh for either submitted outcome.
 			if (txStatus === 'confirmed' || txStatus === 'pending') {
 				onSuccess?.(true);
@@ -101,9 +106,7 @@
 
 	const pendingInfo = (id: string) => algodClient.pendingTransactionInformation(id).do();
 
-	async function trackWithdrawal(id: string, lastValid: number) {
-		const wallet = $selectedWallet?.address;
-		if (!wallet) return;
+	async function trackWithdrawal(id: string, lastValid: number, wallet: string) {
 		const contractId = contract.contractId;
 		trackController?.abort();
 		clearInterval(waitTimer);
@@ -211,11 +214,12 @@
 	$: {
 		void recordTick;
 		if (show && txStatus === 'idle') {
-			const wallet = $selectedWallet?.address;
+			const wallet = activeWallet;
 			const earlier = wallet ? getPendingWithdrawal(wallet, contract.contractId) : undefined;
-			if (earlier) {
+			if (wallet && earlier) {
 				txId = earlier.txId;
-				void trackWithdrawal(earlier.txId, earlier.lastValid);
+				flowWallet = wallet;
+				void trackWithdrawal(earlier.txId, earlier.lastValid, wallet);
 			}
 		}
 	}
@@ -245,6 +249,7 @@
 			return;
 		}
 
+		flowWallet = wallet;
 		isLoading = true;
 		error = null;
 		txStatus = 'building';
@@ -324,13 +329,15 @@
 			) {
 				txStatus = 'error';
 				error = outcome.error;
+				flowWallet = undefined;
 			} else if (outcome.status === 'confirmed') {
 				txStatus = 'confirmed';
 			} else {
-				await trackWithdrawal(outcome.txId, outcome.lastValid);
+				await trackWithdrawal(outcome.txId, outcome.lastValid, wallet);
 			}
 		} catch (err) {
 			txStatus = 'error';
+			flowWallet = undefined;
 			error = 'Failed to process withdrawal';
 			console.error('Withdrawal error:', err);
 		} finally {
