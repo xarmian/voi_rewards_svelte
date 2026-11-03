@@ -81,3 +81,14 @@ test('activation opens a cancellable review of full addresses before confirming 
 	expect(fn('confirmActivation')).toContain('reviewDrifted');
 	expect(fn('cancelActivation')).toContain('plan = null');
 });
+
+test('Confirm re-checks the live selection itself, not only the reactive flag', () => {
+	// The reactive reviewDrifted flag updates on the next tick; a change between that tick and the
+	// click must still stop the activation.
+	const confirm = fn('confirmActivation');
+	const recheck = confirm.indexOf('selectionDrifted(plan, $selectedWallet)');
+	const activate = confirm.indexOf('activateVanityAddress(plan)');
+	expect(recheck, 'confirmActivation must call selectionDrifted itself').toBeGreaterThan(-1);
+	expect(recheck, 'the re-check must come before the activation starts').toBeLessThan(activate);
+	expect(confirm).toContain('reviewDrifted = true');
+});
