@@ -19,9 +19,30 @@ describe('wallet page selection wiring (TASK-132)', () => {
 		expect(source).toMatch(/pickNavigation\s*\(/);
 	});
 
-	test('both route-to-selection writes go through selectionFromRoute', () => {
-		expect(source.match(/selectionFromRoute\s*\(/g)?.length).toBe(2);
-		expect(source).not.toMatch(/selectedWallet\.set\s*\(\s*\{\s*address:\s*(address|walletId)/);
+	test('the one route-to-selection write goes through selectionFromRoute, in initializeWallet only', () => {
+		expect(source.match(/selectionFromRoute\s*\(/g)?.length).toBe(1);
+		expect(source.match(/selectedWallet\.set\s*\(/g)?.length).toBe(1);
+		const update = source.slice(
+			source.indexOf('const updateAccountInfo'),
+			source.indexOf('async function initializeWallet')
+		);
+		expect(update.length).toBeGreaterThan(0);
+		expect(update).not.toMatch(/selectedWallet\.set|selectionFromRoute/);
+	});
+
+	test('the pick handler and the route write both check the live pin count', () => {
+		expect(source.match(/pinned:\s*get\(pinnedFlows\)\s*>\s*0/g)?.length).toBe(2);
+		expect(source).toMatch(/parentAddress:\s*parentWalletId/);
+	});
+
+	test('a modal destroyed mid-flow releases its pin from the count', () => {
+		for (const name of ['SendTokenModal', 'BridgeModal']) {
+			const modal = readFileSync(
+				join(here, '..', '..', '..', 'lib', 'component', `${name}.svelte`),
+				'utf8'
+			);
+			expect(modal, name).toMatch(/flow\.dispose\s*\(\)/);
+		}
 	});
 
 	test('the pick handler is removed again when the page is destroyed', () => {

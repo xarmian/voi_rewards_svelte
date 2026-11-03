@@ -19,6 +19,28 @@ describe('pickNavigation (a selection the user made in the picker)', () => {
 		expect(pickNavigation({ pick: A, routeAddress: 'AAAA', pinned: false })).toBeNull();
 	});
 
+	test('a pick of the parent account of the contract being viewed does not navigate', () => {
+		expect(
+			pickNavigation({
+				pick: A,
+				routeAddress: 'CHILDCONTRACT',
+				parentAddress: 'AAAA',
+				pinned: false
+			})
+		).toBeNull();
+	});
+
+	test('a pick of another account still navigates when a parent is set', () => {
+		expect(
+			pickNavigation({
+				pick: B,
+				routeAddress: 'CHILDCONTRACT',
+				parentAddress: 'AAAA',
+				pinned: false
+			})
+		).toBe('/wallet/BBBB');
+	});
+
 	test('a pick with no route yet navigates to the picked account', () => {
 		expect(pickNavigation({ pick: A, routeAddress: undefined, pinned: false })).toBe(
 			'/wallet/AAAA'

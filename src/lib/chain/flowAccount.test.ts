@@ -18,6 +18,25 @@ test('pinnedFlows counts live pins across flows; a repeat pin or release counts 
 	expect(get(pinnedFlows)).toBe(0);
 });
 
+test('dispose (a modal destroyed mid-flow) drops the pin from the count but keeps the captured account', () => {
+	const flow = createFlowPin();
+	flow.pin('A');
+	expect(get(pinnedFlows)).toBe(1);
+	flow.dispose();
+	expect(get(pinnedFlows)).toBe(0);
+	expect(flow.address).toBe('A');
+	expect(flow.current('B')).toBe('A');
+	flow.dispose();
+	flow.release();
+	expect(get(pinnedFlows)).toBe(0);
+});
+
+test('a flow never pinned can be disposed without touching the count', () => {
+	const flow = createFlowPin();
+	flow.dispose();
+	expect(get(pinnedFlows)).toBe(0);
+});
+
 test('follows selection until pinned, then keeps the starting account through switches and disconnects', () => {
 	const flow = createFlowPin();
 	expect(flow.pinned).toBe(false);
