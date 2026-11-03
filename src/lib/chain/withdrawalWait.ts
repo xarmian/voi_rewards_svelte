@@ -8,3 +8,17 @@ export function minutesUntilExpiry(
 	}
 	return Math.max(1, Math.ceil(((lastValid - currentRound) * secondsPerRound) / 60));
 }
+
+export function explainWait(input: {
+	lastValid: number;
+	currentRound: number;
+	foundUnconfirmed: boolean;
+}): { kind: 'confirming' } | { kind: 'expires-in'; minutes: number } | { kind: 'window-ended' } {
+	if (Number.isFinite(input.currentRound) && input.currentRound > input.lastValid) {
+		return { kind: 'window-ended' };
+	}
+	const minutes = minutesUntilExpiry(input.lastValid, input.currentRound);
+	return input.foundUnconfirmed && minutes !== null
+		? { kind: 'expires-in', minutes }
+		: { kind: 'confirming' };
+}

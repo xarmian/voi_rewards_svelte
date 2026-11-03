@@ -42,6 +42,19 @@ export async function sendWithdrawal(
 		if (!result?.length) return { status: 'not-signed', error: 'Signature was rejected' };
 		signed = result;
 		info = groupInfo(signed);
+		if (
+			input.txns.every(
+				(txn): txn is { txID(): string } =>
+					txn !== null && typeof txn === 'object' && 'txID' in txn && typeof txn.txID === 'function'
+			) &&
+			(input.txns.length !== info.txIds.length ||
+				input.txns.some((txn, index) => txn.txID() !== info.txIds[index]))
+		) {
+			return {
+				status: 'not-signed',
+				error: 'The wallet returned a different transaction group, so nothing was sent.'
+			};
+		}
 	} catch (error) {
 		return {
 			status: 'not-signed',
@@ -69,7 +82,43 @@ export async function sendWithdrawal(
 	}
 
 	try {
-		const outcome = await sendAndConfirm(signed, deps.send);
+		let submitError: unknown;
+		const outcome = await sendAndConfirm(signed, {
+			...deps.send,
+			send: async (group) => {
+				try {
+					return await deps.send.send(group);
+				} catch (error) {
+					submitError = error;
+					throw error;
+				}
+			}
+		});
+		if (outcome.status === 'rejected') {
+			const error = submitError as
+				| {
+						status?: unknown;
+						message?: unknown;
+						response?: { body?: { message?: unknown }; text?: unknown };
+				  }
+				| undefined;
+			const messages = [
+				error?.message,
+				error?.response?.body?.message,
+				error?.response?.text
+			].filter(
+				(message): message is string => typeof message === 'string' && message.trim().length > 0
+			);
+			const alreadyExists =
+				/already\s+in\s+(the\s+)?(ledger|pool)|already\s+(been\s+)?(committed|confirmed|submitted)|duplicate/i;
+			if (
+				error?.status !== 400 ||
+				messages.length === 0 ||
+				messages.some((message) => alreadyExists.test(message))
+			) {
+				return pending;
+			}
+		}
 		if (outcome.status === 'rejected' || outcome.status === 'confirmed') {
 			clearPendingWithdrawal(input.wallet, input.contractId, info.firstTxId, deps.storage);
 			return outcome.status === 'rejected'

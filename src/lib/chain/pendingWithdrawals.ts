@@ -1,12 +1,13 @@
 export type PendingWithdrawal = { txId: string; lastValid: number; createdAt: number };
-export type PendingWithdrawalStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+export type PendingWithdrawalStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> &
+	Partial<Pick<Storage, 'key' | 'length'>>;
 
-type Records = Record<string, PendingWithdrawal>;
-const memory = new Map<string, Records>();
+const prefix = 'voirewards:pending-withdrawal:';
+const memory = new Map<string, PendingWithdrawal>();
 const knownKeys = new Set<string>();
 
-export function pendingWithdrawalStorageKey(wallet: string): string {
-	return `voirewards:pending-withdrawals:${wallet}`;
+export function pendingWithdrawalStorageKey(wallet: string, contractId: number): string {
+	return `${prefix}${wallet}:${contractId}`;
 }
 
 // Resolve on each call so importing this module during SSR never captures browser storage.
@@ -14,25 +15,23 @@ function resolveStorage(storage?: PendingWithdrawalStorage): PendingWithdrawalSt
 	return storage ?? globalThis.localStorage;
 }
 
-function readRecords(key: string, storage?: PendingWithdrawalStorage): Records {
+function readEntry(key: string, storage?: PendingWithdrawalStorage): PendingWithdrawal | undefined {
 	try {
 		const resolved = resolveStorage(storage);
-		const value: unknown = resolved
-			? JSON.parse(resolved.getItem(key) ?? '{}')
-			: (memory.get(key) ?? {});
-		if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-		return Object.fromEntries(
-			Object.entries(value).filter(
-				([, entry]) =>
-					entry &&
-					typeof entry.txId === 'string' &&
-					entry.txId.length > 0 &&
-					Number.isFinite(entry.lastValid) &&
-					Number.isFinite(entry.createdAt)
-			)
-		);
+		const value = resolved ? JSON.parse(resolved.getItem(key) ?? 'null') : memory.get(key);
+		if (
+			value &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			typeof value.txId === 'string' &&
+			value.txId.length > 0 &&
+			Number.isFinite(value.lastValid) &&
+			Number.isFinite(value.createdAt)
+		) {
+			return value;
+		}
 	} catch {
-		return {};
+		return undefined;
 	}
 }
 
@@ -42,13 +41,12 @@ export function rememberPendingWithdrawal(
 	entry: PendingWithdrawal,
 	storage?: PendingWithdrawalStorage
 ): void {
-	const key = pendingWithdrawalStorageKey(wallet);
+	const key = pendingWithdrawalStorageKey(wallet, contractId);
 	knownKeys.add(key);
-	const records = { ...readRecords(key, storage), [String(contractId)]: entry };
 	const resolved = resolveStorage(storage);
 	// A failed persistent write must propagate: callers must not broadcast without the record.
-	if (resolved) resolved.setItem(key, JSON.stringify(records));
-	else memory.set(key, records);
+	if (resolved) resolved.setItem(key, JSON.stringify(entry));
+	memory.set(key, entry);
 }
 
 export function getPendingWithdrawal(
@@ -56,9 +54,9 @@ export function getPendingWithdrawal(
 	contractId: number,
 	storage?: PendingWithdrawalStorage
 ): PendingWithdrawal | undefined {
-	const key = pendingWithdrawalStorageKey(wallet);
+	const key = pendingWithdrawalStorageKey(wallet, contractId);
 	knownKeys.add(key);
-	return readRecords(key, storage)[String(contractId)];
+	return readEntry(key, storage);
 }
 
 export function clearPendingWithdrawal(
@@ -67,24 +65,28 @@ export function clearPendingWithdrawal(
 	txId: string,
 	storage?: PendingWithdrawalStorage
 ): void {
-	const key = pendingWithdrawalStorageKey(wallet);
-	const records = { ...readRecords(key, storage) };
-	if (records[String(contractId)]?.txId !== txId) return;
-	delete records[String(contractId)];
-	const resolved = resolveStorage(storage);
-	if (resolved) {
-		if (Object.keys(records).length) resolved.setItem(key, JSON.stringify(records));
-		else resolved.removeItem(key);
-	} else {
-		memory.set(key, records);
+	const key = pendingWithdrawalStorageKey(wallet, contractId);
+	try {
+		if (readEntry(key, storage)?.txId !== txId) return;
+		resolveStorage(storage)?.removeItem(key);
+	} catch {
+		// A persisted record that cannot be removed will be resolved again on the next open.
+	} finally {
+		if (memory.get(key)?.txId === txId) memory.delete(key);
 	}
 }
 
 export function resetPendingWithdrawals(storage?: PendingWithdrawalStorage): void {
 	const resolved = resolveStorage(storage);
 	if (resolved) {
-		for (const key of knownKeys) resolved.removeItem(key);
-	} else {
-		memory.clear();
+		const keys = new Set(knownKeys);
+		for (let index = 0; index < (resolved.length ?? 0); index++) {
+			const key = resolved.key?.(index);
+			if (key?.startsWith(prefix)) keys.add(key);
+		}
+		for (const key of keys) {
+			if (key.startsWith(prefix)) resolved.removeItem(key);
+		}
 	}
+	memory.clear();
 }

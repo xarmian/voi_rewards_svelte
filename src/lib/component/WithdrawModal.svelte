@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { ContractDetails } from '$lib/types';
-	import { formatNumber, microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
+	import { microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
 	import { abi, CONTRACT } from 'ulujs';
 	import { selectedWallet, signTransactions } from 'avm-wallet-svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import { canOfferWithdraw, sendWithdrawal } from '$lib/chain/withdrawSend';
-	import { minutesUntilExpiry } from '$lib/chain/withdrawalWait';
+	import { explainWait, minutesUntilExpiry } from '$lib/chain/withdrawalWait';
 	import algosdk from 'algosdk';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
@@ -31,6 +31,9 @@
 	let trackController: AbortController | undefined;
 	let waitTimer: ReturnType<typeof setInterval> | undefined;
 	let waitMinutes: number | null = null;
+	let waitKind: ReturnType<typeof explainWait>['kind'] = 'confirming';
+	const windowEndedMessage =
+		"This withdrawal's valid window has ended, but the history service has not yet confirmed whether it landed. We keep checking, and you can withdraw again as soon as that is known.";
 	let recordTick = 0;
 	let withdrawOffered = false;
 
@@ -51,7 +54,8 @@
 
 	function handleStorage(event: StorageEvent) {
 		const wallet = $selectedWallet?.address;
-		if (wallet && event.key === pendingWithdrawalStorageKey(wallet)) recordTick++;
+		if (wallet && event.key === pendingWithdrawalStorageKey(wallet, contract.contractId))
+			recordTick++;
 	}
 
 	onMount(() => {
@@ -110,9 +114,22 @@
 		let currentRound = NaN;
 		txStatus = 'pending';
 		waitMinutes = null;
+		waitKind = 'confirming';
 
+		const pause = (ms: number) =>
+			new Promise<void>((resolve) => {
+				if (signal.aborted) return resolve();
+				const timeout = setTimeout(finish, ms);
+				signal.addEventListener('abort', finish, { once: true });
+				function finish() {
+					clearTimeout(timeout);
+					signal.removeEventListener('abort', finish);
+					resolve();
+				}
+			});
 		const updateEstimate = () => {
 			if (!signal.aborted) {
+				waitKind = explainWait({ lastValid, currentRound, foundUnconfirmed }).kind;
 				waitMinutes = foundUnconfirmed ? minutesUntilExpiry(lastValid, currentRound) : null;
 			}
 		};
@@ -128,63 +145,61 @@
 		const timer = setInterval(() => void updateRound(), 30000);
 		waitTimer = timer;
 
+		const readPending = trackingDeps.pendingInfo;
+		trackingDeps.pendingInfo = async (id) => {
+			const info = await readPending(id);
+			if (!signal.aborted && !((info['confirmed-round'] ?? 0) > 0)) {
+				foundUnconfirmed = true;
+				updateEstimate();
+			}
+			return info;
+		};
+
 		try {
-			// Retain the first pass for quick confirmation and escaped pool-error reporting.
-			const outcome = await awaitWithdrawalConfirmation(id, {
-				pendingInfo: async (id) => {
-					if (signal.aborted) return {};
-					const info = await pendingInfo(id);
-					if (!signal.aborted && !(info['confirmed-round'] > 0)) {
-						foundUnconfirmed = true;
-						updateEstimate();
+			while (!signal.aborted) {
+				try {
+					// Retain the first pass for quick confirmation and escaped pool-error reporting.
+					const outcome = await awaitWithdrawalConfirmation(id, {
+						pendingInfo: async (id) => {
+							if (signal.aborted) return {};
+							const info = await pendingInfo(id);
+							if (!signal.aborted && !(info['confirmed-round'] > 0)) {
+								foundUnconfirmed = true;
+								updateEstimate();
+							}
+							return info;
+						},
+						pause
+					});
+					if (signal.aborted) return;
+					if (outcome.status === 'confirmed') {
+						txStatus = 'confirmed';
+						clearPendingWithdrawal(wallet, contractId, id);
+						return;
 					}
-					return info;
-				},
-				pause: (ms) =>
-					new Promise<void>((resolve) => {
-						if (signal.aborted) return resolve();
-						const timeout = setTimeout(finish, ms);
-						signal.addEventListener('abort', finish, { once: true });
-						function finish() {
-							clearTimeout(timeout);
-							signal.removeEventListener('abort', finish);
-							resolve();
-						}
-					})
-			});
-			if (signal.aborted) return;
-			if (outcome.status === 'confirmed') {
-				clearPendingWithdrawal(wallet, contractId, id);
-				txStatus = 'confirmed';
-				return;
-			}
-			poolError = outcome.poolError ?? null;
-			const readPending = trackingDeps.pendingInfo;
-			trackingDeps.pendingInfo = async (id) => {
-				const info = await readPending(id);
-				if (!signal.aborted && !((info['confirmed-round'] ?? 0) > 0)) {
-					foundUnconfirmed = true;
-					updateEstimate();
+					poolError = outcome.poolError ?? null;
+					const tracked = await trackPending(
+						{ status: 'pending', txIds: [id], firstTxId: id, lastValid },
+						trackingDeps,
+						{ signal }
+					);
+					if (signal.aborted) return;
+					if (tracked.status === 'confirmed') {
+						txStatus = 'confirmed';
+						clearPendingWithdrawal(wallet, contractId, id);
+						return;
+					} else if (tracked.status === 'expired') {
+						txStatus = 'error';
+						error = 'The earlier withdrawal expired without going through. You can withdraw again.';
+						clearPendingWithdrawal(wallet, contractId, id);
+						return;
+					}
+				} catch {
+					if (signal.aborted) return;
+					txStatus = 'pending';
+					await pause(15000);
 				}
-				return info;
-			};
-			const tracked = await trackPending(
-				{ status: 'pending', txIds: [id], firstTxId: id, lastValid },
-				trackingDeps,
-				{ signal }
-			);
-			if (signal.aborted) return;
-			if (tracked.status === 'confirmed') {
-				clearPendingWithdrawal(wallet, contractId, id);
-				txStatus = 'confirmed';
-			} else if (tracked.status === 'expired') {
-				clearPendingWithdrawal(wallet, contractId, id);
-				txStatus = 'error';
-				error = 'The earlier withdrawal expired without going through. You can withdraw again.';
 			}
-		} catch {
-			// A failed lookup or storage clear cannot release the persistent hold.
-			if (!signal.aborted) txStatus = 'pending';
 		} finally {
 			clearInterval(timer);
 		}
@@ -373,7 +388,9 @@
 							A withdrawal is in progress
 						</h3>
 						<p class="text-sm text-gray-500 dark:text-gray-400">
-							{#if waitMinutes !== null}
+							{#if waitKind === 'window-ended'}
+								{windowEndedMessage}
+							{:else if waitKind === 'expires-in'}
 								Waiting for an earlier withdrawal to expire, about {waitMinutes} min.
 							{:else}
 								Waiting for it to be confirmed on the network.
