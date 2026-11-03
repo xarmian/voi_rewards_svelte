@@ -340,6 +340,11 @@
 
 	async function confirmActivation() {
 		if (!plan || reviewDrifted || !reviewOpen) return;
+		// The reactive flag lags a tick behind the store: check the live selection here as well.
+		if (selectionDrifted(plan, $selectedWallet)) {
+			reviewDrifted = true;
+			return;
+		}
 		reviewOpen = false;
 		await activateVanityAddress(plan);
 	}
