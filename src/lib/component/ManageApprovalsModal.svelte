@@ -17,6 +17,7 @@
 	let isLoading = false;
 	let isRevoking: string | null = null;
 	let isApproving = false;
+	let signingPinned = false;
 	let approvalError: string | null = null;
 	let approvalSuccess = false;
 	let successTxId: string | null = null;
@@ -30,9 +31,10 @@
 	let hasChanges = false; // Track if any changes were made
 
 	$: canSignTransactions =
-		$selectedWallet?.address === walletId &&
-		$selectedWallet?.app !== '' &&
-		$selectedWallet?.app !== 'Watch';
+		(signingPinned && (isApproving || isRevoking !== null)) ||
+		($selectedWallet?.address === walletId &&
+			$selectedWallet?.app !== '' &&
+			$selectedWallet?.app !== 'Watch');
 	$: isArc200 = token.type === 'arc200';
 	$: tokenName = token.name;
 	$: tokenSymbol = token.symbol;
@@ -92,11 +94,13 @@
 	}
 
 	async function handleCreateApproval() {
+		if (isApproving || isRevoking !== null) return;
 		if (!walletId || !canSignTransactions || !spenderAddress || !approvalAmount) {
 			approvalError = 'Please fill in all fields';
 			return;
 		}
 
+		signingPinned = canSignTransactions;
 		try {
 			isApproving = true;
 			approvalError = null;
@@ -145,6 +149,7 @@
 			approvalError = error instanceof Error ? error.message : 'Failed to create approval';
 		} finally {
 			isApproving = false;
+			signingPinned = false;
 		}
 	}
 
@@ -154,8 +159,10 @@
 	}
 
 	async function handleRevokeApproval(approval: TokenApproval) {
+		if (isApproving || isRevoking !== null) return;
 		if (!walletId || !canSignTransactions) return;
 
+		signingPinned = canSignTransactions;
 		try {
 			isRevoking = approval.transactionId;
 			approvalError = null;
@@ -192,6 +199,7 @@
 			approvalError = error instanceof Error ? error.message : 'Failed to revoke approval';
 		} finally {
 			isRevoking = null;
+			signingPinned = false;
 		}
 	}
 

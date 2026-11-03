@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { Web3Wallet, signTransactions, selectedWallet } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
+	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
+	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 
@@ -30,6 +32,10 @@
 	let txnStatus: 'idle' | 'sending' | 'success' | 'error' = 'idle';
 	let rekeyTxnStatus: 'idle' | 'sending' | 'success' | 'error' = 'idle';
 	let txnError: string | null = null;
+	let plan: VanityPlan | null = null;
+	let reviewOpen = false;
+	let reviewDrifted = false;
+	$: if (reviewOpen && plan && selectionDrifted(plan, $selectedWallet)) reviewDrifted = true;
 
 	// Method to validate inputs
 	function validateInputs(): boolean {
@@ -314,13 +320,32 @@
 		}
 	}
 
-	// Send 1 VOI to activate the vanity address
-	async function activateVanityAddress() {
-		if (!$selectedWallet?.address || $selectedWallet?.app === 'Watch' || !result) {
-			error = 'Please connect a wallet first';
+	function reviewActivation() {
+		const captured = capturePlan($selectedWallet, result?.address);
+		if (!captured.ok) {
+			error = captured.error;
 			return;
 		}
+		plan = captured.plan;
+		reviewDrifted = false;
+		reviewOpen = true;
+		error = null;
+	}
 
+	function cancelActivation() {
+		reviewOpen = false;
+		plan = null;
+		reviewDrifted = false;
+	}
+
+	async function confirmActivation() {
+		if (!plan || reviewDrifted || !reviewOpen) return;
+		reviewOpen = false;
+		await activateVanityAddress(plan);
+	}
+
+	// Send 1 VOI from the reviewed account, then rekey to that same account.
+	async function activateVanityAddress(plan: VanityPlan) {
 		isActivating = true;
 		txnStatus = 'sending';
 		txnError = null;
@@ -332,8 +357,8 @@
 			// Create an unsigned transaction to send 1 VOI to the vanity address
 			// 1 VOI = 1,000,000 microVOI
 			const unsignedTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-				from: $selectedWallet.address,
-				to: result.address,
+				from: plan.funder,
+				to: plan.vanity,
 				amount: 1000000, // 1 VOI in microVOI
 				suggestedParams: params
 			});
@@ -350,7 +375,7 @@
 			txnStatus = 'success';
 
 			// After sending 1 VOI, we can now initiate the rekey transaction
-			await rekeyVanityAddress();
+			await rekeyVanityAddress(plan);
 		} catch (err) {
 			console.error('Failed to activate address:', err);
 			txnStatus = 'error';
@@ -361,26 +386,28 @@
 	}
 
 	// Rekey the vanity address
-	async function rekeyVanityAddress() {
-		if (!result || !$selectedWallet?.address) return;
-
+	async function rekeyVanityAddress(plan: VanityPlan) {
 		isRekeying = true;
 		rekeyTxnStatus = 'sending';
 
 		try {
+			if (!result || result.address !== plan.vanity) {
+				throw new Error('The generated vanity address changed. Review again.');
+			}
+			const mnemonic = result.mnemonic;
 			// Get parameters for the transaction
 			const params = await algodClient.getTransactionParams().do();
 
 			// Convert the mnemonic to a keypair for signing
-			const vanityAccount = algosdk.mnemonicToSecretKey(result.mnemonic);
+			const vanityAccount = algosdk.mnemonicToSecretKey(mnemonic);
 
-			// Create a rekey transaction to point to the user's connected wallet address
+			// Create a rekey transaction to point to the reviewed target account
 			const rekeyTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-				from: result.address,
-				to: result.address, // Send to self
+				from: plan.vanity,
+				to: plan.vanity, // Send to self
 				amount: 0, // Zero amount for rekey
 				suggestedParams: params,
-				rekeyTo: $selectedWallet.address // Rekey to connected wallet
+				rekeyTo: plan.rekeyTo
 			});
 
 			// Sign the transaction with the vanity address secret key
@@ -656,7 +683,9 @@
 								projectIcons: ['https://voirewards.com/android-chrome-192x192.png']
 							}}
 						/>
-						{#if $selectedWallet?.address && $selectedWallet?.app !== 'Watch'}
+						{#if plan}
+							<ResolvedAddress address={plan.rekeyTo} label="Activation account" />
+						{:else if $selectedWallet?.address && $selectedWallet?.app !== 'Watch'}
 							<div class="flex items-center justify-between">
 								<div>
 									<span class="text-green-600 dark:text-green-400 mr-2"
@@ -677,8 +706,8 @@
 						</h5>
 
 						<p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-							This process will send 1 VOI to your vanity address, then rekey it to your connected
-							wallet.
+							This process will send 1 VOI to your vanity address, then rekey it to the account you
+							review below.
 						</p>
 
 						{#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
@@ -686,11 +715,28 @@
 								class="bg-green-100 dark:bg-green-900/50 p-3 rounded-md text-green-800 dark:text-green-200 mb-3"
 							>
 								<i class="fas fa-check-circle mr-2"></i>
-								Success! Your vanity address is now rekeyed to your connected wallet.
+								Success! Your vanity address is now rekeyed to the reviewed account.
+							</div>
+						{:else if reviewOpen && plan}
+							<div class="space-y-3" aria-label="Review vanity activation">
+								<ResolvedAddress address={plan.vanity} label="Vanity address" />
+								<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />
+								{#if reviewDrifted}
+									<p role="alert" class="text-red-700 dark:text-red-300">
+										Your selected account changed. Review again.
+									</p>
+								{/if}
+								<button
+									on:click={confirmActivation}
+									disabled={reviewDrifted}
+									class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
+									>Confirm</button
+								>
+								<button on:click={cancelActivation} class="py-2 px-4">Cancel</button>
 							</div>
 						{:else}
 							<button
-								on:click={activateVanityAddress}
+								on:click={reviewActivation}
 								disabled={!($selectedWallet?.address && $selectedWallet?.app !== 'Watch') ||
 									isActivating ||
 									isRekeying ||

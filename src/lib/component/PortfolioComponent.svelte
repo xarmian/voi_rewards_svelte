@@ -603,6 +603,7 @@
 	// Bulk claim functionality
 	let isBulkClaiming = false;
 	let bulkClaimProgress = 0;
+	let bulkClaimError: string | null = null;
 	let bulkClaimResults: Array<{ success: boolean; tokenName: string; error?: string }> = [];
 
 	async function bulkClaimAllTokens() {
@@ -612,6 +613,7 @@
 
 		isBulkClaiming = true;
 		bulkClaimProgress = 0;
+		bulkClaimError = null;
 		bulkClaimResults = [];
 
 		// Collect all ARC-200 approvals that can be claimed
@@ -723,6 +725,10 @@
 					algosdk.assignGroupID(batch.transactions);
 
 					// Sign all transactions at once
+					if (!($selectedWallet?.address === walletAddress)) {
+						bulkClaimError = `Your selected account changed during the claim, so it stopped before the next batch. Select ${walletAddress} to continue.`;
+						break;
+					}
 					const signedTxns = await signTransactions([batch.transactions]);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
@@ -1131,6 +1137,9 @@
 		</div>
 	</div>
 
+	{#if bulkClaimError}
+		<p role="alert" class="text-red-700 dark:text-red-300 break-all">{bulkClaimError}</p>
+	{/if}
 	<!-- Claimable Tokens Summary Section -->
 	{#if claimableTokensSummary.length > 0}
 		<div

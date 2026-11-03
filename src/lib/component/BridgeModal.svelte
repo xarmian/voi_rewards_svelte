@@ -10,6 +10,7 @@
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { createFlowPin } from '$lib/chain/flowAccount';
 	import { createTrackingDeps } from '$lib/chain/trackingDeps';
 	import { pollUntil } from '$lib/chain/singleFlightPoll';
 	import { checkDestinationConfirmation, checkAlgorandDeposit } from '$lib/chain/bridgeMonitor';
@@ -114,7 +115,18 @@
 	let trackedEntries: PendingSendEntry[] = [];
 	let showCloseConfirm = false;
 	let keepOpenButton: HTMLButtonElement | undefined;
-	$: syncTracker(show, $selectedWallet?.address);
+	const flow = createFlowPin();
+	let pinTick = 0;
+	$: {
+		void pinTick;
+		syncTracker(show, flow.current($selectedWallet?.address));
+	}
+	$: if (flow.pinned && (!show || bridgeStatus === 'idle')) {
+		flow.release();
+		pinTick++;
+		const address = flow.current($selectedWallet?.address);
+		if (show && address) void fetchVoiBalance(address);
+	}
 	$: closeNeedsConfirm =
 		bridgeStatus === 'submitting' ||
 		bridgeStatus === 'pending' ||
@@ -232,8 +244,10 @@
 	const BRIDGE_ADDRESS = 'ARAMIDFJYV2TOFB5MRNZJIXBSAVZCVAUDAPFGKR5PNX4MTILGAZABBTXQQ';
 
 	const unsub = selectedWallet.subscribe((wallet) => {
-		if (wallet?.address) {
-			fetchVoiBalance(wallet.address);
+		if (flow.pinned) return;
+		const address = flow.current(wallet?.address);
+		if (address) {
+			fetchVoiBalance(address);
 		} else {
 			voiBalance = null;
 		}
@@ -378,6 +392,10 @@
 		if (bridgeStatus !== 'idle' || !algosdk.isValidAddress(destinationAddress)) return;
 		if (isVoiToAlgorand) {
 			const sender = $selectedWallet?.address;
+			if (sender) {
+				flow.pin(sender);
+				pinTick++;
+			}
 			const senderTracker = tracker;
 			const destination = destinationAddress;
 			const enteredAmount = amount;
@@ -775,6 +793,7 @@
 		isLoadingBalance = true;
 		try {
 			const accountInfo = await requireAccountInfo(address, { force: true });
+			if (address !== flow.current($selectedWallet?.address)) return;
 			if (selectedToken.voiAssetId === '0') {
 				// For VOI token
 				voiBalance = (accountInfo.amount as number) / 1e6;
@@ -786,10 +805,11 @@
 				voiBalance = asset ? (asset.amount as number) / 1e6 : 0;
 			}
 		} catch (error) {
+			if (address !== flow.current($selectedWallet?.address)) return;
 			console.error('Error fetching balance:', error);
 			voiBalance = null;
 		} finally {
-			isLoadingBalance = false;
+			if (address === flow.current($selectedWallet?.address)) isLoadingBalance = false;
 		}
 	}
 
@@ -1301,9 +1321,8 @@
 													showSourceSearchResults = false;
 													sourceSearchResults = [];
 													algorandSourceBalance = null;
-													if ($selectedWallet?.address) {
-														fetchVoiBalance($selectedWallet.address);
-													}
+													const address = flow.current($selectedWallet?.address);
+													if (address) fetchVoiBalance(address);
 												}}
 											>
 												<div class="flex-1 font-medium">
@@ -2125,6 +2144,12 @@
 				</div>
 			{:else}
 				<div class="space-y-6">
+					{#if pinTick && flow.address}
+						<p class="text-sm text-gray-600 dark:text-gray-300">
+							This transfer is from {flow.address.slice(0, 8)}...{flow.address.slice(-8)} of the account
+							you started it with.
+						</p>
+					{/if}
 					<!-- Bridge Status Header -->
 					<div class="text-center">
 						{#if bridgeStatus === 'signing'}

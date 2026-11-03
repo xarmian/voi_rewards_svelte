@@ -7,7 +7,7 @@ const source = readFileSync(new URL('./BridgeModal.svelte', import.meta.url), 'u
 const fn = (name: string) =>
 	source.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\t}`))?.[0] ?? '';
 const trackerReaction = () =>
-	source.match(/\$:\s*\{\s*pinTick;\s*syncTracker\([^]*?\n\t\}/)?.[0] ?? '';
+	source.match(/\$:\s*\{\s*void pinTick;\s*syncTracker\([^]*?\n\t\}/)?.[0] ?? '';
 
 test('pins the captured sender before any asynchronous work', () => {
 	const submit = fn('handleSubmit');
@@ -64,7 +64,7 @@ test('releases on idle/reset and external close, retaining the account through p
 
 test('shows the pinned sender near the transfer status', () => {
 	expect(source).toContain('This transfer is from');
-	expect(source).toContain('of the account you started it with.');
+	expect(source.replace(/\s+/g, ' ')).toContain('of the account you started it with.');
 	expect(source).toMatch(/flow\.address(?:\?|!)?\.slice\(0, 8\)/);
 	expect(source).toMatch(/flow\.address(?:\?|!)?\.slice\(-8\)/);
 });
