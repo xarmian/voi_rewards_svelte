@@ -124,15 +124,20 @@ export async function checkAlgorandDeposit(
 		state.startRound = Math.max(0, lastRound - Math.ceil(elapsed / 1000) - 2);
 		state.scanFrom = state.startRound;
 	}
+	state.scanFrom ??= state.startRound;
 	const baseUrl = `${deps.indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${state.scanFrom}&limit=50`;
 	let url = baseUrl;
 	let highestRound = state.scanFrom;
 	let incomplete = false;
+	let previousRound: number | undefined;
+	let nonDecreasing = true;
 	for (let page = 0; page < 3; page++) {
 		const data = await deps.getJson(url, signal);
 		for (const tx of transactions(data)) {
 			const round = isObject(tx) ? tx['confirmed-round'] : undefined;
 			if (typeof round === 'number' && Number.isFinite(round)) {
+				if (previousRound !== undefined && round < previousRound) nonDecreasing = false;
+				previousRound = round;
 				highestRound = Math.max(highestRound ?? round, round);
 			}
 			if (matchBridgeDeposit(tx, expected) && isObject(tx) && typeof tx.id === 'string')
@@ -143,8 +148,8 @@ export async function checkAlgorandDeposit(
 		if (page === 2) incomplete = true;
 		url = `${baseUrl}&next=${encodeURIComponent(next)}`;
 	}
-	// Re-examine the highest round: min-round is inclusive, including at a page cap.
-	if (highestRound !== null)
+	// Re-examine the highest round inclusively; unordered capped scans must re-read the old cursor.
+	if (highestRound !== null && (!incomplete || nonDecreasing))
 		state.scanFrom = Math.max(state.scanFrom ?? highestRound, highestRound);
 	return incomplete ? { done: false, incomplete: true } : { done: false };
 }

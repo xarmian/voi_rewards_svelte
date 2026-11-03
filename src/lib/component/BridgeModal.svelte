@@ -159,9 +159,14 @@
 	let isMonitoringAlgorand = false;
 	let monitoringDots = '';
 	let dotsInterval: number | undefined;
-	let depositState: Parameters<typeof checkAlgorandDeposit>[2] | undefined;
-	let depositDestination: Omit<ExpectedBridgeConfirmation, 'sourceTxId'> | undefined;
-	let depositExpected: Parameters<typeof checkAlgorandDeposit>[1] | undefined;
+	const depositSessions = new Map<
+		string,
+		{
+			state: Parameters<typeof checkAlgorandDeposit>[2];
+			expected: Parameters<typeof checkAlgorandDeposit>[1];
+			destination: Omit<ExpectedBridgeConfirmation, 'sourceTxId'>;
+		}
+	>();
 	let remainingChecks = 3; // Add counter for remaining checks after modal closure
 
 	interface NFDResult {
@@ -642,10 +647,8 @@
 		monitorExpected = undefined;
 		monitorSourceTxId = undefined;
 		monitorIndexerBase = undefined;
-		depositExpected = undefined;
-		depositState = undefined;
+		depositSessions.clear();
 		qrMonitorKey = undefined;
-		depositDestination = undefined;
 		monitorController?.abort();
 		if (dotsInterval) {
 			clearInterval(dotsInterval);
@@ -653,10 +656,8 @@
 	}
 
 	function goBack() {
-		depositExpected = undefined;
-		depositState = undefined;
+		depositSessions.clear();
 		qrMonitorKey = undefined;
-		depositDestination = undefined;
 		depositController?.abort();
 		qrMonitorActive = false;
 		bridgeStatus = 'idle';
@@ -1010,36 +1011,46 @@
 		if (qrMonitorActive && key === qrMonitorKey) return;
 		if (bridgeStatus === 'bridging' || bridgeStatus === 'completed') return;
 		depositController?.abort();
-		if (key !== qrMonitorKey) {
-			qrMonitorKey = key;
-			depositState = {
-				startRound: null,
-				scanFrom: null,
-				startedAtMs: performance.now(),
-				startedAtWallMs: Date.now()
-			};
-			depositDestination = {
-				sourceNetwork: 416001,
-				bridgeAddress: BRIDGE_ADDRESS,
-				destinationAddress: voiDestinationAddress,
-				destinationAssetId: selectedToken.voiAssetId,
-				destinationAmount
-			};
-			depositExpected = {
-				assetId: Number(selectedToken.algorandAssetId),
-				bridgeAddress: BRIDGE_ADDRESS,
-				amount: amountInAtomicUnits,
-				destinationAddress: voiDestinationAddress,
-				sourceAddress: algorandSourceAddress || undefined
+		let session = depositSessions.get(key);
+		if (!session) {
+			session = {
+				state: {
+					startRound: null,
+					scanFrom: null,
+					startedAtMs: performance.now(),
+					startedAtWallMs: Date.now()
+				},
+				destination: {
+					sourceNetwork: 416001,
+					bridgeAddress: BRIDGE_ADDRESS,
+					destinationAddress: voiDestinationAddress,
+					destinationAssetId: selectedToken.voiAssetId,
+					destinationAmount
+				},
+				expected: {
+					assetId: Number(selectedToken.algorandAssetId),
+					bridgeAddress: BRIDGE_ADDRESS,
+					amount: amountInAtomicUnits,
+					destinationAddress: voiDestinationAddress,
+					sourceAddress: algorandSourceAddress || undefined
+				}
 			};
 		}
+		depositSessions.delete(key);
+		depositSessions.set(key, session);
+		if (depositSessions.size > 5) {
+			const oldestKey = depositSessions.keys().next().value;
+			if (oldestKey !== undefined) depositSessions.delete(oldestKey);
+		}
+		qrMonitorKey = key;
 		if (dotsInterval) clearInterval(dotsInterval);
 		dotsInterval = window.setInterval(updateDots, 500);
 		void monitorAlgorandTransactions();
 	}
 
 	async function monitorAlgorandTransactions() {
-		if (!depositExpected || !depositDestination || !depositState) return;
+		const session = qrMonitorKey === undefined ? undefined : depositSessions.get(qrMonitorKey);
+		if (!session) return;
 		depositController?.abort();
 		const controller = new AbortController();
 		depositController = controller;
@@ -1053,9 +1064,7 @@
 		);
 		monitorState = 'checking';
 		monitorReview = null;
-		const expected = depositExpected;
-		const capturedDestination = depositDestination;
-		const state = depositState;
+		const { expected, destination: capturedDestination, state } = session;
 		remainingChecks = 3;
 		isMonitoringAlgorand = true;
 		const result = await pollUntil<{ id: string }>({
@@ -1105,10 +1114,8 @@
 		if (result.status === 'done') {
 			bridgeStatus = 'bridging';
 			bridgeDetails = { sourceTxId: result.value.id };
-			depositExpected = undefined;
-			depositState = undefined;
+			depositSessions.clear();
 			qrMonitorKey = undefined;
-			depositDestination = undefined;
 			depositController?.abort();
 			void startBridgeMonitoring(
 				result.value.id,
