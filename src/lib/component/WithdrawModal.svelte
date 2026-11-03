@@ -1,8 +1,11 @@
 <script lang="ts">
 	import type { ContractDetails } from '$lib/types';
-	import { formatNumber, microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
+	import { microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
 	import { abi, CONTRACT } from 'ulujs';
-	import { selectedWallet, signAndSendTransactions } from 'avm-wallet-svelte';
+	import { selectedWallet, signTransactions } from 'avm-wallet-svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { canOfferWithdraw, sendWithdrawal } from '$lib/chain/withdrawSend';
+	import { explainWait, minutesUntilExpiry } from '$lib/chain/withdrawalWait';
 	import algosdk from 'algosdk';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
@@ -11,7 +14,7 @@
 	import {
 		clearPendingWithdrawal,
 		getPendingWithdrawal,
-		rememberPendingWithdrawal
+		pendingWithdrawalStorageKey
 	} from '$lib/chain/pendingWithdrawals';
 
 	export let contract: ContractDetails;
@@ -25,6 +28,49 @@
 		'idle';
 	let txId: string | null = null;
 	let poolError: string | null = null;
+	let trackController: AbortController | undefined;
+	let waitTimer: ReturnType<typeof setInterval> | undefined;
+	let waitMinutes: number | null = null;
+	let waitKind: ReturnType<typeof explainWait>['kind'] = 'confirming';
+	const windowEndedMessage =
+		"This withdrawal's valid window has ended, but the history service has not yet confirmed whether it landed. We keep checking, and you can withdraw again as soon as that is known.";
+	let recordTick = 0;
+	let withdrawOffered = false;
+	// The wallet captured when a withdrawal is submitted. Everything below reads this, never the live
+	// selection, so switching accounts mid-flow cannot move the hold to another wallet's key.
+	let flowWallet: string | undefined;
+	$: activeWallet = flowWallet ?? $selectedWallet?.address;
+
+	const sendDeps = {
+		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
+		waitForConfirmation: (id: string) => algosdk.waitForConfirmation(algodClient, id, 4)
+	};
+
+	// Read storage before rendering, including on each open and cross-tab storage change.
+	$: {
+		void recordTick;
+		withdrawOffered = canOfferWithdraw({
+			status: show ? txStatus : 'closed',
+			wallet: activeWallet,
+			contractId: contract.contractId
+		});
+	}
+
+	function handleStorage(event: StorageEvent) {
+		const wallet = activeWallet;
+		if (wallet && event.key === pendingWithdrawalStorageKey(wallet, contract.contractId))
+			recordTick++;
+	}
+
+	onMount(() => {
+		window.addEventListener('storage', handleStorage);
+	});
+
+	onDestroy(() => {
+		trackController?.abort();
+		clearInterval(waitTimer);
+		if (typeof window !== 'undefined') window.removeEventListener('storage', handleStorage);
+	});
 
 	// Convert microVOI to VOI for display
 	$: availableBalanceVOI = microVOIToVOI(contract.availableForWithdrawal);
@@ -38,7 +84,10 @@
 
 	function handleClose() {
 		if (txStatus !== 'building' && txStatus !== 'signing' && txStatus !== 'confirming') {
+			trackController?.abort();
+			clearInterval(waitTimer);
 			show = false;
+			flowWallet = undefined;
 			// A pending withdrawal may still land, so refresh for either submitted outcome.
 			if (txStatus === 'confirmed' || txStatus === 'pending') {
 				onSuccess?.(true);
@@ -50,59 +99,143 @@
 			txId = null;
 			error = null;
 			poolError = null;
+			waitMinutes = null;
 			withdrawAmountVOI = null;
 		}
 	}
 
 	const pendingInfo = (id: string) => algodClient.pendingTransactionInformation(id).do();
 
-	async function settleWithdrawal(id: string, lastValid: number) {
+	async function trackWithdrawal(id: string, lastValid: number, wallet: string) {
 		const contractId = contract.contractId;
-		txStatus = 'confirming';
-		// Remember it before waiting: if this modal is destroyed mid-wait, a reopened one must
-		// resume this withdrawal rather than offer a second.
-		rememberPendingWithdrawal(contractId, { txId: id, lastValid });
-		const outcome = await awaitWithdrawalConfirmation(id, {
-			pendingInfo,
-			pause: (ms) => new Promise((r) => setTimeout(r, ms))
-		});
-		if (outcome.status === 'confirmed') {
-			clearPendingWithdrawal(contractId, id);
-			txStatus = 'confirmed';
-			return;
-		}
-		// Not confirmed yet: a reader past lastValid that lacks the transaction proves it never
-		// landed, which releases the contract; anything else stays pending.
-		const tracked = await trackPending(
-			{ status: 'pending', txIds: [id], firstTxId: id, lastValid },
-			createTrackingDeps(algodClient, algodIndexer),
-			{ signal: AbortSignal.timeout(10000) }
-		);
-		if (tracked.status === 'confirmed') {
-			clearPendingWithdrawal(contractId, id);
-			txStatus = 'confirmed';
-		} else if (tracked.status === 'expired') {
-			clearPendingWithdrawal(contractId, id);
-			txStatus = 'error';
-			error =
-				'The withdrawal expired before it confirmed and did not go through. You can try again.';
-		} else {
-			txStatus = 'pending';
-			poolError = outcome.poolError ?? null;
+		// Set here, not in the reactive resume block, which reads activeWallet (a reactive cycle).
+		flowWallet = wallet;
+		trackController?.abort();
+		clearInterval(waitTimer);
+		trackController = new AbortController();
+		const { signal } = trackController;
+		const trackingDeps = { ...sharedTrackingDeps };
+		let foundUnconfirmed = false;
+		let currentRound = Number.NaN; // unknown until algod answers once
+		txStatus = 'pending';
+		waitMinutes = null;
+		waitKind = 'confirming';
+
+		const pause = (ms: number) =>
+			new Promise<void>((resolve) => {
+				if (signal.aborted) return resolve();
+				const timeout = setTimeout(finish, ms);
+				signal.addEventListener('abort', finish, { once: true });
+				function finish() {
+					clearTimeout(timeout);
+					signal.removeEventListener('abort', finish);
+					resolve();
+				}
+			});
+		const updateEstimate = () => {
+			if (!signal.aborted) {
+				waitKind = explainWait({ lastValid, currentRound, foundUnconfirmed }).kind;
+				waitMinutes = foundUnconfirmed ? minutesUntilExpiry(lastValid, currentRound) : null;
+			}
+		};
+		const updateRound = async () => {
+			try {
+				currentRound = await trackingDeps.algodRound();
+			} catch {
+				// Keep the last known round: forgetting it would flip the explanation text back and forth.
+			}
+			updateEstimate();
+		};
+		void updateRound();
+		const timer = setInterval(() => void updateRound(), 30000);
+		waitTimer = timer;
+
+		const readPending = trackingDeps.pendingInfo;
+		trackingDeps.pendingInfo = async (id) => {
+			const info = await readPending(id);
+			if (!signal.aborted && !((info['confirmed-round'] ?? 0) > 0)) {
+				foundUnconfirmed = true;
+				updateEstimate();
+			}
+			return info;
+		};
+
+		try {
+			while (!signal.aborted) {
+				try {
+					// Retain the first pass for quick confirmation and escaped pool-error reporting.
+					const outcome = await awaitWithdrawalConfirmation(id, {
+						pendingInfo: async (id) => {
+							if (signal.aborted) return {};
+							const info = await pendingInfo(id);
+							if (!signal.aborted && !(info['confirmed-round'] > 0)) {
+								foundUnconfirmed = true;
+								updateEstimate();
+							}
+							return info;
+						},
+						pause
+					});
+					if (signal.aborted) return;
+					if (outcome.status === 'confirmed') {
+						txStatus = 'confirmed';
+						clearPendingWithdrawal(wallet, contractId, id);
+						return;
+					}
+					poolError = outcome.poolError ?? null;
+					const tracked = await trackPending(
+						{ status: 'pending', txIds: [id], firstTxId: id, lastValid },
+						trackingDeps,
+						{ signal }
+					);
+					if (signal.aborted) return;
+					if (tracked.status === 'confirmed') {
+						txStatus = 'confirmed';
+						clearPendingWithdrawal(wallet, contractId, id);
+						return;
+					} else if (tracked.status === 'expired') {
+						txStatus = 'error';
+						error =
+							'The earlier withdrawal expired without going through. Close this window and open it again to withdraw.';
+						clearPendingWithdrawal(wallet, contractId, id);
+						return;
+					}
+				} catch {
+					if (signal.aborted) return;
+					txStatus = 'pending';
+					await pause(15000);
+				}
+			}
+		} finally {
+			clearInterval(timer);
 		}
 	}
 
-	// A withdrawal from an earlier open of this modal may still land: wait on it rather than
-	// offering a second one for the same contract.
-	$: if (show && txStatus === 'idle') {
-		const earlier = getPendingWithdrawal(contract.contractId);
-		if (earlier) {
-			txId = earlier.txId;
-			void settleWithdrawal(earlier.txId, earlier.lastValid);
+	const sharedTrackingDeps = createTrackingDeps(algodClient, algodIndexer);
+
+	// Read again on storage events so a form already open in another tab resumes the hold.
+	$: {
+		void recordTick;
+		if (show && txStatus === 'idle') {
+			const wallet = activeWallet;
+			const earlier = wallet ? getPendingWithdrawal(wallet, contract.contractId) : undefined;
+			if (wallet && earlier) {
+				txId = earlier.txId;
+				void trackWithdrawal(earlier.txId, earlier.lastValid, wallet);
+			}
 		}
 	}
 
 	async function handleWithdraw() {
+		const wallet = $selectedWallet?.address;
+		if (!wallet) {
+			error = 'Connect a wallet to withdraw';
+			return;
+		}
+		if (!canOfferWithdraw({ status: txStatus, wallet, contractId: contract.contractId })) {
+			recordTick++;
+			return;
+		}
 		if (withdrawAmountVOI === null || withdrawAmountVOI <= 0) {
 			error = 'Please enter a valid amount';
 			return;
@@ -118,6 +251,7 @@
 			return;
 		}
 
+		flowWallet = wallet;
 		isLoading = true;
 		error = null;
 		txStatus = 'building';
@@ -184,18 +318,32 @@
 				algosdk.decodeUnsignedTransaction(new Uint8Array(Buffer.from(txn, 'base64')))
 			);
 
-			txId = txns[1].txID();
 			txStatus = 'signing';
-
-			const result = await signAndSendTransactions([txns]);
-			if (result) {
-				await settleWithdrawal(txId, Number(txns[1].lastRound));
-			} else {
+			const outcome = await sendWithdrawal(
+				{ wallet, contractId: contract.contractId, txns },
+				{
+					sign: signTransactions,
+					send: sendDeps,
+					currentWallet: () => $selectedWallet?.address
+				}
+			);
+			txId = 'txId' in outcome ? outcome.txId : null;
+			if (
+				outcome.status === 'not-recorded' ||
+				outcome.status === 'not-signed' ||
+				outcome.status === 'rejected'
+			) {
 				txStatus = 'error';
-				error = 'Failed to process withdrawal';
+				error = outcome.error;
+				flowWallet = undefined;
+			} else if (outcome.status === 'confirmed') {
+				txStatus = 'confirmed';
+			} else {
+				await trackWithdrawal(outcome.txId, outcome.lastValid, wallet);
 			}
 		} catch (err) {
 			txStatus = 'error';
+			flowWallet = undefined;
 			error = 'Failed to process withdrawal';
 			console.error('Withdrawal error:', err);
 		} finally {
@@ -247,11 +395,20 @@
 							{/if}
 						</div>
 					</div>
-				{:else if txStatus === 'pending'}
+				{:else if txStatus === 'pending' || txStatus === 'confirming'}
 					<div class="text-center space-y-4">
 						<h3 class="text-lg font-medium text-gray-900 dark:text-white">
-							Withdrawal submitted, not yet confirmed
+							A withdrawal is in progress
 						</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400">
+							{#if waitKind === 'window-ended'}
+								{windowEndedMessage}
+							{:else if waitKind === 'expires-in'}
+								Waiting for an earlier withdrawal to expire, about {waitMinutes} min.
+							{:else}
+								Waiting for it to be confirmed on the network.
+							{/if}
+						</p>
 						{#if poolError}
 							<p class="text-sm text-gray-500 dark:text-gray-400">{poolError}</p>
 						{/if}
@@ -291,8 +448,6 @@
 										<i class="fas fa-cog animate-spin text-blue-500"></i>
 									{:else if txStatus === 'signing'}
 										<i class="fas fa-pen animate-pulse text-blue-500"></i>
-									{:else if txStatus === 'confirming'}
-										<i class="fas fa-clock animate-pulse text-blue-500"></i>
 									{/if}
 								</div>
 								<div class="flex-1 min-w-0">
@@ -301,8 +456,6 @@
 											Building Transaction
 										{:else if txStatus === 'signing'}
 											Waiting for Signature
-										{:else if txStatus === 'confirming'}
-											Confirming Transaction
 										{/if}
 									</p>
 								</div>
@@ -336,38 +489,43 @@
 						</div>
 					</div>
 
-					<!-- Amount Input -->
-					<div class="space-y-2">
-						<label for="amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-							Withdrawal Amount (VOI)
-						</label>
-						<div class="relative rounded-md shadow-sm">
-							<input
-								type="number"
-								id="amount"
-								bind:value={withdrawAmountVOI}
-								min="0"
-								max={availableBalanceVOI}
-								step="0.000001"
-								class="block w-full pr-20 border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-								placeholder="0.00"
-								disabled={txStatus !== 'idle'}
-							/>
-							<div class="absolute inset-y-0 right-0 flex items-center">
-								<button
-									type="button"
-									on:click={setMaxAmount}
-									class="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
-									disabled={txStatus !== 'idle'}
-								>
-									MAX
-								</button>
+					{#if withdrawOffered}
+						<!-- Amount Input -->
+						<div class="space-y-2">
+							<label
+								for="amount"
+								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+							>
+								Withdrawal Amount (VOI)
+							</label>
+							<div class="relative rounded-md shadow-sm">
+								<input
+									type="number"
+									id="amount"
+									bind:value={withdrawAmountVOI}
+									min="0"
+									max={availableBalanceVOI}
+									step="0.000001"
+									class="block w-full pr-20 border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+									placeholder="0.00"
+									disabled={!withdrawOffered}
+								/>
+								<div class="absolute inset-y-0 right-0 flex items-center">
+									<button
+										type="button"
+										on:click={setMaxAmount}
+										class="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+										disabled={!withdrawOffered}
+									>
+										MAX
+									</button>
+								</div>
 							</div>
+							<p class="text-sm text-gray-500 dark:text-gray-400">
+								{formattedWithdrawAmount} VOI
+							</p>
 						</div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">
-							{formattedWithdrawAmount} VOI
-						</p>
-					</div>
+					{/if}
 
 					{#if error}
 						<p class="text-sm text-red-600 dark:text-red-400">{error}</p>
@@ -389,11 +547,12 @@
 						? 'Close'
 						: 'Cancel'}
 				</button>
-				{#if txStatus === 'idle'}
+				{#if withdrawOffered}
 					<button
 						type="button"
 						on:click={handleWithdraw}
-						disabled={isLoading ||
+						disabled={!withdrawOffered ||
+							isLoading ||
 							withdrawAmountVOI === null ||
 							withdrawAmountVOI <= 0 ||
 							withdrawAmountVOI > availableBalanceVOI}

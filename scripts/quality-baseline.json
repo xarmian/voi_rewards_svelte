@@ -66,16 +66,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/LockVestComponent.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/NodeComponent.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 3,
@@ -183,12 +173,6 @@
 			},
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/WithdrawModal.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
 				"warnings": 0
 			}
 		},

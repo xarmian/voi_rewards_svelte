@@ -24,15 +24,15 @@ test('WithdrawModal includes a pending transaction status', () => {
 
 test('WithdrawModal renders pending without claiming success or confirmation', () => {
 	const pendingBranch = source.match(
-		/\{:else if txStatus === 'pending'\}([\s\S]*?)(?=\{:else(?: if txStatus|\}))/
+		/\{:else if txStatus === 'pending'(?: \|\| txStatus === 'confirming')?\}([\s\S]*?)(?=\{:else if txStatus)/
 	)?.[1];
 	expect(pendingBranch, 'WithdrawModal must render a distinct pending branch').toBeDefined();
 	expect(
 		pendingBranch,
 		'Pending withdrawals must clearly say they are not yet confirmed'
-	).toContain('Withdrawal submitted, not yet confirmed');
+	).toContain('A withdrawal is in progress');
 	expect(
-		pendingBranch?.replace('not yet confirmed', ''),
+		pendingBranch?.replace('Waiting for it to be confirmed on the network.', ''),
 		'The pending branch must not claim the withdrawal is confirmed or successful'
 	).not.toMatch(/\bconfirmed\b|\bsuccess(?:ful)?\b/i);
 	expect(pendingBranch, 'Pending withdrawals must retain the explorer link').toContain(
@@ -48,8 +48,8 @@ test('WithdrawModal resumes an unresolved withdrawal instead of offering a secon
 	expect(source, 'WithdrawModal must import the pending-withdrawal registry').toMatch(
 		/from\s*['"]\$lib\/chain\/pendingWithdrawals['"]/
 	);
-	expect(source, 'An unresolved withdrawal must be remembered for its contract').toContain(
-		'rememberPendingWithdrawal('
+	expect(source, 'An unresolved withdrawal must be recorded before broadcast').toContain(
+		'sendWithdrawal('
 	);
 	expect(source, 'A reopened modal must look up an unresolved withdrawal').toContain(
 		'getPendingWithdrawal('
@@ -63,8 +63,8 @@ test('WithdrawModal releases a withdrawal that can no longer land', () => {
 	expect(source, 'An unresolved withdrawal must be checked with trackPending').toMatch(
 		/import\s*\{[^}]*\btrackPending\b[^}]*\}\s*from\s*['"]\$lib\/chain\/sendAndConfirm['"]/
 	);
-	expect(source, 'The last valid round must be remembered with the tx id').toMatch(
-		/rememberPendingWithdrawal\([^)]*lastValid/
+	expect(source, 'The stored last valid round must be used when resuming').toMatch(
+		/trackWithdrawal\(earlier\.txId, earlier\.lastValid, wallet\)/
 	);
 	expect(source, 'An expired withdrawal must be handled and its record cleared').toMatch(
 		/status === 'expired'[\s\S]*clearPendingWithdrawal\(/
@@ -78,22 +78,17 @@ test('WithdrawModal does not report a resumed withdrawal with a made-up amount',
 	).toMatch(/\{#if withdrawAmountVOI\}[\s\S]*\{:else\}[\s\S]*Your withdrawal has been confirmed/);
 });
 
-test('WithdrawModal remembers a withdrawal before it starts waiting on it', () => {
-	const body = source.match(/async function settleWithdrawal[\s\S]*?\n\t\}\n/)?.[0];
-	expect(body, 'settleWithdrawal must exist').toBeDefined();
-	const remembered = body?.indexOf('rememberPendingWithdrawal(') ?? -1;
-	const polled = body?.indexOf('await awaitWithdrawalConfirmation(') ?? -1;
-	expect(remembered, 'settleWithdrawal must remember the withdrawal').toBeGreaterThanOrEqual(0);
-	expect(
-		remembered,
-		'The record must exist before polling, so a modal destroyed mid-wait cannot offer a second withdrawal'
-	).toBeLessThan(polled);
+test('WithdrawModal records a withdrawal through the send flow before tracking it', () => {
+	const sent = source.indexOf('await sendWithdrawal(');
+	const polled = source.indexOf('await trackWithdrawal(', sent);
+	expect(sent, 'The send flow records before broadcasting').toBeGreaterThanOrEqual(0);
+	expect(polled, 'The recorded pending outcome must then be tracked').toBeGreaterThan(sent);
 });
 
 test('WithdrawModal only clears the record of the withdrawal it was waiting on', () => {
-	const body = source.match(/async function settleWithdrawal[\s\S]*?\n\t\}\n/)?.[0] ?? '';
+	const body = source.match(/async function trackWithdrawal[\s\S]*?\n\t\}\n/)?.[0] ?? '';
 	const clears = body.match(/clearPendingWithdrawal\([^)]*\)/g) ?? [];
-	expect(clears.length, 'settleWithdrawal must clear on confirmed and on expired').toBeGreaterThan(
+	expect(clears.length, 'trackWithdrawal must clear on confirmed and on expired').toBeGreaterThan(
 		1
 	);
 	for (const call of clears) {
@@ -101,5 +96,43 @@ test('WithdrawModal only clears the record of the withdrawal it was waiting on',
 			call,
 			'A detached wait must not erase a newer withdrawal: pass the tx id to every clear'
 		).toMatch(/,\s*id\s*\)/);
+	}
+});
+
+test('WithdrawModal keys every withdrawal read by the wallet captured at submit', () => {
+	const live = source
+		.split('\n')
+		.filter((line) => line.includes('$selectedWallet') && !line.includes('import '));
+	expect(live.map((line) => line.trim())).toEqual([
+		'$: activeWallet = flowWallet ?? $selectedWallet?.address;',
+		'const wallet = $selectedWallet?.address;',
+		// The one deliberate live read: sendWithdrawal compares it with the captured wallet before and
+		// after signing, because the wallet library signs with whatever is selected at that moment.
+		'currentWallet: () => $selectedWallet?.address'
+	]);
+	expect(source).toMatch(/let flowWallet: string \| undefined;/);
+	expect(source).toMatch(/flowWallet = wallet;/);
+});
+
+test('WithdrawModal tracks the withdrawal under the wallet that signed it', () => {
+	expect(source).toMatch(
+		/async function trackWithdrawal\(id: string, lastValid: number, wallet: string\)/
+	);
+	expect(source).toContain('await trackWithdrawal(outcome.txId, outcome.lastValid, wallet);');
+	expect(source).toContain('void trackWithdrawal(earlier.txId, earlier.lastValid, wallet);');
+});
+
+test('WithdrawModal releases the captured wallet only when the flow ends', () => {
+	const close = source.slice(source.indexOf('function handleClose()'));
+	expect(close.slice(0, close.indexOf('\n\t}\n'))).toContain('flowWallet = undefined;');
+	const withdraw = source.slice(source.indexOf('async function handleWithdraw()'));
+	const body = withdraw.slice(0, withdraw.indexOf('\n\t}\n'));
+	expect(body).toMatch(/status === 'not-recorded'[\s\S]*?flowWallet = undefined;/);
+});
+
+test('WithdrawModal never assigns the captured wallet inside a reactive block that reads it', () => {
+	const blocks = source.match(/\n\t\$: \{[^]*?\n\t\}\n/g) ?? [];
+	for (const block of blocks) {
+		if (block.includes('activeWallet')) expect(block).not.toMatch(/\bflowWallet =/);
 	}
 });

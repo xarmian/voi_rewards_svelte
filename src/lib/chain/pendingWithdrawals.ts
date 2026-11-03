@@ -1,27 +1,93 @@
-// Withdrawals whose confirmation is still unknown, keyed by contract id. The modal is
-// unmounted on close, so without this a reopened modal would offer a second withdrawal while
-// the first may still land (TASK-116). lastValid lets the caller prove a withdrawal can no
-// longer land, so a dropped one does not block the contract. Held in memory for the page
-// session only.
-export type PendingWithdrawal = { txId: string; lastValid: number };
+export type PendingWithdrawal = { txId: string; lastValid: number; createdAt: number };
+export type PendingWithdrawalStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> &
+	Partial<Pick<Storage, 'key' | 'length'>>;
 
-const unresolved = new Map<number, PendingWithdrawal>();
+const prefix = 'voirewards:pending-withdrawal:';
+const memory = new Map<string, PendingWithdrawal>();
+const knownKeys = new Set<string>();
 
-export function rememberPendingWithdrawal(contractId: number, entry: PendingWithdrawal): void {
-	unresolved.set(contractId, entry);
+export function pendingWithdrawalStorageKey(wallet: string, contractId: number): string {
+	return `${prefix}${wallet}:${contractId}`;
 }
 
-export function getPendingWithdrawal(contractId: number): PendingWithdrawal | undefined {
-	return unresolved.get(contractId);
+// Resolve on each call so importing this module during SSR never captures browser storage.
+function resolveStorage(storage?: PendingWithdrawalStorage): PendingWithdrawalStorage | undefined {
+	return storage ?? globalThis.localStorage;
 }
 
-// Clears only if that transaction is still the recorded one, so a wait that outlived its
-// modal cannot erase the record of a newer withdrawal.
-export function clearPendingWithdrawal(contractId: number, txId: string): void {
-	if (unresolved.get(contractId)?.txId !== txId) return;
-	unresolved.delete(contractId);
+function readEntry(key: string, storage?: PendingWithdrawalStorage): PendingWithdrawal | undefined {
+	try {
+		const resolved = resolveStorage(storage);
+		const value = resolved ? JSON.parse(resolved.getItem(key) ?? 'null') : memory.get(key);
+		if (
+			value &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			typeof value.txId === 'string' &&
+			value.txId.length > 0 &&
+			Number.isFinite(value.lastValid) &&
+			Number.isFinite(value.createdAt)
+		) {
+			return value;
+		}
+	} catch {
+		// A blocked or throwing storage read: the record written in this session still holds.
+		return memory.get(key);
+	}
 }
 
-export function resetPendingWithdrawals(): void {
-	unresolved.clear();
+export function rememberPendingWithdrawal(
+	wallet: string,
+	contractId: number,
+	entry: PendingWithdrawal,
+	storage?: PendingWithdrawalStorage
+): void {
+	const key = pendingWithdrawalStorageKey(wallet, contractId);
+	knownKeys.add(key);
+	const resolved = resolveStorage(storage);
+	// A failed persistent write must propagate: callers must not broadcast without the record.
+	if (resolved) resolved.setItem(key, JSON.stringify(entry));
+	memory.set(key, entry);
+}
+
+export function getPendingWithdrawal(
+	wallet: string,
+	contractId: number,
+	storage?: PendingWithdrawalStorage
+): PendingWithdrawal | undefined {
+	const key = pendingWithdrawalStorageKey(wallet, contractId);
+	knownKeys.add(key);
+	return readEntry(key, storage);
+}
+
+export function clearPendingWithdrawal(
+	wallet: string,
+	contractId: number,
+	txId: string,
+	storage?: PendingWithdrawalStorage
+): void {
+	const key = pendingWithdrawalStorageKey(wallet, contractId);
+	try {
+		if (readEntry(key, storage)?.txId !== txId) return;
+		resolveStorage(storage)?.removeItem(key);
+	} catch {
+		// A persisted record that cannot be removed will be resolved again on the next open.
+	} finally {
+		if (memory.get(key)?.txId === txId) memory.delete(key);
+	}
+}
+
+export function resetPendingWithdrawals(storage?: PendingWithdrawalStorage): void {
+	const resolved = resolveStorage(storage);
+	if (resolved) {
+		const keys = new Set(knownKeys);
+		for (let index = 0; index < (resolved.length ?? 0); index++) {
+			const key = resolved.key?.(index);
+			if (key?.startsWith(prefix)) keys.add(key);
+		}
+		for (const key of keys) {
+			if (key.startsWith(prefix)) resolved.removeItem(key);
+		}
+	}
+	memory.clear();
 }
