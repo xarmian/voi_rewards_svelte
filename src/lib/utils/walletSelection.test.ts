@@ -57,6 +57,28 @@ describe('selectionFromRoute (a route load or a dropdown pick)', () => {
 		).toBeNull();
 	});
 
+	test('a selection with no app is upgraded to the connected entry for the same address', () => {
+		expect(
+			selectionFromRoute({
+				routeAddress: 'AAAA',
+				connected,
+				selected: { address: 'AAAA', app: '' },
+				pinned: false
+			})
+		).toEqual(A);
+	});
+
+	test('a selection with no app stays when the address is not connected', () => {
+		expect(
+			selectionFromRoute({
+				routeAddress: 'SOMEONE',
+				connected,
+				selected: { address: 'SOMEONE', app: '' },
+				pinned: false
+			})
+		).toBeNull();
+	});
+
 	test('nothing is written while a captured-account flow is open', () => {
 		expect(
 			selectionFromRoute({ routeAddress: 'BBBB', connected, selected: A, pinned: true })

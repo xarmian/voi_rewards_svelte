@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { escapeHtml } from '$lib/utils/escapeHtml';
-	import { Web3Wallet, selectedWallet, connectedWallets } from 'avm-wallet-svelte';
+	import {
+		Web3Wallet,
+		selectedWallet,
+		connectedWallets,
+		setOnSelectHandler
+	} from 'avm-wallet-svelte';
+	import { get } from 'svelte/store';
+	import { pinnedFlows } from '$lib/chain/flowAccount';
+	import { pickNavigation, selectionFromRoute } from '$lib/utils/walletSelection';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 	import AccountInfo from '$lib/components/wallet/AccountInfo.svelte';
@@ -34,7 +42,6 @@
 	let apiData: any;
 	$: walletId = data.walletId;
 	$: parentWalletId = data.parentWalletId;
-	let loading = true;
 
 	const sections = [
 		{ id: 'portfolio', name: 'Portfolio', icon: 'fas fa-wallet' },
@@ -80,32 +87,25 @@
 	}
 
 	onMount(() => {
-		loading = false;
-		if (data.walletId && data.walletId.length > 0 && data.walletId != $selectedWallet?.address) {
-			//selectedWallet.set({address: data.walletId, app: ''});
-		}
-
 		if (browser) {
 			window.addEventListener('hashchange', handleHashChange);
 			document.addEventListener('click', handleClickOutside);
 
-			// Initialize wallet subscription only on client side
-			unsubSelectedWallet = selectedWallet.subscribe((wallet) => {
-				if (!loading && wallet?.address && wallet.address != walletId) {
-					if (parentWalletId != wallet.address) {
-						goto(`/wallet/${wallet.address}`, { invalidateAll: true });
-					}
-				}
+			setOnSelectHandler((wallet) => {
+				if (wallet.address === parentWalletId) return;
+				const target = pickNavigation({
+					pick: wallet,
+					routeAddress: walletId,
+					pinned: get(pinnedFlows) > 0
+				});
+				if (target) goto(target, { invalidateAll: true });
 			});
 		}
 	});
 
 	onDestroy(() => {
-		if (browser && unsubSelectedWallet) {
-			unsubSelectedWallet();
-		}
-
 		if (browser) {
+			setOnSelectHandler(() => {});
 			window.removeEventListener('hashchange', handleHashChange);
 			document.removeEventListener('click', handleClickOutside);
 		}
@@ -125,8 +125,6 @@
 			history.pushState(null, '', `#${sectionId}`);
 		}
 	}
-
-	let unsubSelectedWallet: (() => void) | undefined;
 
 	interface Account {
 		address: string;
@@ -217,20 +215,13 @@
 			};
 
 			if (browser) {
-				// Set the selected wallet if it's different from current
-				if (
-					address &&
-					address.length > 0 &&
-					(address !== $selectedWallet?.address || $selectedWallet?.app === '')
-				) {
-					// look for app in connectedWallets list
-					const wallet = $connectedWallets.find((w) => w.address === address && w.app !== '');
-					if (wallet) {
-						selectedWallet.set({ address: address, app: wallet.app });
-					} else {
-						selectedWallet.set({ address: address, app: '' });
-					}
-				}
+				const next = selectionFromRoute({
+					routeAddress: address,
+					connected: $connectedWallets,
+					selected: $selectedWallet,
+					pinned: get(pinnedFlows) > 0
+				});
+				if (next) selectedWallet.set(next);
 			}
 
 			// Handle child accounts similarly
@@ -281,26 +272,19 @@
 	async function initializeWallet() {
 		if (!browser || !walletId) return;
 
-		loading = true;
-
 		try {
-			// Set the selected wallet if it's different from current
-			if (walletId && walletId.length > 0 && walletId !== $selectedWallet?.address) {
-				// look for app in connectedWallets list
-				const wallet = $connectedWallets.find((w) => w.address === walletId && w.app !== '');
-				if (wallet) {
-					selectedWallet.set({ address: walletId, app: wallet.app });
-				} else {
-					selectedWallet.set({ address: walletId, app: '' });
-				}
-			}
+			const next = selectionFromRoute({
+				routeAddress: walletId,
+				connected: $connectedWallets,
+				selected: $selectedWallet,
+				pinned: get(pinnedFlows) > 0
+			});
+			if (next) selectedWallet.set(next);
 
 			// Now load the wallet data
 			await updateAccountInfo(parentWalletId || walletId);
 		} catch (error) {
 			console.error('Error initializing wallet:', error);
-		} finally {
-			loading = false;
 		}
 	}
 
