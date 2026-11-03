@@ -137,8 +137,17 @@ export async function trackPending(
 					};
 				}
 				// Absence is proof only after algod has passed lastValid and the indexer
-				// returned that exact block before this search (TASK-117).
-				if (probeResult) {
+				// returned that exact block before this search (TASK-117), AND this same search
+				// response reports a current round at or past lastValid: the probe and the search are
+				// two requests to one load-balanced URL, so a lagging backend can answer the search
+				// after a caught-up one served the block.
+				const searchRound = search['current-round'];
+				if (
+					probeResult &&
+					typeof searchRound === 'number' &&
+					Number.isFinite(searchRound) &&
+					searchRound >= outcome.lastValid
+				) {
 					return { status: 'expired', txIds: outcome.txIds };
 				}
 			}

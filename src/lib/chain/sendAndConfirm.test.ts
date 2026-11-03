@@ -302,6 +302,8 @@ describe('trackPending', () => {
 		const d = deps();
 		d.algodRound.mockResolvedValueOnce(99).mockResolvedValueOnce(100).mockResolvedValue(101);
 		d.indexerHasBlock.mockResolvedValue(true);
+		// The search response itself must report a current round at or past lastValid.
+		d.indexerSearch.mockResolvedValue({ 'current-round': 100, transactions: [] });
 		const settled = vi.fn();
 		const tracking = trackPending(pending, d, { intervalMs: 1 }).then(settled);
 		await vi.advanceTimersByTimeAsync(1);
@@ -396,6 +398,7 @@ describe('trackPending', () => {
 		const d = deps();
 		d.algodRound.mockResolvedValue(101);
 		d.indexerHasBlock.mockResolvedValue(true);
+		d.indexerSearch.mockResolvedValue({ 'current-round': 100, transactions: [] });
 		expect(await trackPending(pending, d)).toEqual({ status: 'expired', txIds: pending.txIds });
 	});
 
