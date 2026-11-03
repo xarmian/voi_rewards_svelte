@@ -57,6 +57,9 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
+const algosdkPrefixFor = (status: number) =>
+	`Network request error. Received status ${status} (Bad Request)`;
+
 describe('sendWithdrawal', () => {
 	it('does not store or send when signing throws', async () => {
 		const d = setup();
@@ -147,8 +150,7 @@ describe('sendWithdrawal', () => {
 		{ status: '400', message: 'transaction rejected' },
 		{ status: 400, response: { body: { message: 'already in pool' } } },
 		{ status: 400, response: { text: 'transaction already in ledger' } },
-		{ status: 400, message: 'Bad Request', response: { body: { message: 'duplicate' } } },
-		{ status: 400, message: 'Bad Request', response: { text: 'already confirmed' } }
+		{ status: 400, message: 'Bad Request', response: { body: { message: 'duplicate' } } }
 	])('keeps the hold for an ambiguous submit error: %j', async (error) => {
 		const d = setup();
 		d.send.mockRejectedValue(error);
@@ -159,6 +161,62 @@ describe('sendWithdrawal', () => {
 		});
 		expect(d.read()).toEqual(d.entry);
 		expect(d.waitForConfirmation).not.toHaveBeenCalled();
+	});
+
+	// A proxy can answer 400 with a JSON body that has no `message` key; response.text then holds the
+	// raw body. algosdk puts the algod text into error.message only when the body had a `message`,
+	// so the raw text is not evidence of an algod rejection.
+	it.each([
+		{ status: 400, message: '', response: { text: '{"error":"bad gateway config"}' } },
+		{ status: 400, message: '', response: { text: 'transaction rejected' } },
+		{ status: 400, message: algosdkPrefixFor(400), response: { text: '{}' } },
+		{
+			status: 400,
+			message: algosdkPrefixFor(400),
+			response: { text: '{"error":"x"}', body: { error: 'x' } }
+		}
+	])('keeps the hold when only response.text carries something: %j', async (error) => {
+		const d = setup();
+		d.send.mockRejectedValue(error);
+		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+			status: 'pending',
+			txId: d.entry.txId,
+			lastValid: 95
+		});
+		expect(d.read()).toEqual(d.entry);
+	});
+
+	// Ordinary algod rejections must release immediately: a wider net would hold the contract for the
+	// whole validity window for a transaction that never landed.
+	it.each([
+		'asset 123 does not exist',
+		'application 456 does not exist',
+		'account already opted in to asset 7',
+		'logic eval error: assert failed; already withdrawn this epoch',
+		'TransactionPool.Remember: transaction TXID: account ADDR balance 5 below min 100000'
+	])('releases an ordinary algod rejection: %s', async (message) => {
+		const d = setup();
+		d.send.mockRejectedValue(
+			Object.assign(new Error(`${algosdkPrefixFor(400)}: ${message}`), { status: 400 })
+		);
+		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'rejected' });
+		expect(d.read()).toBeUndefined();
+	});
+
+	it.each([
+		'transaction already exists',
+		'txn already in the transaction pool',
+		'transaction TXID exists in the ledger',
+		'transaction already in ledger: TXID',
+		'duplicate transaction',
+		'already been committed'
+	])('keeps the hold when the transaction itself exists: %s', async (message) => {
+		const d = setup();
+		d.send.mockRejectedValue(
+			Object.assign(new Error(`${algosdkPrefixFor(400)}: ${message}`), { status: 400 })
+		);
+		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'pending' });
+		expect(d.read()).toEqual(d.entry);
 	});
 
 	// Real algosdk errors always carry a non-empty message: the status prefix, plus the algod body
@@ -193,19 +251,19 @@ describe('sendWithdrawal', () => {
 		expect(d.read()).toBeUndefined();
 	});
 
-	it.each([
-		{ status: 400, response: { body: { message: 'overspend' } } },
-		{ status: 400, message: '', response: { text: 'transaction rejected' } }
-	])('recognizes nested clean messages and preserves shared error text: %j', async (error) => {
-		const d = setup();
-		d.send.mockRejectedValue(error);
-		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
-			status: 'rejected',
-			txId: d.entry.txId,
-			error: String(error)
-		});
-		expect(d.read()).toBeUndefined();
-	});
+	it.each([{ status: 400, response: { body: { message: 'overspend' } } }])(
+		'recognizes nested clean messages and preserves shared error text: %j',
+		async (error) => {
+			const d = setup();
+			d.send.mockRejectedValue(error);
+			expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+				status: 'rejected',
+				txId: d.entry.txId,
+				error: String(error)
+			});
+			expect(d.read()).toBeUndefined();
+		}
+	);
 
 	it('passes the original submit error unchanged to sendAndConfirm', async () => {
 		const d = setup();
