@@ -13,3 +13,14 @@ test('per-holder import amounts are coerced to a string', () => {
 	).not.toMatch(/\bamount\s*=\s*amountValue\s*;/);
 	expect(source.match(/\bamount\s*=\s*String\(amountValue\)\s*;/g)).toHaveLength(2);
 });
+
+test('import cells show full resolved addresses and explain invalid name kinds', () => {
+	expect(source, 'Imported name receivers must never be shortened').not.toMatch(
+		/resolvedAddress\.slice\(/
+	);
+	expect(source).toMatch(
+		/class="[^"]*font-mono[^"]*break-all[^"]*"[^>]*>\s*\{row.resolvedAddress\}/
+	);
+	expect(source).toContain('This name did not resolve to an address.');
+	expect(source).toContain('This import takes Voi addresses and .voi names.');
+});
