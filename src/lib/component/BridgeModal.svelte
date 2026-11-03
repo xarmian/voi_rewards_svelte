@@ -266,6 +266,7 @@
 	onDestroy(() => {
 		pendingController?.abort();
 		tracker?.stop();
+		flow.dispose();
 		unsub();
 		unsubConnectedWallets();
 		if (searchTimeout) {

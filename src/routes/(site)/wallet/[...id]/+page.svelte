@@ -92,10 +92,10 @@
 			document.addEventListener('click', handleClickOutside);
 
 			setOnSelectHandler((wallet) => {
-				if (wallet.address === parentWalletId) return;
 				const target = pickNavigation({
 					pick: wallet,
 					routeAddress: walletId,
+					parentAddress: parentWalletId,
 					pinned: get(pinnedFlows) > 0
 				});
 				if (target) goto(target, { invalidateAll: true });
@@ -213,16 +213,6 @@
 				estimatedRewardsPerMonth: monthlyReward,
 				contractId: 0
 			};
-
-			if (browser) {
-				const next = selectionFromRoute({
-					routeAddress: address,
-					connected: $connectedWallets,
-					selected: $selectedWallet,
-					pinned: get(pinnedFlows) > 0
-				});
-				if (next) selectedWallet.set(next);
-			}
 
 			// Handle child accounts similarly
 			let lockAccounts: LockContract[] = [];

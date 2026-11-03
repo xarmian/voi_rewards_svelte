@@ -3,13 +3,16 @@ import type { WalletConnectionResult as Wallet } from 'avm-wallet-svelte';
 export function pickNavigation({
 	pick,
 	routeAddress,
+	parentAddress,
 	pinned
 }: {
 	pick: Wallet;
 	routeAddress: string | null | undefined;
+	// The owner account when the route is one of its contracts: that pick is already "shown".
+	parentAddress?: string | null;
 	pinned: boolean;
 }): string | null {
-	if (pinned || pick.address === routeAddress) return null;
+	if (pinned || pick.address === routeAddress || pick.address === parentAddress) return null;
 	return `/wallet/${pick.address}`;
 }
 
