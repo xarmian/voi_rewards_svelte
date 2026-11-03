@@ -1,5 +1,41 @@
+import { get } from 'svelte/store';
 import { expect, test } from 'vitest';
-import { createFlowPin } from './flowAccount';
+import { createFlowPin, pinnedFlows } from './flowAccount';
+
+test('pinnedFlows counts live pins across flows; a repeat pin or release counts once', () => {
+	const one = createFlowPin();
+	const two = createFlowPin();
+	expect(get(pinnedFlows)).toBe(0);
+	one.pin('A');
+	one.pin('B');
+	expect(get(pinnedFlows)).toBe(1);
+	two.pin('C');
+	expect(get(pinnedFlows)).toBe(2);
+	one.release();
+	one.release();
+	expect(get(pinnedFlows)).toBe(1);
+	two.release();
+	expect(get(pinnedFlows)).toBe(0);
+});
+
+test('dispose (a modal destroyed mid-flow) drops the pin from the count but keeps the captured account', () => {
+	const flow = createFlowPin();
+	flow.pin('A');
+	expect(get(pinnedFlows)).toBe(1);
+	flow.dispose();
+	expect(get(pinnedFlows)).toBe(0);
+	expect(flow.address).toBe('A');
+	expect(flow.current('B')).toBe('A');
+	flow.dispose();
+	flow.release();
+	expect(get(pinnedFlows)).toBe(0);
+});
+
+test('a flow never pinned can be disposed without touching the count', () => {
+	const flow = createFlowPin();
+	flow.dispose();
+	expect(get(pinnedFlows)).toBe(0);
+});
 
 test('follows selection until pinned, then keeps the starting account through switches and disconnects', () => {
 	const flow = createFlowPin();

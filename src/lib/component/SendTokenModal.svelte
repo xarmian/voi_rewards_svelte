@@ -234,6 +234,7 @@
 	onDestroy(() => {
 		pendingController?.abort();
 		tracker?.stop();
+		flow.dispose();
 	});
 
 	function syncTracker(isOpen: boolean, wallet: string | undefined) {
