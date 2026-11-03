@@ -278,6 +278,73 @@ describe('Algorand deposit', () => {
 		expect(d.getJson.mock.calls[3][0]).toBe(query(249));
 		expect(window.startRound).toBe(98);
 	});
+	it.each([
+		{
+			name: 'incomplete non-decreasing pages',
+			rounds: [[110, 110], [120], [125]],
+			incomplete: true,
+			cursor: 125
+		},
+		{
+			name: 'incomplete pages with an older second page',
+			rounds: [[120], [110], [125]],
+			incomplete: true,
+			cursor: 100
+		},
+		{
+			name: 'incomplete page with decreasing rounds',
+			rounds: [[120, 110], [125], [130]],
+			incomplete: true,
+			cursor: 100
+		},
+		{
+			name: 'complete out-of-order pages',
+			rounds: [[120], [110], [125]],
+			incomplete: false,
+			cursor: 125
+		},
+		{
+			name: 'incomplete ordered pages with nonnumeric rounds',
+			rounds: [
+				[110, undefined, '1'],
+				[null, 120, NaN],
+				[Infinity, 125, {}]
+			],
+			incomplete: true,
+			cursor: 125
+		},
+		{
+			name: 'incomplete unordered pages with nonnumeric rounds',
+			rounds: [[120, '1'], [undefined, 110], [125]],
+			incomplete: true,
+			cursor: 100
+		}
+	])('sets the safe cursor for $name', async ({ rounds, incomplete, cursor }) => {
+		const d = deps();
+		for (const [page, values] of rounds.entries()) {
+			d.getJson.mockResolvedValueOnce({
+				transactions: values.map((round) => ({ 'confirmed-round': round })),
+				...(page < 2 || incomplete ? { 'next-token': String(page + 1) } : {})
+			});
+		}
+		const window = { ...state(), startRound: 98, scanFrom: 100 };
+		expect(await checkAlgorandDeposit(d, depositExpected, window, signal)).toEqual(
+			incomplete ? { done: false, incomplete: true } : { done: false }
+		);
+		expect(window.scanFrom).toBe(cursor);
+		expect(window.startRound).toBe(98);
+		await checkAlgorandDeposit(d, depositExpected, window, signal);
+		expect(d.getJson.mock.calls[3][0]).toBe(query(cursor));
+		expect(window.startRound).toBe(98);
+	});
+	it('uses startRound when an established boundary has a null scan cursor', async () => {
+		const d = deps();
+		const window = { ...state(), startRound: 98 };
+		await checkAlgorandDeposit(d, depositExpected, window, signal);
+		expect(d.getJson.mock.calls.map(([url]) => url)).toEqual([query(98)]);
+		expect(window.scanFrom).toBe(98);
+		expect(window.startRound).toBe(98);
+	});
 	it('never advances backwards or beyond an examined round when a next page remains', async () => {
 		const d = deps();
 		d.getJson

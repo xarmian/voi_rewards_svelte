@@ -185,3 +185,30 @@ it.each(['algod', 'indexer'] as const)(
 		expect(await second).toBe(kind === 'algod' ? 120 : true);
 	}
 );
+
+it.each(['algod', 'indexer'] as const)(
+	'replaces a hung %s request after a backward clock step',
+	async (kind) => {
+		let time = 1000;
+		const { deps, status, block } = clients(() => time, 100);
+		const old = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const fresh = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const underlying = kind === 'algod' ? status : block;
+		underlying.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
+		const lookup = () => (kind === 'algod' ? deps.algodRound() : deps.indexerHasBlock(100));
+		const first = lookup();
+		time = 1100;
+		expect(lookup()).toBe(first);
+		expect(underlying).toHaveBeenCalledOnce();
+		time = 999;
+		const second = lookup();
+		expect(second).not.toBe(first);
+		expect(underlying).toHaveBeenCalledTimes(2);
+		expect(lookup()).toBe(second);
+		old.resolve({ 'last-round': 99, round: 99 });
+		await first;
+		expect(lookup()).toBe(second);
+		fresh.resolve({ 'last-round': 120, round: 100 });
+		expect(await second).toBe(kind === 'algod' ? 120 : true);
+	}
+);
