@@ -29,7 +29,7 @@ export function createTrackingDeps(
 		algodRound: () => {
 			const startedAtMs = now();
 			const age = startedAtMs - (roundRequest?.startedAtMs ?? startedAtMs);
-			if (!roundRequest || age < 0 || age > staleMs) {
+			if (!roundRequest || !(age >= 0 && age <= staleMs)) {
 				const promise = (async () =>
 					(await algodClient.status().do())['last-round'] as number)().finally(() => {
 					if (roundRequest?.promise === promise) roundRequest = undefined;
@@ -42,7 +42,7 @@ export function createTrackingDeps(
 			const existing = blockRequests.get(round);
 			const startedAtMs = now();
 			const age = startedAtMs - (existing?.startedAtMs ?? startedAtMs);
-			if (existing && !(age < 0 || age > staleMs)) return existing.promise;
+			if (existing && age >= 0 && age <= staleMs) return existing.promise;
 			const promise = (async () => {
 				try {
 					const block = await indexer.lookupBlock(round).do();

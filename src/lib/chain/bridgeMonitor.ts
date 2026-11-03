@@ -116,13 +116,17 @@ export async function checkAlgorandDeposit(
 			lastRound < 0
 		)
 			throw new Error('Unexpected algod response');
-		const elapsed = Math.max(
-			deps.nowMs() - state.startedAtMs,
-			deps.wallMs() - state.startedAtWallMs,
-			0
-		);
-		state.startRound = Math.max(0, lastRound - Math.ceil(elapsed / 1000) - 2);
-		state.scanFrom = state.startRound;
+		// Another poll sharing this state may have answered first: the first boundary wins and
+		// the cursor is never pulled back below one that poll already advanced.
+		if (state.startRound === null) {
+			const elapsed = Math.max(
+				deps.nowMs() - state.startedAtMs,
+				deps.wallMs() - state.startedAtWallMs,
+				0
+			);
+			state.startRound = Math.max(0, lastRound - Math.ceil(elapsed / 1000) - 2);
+			state.scanFrom = state.startRound;
+		}
 	}
 	state.scanFrom ??= state.startRound;
 	const baseUrl = `${deps.indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${state.scanFrom}&limit=50`;
