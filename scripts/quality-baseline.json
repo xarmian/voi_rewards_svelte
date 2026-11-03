@@ -188,7 +188,7 @@
 		},
 		"src/lib/component/WithdrawModal.svelte": {
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
+				"errors": 1,
 				"warnings": 0
 			}
 		},
