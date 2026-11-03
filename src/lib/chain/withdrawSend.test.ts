@@ -113,6 +113,123 @@ describe('sendWithdrawal', () => {
 		expect(d.waitForConfirmation).not.toHaveBeenCalled();
 	});
 
+	it.each(['overspend', 'transaction rejected'])(
+		'clears a clean algod 400: %s',
+		async (message) => {
+			const d = setup();
+			d.send.mockRejectedValue(Object.assign(new Error(message), { status: 400 }));
+			expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+				status: 'rejected',
+				txId: d.entry.txId,
+				error: message
+			});
+			expect(d.read()).toBeUndefined();
+		}
+	);
+
+	it.each([
+		{ status: 400, message: 'transaction already in ledger' },
+		{ status: 400, message: 'already in pool' },
+		{ status: 400, message: 'already in the ledger' },
+		{ status: 400, message: 'already been committed' },
+		{ status: 400, message: 'already confirmed' },
+		{ status: 400, message: 'already submitted' },
+		{ status: 400, message: 'Duplicate transaction' },
+		{ status: 400, message: '' },
+		{ status: 400, message: '   ' },
+		{ status: 400 },
+		{ status: 400, message: 123 },
+		...[408, 429, 499, 404, 401, 413].map((status) => ({
+			status,
+			message: 'transaction rejected'
+		})),
+		{ message: 'transaction rejected' },
+		{ status: '400', message: 'transaction rejected' },
+		{ status: 400, response: { body: { message: 'already in pool' } } },
+		{ status: 400, response: { text: 'transaction already in ledger' } },
+		{ status: 400, message: 'Bad Request', response: { body: { message: 'duplicate' } } },
+		{ status: 400, message: 'Bad Request', response: { text: 'already confirmed' } }
+	])('keeps the hold for an ambiguous submit error: %j', async (error) => {
+		const d = setup();
+		d.send.mockRejectedValue(error);
+		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+			status: 'pending',
+			txId: d.entry.txId,
+			lastValid: 95
+		});
+		expect(d.read()).toEqual(d.entry);
+		expect(d.waitForConfirmation).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{ status: 400, response: { body: { message: 'overspend' } } },
+		{ status: 400, message: '', response: { text: 'transaction rejected' } }
+	])('recognizes nested clean messages and preserves shared error text: %j', async (error) => {
+		const d = setup();
+		d.send.mockRejectedValue(error);
+		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+			status: 'rejected',
+			txId: d.entry.txId,
+			error: String(error)
+		});
+		expect(d.read()).toBeUndefined();
+	});
+
+	it('passes the original submit error unchanged to sendAndConfirm', async () => {
+		const d = setup();
+		const error = Object.assign(new Error('overspend'), { status: 400 });
+		d.send.mockRejectedValue(error);
+		const original = sending.sendAndConfirm;
+		vi.spyOn(sending, 'sendAndConfirm').mockImplementation(async (signed, deps) => {
+			await expect(deps.send(signed)).rejects.toBe(error);
+			return original(signed, deps);
+		});
+		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+			status: 'rejected',
+			txId: d.entry.txId,
+			error: 'overspend'
+		});
+	});
+
+	it.each(['different', 'reordered', 'shorter'])(
+		'rejects a %s signed group before recording or broadcasting',
+		async (kind) => {
+			const d = setup();
+			const signed = await d.sign();
+			const other = setup();
+			d.sign.mockResolvedValue(
+				kind === 'different'
+					? await other.sign()
+					: kind === 'reordered'
+						? [...signed!].reverse()
+						: signed!.slice(0, 1)
+			);
+			expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+				status: 'not-signed',
+				error: 'The wallet returned a different transaction group, so nothing was sent.'
+			});
+			expect(d.send).not.toHaveBeenCalled();
+			expect(d.log).toEqual([]);
+			expect(d.read()).toBeUndefined();
+		}
+	);
+
+	it('accepts the same txids in the requested order', async () => {
+		const d = setup();
+		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'pending' });
+		expect(d.send).toHaveBeenCalledOnce();
+		expect(d.read()).toEqual(d.entry);
+	});
+
+	it('skips group identity checks for inputs without txID', async () => {
+		const d = setup();
+		expect(await sendWithdrawal({ ...d.input, txns: [{}, {}] }, d.deps)).toMatchObject({
+			status: 'pending'
+		});
+		expect(d.send).toHaveBeenCalledOnce();
+		expect(d.read()).toEqual(d.entry);
+	});
+
 	it('clears on confirmation', async () => {
 		const d = setup();
 		d.waitForConfirmation.mockResolvedValue({ 'confirmed-round': 20 });
@@ -212,7 +329,7 @@ describe('canOfferWithdraw', () => {
 
 	it('treats corrupt storage as no record', () => {
 		const d = setup();
-		d.storage.setItem(pendingWithdrawalStorageKey(d.input.wallet), 'bad JSON');
+		d.storage.setItem(pendingWithdrawalStorageKey(d.input.wallet, d.input.contractId), 'bad JSON');
 		expect(canOfferWithdraw({ status: 'idle', ...d.input, storage: d.storage })).toBe(true);
 	});
 });

@@ -99,7 +99,7 @@ test('cross-tab storage events invalidate the guard and resume tracking', () => 
 		/removeEventListener\('storage',\s*handleStorage\)/
 	);
 	expect(source, 'Storage updates must match this wallet key').toMatch(
-		/event\.key === pendingWithdrawalStorageKey\(wallet\)/
+		/event\.key === pendingWithdrawalStorageKey\(wallet,\s*contract\.contractId\)/
 	);
 	expect(source, 'Storage updates must invalidate availability').toMatch(
 		/function handleStorage[\s\S]*?recordTick\+\+/
@@ -116,4 +116,35 @@ test('a failure to record is displayed as an error without a modal broadcast pat
 	expect(source, 'Only the pure send flow may broadcast').not.toMatch(
 		/await\s+(?:algodClient\.sendRawTransaction|sendAndConfirm)\(/
 	);
+});
+
+test('the wait explanation includes a window that ended without history proof', () => {
+	expect(source).toContain(
+		"This withdrawal's valid window has ended, but the history service has not yet confirmed whether it landed. We keep checking, and you can withdraw again as soon as that is known."
+	);
+	expect(source).toMatch(/explainWait\(/);
+	expect(source).toContain("'window-ended'");
+});
+
+test('tracking failures retry the entire pass after an abortable fifteen second pause', () => {
+	const tracking = source.match(/async function trackWithdrawal[\s\S]*?\n\t\}/)?.[0] ?? '';
+	expect(tracking).toMatch(/while\s*\(!signal\.aborted\)/);
+	expect(tracking).toMatch(/catch\s*\{[\s\S]*?await pause\(15_?000\)/);
+	expect(tracking).toMatch(/signal\.addEventListener\('abort', finish/);
+	expect(tracking).toMatch(/signal\.removeEventListener\('abort', finish/);
+});
+
+test('every tracking resolution sets the view before clearing the record', () => {
+	const tracking = source.match(/async function trackWithdrawal[\s\S]*?\n\t\}/)?.[0] ?? '';
+	for (const [name, status] of [
+		['outcome', 'confirmed'],
+		['tracked', 'confirmed'],
+		['tracked', 'expired']
+	]) {
+		const branch =
+			tracking.match(new RegExp(String.raw`${name}\.status === '${status}'\) \{([^}]+)`))?.[1] ??
+			'';
+		expect(branch).toContain(`txStatus = '${status === 'expired' ? 'error' : 'confirmed'}'`);
+		expect(branch.indexOf('txStatus =')).toBeLessThan(branch.indexOf('clearPendingWithdrawal('));
+	}
 });

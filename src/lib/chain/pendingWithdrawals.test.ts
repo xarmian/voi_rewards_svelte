@@ -10,6 +10,10 @@ import {
 function fakeStorage() {
 	const values = new Map<string, string>();
 	return {
+		get length() {
+			return values.size;
+		},
+		key: (index: number) => [...values.keys()][index] ?? null,
 		getItem: (key: string) => values.get(key) ?? null,
 		setItem: (key: string, value: string) => {
 			values.set(key, value);
@@ -31,9 +35,7 @@ describe('pending withdrawals', () => {
 	it('persists across fresh callers sharing storage, including reloads and other tabs', () => {
 		const storage = fakeStorage();
 		rememberPendingWithdrawal('wallet-a', 1, entry, storage);
-		expect(JSON.parse(storage.getItem(pendingWithdrawalStorageKey('wallet-a'))!)).toEqual({
-			'1': entry
-		});
+		expect(JSON.parse(storage.getItem(pendingWithdrawalStorageKey('wallet-a', 1))!)).toEqual(entry);
 		expect(getPendingWithdrawal('wallet-a', 1, { ...storage })).toEqual(entry);
 	});
 
@@ -54,14 +56,14 @@ describe('pending withdrawals', () => {
 		'null',
 		'[]',
 		'{"1":null}',
-		'{"1":{"txId":"","lastValid":1,"createdAt":1}}',
-		'{"1":{"txId":"A","lastValid":"1","createdAt":1}}',
-		'{"1":{"txId":"A","lastValid":1}}',
-		'{"1":{"txId":"A","lastValid":1e999,"createdAt":1}}',
-		'{"1":{"txId":"A","lastValid":1,"createdAt":1e999}}'
+		'{"txId":"","lastValid":1,"createdAt":1}',
+		'{"txId":"A","lastValid":"1","createdAt":1}',
+		'{"txId":"A","lastValid":1}',
+		'{"txId":"A","lastValid":1e999,"createdAt":1}',
+		'{"txId":"A","lastValid":1,"createdAt":1e999}'
 	])('reads corrupt or invalid data as absent: %s', (value) => {
 		const storage = fakeStorage();
-		storage.setItem(pendingWithdrawalStorageKey('a'), value);
+		storage.setItem(pendingWithdrawalStorageKey('a', 1), value);
 		expect(() => getPendingWithdrawal('a', 1, storage)).not.toThrow();
 		expect(getPendingWithdrawal('a', 1, storage)).toBeUndefined();
 	});
@@ -140,8 +142,64 @@ describe('pending withdrawals', () => {
 		expect(storage.getItem('other')).toBe('keep');
 	});
 
-	it('has a stable key per wallet', () => {
-		expect(pendingWithdrawalStorageKey('a')).toBe('voirewards:pending-withdrawals:a');
-		expect(pendingWithdrawalStorageKey('b')).not.toBe(pendingWithdrawalStorageKey('a'));
+	it('has a stable key per wallet and contract', () => {
+		expect(pendingWithdrawalStorageKey('a', 1)).toBe('voirewards:pending-withdrawal:a:1');
+		expect(pendingWithdrawalStorageKey('b', 1)).not.toBe(pendingWithdrawalStorageKey('a', 1));
+		expect(pendingWithdrawalStorageKey('a', 2)).not.toBe(pendingWithdrawalStorageKey('a', 1));
+	});
+
+	it('writes one contract without reading or rewriting another contract key', () => {
+		const storage = fakeStorage();
+		rememberPendingWithdrawal('a', 1, entry, storage);
+		const firstValue = storage.getItem(pendingWithdrawalStorageKey('a', 1));
+		const set = vi.spyOn(storage, 'setItem');
+		const get = vi.spyOn(storage, 'getItem');
+		rememberPendingWithdrawal('a', 2, { ...entry, txId: 'TX-B' }, storage);
+		expect(set).toHaveBeenCalledExactlyOnceWith(
+			pendingWithdrawalStorageKey('a', 2),
+			JSON.stringify({ ...entry, txId: 'TX-B' })
+		);
+		expect(get).not.toHaveBeenCalledWith(pendingWithdrawalStorageKey('a', 1));
+		expect(storage.getItem(pendingWithdrawalStorageKey('a', 1))).toBe(firstValue);
+		expect(getPendingWithdrawal('a', 1, storage)).toEqual(entry);
+		expect(getPendingWithdrawal('a', 2, storage)?.txId).toBe('TX-B');
+	});
+
+	it.each(['removeItem', 'setItem', 'getItem', 'localStorage'] as const)(
+		'clear never throws when %s is blocked and removes its memory entry',
+		(method) => {
+			rememberPendingWithdrawal('a', 1, entry);
+			const storage = fakeStorage();
+			rememberPendingWithdrawal('a', 1, entry, storage);
+			rememberPendingWithdrawal('a', 2, { ...entry, txId: 'TX-B' }, storage);
+			if (method === 'localStorage') {
+				Object.defineProperty(globalThis, 'localStorage', {
+					configurable: true,
+					get() {
+						throw new Error('blocked');
+					}
+				});
+			} else {
+				vi.spyOn(storage, method).mockImplementation(() => {
+					throw new Error('blocked');
+				});
+			}
+			expect(() =>
+				clearPendingWithdrawal('a', 1, entry.txId, method === 'localStorage' ? undefined : storage)
+			).not.toThrow();
+			vi.stubGlobal('localStorage', undefined);
+			expect(getPendingWithdrawal('a', 1)).toBeUndefined();
+		}
+	);
+
+	it('resets only prefix keys, including records not read in this module instance', () => {
+		const storage = fakeStorage();
+		storage.setItem('voirewards:pending-withdrawal:unseen:99', JSON.stringify(entry));
+		storage.setItem('foreign', 'keep');
+		storage.setItem('voirewards:pending-withdrawals:old', 'keep');
+		resetPendingWithdrawals(storage);
+		expect(storage.getItem('voirewards:pending-withdrawal:unseen:99')).toBeNull();
+		expect(storage.getItem('foreign')).toBe('keep');
+		expect(storage.getItem('voirewards:pending-withdrawals:old')).toBe('keep');
 	});
 });
