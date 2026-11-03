@@ -3,6 +3,7 @@
 	import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 	import {
 		fetchTokenTransfers,
+		TransfersUnavailableError,
 		fetchCurrentPoolBalance as getCurrentPoolBalance,
 		type Transfer
 	} from '$lib/services/tokenTransfers';
@@ -26,6 +27,7 @@
 	let filteredTransfers: Transfer[] = [];
 	let isLoading = false;
 	let error: string | null = null;
+	let failedRequest: { append: boolean; offset: number } | null = null;
 	let offset = 0;
 	let limit = 50;
 	let hasMore = true;
@@ -96,7 +98,7 @@
 		}
 	});
 
-	async function fetchTransfers(append = false) {
+	async function fetchTransfers(append = false, requestedOffset = offset) {
 		if (isLoading) return;
 		isLoading = true;
 		error = null;
@@ -108,13 +110,15 @@
 				hasMore,
 				append,
 				limit,
-				offset,
+				offset: requestedOffset,
 				transfers,
 				onPagination: (pagination) => {
 					nextToken = pagination.nextToken;
-					hasMore = pagination.hasMore;
 				}
 			});
+			offset = requestedOffset;
+			hasMore = result.hasMore;
+			failedRequest = null;
 			if (result.transfers.length === 0) return;
 			if (append) {
 				transfers = [...transfers, ...result.transfers];
@@ -123,11 +127,28 @@
 			}
 			applyFilters();
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to fetch transfers';
-			hasMore = false;
+			console.error('Error fetching transfers:', err);
+			error =
+				err instanceof TransfersUnavailableError
+					? err.message
+					: "Couldn't load transfers right now. Please try again.";
+			failedRequest = { append, offset: requestedOffset };
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	async function retryTransfers() {
+		if (!failedRequest) return;
+		await fetchTransfers(failedRequest.append, failedRequest.offset);
+	}
+
+	async function retryLpLabels() {
+		if (isLoading) return;
+		offset = 0;
+		transfers = [];
+		applyFilters();
+		await fetchTransfers(false);
 	}
 
 	function applyFilters() {
@@ -155,11 +176,8 @@
 		const target = e.target as HTMLDivElement;
 		const bottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
 
-		if (bottom && !isLoading && hasMore) {
-			if (token.type === 'arc200') {
-				offset += limit;
-			}
-			fetchTransfers(true);
+		if (bottom && !isLoading && hasMore && !error) {
+			fetchTransfers(true, token.type === 'arc200' ? offset + limit : offset);
 		}
 	}
 
@@ -312,17 +330,23 @@
 					{totalProfitLossPercentInB}
 				/>
 
-				{#if error}
+				{#if error && !failedRequest?.append}
 					<div class="text-red-500 text-center py-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
 						{error}
+						<button class="underline ml-2" on:click={retryTransfers} disabled={isLoading}>
+							Retry
+						</button>
 					</div>
-				{:else if filteredTransfers.length === 0 && !isLoading}
-					<div
-						class="text-gray-500 dark:text-gray-400 text-center py-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-					>
-						No transfers found
+				{/if}
+				{#if transfers.some((transfer) => transfer.lpLabelUnavailable)}
+					<div class="text-gray-500 dark:text-gray-400 text-center py-4">
+						Some add and remove liquidity labels couldn't be loaded.
+						<button class="underline ml-2" on:click={retryLpLabels} disabled={isLoading}>
+							Retry
+						</button>
 					</div>
-				{:else}
+				{/if}
+				{#if filteredTransfers.length > 0}
 					<div class="space-y-3">
 						{#each filteredTransfers as transfer, index (`${transfer.transactionid}-${transfer.round}-${index}`)}
 							<TransferRow
@@ -338,6 +362,20 @@
 								{formatTimestamp}
 							/>
 						{/each}
+					</div>
+				{:else if filteredTransfers.length === 0 && !isLoading && !error}
+					<div
+						class="text-gray-500 dark:text-gray-400 text-center py-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+					>
+						No transfers found
+					</div>
+				{/if}
+				{#if error && failedRequest?.append}
+					<div class="text-red-500 text-center py-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+						{error}
+						<button class="underline ml-2" on:click={retryTransfers} disabled={isLoading}>
+							Retry
+						</button>
 					</div>
 				{/if}
 				{#if isLoading}

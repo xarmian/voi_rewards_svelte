@@ -1,6 +1,7 @@
 import algosdk from 'algosdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { retryRecipients, sendGroups } from './groupSend';
+import * as sendAndConfirmModule from './sendAndConfirm';
 import { retryable, type Outcome, type TrackingDependencies } from './sendAndConfirm';
 import {
 	addPending,
@@ -143,12 +144,31 @@ describe('pending send tracker', () => {
 		storage = fakeStorage();
 		deps = {
 			pendingInfo: vi.fn(async () => ({})),
-			indexerSearch: vi.fn(async () => ({ 'current-round': 50, transactions: [] }))
+			indexerSearch: vi.fn(async () => ({ 'current-round': 50, transactions: [] })),
+			algodRound: vi.fn(async () => 50),
+			indexerHasBlock: vi.fn(async () => false)
 		};
 	});
 	afterEach(() => {
 		for (const active of trackers.splice(0)) active.stop();
 		vi.useRealTimers();
+	});
+
+	it('forwards the same deps including algodRound and indexerHasBlock to trackPending', async () => {
+		const spy = vi.spyOn(sendAndConfirmModule, 'trackPending');
+		try {
+			const active = tracker();
+			const result = active.add(record());
+			await vi.advanceTimersByTimeAsync(0);
+			expect(spy.mock.calls[0][1]).toBe(deps);
+			expect(spy.mock.calls[0][1].algodRound).toBe(deps.algodRound);
+			expect(spy.mock.calls[0][1].indexerHasBlock).toBe(deps.indexerHasBlock);
+			expect(deps.algodRound).toHaveBeenCalled();
+			active.stop();
+			await result;
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	it.each(['confirmed', 'expired'] as const)(
@@ -158,8 +178,11 @@ describe('pending send tracker', () => {
 				expect(loadPending('sender', storage)).toEqual([record()]);
 				return status === 'confirmed' ? { 'confirmed-round': 80 } : {};
 			});
-			if (status === 'expired')
+			if (status === 'expired') {
 				deps.indexerSearch = async () => ({ 'current-round': 101, transactions: [] });
+				vi.mocked(deps.algodRound).mockResolvedValue(101);
+				vi.mocked(deps.indexerHasBlock).mockResolvedValue(true);
+			}
 			const onChange = vi.fn();
 			const active = tracker(onChange);
 			expect((await active.add(record())).status).toBe(status);

@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 import { algodClient, algodIndexer } from '$lib/utils/algod';
 import { getEnvoiNames } from '$lib/utils/envoi';
-import { fetchTokenTransfers, fetchCurrentPoolBalance } from './tokenTransfers';
+import {
+	fetchTokenTransfers,
+	fetchCurrentPoolBalance,
+	TransfersUnavailableError
+} from './tokenTransfers';
 
 vi.mock('$lib/utils/algod', () => ({
 	algodClient: { getApplicationByID: vi.fn() },
@@ -80,6 +84,101 @@ afterEach(() => vi.unstubAllGlobals());
 
 // Characterization of the moved branches. Every upstream is stubbed.
 describe('fetchTokenTransfers', () => {
+	const unavailable = "Couldn't load transfers right now. The history service isn't responding.";
+	it.each([
+		['native', 'fetch failed'],
+		['native', `Unexpected token 'S', "Service Unavailable" is not valid JSON`],
+		['vsa', 'fetch failed'],
+		['vsa', `Unexpected token 'S', "Service Unavailable" is not valid JSON`]
+	] as const)('wraps %s indexer rejection: %s', async (type, message) => {
+		const original = new Error(message);
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const onPagination = vi.fn();
+		query.do.mockRejectedValueOnce(original);
+		try {
+			const failure = await fetchTokenTransfers({
+				token: { ...token, type },
+				walletId: 'wallet',
+				onPagination
+			}).catch((error: unknown) => error);
+			expect(failure).toBeInstanceOf(TransfersUnavailableError);
+			expect(failure).toMatchObject({ message: unavailable, cause: original });
+			expect((failure as Error).message).not.toContain(message);
+			expect(logged).toHaveBeenCalledWith(expect.any(String), original);
+			expect(onPagination).toHaveBeenCalledOnce();
+		} finally {
+			logged.mockRestore();
+		}
+	});
+	it.each(['rejected fetch', 'non-OK', 'non-JSON', 'mimir error'])(
+		'wraps ARC-200 failure: %s',
+		async (mode) => {
+			const original = new Error('fetch failed');
+			if (mode === 'rejected fetch') fetchMock.mockRejectedValueOnce(original);
+			if (mode === 'non-OK') {
+				fetchMock.mockResolvedValueOnce(Response.json({ data: [] }, { status: 503 }));
+			}
+			if (mode === 'non-JSON') {
+				fetchMock.mockResolvedValueOnce(new Response('Service Unavailable'));
+			}
+			if (mode === 'mimir error') fetchMock.mockResolvedValueOnce(Response.json({ error: 'x' }));
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const onPagination = vi.fn();
+			try {
+				const failure = await fetchTokenTransfers({
+					token: { ...token, type: 'arc200' },
+					walletId: 'wallet',
+					onPagination
+				}).catch((error: unknown) => error);
+				expect(failure).toBeInstanceOf(TransfersUnavailableError);
+				expect(failure).toMatchObject({ message: unavailable, cause: expect.any(Error) });
+				if (mode === 'rejected fetch') expect((failure as Error).cause).toBe(original);
+				expect(logged).toHaveBeenCalledWith(expect.any(String), (failure as Error).cause);
+				expect(onPagination).toHaveBeenCalledOnce();
+			} finally {
+				logged.mockRestore();
+			}
+		}
+	);
+	it.each(['rejection', 'missing transaction'])(
+		'keeps all LP transfers and flags only the failed lookup: %s',
+		async (mode) => {
+			fetchMock.mockResolvedValueOnce(
+				Response.json({
+					data: ['first', 'failed', 'last'].map((transactionid) => ({
+						...arcTransfer,
+						transactionid
+					}))
+				})
+			);
+			vi.mocked(algodIndexer.lookupTransactionByID).mockImplementation(
+				(id) =>
+					({
+						do: () => {
+							if (id !== 'failed') return Promise.resolve({ transaction: {} });
+							return mode === 'rejection'
+								? Promise.reject(new Error('lookup failed'))
+								: Promise.resolve({});
+						}
+					}) as ReturnType<typeof algodIndexer.lookupTransactionByID>
+			);
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				const result = await fetchTokenTransfers({ token: lp, walletId: 'wallet' });
+				expect(result.transfers.map((transfer) => transfer.transactionid)).toEqual([
+					'first',
+					'failed',
+					'last'
+				]);
+				expect(result.transfers[1]).toHaveProperty('lpLabelUnavailable', true);
+				expect(result.transfers[0]).not.toHaveProperty('lpLabelUnavailable');
+				expect(result.transfers[2]).not.toHaveProperty('lpLabelUnavailable');
+				expect(logged).toHaveBeenCalledOnce();
+			} finally {
+				logged.mockRestore();
+			}
+		}
+	);
 	it('normalizes native payments, inner payments and standalone fees and enriches names', async () => {
 		query.do.mockResolvedValue({
 			transactions: [
@@ -116,6 +215,45 @@ describe('fetchTokenTransfers', () => {
 			{ amount: '0.01', type: 'fee', to_name: 'Fee Sink' }
 		]);
 	});
+	it.each(['vsa', 'native'] as const)(
+		'retains the original %s cursor when the page fails',
+		async (type) => {
+			const onPagination = vi.fn();
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			if (type === 'vsa') {
+				query.do.mockResolvedValueOnce({
+					'next-token': 'advanced',
+					transactions: [{ ...transaction, 'tx-type': 'axfer' }]
+				});
+			} else {
+				query.do
+					.mockResolvedValueOnce({ 'next-token': 'advanced', transactions: [] })
+					.mockRejectedValueOnce(new Error('page two unavailable'));
+			}
+			try {
+				await expect(
+					fetchTokenTransfers({
+						token: { ...token, type },
+						walletId: 'wallet',
+						append: true,
+						nextToken: 'original',
+						hasMore: false,
+						onPagination
+					})
+				).rejects.toThrow(unavailable);
+				expect(onPagination).toHaveBeenCalledExactlyOnceWith({
+					nextToken: 'original',
+					hasMore: false
+				});
+				if (type === 'native') {
+					expect(query.do).toHaveBeenCalledTimes(2);
+					expect(query.nextToken.mock.calls.slice(-2)).toEqual([['original'], ['advanced']]);
+				}
+			} finally {
+				logged.mockRestore();
+			}
+		}
+	);
 	it('passes through VSA pagination and scales asset transfers', async () => {
 		query.do.mockResolvedValue({
 			'next-token': 'next',

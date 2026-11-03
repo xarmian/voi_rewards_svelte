@@ -1,4 +1,5 @@
 import algosdk from 'algosdk';
+import { indexerCaughtUpPast } from './indexerHealth';
 
 export type PendingOutcome = {
 	status: 'pending';
@@ -22,8 +23,9 @@ export type SendDependencies = {
 export type TrackingDependencies = {
 	// Positive evidence only: any node reporting a confirmed round is proof it landed.
 	pendingInfo(txId: string): Promise<{ 'confirmed-round'?: number }>;
-	// GET /v2/transactions?txid=…: the round and the result come from the same response, so
-	// absence is only proven by the reader that answered (TASK-81 review P1).
+	// Expiry requires fresh algod and exact-block evidence before searching for absence.
+	algodRound(): Promise<number>;
+	indexerHasBlock(round: number): Promise<boolean>;
 	indexerSearch(txId: string): Promise<{
 		'current-round': number;
 		transactions: { id?: string; 'confirmed-round'?: number }[];
@@ -108,6 +110,8 @@ export async function trackPending(
 	if (signal?.aborted) return outcome;
 	async function poll(): Promise<TrackedOutcome> {
 		while (!signal?.aborted) {
+			const caughtUp = indexerCaughtUpPast(outcome.lastValid, deps);
+			if (signal?.aborted) break;
 			const info = await unknownOnError(() => deps.pendingInfo(outcome.firstTxId));
 			if (signal?.aborted) break;
 			const confirmedRound = info?.['confirmed-round'];
@@ -116,6 +120,9 @@ export async function trackPending(
 			}
 			// A pool error from one node is not proof the transaction is dead (TASK-81 review P1):
 			// only a 4xx on submit is, so this stays pending until it confirms or expires.
+
+			const probeResult = await caughtUp;
+			if (signal?.aborted) break;
 
 			// An error from the search proves nothing; keep polling.
 			const search = await unknownOnError(() => deps.indexerSearch(outcome.firstTxId));
@@ -129,9 +136,18 @@ export async function trackPending(
 						confirmedRound: found['confirmed-round'] ?? 0
 					};
 				}
-				// No transaction can confirm after lastValid, so a reader past it that lacks the txid
-				// proves it never landed.
-				if (search['current-round'] > outcome.lastValid) {
+				// Absence is proof only after algod has passed lastValid and the indexer
+				// returned that exact block before this search (TASK-117), AND this same search
+				// response reports a current round at or past lastValid: the probe and the search are
+				// two requests to one load-balanced URL, so a lagging backend can answer the search
+				// after a caught-up one served the block.
+				const searchRound = search['current-round'];
+				if (
+					probeResult &&
+					typeof searchRound === 'number' &&
+					Number.isFinite(searchRound) &&
+					searchRound >= outcome.lastValid
+				) {
 					return { status: 'expired', txIds: outcome.txIds };
 				}
 			}
