@@ -399,6 +399,63 @@ describe('trackPending', () => {
 		expect(await trackPending(pending, d)).toEqual({ status: 'expired', txIds: pending.txIds });
 	});
 
+	// The block probe and the txid search are two requests to one load-balanced URL: a lagging backend
+	// can return an empty search right after a caught-up one served the block. Absence therefore also
+	// needs the SAME search response to report a current-round at or past lastValid (dev lead).
+	it('a search current-round one below lastValid stays pending', async () => {
+		const d = deps();
+		d.algodRound.mockResolvedValue(pending.lastValid + 1);
+		d.indexerHasBlock.mockResolvedValue(true);
+		d.indexerSearch.mockResolvedValue({
+			'current-round': pending.lastValid - 1,
+			transactions: []
+		});
+		await staysPending(d);
+	});
+
+	it.each([
+		['missing', { transactions: [] }],
+		['a string', { 'current-round': String(100), transactions: [] }],
+		['NaN', { 'current-round': Number.NaN, transactions: [] }],
+		['Infinity', { 'current-round': Number.POSITIVE_INFINITY, transactions: [] }],
+		['null', { 'current-round': null, transactions: [] }]
+	])('a search current-round that is %s stays pending', async (_label, response) => {
+		const d = deps();
+		d.algodRound.mockResolvedValue(pending.lastValid + 1);
+		d.indexerHasBlock.mockResolvedValue(true);
+		d.indexerSearch.mockResolvedValue(response as never);
+		await staysPending(d);
+	});
+
+	it.each([0, 1, 10])(
+		'a search current-round of lastValid + %s reads as expired',
+		async (extra) => {
+			const d = deps();
+			d.algodRound.mockResolvedValue(pending.lastValid + 1);
+			d.indexerHasBlock.mockResolvedValue(true);
+			d.indexerSearch.mockResolvedValue({
+				'current-round': pending.lastValid + extra,
+				transactions: []
+			});
+			expect(await trackPending(pending, d)).toEqual({ status: 'expired', txIds: pending.txIds });
+		}
+	);
+
+	it('a lagging search that reports an older round never expires a send the probe called caught up', async () => {
+		const d = deps();
+		d.algodRound.mockResolvedValue(pending.lastValid + 50);
+		d.indexerHasBlock.mockResolvedValue(true);
+		// First passes: a lagging backend answers an empty search with an old round; later: caught up.
+		d.indexerSearch
+			.mockResolvedValueOnce({ 'current-round': pending.lastValid - 20, transactions: [] })
+			.mockResolvedValueOnce({ 'current-round': pending.lastValid - 1, transactions: [] })
+			.mockResolvedValue({ 'current-round': pending.lastValid + 1, transactions: [] });
+		const tracking = trackPending(pending, d, { intervalMs: 1 });
+		await vi.advanceTimersByTimeAsync(10);
+		expect(await tracking).toEqual({ status: 'expired', txIds: pending.txIds });
+		expect(d.indexerSearch).toHaveBeenCalledTimes(3);
+	});
+
 	it('finishes a fresh probe BEFORE the search in each pass, with pending-info read meanwhile', async () => {
 		const calls: string[] = [];
 		const d = deps();
