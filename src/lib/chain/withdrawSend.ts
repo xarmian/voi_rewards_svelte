@@ -108,14 +108,17 @@ export async function sendWithdrawal(
 			const algosdkPrefix = /^\s*Network request error\. Received status \d+ \([^)]*\)\s*:?\s*/i;
 			const bodyText = (message: unknown) =>
 				typeof message === 'string' ? message.replace(algosdkPrefix, '').trim() : '';
-			const messages = [
-				bodyText(error?.message),
-				bodyText(error?.response?.body?.message),
-				bodyText(error?.response?.text)
-			].filter((message) => message.length > 0);
-			// Any wording that says the transaction exists keeps the hold (wrongly holding is safe).
+			// response.text is the raw body and is NOT evidence: a proxy can answer 400 with JSON that has
+			// no `message` key. algosdk copies the algod text into error.message only when the body had
+			// one, and response.body.message is that same field.
+			const messages = [bodyText(error?.message), bodyText(error?.response?.body?.message)].filter(
+				(message) => message.length > 0
+			);
+			// Wording that says the TRANSACTION exists (ledger, pool, duplicate) keeps the hold. It must
+			// not match an asset, application or account that does not exist, or an ordinary rejection
+			// would hold the contract for a whole validity window for a transaction that never landed.
 			const alreadyExists =
-				/already|duplicate|exist|\bin\s+(the\s+)?(transaction\s+)?(ledger|pool)\b/i;
+				/already\s+in\s+(the\s+)?(transaction\s+)?(ledger|pool)|already\s+(been\s+)?(committed|confirmed|submitted|included|known|seen)|duplicate|\b(transaction|txn|txgroup)\b[^.]{0,40}\bexists?\b|\bexists?\s+in\s+(the\s+)?(transaction\s+)?(ledger|pool)\b/i;
 			if (
 				error?.status !== 400 ||
 				messages.length === 0 ||
