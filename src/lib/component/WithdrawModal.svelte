@@ -108,6 +108,8 @@
 
 	async function trackWithdrawal(id: string, lastValid: number, wallet: string) {
 		const contractId = contract.contractId;
+		// Set here, not in the reactive resume block, which reads activeWallet (a reactive cycle).
+		flowWallet = wallet;
 		trackController?.abort();
 		clearInterval(waitTimer);
 		trackController = new AbortController();
@@ -218,7 +220,6 @@
 			const earlier = wallet ? getPendingWithdrawal(wallet, contract.contractId) : undefined;
 			if (wallet && earlier) {
 				txId = earlier.txId;
-				flowWallet = wallet;
 				void trackWithdrawal(earlier.txId, earlier.lastValid, wallet);
 			}
 		}

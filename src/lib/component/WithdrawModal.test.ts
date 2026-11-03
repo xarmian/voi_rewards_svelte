@@ -126,3 +126,10 @@ test('WithdrawModal releases the captured wallet only when the flow ends', () =>
 	const body = withdraw.slice(0, withdraw.indexOf('\n\t}\n'));
 	expect(body).toMatch(/status === 'not-recorded'[\s\S]*?flowWallet = undefined;/);
 });
+
+test('WithdrawModal never assigns the captured wallet inside a reactive block that reads it', () => {
+	const blocks = source.match(/\n\t\$: \{[^]*?\n\t\}\n/g) ?? [];
+	for (const block of blocks) {
+		if (block.includes('activeWallet')) expect(block).not.toMatch(/\bflowWallet =/);
+	}
+});
