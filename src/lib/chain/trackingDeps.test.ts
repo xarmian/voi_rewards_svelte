@@ -26,6 +26,24 @@ function clients(now = Date.now, staleMs = 15000) {
 }
 
 describe('createTrackingDeps', () => {
+	it('treats a request as stale when the clock yields no valid age', async () => {
+		let tick = 0;
+		const status = vi.fn(() => ({ do: () => new Promise<Record<string, unknown>>(() => {}) }));
+		const { deps } = (() => {
+			const algod = { status, pendingTransactionInformation: vi.fn() };
+			const indexer = { searchForTransactions: vi.fn(), lookupBlock: vi.fn() };
+			return { deps: createTrackingDeps(algod as never, indexer as never, () => tick, 15000) };
+		})();
+		void deps.algodRound();
+		expect(status).toHaveBeenCalledTimes(1);
+		tick = Number.NaN;
+		void deps.algodRound();
+		expect(
+			status,
+			'A clock that yields NaN must not keep a hung request shared'
+		).toHaveBeenCalledTimes(2);
+	});
+
 	it('reads last-round and passes through pendingInfo and indexerSearch', async () => {
 		const { deps, algod, txid } = clients();
 		expect(await deps.algodRound()).toBe(101);

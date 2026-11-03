@@ -176,6 +176,31 @@ describe('Algorand deposit', () => {
 			expect(requestSignal).toBe(signal);
 		}
 	});
+	it('keeps the first boundary when two polls share one state', async () => {
+		const first = Promise.withResolvers<unknown>();
+		const second = Promise.withResolvers<unknown>();
+		const answers = [first, second];
+		const d = deps();
+		d.getJson.mockImplementation(async (url) =>
+			url === `${algodBase}/v2/status` ? answers.shift()!.promise : { transactions: [] }
+		);
+		const window = state();
+		const a = checkAlgorandDeposit(d, depositExpected, window, signal);
+		const b = checkAlgorandDeposit(d, depositExpected, window, signal);
+		// The later poll answers first and establishes the boundary; the earlier answer must not move it.
+		second.resolve({ 'last-round': 120 });
+		await b;
+		expect(window.startRound).toBe(118);
+		window.scanFrom = 130;
+		first.resolve({ 'last-round': 100 });
+		await a;
+		expect(window.startRound).toBe(118);
+		expect(window.scanFrom).toBe(130);
+		const queries = d.getJson.mock.calls
+			.map(([url]) => url)
+			.filter((url) => url.includes('/v2/transactions'));
+		expect(queries.at(-1)).toBe(query(130));
+	});
 	it('finds a deposit already present on the first call', async () => {
 		const d = deps({ transactions: [deposit()] });
 		expect(await checkAlgorandDeposit(d, depositExpected, state(), signal)).toEqual({
