@@ -195,7 +195,8 @@
 						return;
 					} else if (tracked.status === 'expired') {
 						txStatus = 'error';
-						error = 'The earlier withdrawal expired without going through. You can withdraw again.';
+						error =
+							'The earlier withdrawal expired without going through. Close this window and open it again to withdraw.';
 						clearPendingWithdrawal(wallet, contractId, id);
 						return;
 					}
@@ -320,7 +321,11 @@
 			txStatus = 'signing';
 			const outcome = await sendWithdrawal(
 				{ wallet, contractId: contract.contractId, txns },
-				{ sign: signTransactions, send: sendDeps }
+				{
+					sign: signTransactions,
+					send: sendDeps,
+					currentWallet: () => $selectedWallet?.address
+				}
 			);
 			txId = 'txId' in outcome ? outcome.txId : null;
 			if (

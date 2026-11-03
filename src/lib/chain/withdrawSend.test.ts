@@ -423,3 +423,48 @@ describe('canOfferWithdraw', () => {
 		expect(canOfferWithdraw({ status: 'idle', ...d.input, storage: d.storage })).toBe(true);
 	});
 });
+
+describe('sendWithdrawal: wallet pinning and a record from another tab', () => {
+	it('signs nothing when the connected wallet changed after the form was submitted', async () => {
+		const d = setup();
+		const outcome = await sendWithdrawal(d.input, { ...d.deps, currentWallet: () => 'another' });
+		expect(outcome.status).toBe('not-signed');
+		expect(d.sign).not.toHaveBeenCalled();
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toBeUndefined();
+	});
+
+	it('records and sends nothing when the wallet changed while the signing prompt was open', async () => {
+		const d = setup();
+		let current = d.input.wallet;
+		const signed = await d.sign();
+		d.sign.mockImplementation(async () => {
+			current = 'another';
+			return signed;
+		});
+		const outcome = await sendWithdrawal(d.input, { ...d.deps, currentWallet: () => current });
+		expect(outcome.status).toBe('not-signed');
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toBeUndefined();
+	});
+
+	it('still sends when the connected wallet is the one captured at submit', async () => {
+		const d = setup();
+		const outcome = await sendWithdrawal(d.input, {
+			...d.deps,
+			currentWallet: () => d.input.wallet
+		});
+		expect(outcome.status).not.toBe('not-signed');
+		expect(d.send).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not overwrite or broadcast over a live record for another transaction', async () => {
+		const d = setup();
+		const other = { txId: 'OTHERTX', lastValid: 500, createdAt: 1 };
+		rememberPendingWithdrawal(d.input.wallet, d.input.contractId, other, d.storage);
+		const outcome = await sendWithdrawal(d.input, d.deps);
+		expect(outcome.status).toBe('not-recorded');
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toEqual(other);
+	});
+});

@@ -33,13 +33,30 @@ export async function sendWithdrawal(
 		send: SendDependencies;
 		now?(): number;
 		storage?: PendingWithdrawalStorage;
+		// The wallet the signing library will use right now. The hold is keyed by input.wallet, so a
+		// switch between submit and signing would sign with one wallet and hold under another.
+		currentWallet?(): string | undefined;
 	}
 ): Promise<WithdrawSendOutcome> {
+	const walletChanged = () =>
+		deps.currentWallet !== undefined && deps.currentWallet() !== input.wallet;
+	if (walletChanged()) {
+		return {
+			status: 'not-signed',
+			error: 'The connected wallet changed, so nothing was signed. Try again.'
+		};
+	}
 	let signed: Uint8Array[];
 	let info: ReturnType<typeof groupInfo>;
 	try {
 		const result = await deps.sign([input.txns]);
 		if (!result?.length) return { status: 'not-signed', error: 'Signature was rejected' };
+		if (walletChanged()) {
+			return {
+				status: 'not-signed',
+				error: 'The connected wallet changed while signing, so nothing was sent. Try again.'
+			};
+		}
 		signed = result;
 		info = groupInfo(signed);
 		if (
@@ -63,6 +80,15 @@ export async function sendWithdrawal(
 	}
 
 	const pending = { status: 'pending', txId: info.firstTxId, lastValid: info.lastValid } as const;
+	// The check and the write below are synchronous, so two tabs cannot both pass it: the second sees
+	// the first's record and sends nothing instead of replacing the record that tracks the first send.
+	const live = getPendingWithdrawal(input.wallet, input.contractId, deps.storage);
+	if (live && live.txId !== info.firstTxId) {
+		return {
+			status: 'not-recorded',
+			error: 'Another withdrawal for this contract is already pending, so nothing was sent.'
+		};
+	}
 	try {
 		rememberPendingWithdrawal(
 			input.wallet,

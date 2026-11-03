@@ -105,7 +105,10 @@ test('WithdrawModal keys every withdrawal read by the wallet captured at submit'
 		.filter((line) => line.includes('$selectedWallet') && !line.includes('import '));
 	expect(live.map((line) => line.trim())).toEqual([
 		'$: activeWallet = flowWallet ?? $selectedWallet?.address;',
-		'const wallet = $selectedWallet?.address;'
+		'const wallet = $selectedWallet?.address;',
+		// The one deliberate live read: sendWithdrawal compares it with the captured wallet before and
+		// after signing, because the wallet library signs with whatever is selected at that moment.
+		'currentWallet: () => $selectedWallet?.address'
 	]);
 	expect(source).toMatch(/let flowWallet: string \| undefined;/);
 	expect(source).toMatch(/flowWallet = wallet;/);

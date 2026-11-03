@@ -57,7 +57,7 @@ test('the in-progress view explains confirmation and expiry without offering ano
 		'A withdrawal is in progress',
 		'Waiting for it to be confirmed on the network.',
 		'Waiting for an earlier withdrawal to expire',
-		'The earlier withdrawal expired without going through. You can withdraw again.'
+		'The earlier withdrawal expired without going through. Close this window and open it again to withdraw.'
 	])
 		expect(source, `Missing withdrawal message: ${text}`).toContain(text);
 	const branch = source.match(
