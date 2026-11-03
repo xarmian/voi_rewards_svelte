@@ -611,6 +611,7 @@
 			return;
 		}
 
+		const claimAccount = walletAddress;
 		isBulkClaiming = true;
 		bulkClaimProgress = 0;
 		bulkClaimError = null;
@@ -725,13 +726,17 @@
 					algosdk.assignGroupID(batch.transactions);
 
 					// Sign all transactions at once
-					if (!($selectedWallet?.address === walletAddress)) {
-						bulkClaimError = `Your selected account changed during the claim, so it stopped before the next batch. Select ${walletAddress} to continue.`;
+					if ($selectedWallet?.address !== claimAccount) {
+						bulkClaimError = `Your selected account changed during the claim, so it stopped before the next batch. Select ${claimAccount} to continue.`;
 						break;
 					}
 					const signedTxns = await signTransactions([batch.transactions]);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
+					}
+					if ($selectedWallet?.address !== claimAccount) {
+						bulkClaimError = `Your selected account changed while signing, so this batch was not sent. Select ${claimAccount} to continue.`;
+						break;
 					}
 
 					// Submit the signed transactions
