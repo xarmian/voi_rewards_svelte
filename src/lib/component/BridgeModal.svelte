@@ -86,6 +86,7 @@
 	let monitorController: AbortController | undefined;
 	let depositController: AbortController | undefined;
 	let qrMonitorActive = false;
+	let qrMonitorKey: string | undefined;
 	let monitorExpected: ExpectedBridgeConfirmation | undefined;
 	let monitorSourceTxId: string | undefined;
 	let monitorIndexerBase: string | undefined;
@@ -158,7 +159,7 @@
 	let isMonitoringAlgorand = false;
 	let monitoringDots = '';
 	let dotsInterval: number | undefined;
-	let depositAfterTime: string | undefined;
+	let depositState: Parameters<typeof checkAlgorandDeposit>[2] | undefined;
 	let depositDestination: Omit<ExpectedBridgeConfirmation, 'sourceTxId'> | undefined;
 	let depositExpected: Parameters<typeof checkAlgorandDeposit>[1] | undefined;
 	let remainingChecks = 3; // Add counter for remaining checks after modal closure
@@ -642,7 +643,8 @@
 		monitorSourceTxId = undefined;
 		monitorIndexerBase = undefined;
 		depositExpected = undefined;
-		depositAfterTime = undefined;
+		depositState = undefined;
+		qrMonitorKey = undefined;
 		depositDestination = undefined;
 		monitorController?.abort();
 		if (dotsInterval) {
@@ -666,6 +668,7 @@
 		tracker?.stop();
 		showCloseConfirm = false;
 		show = false;
+		showQrCode = false;
 		algorandDestinationAddress = '';
 		voiDestinationAddress = '';
 		searchResults = [];
@@ -992,7 +995,17 @@
 				: '';
 
 	function startQrMonitoring() {
-		if (qrMonitorActive || bridgeStatus === 'bridging' || bridgeStatus === 'completed') return;
+		const key = JSON.stringify([
+			amountInAtomicUnits,
+			voiDestinationAddress,
+			selectedToken.algorandAssetId,
+			selectedToken.voiAssetId,
+			algorandSourceAddress
+		]);
+		if (qrMonitorActive && key === qrMonitorKey) return;
+		if (bridgeStatus === 'bridging' || bridgeStatus === 'completed') return;
+		depositController?.abort();
+		qrMonitorKey = key;
 		if (dotsInterval) clearInterval(dotsInterval);
 		dotsInterval = window.setInterval(updateDots, 500);
 		void monitorAlgorandTransactions();
@@ -1000,7 +1013,7 @@
 
 	async function monitorAlgorandTransactions(retry = false) {
 		if (!retry) {
-			depositAfterTime = new Date(Date.now() - 30_000).toISOString();
+			depositState = { startRound: null, startedAtMs: performance.now() };
 			depositDestination = {
 				sourceNetwork: 416001,
 				bridgeAddress: BRIDGE_ADDRESS,
@@ -1016,7 +1029,7 @@
 				sourceAddress: algorandSourceAddress || undefined
 			};
 		}
-		if (!depositExpected || !depositDestination || !depositAfterTime) return;
+		if (!depositExpected || !depositDestination || !depositState) return;
 		depositController?.abort();
 		const controller = new AbortController();
 		depositController = controller;
@@ -1032,7 +1045,7 @@
 		monitorReview = null;
 		const expected = depositExpected;
 		const capturedDestination = depositDestination;
-		const afterTime = depositAfterTime;
+		const state = depositState;
 		remainingChecks = 3;
 		isMonitoringAlgorand = true;
 		const result = await pollUntil<{ id: string }>({
@@ -1045,7 +1058,17 @@
 				const finalCheck = !showQrCode && --remainingChecks <= 0;
 				let found = false;
 				try {
-					const deposit = await checkAlgorandDeposit({ getJson }, expected, afterTime, signal);
+					const deposit = await checkAlgorandDeposit(
+						{
+							getJson,
+							nowMs: () => performance.now(),
+							algodBase: 'https://mainnet-api.4160.nodely.dev',
+							indexerBase: 'https://mainnet-idx.4160.nodely.dev'
+						},
+						expected,
+						state,
+						signal
+					);
 					if (signal.aborted || controller.signal.aborted) return { done: false };
 					if (deposit.done) {
 						found = true;

@@ -146,9 +146,8 @@ describe('Algorand deposit', () => {
 			algodBase,
 			indexerBase,
 			nowMs: vi.fn(() => 100 + elapsed),
-			getJson: vi.fn(
-				async (url: string, _signal: AbortSignal): Promise<unknown> =>
-					url === `${algodBase}/v2/status` ? { 'last-round': lastRound } : response
+			getJson: vi.fn<(url: string, signal: AbortSignal) => Promise<unknown>>(async (url) =>
+				url === `${algodBase}/v2/status` ? { 'last-round': lastRound } : response
 			)
 		};
 	}

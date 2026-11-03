@@ -4,6 +4,12 @@ export interface BridgeFetchDeps {
 	getJson(url: string, signal: AbortSignal): Promise<unknown>;
 }
 
+interface AlgorandDepositDeps extends BridgeFetchDeps {
+	algodBase: string;
+	indexerBase: string;
+	nowMs(): number;
+}
+
 type ExpectedBridgeDeposit = {
 	assetId: number;
 	bridgeAddress: string;
@@ -89,18 +95,37 @@ export function matchBridgeDeposit(tx: unknown, expected: ExpectedBridgeDeposit)
 }
 
 export async function checkAlgorandDeposit(
-	deps: BridgeFetchDeps,
+	deps: AlgorandDepositDeps,
 	expected: ExpectedBridgeDeposit,
-	afterTime: string,
+	state: { startRound: number | null; startedAtMs: number },
 	signal: AbortSignal
 ): Promise<MonitorResult> {
-	const data = await deps.getJson(
-		`https://mainnet-idx.4160.nodely.dev/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&after-time=${encodeURIComponent(afterTime)}&limit=10`,
-		signal
-	);
-	for (const tx of transactions(data)) {
-		if (matchBridgeDeposit(tx, expected) && isObject(tx) && typeof tx.id === 'string')
-			return { done: true, tx: { id: tx.id } };
+	if (state.startRound === null) {
+		const status = await deps.getJson(`${deps.algodBase}/v2/status`, signal);
+		const lastRound = isObject(status) ? status['last-round'] : undefined;
+		if (
+			typeof lastRound !== 'number' ||
+			!Number.isFinite(lastRound) ||
+			!Number.isInteger(lastRound) ||
+			lastRound < 0
+		)
+			throw new Error('Unexpected algod response');
+		state.startRound = Math.max(
+			0,
+			lastRound - Math.ceil((deps.nowMs() - state.startedAtMs) / 2000) - 2
+		);
+	}
+	const baseUrl = `${deps.indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${state.startRound}&limit=50`;
+	let url = baseUrl;
+	for (let page = 0; page < 3; page++) {
+		const data = await deps.getJson(url, signal);
+		for (const tx of transactions(data)) {
+			if (matchBridgeDeposit(tx, expected) && isObject(tx) && typeof tx.id === 'string')
+				return { done: true, tx: { id: tx.id } };
+		}
+		const next = isObject(data) ? data['next-token'] : undefined;
+		if (typeof next !== 'string' || !next) break;
+		url = `${baseUrl}&next=${encodeURIComponent(next)}`;
 	}
 	return { done: false };
 }

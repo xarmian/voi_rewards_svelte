@@ -14,6 +14,8 @@ export function createTrackingDeps(
 	algodClient: AlgodClient,
 	indexer: Indexer
 ): TrackingDependencies {
+	let roundRequest: Promise<number> | undefined;
+	const blockRequests = new Map<number, Promise<boolean>>();
 	return {
 		pendingInfo: (txId) => algodClient.pendingTransactionInformation(txId).do(),
 		indexerSearch: async (txId) =>
@@ -21,23 +23,37 @@ export function createTrackingDeps(
 				'current-round': number;
 				transactions: { id?: string; 'confirmed-round'?: number }[];
 			},
-		algodRound: async () => (await algodClient.status().do())['last-round'] as number,
-		indexerHasBlock: async (round) => {
-			try {
-				const block = await indexer.lookupBlock(round).do();
-				return (
-					typeof block === 'object' && block !== null && 'round' in block && block.round === round
-				);
-			} catch (error) {
-				if (
-					typeof error === 'object' &&
-					error !== null &&
-					'status' in error &&
-					error.status === 404
-				)
-					return false;
-				throw error;
+		algodRound: () => {
+			if (!roundRequest) {
+				roundRequest = (async () =>
+					(await algodClient.status().do())['last-round'] as number)().finally(() => {
+					roundRequest = undefined;
+				});
 			}
+			return roundRequest;
+		},
+		indexerHasBlock: (round) => {
+			const existing = blockRequests.get(round);
+			if (existing) return existing;
+			const request = (async () => {
+				try {
+					const block = await indexer.lookupBlock(round).do();
+					return (
+						typeof block === 'object' && block !== null && 'round' in block && block.round === round
+					);
+				} catch (error) {
+					if (
+						typeof error === 'object' &&
+						error !== null &&
+						'status' in error &&
+						error.status === 404
+					)
+						return false;
+					throw error;
+				}
+			})().finally(() => blockRequests.delete(round));
+			blockRequests.set(round, request);
+			return request;
 		}
 	};
 }
