@@ -13,7 +13,9 @@ function currentEpochRow() {
 
 test('the epoch block has its own loading state, reset on every fetch', () => {
 	expect(source, 'Declare an epochPart state like the other parts').toMatch(/let epochPart\b/);
-	const fetchStart = source.match(/async function fetchAccountDetails[\s\S]*?const epochLoading/)?.[0];
+	const fetchStart = source.match(
+		/async function fetchAccountDetails[\s\S]*?const epochLoading/
+	)?.[0];
 	expect(fetchStart, 'Reset epochPart to loading before the epoch block runs').toMatch(
 		/epochPart = \{ status: 'loading' \}/
 	);
