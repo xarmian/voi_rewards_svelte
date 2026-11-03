@@ -31,7 +31,8 @@ function readEntry(key: string, storage?: PendingWithdrawalStorage): PendingWith
 			return value;
 		}
 	} catch {
-		return undefined;
+		// A blocked or throwing storage read: the record written in this session still holds.
+		return memory.get(key);
 	}
 }
 

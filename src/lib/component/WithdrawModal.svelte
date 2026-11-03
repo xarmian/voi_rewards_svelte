@@ -111,7 +111,7 @@
 		const { signal } = trackController;
 		const trackingDeps = { ...sharedTrackingDeps };
 		let foundUnconfirmed = false;
-		let currentRound = NaN;
+		let currentRound = Number.NaN; // unknown until algod answers once
 		txStatus = 'pending';
 		waitMinutes = null;
 		waitKind = 'confirming';
@@ -137,7 +137,7 @@
 			try {
 				currentRound = await trackingDeps.algodRound();
 			} catch {
-				currentRound = NaN;
+				// Keep the last known round: forgetting it would flip the explanation text back and forth.
 			}
 			updateEstimate();
 		};

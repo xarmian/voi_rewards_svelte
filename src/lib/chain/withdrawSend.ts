@@ -102,15 +102,20 @@ export async function sendWithdrawal(
 						response?: { body?: { message?: unknown }; text?: unknown };
 				  }
 				| undefined;
+			// algosdk's own message is always non-empty: the status prefix, plus the algod body text only
+			// when the response carried a JSON message. A bare prefix (a proxy 400 with no algod body)
+			// proves nothing, so only the text after it counts.
+			const algosdkPrefix = /^\s*Network request error\. Received status \d+ \([^)]*\)\s*:?\s*/i;
+			const bodyText = (message: unknown) =>
+				typeof message === 'string' ? message.replace(algosdkPrefix, '').trim() : '';
 			const messages = [
-				error?.message,
-				error?.response?.body?.message,
-				error?.response?.text
-			].filter(
-				(message): message is string => typeof message === 'string' && message.trim().length > 0
-			);
+				bodyText(error?.message),
+				bodyText(error?.response?.body?.message),
+				bodyText(error?.response?.text)
+			].filter((message) => message.length > 0);
+			// Any wording that says the transaction exists keeps the hold (wrongly holding is safe).
 			const alreadyExists =
-				/already\s+in\s+(the\s+)?(ledger|pool)|already\s+(been\s+)?(committed|confirmed|submitted)|duplicate/i;
+				/already|duplicate|exist|\bin\s+(the\s+)?(transaction\s+)?(ledger|pool)\b/i;
 			if (
 				error?.status !== 400 ||
 				messages.length === 0 ||

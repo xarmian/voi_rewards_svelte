@@ -14,7 +14,12 @@ export function explainWait(input: {
 	currentRound: number;
 	foundUnconfirmed: boolean;
 }): { kind: 'confirming' } | { kind: 'expires-in'; minutes: number } | { kind: 'window-ended' } {
-	if (Number.isFinite(input.currentRound) && input.currentRound > input.lastValid) {
+	// Only once the transaction was found unconfirmed: a confirmed one must not flash this text.
+	if (
+		input.foundUnconfirmed &&
+		Number.isFinite(input.currentRound) &&
+		input.currentRound > input.lastValid
+	) {
 		return { kind: 'window-ended' };
 	}
 	const minutes = minutesUntilExpiry(input.lastValid, input.currentRound);
