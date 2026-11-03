@@ -8,6 +8,7 @@ import {
 	type PendingOutcome
 } from './sendAndConfirm';
 import type { TrackingDependencies } from './sendAndConfirm';
+import { createTrackingDeps } from './trackingDeps';
 
 function signedGroup() {
 	const account = algosdk.generateAccount();
@@ -153,6 +154,36 @@ describe('trackPending', () => {
 		controller.abort();
 		await tracking;
 		expect(settled).toHaveBeenCalledWith(pending);
+		expect(vi.getTimerCount()).toBe(0);
+	});
+	it('keeps a send pending across timed out passes with one hung underlying status request', async () => {
+		const status = vi.fn(() => ({ do: () => new Promise<Record<string, unknown>>(() => {}) }));
+		const pendingInfo = vi.fn(async () => ({}));
+		const search = vi.fn(async () => ({ 'current-round': 200, transactions: [] }));
+		const lookupBlock = vi.fn(() => ({ do: async () => ({ round: 100 }) }));
+		const d = createTrackingDeps(
+			{ status, pendingTransactionInformation: () => ({ do: pendingInfo }) },
+			{ lookupBlock, searchForTransactions: () => ({ txid: () => ({ do: search }) }) }
+		);
+		const controller = new AbortController();
+		const settled = vi.fn();
+		const tracking = trackPending(pending, d, { intervalMs: 1000, signal: controller.signal }).then(
+			settled
+		);
+		try {
+			await vi.advanceTimersByTimeAsync(34000);
+			expect(search).toHaveBeenCalledTimes(3);
+			expect(pendingInfo).toHaveBeenCalledTimes(4);
+			expect(status).toHaveBeenCalledOnce();
+			expect(lookupBlock).not.toHaveBeenCalled();
+			expect(settled).not.toHaveBeenCalled();
+		} finally {
+			controller.abort();
+			await tracking;
+		}
+		expect(settled).toHaveBeenCalledWith(pending);
+		// Let the last detached expiry race time out before restoring real timers.
+		await vi.advanceTimersByTimeAsync(10000);
 		expect(vi.getTimerCount()).toBe(0);
 	});
 	it('waits for the fresh probe to settle before searching', async () => {

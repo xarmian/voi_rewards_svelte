@@ -101,6 +101,35 @@ describe('QR monitor isolation', () => {
 			/dotsInterval|remainingChecks|bridgeMonitorInterval|isMonitoringAlgorand/
 		);
 	});
+	it('uses a monotonic round window and keeps it out of the retry path', () => {
+		for (const removed of ['depositAfterTime', 'after-time', '/health']) {
+			expect(source).not.toContain(removed);
+		}
+		const monitor = functionBody('monitorAlgorandTransactions');
+		expect(monitor).toMatch(
+			/if \(!retry\) \{[^]*?depositState = \{[^]*?startRound: null[^]*?startedAtMs: performance\.now\(\)/
+		);
+		expect(source.match(/depositState = \{/g)).toHaveLength(1);
+		expect(monitor).toMatch(/nowMs: \(\) => performance\.now\(\)/);
+		expect(monitor).toContain('https://mainnet-api.4160.nodely.dev');
+	});
+	it('compares the running expectation key before deciding to restart', () => {
+		const start = functionBody('startQrMonitoring');
+		expect(source).toMatch(/let qrMonitorKey/);
+		expect(start).toMatch(/qrMonitorActive && [^\n]*qrMonitorKey[^\n]*return/);
+		for (const value of [
+			'amountInAtomicUnits',
+			'voiDestinationAddress',
+			'selectedToken.algorandAssetId',
+			'selectedToken.voiAssetId',
+			'algorandSourceAddress'
+		]) {
+			expect(start).toContain(value);
+		}
+	});
+	it('hides the QR on close so Create can trigger monitoring again', () => {
+		expect(functionBody('closeModal')).toContain('showQrCode = false');
+	});
 	it('hands off with the captured destination rather than live form defaults', () => {
 		expect(functionBody('monitorAlgorandTransactions')).toMatch(
 			/startBridgeMonitoring\([^,]+,\s*\{\s*\.\.\.capturedDestination,\s*sourceTxId:/
@@ -119,7 +148,7 @@ function qrHarness() {
 	const checkAlgorandDeposit = vi.fn().mockResolvedValue({ done: false });
 	const context = createContext({
 		AbortController,
-		Date,
+		performance: { now: vi.fn(() => 1234) },
 		pollUntil,
 		checkAlgorandDeposit,
 		getJson: vi.fn(),
@@ -131,9 +160,9 @@ function qrHarness() {
 		monitorController: undefined,
 		qrMonitorActive: false,
 		depositExpected: undefined,
-		depositAfterTime: undefined,
+		qrMonitorKey: undefined,
 		depositDestination: undefined,
-		depositState: { startRound: null },
+		depositState: undefined,
 		monitorExpected: undefined,
 		monitorSourceTxId: undefined,
 		monitorIndexerBase: undefined,
@@ -215,14 +244,14 @@ it('keeps the destination monitor alive through a repeated QR trigger after hand
 	}
 });
 
-it('retains the QR timestamp and both expectations on deposit retry', async () => {
+it('retains the QR round window and both expectations on deposit retry', async () => {
 	vi.useFakeTimers();
 	try {
 		const { run, deposit, destination, pollUntil, checkAlgorandDeposit } = qrHarness();
-		const before = Date.now();
 		run('startQrMonitoring()');
-		const afterTime = run('depositAfterTime');
-		expect(afterTime).toBe(new Date(before - 30000).toISOString());
+		const window = run('depositState');
+		expect(window).toEqual({ startRound: null, startedAtMs: 1234 });
+		run('depositState.startRound = 98');
 		const first = pollUntil.mock.calls[0][0];
 		await first.check(first.signal);
 		deposit.resolve({ status: 'timeout' });
@@ -230,7 +259,11 @@ it('retains the QR timestamp and both expectations on deposit retry', async () =
 		run("voiDestinationAddress = 'EDITED'; destinationAmount = 1; amountInAtomicUnits = 1");
 		const retry = run('monitorAlgorandTransactions(true)') as Promise<void>;
 		const second = pollUntil.mock.calls[1][0];
+		expect(run('depositState')).toBe(window);
+		expect(run('depositState.startRound')).toBe(98);
 		await second.check(second.signal);
+		expect(checkAlgorandDeposit.mock.calls[0][2]).toBe(window);
+		expect(checkAlgorandDeposit.mock.calls[1][2]).toBe(window);
 		expect(checkAlgorandDeposit.mock.calls.map((call) => call.slice(1, 3))).toEqual([
 			[
 				{
@@ -240,7 +273,7 @@ it('retains the QR timestamp and both expectations on deposit retry', async () =
 					destinationAddress: 'ORIGINAL',
 					sourceAddress: 'SENDER'
 				},
-				afterTime
+				window
 			],
 			[
 				{
@@ -250,7 +283,7 @@ it('retains the QR timestamp and both expectations on deposit retry', async () =
 					destinationAddress: 'ORIGINAL',
 					sourceAddress: 'SENDER'
 				},
-				afterTime
+				window
 			]
 		]);
 		destination.resolve({ status: 'done', value: { id: 'DEPOSIT' } });
@@ -262,4 +295,56 @@ it('retains the QR timestamp and both expectations on deposit retry', async () =
 	} finally {
 		vi.useRealTimers();
 	}
+});
+
+it.each([
+	['amountInAtomicUnits = 2000', { amount: 2000 }],
+	["voiDestinationAddress = 'NEW'", { destinationAddress: 'NEW' }],
+	["selectedToken = { algorandAssetId: '789', voiAssetId: '456' }", { assetId: 789 }],
+	["selectedToken = { algorandAssetId: '123', voiAssetId: '789' }", {}],
+	["algorandSourceAddress = 'NEW_SENDER'", { sourceAddress: 'NEW_SENDER' }]
+])('restarts an active QR watch for changed expectations: %s', async (edit, changed) => {
+	const { run, deposit, destination, pollUntil, checkAlgorandDeposit } = qrHarness();
+	// A QR restart must never abort the independent destination controller.
+	const destinationController = run('monitorController = new AbortController()') as AbortController;
+	run('startQrMonitoring()');
+	const firstController = run('depositController') as AbortController;
+	const firstState = run('depositState');
+	run('startQrMonitoring()');
+	expect(pollUntil).toHaveBeenCalledOnce();
+	expect(firstController.signal.aborted).toBe(false);
+	expect(destinationController.signal.aborted).toBe(false);
+	run('showQrCode = false');
+	run(edit);
+	run('showQrCode = true; startQrMonitoring()');
+	expect(firstController.signal.aborted).toBe(true);
+	expect(pollUntil).toHaveBeenCalledTimes(2);
+	expect(destinationController.signal.aborted).toBe(false);
+	const secondController = run('depositController') as AbortController;
+	expect(secondController).not.toBe(firstController);
+	expect(secondController.signal.aborted).toBe(false);
+	expect(run('depositState')).not.toBe(firstState);
+	expect(run('depositState')).toEqual({ startRound: null, startedAtMs: 1234 });
+	const second = pollUntil.mock.calls[1][0];
+	await second.check(second.signal);
+	expect(checkAlgorandDeposit.mock.calls[0][1]).toMatchObject({
+		assetId: 123,
+		amount: 1000,
+		destinationAddress: 'ORIGINAL',
+		sourceAddress: 'SENDER',
+		...changed
+	});
+	if (edit.includes('voiAssetId')) {
+		expect(run('depositDestination.destinationAssetId')).toBe(
+			edit.includes("voiAssetId: '789'") ? '789' : '456'
+		);
+	}
+	// A stale completion from the aborted request cannot hand off or stop its replacement.
+	deposit.resolve({ status: 'done', value: { id: 'STALE' } });
+	await Promise.resolve();
+	expect(run('depositController')).toBe(secondController);
+	expect(run('qrMonitorActive')).toBe(true);
+	expect(run('bridgeStatus')).toBe('idle');
+	secondController.abort();
+	destination.resolve({ status: 'aborted' });
 });
