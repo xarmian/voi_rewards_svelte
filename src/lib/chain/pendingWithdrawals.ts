@@ -1,27 +1,90 @@
-// Withdrawals whose confirmation is still unknown, keyed by contract id. The modal is
-// unmounted on close, so without this a reopened modal would offer a second withdrawal while
-// the first may still land (TASK-116). lastValid lets the caller prove a withdrawal can no
-// longer land, so a dropped one does not block the contract. Held in memory for the page
-// session only.
-export type PendingWithdrawal = { txId: string; lastValid: number };
+export type PendingWithdrawal = { txId: string; lastValid: number; createdAt: number };
+export type PendingWithdrawalStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-const unresolved = new Map<number, PendingWithdrawal>();
+type Records = Record<string, PendingWithdrawal>;
+const memory = new Map<string, Records>();
+const knownKeys = new Set<string>();
 
-export function rememberPendingWithdrawal(contractId: number, entry: PendingWithdrawal): void {
-	unresolved.set(contractId, entry);
+export function pendingWithdrawalStorageKey(wallet: string): string {
+	return `voirewards:pending-withdrawals:${wallet}`;
 }
 
-export function getPendingWithdrawal(contractId: number): PendingWithdrawal | undefined {
-	return unresolved.get(contractId);
+// Resolve on each call so importing this module during SSR never captures browser storage.
+function resolveStorage(storage?: PendingWithdrawalStorage): PendingWithdrawalStorage | undefined {
+	return storage ?? globalThis.localStorage;
 }
 
-// Clears only if that transaction is still the recorded one, so a wait that outlived its
-// modal cannot erase the record of a newer withdrawal.
-export function clearPendingWithdrawal(contractId: number, txId: string): void {
-	if (unresolved.get(contractId)?.txId !== txId) return;
-	unresolved.delete(contractId);
+function readRecords(key: string, storage?: PendingWithdrawalStorage): Records {
+	try {
+		const resolved = resolveStorage(storage);
+		const value: unknown = resolved
+			? JSON.parse(resolved.getItem(key) ?? '{}')
+			: (memory.get(key) ?? {});
+		if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+		return Object.fromEntries(
+			Object.entries(value).filter(
+				([, entry]) =>
+					entry &&
+					typeof entry.txId === 'string' &&
+					entry.txId.length > 0 &&
+					Number.isFinite(entry.lastValid) &&
+					Number.isFinite(entry.createdAt)
+			)
+		);
+	} catch {
+		return {};
+	}
 }
 
-export function resetPendingWithdrawals(): void {
-	unresolved.clear();
+export function rememberPendingWithdrawal(
+	wallet: string,
+	contractId: number,
+	entry: PendingWithdrawal,
+	storage?: PendingWithdrawalStorage
+): void {
+	const key = pendingWithdrawalStorageKey(wallet);
+	knownKeys.add(key);
+	const records = { ...readRecords(key, storage), [String(contractId)]: entry };
+	const resolved = resolveStorage(storage);
+	// A failed persistent write must propagate: callers must not broadcast without the record.
+	if (resolved) resolved.setItem(key, JSON.stringify(records));
+	else memory.set(key, records);
+}
+
+export function getPendingWithdrawal(
+	wallet: string,
+	contractId: number,
+	storage?: PendingWithdrawalStorage
+): PendingWithdrawal | undefined {
+	const key = pendingWithdrawalStorageKey(wallet);
+	knownKeys.add(key);
+	return readRecords(key, storage)[String(contractId)];
+}
+
+export function clearPendingWithdrawal(
+	wallet: string,
+	contractId: number,
+	txId: string,
+	storage?: PendingWithdrawalStorage
+): void {
+	const key = pendingWithdrawalStorageKey(wallet);
+	const records = { ...readRecords(key, storage) };
+	if (records[String(contractId)]?.txId !== txId) return;
+	delete records[String(contractId)];
+	const resolved = resolveStorage(storage);
+	if (resolved) {
+		if (Object.keys(records).length) resolved.setItem(key, JSON.stringify(records));
+		else resolved.removeItem(key);
+	} else {
+		memory.set(key, records);
+	}
+}
+
+export function resetPendingWithdrawals(storage?: PendingWithdrawalStorage): void {
+	const resolved = resolveStorage(storage);
+	if (resolved) {
+		for (const key of knownKeys) resolved.removeItem(key);
+	} else {
+		memory.clear();
+	}
 }

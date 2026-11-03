@@ -7,7 +7,7 @@ test('withdraw signs separately and uses the recorded send flow and wait estimat
 	expect(source, 'The wallet combined helper cannot distinguish ambiguous sends').not.toContain(
 		'signAndSendTransactions'
 	);
-	for (const name of ['sendWithdrawal', 'signTransactions', 'minutesUntilExpiry'])
+	for (const name of ['sendWithdrawal', 'minutesUntilExpiry'])
 		expect(source, `${name} must be imported and used`).toMatch(new RegExp(`\\b${name}\\(`));
 	expect(source, 'Signing must be delegated to signTransactions').toMatch(
 		/sign:\s*signTransactions/
@@ -71,7 +71,7 @@ test('the in-progress view explains confirmation and expiry without offering ano
 
 test('the amount input and Withdraw button use the synchronous registry guard', () => {
 	expect(source, 'Availability must be derived from canOfferWithdraw and recordTick').toMatch(
-		/\$:\s*\{\s*recordTick;\s*\w+\s*=\s*canOfferWithdraw\(/
+		/\$:\s*\{\s*void recordTick;\s*\w+\s*=\s*canOfferWithdraw\(/
 	);
 	const guard = source.match(/(\w+)\s*=\s*canOfferWithdraw\(/)?.[1];
 	expect(guard, 'A synchronous guard must exist').toBeDefined();
@@ -105,7 +105,7 @@ test('cross-tab storage events invalidate the guard and resume tracking', () => 
 		/function handleStorage[\s\S]*?recordTick\+\+/
 	);
 	expect(source, 'Resume must react to cross-tab record changes').toMatch(
-		/\$:\s*\{\s*recordTick;[\s\S]*?show && txStatus === 'idle'[\s\S]*?getPendingWithdrawal\(/
+		/\$:\s*\{\s*void recordTick;[\s\S]*?show && txStatus === 'idle'[\s\S]*?getPendingWithdrawal\(/
 	);
 });
 

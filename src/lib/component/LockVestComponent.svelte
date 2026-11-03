@@ -22,6 +22,7 @@
 	let error: string | null = null;
 	let selectedContract: ContractDetails | null = null;
 	let showWithdrawModal = false;
+	let withdrawOpenGeneration = 0;
 	let showRegisterVoteKey = false;
 	let consensusData: { [key: string]: any } = {};
 
@@ -200,15 +201,17 @@
 	}
 
 	function handleWithdrawClick(contract: ContractDetails) {
+		withdrawOpenGeneration++;
 		selectedContract = contract;
 		showWithdrawModal = true;
 	}
 
 	async function handleWithdrawSuccess(forceRefresh = false) {
+		const generation = withdrawOpenGeneration;
 		if (forceRefresh) {
 			await loadContractDetails();
 		}
-		selectedContract = null;
+		if (generation === withdrawOpenGeneration) selectedContract = null;
 	}
 
 	function handleRegisterVoteKey(contract: ContractDetails) {
