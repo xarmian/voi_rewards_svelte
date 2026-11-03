@@ -148,3 +148,11 @@ test('every tracking resolution sets the view before clearing the record', () =>
 		expect(branch.indexOf('txStatus =')).toBeLessThan(branch.indexOf('clearPendingWithdrawal('));
 	}
 });
+
+test('a failed round lookup keeps the last known round instead of forgetting it', () => {
+	const source = readFileSync(new URL('./WithdrawModal.svelte', import.meta.url), 'utf8');
+	expect(
+		source,
+		'Resetting the round to NaN on a lookup error would flip the explanation text back and forth'
+	).not.toMatch(/currentRound\s*=\s*NaN/);
+});

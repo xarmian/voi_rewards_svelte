@@ -34,7 +34,9 @@ test.each<WaitCase>([
 	],
 	[{ lastValid: 100, currentRound: 100, foundUnconfirmed: false }, { kind: 'confirming' }],
 	[{ lastValid: 100, currentRound: 101, foundUnconfirmed: true }, { kind: 'window-ended' }],
-	[{ lastValid: 100, currentRound: 101, foundUnconfirmed: false }, { kind: 'window-ended' }],
+	// The ended-window text appears only once the transaction was actually found unconfirmed
+	// (otherwise a confirmed withdrawal would flash it while the first lookup is in flight).
+	[{ lastValid: 100, currentRound: 101, foundUnconfirmed: false }, { kind: 'confirming' }],
 	[{ lastValid: 100, currentRound: 0, foundUnconfirmed: false }, { kind: 'confirming' }],
 	...[NaN, Infinity, -Infinity].flatMap((currentRound) =>
 		[true, false].map(

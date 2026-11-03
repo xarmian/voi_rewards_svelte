@@ -161,6 +161,38 @@ describe('sendWithdrawal', () => {
 		expect(d.waitForConfirmation).not.toHaveBeenCalled();
 	});
 
+	// Real algosdk errors always carry a non-empty message: the status prefix, plus the algod body
+	// text only when the response had a JSON body with a message.
+	const algosdkPrefix = 'Network request error. Received status 400 (Bad Request)';
+	it.each([
+		algosdkPrefix,
+		`${algosdkPrefix}: `,
+		`${algosdkPrefix}:   `,
+		`${algosdkPrefix}: transaction already in ledger: TXID`,
+		`${algosdkPrefix}: txgroup already in transaction pool`,
+		`${algosdkPrefix}: transaction exists in the pool`,
+		`${algosdkPrefix}: already included`
+	])('keeps the hold for the algosdk error %j (a bare prefix proves nothing)', async (message) => {
+		const d = setup();
+		d.send.mockRejectedValue(Object.assign(new Error(message), { status: 400 }));
+		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+			status: 'pending',
+			txId: d.entry.txId,
+			lastValid: 95
+		});
+		expect(d.read()).toEqual(d.entry);
+	});
+
+	it.each([
+		`${algosdkPrefix}: TransactionPool.Remember: transaction TXID: overspend`,
+		`${algosdkPrefix}: transaction rejected by logic`
+	])('clears an algosdk 400 that carries an algod rejection: %j', async (message) => {
+		const d = setup();
+		d.send.mockRejectedValue(Object.assign(new Error(message), { status: 400 }));
+		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'rejected' });
+		expect(d.read()).toBeUndefined();
+	});
+
 	it.each([
 		{ status: 400, response: { body: { message: 'overspend' } } },
 		{ status: 400, message: '', response: { text: 'transaction rejected' } }

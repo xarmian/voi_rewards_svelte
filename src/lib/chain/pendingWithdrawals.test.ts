@@ -78,6 +78,20 @@ describe('pending withdrawals', () => {
 		expect(getPendingWithdrawal('a', 1, storage)).toBeUndefined();
 	});
 
+	it("falls back to this session's record when a storage read throws", () => {
+		const storage = fakeStorage();
+		rememberPendingWithdrawal('a', 1, entry, storage);
+		const blocked = {
+			...storage,
+			getItem: () => {
+				throw new Error('blocked');
+			}
+		};
+		// The record written in this session still holds the contract; a record never seen is absent.
+		expect(getPendingWithdrawal('a', 1, blocked)).toEqual(entry);
+		expect(getPendingWithdrawal('a', 2, blocked)).toBeUndefined();
+	});
+
 	it('clears only a matching txid and preserves other wallets and contracts', () => {
 		const storage = fakeStorage();
 		for (const [wallet, id] of [
