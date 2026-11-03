@@ -483,16 +483,18 @@ describe('sendWithdrawal: wallet pinning and a record from another tab', () => {
 			},
 			removeItem: (key: string) => d.storage.removeItem(key)
 		};
-		const lock = vi.fn(async <T>(run: () => T): Promise<T> => {
+		let lockCalls = 0;
+		async function lock<T>(run: () => T): Promise<T> {
+			lockCalls++;
 			held = true;
 			try {
 				return run();
 			} finally {
 				held = false;
 			}
-		});
+		}
 		await sendWithdrawal(d.input, { ...d.deps, storage, lock });
-		expect(lock).toHaveBeenCalledTimes(1);
+		expect(lockCalls).toBe(1);
 		expect(seen).toContain('get:true');
 		expect(seen).toContain('set:true');
 		expect(seen.filter((entry) => entry.endsWith(':false'))).toEqual([]);
@@ -500,12 +502,63 @@ describe('sendWithdrawal: wallet pinning and a record from another tab', () => {
 
 	it('sends nothing when the cross-tab lock cannot be taken', async () => {
 		const d = setup();
-		const lock = vi.fn(async () => {
+		async function lock<T>(): Promise<T> {
 			throw new Error('locks unavailable');
-		});
+		}
 		const outcome = await sendWithdrawal(d.input, { ...d.deps, lock });
 		expect(outcome.status).toBe('not-recorded');
 		expect(d.send).not.toHaveBeenCalled();
 		expect(d.read()).toBeUndefined();
+	});
+
+	it('sends nothing when a lock resolves without ever running the record step', async () => {
+		const d = setup();
+		async function lock<T>(): Promise<T> {
+			return undefined as T;
+		}
+		const outcome = await sendWithdrawal(d.input, { ...d.deps, lock });
+		expect(outcome.status).toBe('not-recorded');
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toBeUndefined();
+	});
+
+	it('takes the real navigator.locks lock by name and runs the record step inside it', async () => {
+		const d = setup();
+		const requested: string[] = [];
+		let held = false;
+		const seen: string[] = [];
+		const storage = {
+			getItem: (key: string) => {
+				seen.push(`get:${held}`);
+				return d.storage.getItem(key);
+			},
+			setItem: (key: string, value: string) => {
+				seen.push(`set:${held}`);
+				d.storage.setItem(key, value);
+			},
+			removeItem: (key: string) => d.storage.removeItem(key)
+		};
+		vi.stubGlobal('navigator', {
+			locks: {
+				request: async (name: string, run: () => Promise<unknown>) => {
+					requested.push(name);
+					held = true;
+					try {
+						return await run();
+					} finally {
+						held = false;
+					}
+				}
+			}
+		});
+		try {
+			await sendWithdrawal(d.input, { ...d.deps, storage });
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(requested).toEqual(['voirewards:pending-withdrawal']);
+		expect(seen).toContain('set:true');
+		expect(seen.filter((entry) => entry.endsWith(':false'))).toEqual([]);
+		expect(d.send).toHaveBeenCalledTimes(1);
 	});
 });

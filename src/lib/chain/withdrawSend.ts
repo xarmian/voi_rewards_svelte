@@ -27,8 +27,8 @@ export function canOfferWithdraw(input: {
 }
 
 // Web Locks is exclusive per origin, across tabs and workers. Without it (an old browser, SSR) the
-// run is direct: one tab at a time is still guarded by the check, and only a same-instant race across
-// two tabs in such a browser is left.
+// run is direct and the read and the write can interleave with another tab's, so there the check only
+// catches a record that already exists.
 async function withRecordLock<T>(run: () => T): Promise<T> {
 	const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks;
 	if (!locks?.request) return run();
@@ -94,7 +94,9 @@ export async function sendWithdrawal(
 	// Separate localStorage reads and writes are not atomic across tabs, so the read of the live record
 	// and the write of this one run under one origin-wide lock: the second tab to get it sees the
 	// first's record and sends nothing instead of replacing the record that tracks the first send.
+	let claimRan = false;
 	const claim = (): WithdrawSendOutcome | undefined => {
+		claimRan = true;
 		const live = getPendingWithdrawal(input.wallet, input.contractId, deps.storage);
 		if (live && live.txId !== info.firstTxId) {
 			return {
@@ -131,6 +133,13 @@ export async function sendWithdrawal(
 		};
 	}
 	if (refused) return refused;
+	// A lock that returned without running the step wrote no record: sending would be unrecorded.
+	if (!claimRan) {
+		return {
+			status: 'not-recorded',
+			error: "Couldn't save the pending withdrawal, so nothing was sent."
+		};
+	}
 
 	try {
 		let submitError: unknown;
