@@ -186,12 +186,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/WithdrawModal.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/ui/Collection.svelte": {
 			"@typescript-eslint/ban-ts-comment": {
 				"errors": 1,
