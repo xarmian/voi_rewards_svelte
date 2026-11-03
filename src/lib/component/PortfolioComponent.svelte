@@ -603,6 +603,7 @@
 	// Bulk claim functionality
 	let isBulkClaiming = false;
 	let bulkClaimProgress = 0;
+	let bulkClaimError: string | null = null;
 	let bulkClaimResults: Array<{ success: boolean; tokenName: string; error?: string }> = [];
 
 	async function bulkClaimAllTokens() {
@@ -610,8 +611,10 @@
 			return;
 		}
 
+		const claimAccount = walletAddress;
 		isBulkClaiming = true;
 		bulkClaimProgress = 0;
+		bulkClaimError = null;
 		bulkClaimResults = [];
 
 		// Collect all ARC-200 approvals that can be claimed
@@ -645,7 +648,7 @@
 				try {
 					const appId = Number(token.id);
 					const from = approval.owner;
-					const to = walletAddress;
+					const to = claimAccount;
 					const amount = approval.amount;
 
 					// Get the unsigned transactions from arc200TransferFrom without signing
@@ -654,7 +657,7 @@
 
 					const contract = new Arc200Contract(appId, algodClient, algodIndexer, {
 						acc: {
-							addr: walletAddress,
+							addr: claimAccount,
 							sk: new Uint8Array()
 						}
 					});
@@ -723,9 +726,17 @@
 					algosdk.assignGroupID(batch.transactions);
 
 					// Sign all transactions at once
+					if ($selectedWallet?.address !== claimAccount) {
+						bulkClaimError = `Your selected account changed during the claim, so it stopped before the next batch. Select ${claimAccount} to continue.`;
+						break;
+					}
 					const signedTxns = await signTransactions([batch.transactions]);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
+					}
+					if ($selectedWallet?.address !== claimAccount) {
+						bulkClaimError = `Your selected account changed while signing, so this batch was not sent. Select ${claimAccount} to continue.`;
+						break;
 					}
 
 					// Submit the signed transactions
@@ -1131,6 +1142,9 @@
 		</div>
 	</div>
 
+	{#if bulkClaimError}
+		<p role="alert" class="text-red-700 dark:text-red-300 break-all">{bulkClaimError}</p>
+	{/if}
 	<!-- Claimable Tokens Summary Section -->
 	{#if claimableTokensSummary.length > 0}
 		<div

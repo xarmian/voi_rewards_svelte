@@ -8,6 +8,7 @@
 		type RecipientTokenKind
 	} from '$lib/chain/recipientInfo';
 	import { runBounded } from '$lib/chain/boundedPool';
+	import { createFlowPin } from '$lib/chain/flowAccount';
 	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
@@ -35,6 +36,8 @@
 	// Constants for Algorand transaction limits
 	const MAX_TXN_PER_GROUP = 16;
 	const MAX_GROUPS_PER_SIGNING = 16;
+	const flow = createFlowPin();
+	let pinTick = 0;
 
 	export let tokens: FungibleTokenType[];
 
@@ -108,28 +111,32 @@
 	};
 
 	// Fetch VOI balance only on initial modal open
-	$: if (open && $selectedWallet?.address && isInitialLoad) {
-		isInitialLoad = false;
-		requireAccountInfo($selectedWallet.address, { force: true })
-			.then((info) => {
-				nativeVoiToken = {
-					...nativeVoiToken,
-					balance: info.amount as number,
-					value: (info.amount as number) / 1e6
-				};
-				// If the selected token is native VOI, update it too
-				if (isNativeToken(selectedToken)) {
-					selectedToken = {
-						...selectedToken,
-						balance: info.amount as number
+	$: {
+		void pinTick;
+		const address = flow.current($selectedWallet?.address);
+		if (open && address && isInitialLoad && !flow.pinned) {
+			isInitialLoad = false;
+			requireAccountInfo(address, { force: true })
+				.then((info) => {
+					if (address !== flow.current($selectedWallet?.address)) return;
+					nativeVoiToken = {
+						...nativeVoiToken,
+						balance: info.amount as number,
+						value: (info.amount as number) / 1e6
 					};
-				}
-				// Force Svelte reactivity for available tokens
-				availableTokens = [nativeVoiToken, ...availableTokens.filter((t) => t.id !== '0')];
-			})
-			.catch(console.error);
+					// If the selected token is native VOI, update it too
+					if (isNativeToken(selectedToken)) {
+						selectedToken = {
+							...selectedToken,
+							balance: info.amount as number
+						};
+					}
+					// Force Svelte reactivity for available tokens
+					availableTokens = [nativeVoiToken, ...availableTokens.filter((t) => t.id !== '0')];
+				})
+				.catch(console.error);
+		}
 	}
-
 	// Reset isInitialLoad when modal closes
 	$: if (!open) {
 		isInitialLoad = true;
@@ -205,7 +212,15 @@
 	let trackedEntries: PendingSendEntry[] = [];
 	let showCloseConfirm = false;
 	let keepOpenButton: HTMLButtonElement | undefined;
-	$: syncTracker(open, $selectedWallet?.address);
+	$: {
+		void pinTick;
+		syncTracker(open, flow.current($selectedWallet?.address));
+	}
+	$: if (flow.pinned && (!open || (txState === 'idle' && !showResults && !isSending))) {
+		flow.release();
+		pinTick++;
+		isInitialLoad = true;
+	}
 	$: closeNeedsConfirm =
 		txState === 'sending' || trackedEntries.some((entry) => entry.status === 'pending');
 	$: awaitingEntries = trackedEntries.filter(
@@ -689,6 +704,8 @@
 			return;
 		}
 
+		flow.pin(sender);
+		pinTick++;
 		pendingController?.abort();
 		const controller = new AbortController();
 		pendingController = controller;
@@ -1253,6 +1270,13 @@
 					</div>
 				{/each}
 			</section>
+		{/if}
+
+		{#if pinTick && flow.address}
+			<p class="text-sm text-gray-600 dark:text-gray-300">
+				This transfer is from {flow.address.slice(0, 8)}...{flow.address.slice(-8)} of the account you
+				started it with.
+			</p>
 		{/if}
 
 		{#if !showResults}

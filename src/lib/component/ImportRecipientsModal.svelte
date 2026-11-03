@@ -1779,16 +1779,20 @@
 															{#if !row.isValid}
 																<i
 																	class="fas fa-exclamation-circle text-red-600 dark:text-red-400"
-																	title="Invalid address format"
+																	title={/\.algo$/i.test(row.cells[j])
+																		? 'This import takes Voi addresses and .voi names.'
+																		: /\.voi$/i.test(row.cells[j])
+																			? 'This name did not resolve to an address.'
+																			: 'Invalid address format'}
 																></i>
 															{/if}
 														</div>
 														{#if row.cells[j].endsWith('.voi')}
 															{#if row.resolvedAddress}
-																<div class="text-xs text-gray-500 dark:text-gray-400 font-normal">
-																	{row.resolvedAddress.slice(0, 8)}...{row.resolvedAddress.slice(
-																		-8
-																	)}
+																<div
+																	class="text-xs font-mono break-all text-gray-500 dark:text-gray-400"
+																>
+																	{row.resolvedAddress}
 																</div>
 															{:else}
 																<div class="text-xs text-gray-500 dark:text-gray-400 font-normal">

@@ -123,7 +123,7 @@ describe('QR monitor isolation', () => {
 		for (const value of [
 			'amountInAtomicUnits',
 			'destinationAmount',
-			'voiDestinationAddress',
+			'destinationAddress',
 			'selectedToken.algorandAssetId',
 			'selectedToken.voiAssetId',
 			'algorandSourceAddress'
@@ -186,8 +186,8 @@ function qrHarness() {
 		BRIDGE_ADDRESS: 'BRIDGE',
 		amountInAtomicUnits: 1000,
 		destinationAmount: 900,
-		voiDestinationAddress: 'ORIGINAL',
-		algorandDestinationAddress: '',
+		destinationAddress: 'ORIGINAL',
+		emptyDestination: { text: '', address: null, name: null, error: null },
 		algorandSourceAddress: 'SENDER'
 	});
 	const names = [
@@ -224,7 +224,7 @@ it('keeps the destination monitor alive through a repeated QR trigger after hand
 		run('startQrMonitoring()');
 		expect(pollUntil).toHaveBeenCalledOnce();
 		run(
-			"voiDestinationAddress = 'EDITED'; destinationAmount = 1; selectedToken = { algorandAssetId: '999', voiAssetId: '999' }"
+			"destinationAddress = 'EDITED'; destinationAmount = 1; selectedToken = { algorandAssetId: '999', voiAssetId: '999' }"
 		);
 		deposit.resolve({ status: 'done', value: { id: 'DEPOSIT' } });
 		await vi.advanceTimersByTimeAsync(0);
@@ -272,7 +272,7 @@ it('retains the QR round window and both expectations on deposit retry', async (
 		await first.check(first.signal);
 		deposit.resolve({ status: 'timeout' });
 		await vi.advanceTimersByTimeAsync(0);
-		run("voiDestinationAddress = 'EDITED'; destinationAmount = 1; amountInAtomicUnits = 1");
+		run("destinationAddress = 'EDITED'; destinationAmount = 1; amountInAtomicUnits = 1");
 		const retry = run('monitorAlgorandTransactions(true)') as Promise<void>;
 		const second = pollUntil.mock.calls[1][0];
 		expect(run('depositSessions.get(qrMonitorKey).state')).toBe(window);
@@ -316,7 +316,7 @@ it('retains the QR round window and both expectations on deposit retry', async (
 it.each([
 	['amountInAtomicUnits = 2000', { amount: 2000 }],
 	['destinationAmount = 800', {}],
-	["voiDestinationAddress = 'NEW'", { destinationAddress: 'NEW' }],
+	["destinationAddress = 'NEW'", { destinationAddress: 'NEW' }],
 	["selectedToken = { algorandAssetId: '789', voiAssetId: '456' }", { assetId: 789 }],
 	["selectedToken = { algorandAssetId: '123', voiAssetId: '789' }", {}],
 	["algorandSourceAddress = 'NEW_SENDER'", { sourceAddress: 'NEW_SENDER' }]
@@ -439,7 +439,7 @@ it.each(['resetBridgeState', 'closeModal', 'goBack'])(
 	async (name) => {
 		const { run, deposit, destination } = qrHarness();
 		try {
-			run("startQrMonitoring(); voiDestinationAddress = 'B'; startQrMonitoring()");
+			run("startQrMonitoring(); destinationAddress = 'B'; startQrMonitoring()");
 			const controller = run('depositController') as AbortController;
 			expect(run('depositSessions.size')).toBe(2);
 			run(`${name}()`);
@@ -459,7 +459,7 @@ it('reuses A after A -> B -> A and evicts the least recently used of six keys', 
 	const { run, deposit, destination, pollUntil, checkAlgorandDeposit } = qrHarness();
 	const start = async (address: string) => {
 		run(
-			`showQrCode = false; voiDestinationAddress = ${JSON.stringify(address)}; showQrCode = true; startQrMonitoring()`
+			`showQrCode = false; destinationAddress = ${JSON.stringify(address)}; showQrCode = true; startQrMonitoring()`
 		);
 		const poll = pollUntil.mock.calls.at(-1)?.[0];
 		await poll.check(poll.signal);

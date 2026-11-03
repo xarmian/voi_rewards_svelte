@@ -8,6 +8,7 @@
 	} from '$lib/chain/recipientInfo';
 	import { Input } from 'flowbite-svelte';
 	import WalletSearch from './WalletSearch.svelte';
+	import ResolvedAddress from './ResolvedAddress.svelte';
 	import type { FungibleTokenType } from '$lib/types/assets';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { arc200 as Contract } from 'ulujs';
@@ -33,6 +34,14 @@
 	export let onAmountChange: (index: number, amount: string) => void;
 	export let onNoteChange: (index: number, note: string) => void;
 	export let onError: (message: string | null) => void = () => {};
+
+	let recipientText = recipient.address || '';
+	let selectedAddress = recipient.address;
+	// Imported or reordered rows can replace the recipient without recreating this component.
+	$: if (recipient.address !== selectedAddress) {
+		selectedAddress = recipient.address;
+		recipientText = recipient.address || '';
+	}
 
 	// State for note field visibility
 	let isNoteVisible = false;
@@ -121,10 +130,22 @@
 		recipient.isLoading = false;
 	}
 
+	function handleRecipientEdit() {
+		selectedAddress = null;
+		recipient.address = null;
+		recipient.info = null;
+		recipient.isValid = false;
+		recipient.lookupError = null;
+		recipient.isLoading = false;
+		recipient.lookupId = nextLookupId();
+		onError(null);
+	}
+
 	async function handleRecipientSelected(address: string) {
 		if (address === recipient.address) return;
 		recipient.lookupError = null;
 		if (address === '') {
+			selectedAddress = null;
 			recipient.address = null;
 			recipient.info = null;
 			recipient.isValid = false;
@@ -132,6 +153,7 @@
 			recipient.lookupError = null;
 			return;
 		}
+		selectedAddress = address;
 		recipient.address = address;
 		onError(null);
 		await fetchRecipientInfo(address);
@@ -244,12 +266,13 @@
 			<!-- Recipient Column -->
 			<div class="space-y-2">
 				<WalletSearch
+					onEdit={handleRecipientEdit}
 					onSubmit={(addr) => handleRecipientSelected(addr)}
 					loadPreviousValue={false}
 					storeAddress={false}
 					clearOnSubmit={false}
 					hideSubmitButton={true}
-					searchText={recipient.address || ''}
+					bind:searchText={recipientText}
 				/>
 				<div class="relative">
 					{#if recipient.address}
@@ -292,20 +315,8 @@
 							<div class="space-y-2">
 								<!-- Address with copy and explorer links -->
 								<div class="flex items-center gap-1.5">
-									<span class="font-mono text-gray-900 dark:text-white">
-										{recipient.address.slice(0, 8)}...{recipient.address.slice(-8)}
-									</span>
+									<ResolvedAddress address={recipient.address} />
 									<div class="flex items-center gap-1">
-										<button
-											type="button"
-											class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-											aria-label="Copy address"
-											on:click={() => {
-												navigator.clipboard.writeText(recipient.address || '');
-											}}
-										>
-											<i class="fas fa-copy text-xs"></i>
-										</button>
 										<a
 											href={`https://block.voi.network/explorer/account/${recipient.address}`}
 											target="_blank"

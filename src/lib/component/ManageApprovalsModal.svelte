@@ -6,6 +6,7 @@
 	import { signTransactions } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
 	import WalletSearch from './WalletSearch.svelte';
+	import ResolvedAddress from './ResolvedAddress.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -16,21 +17,24 @@
 	let isLoading = false;
 	let isRevoking: string | null = null;
 	let isApproving = false;
+	let signingPinned = false;
 	let approvalError: string | null = null;
 	let approvalSuccess = false;
 	let successTxId: string | null = null;
 	let isRefreshing = false;
 
 	let spenderAddress = '';
+	let spenderText = '';
 	let approvalAmount = '';
 	let outgoingApprovals: TokenApproval[] = [];
 	let refreshTrigger = 0; // Used to trigger re-fetches
 	let hasChanges = false; // Track if any changes were made
 
 	$: canSignTransactions =
-		$selectedWallet?.address === walletId &&
-		$selectedWallet?.app !== '' &&
-		$selectedWallet?.app !== 'Watch';
+		(signingPinned && (isApproving || isRevoking !== null)) ||
+		($selectedWallet?.address === walletId &&
+			$selectedWallet?.app !== '' &&
+			$selectedWallet?.app !== 'Watch');
 	$: isArc200 = token.type === 'arc200';
 	$: tokenName = token.name;
 	$: tokenSymbol = token.symbol;
@@ -90,11 +94,13 @@
 	}
 
 	async function handleCreateApproval() {
+		if (isApproving || isRevoking !== null) return;
 		if (!walletId || !canSignTransactions || !spenderAddress || !approvalAmount) {
 			approvalError = 'Please fill in all fields';
 			return;
 		}
 
+		signingPinned = canSignTransactions;
 		try {
 			isApproving = true;
 			approvalError = null;
@@ -132,6 +138,7 @@
 			approvalSuccess = true;
 			successTxId = result.txId;
 			spenderAddress = '';
+			spenderText = '';
 			approvalAmount = '';
 			hasChanges = true;
 
@@ -142,6 +149,7 @@
 			approvalError = error instanceof Error ? error.message : 'Failed to create approval';
 		} finally {
 			isApproving = false;
+			signingPinned = false;
 		}
 	}
 
@@ -151,8 +159,10 @@
 	}
 
 	async function handleRevokeApproval(approval: TokenApproval) {
+		if (isApproving || isRevoking !== null) return;
 		if (!walletId || !canSignTransactions) return;
 
+		signingPinned = canSignTransactions;
 		try {
 			isRevoking = approval.transactionId;
 			approvalError = null;
@@ -189,6 +199,7 @@
 			approvalError = error instanceof Error ? error.message : 'Failed to revoke approval';
 		} finally {
 			isRevoking = null;
+			signingPinned = false;
 		}
 	}
 
@@ -265,12 +276,16 @@
 								<WalletSearch
 									inputId="spender"
 									onSubmit={handleSpenderSelected}
+									onEdit={() => (spenderAddress = '')}
 									loadPreviousValue={false}
 									storeAddress={false}
 									clearOnSubmit={false}
 									hideSubmitButton={true}
-									searchText={spenderAddress}
+									bind:searchText={spenderText}
 								/>
+								{#if algosdk.isValidAddress(spenderAddress)}
+									<ResolvedAddress address={spenderAddress} name={spenderText} />
+								{/if}
 							</div>
 
 							<div>
@@ -304,7 +319,10 @@
 							<button
 								on:click={handleCreateApproval}
 								class="w-full px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-								disabled={isApproving || !canSignTransactions || !spenderAddress || !approvalAmount}
+								disabled={isApproving ||
+									!canSignTransactions ||
+									!algosdk.isValidAddress(spenderAddress) ||
+									!approvalAmount}
 							>
 								{#if isApproving}
 									<div
