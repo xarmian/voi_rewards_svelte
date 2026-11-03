@@ -467,4 +467,45 @@ describe('sendWithdrawal: wallet pinning and a record from another tab', () => {
 		expect(d.send).not.toHaveBeenCalled();
 		expect(d.read()).toEqual(other);
 	});
+
+	it('reads the live record and writes its own inside one cross-tab lock', async () => {
+		const d = setup();
+		let held = false;
+		const seen: string[] = [];
+		const storage = {
+			getItem: (key: string) => {
+				seen.push(`get:${held}`);
+				return d.storage.getItem(key);
+			},
+			setItem: (key: string, value: string) => {
+				seen.push(`set:${held}`);
+				d.storage.setItem(key, value);
+			},
+			removeItem: (key: string) => d.storage.removeItem(key)
+		};
+		const lock = vi.fn(async <T>(run: () => T): Promise<T> => {
+			held = true;
+			try {
+				return run();
+			} finally {
+				held = false;
+			}
+		});
+		await sendWithdrawal(d.input, { ...d.deps, storage, lock });
+		expect(lock).toHaveBeenCalledTimes(1);
+		expect(seen).toContain('get:true');
+		expect(seen).toContain('set:true');
+		expect(seen.filter((entry) => entry.endsWith(':false'))).toEqual([]);
+	});
+
+	it('sends nothing when the cross-tab lock cannot be taken', async () => {
+		const d = setup();
+		const lock = vi.fn(async () => {
+			throw new Error('locks unavailable');
+		});
+		const outcome = await sendWithdrawal(d.input, { ...d.deps, lock });
+		expect(outcome.status).toBe('not-recorded');
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toBeUndefined();
+	});
 });

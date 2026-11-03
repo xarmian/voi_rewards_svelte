@@ -26,6 +26,15 @@ export function canOfferWithdraw(input: {
 	);
 }
 
+// Web Locks is exclusive per origin, across tabs and workers. Without it (an old browser, SSR) the
+// run is direct: one tab at a time is still guarded by the check, and only a same-instant race across
+// two tabs in such a browser is left.
+async function withRecordLock<T>(run: () => T): Promise<T> {
+	const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks;
+	if (!locks?.request) return run();
+	return locks.request('voirewards:pending-withdrawal', async () => run());
+}
+
 export async function sendWithdrawal(
 	input: { wallet: string; contractId: number; txns: unknown[] },
 	deps: {
@@ -36,6 +45,8 @@ export async function sendWithdrawal(
 		// The wallet the signing library will use right now. The hold is keyed by input.wallet, so a
 		// switch between submit and signing would sign with one wallet and hold under another.
 		currentWallet?(): string | undefined;
+		// Runs the record check-and-write exclusively across tabs; defaults to the Web Locks API.
+		lock?<T>(run: () => T): Promise<T>;
 	}
 ): Promise<WithdrawSendOutcome> {
 	const walletChanged = () =>
@@ -80,32 +91,46 @@ export async function sendWithdrawal(
 	}
 
 	const pending = { status: 'pending', txId: info.firstTxId, lastValid: info.lastValid } as const;
-	// The check and the write below are synchronous, so two tabs cannot both pass it: the second sees
-	// the first's record and sends nothing instead of replacing the record that tracks the first send.
-	const live = getPendingWithdrawal(input.wallet, input.contractId, deps.storage);
-	if (live && live.txId !== info.firstTxId) {
-		return {
-			status: 'not-recorded',
-			error: 'Another withdrawal for this contract is already pending, so nothing was sent.'
-		};
-	}
+	// Separate localStorage reads and writes are not atomic across tabs, so the read of the live record
+	// and the write of this one run under one origin-wide lock: the second tab to get it sees the
+	// first's record and sends nothing instead of replacing the record that tracks the first send.
+	const claim = (): WithdrawSendOutcome | undefined => {
+		const live = getPendingWithdrawal(input.wallet, input.contractId, deps.storage);
+		if (live && live.txId !== info.firstTxId) {
+			return {
+				status: 'not-recorded',
+				error: 'Another withdrawal for this contract is already pending, so nothing was sent.'
+			};
+		}
+		try {
+			rememberPendingWithdrawal(
+				input.wallet,
+				input.contractId,
+				{
+					txId: info.firstTxId,
+					lastValid: info.lastValid,
+					createdAt: (deps.now ?? Date.now)()
+				},
+				deps.storage
+			);
+		} catch {
+			return {
+				status: 'not-recorded',
+				error: "Couldn't save the pending withdrawal, so nothing was sent."
+			};
+		}
+		return undefined;
+	};
+	let refused: WithdrawSendOutcome | undefined;
 	try {
-		rememberPendingWithdrawal(
-			input.wallet,
-			input.contractId,
-			{
-				txId: info.firstTxId,
-				lastValid: info.lastValid,
-				createdAt: (deps.now ?? Date.now)()
-			},
-			deps.storage
-		);
+		refused = await (deps.lock ?? withRecordLock)(claim);
 	} catch {
 		return {
 			status: 'not-recorded',
 			error: "Couldn't save the pending withdrawal, so nothing was sent."
 		};
 	}
+	if (refused) return refused;
 
 	try {
 		let submitError: unknown;
