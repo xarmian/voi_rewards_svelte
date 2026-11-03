@@ -648,7 +648,7 @@
 				try {
 					const appId = Number(token.id);
 					const from = approval.owner;
-					const to = walletAddress;
+					const to = claimAccount;
 					const amount = approval.amount;
 
 					// Get the unsigned transactions from arc200TransferFrom without signing
@@ -657,7 +657,7 @@
 
 					const contract = new Arc200Contract(appId, algodClient, algodIndexer, {
 						acc: {
-							addr: walletAddress,
+							addr: claimAccount,
 							sk: new Uint8Array()
 						}
 					});

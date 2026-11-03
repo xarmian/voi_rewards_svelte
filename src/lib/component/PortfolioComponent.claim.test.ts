@@ -45,3 +45,12 @@ test('bulk claim pins the account at start and rechecks it after signing, before
 	expect(between).toMatch(/\$selectedWallet\?\.address !== claimAccount/);
 	expect(between).toContain('break;');
 });
+
+test('bulk claim builds its transactions from the captured account, not the live route address', () => {
+	const start = source.indexOf('async function bulkClaimAllTokens()');
+	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
+	const afterCapture = fn.slice(
+		fn.indexOf('const claimAccount = walletAddress;') + 'const claimAccount = walletAddress;'.length
+	);
+	expect(afterCapture).not.toMatch(/\bwalletAddress\b/);
+});
