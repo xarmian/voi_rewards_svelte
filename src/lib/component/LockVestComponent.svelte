@@ -24,7 +24,7 @@
 	let showWithdrawModal = false;
 	let withdrawOpenGeneration = 0;
 	let showRegisterVoteKey = false;
-	let consensusData: { [key: string]: any } = {};
+	let consensusData: { [key: string]: unknown } = {};
 
 	// TASK-111: a reload can start while an earlier one is in flight; only the latest may write.
 	let loadSequence = 0;
@@ -77,11 +77,6 @@
 
 						const lockupPeriod = lockupDelay;
 						const fullVestingTime = lockupPeriod + vestingDelay;
-						const vestingPeriod =
-							Number(decodedState.global_distribution_count ?? 0) *
-							Number(decodedState.global_distribution_seconds ?? 0);
-
-						const totalPeriod = fullVestingTime + vestingPeriod;
 						const elapsedTime = now - fundingTime;
 						const totalBalance = Number(decodedState.global_total ?? '0');
 
