@@ -9,7 +9,10 @@ const fn = (name: string) =>
 	source.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\t}`))?.[0] ?? '';
 
 test('displays the same whole receiver used by Send transactions', () => {
-	expect(source).toMatch(/<ResolvedAddress\s+address=\{recipient\.address\}/);
+	expect(source).toMatch(
+		/\{#if recipientText !== recipient\.address\}\s*<ResolvedAddress\s+address=\{recipient\.address\}\s*\/>/
+	);
+	expect(source, 'The name is already in the input').not.toMatch(/<ResolvedAddress[^>]*\bname=/);
 	expect(source).not.toMatch(/recipient\.address\.slice\(0, 8\)/);
 	expect(source).toMatch(/<WalletSearch\s[^]*?onEdit=\{handleRecipientEdit\}/);
 	expect(source).toContain('aria-label="View on explorer"');

@@ -14,10 +14,16 @@
 	import { SearchOutline } from 'flowbite-svelte-icons';
 	import { debounce } from 'lodash-es';
 	import { connectedWallets } from 'avm-wallet-svelte';
+	import NameAvatar from './NameAvatar.svelte';
 
 	export let searchText = '';
 	export let onEdit: (() => void) | undefined = undefined;
 	let selectedText: string | null = null;
+	// Set only when the text came from picking a name, so the avatar sits with the name in the input.
+	let pickedResult: { name: string; avatar: string | null } | null = null;
+	// Shown only while the input still holds that name, so a change made outside this component
+	// (a reset after submit, an import overwriting the text) cannot leave a stale avatar behind.
+	$: pickedShown = pickedResult && searchText === pickedResult.name ? pickedResult : null;
 	let addressList: EnvoiSearchResult[] = [];
 	let selectedAddressIndex = -1;
 	let windowDefined = false;
@@ -68,9 +74,14 @@
 
 	// Function to handle text input changes
 	function handleInput(event?: Event) {
-		if (event) searchText = (event.currentTarget as HTMLInputElement).value;
+		if (event) {
+			searchText = (event.currentTarget as HTMLInputElement).value;
+			// Typing or pasting is a new input: a suggestion highlighted earlier must not replace it.
+			selectedAddressIndex = -1;
+		}
 		if (selectedText !== null && searchText !== selectedText) {
 			selectedText = null;
+			pickedResult = null;
 			onEdit?.();
 		}
 		if (searchText.length === 58) {
@@ -113,6 +124,7 @@
 		if (result) {
 			searchText = result.name;
 		}
+		pickedResult = result ? { name: result.name, avatar: result.metadata?.avatar || null } : null;
 
 		selectedText = searchText;
 		onSubmit(addr, selectedAddressIndex);
@@ -213,6 +225,7 @@
 
 	function clearSearchText() {
 		searchText = '';
+		pickedResult = null;
 		addressList = [];
 		localStorage.removeItem('searchText');
 		selectedAddressIndex = -1;
@@ -230,7 +243,13 @@
 
 <div class="relative" bind:this={componentElement}>
 	<div class="dark:bg-gray-800 bg-white flex items-center rounded-lg relative">
+		{#if pickedShown}
+			<span class="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center pl-2">
+				<NameAvatar name={pickedShown.name} avatar={pickedShown.avatar} />
+			</span>
+		{/if}
 		<input
+			style:padding-left={pickedShown ? '2.5rem' : undefined}
 			id={inputId}
 			aria-label={inputId ? undefined : label}
 			type="text"

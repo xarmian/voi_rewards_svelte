@@ -315,7 +315,9 @@
 							<div class="space-y-2">
 								<!-- Address with copy and explorer links -->
 								<div class="flex items-center gap-1.5">
-									<ResolvedAddress address={recipient.address} />
+									{#if recipientText !== recipient.address}
+										<ResolvedAddress address={recipient.address} />
+									{/if}
 									<div class="flex items-center gap-1">
 										<a
 											href={`https://block.voi.network/explorer/account/${recipient.address}`}

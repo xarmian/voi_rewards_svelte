@@ -1,9 +1,5 @@
 <script lang="ts">
-	let {
-		address,
-		name = null,
-		label
-	}: { address: string; name?: string | null; label?: string } = $props();
+	let { address, label }: { address: string; label?: string } = $props();
 
 	async function copyAddress() {
 		if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -16,14 +12,15 @@
 	}
 </script>
 
-<div class="min-w-0 space-y-1 text-sm text-gray-900 dark:text-white">
-	{#if label}<span>{label}</span>{/if}
-	{#if name}<div>{name}</div>{/if}
-	<div class="font-mono break-all" data-testid="resolved-address" title={address}>{address}</div>
+<div class="flex min-w-0 items-start gap-2 text-sm text-gray-900 dark:text-white">
+	{#if label}<span class="shrink-0">{label}</span>{/if}
+	<div class="min-w-0 flex-1 font-mono break-all" data-testid="resolved-address" title={address}>
+		{address}
+	</div>
 	<button
 		type="button"
 		aria-label="Copy address"
-		class="text-blue-700 hover:underline dark:text-blue-300"
+		class="shrink-0 text-blue-700 hover:underline dark:text-blue-300"
 		onclick={copyAddress}
 	>
 		Copy

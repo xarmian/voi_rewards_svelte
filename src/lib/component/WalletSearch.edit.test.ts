@@ -58,3 +58,29 @@ test('uses the current input event value before checking for an edit', () => {
 	expect(onEdit).toHaveBeenCalledOnce();
 	expect(runInContext('searchText', context)).toBe('bob.voi');
 });
+
+test('typing or pasting an address clears the highlighted suggestion before it is submitted', () => {
+	const context = createContext({
+		selectedText: null,
+		searchText: '',
+		onEdit: vi.fn(),
+		debouncedSearch: vi.fn(),
+		selectedAddressIndex: 2
+	});
+	runInContext(
+		'var seenIndex = null; function handleSubmit() { seenIndex = selectedAddressIndex; }',
+		context
+	);
+	runInContext(ts.transpileModule(fn('handleInput'), {}).outputText, context);
+	runInContext(`handleInput({ currentTarget: { value: 'A'.repeat(58) } })`, context);
+	expect(runInContext('seenIndex', context)).toBe(-1);
+});
+
+test('the picked-name avatar only shows while the input still holds the picked name', () => {
+	expect(source).toMatch(
+		/\$: pickedShown =\s*pickedResult && searchText === pickedResult\.name \? pickedResult : null;/
+	);
+	expect(source).toContain('{#if pickedShown}');
+	expect(source).toContain('style:padding-left={pickedShown ?');
+	expect(source).not.toMatch(/\{#if pickedResult\}|style:padding-left=\{pickedResult/);
+});

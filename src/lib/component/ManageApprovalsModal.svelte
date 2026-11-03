@@ -283,8 +283,8 @@
 									hideSubmitButton={true}
 									bind:searchText={spenderText}
 								/>
-								{#if algosdk.isValidAddress(spenderAddress)}
-									<ResolvedAddress address={spenderAddress} name={spenderText} />
+								{#if algosdk.isValidAddress(spenderAddress) && spenderText !== spenderAddress}
+									<ResolvedAddress address={spenderAddress} />
 								{/if}
 							</div>
 
