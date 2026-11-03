@@ -5,7 +5,10 @@ const source = readFileSync(new URL('./ManageApprovalsModal.svelte', import.meta
 
 test('clears the selected spender on edit and displays its full address', () => {
 	expect(source).toMatch(/onEdit=\{\(\) => \(spenderAddress = ''\)\}/);
-	expect(source).toMatch(/<ResolvedAddress\s+address=\{spenderAddress\}\s+name=\{spenderText\}/);
+	expect(source).toMatch(
+		/\{#if algosdk\.isValidAddress\(spenderAddress\) && spenderText !== spenderAddress\}\s*<ResolvedAddress\s+address=\{spenderAddress\}\s*\/>/
+	);
+	expect(source, 'The name is already in the input').not.toMatch(/<ResolvedAddress[^>]*\bname=/);
 	expect(source).toMatch(/bind:searchText=\{spenderText\}/);
 });
 test('requires a valid spender before enabling approval', () => {

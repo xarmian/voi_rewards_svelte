@@ -51,10 +51,10 @@ test('shows the transaction receiver under each input and in the pre-sign summar
 		source.indexOf('<!-- QR Code Modal -->')
 	);
 	expect(summary).toContain('To:');
-	expect(summary).toMatch(/<ResolvedAddress\s+address=\{destinationAddress\}/);
+	expect(summary).toMatch(/data-testid="bridge-to-address"[^>]*>\{destinationAddress\}</);
 	// The summary identifier must be identical to the submit receiver identifier.
 	const receiver = fn('handleSubmit').match(/const destination = (\w+);/)?.[1];
-	expect(summary).toContain(`address={${receiver}}`);
+	expect(summary).toContain(`{${receiver}}<`);
 });
 test('resets both destinations on direction change, reset, close and back', () => {
 	const direction = source.match(/\$:\s*if \(selectedDirection\) \{([^]*?)\n\t\}/)?.[1] ?? '';
@@ -66,6 +66,7 @@ test('resets both destinations on direction change, reset, close and back', () =
 });
 test('picking an NFD makes the screen and bridge receiver agree', async () => {
 	const { selectDestinationName, emptyDestination } = await import('../chain/destinationSelection');
+	const { nfdReceiveAddress } = await import('../utils/nfd');
 	const address = algosdk.encodeAddress(new Uint8Array(32));
 	const context = createContext({
 		algorandDestination: { ...emptyDestination, text: 'typed query' },
@@ -73,6 +74,7 @@ test('picking an NFD makes the screen and bridge receiver agree', async () => {
 		isVoiToAlgorand: true,
 		destinationAddress: '',
 		selectDestinationName,
+		nfdReceiveAddress,
 		algosdk,
 		resolvedName: null,
 		showSearchResults: true,

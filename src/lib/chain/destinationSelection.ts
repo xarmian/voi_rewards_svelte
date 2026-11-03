@@ -56,3 +56,8 @@ export function unresolvedName(state: DestinationState, rules: DestinationRules)
 			: null
 	};
 }
+
+/** True when the field holds a name the user picked, as opposed to an address they typed. */
+export function pickedName(state: DestinationState): boolean {
+	return Boolean(state.address && state.name && state.text === state.name);
+}

@@ -6,7 +6,7 @@
 	import QRCode from 'qrcode';
 	import algosdk from 'algosdk';
 	import { onMount } from 'svelte';
-	import { getNFD, searchNFDomains } from '$lib/utils/nfd';
+	import { getNFD, nfdReceiveAddress, searchNFDomains } from '$lib/utils/nfd';
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
@@ -22,9 +22,11 @@
 	} from '$lib/chain/pendingSends';
 	import BridgeAnimation from './BridgeAnimation.svelte';
 	import ResolvedAddress from './ResolvedAddress.svelte';
+	import NameAvatar from './NameAvatar.svelte';
 	import {
 		emptyDestination,
 		editDestination,
+		pickedName,
 		selectDestinationName,
 		unresolvedName,
 		type DestinationState
@@ -194,6 +196,7 @@
 	interface NFDResult {
 		name: string;
 		owner: string;
+		depositAccount?: string;
 		properties?: {
 			verified?: {
 				avatar?: string;
@@ -362,7 +365,7 @@
 		if ('owner' in result) {
 			algorandDestination = selectDestinationName(
 				algorandDestination,
-				{ name: result.name, address: result.owner },
+				{ name: result.name, address: nfdReceiveAddress(result) },
 				nfdRules
 			);
 			resolvedName = algorandDestination.address
@@ -1670,7 +1673,18 @@
 										placeholder={`Enter address or search ${isVoiToAlgorand ? 'NFDomains' : 'Envoi names'}...`}
 										class:border-green-500={isValidDestination}
 										class:border-red-500={Boolean(algorandDestination.error)}
+										style:padding-left={pickedName(algorandDestination) ? '2.75rem' : undefined}
 									/>
+									{#if pickedName(algorandDestination)}
+										<span
+											class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
+										>
+											<NameAvatar
+												name={algorandDestination.name ?? ''}
+												avatar={resolvedName?.avatar}
+											/>
+										</span>
+									{/if}
 									{#if algorandDestination.text}
 										<button
 											type="button"
@@ -1739,7 +1753,9 @@
 																{result.name}
 															</div>
 															<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-																{'owner' in result ? result.owner : result.address}
+																{'owner' in result
+																	? (nfdReceiveAddress(result) ?? '')
+																	: result.address}
 															</div>
 														</div>
 													</button>
@@ -1749,11 +1765,8 @@
 									</div>
 								{/if}
 
-								{#if algorandDestination.address}
-									<ResolvedAddress
-										address={algorandDestination.address}
-										name={algorandDestination.name}
-									/>
+								{#if pickedName(algorandDestination) && algorandDestination.address}
+									<ResolvedAddress address={algorandDestination.address} />
 								{/if}
 								{#if algorandDestination.error}
 									<p class="text-sm text-red-600 dark:text-red-400" role="alert">
@@ -1761,30 +1774,9 @@
 									</p>
 								{/if}
 
-								{#if resolvedName}
-									<div class="mt-2 flex items-center space-x-2">
-										<div
-											class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-										>
-											{#if resolvedName.avatar}
-												<img
-													src={resolvedName.avatar}
-													alt="Avatar"
-													class="w-full h-full object-cover"
-													on:error={(e) => {
-														const target = e.currentTarget as HTMLImageElement;
-														target.style.display = 'none';
-														(target.nextElementSibling as HTMLDivElement).style.display = 'flex';
-													}}
-												/>
-											{:else}
-												<div
-													class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium"
-												>
-													{getInitials(resolvedName.name)}
-												</div>
-											{/if}
-										</div>
+								{#if resolvedName && !pickedName(algorandDestination)}
+									<div class="mt-2 flex items-center gap-2">
+										<NameAvatar name={resolvedName.name} avatar={resolvedName.avatar} />
 										<p class="text-sm text-gray-500 dark:text-gray-400">
 											{resolvedName.name}
 										</p>
@@ -1847,7 +1839,15 @@
 										placeholder="Enter address or search Envoi names..."
 										class:border-green-500={isValidDestination}
 										class:border-red-500={Boolean(voiDestination.error)}
+										style:padding-left={pickedName(voiDestination) ? '2.75rem' : undefined}
 									/>
+									{#if pickedName(voiDestination)}
+										<span
+											class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
+										>
+											<NameAvatar name={voiDestination.name ?? ''} avatar={resolvedName?.avatar} />
+										</span>
+									{/if}
 									{#if voiDestination.text}
 										<button
 											type="button"
@@ -1961,7 +1961,9 @@
 																{result.name}
 															</div>
 															<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-																{'owner' in result ? result.owner : result.address}
+																{'owner' in result
+																	? (nfdReceiveAddress(result) ?? '')
+																	: result.address}
 															</div>
 														</div>
 													</button>
@@ -1971,8 +1973,8 @@
 									</div>
 								{/if}
 
-								{#if voiDestination.address}
-									<ResolvedAddress address={voiDestination.address} name={voiDestination.name} />
+								{#if pickedName(voiDestination) && voiDestination.address}
+									<ResolvedAddress address={voiDestination.address} />
 								{/if}
 								{#if voiDestination.error}
 									<p class="text-sm text-red-600 dark:text-red-400" role="alert">
@@ -1980,30 +1982,9 @@
 									</p>
 								{/if}
 
-								{#if resolvedName}
-									<div class="mt-2 flex items-center space-x-2">
-										<div
-											class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-										>
-											{#if resolvedName.avatar}
-												<img
-													src={resolvedName.avatar}
-													alt="Avatar"
-													class="w-full h-full object-cover"
-													on:error={(e) => {
-														const target = e.currentTarget as HTMLImageElement;
-														target.style.display = 'none';
-														(target.nextElementSibling as HTMLDivElement).style.display = 'flex';
-													}}
-												/>
-											{:else}
-												<div
-													class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium"
-												>
-													{getInitials(resolvedName.name)}
-												</div>
-											{/if}
-										</div>
+								{#if resolvedName && !pickedName(voiDestination)}
+									<div class="mt-2 flex items-center gap-2">
+										<NameAvatar name={resolvedName.name} avatar={resolvedName.avatar} />
 										<p class="text-sm text-gray-500 dark:text-gray-400">
 											{resolvedName.name}
 										</p>
@@ -2056,10 +2037,9 @@
 							{#if destinationAddress}
 								<div class="text-sm text-gray-500 dark:text-gray-400">
 									To:
-									<ResolvedAddress
-										address={destinationAddress}
-										name={(isVoiToAlgorand ? algorandDestination : voiDestination).name}
-									/>
+									<span class="font-mono break-all" data-testid="bridge-to-address"
+										>{destinationAddress}</span
+									>
 								</div>
 							{/if}
 						</div>

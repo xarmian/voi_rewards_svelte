@@ -25,3 +25,10 @@ test('provides an accessible, guarded Copy button', () => {
 		/navigator\?\.clipboard|navigator\.clipboard\?|if\s*\([^)]*navigator\.clipboard/
 	);
 });
+
+test('the address and its Copy button share one line and the name is never rendered', () => {
+	expect(source, 'No name prop').not.toMatch(/\bname\b/);
+	expect(source, 'Address and Copy sit in one flex row').toMatch(
+		/<div class="[^"]*\bflex\b[^"]*">\s*(?:\{#if label\}[^]*?\{\/if\}\s*)?<div[^>]*data-testid="resolved-address"[^]*?<\/div>\s*<button/
+	);
+});

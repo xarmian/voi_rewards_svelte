@@ -1,3 +1,5 @@
+import algosdk from 'algosdk';
+
 export async function getAddressesForNFD(nfdName: string): Promise<string[]> {
 	// Define the API endpoint
 	const url = `https://api.nf.domains/nfd/${nfdName.toLocaleLowerCase()}?view=brief&poll=false&nocache=false`;
@@ -138,4 +140,20 @@ export async function searchNFDomains(query: string): Promise<NFDSearchResult[]>
 		console.error('Error searching NFDomains:', error);
 		return [];
 	}
+}
+
+/**
+ * The address an NFD receives funds at: the account its holder designated for deposits, falling back
+ * to the owner only when that is empty or not a valid address. Every input that takes an NFD as a
+ * recipient must resolve it here, so none picks `owner` by accident. A typed address never goes
+ * through this: it is used exactly as typed.
+ */
+export function nfdReceiveAddress(result: {
+	owner?: string | null;
+	depositAccount?: string | null;
+}): string | null {
+	for (const candidate of [result.depositAccount, result.owner]) {
+		if (candidate && algosdk.isValidAddress(candidate)) return candidate;
+	}
+	return null;
 }
