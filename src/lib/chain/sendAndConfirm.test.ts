@@ -156,7 +156,7 @@ describe('trackPending', () => {
 		expect(settled).toHaveBeenCalledWith(pending);
 		expect(vi.getTimerCount()).toBe(0);
 	});
-	it('keeps a send pending across timed out passes with one hung underlying status request', async () => {
+	it('keeps a send pending across timed out passes with at most one hung status request per stale window', async () => {
 		const status = vi.fn(() => ({ do: () => new Promise<Record<string, unknown>>(() => {}) }));
 		const pendingInfo = vi.fn(async () => ({}));
 		const search = vi.fn(async () => ({ 'current-round': 200, transactions: [] }));
@@ -174,7 +174,10 @@ describe('trackPending', () => {
 			await vi.advanceTimersByTimeAsync(34000);
 			expect(search).toHaveBeenCalledTimes(3);
 			expect(pendingInfo).toHaveBeenCalledTimes(4);
-			expect(status).toHaveBeenCalledOnce();
+			// A hung shared request is replaced once it is stale (15 s): requests start at about 0, 15
+			// and 30 s, never one per pass, and the send is never expired on a hung probe.
+			expect(status.mock.calls.length).toBeGreaterThanOrEqual(2);
+			expect(status.mock.calls.length).toBeLessThanOrEqual(1 + Math.floor(34000 / 15000));
 			expect(lookupBlock).not.toHaveBeenCalled();
 			expect(settled).not.toHaveBeenCalled();
 		} finally {
