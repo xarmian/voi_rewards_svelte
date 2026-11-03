@@ -138,7 +138,12 @@ describe('destination confirmation', () => {
 describe('Algorand deposit', () => {
 	const algodBase = 'https://algod.example';
 	const indexerBase = 'https://indexer.example';
-	const state = () => ({ startRound: null as number | null, startedAtMs: 100 });
+	const state = () => ({
+		startRound: null as number | null,
+		scanFrom: null as number | null,
+		startedAtMs: 100,
+		startedAtWallMs: 10000
+	});
 	const query = (round: number) =>
 		`${indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${round}&limit=50`;
 	function deps(response: unknown = { transactions: [] }, elapsed = 0, lastRound = 100) {
@@ -146,6 +151,7 @@ describe('Algorand deposit', () => {
 			algodBase,
 			indexerBase,
 			nowMs: vi.fn(() => 100 + elapsed),
+			wallMs: vi.fn(() => 10000),
 			getJson: vi.fn<(url: string, signal: AbortSignal) => Promise<unknown>>(async (url) =>
 				url === `${algodBase}/v2/status` ? { 'last-round': lastRound } : response
 			)
@@ -153,7 +159,7 @@ describe('Algorand deposit', () => {
 	}
 	it.each([
 		[100, 0, 98],
-		[100, 5000, 95],
+		[100, 5000, 93],
 		[3, 5000, 0]
 	])('starts from algod round %s with elapsed %s at min-round %s', async (round, elapsed, min) => {
 		const d = deps({ transactions: [] }, elapsed, round);
@@ -180,7 +186,7 @@ describe('Algorand deposit', () => {
 	});
 	it('keeps an established boundary without asking algod again', async () => {
 		const d = deps();
-		const window = { startRound: 75, startedAtMs: 100 };
+		const window = { ...state(), startRound: 75, scanFrom: 75 };
 		await checkAlgorandDeposit(d, depositExpected, window, signal);
 		d.nowMs.mockReturnValue(90000);
 		await checkAlgorandDeposit(d, depositExpected, window, signal);
@@ -197,11 +203,11 @@ describe('Algorand deposit', () => {
 		expect(window.startRound).toBeNull();
 		d.nowMs.mockReturnValue(5100);
 		await checkAlgorandDeposit(d, depositExpected, window, signal);
-		expect(window.startRound).toBe(95);
+		expect(window.startRound).toBe(93);
 		expect(d.getJson.mock.calls.map(([url]) => url)).toEqual([
 			`${algodBase}/v2/status`,
 			`${algodBase}/v2/status`,
-			query(95)
+			query(93)
 		]);
 	});
 	it.each([NaN, Infinity, -Infinity, -1, 1.5, '100', undefined])(
@@ -222,28 +228,112 @@ describe('Algorand deposit', () => {
 			.mockResolvedValueOnce({ transactions: [], 'next-token': 'page+2/=' })
 			.mockResolvedValueOnce({ transactions: [deposit(), { ...deposit(), id: 'SECOND' }] });
 		expect(
-			await checkAlgorandDeposit(d, depositExpected, { ...state(), startRound: 98 }, signal)
+			await checkAlgorandDeposit(
+				d,
+				depositExpected,
+				{ ...state(), startRound: 98, scanFrom: 98 },
+				signal
+			)
 		).toEqual({ done: true, tx: { id: 'DEPOSIT' } });
 		expect(d.getJson.mock.calls.map(([url]) => url)).toEqual([
 			query(98),
 			`${query(98)}&next=page%2B2%2F%3D`
 		]);
 	});
-	it('stops after three pages even with another next-token', async () => {
+	it('advances through capped scans and finds a deposit beyond 150 earlier transactions', async () => {
+		const earlier = Array.from({ length: 151 }, (_, i) => ({
+			...deposit(),
+			id: `OTHER-${i}`,
+			sender: 'OTHER',
+			'confirmed-round': 100 + i
+		}));
+		const all = [...earlier, { ...deposit(), 'confirmed-round': 251 }];
 		const d = deps();
-		d.getJson
-			.mockResolvedValueOnce({ transactions: [], 'next-token': 'two' })
-			.mockResolvedValueOnce({ transactions: [], 'next-token': 'three' })
-			.mockResolvedValueOnce({ transactions: [], 'next-token': 'four' })
-			.mockResolvedValueOnce({ transactions: [deposit()] });
-		expect(
-			await checkAlgorandDeposit(d, depositExpected, { ...state(), startRound: 98 }, signal)
-		).toEqual({ done: false });
+		d.getJson.mockImplementation(async (url) => {
+			const params = new URL(url).searchParams;
+			const min = Number(params.get('min-round'));
+			const offset = Number(params.get('next') ?? 0);
+			const available = all.filter((tx) => tx['confirmed-round'] >= min);
+			return {
+				transactions: available.slice(offset, offset + 50),
+				...(offset + 50 < available.length ? { 'next-token': String(offset + 50) } : {})
+			};
+		});
+		const window = { ...state(), startRound: 98, scanFrom: 98 };
+		expect(await checkAlgorandDeposit(d, depositExpected, window, signal)).toEqual({
+			done: false,
+			incomplete: true
+		});
+		expect(window.scanFrom).toBe(249);
+		expect(window.startRound).toBe(98);
 		expect(d.getJson.mock.calls.map(([url]) => url)).toEqual([
 			query(98),
-			`${query(98)}&next=two`,
-			`${query(98)}&next=three`
+			`${query(98)}&next=50`,
+			`${query(98)}&next=100`
 		]);
+		expect(await checkAlgorandDeposit(d, depositExpected, window, signal)).toEqual({
+			done: true,
+			tx: { id: 'DEPOSIT' }
+		});
+		expect(d.getJson.mock.calls[3][0]).toBe(query(249));
+		expect(window.startRound).toBe(98);
+	});
+	it('never advances backwards or beyond an examined round when a next page remains', async () => {
+		const d = deps();
+		d.getJson
+			.mockResolvedValueOnce({ transactions: [{ 'confirmed-round': 110 }], 'next-token': 'two' })
+			.mockResolvedValueOnce({ transactions: [{ 'confirmed-round': 120 }], 'next-token': 'three' })
+			.mockResolvedValueOnce({
+				transactions: [{ 'confirmed-round': 125 }, {}],
+				'next-token': 'four'
+			})
+			.mockResolvedValueOnce({ transactions: [{ 'confirmed-round': 999 }] });
+		const window = { ...state(), startRound: 98, scanFrom: 100 };
+		expect(await checkAlgorandDeposit(d, depositExpected, window, signal)).toEqual({
+			done: false,
+			incomplete: true
+		});
+		expect(d.getJson).toHaveBeenCalledTimes(3);
+		expect(window.scanFrom).toBe(125);
+		d.getJson.mockReset().mockResolvedValue({ transactions: [{ 'confirmed-round': 110 }] });
+		await checkAlgorandDeposit(d, depositExpected, window, signal);
+		expect(d.getJson).toHaveBeenCalledWith(query(125), signal);
+		expect(window.scanFrom).toBe(125);
+		expect(window.startRound).toBe(98);
+	});
+	it.each([{ transactions: [] }, { transactions: [null, {}, { 'confirmed-round': '999' }] }])(
+		'leaves the cursor unchanged without numeric confirmed rounds: %j',
+		async ({ transactions }) => {
+			const d = deps({ transactions });
+			const window = { ...state(), startRound: 98, scanFrom: 123 };
+			await checkAlgorandDeposit(d, depositExpected, window, signal);
+			expect(window.scanFrom).toBe(123);
+			expect(window.startRound).toBe(98);
+		}
+	);
+	it('returns a match immediately even when another page exists', async () => {
+		const d = deps({ transactions: [deposit()], 'next-token': 'two' });
+		const window = { ...state(), startRound: 98, scanFrom: 98 };
+		expect(await checkAlgorandDeposit(d, depositExpected, window, signal)).toEqual({
+			done: true,
+			tx: { id: 'DEPOSIT' }
+		});
+		expect(d.getJson).toHaveBeenCalledOnce();
+	});
+	it.each([
+		[5000, 1000, 93],
+		[1000, 9000, 89],
+		[5000, -9000, 93],
+		[-5000, -9000, 98],
+		[0, 0, 98]
+	])('uses the larger nonnegative elapsed time: monotonic %s, wall %s', async (mono, wall, min) => {
+		const d = deps({ transactions: [] }, mono);
+		d.wallMs.mockReturnValue(10000 + wall);
+		const window = state();
+		await checkAlgorandDeposit(d, depositExpected, window, signal);
+		expect(window.startRound).toBe(min);
+		expect(window.scanFrom).toBe(min);
+		expect(d.getJson).toHaveBeenLastCalledWith(query(min), signal);
 	});
 	it('returns not done for a non-matching list', async () => {
 		expect(
@@ -269,7 +359,7 @@ describe('Algorand deposit', () => {
 			.mockResolvedValueOnce({ transactions: [], 'next-token': 'two' })
 			.mockResolvedValueOnce({});
 		await expect(
-			checkAlgorandDeposit(d, depositExpected, { ...state(), startRound: 98 }, signal)
+			checkAlgorandDeposit(d, depositExpected, { ...state(), startRound: 98, scanFrom: 98 }, signal)
 		).rejects.toThrow('Unexpected indexer response');
 	});
 	it('skips a match without a string id and keeps searching', async () => {
@@ -287,7 +377,7 @@ describe('Algorand deposit', () => {
 		const error = new Error('offline');
 		d.getJson.mockRejectedValueOnce(error);
 		await expect(
-			checkAlgorandDeposit(d, depositExpected, { ...state(), startRound: 98 }, signal)
+			checkAlgorandDeposit(d, depositExpected, { ...state(), startRound: 98, scanFrom: 98 }, signal)
 		).rejects.toBe(error);
 	});
 	it.each([

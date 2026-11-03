@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTrackingDeps } from './trackingDeps';
 
-function clients() {
+function clients(now = Date.now, staleMs = 15000) {
 	const status = vi.fn(async () => ({ 'last-round': 101 }));
 	const pendingInfo = vi.fn(async () => ({ 'confirmed-round': 99 }));
 	const search = vi.fn(async () => ({ 'current-round': 110, transactions: [{ id: 'A' }] }));
@@ -15,7 +15,14 @@ function clients() {
 		searchForTransactions: () => ({ txid }),
 		lookupBlock: vi.fn(() => ({ do: block }))
 	};
-	return { deps: createTrackingDeps(algod, indexer), algod, indexer, status, block, txid };
+	return {
+		deps: createTrackingDeps(algod, indexer, now, staleMs),
+		algod,
+		indexer,
+		status,
+		block,
+		txid
+	};
 }
 
 describe('createTrackingDeps', () => {
@@ -117,3 +124,64 @@ describe('tracking probe single-flight', () => {
 		expect(indexer.lookupBlock).toHaveBeenCalledOnce();
 	});
 });
+
+// Both shared probes must recover without waiting for a half-open request.
+it.each(['algod', 'indexer'] as const)(
+	'replaces stale %s requests once per stale window and uses the new result',
+	async (kind) => {
+		let time = 0;
+		const { deps, status, block } = clients(() => time);
+		const old = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const fresh = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const third = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const underlying = kind === 'algod' ? status : block;
+		underlying
+			.mockReturnValueOnce(old.promise)
+			.mockReturnValueOnce(fresh.promise)
+			.mockReturnValueOnce(third.promise);
+		const lookup = () => (kind === 'algod' ? deps.algodRound() : deps.indexerHasBlock(100));
+		const first = lookup();
+		time = 14999;
+		for (let i = 0; i < 10; i++) expect(lookup()).toBe(first);
+		expect(underlying).toHaveBeenCalledOnce();
+		time = 15001;
+		const second = lookup();
+		expect(second).not.toBe(first);
+		expect(underlying).toHaveBeenCalledTimes(2);
+		time = 30000;
+		for (let i = 0; i < 10; i++) expect(lookup()).toBe(second);
+		expect(underlying).toHaveBeenCalledTimes(2);
+		time = 30002;
+		const latest = lookup();
+		expect(latest).not.toBe(second);
+		expect(underlying).toHaveBeenCalledTimes(3);
+		third.resolve({ 'last-round': 120, round: 100 });
+		expect(await latest).toBe(kind === 'algod' ? 120 : true);
+		old.resolve({ 'last-round': 99, round: 99 });
+		fresh.resolve({ 'last-round': 110, round: 100 });
+		await Promise.all([first, second]);
+	}
+);
+
+it.each(['algod', 'indexer'] as const)(
+	'an old %s request settling cannot remove its replacement',
+	async (kind) => {
+		let time = 0;
+		const { deps, status, block } = clients(() => time, 100);
+		const old = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const fresh = Promise.withResolvers<{ 'last-round': number; round: number }>();
+		const underlying = kind === 'algod' ? status : block;
+		underlying.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
+		const lookup = () => (kind === 'algod' ? deps.algodRound() : deps.indexerHasBlock(100));
+		const first = lookup();
+		time = 101;
+		const second = lookup();
+		expect(second).not.toBe(first);
+		old.resolve({ 'last-round': 99, round: 99 });
+		await first;
+		expect(lookup()).toBe(second);
+		expect(underlying).toHaveBeenCalledTimes(2);
+		fresh.resolve({ 'last-round': 120, round: 100 });
+		expect(await second).toBe(kind === 'algod' ? 120 : true);
+	}
+);
