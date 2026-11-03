@@ -1,6 +1,7 @@
 import type { TrackingDependencies } from './sendAndConfirm';
 
 type Request<T> = { do(): Promise<T> };
+type SharedRequest<T> = { promise: Promise<T>; startedAtMs: number };
 type AlgodClient = {
 	pendingTransactionInformation(txId: string): Request<{ 'confirmed-round'?: number }>;
 	status(): Request<Record<string, unknown>>;
@@ -12,10 +13,12 @@ type Indexer = {
 
 export function createTrackingDeps(
 	algodClient: AlgodClient,
-	indexer: Indexer
+	indexer: Indexer,
+	now: () => number = Date.now,
+	staleMs = 15000
 ): TrackingDependencies {
-	let roundRequest: Promise<number> | undefined;
-	const blockRequests = new Map<number, Promise<boolean>>();
+	let roundRequest: SharedRequest<number> | undefined;
+	const blockRequests = new Map<number, SharedRequest<boolean>>();
 	return {
 		pendingInfo: (txId) => algodClient.pendingTransactionInformation(txId).do(),
 		indexerSearch: async (txId) =>
@@ -24,18 +27,21 @@ export function createTrackingDeps(
 				transactions: { id?: string; 'confirmed-round'?: number }[];
 			},
 		algodRound: () => {
-			if (!roundRequest) {
-				roundRequest = (async () =>
+			const startedAtMs = now();
+			if (!roundRequest || startedAtMs - roundRequest.startedAtMs > staleMs) {
+				const promise = (async () =>
 					(await algodClient.status().do())['last-round'] as number)().finally(() => {
-					roundRequest = undefined;
+					if (roundRequest?.promise === promise) roundRequest = undefined;
 				});
+				roundRequest = { promise, startedAtMs };
 			}
-			return roundRequest;
+			return roundRequest.promise;
 		},
 		indexerHasBlock: (round) => {
 			const existing = blockRequests.get(round);
-			if (existing) return existing;
-			const request = (async () => {
+			const startedAtMs = now();
+			if (existing && startedAtMs - existing.startedAtMs <= staleMs) return existing.promise;
+			const promise = (async () => {
 				try {
 					const block = await indexer.lookupBlock(round).do();
 					return (
@@ -51,9 +57,11 @@ export function createTrackingDeps(
 						return false;
 					throw error;
 				}
-			})().finally(() => blockRequests.delete(round));
-			blockRequests.set(round, request);
-			return request;
+			})().finally(() => {
+				if (blockRequests.get(round)?.promise === promise) blockRequests.delete(round);
+			});
+			blockRequests.set(round, { promise, startedAtMs });
+			return promise;
 		}
 	};
 }

@@ -8,6 +8,7 @@ interface AlgorandDepositDeps extends BridgeFetchDeps {
 	algodBase: string;
 	indexerBase: string;
 	nowMs(): number;
+	wallMs(): number;
 }
 
 type ExpectedBridgeDeposit = {
@@ -17,7 +18,7 @@ type ExpectedBridgeDeposit = {
 	destinationAddress: string;
 	sourceAddress?: string;
 };
-type MonitorResult = { done: true; tx: { id: string } } | { done: false };
+type MonitorResult = { done: true; tx: { id: string } } | { done: false; incomplete?: true };
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -97,7 +98,12 @@ export function matchBridgeDeposit(tx: unknown, expected: ExpectedBridgeDeposit)
 export async function checkAlgorandDeposit(
 	deps: AlgorandDepositDeps,
 	expected: ExpectedBridgeDeposit,
-	state: { startRound: number | null; startedAtMs: number },
+	state: {
+		startRound: number | null;
+		scanFrom: number | null;
+		startedAtMs: number;
+		startedAtWallMs: number;
+	},
 	signal: AbortSignal
 ): Promise<MonitorResult> {
 	if (state.startRound === null) {
@@ -110,22 +116,35 @@ export async function checkAlgorandDeposit(
 			lastRound < 0
 		)
 			throw new Error('Unexpected algod response');
-		state.startRound = Math.max(
-			0,
-			lastRound - Math.ceil((deps.nowMs() - state.startedAtMs) / 2000) - 2
+		const elapsed = Math.max(
+			deps.nowMs() - state.startedAtMs,
+			deps.wallMs() - state.startedAtWallMs,
+			0
 		);
+		state.startRound = Math.max(0, lastRound - Math.ceil(elapsed / 1000) - 2);
+		state.scanFrom = state.startRound;
 	}
-	const baseUrl = `${deps.indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${state.startRound}&limit=50`;
+	const baseUrl = `${deps.indexerBase}/v2/transactions?note-prefix=${encodeURIComponent(btoa('aramid-transfer/v1:j'))}&min-round=${state.scanFrom}&limit=50`;
 	let url = baseUrl;
+	let highestRound = state.scanFrom;
+	let incomplete = false;
 	for (let page = 0; page < 3; page++) {
 		const data = await deps.getJson(url, signal);
 		for (const tx of transactions(data)) {
+			const round = isObject(tx) ? tx['confirmed-round'] : undefined;
+			if (typeof round === 'number' && Number.isFinite(round)) {
+				highestRound = Math.max(highestRound ?? round, round);
+			}
 			if (matchBridgeDeposit(tx, expected) && isObject(tx) && typeof tx.id === 'string')
 				return { done: true, tx: { id: tx.id } };
 		}
 		const next = isObject(data) ? data['next-token'] : undefined;
 		if (typeof next !== 'string' || !next) break;
+		if (page === 2) incomplete = true;
 		url = `${baseUrl}&next=${encodeURIComponent(next)}`;
 	}
-	return { done: false };
+	// Re-examine the highest round: min-round is inclusive, including at a page cap.
+	if (highestRound !== null)
+		state.scanFrom = Math.max(state.scanFrom ?? highestRound, highestRound);
+	return incomplete ? { done: false, incomplete: true } : { done: false };
 }

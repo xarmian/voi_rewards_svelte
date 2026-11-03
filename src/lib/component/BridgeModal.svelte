@@ -653,6 +653,10 @@
 	}
 
 	function goBack() {
+		depositExpected = undefined;
+		depositState = undefined;
+		qrMonitorKey = undefined;
+		depositDestination = undefined;
 		depositController?.abort();
 		qrMonitorActive = false;
 		bridgeStatus = 'idle';
@@ -997,6 +1001,7 @@
 	function startQrMonitoring() {
 		const key = JSON.stringify([
 			amountInAtomicUnits,
+			destinationAmount,
 			voiDestinationAddress,
 			selectedToken.algorandAssetId,
 			selectedToken.voiAssetId,
@@ -1005,15 +1010,14 @@
 		if (qrMonitorActive && key === qrMonitorKey) return;
 		if (bridgeStatus === 'bridging' || bridgeStatus === 'completed') return;
 		depositController?.abort();
-		qrMonitorKey = key;
-		if (dotsInterval) clearInterval(dotsInterval);
-		dotsInterval = window.setInterval(updateDots, 500);
-		void monitorAlgorandTransactions();
-	}
-
-	async function monitorAlgorandTransactions(retry = false) {
-		if (!retry) {
-			depositState = { startRound: null, startedAtMs: performance.now() };
+		if (key !== qrMonitorKey) {
+			qrMonitorKey = key;
+			depositState = {
+				startRound: null,
+				scanFrom: null,
+				startedAtMs: performance.now(),
+				startedAtWallMs: Date.now()
+			};
 			depositDestination = {
 				sourceNetwork: 416001,
 				bridgeAddress: BRIDGE_ADDRESS,
@@ -1029,6 +1033,12 @@
 				sourceAddress: algorandSourceAddress || undefined
 			};
 		}
+		if (dotsInterval) clearInterval(dotsInterval);
+		dotsInterval = window.setInterval(updateDots, 500);
+		void monitorAlgorandTransactions();
+	}
+
+	async function monitorAlgorandTransactions() {
 		if (!depositExpected || !depositDestination || !depositState) return;
 		depositController?.abort();
 		const controller = new AbortController();
@@ -1062,6 +1072,7 @@
 						{
 							getJson,
 							nowMs: () => performance.now(),
+							wallMs: () => Date.now(),
 							algodBase: 'https://mainnet-api.4160.nodely.dev',
 							indexerBase: 'https://mainnet-idx.4160.nodely.dev'
 						},
@@ -1094,6 +1105,10 @@
 		if (result.status === 'done') {
 			bridgeStatus = 'bridging';
 			bridgeDetails = { sourceTxId: result.value.id };
+			depositExpected = undefined;
+			depositState = undefined;
+			qrMonitorKey = undefined;
+			depositDestination = undefined;
 			depositController?.abort();
 			void startBridgeMonitoring(
 				result.value.id,
@@ -2020,7 +2035,7 @@
 										<button
 											type="button"
 											class="text-sm text-blue-600 dark:text-blue-400 underline"
-											on:click={() => monitorAlgorandTransactions(true)}>Retry</button
+											on:click={() => monitorAlgorandTransactions()}>Retry</button
 										>
 									{/if}
 									<a
