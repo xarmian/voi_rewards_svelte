@@ -16,9 +16,8 @@ const VOI_TOKEN_IDS = [0, 390001];
 // aUSDC can be represented by either token ID 302190 or 395614
 const AUSDC_TOKEN_IDS = [302190, 395614];
 
-// PostgREST's default max rows per request is 1000; each equivalent-id pair adds up to 4 rows per bucket.
+// PostgREST's default max rows per request is 1000.
 const PAGE_SIZE = 1000;
-const MAX_PAGES = 9;
 
 const getEquivalentTokenIds = (tokenId: number): number[] => {
 	if (VOI_TOKEN_IDS.includes(tokenId)) return VOI_TOKEN_IDS;
@@ -120,21 +119,25 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Fetch candles from MIMIR database
-		let query = supabaseMimirClient.from('price_candles').select('*');
+		// Built fresh for every page: postgrest-js filters mutate the builder they are called on.
+		const buildQuery = () => {
+			let query = supabaseMimirClient.from('price_candles').select('*');
 
-		// Handle base token - use .in() for equivalent tokens (VOI, aUSDC)
-		if (hasEquivalents(baseTokenId)) {
-			query = query.in('base_token_id', getEquivalentTokenIds(baseTokenId));
-		} else {
-			query = query.eq('base_token_id', baseTokenId);
-		}
+			// Handle base token - use .in() for equivalent tokens (VOI, aUSDC)
+			if (hasEquivalents(baseTokenId)) {
+				query = query.in('base_token_id', getEquivalentTokenIds(baseTokenId));
+			} else {
+				query = query.eq('base_token_id', baseTokenId);
+			}
 
-		// Handle quote token - use .in() for equivalent tokens (VOI, aUSDC)
-		if (hasEquivalents(finalQuoteTokenId)) {
-			query = query.in('quote_token_id', getEquivalentTokenIds(finalQuoteTokenId));
-		} else {
-			query = query.eq('quote_token_id', finalQuoteTokenId);
-		}
+			// Handle quote token - use .in() for equivalent tokens (VOI, aUSDC)
+			if (hasEquivalents(finalQuoteTokenId)) {
+				query = query.in('quote_token_id', getEquivalentTokenIds(finalQuoteTokenId));
+			} else {
+				query = query.eq('quote_token_id', finalQuoteTokenId);
+			}
+			return query;
+		};
 
 		// Equivalent token ids can carry several rows per bucket, so `limit` counts buckets, not rows:
 		// read newest-first in pages until a bucket beyond the limit shows up (every row of the newest
@@ -143,12 +146,18 @@ export const GET: RequestHandler = async ({ url }) => {
 		const rows: PriceCandle[] = [];
 		const buckets = new Set<string>();
 		const seen = new Set<string>();
-		for (let page = 0; page < MAX_PAGES; page++) {
-			const { data, error } = await query
+		// Each bucket holds at most 4 rows (2 equivalent base ids x 2 quote ids), plus one row of the
+		// bucket that ends the read.
+		const maxPages = Math.ceil((bucketLimit * 4 + 1) / PAGE_SIZE) + 1;
+		for (let page = 0; page < maxPages; page++) {
+			const { data, error } = await buildQuery()
 				.eq('resolution', resolution)
 				.gte('bucket_start', startTime.toISOString())
 				.lt('bucket_start', endTime.toISOString())
+				// A total order: tied rows of one bucket would otherwise move between page reads.
 				.order('bucket_start', { ascending: false })
+				.order('base_token_id', { ascending: false })
+				.order('quote_token_id', { ascending: false })
 				.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 

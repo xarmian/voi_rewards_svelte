@@ -42,6 +42,34 @@ it('reads the newest rows first, in pages, ordered before the range is applied',
 	);
 });
 
+it('orders by a total key so offset pages never skip or repeat tied rows', async () => {
+	await request('&limit=3');
+	expect(query.order.mock.calls.map((call) => call[0])).toEqual([
+		'bucket_start',
+		'base_token_id',
+		'quote_token_id'
+	]);
+});
+
+it('builds a fresh query for every page', async () => {
+	rows = Array.from({ length: 1000 }, (_, i) => ({
+		base_token_id: 7,
+		quote_token_id: 390001,
+		resolution: '1h' as const,
+		bucket_start: new Date((5000 - i) * 1000).toISOString(),
+		open: '2',
+		high: '4',
+		low: '1',
+		close: '3',
+		volume_base: '5',
+		volume_quote: '10',
+		trades_count: 1
+	}));
+	await request('&start=1&end=9999999&limit=3000');
+	expect(query.range.mock.calls.length).toBeGreaterThan(1);
+	expect(mocks.from).toHaveBeenCalledTimes(query.range.mock.calls.length);
+});
+
 it('returns newest-first database rows as ascending candles and volumes with the correct count', async () => {
 	rows = [300, 200, 100].map((time) => ({
 		base_token_id: 7,

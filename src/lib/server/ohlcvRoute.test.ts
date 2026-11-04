@@ -12,11 +12,14 @@ vi.mock('$lib/mimir', () => {
 	let from = 0;
 	let to = Number.MAX_SAFE_INTEGER;
 	let ascending = true;
+	let ordered = false;
 	for (const name of ['select', 'in', 'eq', 'gte', 'lt', 'abortSignal']) {
 		builder[name] = () => builder;
 	}
 	builder.order = (_col: string, opts?: { ascending?: boolean }) => {
-		ascending = opts?.ascending ?? true;
+		// only the first key sets the direction; later keys are tie-breakers
+		if (!ordered) ascending = opts?.ascending ?? true;
+		ordered = true;
 		return builder;
 	};
 	builder.limit = (n: number) => {
@@ -40,6 +43,7 @@ vi.mock('$lib/mimir', () => {
 		if (state.repeatBoundaryRow && from > 0) data.unshift(sorted[from - 1]);
 		from = 0;
 		to = Number.MAX_SAFE_INTEGER;
+		ordered = false;
 		return Promise.resolve({ data, error: null }).then(resolve);
 	};
 	return { mimirClient: { from: () => builder } };
