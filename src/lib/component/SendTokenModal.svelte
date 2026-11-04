@@ -19,6 +19,7 @@
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
 	import {
 		createOutcomeHandler,
 		createPendingTracker,
@@ -456,7 +457,7 @@
 			throw new Error('Invalid asset ID for VSA transaction');
 		}
 
-		return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+		return buildAssetTransfer({
 			from: sender,
 			to: recipientAddress,
 			assetIndex: Number(token.id),
@@ -578,7 +579,7 @@
 		if (!sender) {
 			throw new Error('Wallet not connected');
 		}
-		return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+		return buildPayment({
 			from: sender,
 			to: recipientAddress,
 			amount,
@@ -628,20 +629,7 @@
 
 				if (totalPaymentAmount > 0n) {
 					const firstPayment = paymentsToProcess[0].payment!;
-					const combinedPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-						from: algosdk.encodeAddress(firstPayment.from.publicKey),
-						to: algosdk.encodeAddress(firstPayment.to.publicKey),
-						amount: totalPaymentAmount,
-						note: firstPayment.note,
-						suggestedParams: {
-							fee: firstPayment.fee,
-							firstRound: firstPayment.firstRound,
-							lastRound: firstPayment.lastRound,
-							genesisHash: Buffer.from(firstPayment.genesisHash).toString('base64'),
-							genesisID: firstPayment.genesisID,
-							flatFee: true
-						}
-					});
+					const combinedPayment = buildCombinedPayment(firstPayment, totalPaymentAmount);
 					batchTransactions.push(combinedPayment);
 				}
 			}

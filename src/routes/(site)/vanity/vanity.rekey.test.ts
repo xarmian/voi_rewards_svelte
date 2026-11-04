@@ -28,8 +28,8 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		txnError: null,
 		error: null,
 		console,
+		buildPayment: makePayment,
 		algosdk: {
-			makePaymentTxnWithSuggestedParamsFromObject: makePayment,
 			mnemonicToSecretKey: vi.fn(() => ({ sk: new Uint8Array() })),
 			waitForConfirmation: vi.fn().mockResolvedValue({})
 		},

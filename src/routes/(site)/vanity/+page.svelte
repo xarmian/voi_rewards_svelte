@@ -4,6 +4,7 @@
 	import algosdk from 'algosdk';
 	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
 	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
+	import { buildPayment } from '$lib/chain/txBuilders';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 
@@ -361,7 +362,7 @@
 
 			// Create an unsigned transaction to send 1 VOI to the vanity address
 			// 1 VOI = 1,000,000 microVOI
-			const unsignedTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+			const unsignedTxn = buildPayment({
 				from: plan.funder,
 				to: plan.vanity,
 				amount: 1000000, // 1 VOI in microVOI
@@ -407,7 +408,7 @@
 			const vanityAccount = algosdk.mnemonicToSecretKey(mnemonic);
 
 			// Create a rekey transaction to point to the reviewed target account
-			const rekeyTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+			const rekeyTxn = buildPayment({
 				from: plan.vanity,
 				to: plan.vanity, // Send to self
 				amount: 0, // Zero amount for rekey

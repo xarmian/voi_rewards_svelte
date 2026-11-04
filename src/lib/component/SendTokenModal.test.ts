@@ -3,6 +3,7 @@ import { createContext, runInContext } from 'node:vm';
 import algosdk from 'algosdk';
 import ts from 'typescript';
 import { expect, test } from 'vitest';
+import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
 
@@ -17,7 +18,12 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 			return match[0];
 		})
 		.join('\n');
-	const context = createContext(globals);
+	const context = createContext({
+		buildPayment,
+		buildAssetTransfer,
+		buildCombinedPayment,
+		...globals
+	});
 	runInContext(
 		ts.transpileModule(script, {
 			compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }

@@ -10,6 +10,7 @@
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { buildAssetTransfer, buildPayment } from '$lib/chain/txBuilders';
 	import { createFlowPin } from '$lib/chain/flowAccount';
 	import { createTrackingDeps } from '$lib/chain/trackingDeps';
 	import { pollUntil } from '$lib/chain/singleFlightPoll';
@@ -435,7 +436,7 @@
 				let txn;
 				if (selectedToken.voiAssetId === '0') {
 					// Payment transaction for VOI
-					txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+					txn = buildPayment({
 						from: sender,
 						to: BRIDGE_ADDRESS,
 						amount: amountInAtomicUnits,
@@ -444,7 +445,7 @@
 					});
 				} else {
 					// ASA transfer for other tokens
-					txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+					txn = buildAssetTransfer({
 						from: sender,
 						to: BRIDGE_ADDRESS,
 						amount: amountInAtomicUnits,

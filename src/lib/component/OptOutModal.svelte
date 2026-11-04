@@ -4,6 +4,7 @@
 	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
 	import { algodClient } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
+	import { buildAssetTransfer } from '$lib/chain/txBuilders';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -33,7 +34,7 @@
 			optOutError = null;
 
 			const suggestedParams = await algodClient.getTransactionParams().do();
-			const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+			const txn = buildAssetTransfer({
 				from: $selectedWallet.address,
 				to: $selectedWallet.address,
 				assetIndex: Number(token.id),
