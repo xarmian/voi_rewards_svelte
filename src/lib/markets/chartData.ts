@@ -85,9 +85,7 @@ export async function fetchTokenChartData(
 						? convertVoiQuotedVolumesToUsd(voiData.volumes, voiUsdData)
 						: [];
 				} else {
-					// Fallback to VOI data if USD conversion fails
-					chartData = voiData.candles;
-					volumeData = voiData.volumes || [];
+					return { error: 'USD prices are unavailable right now' };
 				}
 			}
 		} else {
