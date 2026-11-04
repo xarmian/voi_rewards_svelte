@@ -16,7 +16,7 @@ const query = {
 	gte: vi.fn().mockReturnThis(),
 	lt: vi.fn().mockReturnThis(),
 	order: vi.fn().mockReturnThis(),
-	limit: vi.fn().mockReturnThis(),
+	range: vi.fn().mockReturnThis(),
 	abortSignal: vi.fn(async () => ({ data: rows, error }))
 };
 
@@ -33,12 +33,12 @@ function request(params = '') {
 	} as Parameters<typeof GET>[0]);
 }
 
-it('queries the newest candles before applying the requested limit', async () => {
+it('reads the newest rows first, in pages, ordered before the range is applied', async () => {
 	await request('&limit=3');
 	expect(query.order).toHaveBeenCalledWith('bucket_start', { ascending: false });
-	expect(query.limit).toHaveBeenCalledWith(3);
+	expect(query.range).toHaveBeenCalledWith(0, 999);
 	expect(query.order.mock.invocationCallOrder[0]).toBeLessThan(
-		query.limit.mock.invocationCallOrder[0]
+		query.range.mock.invocationCallOrder[0]
 	);
 });
 
@@ -73,12 +73,27 @@ it('returns newest-first database rows as ascending candles and volumes with the
 	});
 });
 
+// The limit counts buckets (TASK-142); the row-level contract is in src/lib/server/ohlcvRoute.test.ts.
 it.each([
 	{ params: '&limit=3000', expected: 2000 },
 	{ params: '', expected: 500 }
 ])('preserves the limit clamp and default ($params → $expected)', async ({ params, expected }) => {
-	await request(params);
-	expect(query.limit).toHaveBeenCalledWith(expected);
+	rows = Array.from({ length: 2100 }, (_, i) => ({
+		base_token_id: 7,
+		quote_token_id: 390001,
+		resolution: '1h' as const,
+		bucket_start: new Date((2100 - i) * 1000).toISOString(),
+		open: '2',
+		high: '4',
+		low: '1',
+		close: '3',
+		volume_base: '5',
+		volume_quote: '10',
+		trades_count: 1
+	}));
+	const body = await (await request(`&start=1&end=9999999${params}`)).json();
+	expect(body.count).toBe(expected);
+	expect(body.candles).toHaveLength(expected);
 });
 
 it('returns the existing 500 error response when MIMIR fails', async () => {
