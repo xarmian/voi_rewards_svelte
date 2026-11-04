@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // TASK-142: /api/ohlcv returns one candle per bucket time, and limit counts buckets, not rows.
 const state = vi.hoisted(() => ({
 	rows: [] as Record<string, unknown>[],
-	ranges: [] as number[][]
+	ranges: [] as number[][],
+	repeatBoundaryRow: false
 }));
 
 vi.mock('$lib/mimir', () => {
@@ -35,6 +36,8 @@ vi.mock('$lib/mimir', () => {
 				: String(b.bucket_start).localeCompare(String(a.bucket_start))
 		);
 		const data = sorted.slice(from, to + 1);
+		// a row inserted mid-read shifts the offset: the next page repeats the previous page's last row
+		if (state.repeatBoundaryRow && from > 0) data.unshift(sorted[from - 1]);
 		from = 0;
 		to = Number.MAX_SAFE_INTEGER;
 		return Promise.resolve({ data, error: null }).then(resolve);
@@ -74,6 +77,7 @@ async function call(query: string) {
 beforeEach(() => {
 	state.rows = [];
 	state.ranges = [];
+	state.repeatBoundaryRow = false;
 });
 
 describe('/api/ohlcv', () => {
@@ -114,5 +118,15 @@ describe('/api/ohlcv', () => {
 		expect(body.count).toBe(700);
 		expect(body.candles.every((c) => c.volume === 2)).toBe(true);
 		expect(state.ranges.length).toBeGreaterThan(1);
+	});
+
+	it('counts a row once when a page repeats the previous page boundary row', async () => {
+		state.repeatBoundaryRow = true;
+		state.rows = Array.from({ length: 700 }, (_, b) => [row(b, 0, 1), row(b, 390001, 1)]).flat();
+		const body = await call(
+			'baseTokenId=0&quote=USD&resolution=1h&limit=700&start=1&end=9999999999'
+		);
+		expect(body.count).toBe(700);
+		expect(body.candles.every((c) => c.volume === 2)).toBe(true);
 	});
 });

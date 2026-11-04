@@ -142,6 +142,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		const bucketLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 2000) : 500;
 		const rows: PriceCandle[] = [];
 		const buckets = new Set<string>();
+		const seen = new Set<string>();
 		for (let page = 0; page < MAX_PAGES; page++) {
 			const { data, error } = await query
 				.eq('resolution', resolution)
@@ -156,8 +157,15 @@ export const GET: RequestHandler = async ({ url }) => {
 			}
 
 			const pageRows = (data ?? []) as PriceCandle[];
-			rows.push(...pageRows);
-			for (const row of pageRows) buckets.add(row.bucket_start);
+			// A row inserted between page reads shifts the offset and repeats a row: count each
+			// (base, quote, bucket) once, or the merge would double its volume.
+			for (const row of pageRows) {
+				const key = `${row.base_token_id}:${row.quote_token_id}:${row.bucket_start}`;
+				if (seen.has(key)) continue;
+				seen.add(key);
+				rows.push(row);
+				buckets.add(row.bucket_start);
+			}
 			if (pageRows.length < PAGE_SIZE || buckets.size > bucketLimit) break;
 		}
 
