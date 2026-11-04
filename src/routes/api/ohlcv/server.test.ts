@@ -44,10 +44,11 @@ it('reads the newest rows first, in pages, ordered before the range is applied',
 
 it('orders by a total key so offset pages never skip or repeat tied rows', async () => {
 	await request('&limit=3');
-	expect(query.order.mock.calls.map((call) => call[0])).toEqual([
-		'bucket_start',
-		'base_token_id',
-		'quote_token_id'
+	// newest first on every key: the handler stops at the first bucket past the limit
+	expect(query.order.mock.calls).toEqual([
+		['bucket_start', { ascending: false }],
+		['base_token_id', { ascending: false }],
+		['quote_token_id', { ascending: false }]
 	]);
 });
 
