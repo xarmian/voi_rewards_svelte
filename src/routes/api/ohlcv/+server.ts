@@ -2,6 +2,7 @@ import { CACHE_TTL, publicCache } from '$lib/server/httpCache';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
+import { mergeCandleRows } from '$lib/server/ohlcvMerge';
 import type {
 	Resolution,
 	OHLCVRequest,
@@ -14,6 +15,10 @@ import type {
 const VOI_TOKEN_IDS = [0, 390001];
 // aUSDC can be represented by either token ID 302190 or 395614
 const AUSDC_TOKEN_IDS = [302190, 395614];
+
+// PostgREST's default max rows per request is 1000; each equivalent-id pair adds up to 4 rows per bucket.
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 9;
 
 const getEquivalentTokenIds = (tokenId: number): number[] => {
 	if (VOI_TOKEN_IDS.includes(tokenId)) return VOI_TOKEN_IDS;
@@ -131,27 +136,35 @@ export const GET: RequestHandler = async ({ url }) => {
 			query = query.eq('quote_token_id', finalQuoteTokenId);
 		}
 
-		const { data, error } = await query
-			.eq('resolution', resolution)
-			.gte('bucket_start', startTime.toISOString())
-			.lt('bucket_start', endTime.toISOString())
-			.order('bucket_start', { ascending: false })
-			.limit(Math.min(limit, 2000))
-			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
+		// Equivalent token ids can carry several rows per bucket, so `limit` counts buckets, not rows:
+		// read newest-first in pages until a bucket beyond the limit shows up (every row of the newest
+		// `limit` buckets has then been read) or the rows run out (TASK-142).
+		const bucketLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 2000) : 500;
+		const rows: PriceCandle[] = [];
+		const buckets = new Set<string>();
+		for (let page = 0; page < MAX_PAGES; page++) {
+			const { data, error } = await query
+				.eq('resolution', resolution)
+				.gte('bucket_start', startTime.toISOString())
+				.lt('bucket_start', endTime.toISOString())
+				.order('bucket_start', { ascending: false })
+				.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+				.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
-		if (error) {
-			return json({ error: `Failed to fetch OHLCV data: ${error.message}` }, { status: 500 });
+			if (error) {
+				return json({ error: `Failed to fetch OHLCV data: ${error.message}` }, { status: 500 });
+			}
+
+			const pageRows = (data ?? []) as PriceCandle[];
+			rows.push(...pageRows);
+			for (const row of pageRows) buckets.add(row.bucket_start);
+			if (pageRows.length < PAGE_SIZE || buckets.size > bucketLimit) break;
 		}
 
-		// Convert to chart format. Use quote volume so bars reflect the quote token.
-		const candles: OHLCVData[] = (data as PriceCandle[]).reverse().map((candle) => ({
-			time: Math.floor(new Date(candle.bucket_start).getTime() / 1000),
-			open: Number(candle.open),
-			high: Number(candle.high),
-			low: Number(candle.low),
-			close: Number(candle.close),
-			volume: Number(candle.volume_quote)
-		}));
+		// Newest `limit` buckets, merged to one candle each, ascending by time.
+		const newest = [...buckets].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+		const keep = new Set(newest.slice(0, bucketLimit));
+		const candles: OHLCVData[] = mergeCandleRows(rows.filter((row) => keep.has(row.bucket_start)));
 
 		const volumes: VolumeData[] = candles.map((candle) => ({
 			time: candle.time,
