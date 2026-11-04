@@ -99,11 +99,11 @@ it.each(['USD', 'VOI'] as const)(
 	async (quote) => {
 		const fetch = jsonFetch({ candles, volumes, error: 'ignored' }, 500);
 		const get = vi.fn(async () => null);
-		expect(await fetchTokenChartData(fetch, get, 7, '4h', quote)).toEqual({
-			data: candles,
-			volumes,
-			error: ''
-		});
+		expect(await fetchTokenChartData(fetch, get, 7, '4h', quote)).toEqual(
+			quote === 'USD'
+				? { error: 'USD prices are unavailable right now' }
+				: { data: candles, volumes, error: '' }
+		);
 		expect(fetch).toHaveBeenCalledWith(
 			'/api/ohlcv?baseTokenId=7&quoteTokenId=390001&resolution=4h&limit=240'
 		);
@@ -145,6 +145,25 @@ it('converts token candles and volumes using the reference data', async () => {
 		volumes: [{ time: 100, value: 0.02, color: undefined }],
 		error: ''
 	});
+});
+
+it.each([{ reference: null }, { reference: [] }])(
+	'returns an error for a USD request when the reference is unavailable ($reference)',
+	async ({ reference }) => {
+		const fetch = jsonFetch({ candles, volumes });
+		expect(await fetchTokenChartData(fetch, async () => reference, 7, '1h', 'USD')).toEqual({
+			error: 'USD prices are unavailable right now'
+		});
+	}
+);
+
+it('preserves the no-candles error for a USD request when the reference is unavailable', async () => {
+	const fetch = jsonFetch({ candles: [] });
+	const get = vi.fn(async () => null);
+	expect(await fetchTokenChartData(fetch, get, 7, '1h', 'USD')).toEqual({
+		error: 'No chart data available for this token'
+	});
+	expect(get).not.toHaveBeenCalled();
 });
 
 it('turns a token network error or a reference rejection into the existing generic error', async () => {

@@ -135,7 +135,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			.eq('resolution', resolution)
 			.gte('bucket_start', startTime.toISOString())
 			.lt('bucket_start', endTime.toISOString())
-			.order('bucket_start', { ascending: true })
+			.order('bucket_start', { ascending: false })
 			.limit(Math.min(limit, 2000))
 			.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS));
 
@@ -144,7 +144,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 
 		// Convert to chart format. Use quote volume so bars reflect the quote token.
-		const candles: OHLCVData[] = (data as PriceCandle[]).map((candle) => ({
+		const candles: OHLCVData[] = (data as PriceCandle[]).reverse().map((candle) => ({
 			time: Math.floor(new Date(candle.bucket_start).getTime() / 1000),
 			open: Number(candle.open),
 			high: Number(candle.high),
