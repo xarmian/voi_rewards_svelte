@@ -1593,6 +1593,7 @@
 {#if typeof walletAddress === 'string' && showSendVoiModal}
 	<svelte:component
 		this={SendTokenModal}
+		accountAddress={walletAddress}
 		bind:open={showSendVoiModal}
 		token={{
 			type: 'native',

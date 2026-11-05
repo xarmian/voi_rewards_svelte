@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import algosdk from 'algosdk';
 import ts from 'typescript';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
+import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
+import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 import { createFlowPin } from '$lib/chain/flowAccount';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
@@ -20,6 +22,8 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 		})
 		.join('\n');
 	const context = createContext({
+		signerMatchesAccount,
+		wrongSignerMessage,
 		buildPayment,
 		buildAssetTransfer,
 		buildCombinedPayment,
@@ -39,6 +43,7 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 function selectedWalletGlobals() {
 	const address = algosdk.generateAccount().addr.toString();
 	return {
+		accountAddress: address,
 		$selectedWallet: { address },
 		captureSigner: () => ({ address, walletId: 'pera' }),
 		flow: createFlowPin()
@@ -54,6 +59,7 @@ async function retryHarness(pinned: string, selected: string) {
 	const run = componentFunctions(['handleSend'], {
 		decimalToBaseUnits,
 		algosdk,
+		accountAddress: pinned,
 		$selectedWallet: { address: selected },
 		captureSigner: () => ({ address: selected, walletId: 'pera' }),
 		flow,
@@ -204,4 +210,56 @@ test('combined ARC-200 payments sum exact raw units', () => {
 	});
 	const groups = run('createOptimizedGroups(payments, [{}, {}])');
 	expect(groups[0][0].payment?.amount).toBe(9007199254740995n);
+});
+
+// Run real submit and native/VSA builders through signing with local network doubles.
+test.each(['native', 'vsa'])('%s send stays with the page account', async (type) => {
+	const page = algosdk.generateAccount().addr.toString();
+	const other = algosdk.generateAccount().addr.toString();
+	for (const accountAddress of [page, undefined]) {
+		for (const selected of [other, page]) {
+			const payment = vi.fn(buildPayment);
+			const asset = vi.fn(buildAssetTransfer);
+			const combined = vi.fn(buildCombinedPayment);
+			const signTransactions = vi.fn().mockResolvedValue([new Uint8Array([1])]);
+			const sendRawTransaction = vi.fn();
+			const sendGroups = vi.fn().mockResolvedValue(undefined);
+			const flow = createFlowPin();
+			const run = componentFunctions(
+				['handleSend', 'withinBalance', 'buildVOITransaction', 'buildVSATransaction'],
+				{
+					accountAddress, signerMatchesAccount, wrongSignerMessage,
+					$selectedWallet: { address: selected },
+					captureSigner: () => ({ address: selected, walletId: 'pera' }),
+					buildPayment: payment, buildAssetTransfer: asset, buildCombinedPayment: combined,
+					signTransactions, sendGroups, algosdk, decimalToBaseUnits, sumBaseUnits,
+					algodClient: { getTransactionParams: () => ({ do: async () => suggestedParams }), sendRawTransaction },
+					flow, tracker: {}, isSending: false, error: null, pinTick: 0,
+					pendingController: undefined, AbortController,
+					selectedToken: { type, id: '1', decimals: 6, symbol: 'TEST', balance: 2000000 },
+					recipients: [{ address: page, amount: '1' }],
+					isARC200Token: () => false, isNativeToken: () => type === 'native',
+					MAX_TXN_PER_GROUP: 16, MAX_GROUPS_PER_SIGNING: 16,
+					sendDeps: {}, createOutcomeHandler: vi.fn(), recordOutcome: vi.fn()
+				}
+			);
+			await run('handleSend()');
+			if (selected !== accountAddress) {
+				expect(run('error')).toBe(wrongSignerMessage(accountAddress));
+				for (const call of [payment, asset, combined, signTransactions, sendRawTransaction, sendGroups]) {
+					expect(call).not.toHaveBeenCalled();
+				}
+			} else {
+				expect(run('error')).toBeNull();
+				expect(type === 'native' ? payment : asset).toHaveBeenCalledWith(expect.objectContaining({ from: page }));
+				expect(signTransactions).toHaveBeenCalledWith(
+					[[(type === 'native' ? payment : asset).mock.results[0].value]],
+					{ address: page, walletId: 'pera' }
+				);
+				expect(sendGroups).toHaveBeenCalledOnce();
+				expect(run('showResults')).toBe(true);
+			}
+			flow.dispose();
+		}
+	}
 });

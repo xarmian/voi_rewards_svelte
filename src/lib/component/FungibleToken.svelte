@@ -839,6 +839,7 @@
 
 {#if showOptOutModal}
 	<OptOutModal
+		accountAddress={walletId}
 		bind:open={showOptOutModal}
 		{token}
 		onTokenOptedOut={() => {
@@ -849,6 +850,7 @@
 
 {#if showSendModal}
 	<SendTokenModal
+		accountAddress={walletId}
 		bind:open={showSendModal}
 		{token}
 		onTokenSent={() => {
