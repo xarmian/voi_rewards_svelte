@@ -54,12 +54,3 @@
 .markdown img {
 	@apply max-w-full h-auto;
 }
-
-/* avm-wallet-svelte positions its dropdown with left: 0 under the trigger, so a picker at the right
-   edge of the page opens off-screen. The wallet page's pickers carry avm-wallet-end and open
-   leftwards instead. Three classes outrank the library's scoped rule (.avm-wallet__dropdown plus its
-   svelte hash class) whatever the stylesheet order. */
-.avm-wallet.avm-wallet-end .avm-wallet__dropdown {
-	left: auto;
-	right: 0;
-}

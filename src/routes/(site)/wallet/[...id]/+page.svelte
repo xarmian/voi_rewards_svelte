@@ -334,7 +334,7 @@
 					url: 'https://voirewards.com',
 					icons: ['https://voirewards.com/android-chrome-192x192.png']
 				}}
-				class="avm-wallet-end bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+				class="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
 				allowWatchAccounts={true}
 				showSignInStatus={false}
 				displayMode="dropdown"
@@ -761,7 +761,7 @@
 							url: 'https://voirewards.com',
 							icons: ['https://voirewards.com/android-chrome-192x192.png']
 						}}
-						class="avm-wallet-end bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
+						class="bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
 						allowWatchAccounts={true}
 						showSignInStatus={false}
 						displayMode="dropdown"
@@ -837,3 +837,15 @@
 		</div>
 	</main>
 </div>
+
+<style>
+	/* avm-wallet-svelte opens its dropdown with left: 0 under the trigger. This page puts its two
+	   pickers at the right edge (the page header and the sidebar), so the panel ran off-screen at 1440
+	   and at 390 wide. Open them leftwards. The selector hangs off this page's own wrappers, which
+	   Svelte scopes to this component, so it reaches the pickers this page places and not the vanity
+	   page's, even while this stylesheet stays loaded after a client-side navigation. */
+	div:has(> :global(.avm-wallet)) :global(.avm-wallet__dropdown) {
+		left: auto;
+		right: 0;
+	}
+</style>
