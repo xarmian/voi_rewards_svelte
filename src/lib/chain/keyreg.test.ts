@@ -8,6 +8,7 @@ import {
 	keyregAccount,
 	keyregFee,
 	keyregSubmitError,
+	mayHaveLanded,
 	parseKeyregInput,
 	KeyregUnconfirmedError,
 	sendWalletKeyreg
@@ -500,5 +501,60 @@ describe('incentive opt-in (TASK-68)', () => {
 			buildWalletKeyregTxn({ params, sender: address, ...keys, fee: incentiveKeyregFee(on) });
 		expect(build(true).fee).toBe(2000000n);
 		expect(build(false).fee).toBe(1000n);
+	});
+});
+
+// The v2 wallet library submits and confirms inside signAndSend, so it reports a failed wait as a
+// submission error with one state per group (TASK-138). A group that may have landed must not read as
+// a plain failure, or the user retries and registers the keys twice.
+describe('sendWalletKeyreg with the library submission error', () => {
+	const submissionError = (state: string) =>
+		Object.assign(new Error('Submission failed at group 0: timeout'), {
+			code: 'SIGNER_SUBMISSION_FAILED',
+			groups: [{ index: 0, txIds: ['T'], state }]
+		});
+
+	it('reports a submitted-unconfirmed group as unconfirmed, naming the local transaction id', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const signAndSend = vi.fn().mockRejectedValue(submissionError('submitted-unconfirmed'));
+		const waitForConfirmation = vi.fn();
+		const outcome = await sendWalletKeyreg(tx, { signAndSend, waitForConfirmation }).catch(
+			(error) => error
+		);
+		expect(outcome).toBeInstanceOf(KeyregUnconfirmedError);
+		expect(outcome.txid).toBe(tx.txID());
+		expect(waitForConfirmation).not.toHaveBeenCalled();
+	});
+
+	it('keeps a not-sent group as the original failure, so a retry stays possible', async () => {
+		const tx = buildWalletKeyregTxn({ params, sender: address, ...keys });
+		const error = submissionError('not-sent');
+		const signAndSend = vi.fn().mockRejectedValue(error);
+		await expect(sendWalletKeyreg(tx, { signAndSend, waitForConfirmation: vi.fn() })).rejects.toBe(
+			error
+		);
+	});
+
+	it('does not mistake other errors for an unconfirmed send', () => {
+		for (const error of [
+			new Error('plain'),
+			Object.assign(new Error('x'), { code: 'SIGNER_DISCONNECTED' }),
+			Object.assign(new Error('x'), { code: 'SIGNER_SUBMISSION_FAILED' }),
+			Object.assign(new Error('x'), { code: 'SIGNER_SUBMISSION_FAILED', groups: [null] }),
+			null,
+			'text'
+		])
+			expect(mayHaveLanded(error)).toBe(false);
+	});
+
+	it('treats any submitted-unconfirmed group in a multi-group failure as possibly landed', () => {
+		const error = Object.assign(new Error('x'), {
+			code: 'SIGNER_SUBMISSION_FAILED',
+			groups: [
+				{ index: 0, txIds: ['A'], state: 'confirmed' },
+				{ index: 1, txIds: ['B'], state: 'submitted-unconfirmed' }
+			]
+		});
+		expect(mayHaveLanded(error)).toBe(true);
 	});
 });

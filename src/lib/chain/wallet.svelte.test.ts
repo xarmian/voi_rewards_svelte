@@ -22,11 +22,36 @@ import {
 	connectedWallets,
 	selectWallet,
 	selectedWallet,
+	SignerSubmissionError,
 	type Wallet
 } from './wallet.svelte';
+import { mayHaveLanded } from './keyreg';
 
 const A = 'A'.repeat(58);
 const B = 'B'.repeat(58);
+
+// keyreg.ts recognises a send that may have landed by the shape of the library's error, so it stays
+// free of the library. This pins that shape against the real class: a library change that renames
+// the code or the group states fails here instead of silently turning "may have landed" into a plain
+// failure that invites a double registration.
+describe("the library's submission error, as keyreg reads it", () => {
+	const group = (state: 'confirmed' | 'submitted-unconfirmed' | 'not-sent') => ({
+		index: 0,
+		txIds: ['T'],
+		state
+	});
+
+	it('reads a submitted-unconfirmed group as possibly landed', () => {
+		const error = new SignerSubmissionError(0, [group('submitted-unconfirmed')], new Error('t'));
+		expect(error.code).toBe('SIGNER_SUBMISSION_FAILED');
+		expect(mayHaveLanded(error)).toBe(true);
+	});
+
+	it('reads a not-sent group as an ordinary failure', () => {
+		const error = new SignerSubmissionError(0, [group('not-sent')], new Error('rejected'));
+		expect(mayHaveLanded(error)).toBe(false);
+	});
+});
 
 function account(address: string, walletId: 'pera' | 'defly' | 'watch', name?: string) {
 	return { address, walletId, authenticated: false, isWatch: walletId === 'watch', name };

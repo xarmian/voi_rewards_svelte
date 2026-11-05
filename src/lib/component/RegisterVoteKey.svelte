@@ -15,6 +15,7 @@
 		keyregAccount,
 		keyregFee as walletKeyregFee,
 		isKeyregUri,
+		keyregSendFailure,
 		keyregSubmitError,
 		MIN_KEYREG_FEE,
 		parseKeyregInput,
@@ -266,7 +267,13 @@
 
 			transactionStatus = 'submitting';
 
-			const result = await signAndSendTransactions([txns], signer);
+			let result;
+			try {
+				result = await signAndSendTransactions([txns], signer);
+			} catch (sendError) {
+				// The library confirms inside the call: a wait that failed may still have landed.
+				throw keyregSendFailure(sendError, txid);
+			}
 			if (result) {
 				transactionStatus = 'success';
 				transactionId = txid;
@@ -435,7 +442,13 @@
 
 			transactionStatus = 'submitting';
 
-			const result = await signAndSendTransactions([txns], signer);
+			let result;
+			try {
+				result = await signAndSendTransactions([txns], signer);
+			} catch (sendError) {
+				// The library confirms inside the call: a wait that failed may still have landed.
+				throw keyregSendFailure(sendError, txid);
+			}
 			if (result) {
 				transactionStatus = 'success';
 				transactionId = txid;
