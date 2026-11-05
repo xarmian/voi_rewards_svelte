@@ -40,3 +40,19 @@ test('the theme darkens under the class this app toggles on the root element', (
 	expect(read(`${libraryDist}styles/theme.css`)).toMatch(/^\.dark,/m);
 	expect(read('src/app.html')).toContain("classList.toggle('dark'");
 });
+
+// The library opens its dropdown with left: 0 under the trigger. The wallet page puts its pickers at
+// the right edge (page header and sidebar), so the panel ran off-screen at 1440 and at 390 wide.
+test('the wallet page pickers open leftwards, so the dropdown stays on screen', () => {
+	const page = read('src/routes/(site)/wallet/[...id]/+page.svelte');
+	const pickers = page.match(/<Web3Wallet\b/g)?.length ?? 0;
+	expect(pickers).toBeGreaterThan(0);
+	expect(page.match(/class="avm-wallet-end [^"]*"/g)).toHaveLength(pickers);
+
+	const css = read('src/app.css');
+	// Three classes, so it outranks the library's scoped rule in any stylesheet order.
+	const rule = css.match(/^\.avm-wallet\.avm-wallet-end \.avm-wallet__dropdown \{([^}]*)\}/m);
+	expect(rule, 'the global rule exists').not.toBeNull();
+	expect(rule?.[1]).toMatch(/left:\s*auto;/);
+	expect(rule?.[1]).toMatch(/right:\s*0;/);
+});

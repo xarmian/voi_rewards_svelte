@@ -334,7 +334,7 @@
 					url: 'https://voirewards.com',
 					icons: ['https://voirewards.com/android-chrome-192x192.png']
 				}}
-				class="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+				class="avm-wallet-end bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
 				allowWatchAccounts={true}
 				showSignInStatus={false}
 				displayMode="dropdown"
@@ -761,7 +761,7 @@
 							url: 'https://voirewards.com',
 							icons: ['https://voirewards.com/android-chrome-192x192.png']
 						}}
-						class="bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
+						class="avm-wallet-end bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
 						allowWatchAccounts={true}
 						showSignInStatus={false}
 						displayMode="dropdown"
