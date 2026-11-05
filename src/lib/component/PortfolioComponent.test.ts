@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, test, vi } from 'vitest';
+import { canSignFor } from '$lib/chain/signerGate';
 
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 
@@ -13,6 +14,8 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 		.replace(/export let /g, 'let ');
 	const error = vi.fn();
 	const context = createContext({
+		canSignFor,
+		$selectedWallet: undefined,
 		$voiPrice: { price: 0 },
 		browser: false,
 		console: { error },
