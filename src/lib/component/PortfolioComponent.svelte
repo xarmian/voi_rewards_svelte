@@ -180,6 +180,7 @@
 		// module-level store for every later render.
 		if (browser && walletAddress && walletAddress !== lastInitializedWallet) {
 			lastInitializedWallet = walletAddress;
+			showSendVoiModal = false;
 			fungibleTokens = [];
 			lastTokenPrice = 0;
 			tokensPrice = 0;
