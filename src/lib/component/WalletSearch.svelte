@@ -13,7 +13,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { SearchOutline } from 'flowbite-svelte-icons';
 	import { debounce } from 'lodash-es';
-	import { connectedWallets } from 'avm-wallet-svelte';
+	import { connectedWallets } from '$lib/chain/wallet.svelte';
 	import NameAvatar from './NameAvatar.svelte';
 
 	export let searchText = '';
@@ -151,7 +151,7 @@
 			.map((address) => ({
 				address,
 				name:
-					$connectedWallets.find((w) => w.address === address)?.envoiName ||
+					$connectedWallets.find((w) => w.address === address)?.name ||
 					address.slice(0, 8) + '...' + address.slice(-8),
 				metadata: {},
 				cached: true

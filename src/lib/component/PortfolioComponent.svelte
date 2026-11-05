@@ -14,7 +14,8 @@
 	import { config } from '$lib/config';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
+	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
@@ -23,7 +24,6 @@
 	import StakingComponent from './ui/StakingComponent.svelte';
 	import { fetchFungibleTokens } from '$lib/services/accounts';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
-	import { signTransactions } from 'avm-wallet-svelte';
 	import algosdk from 'algosdk';
 	export let parentWalletAddress: string | null = null;
 	export let walletAddress: string | undefined = undefined;
@@ -613,14 +613,38 @@
 	let isBulkClaiming = false;
 	let bulkClaimProgress = 0;
 	let bulkClaimError: string | null = null;
-	let bulkClaimResults: Array<{ success: boolean; tokenName: string; error?: string }> = [];
+	let bulkClaimResults: Array<{
+		success: boolean;
+		tokenName: string;
+		wallet: string;
+		error?: string;
+	}> = [];
 
 	async function bulkClaimAllTokens() {
-		if (!canSignTransactions || isBulkClaiming || !walletAddress || !$selectedWallet?.address) {
+		if (isBulkClaiming || !walletAddress) return;
+		const selected = $selectedWallet;
+		if (selected?.address !== walletAddress || !selected.app || selected.app === 'Watch') {
+			bulkClaimError = `Select account ${walletAddress} in a signing wallet to continue.`;
 			return;
 		}
 
-		const claimAccount = walletAddress;
+		// The account the user confirmed. Every batch signs as it, wherever the picker goes. The store
+		// above can lag the rune store by a tick, so the capture can still refuse: show it.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			bulkClaimError = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		// The claims below are built for the account this page shows, from its approvals. If the rune
+		// store moved while the readable one still showed it, the signer is another account: refuse,
+		// since a transfer built from the signer's address would not be the claim the user confirmed.
+		if (signer.address !== walletAddress) {
+			bulkClaimError = `Select account ${walletAddress} in a signing wallet to continue.`;
+			return;
+		}
+		const claimAccount = signer.address;
 		isBulkClaiming = true;
 		bulkClaimProgress = 0;
 		bulkClaimError = null;
@@ -734,18 +758,10 @@
 					// Assign a new group ID to all transactions in this batch
 					const grouped = algosdk.assignGroupID(batch.transactions);
 
-					// Sign all transactions at once
-					if ($selectedWallet?.address !== claimAccount) {
-						bulkClaimError = `Your selected account changed during the claim, so it stopped before the next batch. Select ${claimAccount} to continue.`;
-						break;
-					}
-					const signedTxns = await signTransactions([grouped]);
+					// Sign all transactions at once, as the captured account
+					const signedTxns = await signTransactions([grouped], signer);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
-					}
-					if ($selectedWallet?.address !== claimAccount) {
-						bulkClaimError = `Your selected account changed while signing, so this batch was not sent. Select ${claimAccount} to continue.`;
-						break;
 					}
 
 					// Submit the signed transactions
@@ -758,7 +774,8 @@
 					batch.tokens.forEach(({ token }) => {
 						bulkClaimResults.push({
 							success: true,
-							tokenName: token.name
+							tokenName: token.name,
+							wallet: claimAccount
 						});
 					});
 
@@ -770,9 +787,24 @@
 						bulkClaimResults.push({
 							success: false,
 							tokenName: token.name,
+							wallet: claimAccount,
 							error: error instanceof Error ? error.message : 'Batch failed'
 						});
 					});
+
+					// A signer error (disconnected wallet, watch-only account, sender mismatch, or a wallet
+					// that returned the wrong signatures) will not clear on the next batch, and each retry
+					// would prompt the user again: stop, and show the library's message.
+					if (
+						typeof error === 'object' &&
+						error !== null &&
+						'code' in error &&
+						typeof error.code === 'string' &&
+						error.code.startsWith('SIGNER_')
+					) {
+						bulkClaimError = error instanceof Error ? error.message : 'Batch failed';
+						break;
+					}
 
 					// If user cancelled, stop the entire process
 					if (error instanceof Error && error.message.includes('rejected')) {

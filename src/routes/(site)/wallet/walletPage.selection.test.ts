@@ -15,19 +15,21 @@ describe('wallet page selection wiring (TASK-132)', () => {
 	});
 
 	test('navigation on a user pick comes from the library pick event through pickNavigation', () => {
-		expect(source).toMatch(/setOnSelectHandler\s*\(/);
-		expect(source).toMatch(/pickNavigation\s*\(/);
+		expect(source).not.toMatch(/setOnSelectHandler/);
+		const handler = source.slice(source.indexOf('function handleAccountPicked'));
+		expect(handler.slice(0, handler.indexOf('\n\t}\n'))).toMatch(/pickNavigation\s*\(/);
 	});
 
 	test('the one route-to-selection write goes through selectionFromRoute, in initializeWallet only', () => {
 		expect(source.match(/selectionFromRoute\s*\(/g)?.length).toBe(1);
-		expect(source.match(/selectedWallet\.set\s*\(/g)?.length).toBe(1);
+		expect(source.match(/selectWallet\s*\(/g)?.length).toBe(1);
+		expect(source).not.toMatch(/selectedWallet\.set\s*\(/);
 		const update = source.slice(
 			source.indexOf('const updateAccountInfo'),
 			source.indexOf('async function initializeWallet')
 		);
 		expect(update.length).toBeGreaterThan(0);
-		expect(update).not.toMatch(/selectedWallet\.set|selectionFromRoute/);
+		expect(update).not.toMatch(/selectWallet|selectionFromRoute/);
 	});
 
 	test('the pick handler and the route write both check the live pin count', () => {
@@ -45,7 +47,9 @@ describe('wallet page selection wiring (TASK-132)', () => {
 		}
 	});
 
-	test('the pick handler is removed again when the page is destroyed', () => {
-		expect(source).toMatch(/setOnSelectHandler\s*\(\s*\(\)\s*=>\s*\{\s*\}\s*\)/);
+	test('every wallet picker on the page reports its picks to the one handler', () => {
+		const pickers = source.match(/<Web3Wallet\b/g)?.length;
+		expect(pickers).toBeGreaterThan(0);
+		expect(source.match(/onAccountPicked=\{handleAccountPicked\}/g)?.length).toBe(pickers);
 	});
 });

@@ -2,7 +2,12 @@
 	import type { ContractDetails } from '$lib/types';
 	import { microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
 	import { abi, CONTRACT } from 'ulujs';
-	import { selectedWallet, signTransactions } from 'avm-wallet-svelte';
+	import {
+		selectedWallet,
+		signTransactions,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import { canOfferWithdraw, sendWithdrawal } from '$lib/chain/withdrawSend';
 	import { explainWait, minutesUntilExpiry } from '$lib/chain/withdrawalWait';
@@ -226,11 +231,19 @@
 	}
 
 	async function handleWithdraw() {
-		const wallet = $selectedWallet?.address;
-		if (!wallet) {
+		if (!$selectedWallet?.address) {
 			error = 'Connect a wallet to withdraw';
 			return;
 		}
+		// The account the user confirmed; it signs and keys the hold, wherever the picker goes.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			error = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		const wallet = signer.address;
 		if (!canOfferWithdraw({ status: txStatus, wallet, contractId: contract.contractId })) {
 			recordTick++;
 			return;
@@ -321,9 +334,8 @@
 			const outcome = await sendWithdrawal(
 				{ wallet, contractId: contract.contractId, txns },
 				{
-					sign: signTransactions,
-					send: sendDeps,
-					currentWallet: () => $selectedWallet?.address
+					sign: (groups) => signTransactions(groups, signer),
+					send: sendDeps
 				}
 			);
 			txId = 'txId' in outcome ? outcome.txId : null;

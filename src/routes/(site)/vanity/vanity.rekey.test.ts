@@ -19,6 +19,8 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 	}));
 	const context = createContext({
 		$selectedWallet: { address: funder, app: 'Pera' },
+		// The account captured at confirmation; the picker switching below must not change it.
+		signer: Object.freeze({ address: funder, walletId: 'pera' }),
 		plan: { funder, rekeyTo: funder, vanity },
 		result: { address: vanity, mnemonic: 'test mnemonic' },
 		isActivating: false,
@@ -48,10 +50,12 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		}).outputText,
 		context
 	);
-	const activation = runInContext('activateVanityAddress(plan)', context);
+	const activation = runInContext('activateVanityAddress(plan, signer)', context);
 	await vi.waitFor(() => expect(context.signTransactions).toHaveBeenCalledOnce());
 	signing.resolve([new Uint8Array()]);
 	await activation;
+	// The picker moved to another account while the prompt was open; the funder still signed.
+	expect(context.signTransactions.mock.calls[0][1]).toEqual({ address: funder, walletId: 'pera' });
 	expect(makePayment).toHaveBeenCalledTimes(2);
 	expect(makePayment.mock.calls[0][0]).toMatchObject({ from: funder, to: vanity });
 	expect(makePayment.mock.calls[1][0]).toMatchObject({
@@ -77,9 +81,20 @@ test('activation opens a cancellable review of full addresses before confirming 
 	expect(source).toContain('Your selected account changed. Review again.');
 	expect(source).toContain('selectionDrifted(plan, $selectedWallet)');
 	expect(source).toMatch(/disabled=\{reviewDrifted\}/);
-	expect(fn('confirmActivation')).toContain('activateVanityAddress(plan)');
+	expect(fn('confirmActivation')).toContain('activateVanityAddress(plan, signer)');
 	expect(fn('confirmActivation')).toContain('reviewDrifted');
 	expect(fn('cancelActivation')).toContain('plan = null');
+});
+
+test('Confirm signs as the account captured at confirmation, and only if it is the reviewed funder', () => {
+	const confirm = fn('confirmActivation');
+	const capture = confirm.indexOf('captureSigner()');
+	const funderCheck = confirm.indexOf('signer.address !== plan.funder');
+	const activate = confirm.indexOf('activateVanityAddress(plan, signer)');
+	expect(capture, 'the signer is taken at confirmation').toBeGreaterThan(-1);
+	expect(funderCheck, 'a different account counts as drift').toBeGreaterThan(capture);
+	expect(activate).toBeGreaterThan(funderCheck);
+	expect(fn('activateVanityAddress')).toContain('signTransactions([[unsignedTxn]], signer)');
 });
 
 test('Confirm re-checks the live selection itself, not only the reactive flag', () => {
@@ -87,7 +102,7 @@ test('Confirm re-checks the live selection itself, not only the reactive flag', 
 	// click must still stop the activation.
 	const confirm = fn('confirmActivation');
 	const recheck = confirm.indexOf('selectionDrifted(plan, $selectedWallet)');
-	const activate = confirm.indexOf('activateVanityAddress(plan)');
+	const activate = confirm.indexOf('activateVanityAddress(plan, signer)');
 	expect(recheck, 'confirmActivation must call selectionDrifted itself').toBeGreaterThan(-1);
 	expect(recheck, 'the re-check must come before the activation starts').toBeLessThan(activate);
 	expect(confirm).toContain('reviewDrifted = true');

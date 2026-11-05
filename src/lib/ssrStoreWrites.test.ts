@@ -52,7 +52,10 @@ async function storeSnapshot() {
 }
 
 // A fresh module graph per case: the wallet components import algosdk and the wallet libraries cold.
-const test = (name: string, fn: () => Promise<void>) => baseTest(name, fn, 60_000);
+// The wallet-page case alone takes 13 to 16 seconds on an idle box and 25 to 50 inside a full
+// parallel run, so 60 seconds timed out twice in three full runs on a loaded one (TASK-149). The
+// bound is a time limit, not an assertion: every case still has to finish its render and its checks.
+const test = (name: string, fn: () => Promise<void>) => baseTest(name, fn, 180_000);
 
 let fetchSpy: ReturnType<typeof vi.fn>;
 

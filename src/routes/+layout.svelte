@@ -2,6 +2,10 @@
 	// import need to init tailwind
 	import '../app.css';
 	import '@fortawesome/fontawesome-free/css/all.min.css';
+	// avm-wallet-svelte 3 colours its components through --avm-* variables that only this stylesheet
+	// defines (light, and dark under the .dark class this app toggles on <html>). Without it the wallet
+	// picker, account list and modals render with no colours, backgrounds or borders.
+	import 'avm-wallet-svelte/styles/theme.css';
 	import lato700 from '@fontsource/lato/files/lato-latin-700-normal.woff2?url';
 	import lato900 from '@fontsource/lato/files/lato-latin-900-normal.woff2?url';
 	import { page } from '$app/stores';

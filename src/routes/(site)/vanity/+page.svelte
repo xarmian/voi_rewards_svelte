@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Web3Wallet, signTransactions, selectedWallet } from 'avm-wallet-svelte';
+	import { Web3Wallet } from 'avm-wallet-svelte';
+	import {
+		signTransactions,
+		selectedWallet,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
 	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
@@ -346,12 +352,24 @@
 			reviewDrifted = true;
 			return;
 		}
+		// The account the user confirmed. It must be the reviewed funder, wallet and all.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+			return;
+		}
+		if (signer.address !== plan.funder) {
+			reviewDrifted = true;
+			return;
+		}
 		reviewOpen = false;
-		await activateVanityAddress(plan);
+		await activateVanityAddress(plan, signer);
 	}
 
 	// Send 1 VOI from the reviewed account, then rekey to that same account.
-	async function activateVanityAddress(plan: VanityPlan) {
+	async function activateVanityAddress(plan: VanityPlan, signer: TransactionSigner) {
 		isActivating = true;
 		txnStatus = 'sending';
 		txnError = null;
@@ -370,7 +388,7 @@
 			});
 
 			// Ask user to sign the transaction
-			const signedTxns = await signTransactions([[unsignedTxn]]);
+			const signedTxns = await signTransactions([[unsignedTxn]], signer);
 
 			// Send the signed transaction to the network
 			const { txid: txId } = await algodClient.sendRawTransaction(signedTxns).do();
@@ -667,26 +685,19 @@
 						</h5>
 
 						<Web3Wallet
-							availableWallets={[
-								'WalletConnect',
-								'Kibisis',
-								'LuteWallet',
-								'Biatec Wallet',
-								'VoiWallet'
-							]}
-							walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+							enabledWallets={['walletconnect', 'kibisis', 'lute', 'biatec', 'voiwallet']}
+							class="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
 							allowWatchAccounts={false}
-							showAuthenticated={false}
-							modalType="dropdown"
-							showAuthButtons={false}
+							showSignInStatus={false}
+							displayMode="dropdown"
 							{algodClient}
 							indexerClient={algodIndexer}
-							wcProject={{
+							wcConfig={{
 								projectId: wcProjectId,
-								projectName: 'Voi Rewards Auditor',
-								projectDescription: 'Voi Rewards Auditor',
-								projectUrl: 'https://voirewards.com',
-								projectIcons: ['https://voirewards.com/android-chrome-192x192.png']
+								name: 'Voi Rewards Auditor',
+								description: 'Voi Rewards Auditor',
+								url: 'https://voirewards.com',
+								icons: ['https://voirewards.com/android-chrome-192x192.png']
 							}}
 						/>
 						{#if plan}

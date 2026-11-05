@@ -9,10 +9,9 @@
 	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { calculateUserPoolAmounts, calculateUserPoolShare } from '$lib/tokens/lpStats';
 	import { algodClient } from '$lib/utils/algod';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
-	import { signTransactions } from 'avm-wallet-svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -199,6 +198,8 @@
 		}
 
 		try {
+			// The account the user confirmed, taken before any await.
+			const signer = captureSigner();
 			claimingApproval = approval.transactionId;
 			claimingError = null;
 			claimSuccess = false;
@@ -217,7 +218,7 @@
 				amount,
 				walletId,
 				async (txnsToSign: algosdk.Transaction[]) => {
-					const signedTxns = await signTransactions([txnsToSign]);
+					const signedTxns = await signTransactions([txnsToSign], signer);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
 					}

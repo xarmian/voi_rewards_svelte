@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ContractDetails } from '$lib/types';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet } from '$lib/chain/wallet.svelte';
 
 	export let contract: ContractDetails;
 	export let onWithdrawClick: (contract: ContractDetails) => void;

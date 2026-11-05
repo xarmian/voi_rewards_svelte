@@ -9,8 +9,8 @@ test('withdraw signs separately and uses the recorded send flow and wait estimat
 	);
 	for (const name of ['sendWithdrawal', 'minutesUntilExpiry'])
 		expect(source, `${name} must be imported and used`).toMatch(new RegExp(`\\b${name}\\(`));
-	expect(source, 'Signing must be delegated to signTransactions').toMatch(
-		/sign:\s*signTransactions/
+	expect(source, 'Signing must be delegated to signTransactions, as the captured signer').toMatch(
+		/sign:\s*\(groups\) => signTransactions\(groups, signer\)/
 	);
 	expect(source, 'A missing wallet must be rejected before building').toMatch(
 		/Connect a wallet to withdraw[\s\S]*new CONTRACT\(/
