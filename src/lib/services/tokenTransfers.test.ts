@@ -241,6 +241,26 @@ describe('fetchTokenTransfers', () => {
 		const vsa = await fetchTokenTransfers({ token: { ...token, type: 'vsa' }, walletId: 'wallet' });
 		expect(vsa.transfers[0].amount).toBe('90071992547409.93');
 	});
+	it.each([
+		[0, 9007199254740993n, '9007199254740993'],
+		[0, 200n, '200'],
+		[6, 0n, '0'],
+		[6, 5n, '0.000005'],
+		[2, 100n, '1'],
+		[2, 150n, '1.5']
+	] as const)('scales %i decimals of %s base units to %s', async (decimals, amount, expected) => {
+		query.do.mockResolvedValue({
+			transactions: [
+				{
+					...transaction,
+					txType: 'pay',
+					paymentTransaction: { receiver: 'other', amount }
+				}
+			]
+		});
+		const result = await fetchTokenTransfers({ token: { ...token, decimals }, walletId: 'wallet' });
+		expect(result.transfers[0].amount).toBe(expected);
+	});
 	it.each(['vsa', 'native'] as const)(
 		'retains the original %s cursor when the page fails',
 		async (type) => {
