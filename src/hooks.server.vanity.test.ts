@@ -30,7 +30,7 @@ test.each(['/vanity', '/vanity/nested'])(
 		const nonce = policy.match(/'nonce-([A-Za-z0-9+/]{22}==)'/)?.[1];
 		expect(nonce).toBeDefined();
 		expect(setHeaders).toHaveBeenCalledWith({
-			'content-security-policy': `script-src 'self' 'nonce-${nonce}'; worker-src 'self'; object-src 'none'; base-uri 'self'`
+			'content-security-policy': `script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'`
 		});
 		expect(resolve).toHaveBeenCalledOnce();
 		const options = resolve.mock.calls[0][1];

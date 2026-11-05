@@ -26,10 +26,18 @@ test('creates a base64 nonce from sixteen cryptographically random bytes', () =>
 	expect(random.mock.calls[0][0]?.byteLength).toBe(16);
 });
 
-test('allows only local scripts and workers plus nonce-bearing inline scripts', () => {
+test('allows only local scripts, stylesheets and workers plus nonce-bearing inline scripts', () => {
 	expect(vanityCsp('test-nonce')).toBe(
-		"script-src 'self' 'nonce-test-nonce'; worker-src 'self'; object-src 'none'; base-uri 'self'"
+		"script-src 'self' 'nonce-test-nonce'; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'"
 	);
+});
+
+test('lets no remote stylesheet through: style-src names no host', () => {
+	const style = vanityCsp('n')
+		.split('; ')
+		.find((part) => part.startsWith('style-src '));
+	expect(style).toBe("style-src 'self' 'unsafe-inline'");
+	expect(style).not.toMatch(/https?:|\*/);
 });
 
 test('nonces theme, recaptcha and bootstrap inline scripts while preserving existing attributes', () => {

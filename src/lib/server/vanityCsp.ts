@@ -7,7 +7,7 @@ export function newNonce(): string {
 }
 
 export function vanityCsp(nonce: string): string {
-	return `script-src 'self' 'nonce-${nonce}'; worker-src 'self'; object-src 'none'; base-uri 'self'`;
+	return `script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'`;
 }
 
 export function nonceInlineScripts(html: string, nonce: string): string {
