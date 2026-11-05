@@ -1589,9 +1589,14 @@
 							</div>
 						</div>
 					{/if}
-					<p class="text-sm text-gray-500 dark:text-gray-400">Signing account: {$selectedWallet?.address}</p>
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						Signing account: {$selectedWallet?.address}
+					</p>
 					{#if $selectedWallet?.address !== accountAddress}
-						<div role="alert" class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg">
+						<div
+							role="alert"
+							class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg"
+						>
 							{wrongSignerMessage(accountAddress)}
 						</div>
 					{/if}
@@ -1621,7 +1626,9 @@
 								color="blue"
 								class="flex-1 sm:flex-none"
 								on:click={handleSend}
-								disabled={!canSubmit || txState !== 'idle' || $selectedWallet?.address !== accountAddress}
+								disabled={!canSubmit ||
+									txState !== 'idle' ||
+									$selectedWallet?.address !== accountAddress}
 							>
 								{#if txState === 'building'}
 									<svg

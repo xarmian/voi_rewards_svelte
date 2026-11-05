@@ -10,7 +10,9 @@ test('signing availability reacts to both the selection and the page account', (
 });
 
 test('portfolio initialization does not assign signing availability', () => {
-	const block = source.match(/lastInitializedWallet = walletAddress;[\s\S]*?initializePortfolio\(\);/);
+	const block = source.match(
+		/lastInitializedWallet = walletAddress;[\s\S]*?initializePortfolio\(\);/
+	);
 	expect(block).not.toBeNull();
 	expect(block?.[0]).not.toMatch(/canSignTransactions\s*=/);
 });

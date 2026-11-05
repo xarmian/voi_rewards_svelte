@@ -19,7 +19,9 @@ test('pins the captured sender before any asynchronous work', () => {
 
 test('reacts to pin changes and holds the tracker on A after selection switches to B', async () => {
 	const reaction = trackerReaction();
-	expect(reaction).toContain('syncTracker(open, flow.current(accountAddress ?? $selectedWallet?.address))');
+	expect(reaction).toContain(
+		'syncTracker(open, flow.current(accountAddress ?? $selectedWallet?.address))'
+	);
 	const { createFlowPin } = await import('../chain/flowAccount');
 	const flow = createFlowPin();
 	const syncTracker = vi.fn();
@@ -47,7 +49,9 @@ test('reacts to pin changes and holds the tracker on A after selection switches 
 test('keeps balance reads with the flow account and ignores selection changes while pinned', () => {
 	expect(source).toContain('!flow.pinned');
 	expect(source).toMatch(/requireAccountInfo\(address, \{ force: true \}\)/);
-	expect(source).toContain('const address = flow.current(accountAddress ?? $selectedWallet?.address)');
+	expect(source).toContain(
+		'const address = flow.current(accountAddress ?? $selectedWallet?.address)'
+	);
 });
 
 test('releases on idle/reset and external close, retaining the account through pending results', () => {
@@ -70,8 +74,12 @@ test('shows the pinned sender near the transfer status', () => {
 test('the unpinned tracker follows the page account even when selection changes', () => {
 	const syncTracker = vi.fn();
 	const context = createContext({
-		accountAddress: 'Y', $selectedWallet: { address: 'X' },
-		flow: { current: (address: string) => address }, syncTracker, open: true, pinTick: 0
+		accountAddress: 'Y',
+		$selectedWallet: { address: 'X' },
+		flow: { current: (address: string) => address },
+		syncTracker,
+		open: true,
+		pinTick: 0
 	});
 	runInContext(ts.transpileModule(trackerReaction(), {}).outputText, context);
 	expect(syncTracker).toHaveBeenCalledWith(true, 'Y');

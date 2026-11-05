@@ -228,30 +228,59 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 			const run = componentFunctions(
 				['handleSend', 'withinBalance', 'buildVOITransaction', 'buildVSATransaction'],
 				{
-					accountAddress, signerMatchesAccount, wrongSignerMessage,
+					accountAddress,
+					signerMatchesAccount,
+					wrongSignerMessage,
 					$selectedWallet: { address: selected },
 					captureSigner: () => ({ address: selected, walletId: 'pera' }),
-					buildPayment: payment, buildAssetTransfer: asset, buildCombinedPayment: combined,
-					signTransactions, sendGroups, algosdk, decimalToBaseUnits, sumBaseUnits,
-					algodClient: { getTransactionParams: () => ({ do: async () => suggestedParams }), sendRawTransaction },
-					flow, tracker: {}, isSending: false, error: null, pinTick: 0,
-					pendingController: undefined, AbortController,
+					buildPayment: payment,
+					buildAssetTransfer: asset,
+					buildCombinedPayment: combined,
+					signTransactions,
+					sendGroups,
+					algosdk,
+					decimalToBaseUnits,
+					sumBaseUnits,
+					algodClient: {
+						getTransactionParams: () => ({ do: async () => suggestedParams }),
+						sendRawTransaction
+					},
+					flow,
+					tracker: {},
+					isSending: false,
+					error: null,
+					pinTick: 0,
+					pendingController: undefined,
+					AbortController,
 					selectedToken: { type, id: '1', decimals: 6, symbol: 'TEST', balance: 2000000 },
 					recipients: [{ address: page, amount: '1' }],
-					isARC200Token: () => false, isNativeToken: () => type === 'native',
-					MAX_TXN_PER_GROUP: 16, MAX_GROUPS_PER_SIGNING: 16,
-					sendDeps: {}, createOutcomeHandler: vi.fn(), recordOutcome: vi.fn()
+					isARC200Token: () => false,
+					isNativeToken: () => type === 'native',
+					MAX_TXN_PER_GROUP: 16,
+					MAX_GROUPS_PER_SIGNING: 16,
+					sendDeps: {},
+					createOutcomeHandler: vi.fn(),
+					recordOutcome: vi.fn()
 				}
 			);
 			await run('handleSend()');
 			if (selected !== accountAddress) {
 				expect(run('error')).toBe(wrongSignerMessage(accountAddress));
-				for (const call of [payment, asset, combined, signTransactions, sendRawTransaction, sendGroups]) {
+				for (const call of [
+					payment,
+					asset,
+					combined,
+					signTransactions,
+					sendRawTransaction,
+					sendGroups
+				]) {
 					expect(call).not.toHaveBeenCalled();
 				}
 			} else {
 				expect(run('error')).toBeNull();
-				expect(type === 'native' ? payment : asset).toHaveBeenCalledWith(expect.objectContaining({ from: page }));
+				expect(type === 'native' ? payment : asset).toHaveBeenCalledWith(
+					expect.objectContaining({ from: page })
+				);
 				expect(signTransactions).toHaveBeenCalledWith(
 					[[(type === 'native' ? payment : asset).mock.results[0].value]],
 					{ address: page, walletId: 'pera' }

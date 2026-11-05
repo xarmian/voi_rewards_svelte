@@ -164,29 +164,56 @@ test('withdraw requires the contract owner before building or signing', async ()
 		const withdraw = vi.fn().mockResolvedValue({ obj: {} });
 		const custom = vi.fn().mockResolvedValue({ txns: ['txn'] });
 		const CONTRACT = vi.fn(function () {
-			return { withdraw, custom, setFee: vi.fn(), setEnableGroupResourceSharing: vi.fn(), setExtraTxns: vi.fn() };
+			return {
+				withdraw,
+				custom,
+				setFee: vi.fn(),
+				setEnableGroupResourceSharing: vi.fn(),
+				setExtraTxns: vi.fn()
+			};
 		});
 		const signTransactions = vi.fn().mockResolvedValue([[1]]);
 		const signAndSendTransactions = vi.fn();
-		const sendWithdrawal = vi.fn(async (_request: unknown, deps: { sign: (groups: unknown[][]) => Promise<unknown> }) => {
-			await deps.sign([[{}]]);
-			return { status: 'confirmed', txId: 'tx' };
-		});
+		const sendWithdrawal = vi.fn(
+			async (_request: unknown, deps: { sign: (groups: unknown[][]) => Promise<unknown> }) => {
+				await deps.sign([[{}]]);
+				return { status: 'confirmed', txId: 'tx' };
+			}
+		);
 		const context = createContext({
-			$selectedWallet: { address: selected }, captureSigner: () => ({ address: selected }),
-			signerMatchesAccount, wrongSignerMessage,
-			contract: { owner: 'Z', contractId: 1 }, canOfferWithdraw: () => true,
-			withdrawAmountVOI: 1, availableBalanceVOI: 2, error: null, txStatus: 'idle',
+			$selectedWallet: { address: selected },
+			captureSigner: () => ({ address: selected }),
+			signerMatchesAccount,
+			wrongSignerMessage,
+			contract: { owner: 'Z', contractId: 1 },
+			canOfferWithdraw: () => true,
+			withdrawAmountVOI: 1,
+			availableBalanceVOI: 2,
+			error: null,
+			txStatus: 'idle',
 			VOIToMicroVOI: (amount: number) => amount * 1e6,
-			CONTRACT, abi: { custom: {} }, algodClient: {}, Buffer,
+			CONTRACT,
+			abi: { custom: {} },
+			algodClient: {},
+			Buffer,
 			algosdk: { decodeUnsignedTransaction: () => ({}) },
-			signTransactions, signAndSendTransactions, sendWithdrawal, sendDeps: {}
+			signTransactions,
+			signAndSendTransactions,
+			sendWithdrawal,
+			sendDeps: {}
 		});
 		runInContext(ts.transpileModule(handler!, {}).outputText, context);
 		await runInContext('handleWithdraw()', context);
 		if (selected !== 'Z') {
 			expect(context.error).toBe(wrongSignerMessage('Z'));
-			for (const call of [CONTRACT, withdraw, custom, sendWithdrawal, signTransactions, signAndSendTransactions]) {
+			for (const call of [
+				CONTRACT,
+				withdraw,
+				custom,
+				sendWithdrawal,
+				signTransactions,
+				signAndSendTransactions
+			]) {
 				expect(call).not.toHaveBeenCalled();
 			}
 		} else {
@@ -194,7 +221,8 @@ test('withdraw requires the contract owner before building or signing', async ()
 			expect(withdraw).toHaveBeenCalledWith(1000000);
 			expect(signTransactions).toHaveBeenCalledWith([[{}]], { address: 'Z' });
 			expect(sendWithdrawal).toHaveBeenCalledWith(
-				expect.objectContaining({ wallet: 'Z', contractId: 1 }), expect.anything()
+				expect.objectContaining({ wallet: 'Z', contractId: 1 }),
+				expect.anything()
 			);
 			expect(context.txStatus).toBe('confirmed');
 		}
