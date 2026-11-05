@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { Web3Wallet } from 'avm-wallet-svelte';
 	import {
 		signTransactions,
@@ -10,12 +10,15 @@
 	import algosdk from 'algosdk';
 	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
 	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
+	import { hasThirdPartyScript, decideVanityStart } from '$lib/chain/vanityGuard';
 	import { buildPayment } from '$lib/chain/txBuilders';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 
 	// Worker instance - needs to be accessible outside generateVanityAddress
 	let worker: Worker | null = null;
+	let ready = false;
+	let blocked = false;
 
 	// Form state
 	let prefix = '';
@@ -139,6 +142,7 @@
 
 	// Generate the vanity address
 	async function generateVanityAddress() {
+		if (!ready) return;
 		if (!validateInputs()) return;
 
 		// Reset state
@@ -387,15 +391,40 @@
 		}
 	}
 
-	// Clean up on unmount
 	onMount(() => {
-		return () => {
-			if (updateInterval) clearInterval(updateInterval);
-			if (worker) {
-				worker.terminate(); // Ensure worker is terminated on component destroy
-				worker = null;
+		const thirdParty = hasThirdPartyScript(document, location.origin, window as Window & { dataLayer?: unknown });
+		let alreadyReloaded = true;
+		try {
+			alreadyReloaded = sessionStorage.getItem('vanity-reloaded') === '1';
+		} catch {}
+		const decision = decideVanityStart({ thirdParty, alreadyReloaded });
+		if (decision === 'reload') {
+			try {
+				sessionStorage.setItem('vanity-reloaded', '1');
+			} catch {
+				blocked = true;
+				return;
 			}
-		};
+			window.location.reload();
+			return;
+		}
+		if (decision === 'blocked') {
+			blocked = true;
+			return;
+		}
+		try {
+			sessionStorage.removeItem('vanity-reloaded');
+		} catch {}
+		ready = true;
+	});
+
+	// Clean up on unmount
+	onDestroy(() => {
+		if (updateInterval) clearInterval(updateInterval);
+		if (worker) {
+			worker.terminate(); // Ensure worker is terminated on component destroy
+			worker = null;
+		}
 	});
 </script>
 
@@ -415,6 +444,14 @@
 			in your browser; keys are never sent anywhere.
 		</p>
 
+		{#if blocked}
+			<p role="alert" class="text-red-700 dark:text-red-300">
+				Key generation is switched off because another script is loaded in this page.
+				Open voirewards.com/vanity directly in a new tab.
+			</p>
+		{/if}
+
+		{#if ready}
 		<form on:submit|preventDefault={generateVanityAddress} class="space-y-6">
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 				<div>
@@ -718,6 +755,7 @@
 					{/if}
 				</div>
 			</div>
+		{/if}
 		{/if}
 	</div>
 

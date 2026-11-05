@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from 'vitest';
+import { createContext, runInContext } from 'node:vm';
+import ts from 'typescript';
+import { expect, test, vi } from 'vitest';
 
 const page = new URL('./+page.svelte', import.meta.url);
 
@@ -18,4 +20,38 @@ test('constructs the bundled module worker as a complete statement', () => {
 	const source = readFileSync(page, 'utf8');
 	expect(source).not.toMatch(/new\s+Blob\s*\(|createObjectURL/);
 	expect(source).toMatch(/worker\s*=\s*new Worker\(new URL\('\.\.\/\.\.\/\.\.\/lib\/chain\/vanity\.worker\.ts', import\.meta\.url\), \{ type: 'module' \}\);/);
+});
+
+test.each(['proceed', 'reload', 'blocked'] as const)('mount gates generation on %s', (decision) => {
+	const source = readFileSync(page, 'utf8');
+	const mount = source.match(/onMount\(\(\) => \{[^]*?\n\t\}\);/)?.[0];
+	expect(mount).toBeDefined();
+	const reload = vi.fn();
+	const sessionStorage = { getItem: vi.fn(() => '1'), setItem: vi.fn(), removeItem: vi.fn() };
+	const hasThirdPartyScript = vi.fn(() => true);
+	const decideVanityStart = vi.fn(() => decision);
+	const document = {};
+	const window = { location: { reload } };
+	const context = createContext({
+		ready: false, blocked: false, document, window, sessionStorage,
+		location: { origin: 'https://voirewards.com' },
+		hasThirdPartyScript, decideVanityStart,
+		onMount: (callback: () => void) => callback()
+	});
+	runInContext(ts.transpileModule(mount!, {}).outputText, context);
+	expect(hasThirdPartyScript).toHaveBeenCalledWith(document, 'https://voirewards.com', window);
+	expect(sessionStorage.getItem).toHaveBeenCalledWith('vanity-reloaded');
+	expect(decideVanityStart).toHaveBeenCalledWith({ thirdParty: true, alreadyReloaded: true });
+	expect(context.ready).toBe(decision === 'proceed');
+	expect(context.blocked).toBe(decision === 'blocked');
+	expect(reload).toHaveBeenCalledTimes(decision === 'reload' ? 1 : 0);
+	if (decision === 'reload') expect(sessionStorage.setItem).toHaveBeenCalledWith('vanity-reloaded', '1');
+	if (decision === 'proceed') expect(sessionStorage.removeItem).toHaveBeenCalledWith('vanity-reloaded');
+});
+
+test('the form and result UI require readiness and the handler also checks it', () => {
+	const source = readFileSync(page, 'utf8');
+	expect(source).toMatch(/async function generateVanityAddress\(\) \{\s*if \(!ready\) return;/);
+	expect(source).toMatch(/\{#if ready\}\s*<form[^]*\{#if result\}[^]*<Web3Wallet[^]*\{\/if\}\s*\{\/if\}\s*<\/div>/);
+	expect(source).toMatch(/\{#if blocked\}\s*<p[^>]*role="alert"[^>]*>\s*Key generation is switched off because another script is loaded in this page\.\s*Open voirewards\.com\/vanity directly in a new tab\./);
 });
