@@ -22,24 +22,25 @@ function setup() {
 		}
 	};
 	const account = algosdk.generateAccount();
-	const txns = [100, 95].map((lastRound, i) =>
+	const txns = [100, 95].map((lastValid, i) =>
 		algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-			from: account.addr,
-			to: account.addr,
+			sender: account.addr,
+			receiver: account.addr,
 			amount: i + 1,
 			suggestedParams: {
 				fee: 1000,
+				minFee: 1000,
 				flatFee: true,
-				firstRound: 1,
-				lastRound,
+				firstValid: 1,
+				lastValid,
 				genesisID: 'voimain-v1.0',
-				genesisHash: Buffer.alloc(32).toString('base64')
+				genesisHash: new Uint8Array(32)
 			}
 		})
 	);
 	algosdk.assignGroupID(txns);
 	const signed = txns.map((txn) => txn.signTxn(account.sk));
-	const input = { wallet: account.addr, contractId: 123, txns };
+	const input = { wallet: account.addr.toString(), contractId: 123, txns };
 	const sign = vi.fn(async (): Promise<Uint8Array[] | null | undefined> => signed);
 	const send = vi.fn(async () => {
 		log.push('send');
@@ -55,6 +56,11 @@ function setup() {
 afterEach(() => {
 	vi.restoreAllMocks();
 	vi.useRealTimers();
+});
+
+// algosdk 3 keeps the HTTP status on error.response, with the raw body as bytes.
+const v3Status = (status: number) => ({
+	response: { status, body: new Uint8Array(), headers: {} }
 });
 
 const algosdkPrefixFor = (status: number) =>
@@ -106,7 +112,7 @@ describe('sendWithdrawal', () => {
 
 	it('clears on a 4xx submit refusal', async () => {
 		const d = setup();
-		d.send.mockRejectedValue(Object.assign(new Error('refused'), { status: 400 }));
+		d.send.mockRejectedValue(Object.assign(new Error('refused'), v3Status(400)));
 		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
 			status: 'rejected',
 			txId: d.entry.txId,
@@ -120,7 +126,7 @@ describe('sendWithdrawal', () => {
 		'clears a clean algod 400: %s',
 		async (message) => {
 			const d = setup();
-			d.send.mockRejectedValue(Object.assign(new Error(message), { status: 400 }));
+			d.send.mockRejectedValue(Object.assign(new Error(message), v3Status(400)));
 			expect(await sendWithdrawal(d.input, d.deps)).toEqual({
 				status: 'rejected',
 				txId: d.entry.txId,
@@ -131,26 +137,31 @@ describe('sendWithdrawal', () => {
 	);
 
 	it.each([
-		{ status: 400, message: 'transaction already in ledger' },
-		{ status: 400, message: 'already in pool' },
-		{ status: 400, message: 'already in the ledger' },
-		{ status: 400, message: 'already been committed' },
-		{ status: 400, message: 'already confirmed' },
-		{ status: 400, message: 'already submitted' },
-		{ status: 400, message: 'Duplicate transaction' },
-		{ status: 400, message: '' },
-		{ status: 400, message: '   ' },
-		{ status: 400 },
-		{ status: 400, message: 123 },
+		{ response: { status: 400 }, message: 'transaction already in ledger' },
+		{ response: { status: 400 }, message: 'already in pool' },
+		{ response: { status: 400 }, message: 'already in the ledger' },
+		{ response: { status: 400 }, message: 'already been committed' },
+		{ response: { status: 400 }, message: 'already confirmed' },
+		{ response: { status: 400 }, message: 'already submitted' },
+		{ response: { status: 400 }, message: 'Duplicate transaction' },
+		{ response: { status: 400 }, message: '' },
+		{ response: { status: 400 }, message: '   ' },
+		{ response: { status: 400 } },
+		{ response: { status: 400 }, message: 123 },
 		...[408, 429, 499, 404, 401, 413].map((status) => ({
-			status,
+			response: { status },
 			message: 'transaction rejected'
 		})),
 		{ message: 'transaction rejected' },
-		{ status: '400', message: 'transaction rejected' },
-		{ status: 400, response: { body: { message: 'already in pool' } } },
-		{ status: 400, response: { text: 'transaction already in ledger' } },
-		{ status: 400, message: 'Bad Request', response: { body: { message: 'duplicate' } } }
+		{ response: { status: '400' }, message: 'transaction rejected' },
+		// algosdk 3 keeps the body as bytes: a message that is only in the body is not evidence.
+		{
+			response: {
+				status: 400,
+				body: new TextEncoder().encode('{"message":"already in pool"}')
+			}
+		},
+		{ response: { status: 400, text: 'transaction already in ledger' } }
 	])('keeps the hold for an ambiguous submit error: %j', async (error) => {
 		const d = setup();
 		d.send.mockRejectedValue(error);
@@ -167,13 +178,16 @@ describe('sendWithdrawal', () => {
 	// raw body. algosdk puts the algod text into error.message only when the body had a `message`,
 	// so the raw text is not evidence of an algod rejection.
 	it.each([
-		{ status: 400, message: '', response: { text: '{"error":"bad gateway config"}' } },
-		{ status: 400, message: '', response: { text: 'transaction rejected' } },
-		{ status: 400, message: algosdkPrefixFor(400), response: { text: '{}' } },
+		{ message: '', response: { status: 400, text: '{"error":"bad gateway config"}' } },
+		{ message: '', response: { status: 400, text: 'transaction rejected' } },
+		{ message: algosdkPrefixFor(400), response: { status: 400, text: '{}' } },
 		{
-			status: 400,
 			message: algosdkPrefixFor(400),
-			response: { text: '{"error":"x"}', body: { error: 'x' } }
+			response: {
+				status: 400,
+				text: '{"error":"x"}',
+				body: new TextEncoder().encode('{"error":"x"}')
+			}
 		}
 	])('keeps the hold when only response.text carries something: %j', async (error) => {
 		const d = setup();
@@ -197,7 +211,7 @@ describe('sendWithdrawal', () => {
 	])('releases an ordinary algod rejection: %s', async (message) => {
 		const d = setup();
 		d.send.mockRejectedValue(
-			Object.assign(new Error(`${algosdkPrefixFor(400)}: ${message}`), { status: 400 })
+			Object.assign(new Error(`${algosdkPrefixFor(400)}: ${message}`), v3Status(400))
 		);
 		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'rejected' });
 		expect(d.read()).toBeUndefined();
@@ -213,7 +227,7 @@ describe('sendWithdrawal', () => {
 	])('keeps the hold when the transaction itself exists: %s', async (message) => {
 		const d = setup();
 		d.send.mockRejectedValue(
-			Object.assign(new Error(`${algosdkPrefixFor(400)}: ${message}`), { status: 400 })
+			Object.assign(new Error(`${algosdkPrefixFor(400)}: ${message}`), v3Status(400))
 		);
 		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'pending' });
 		expect(d.read()).toEqual(d.entry);
@@ -232,7 +246,7 @@ describe('sendWithdrawal', () => {
 		`${algosdkPrefix}: already included`
 	])('keeps the hold for the algosdk error %j (a bare prefix proves nothing)', async (message) => {
 		const d = setup();
-		d.send.mockRejectedValue(Object.assign(new Error(message), { status: 400 }));
+		d.send.mockRejectedValue(Object.assign(new Error(message), v3Status(400)));
 		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
 			status: 'pending',
 			txId: d.entry.txId,
@@ -246,28 +260,34 @@ describe('sendWithdrawal', () => {
 		`${algosdkPrefix}: transaction rejected by logic`
 	])('clears an algosdk 400 that carries an algod rejection: %j', async (message) => {
 		const d = setup();
-		d.send.mockRejectedValue(Object.assign(new Error(message), { status: 400 }));
+		d.send.mockRejectedValue(Object.assign(new Error(message), v3Status(400)));
 		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'rejected' });
 		expect(d.read()).toBeUndefined();
 	});
 
-	it.each([{ status: 400, response: { body: { message: 'overspend' } } }])(
-		'recognizes nested clean messages and preserves shared error text: %j',
-		async (error) => {
-			const d = setup();
-			d.send.mockRejectedValue(error);
-			expect(await sendWithdrawal(d.input, d.deps)).toEqual({
-				status: 'rejected',
-				txId: d.entry.txId,
-				error: String(error)
-			});
-			expect(d.read()).toBeUndefined();
-		}
-	);
+	// The shape algosdk 3 really throws for an algod 400 with a JSON message: the text is in
+	// error.message, the status is on error.response, and the body is the raw bytes.
+	it('clears a real algosdk 3 400 and keeps its error text', async () => {
+		const d = setup();
+		const error = Object.assign(new Error(`${algosdkPrefixFor(400)}: overspend`), {
+			response: {
+				status: 400,
+				body: new TextEncoder().encode('{"message":"overspend"}'),
+				headers: {}
+			}
+		});
+		d.send.mockRejectedValue(error);
+		expect(await sendWithdrawal(d.input, d.deps)).toEqual({
+			status: 'rejected',
+			txId: d.entry.txId,
+			error: error.message
+		});
+		expect(d.read()).toBeUndefined();
+	});
 
 	it('passes the original submit error unchanged to sendAndConfirm', async () => {
 		const d = setup();
-		const error = Object.assign(new Error('overspend'), { status: 400 });
+		const error = Object.assign(new Error('overspend'), v3Status(400));
 		d.send.mockRejectedValue(error);
 		const original = sending.sendAndConfirm;
 		vi.spyOn(sending, 'sendAndConfirm').mockImplementation(async (signed, deps) => {
@@ -307,15 +327,6 @@ describe('sendWithdrawal', () => {
 	it('accepts the same txids in the requested order', async () => {
 		const d = setup();
 		expect(await sendWithdrawal(d.input, d.deps)).toMatchObject({ status: 'pending' });
-		expect(d.send).toHaveBeenCalledOnce();
-		expect(d.read()).toEqual(d.entry);
-	});
-
-	it('skips group identity checks for inputs without txID', async () => {
-		const d = setup();
-		expect(await sendWithdrawal({ ...d.input, txns: [{}, {}] }, d.deps)).toMatchObject({
-			status: 'pending'
-		});
 		expect(d.send).toHaveBeenCalledOnce();
 		expect(d.read()).toEqual(d.entry);
 	});
@@ -424,38 +435,34 @@ describe('canOfferWithdraw', () => {
 	});
 });
 
-describe('sendWithdrawal: wallet pinning and a record from another tab', () => {
-	it('signs nothing when the connected wallet changed after the form was submitted', async () => {
+describe('sendWithdrawal: the captured wallet and a record from another tab', () => {
+	// The signer is fixed when the user confirms, so the module no longer compares against a live
+	// selection: a picker move cannot change who signs, and the hold stays under the signer's key.
+	it('signs exactly the transactions it was given, once', async () => {
 		const d = setup();
-		const outcome = await sendWithdrawal(d.input, { ...d.deps, currentWallet: () => 'another' });
-		expect(outcome.status).toBe('not-signed');
-		expect(d.sign).not.toHaveBeenCalled();
-		expect(d.send).not.toHaveBeenCalled();
-		expect(d.read()).toBeUndefined();
+		await sendWithdrawal(d.input, d.deps);
+		expect(d.sign).toHaveBeenCalledExactlyOnceWith([d.input.txns]);
 	});
 
-	it('records and sends nothing when the wallet changed while the signing prompt was open', async () => {
+	it('keys the hold by the wallet that signed', async () => {
 		const d = setup();
-		let current = d.input.wallet;
-		const signed = await d.sign();
-		d.sign.mockImplementation(async () => {
-			current = 'another';
-			return signed;
-		});
-		const outcome = await sendWithdrawal(d.input, { ...d.deps, currentWallet: () => current });
-		expect(outcome.status).toBe('not-signed');
-		expect(d.send).not.toHaveBeenCalled();
-		expect(d.read()).toBeUndefined();
+		const outcome = await sendWithdrawal(d.input, d.deps);
+		expect(outcome.status).toBe('pending');
+		expect(d.read()).toEqual(d.entry);
+		const other = pendingWithdrawalStorageKey('another', d.input.contractId);
+		expect(d.storage.getItem(other)).toBeNull();
 	});
 
-	it('still sends when the connected wallet is the one captured at submit', async () => {
+	it('reports a disconnected signer as not-signed and records nothing', async () => {
 		const d = setup();
-		const outcome = await sendWithdrawal(d.input, {
-			...d.deps,
-			currentWallet: () => d.input.wallet
+		d.sign.mockRejectedValue(new Error('Account X: its wallet (pera) is disconnected.'));
+		const outcome = await sendWithdrawal(d.input, d.deps);
+		expect(outcome).toEqual({
+			status: 'not-signed',
+			error: 'Account X: its wallet (pera) is disconnected.'
 		});
-		expect(outcome.status).not.toBe('not-signed');
-		expect(d.send).toHaveBeenCalledTimes(1);
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toBeUndefined();
 	});
 
 	it('does not overwrite or broadcast over a live record for another transaction', async () => {

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 	import { Modal, Button } from 'flowbite-svelte';
-	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
+	import { signTransactions, selectedWallet, captureSigner } from '$lib/chain/wallet.svelte';
+	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
 	import { algodClient } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
+	import { buildAssetTransfer } from '$lib/chain/txBuilders';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -22,9 +24,19 @@
 			return;
 		}
 
-		if ($selectedWallet?.app === '') {
+		if ($selectedWallet.app === '' || $selectedWallet.app === 'Watch') {
 			optOutError =
 				'Wallet not found. Please re-select your account and/or ensure you are not using a Watch account.';
+			return;
+		}
+
+		// The account the user confirmed; the picker may move while the wallet prompt is open. The
+		// store above can lag the rune store by a tick, so the capture can still refuse: show it.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			optOutError = captureError instanceof Error ? captureError.message : String(captureError);
 			return;
 		}
 
@@ -33,20 +45,20 @@
 			optOutError = null;
 
 			const suggestedParams = await algodClient.getTransactionParams().do();
-			const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-				from: $selectedWallet.address,
-				to: $selectedWallet.address,
+			const txn = buildAssetTransfer({
+				from: signer.address,
+				to: signer.address,
 				assetIndex: Number(token.id),
 				amount: 0,
 				suggestedParams,
-				closeRemainderTo: $selectedWallet.address
+				closeRemainderTo: signer.address
 			});
 
-			const signedTxns = await signTransactions([[txn]]);
+			const signedTxns = await signTransactions([[txn]], signer);
 
 			if (signedTxns) {
 				const response = await algodClient.sendRawTransaction(signedTxns[0]).do();
-				await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+				await algosdk.waitForConfirmation(algodClient, response.txid, 4);
 				optOutSuccess = true;
 				onTokenOptedOut();
 				setTimeout(() => {

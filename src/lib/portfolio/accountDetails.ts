@@ -11,14 +11,34 @@ export type AccountSnapshot = {
 
 export type RewardsTransaction = {
 	sender: string;
-	'confirmed-round': number;
-	'payment-transaction'?: { amount: number };
+	confirmedRound?: bigint | number;
+	paymentTransaction?: { amount: bigint | number };
 };
 
-export function snapshotFromAlgodAccount(raw: Record<string, unknown>): AccountSnapshot {
-	function numberField(key: string): number {
-		const value = raw[key];
-		if (typeof value !== 'number' || !Number.isFinite(value)) {
+/** The fields of algosdk's account model this reads. Rounds and amounts are bigint there. */
+export type AlgodAccount = {
+	amount?: unknown;
+	status?: unknown;
+	minBalance?: unknown;
+	pendingRewards?: unknown;
+	round?: unknown;
+	participation?: { voteLastValid?: unknown } | null;
+};
+
+// A number or bigint that is a whole, safe value; anything else is not evidence of a balance.
+export function safeNumber(value: unknown): number | undefined {
+	if (typeof value === 'bigint') {
+		return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER)
+			? Number(value)
+			: undefined;
+	}
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+export function snapshotFromAlgodAccount(raw: AlgodAccount): AccountSnapshot {
+	function numberField(key: keyof AlgodAccount): number {
+		const value = safeNumber(raw[key]);
+		if (value === undefined) {
 			throw new Error(`Invalid account: ${key} must be a finite number`);
 		}
 		return value;
@@ -33,19 +53,19 @@ export function snapshotFromAlgodAccount(raw: Record<string, unknown>): AccountS
 	const snapshot: AccountSnapshot = {
 		balance,
 		status: raw.status,
-		minBalance: numberField('min-balance'),
-		pendingRewards: numberField('pending-rewards'),
+		minBalance: numberField('minBalance'),
+		pendingRewards: numberField('pendingRewards'),
 		round: numberField('round')
 	};
 	if (raw.participation && typeof raw.participation === 'object') {
-		const lastValid = (raw.participation as Record<string, unknown>)['vote-last-valid'];
-		if (typeof lastValid === 'number') snapshot.voteLastValid = lastValid;
+		const lastValid = safeNumber(raw.participation.voteLastValid);
+		if (lastValid !== undefined) snapshot.voteLastValid = lastValid;
 	}
 	return snapshot;
 }
 
 export interface AccountDetailsDeps {
-	fetchAccount(address: string): Promise<Record<string, unknown>>;
+	fetchAccount(address: string): Promise<AlgodAccount>;
 	lookupCreatedAt(address: string): Promise<number>;
 	fetchRewardsTransactions(address: string): Promise<RewardsTransaction[]>;
 }
@@ -115,11 +135,11 @@ export async function loadAccountDetails(
 }
 
 export function totalRewardsMicroVoi(transactions: RewardsTransaction[]): number {
-	return transactions.reduce((sum, tx) => {
-		if (tx['confirmed-round'] < 1520000) return sum;
-		if (tx['payment-transaction']) {
-			return sum + tx['payment-transaction'].amount;
-		}
-		return sum;
-	}, 0);
+	let sum = 0n;
+	for (const tx of transactions) {
+		// A transaction with no confirmed round is not a payout.
+		if (tx.confirmedRound === undefined || tx.confirmedRound < 1520000) continue;
+		if (tx.paymentTransaction) sum += BigInt(tx.paymentTransaction.amount);
+	}
+	return Number(sum);
 }

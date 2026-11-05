@@ -1,6 +1,6 @@
 import type { PageLoad } from './$types';
 import { get } from 'svelte/store';
-import { selectedWallet } from 'avm-wallet-svelte';
+import { selectedWallet } from '$lib/chain/wallet.svelte';
 
 export const load = (({ params, data, depends }) => {
 	depends('wallet:id');

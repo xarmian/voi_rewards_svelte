@@ -11,14 +11,25 @@
 	import { createFlowPin } from '$lib/chain/flowAccount';
 	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
-	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
+	import {
+		signTransactions,
+		selectedWallet,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
 	import { onDestroy, tick } from 'svelte';
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
-	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
+	import {
+		buildAssetTransfer,
+		buildCombinedPayment,
+		buildPayment,
+		withNoteNoGroup
+	} from '$lib/chain/txBuilders';
 	import {
 		createOutcomeHandler,
 		createPendingTracker,
@@ -121,14 +132,14 @@
 					if (address !== flow.current($selectedWallet?.address)) return;
 					nativeVoiToken = {
 						...nativeVoiToken,
-						balance: info.amount as number,
-						value: (info.amount as number) / 1e6
+						balance: Number(info.amount),
+						value: Number(info.amount) / 1e6
 					};
 					// If the selected token is native VOI, update it too
 					if (isNativeToken(selectedToken)) {
 						selectedToken = {
 							...selectedToken,
-							balance: info.amount as number
+							balance: Number(info.amount)
 						};
 					}
 					// Force Svelte reactivity for available tokens
@@ -179,10 +190,7 @@
 	let groupOutcomes: (TrackedOutcome | undefined)[] = [];
 	let recipientsByGroup: Recipient[][] = [];
 	let pendingController: AbortController | undefined;
-	const sendDeps = {
-		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
-		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
-	};
+	const sendDeps = createSendDeps(algodClient);
 	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	$: retryList = retryRecipients(groupOutcomes, recipientsByGroup);
 	$: confirmedTotal = Number(
@@ -395,8 +403,7 @@
 				? { kind: 'arc200' }
 				: { kind: 'vsa', assetId: Number(checkedToken.id) };
 		const result = await loadRecipientInfo(address, token, {
-			fetchAccount: async (a) =>
-				(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+			fetchAccount: async (a) => requireAccountInfo(a, { force: true }),
 			arc200BalanceOf: async (a) => {
 				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
 				const balance = await contract.arc200_balanceOf(a);
@@ -456,7 +463,7 @@
 			throw new Error('Invalid asset ID for VSA transaction');
 		}
 
-		return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+		return buildAssetTransfer({
 			from: sender,
 			to: recipientAddress,
 			assetIndex: Number(token.id),
@@ -502,19 +509,18 @@
 		for (const txn of resp.txns) {
 			const bytes = Buffer.from(txn, 'base64');
 			const tx = algosdk.decodeUnsignedTransaction(bytes);
-			delete tx.group;
 
-			// if the transaction is a payment, append the index of this transaction to the tx.txn field
+			// if the transaction is a payment, append the index of this transaction to its note
+			let note: Uint8Array | undefined;
 			if (tx.type === 'pay') {
 				const existingNote = tx.note ? new TextDecoder().decode(tx.note) : '';
-				tx.note = new TextEncoder().encode(`${existingNote}${existingNote ? ' ' : ''}${index}`);
-			} else {
-				if (noteText) {
-					tx.note = new TextEncoder().encode(noteText);
-				}
+				note = new TextEncoder().encode(`${existingNote}${existingNote ? ' ' : ''}${index}`);
+			} else if (noteText) {
+				note = new TextEncoder().encode(noteText);
 			}
 
-			decodedTxns.push(tx);
+			// The group id is dropped here; the groups are assigned again later.
+			decodedTxns.push(withNoteNoGroup(tx, note));
 		}
 
 		return decodedTxns;
@@ -578,7 +584,7 @@
 		if (!sender) {
 			throw new Error('Wallet not connected');
 		}
-		return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+		return buildPayment({
 			from: sender,
 			to: recipientAddress,
 			amount,
@@ -622,26 +628,13 @@
 			const paymentsToProcess = currentBatch.filter((pair) => pair.payment !== null);
 			if (paymentsToProcess.length > 0) {
 				const totalPaymentAmount = paymentsToProcess.reduce(
-					(sum, pair) => sum + BigInt(pair.payment?.amount ?? 0),
+					(sum, pair) => sum + BigInt(pair.payment?.payment?.amount ?? 0),
 					0n
 				);
 
 				if (totalPaymentAmount > 0n) {
 					const firstPayment = paymentsToProcess[0].payment!;
-					const combinedPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-						from: algosdk.encodeAddress(firstPayment.from.publicKey),
-						to: algosdk.encodeAddress(firstPayment.to.publicKey),
-						amount: totalPaymentAmount,
-						note: firstPayment.note,
-						suggestedParams: {
-							fee: firstPayment.fee,
-							firstRound: firstPayment.firstRound,
-							lastRound: firstPayment.lastRound,
-							genesisHash: Buffer.from(firstPayment.genesisHash).toString('base64'),
-							genesisID: firstPayment.genesisID,
-							flatFee: true
-						}
-					});
+					const combinedPayment = buildCombinedPayment(firstPayment, totalPaymentAmount);
 					batchTransactions.push(combinedPayment);
 				}
 			}
@@ -677,7 +670,22 @@
 			return;
 		}
 		const token = selectedToken;
-		const sender = $selectedWallet.address;
+		// The account the user confirmed; every batch signs as it.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			error = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		// After a failed send the pin keeps this form (tracker, token, balance checks) on that account
+		// while its error shows, so a send for a different selection would sign as one account and be
+		// validated against another's funds. Only the pinned account can retry; closing starts over.
+		if (flow.pinned && flow.address !== signer.address) {
+			error = `Select account ${flow.address} in a signing wallet to continue.`;
+			return;
+		}
+		const sender = signer.address;
 		const senderTracker = tracker;
 		if (!senderTracker) return;
 		const symbol = token.symbol;
@@ -822,7 +830,7 @@
 				currentTxnGroup = currentBatch;
 
 				// Sign all transactions in this batch (up to 16 groups) at once
-				const signedTransactions = await signTransactions([batchTransactions]);
+				const signedTransactions = await signTransactions([batchTransactions], signer);
 				if (!signedTransactions) {
 					throw new Error('User rejected transaction signing');
 				}

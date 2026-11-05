@@ -9,15 +9,15 @@ test.each([
 	// FungibleTokenType.type is optional: untyped tokens still get a distinct key per id.
 	[{ id: '7' }, 'undefined:7'],
 	[{ id: '8' }, 'undefined:8']
-] as const)('tokenKey identifies %j as %s', (token, key) => {
+] as const)('tokenKey identifies %o as %s', (token, key) => {
 	expect(tokenKey(token)).toBe(key);
 });
 
 const rawAccount = {
-	amount: 123456789,
+	amount: 123456789n,
 	status: 'Offline',
-	'min-balance': 100000,
-	'pending-rewards': 0,
+	minBalance: 100000n,
+	pendingRewards: 0n,
 	round: 10000000
 };
 
@@ -33,7 +33,7 @@ describe('loadRecipientInfo', () => {
 		const deps = dependencies();
 		await expect(loadRecipientInfo('wallet', { kind: 'native' }, deps)).resolves.toEqual({
 			status: 'loaded',
-			info: { balance: rawAccount.amount, hasOptedIn: false, assetBalance: 0 }
+			info: { balance: Number(rawAccount.amount), hasOptedIn: false, assetBalance: 0 }
 		});
 		expect(deps.fetchAccount).toHaveBeenCalledExactlyOnceWith('wallet');
 		expect(deps.arc200BalanceOf).not.toHaveBeenCalled();
@@ -44,19 +44,19 @@ describe('loadRecipientInfo', () => {
 		deps.fetchAccount.mockResolvedValue({
 			...rawAccount,
 			assets: [
-				{ 'asset-id': 2, amount: 999 },
-				{ 'asset-id': 7, amount: 123 }
+				{ assetId: 2n, amount: 999n },
+				{ assetId: 7n, amount: 123n }
 			]
 		});
 		await expect(loadRecipientInfo('wallet', { kind: 'vsa', assetId: 7 }, deps)).resolves.toEqual({
 			status: 'loaded',
-			info: { balance: rawAccount.amount, hasOptedIn: true, assetBalance: 123 }
+			info: { balance: Number(rawAccount.amount), hasOptedIn: true, assetBalance: 123 }
 		});
 		expect(deps.arc200BalanceOf).not.toHaveBeenCalled();
 	});
 
-	test.each([undefined, [], [{ 'asset-id': 2, amount: 999 }]])(
-		'loads a real VSA not-opted-in answer with assets %j',
+	test.each([undefined, [], [{ assetId: 2n, amount: 999n }]])(
+		'loads a real VSA not-opted-in answer with assets %o',
 		async (assets) => {
 			const deps = dependencies();
 			deps.fetchAccount.mockResolvedValue({
@@ -66,7 +66,7 @@ describe('loadRecipientInfo', () => {
 			await expect(loadRecipientInfo('wallet', { kind: 'vsa', assetId: 7 }, deps)).resolves.toEqual(
 				{
 					status: 'loaded',
-					info: { balance: rawAccount.amount, hasOptedIn: false, assetBalance: 0 }
+					info: { balance: Number(rawAccount.amount), hasOptedIn: false, assetBalance: 0 }
 				}
 			);
 		}
@@ -85,11 +85,10 @@ describe('loadRecipientInfo', () => {
 		{ amount: 'abc' },
 		{ assets: 'x' },
 		{ assets: null },
-		{ assets: undefined },
 		...['abc', '123', -1, NaN, Infinity].map((amount) => ({
-			assets: [{ 'asset-id': 7, amount }]
+			assets: [{ assetId: 7n, amount }]
 		}))
-	])('makes malformed algod fields %j unavailable without a balance', async (fields) => {
+	])('makes malformed algod fields %o unavailable without a balance', async (fields) => {
 		const deps = dependencies();
 		deps.fetchAccount.mockResolvedValue({ ...rawAccount, ...fields });
 		const result = await loadRecipientInfo('wallet', { kind: 'vsa', assetId: 7 }, deps);
@@ -116,7 +115,11 @@ describe('loadRecipientInfo', () => {
 			deps.arc200BalanceOf.mockResolvedValue({ success: true, returnValue });
 			await expect(loadRecipientInfo('wallet', { kind: 'arc200' }, deps)).resolves.toEqual({
 				status: 'loaded',
-				info: { balance: rawAccount.amount, hasOptedIn: true, assetBalance: Number(returnValue) }
+				info: {
+					balance: Number(rawAccount.amount),
+					hasOptedIn: true,
+					assetBalance: Number(returnValue)
+				}
 			});
 			expect(deps.arc200BalanceOf).toHaveBeenCalledExactlyOnceWith('wallet');
 		}
@@ -138,7 +141,7 @@ describe('loadRecipientInfo', () => {
 			success: true,
 			returnValue
 		}))
-	])('makes an invalid ARC-200 response %j unavailable', async (response) => {
+	])('makes an invalid ARC-200 response %o unavailable', async (response) => {
 		const deps = dependencies();
 		deps.arc200BalanceOf.mockResolvedValue(response);
 		const result = await loadRecipientInfo('wallet', { kind: 'arc200' }, deps);

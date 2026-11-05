@@ -3,6 +3,8 @@ import { createContext, runInContext } from 'node:vm';
 import algosdk from 'algosdk';
 import ts from 'typescript';
 import { expect, test } from 'vitest';
+import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
+import { createFlowPin } from '$lib/chain/flowAccount';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
 
@@ -17,7 +19,12 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 			return match[0];
 		})
 		.join('\n');
-	const context = createContext(globals);
+	const context = createContext({
+		buildPayment,
+		buildAssetTransfer,
+		buildCombinedPayment,
+		...globals
+	});
 	runInContext(
 		ts.transpileModule(script, {
 			compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
@@ -26,6 +33,63 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 	);
 	return (code: string) => runInContext(code, context);
 }
+
+// handleSend takes its signer from the selection before it validates anything, as it does when the
+// user confirms, so the harness supplies both the store value and the capture.
+function selectedWalletGlobals() {
+	const address = algosdk.generateAccount().addr.toString();
+	return {
+		$selectedWallet: { address },
+		captureSigner: () => ({ address, walletId: 'pera' }),
+		flow: createFlowPin()
+	};
+}
+
+// After a failed send the pin keeps the form on the submitted account while its error shows. A retry
+// for another selection would sign as one account and validate against another's funds.
+async function retryHarness(pinned: string, selected: string) {
+	const { decimalToBaseUnits } = await import('../chain/baseUnits');
+	const flow = createFlowPin();
+	flow.pin(pinned);
+	const run = componentFunctions(['handleSend'], {
+		decimalToBaseUnits,
+		algosdk,
+		$selectedWallet: { address: selected },
+		captureSigner: () => ({ address: selected, walletId: 'pera' }),
+		flow,
+		selectedToken: { decimals: 6, symbol: 'VOI' },
+		tracker: {},
+		// An invalid second amount stops the send right after the guard, so no network is needed.
+		recipients: ['1', 'abc'].map((value) => ({
+			address: algosdk.generateAccount().addr.toString(),
+			amount: value
+		})),
+		isSending: false,
+		error: null
+	});
+	return { run, flow };
+}
+
+test('a retry after a failed send refuses a different selected account and names the pinned one', async () => {
+	const pinned = algosdk.generateAccount().addr.toString();
+	const other = algosdk.generateAccount().addr.toString();
+	const { run, flow } = await retryHarness(pinned, other);
+	await run('handleSend()');
+	expect(run('error')).toBe(`Select account ${pinned} in a signing wallet to continue.`);
+	expect(run('isSending')).toBe(false);
+	// The refusal leaves the pin where it was: the form still belongs to the submitted account.
+	expect(flow.address).toBe(pinned);
+	flow.dispose();
+});
+
+test('a retry after a failed send with the pinned account selected again goes on to validate', async () => {
+	const pinned = algosdk.generateAccount().addr.toString();
+	const { run, flow } = await retryHarness(pinned, pinned);
+	await run('handleSend()');
+	// It got past the account guard to the next check.
+	expect(run('error')).toBe('Invalid amount for recipient 2');
+	flow.dispose();
+});
 
 test('send conversions never use a floating point decimal scale', () => {
 	expect(
@@ -54,11 +118,11 @@ test.each(['', '-1', 'abc', '1e-7', '0', '0.0000001'])(
 		const run = componentFunctions(['handleSend'], {
 			decimalToBaseUnits,
 			algosdk,
-			$selectedWallet: { address: algosdk.generateAccount().addr },
+			...selectedWalletGlobals(),
 			selectedToken: { decimals: 6, symbol: 'VOI' },
 			tracker: {},
 			recipients: ['1', amount].map((value) => ({
-				address: algosdk.generateAccount().addr,
+				address: algosdk.generateAccount().addr.toString(),
 				amount: value
 			})),
 			isSending: false,
@@ -77,11 +141,11 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 		decimalToBaseUnits,
 		sumBaseUnits,
 		algosdk,
-		$selectedWallet: { address: algosdk.generateAccount().addr },
+		...selectedWalletGlobals(),
 		selectedToken: { decimals: 6, symbol: 'VOI', balance: 9007199254740992 },
 		tracker: {},
 		recipients: ['9007199254.740993', '0.000001'].map((value) => ({
-			address: algosdk.generateAccount().addr,
+			address: algosdk.generateAccount().addr.toString(),
 			amount: value
 		})),
 		isSending: false,
@@ -94,10 +158,11 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 
 const suggestedParams = {
 	fee: 1000,
+	minFee: 1000,
 	flatFee: true,
-	firstRound: 1,
-	lastRound: 1000,
-	genesisHash: Buffer.alloc(32).toString('base64'),
+	firstValid: 1,
+	lastValid: 1000,
+	genesisHash: new Uint8Array(32),
 	genesisID: 'test'
 };
 
@@ -106,24 +171,26 @@ test.each(['buildVOITransaction', 'buildVSATransaction'])(
 	async (builder) => {
 		const run = componentFunctions([builder], {
 			algosdk,
-			sender: algosdk.generateAccount().addr,
-			recipient: algosdk.generateAccount().addr,
+			sender: algosdk.generateAccount().addr.toString(),
+			recipient: algosdk.generateAccount().addr.toString(),
 			suggestedParams
 		});
 		const txn = await run(
 			`${builder}({ id: '1' }, sender, recipient, 9007199254740993n, suggestedParams)`
 		);
-		expect(txn.amount).toBe(9007199254740993n);
+		expect(
+			builder === 'buildVOITransaction' ? txn.payment?.amount : txn.assetTransfer?.amount
+		).toBe(9007199254740993n);
 	}
 );
 
 test('combined ARC-200 payments sum exact raw units', () => {
-	const sender = algosdk.generateAccount().addr;
-	const recipient = algosdk.generateAccount().addr;
+	const sender = algosdk.generateAccount().addr.toString();
+	const recipient = algosdk.generateAccount().addr.toString();
 	const payments = [9007199254740993n, 2n].map((amount) => [
 		algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-			from: sender,
-			to: recipient,
+			sender,
+			receiver: recipient,
 			amount,
 			suggestedParams
 		})
@@ -136,5 +203,5 @@ test('combined ARC-200 payments sum exact raw units', () => {
 		payments
 	});
 	const groups = run('createOptimizedGroups(payments, [{}, {}])');
-	expect(groups[0][0].amount).toBe(9007199254740995n);
+	expect(groups[0][0].payment?.amount).toBe(9007199254740995n);
 });

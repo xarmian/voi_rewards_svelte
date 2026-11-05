@@ -224,7 +224,7 @@ function base64UrlKey(value: string, bytes: number): string | null {
 	return padded;
 }
 
-type KeyregParams = algosdk.SuggestedParams & { minFee?: number };
+type KeyregParams = Omit<algosdk.SuggestedParams, 'minFee'> & { minFee?: number | bigint };
 
 type OnlineKeyreg = Pick<
 	ParsedKeys,
@@ -244,7 +244,7 @@ export function keyregAccount(opts: {
 	contractId: number | null;
 }): string {
 	if (opts.parentWalletAddress !== null && opts.contractId !== null) {
-		return algosdk.getApplicationAddress(Number(opts.contractId));
+		return algosdk.getApplicationAddress(Number(opts.contractId)).toString();
 	}
 	return opts.walletAddress;
 }
@@ -261,8 +261,11 @@ export function incentiveKeyregFee(payIncentiveFee: boolean): number | null {
 }
 
 // The flat fee a wallet keyreg carries: the URI fee, raised to the network minimum.
-export function keyregFee(fee: number | null | undefined, minFee: number | undefined): number {
-	const min = minFee ?? MIN_KEYREG_FEE;
+export function keyregFee(
+	fee: number | null | undefined,
+	minFee: number | bigint | undefined
+): number {
+	const min = minFee === undefined ? MIN_KEYREG_FEE : Number(minFee);
 	return Math.max(fee ?? min, min);
 }
 
@@ -274,12 +277,12 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 	// permanently non-participating, so it can never go online again (TASK-78).
 	if (input.offline) {
 		return algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-			from: input.sender,
-			suggestedParams: { ...input.params, fee: minFee, flatFee: true }
+			sender: input.sender,
+			suggestedParams: { ...input.params, minFee, fee: minFee, flatFee: true }
 		});
 	}
 	return algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-		from: input.sender,
+		sender: input.sender,
 		voteKey: Buffer.from(input.votingKey, 'base64'),
 		selectionKey: Buffer.from(input.selectionKey, 'base64'),
 		stateProofKey: Buffer.from(input.stateProofKey, 'base64'),
@@ -288,6 +291,7 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 		voteKeyDilution: input.keyDilution,
 		suggestedParams: {
 			...input.params,
+			minFee,
 			fee: keyregFee(input.fee, input.params.minFee),
 			flatFee: true
 		}
@@ -304,6 +308,29 @@ export class KeyregUnconfirmedError extends Error {
 	}
 }
 
+/**
+ * The wallet library signs, submits and waits for confirmation in one call, and reports a failed
+ * submission as a SignerSubmissionError (code SIGNER_SUBMISSION_FAILED) carrying one state per
+ * group. A group that is 'submitted-unconfirmed' may have landed (a confirmation timeout, a send
+ * that errored without an algod rejection, "already in ledger"), so retrying could register twice.
+ * 'not-sent' means this call never sent it or algod rejected it, which is an ordinary failure.
+ * Matched by shape, so this module stays free of the library.
+ */
+export function mayHaveLanded(error: unknown): boolean {
+	if (typeof error !== 'object' || error === null) return false;
+	const { code, groups } = error as { code?: unknown; groups?: unknown };
+	return (
+		code === 'SIGNER_SUBMISSION_FAILED' &&
+		Array.isArray(groups) &&
+		groups.some((group) => group?.state === 'submitted-unconfirmed')
+	);
+}
+
+/** Turn a submission that may have landed into the unconfirmed error; rethrow anything else. */
+export function keyregSendFailure(error: unknown, txid: string): unknown {
+	return mayHaveLanded(error) ? new KeyregUnconfirmedError(txid) : error;
+}
+
 export async function sendWalletKeyreg(
 	tx: algosdk.Transaction,
 	deps: {
@@ -313,7 +340,12 @@ export async function sendWalletKeyreg(
 	}
 ): Promise<string> {
 	const txid = tx.txID();
-	const result = await deps.signAndSend([[tx]]);
+	let result: unknown;
+	try {
+		result = await deps.signAndSend([[tx]]);
+	} catch (error) {
+		throw keyregSendFailure(error, txid);
+	}
 	if (!result) throw new Error('Failed to send wallet key registration transaction');
 	deps.onSubmitted?.(txid);
 	// Wallet providers wait one round and swallow errors, so a failed wait here is not a failed send.

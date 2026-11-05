@@ -9,10 +9,9 @@
 	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { calculateUserPoolAmounts, calculateUserPoolShare } from '$lib/tokens/lpStats';
 	import { algodClient } from '$lib/utils/algod';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
-	import { signTransactions } from 'avm-wallet-svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -105,8 +104,11 @@
 					totalSupply = data.tokens[0].totalSupply;
 				} else {
 					const assetInfo = await algodClient.getAssetByID(Number(token.id)).do();
-					creator = assetInfo.params.creator;
-					totalSupply = assetInfo.params.total;
+					const params = assetInfo.params;
+					creator = params ? params.creator.toString() : null;
+					// A total beyond the safe integer range is unavailable, not a rounded figure.
+					totalSupply =
+						params && params.total <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(params.total) : null;
 				}
 
 				// Fetch Envoi name for creator
@@ -196,6 +198,8 @@
 		}
 
 		try {
+			// The account the user confirmed, taken before any await.
+			const signer = captureSigner();
 			claimingApproval = approval.transactionId;
 			claimingError = null;
 			claimSuccess = false;
@@ -214,7 +218,7 @@
 				amount,
 				walletId,
 				async (txnsToSign: algosdk.Transaction[]) => {
-					const signedTxns = await signTransactions([txnsToSign]);
+					const signedTxns = await signTransactions([txnsToSign], signer);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
 					}

@@ -2,7 +2,13 @@
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Modal } from 'flowbite-svelte';
 	import { createEventDispatcher, onDestroy, tick } from 'svelte';
-	import { selectedWallet, signTransactions, connectedWallets } from 'avm-wallet-svelte';
+	import {
+		selectedWallet,
+		signTransactions,
+		connectedWallets,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import QRCode from 'qrcode';
 	import algosdk from 'algosdk';
 	import { onMount } from 'svelte';
@@ -10,8 +16,9 @@
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
+	import { buildAssetTransfer, buildPayment } from '$lib/chain/txBuilders';
 	import { createFlowPin } from '$lib/chain/flowAccount';
-	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
 	import { pollUntil } from '$lib/chain/singleFlightPoll';
 	import { checkDestinationConfirmation, checkAlgorandDeposit } from '$lib/chain/bridgeMonitor';
 	import type { ExpectedBridgeConfirmation } from '$lib/chain/bridgeConfirmation';
@@ -107,10 +114,7 @@
 	let monitorReview: { expected: bigint; actual: bigint } | null = null;
 	let bridgeError: string | null = null;
 	let pendingController: AbortController | undefined;
-	const sendDeps = {
-		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
-		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
-	};
+	const sendDeps = createSendDeps(algodClient);
 	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	let tracker: PendingTracker | undefined;
 	let trackerWallet: string | undefined;
@@ -395,7 +399,16 @@
 	async function handleSubmit() {
 		if (bridgeStatus !== 'idle' || !algosdk.isValidAddress(destinationAddress)) return;
 		if (isVoiToAlgorand) {
-			const sender = $selectedWallet?.address;
+			// The account the user confirmed, taken before any await; it signs whatever the picker does.
+			let signer: TransactionSigner | undefined;
+			let noSignerMessage = 'No wallet connected';
+			try {
+				signer = captureSigner();
+			} catch (captureError) {
+				if ($selectedWallet && captureError instanceof Error)
+					noSignerMessage = captureError.message;
+			}
+			const sender = signer?.address;
 			if (sender) {
 				flow.pin(sender);
 				pinTick++;
@@ -423,8 +436,8 @@
 				bridgeStatus = 'signing';
 				bridgeError = null;
 
-				if (!sender || !senderTracker) {
-					throw new Error('No wallet connected');
+				if (!signer || !sender || !senderTracker) {
+					throw new Error(noSignerMessage);
 				}
 
 				// Get suggested params for the transaction
@@ -435,7 +448,7 @@
 				let txn;
 				if (selectedToken.voiAssetId === '0') {
 					// Payment transaction for VOI
-					txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+					txn = buildPayment({
 						from: sender,
 						to: BRIDGE_ADDRESS,
 						amount: amountInAtomicUnits,
@@ -444,7 +457,7 @@
 					});
 				} else {
 					// ASA transfer for other tokens
-					txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+					txn = buildAssetTransfer({
 						from: sender,
 						to: BRIDGE_ADDRESS,
 						amount: amountInAtomicUnits,
@@ -457,7 +470,7 @@
 				// Sign transaction
 				let signedTxns;
 				try {
-					signedTxns = await signTransactions([[txn]]);
+					signedTxns = await signTransactions([[txn]], signer);
 					if (!signedTxns) throw new Error('Transaction signing was rejected');
 				} catch (error) {
 					if (controller.signal.aborted) return;
@@ -800,13 +813,13 @@
 			if (address !== flow.current($selectedWallet?.address)) return;
 			if (selectedToken.voiAssetId === '0') {
 				// For VOI token
-				voiBalance = (accountInfo.amount as number) / 1e6;
+				voiBalance = Number(accountInfo.amount) / 1e6;
 			} else {
 				// For ASAs
-				const asset = accountInfo['assets']?.find(
-					(a: any) => a['asset-id'].toString() === selectedToken.voiAssetId
+				const asset = accountInfo.assets?.find(
+					(a) => a.assetId.toString() === selectedToken.voiAssetId
 				);
-				voiBalance = asset ? (asset.amount as number) / 1e6 : 0;
+				voiBalance = asset ? Number(asset.amount) / 1e6 : 0;
 			}
 		} catch (error) {
 			if (address !== flow.current($selectedWallet?.address)) return;

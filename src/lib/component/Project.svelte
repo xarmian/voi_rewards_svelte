@@ -92,7 +92,7 @@
 				} else if (accountInfo.status === 'Online') {
 					steps[0].detected = true;
 					steps[0].name = 'Wallet Online';
-					steps[0].additionalInfo = `Online Balance: ${displayBalance(accountInfo.amount as number)} VOI`;
+					steps[0].additionalInfo = `Online Balance: ${displayBalance(Number(accountInfo.amount))} VOI`;
 				}
 
 				if (points && points.length > 0) {

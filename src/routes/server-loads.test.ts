@@ -6,12 +6,16 @@ const mocks = vi.hoisted(() => ({ from: vi.fn(), lockvest: vi.fn() }));
 vi.mock('$lib/supabase', () => ({ supabasePublicClient: { from: mocks.from } }));
 vi.mock('$lib/services/lockvest', () => ({ getLockContractByAddress: mocks.lockvest }));
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: async () => 100 }));
-vi.mock('avm-wallet-svelte', async () => {
+vi.mock('$lib/chain/wallet.svelte', async () => {
 	const { writable } = await import('svelte/store');
 	return { selectedWallet: writable(null) };
 });
 
-import { selectedWallet } from 'avm-wallet-svelte';
+import type { Writable } from 'svelte/store';
+import { selectedWallet as seamSelectedWallet } from '$lib/chain/wallet.svelte';
+
+// The mock above is a writable; the real seam's store is read-only, so only this test writes it.
+const selectedWallet = seamSelectedWallet as unknown as Writable<unknown>;
 import { fetchProjects } from './(site)/phase2/[...slug]/projects';
 import { GET } from './api/relay-rewards/+server';
 

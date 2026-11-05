@@ -12,18 +12,19 @@ import { createTrackingDeps } from './trackingDeps';
 
 function signedGroup() {
 	const account = algosdk.generateAccount();
-	const txns = [100, 95].map((lastRound, i) =>
+	const txns = [100, 95].map((lastValid, i) =>
 		algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-			from: account.addr,
-			to: account.addr,
+			sender: account.addr,
+			receiver: account.addr,
 			amount: i + 1,
 			suggestedParams: {
 				fee: 1000,
+				minFee: 1000,
 				flatFee: true,
-				firstRound: 1,
-				lastRound,
+				firstValid: 1,
+				lastValid,
 				genesisID: 'voimain-v1.0',
-				genesisHash: Buffer.alloc(32).toString('base64')
+				genesisHash: new Uint8Array(32)
 			}
 		})
 	);
@@ -62,9 +63,9 @@ describe('sendAndConfirm', () => {
 	});
 
 	it.each([
-		[Object.assign(new Error('refused'), { status: 400 }), 'rejected'],
+		[Object.assign(new Error('refused'), { response: { status: 400 } }), 'rejected'],
 		[new Error('network disconnected'), 'pending'],
-		[Object.assign(new Error('server error'), { status: 500 }), 'pending']
+		[Object.assign(new Error('server error'), { response: { status: 500 } }), 'pending']
 	])('classifies a send error: %s as %s', async (error, status) => {
 		const { signed, txIds } = signedGroup();
 		const waitForConfirmation = vi.fn();
@@ -157,10 +158,10 @@ describe('trackPending', () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 	it('keeps a send pending across timed out passes with at most one hung status request per stale window', async () => {
-		const status = vi.fn(() => ({ do: () => new Promise<Record<string, unknown>>(() => {}) }));
+		const status = vi.fn(() => ({ do: () => new Promise<{ lastRound: bigint }>(() => {}) }));
 		const pendingInfo = vi.fn(async () => ({}));
-		const search = vi.fn(async () => ({ 'current-round': 200, transactions: [] }));
-		const lookupBlock = vi.fn(() => ({ do: async () => ({ round: 100 }) }));
+		const search = vi.fn(async () => ({ currentRound: 200n, transactions: [] }));
+		const lookupBlock = vi.fn(() => ({ do: async () => ({ round: 100n }) }));
 		const d = createTrackingDeps(
 			{ status, pendingTransactionInformation: () => ({ do: pendingInfo }) },
 			{ lookupBlock, searchForTransactions: () => ({ txid: () => ({ do: search }) }) }
@@ -359,13 +360,13 @@ describe('trackPending', () => {
 		const { createTrackingDeps } = await import('./trackingDeps');
 		const d = createTrackingDeps(
 			{
-				status: () => ({ do: async () => ({ 'last-round': 101 }) }),
+				status: () => ({ do: async () => ({ lastRound: 101n }) }),
 				pendingTransactionInformation: () => ({ do: async () => ({}) })
 			},
 			{
-				lookupBlock: () => ({ do: async () => ({ round: pending.lastValid - 1 }) }),
+				lookupBlock: () => ({ do: async () => ({ round: BigInt(pending.lastValid - 1) }) }),
 				searchForTransactions: () => ({
-					txid: () => ({ do: async () => ({ 'current-round': 110, transactions: [] }) })
+					txid: () => ({ do: async () => ({ currentRound: 110n, transactions: [] }) })
 				})
 			}
 		);

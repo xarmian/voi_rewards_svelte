@@ -26,9 +26,9 @@ beforeEach(() => {
 	vi.useFakeTimers();
 	vi.setSystemTime(1000);
 	mocks.account.mockReset().mockReturnValue({ do: vi.fn().mockResolvedValue({ amount: 100 }) });
-	mocks.supply
-		.mockReset()
-		.mockReturnValue({ do: vi.fn().mockResolvedValue({ 'online-money': 200 }) });
+	mocks.supply.mockReset().mockReturnValue({
+		do: vi.fn().mockResolvedValue({ currentRound: 1n, onlineMoney: 200n, totalMoney: 300n })
+	});
 	vi.stubGlobal(
 		'fetch',
 		vi.fn(async () => Response.json({ blacklist_balance_total: '50' }))
@@ -137,7 +137,12 @@ it('shares supply and blacklist requests, expires supply, and retries failures',
 	const values = await Promise.all([getSupplyInfo(), getSupplyInfo()]);
 	expect(mocks.supply).toHaveBeenCalledTimes(1);
 	expect(fetch).toHaveBeenCalledTimes(1);
-	expect(values[0]).toEqual({ 'online-money': 200, 'blacklisted-money': 50 });
+	expect(values[0]).toEqual({
+		'current-round': 1,
+		'online-money': 200,
+		'total-money': 300,
+		'blacklisted-money': 50
+	});
 	expect(get(supply)).toEqual(values[0]);
 	vi.setSystemTime(1000 + 300_000);
 	vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
@@ -188,7 +193,7 @@ it('starts blacklist fetch before the pending algod supply resolves', async () =
 	const pending = getSupplyInfo();
 	await Promise.resolve();
 	expect(fetch).toHaveBeenCalledWith('https://test.invalid?action=blacklist-balance');
-	finish({ 'current-round': 10, 'online-money': 200, 'total-money': 1000 });
+	finish({ currentRound: 10n, onlineMoney: 200n, totalMoney: 1000n });
 	expect(await pending).toEqual({
 		'current-round': 10,
 		'online-money': 200,

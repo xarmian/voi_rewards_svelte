@@ -149,8 +149,7 @@ export async function getAccountInfo(
 	if (!address) return;
 	return accountCache.get(address, async () => {
 		try {
-			const data = (await algodClient.accountInformation(address).do()) as algosdk.modelsv2.Account;
-			return data;
+			return await algodClient.accountInformation(address).do();
 		} catch (error) {
 			console.error('Error fetching account info:', error);
 			return undefined;
@@ -164,7 +163,7 @@ export async function requireAccountInfo(
 ): Promise<algosdk.modelsv2.Account> {
 	return accountCache.get(
 		address,
-		async () => (await algodClient.accountInformation(address).do()) as algosdk.modelsv2.Account,
+		() => algodClient.accountInformation(address).do(),
 		{ force, strict: true }
 	);
 }
@@ -172,10 +171,15 @@ export async function requireAccountInfo(
 export async function getSupplyInfo(): Promise<SupplyInfo | null> {
 	return supplyCache.get('supply', async () => {
 		try {
-			const [data, res] = await Promise.all([
-				algodClient.supply().do() as Promise<SupplyInfo>,
+			const [supply, res] = await Promise.all([
+				algodClient.supply().do(),
 				fetch(`${config.proposalApiBaseUrl}?action=blacklist-balance`)
 			]);
+			const data = {
+				'current-round': Number(supply.currentRound),
+				'online-money': Number(supply.onlineMoney),
+				'total-money': Number(supply.totalMoney)
+			};
 			if (!res.ok) throw new Error(`Failed to fetch blacklist balance: HTTP ${res.status}`);
 			const blacklistData = await res.json();
 			const ballastBalance = Number(blacklistData.blacklist_balance_total);

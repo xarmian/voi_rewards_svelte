@@ -96,8 +96,7 @@
 				? { kind: 'arc200' }
 				: { kind: 'vsa', assetId: Number(checkedToken.id) };
 		const result = await loadRecipientInfo(address, token, {
-			fetchAccount: async (a) =>
-				(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+			fetchAccount: async (a) => requireAccountInfo(a, { force: true }),
 			arc200BalanceOf: async (a) => {
 				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
 				const balance = await contract.arc200_balanceOf(a);

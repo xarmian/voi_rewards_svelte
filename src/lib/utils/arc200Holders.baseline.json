@@ -1,0 +1,255 @@
+{
+	"capturedWith": {
+		"algosdk": "2.10.0",
+		"mainCommit": "df63200811f5ee45a267783f12ddb14fc9ac4f71"
+	},
+	"appId": 6779767,
+	"balances": [
+		{
+			"accountId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ",
+			"balance": "1000000",
+			"decimals": 6
+		},
+		{
+			"accountId": "INM3RC2AU43ZYJNLUOJF3NMWVK56CDL36JVQUP2G573E3PY4PU7KGHELJA",
+			"balance": "5000000",
+			"decimals": 6
+		},
+		{
+			"accountId": "OKSDOCOXVGMBXQ5TP5YA4VWTZWZJLJP3OMIILPHMHGHURUFE2Q3JP62QNU",
+			"balance": "-100",
+			"decimals": 6
+		},
+		{
+			"accountId": "O3VYQKJ45XILV2GVDO44LM2IGPUD2QYRXNFX5K4ZDC2B4BD4ZZXU5AQG24",
+			"balance": "500000",
+			"decimals": 6
+		},
+		{
+			"accountId": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+			"balance": "2000000",
+			"decimals": 6
+		},
+		{
+			"accountId": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+			"balance": "10000000",
+			"decimals": 6
+		},
+		{
+			"accountId": "2473OSBX37GQG3RVAS7CT7FXGOO7MTZ5UWKL4TZHLQUNOZZDDAHBYWIWGQ",
+			"balance": "",
+			"decimals": 6
+		},
+		{
+			"accountId": "R3BJTS37H37MFD2UEOL6A7YHCGGXJSDV7BKAT3MONOJ4C63A5GJIUIBBFY",
+			"decimals": 6
+		}
+	],
+	"validHolderCount": 3,
+	"filtered": {
+		"0": [
+			"O3VYQKJ45XILV2GVDO44LM2IGPUD2QYRXNFX5K4ZDC2B4BD4ZZXU5AQG24",
+			"FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+			"SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+			"2473OSBX37GQG3RVAS7CT7FXGOO7MTZ5UWKL4TZHLQUNOZZDDAHBYWIWGQ",
+			"R3BJTS37H37MFD2UEOL6A7YHCGGXJSDV7BKAT3MONOJ4C63A5GJIUIBBFY"
+		],
+		"1.5": [
+			"FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+			"SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY"
+		]
+	},
+	"qualifiedCount": {
+		"0": 5,
+		"1.5": 2
+	},
+	"amountValue": "100",
+	"recipients": {
+		"equal": {
+			"0": [
+				{
+					"address": "O3VYQKJ45XILV2GVDO44LM2IGPUD2QYRXNFX5K4ZDC2B4BD4ZZXU5AQG24",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "2473OSBX37GQG3RVAS7CT7FXGOO7MTZ5UWKL4TZHLQUNOZZDDAHBYWIWGQ",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "R3BJTS37H37MFD2UEOL6A7YHCGGXJSDV7BKAT3MONOJ4C63A5GJIUIBBFY",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				}
+			],
+			"1.5": [
+				{
+					"address": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				}
+			]
+		},
+		"per-holder": {
+			"0": [
+				{
+					"address": "O3VYQKJ45XILV2GVDO44LM2IGPUD2QYRXNFX5K4ZDC2B4BD4ZZXU5AQG24",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "2473OSBX37GQG3RVAS7CT7FXGOO7MTZ5UWKL4TZHLQUNOZZDDAHBYWIWGQ",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "R3BJTS37H37MFD2UEOL6A7YHCGGXJSDV7BKAT3MONOJ4C63A5GJIUIBBFY",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				}
+			],
+			"1.5": [
+				{
+					"address": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+					"amount": "100",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				}
+			]
+		},
+		"proportional": {
+			"0": [
+				{
+					"address": "O3VYQKJ45XILV2GVDO44LM2IGPUD2QYRXNFX5K4ZDC2B4BD4ZZXU5AQG24",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "2473OSBX37GQG3RVAS7CT7FXGOO7MTZ5UWKL4TZHLQUNOZZDDAHBYWIWGQ",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "R3BJTS37H37MFD2UEOL6A7YHCGGXJSDV7BKAT3MONOJ4C63A5GJIUIBBFY",
+					"amount": "",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				}
+			],
+			"1.5": [
+				{
+					"address": "FPKJ7KD37AEIB3MJ6WXEXJIZH4DACLBNCR5PNUQREUWMC2YLIWFH2NHX24",
+					"amount": "16.66666667",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				},
+				{
+					"address": "SW4BTZGCCNMSDYSANRLKFQOZNYRKH4B7J6DNSEUAYPSRGOYZRGKQEAW5EY",
+					"amount": "83.33333333",
+					"note": "",
+					"info": null,
+					"isLoading": false,
+					"isValid": true
+				}
+			]
+		}
+	}
+}

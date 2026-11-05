@@ -2,7 +2,7 @@
 	import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
 	import { createEventDispatcher } from 'svelte';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
-	import { signTransactions } from 'avm-wallet-svelte';
+	import { signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import { algodClient } from '$lib/utils/algod';
 
@@ -48,6 +48,8 @@
 		claimSuccess = false;
 
 		try {
+			// The account the user confirmed, taken before any await and kept for every approval.
+			const signer = captureSigner();
 			// Only handle ARC-200 tokens for now
 			if (token.type === 'arc200') {
 				// Claim all approvals for this token
@@ -64,7 +66,7 @@
 						amount,
 						walletId,
 						async (txnsToSign: algosdk.Transaction[]) => {
-							const signedTxns = await signTransactions([txnsToSign]);
+							const signedTxns = await signTransactions([txnsToSign], signer);
 							if (!signedTxns) {
 								throw new Error('User rejected transaction signing');
 							}

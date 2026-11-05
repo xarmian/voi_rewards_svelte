@@ -2,8 +2,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
 	import { arc200Approve, arc200RevokeApproval, fetchOutgoingApprovals } from '$lib/utils/arc200';
-	import { selectedWallet } from 'avm-wallet-svelte';
-	import { signTransactions } from 'avm-wallet-svelte';
+	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import WalletSearch from './WalletSearch.svelte';
 	import ResolvedAddress from './ResolvedAddress.svelte';
@@ -102,6 +101,8 @@
 
 		signingPinned = canSignTransactions;
 		try {
+			// The account the user confirmed, taken before any await.
+			const signer = captureSigner();
 			isApproving = true;
 			approvalError = null;
 			approvalSuccess = false;
@@ -122,7 +123,7 @@
 				rawAmount,
 				walletId,
 				async (txnsToSign: algosdk.Transaction[]) => {
-					const signedTxns = await signTransactions([txnsToSign]);
+					const signedTxns = await signTransactions([txnsToSign], signer);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
 					}
@@ -164,6 +165,8 @@
 
 		signingPinned = canSignTransactions;
 		try {
+			// The account the user confirmed, taken before any await.
+			const signer = captureSigner();
 			isRevoking = approval.transactionId;
 			approvalError = null;
 			approvalSuccess = false;
@@ -175,7 +178,7 @@
 				approval.spender,
 				walletId,
 				async (txnsToSign: algosdk.Transaction[]) => {
-					const signedTxns = await signTransactions([txnsToSign]);
+					const signedTxns = await signTransactions([txnsToSign], signer);
 					if (!signedTxns) {
 						throw new Error('User rejected transaction signing');
 					}

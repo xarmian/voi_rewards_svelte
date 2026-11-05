@@ -4,11 +4,12 @@
 
 	import { algodClient } from '$lib/utils/algod';
 	import { decodeLockContractState } from '$lib/chain/lockContract';
+	import { globalStateEntries } from '$lib/chain/algodShapes';
 	import WithdrawModal from './WithdrawModal.svelte';
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
 	import { getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import type { ContractDetails } from '$lib/types';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet } from '$lib/chain/wallet.svelte';
 
 	export let childAccounts: {
 		contractId: number;
@@ -43,11 +44,11 @@
 					// Get the application info using algodClient
 					const appInfo = await algodClient.getApplicationByID(account.contractId).do();
 					const accountInfo = await requireAccountInfo(account.address, { force: true });
-					const currentBalance = accountInfo.amount as number;
+					const currentBalance = Number(accountInfo.amount);
 
 					// Decode the global state
 					const decodedState = decodeLockContractState(
-						appInfo.params['global-state'],
+						globalStateEntries(appInfo.params?.globalState),
 						account.address
 					);
 
@@ -128,9 +129,7 @@
 						}
 
 						// Calculate available withdrawal amount considering minimum balance
-						const minimumBalance = (accountInfo as unknown as Record<string, number>)[
-							'min-balance'
-						];
+						const minimumBalance = Number(accountInfo.minBalance);
 						availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
 					}
 
@@ -166,7 +165,13 @@
 						periodSeconds: Number(decodedState.global_period_seconds ?? 0),
 						period: Number(decodedState.global_period ?? 0),
 						consensusDetails: consensusInfo,
-						accountInfo: accountInfo as unknown as ContractDetails['accountInfo']
+						accountInfo: {
+							round: Number(accountInfo.round),
+							status: accountInfo.status,
+							participation: accountInfo.participation
+								? { voteLastValid: Number(accountInfo.participation.voteLastValid) }
+								: undefined
+						}
 					};
 				} catch (err) {
 					console.error('Error loading contract:', err);

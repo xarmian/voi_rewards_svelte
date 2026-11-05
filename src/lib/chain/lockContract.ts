@@ -3,7 +3,7 @@ import * as algosdk from 'algosdk';
 interface GlobalStateValue {
 	type: number;
 	bytes: string;
-	uint: number;
+	uint: number | bigint;
 }
 
 interface GlobalStateEntry {
@@ -37,7 +37,7 @@ const decodeAddress = (value: GlobalStateValue): string =>
 	algosdk.encodeAddress(Buffer.from(value.bytes, 'base64'));
 
 const decodeNumber = (value: GlobalStateValue): number => {
-	if (value.type === 2) return value.uint;
+	if (value.type === 2) return Number(value.uint);
 	return Number(algosdk.decodeUint64(Buffer.from(value.bytes, 'base64'), 'safe'));
 };
 
