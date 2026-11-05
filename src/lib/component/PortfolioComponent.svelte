@@ -637,6 +637,13 @@
 			bulkClaimError = captureError instanceof Error ? captureError.message : String(captureError);
 			return;
 		}
+		// The claims below are built for the account this page shows, from its approvals. If the rune
+		// store moved while the readable one still showed it, the signer is another account: refuse,
+		// since a transfer built from the signer's address would not be the claim the user confirmed.
+		if (signer.address !== walletAddress) {
+			bulkClaimError = `Select account ${walletAddress} in a signing wallet to continue.`;
+			return;
+		}
 		const claimAccount = signer.address;
 		isBulkClaiming = true;
 		bulkClaimProgress = 0;

@@ -68,6 +68,26 @@ test('bulk claim captures its signer before any await and refuses another select
 	expect(fn).toMatch(/const claimAccount = signer\.address;/);
 });
 
+test('bulk claim refuses a signer that is not the account the page claims for, before building', () => {
+	// The readable store can lag the rune store by a tick, so the guard can pass for account A while
+	// captureSigner returns B. The claims are built for A's approvals from claimAccount: a signer that
+	// is not A must stop the run before any transaction is built, or the sender would follow the
+	// signer instead of the account the user confirmed.
+	const start = source.indexOf('async function bulkClaimAllTokens()');
+	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
+	const capture = fn.indexOf('captureSigner()');
+	// The whole statement, so a neutralised condition (`false && …`) does not satisfy it.
+	const statement = /\n\t\tif \(signer\.address !== walletAddress\) \{\n/.exec(fn);
+	expect(statement).not.toBeNull();
+	const check = statement?.index ?? -1;
+	const marker = fn.indexOf('const claimAccount = signer.address;');
+	expect(check).toBeGreaterThan(capture);
+	expect(marker).toBeGreaterThan(check);
+	expect(check).toBeLessThan(fn.indexOf('await '));
+	const refusal = fn.slice(check, fn.indexOf('return;', check));
+	expect(refusal).toContain('bulkClaimError = `Select account ${walletAddress}');
+});
+
 test('bulk claim builds its transactions from the captured account, not the live route address', () => {
 	const start = source.indexOf('async function bulkClaimAllTokens()');
 	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
