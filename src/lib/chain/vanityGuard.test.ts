@@ -6,9 +6,12 @@ test.each([
 	[false, true, 'proceed'],
 	[true, false, 'reload'],
 	[true, true, 'blocked']
-] as const)('thirdParty=%s, alreadyReloaded=%s gives %s', (thirdParty, alreadyReloaded, expected) => {
-	expect(decideVanityStart({ thirdParty, alreadyReloaded })).toBe(expected);
-});
+] as const)(
+	'thirdParty=%s, alreadyReloaded=%s gives %s',
+	(thirdParty, alreadyReloaded, expected) => {
+		expect(decideVanityStart({ thirdParty, alreadyReloaded })).toBe(expected);
+	}
+);
 
 test.each([
 	[[], undefined, false],
@@ -20,6 +23,8 @@ test.each([
 	[[], null, true]
 ] as const)('detects scripts %j and dataLayer %j', (sources, dataLayer, expected) => {
 	const querySelectorAll = vi.fn(() => sources.map((src) => ({ src })));
-	expect(hasThirdPartyScript({ querySelectorAll }, 'https://voirewards.com', { dataLayer })).toBe(expected);
+	expect(hasThirdPartyScript({ querySelectorAll }, 'https://voirewards.com', { dataLayer })).toBe(
+		expected
+	);
 	if (dataLayer === undefined) expect(querySelectorAll).toHaveBeenCalledWith('script[src]');
 });

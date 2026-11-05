@@ -3,8 +3,11 @@ export function hasThirdPartyScript(
 	origin: string,
 	win: { dataLayer?: unknown }
 ): boolean {
-	return win.dataLayer !== undefined || Array.from(doc.querySelectorAll('script[src]')).some(
-		(script) => new URL(script.src, origin).origin !== origin
+	return (
+		win.dataLayer !== undefined ||
+		Array.from(doc.querySelectorAll('script[src]')).some(
+			(script) => new URL(script.src, origin).origin !== origin
+		)
 	);
 }
 

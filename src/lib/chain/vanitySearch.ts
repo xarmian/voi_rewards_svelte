@@ -6,7 +6,10 @@ export type VanityMessage =
 	| { type: 'result'; address: string; mnemonic: string; attempts: number }
 	| { type: 'maxAttempts'; attempts: number; lastAddressChecked: string };
 
-export function runVanitySearch(request: VanityRequest, post: (message: VanityMessage) => void): void {
+export function runVanitySearch(
+	request: VanityRequest,
+	post: (message: VanityMessage) => void
+): void {
 	const prefixLower = request.prefix.toLowerCase();
 	const suffixLower = request.suffix.toLowerCase();
 	let attempts = 0;

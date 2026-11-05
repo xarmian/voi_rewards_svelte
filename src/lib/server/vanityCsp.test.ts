@@ -4,8 +4,12 @@ import { isVanityPath, newNonce, nonceInlineScripts, vanityCsp } from './vanityC
 afterEach(() => vi.restoreAllMocks());
 
 test.each([
-	['/vanity', true], ['/vanity/', true], ['/vanity/nested', true],
-	['/vanityfoo', false], ['/', false], ['/wallet/x', false]
+	['/vanity', true],
+	['/vanity/', true],
+	['/vanity/nested', true],
+	['/vanityfoo', false],
+	['/', false],
+	['/wallet/x', false]
 ] as const)('isVanityPath(%s) is %s', (path, expected) => {
 	expect(isVanityPath(path)).toBe(expected);
 });
@@ -23,11 +27,14 @@ test('creates a base64 nonce from sixteen cryptographically random bytes', () =>
 });
 
 test('allows only local scripts and workers plus nonce-bearing inline scripts', () => {
-	expect(vanityCsp('test-nonce')).toBe("script-src 'self' 'nonce-test-nonce'; worker-src 'self'; object-src 'none'; base-uri 'self'");
+	expect(vanityCsp('test-nonce')).toBe(
+		"script-src 'self' 'nonce-test-nonce'; worker-src 'self'; object-src 'none'; base-uri 'self'"
+	);
 });
 
 test('nonces theme, recaptcha and bootstrap inline scripts while preserving existing attributes', () => {
-	const html = '<script id="theme-init">theme()</script>' +
+	const html =
+		'<script id="theme-init">theme()</script>' +
 		'<script>window.recaptcha = {};</script>' +
 		'<script>__sveltekit = {}; start();</script>' +
 		'<script type="module" data-test="value">boot()</script>' +
@@ -35,12 +42,14 @@ test('nonces theme, recaptcha and bootstrap inline scripts while preserving exis
 		'<script defer src="/app.js"></script>' +
 		'<script type="module" nonce="existing">keep()</script>';
 	const output = nonceInlineScripts(html, 'test-nonce');
-	expect(output).toBe('<script nonce="test-nonce" id="theme-init">theme()</script>' +
-		'<script nonce="test-nonce">window.recaptcha = {};</script>' +
-		'<script nonce="test-nonce">__sveltekit = {}; start();</script>' +
-		'<script nonce="test-nonce" type="module" data-test="value">boot()</script>' +
-		'<script nonce="test-nonce" defer>upper()</SCRIPT>' +
-		'<script defer src="/app.js"></script>' +
-		'<script type="module" nonce="existing">keep()</script>');
+	expect(output).toBe(
+		'<script nonce="test-nonce" id="theme-init">theme()</script>' +
+			'<script nonce="test-nonce">window.recaptcha = {};</script>' +
+			'<script nonce="test-nonce">__sveltekit = {}; start();</script>' +
+			'<script nonce="test-nonce" type="module" data-test="value">boot()</script>' +
+			'<script nonce="test-nonce" defer>upper()</SCRIPT>' +
+			'<script defer src="/app.js"></script>' +
+			'<script type="module" nonce="existing">keep()</script>'
+	);
 	expect(nonceInlineScripts(output, 'another-nonce')).toBe(output);
 });

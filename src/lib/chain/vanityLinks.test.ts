@@ -18,6 +18,8 @@ test('vanity links always load a fresh document', () => {
 			expect(tag, file).toMatch(/\sdata-sveltekit-reload(?=\s|=|>)/);
 			expect(tag, file).not.toMatch(/data-sveltekit-reload\s*=\s*(?:["']false["']|\{false\})/);
 		}
-		expect(source, `${file}: use window.location.assign for vanity navigation`).not.toMatch(/\bgoto\s*\(\s*['"`]\/vanity/);
+		expect(source, `${file}: use window.location.assign for vanity navigation`).not.toMatch(
+			/\bgoto\s*\(\s*['"`]\/vanity/
+		);
 	}
 });
