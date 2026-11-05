@@ -34,11 +34,12 @@
 
 	onMount(() => {
 		initTheme();
-		// Conditionally inject Google Analytics except on /discover
+		// Conditionally inject Google Analytics except on /discover and /vanity
 		try {
 			const pathname = $page.url.pathname;
 			const isDiscover = pathname.startsWith('/discover');
-			if (typeof window !== 'undefined' && !isDiscover) {
+			const isVanity = pathname === '/vanity' || pathname.startsWith('/vanity/');
+			if (typeof window !== 'undefined' && !isDiscover && !isVanity) {
 				if (!document.getElementById('ga-script')) {
 					const ga = document.createElement('script');
 					ga.id = 'ga-script';
