@@ -30,8 +30,15 @@ test.each(['/vanity', '/vanity/nested'])(
 		const nonce = policy.match(/'nonce-([A-Za-z0-9+/]{22}==)'/)?.[1];
 		expect(nonce).toBeDefined();
 		expect(setHeaders).toHaveBeenCalledWith({
-			'content-security-policy': `script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'`
+			'content-security-policy': `script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'`,
+			'cache-control': 'private, no-store, no-transform'
 		});
+		// no-transform asks proxies (Cloudflare injects an analytics script into HTML otherwise) to leave
+		// the body alone; no-store keeps a response carrying a per-request nonce out of shared caches.
+		const cacheControl = setHeaders.mock.calls[0][0]['cache-control'] as string;
+		expect(cacheControl.split(/\s*,\s*/)).toEqual(
+			expect.arrayContaining(['no-transform', 'no-store'])
+		);
 		expect(resolve).toHaveBeenCalledOnce();
 		const options = resolve.mock.calls[0][1];
 		expect(
