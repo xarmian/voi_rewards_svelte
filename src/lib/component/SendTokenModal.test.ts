@@ -4,6 +4,7 @@ import algosdk from 'algosdk';
 import ts from 'typescript';
 import { expect, test } from 'vitest';
 import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
+import { createFlowPin } from '$lib/chain/flowAccount';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
 
@@ -39,9 +40,56 @@ function selectedWalletGlobals() {
 	const address = algosdk.generateAccount().addr.toString();
 	return {
 		$selectedWallet: { address },
-		captureSigner: () => ({ address, walletId: 'pera' })
+		captureSigner: () => ({ address, walletId: 'pera' }),
+		flow: createFlowPin()
 	};
 }
+
+// After a failed send the pin keeps the form on the submitted account while its error shows. A retry
+// for another selection would sign as one account and validate against another's funds.
+async function retryHarness(pinned: string, selected: string) {
+	const { decimalToBaseUnits } = await import('../chain/baseUnits');
+	const flow = createFlowPin();
+	flow.pin(pinned);
+	const run = componentFunctions(['handleSend'], {
+		decimalToBaseUnits,
+		algosdk,
+		$selectedWallet: { address: selected },
+		captureSigner: () => ({ address: selected, walletId: 'pera' }),
+		flow,
+		selectedToken: { decimals: 6, symbol: 'VOI' },
+		tracker: {},
+		// An invalid second amount stops the send right after the guard, so no network is needed.
+		recipients: ['1', 'abc'].map((value) => ({
+			address: algosdk.generateAccount().addr.toString(),
+			amount: value
+		})),
+		isSending: false,
+		error: null
+	});
+	return { run, flow };
+}
+
+test('a retry after a failed send refuses a different selected account and names the pinned one', async () => {
+	const pinned = algosdk.generateAccount().addr.toString();
+	const other = algosdk.generateAccount().addr.toString();
+	const { run, flow } = await retryHarness(pinned, other);
+	await run('handleSend()');
+	expect(run('error')).toBe(`Select account ${pinned} in a signing wallet to continue.`);
+	expect(run('isSending')).toBe(false);
+	// The refusal leaves the pin where it was: the form still belongs to the submitted account.
+	expect(flow.address).toBe(pinned);
+	flow.dispose();
+});
+
+test('a retry after a failed send with the pinned account selected again goes on to validate', async () => {
+	const pinned = algosdk.generateAccount().addr.toString();
+	const { run, flow } = await retryHarness(pinned, pinned);
+	await run('handleSend()');
+	// It got past the account guard to the next check.
+	expect(run('error')).toBe('Invalid amount for recipient 2');
+	flow.dispose();
+});
 
 test('send conversions never use a floating point decimal scale', () => {
 	expect(

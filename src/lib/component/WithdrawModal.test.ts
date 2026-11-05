@@ -119,6 +119,18 @@ test('WithdrawModal keys every withdrawal read by the wallet captured at submit'
 	expect(source).toMatch(/flowWallet = wallet;/);
 });
 
+test('a repeat call that returns at a guard leaves the captured wallet alone', () => {
+	const withdraw = source.slice(source.indexOf('async function handleWithdraw()'));
+	const body = withdraw.slice(0, withdraw.indexOf('\n\t}\n'));
+	const assign = body.indexOf('flowWallet = wallet;');
+	expect(assign).toBeGreaterThan(-1);
+	// Every early return comes before the assignment, and none of them clears the capture.
+	const guards = body.slice(0, assign);
+	expect(guards).toContain('canOfferWithdraw(');
+	expect(guards).not.toContain('flowWallet = undefined');
+	expect(guards.match(/\n\t\t\treturn;/g)?.length).toBeGreaterThanOrEqual(4);
+});
+
 test('WithdrawModal tracks the withdrawal under the wallet that signed it', () => {
 	expect(source).toMatch(
 		/async function trackWithdrawal\(id: string, lastValid: number, wallet: string\)/
