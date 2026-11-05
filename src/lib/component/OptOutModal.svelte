@@ -2,6 +2,7 @@
 	import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 	import { Modal, Button } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet, captureSigner } from '$lib/chain/wallet.svelte';
+	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
 	import { algodClient } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
 	import { buildAssetTransfer } from '$lib/chain/txBuilders';
@@ -29,8 +30,15 @@
 			return;
 		}
 
-		// The account the user confirmed; the picker may move while the wallet prompt is open.
-		const signer = captureSigner();
+		// The account the user confirmed; the picker may move while the wallet prompt is open. The
+		// store above can lag the rune store by a tick, so the capture can still refuse: show it.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			optOutError = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
 
 		try {
 			isOptingOut = true;

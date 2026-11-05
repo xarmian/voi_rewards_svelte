@@ -628,8 +628,15 @@
 			return;
 		}
 
-		// The account the user confirmed. Every batch signs as it, wherever the picker goes.
-		const signer: TransactionSigner = captureSigner();
+		// The account the user confirmed. Every batch signs as it, wherever the picker goes. The store
+		// above can lag the rune store by a tick, so the capture can still refuse: show it.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			bulkClaimError = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
 		const claimAccount = signer.address;
 		isBulkClaiming = true;
 		bulkClaimProgress = 0;
@@ -778,13 +785,15 @@
 						});
 					});
 
-					// A disconnected wallet or a sender mismatch cannot succeed on the next batch
-					// either: stop, and show the library's message.
+					// A signer error (disconnected wallet, watch-only account, sender mismatch, or a wallet
+					// that returned the wrong signatures) will not clear on the next batch, and each retry
+					// would prompt the user again: stop, and show the library's message.
 					if (
 						typeof error === 'object' &&
 						error !== null &&
 						'code' in error &&
-						(error.code === 'SIGNER_DISCONNECTED' || error.code === 'SIGNER_TRANSACTION_MISMATCH')
+						typeof error.code === 'string' &&
+						error.code.startsWith('SIGNER_')
 					) {
 						bulkClaimError = error instanceof Error ? error.message : 'Batch failed';
 						break;

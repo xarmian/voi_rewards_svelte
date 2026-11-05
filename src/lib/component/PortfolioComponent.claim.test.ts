@@ -12,15 +12,30 @@ test('signs every bulk claim batch as the captured signer, whatever the picker d
 	expect(source).toContain('{bulkClaimError}');
 });
 
-test('stops the bulk claim on a disconnected wallet or a sender mismatch, with the library message', () => {
+test('stops the bulk claim on any signer error, with the library message', () => {
+	// SIGNER_DISCONNECTED, SIGNER_WATCH_ONLY, SIGNER_TRANSACTION_MISMATCH and SIGNER_RESULT_MISMATCH
+	// will not clear on the next batch, and each retry would prompt the user again.
 	const loop = source.slice(source.indexOf('for (const batch of transactionBatches)'));
-	expect(loop).toContain("error.code === 'SIGNER_DISCONNECTED'");
-	expect(loop).toContain("error.code === 'SIGNER_TRANSACTION_MISMATCH'");
-	const stop = loop.slice(loop.indexOf("error.code === 'SIGNER_DISCONNECTED'"));
-	expect(stop.slice(0, stop.indexOf('break;'))).toContain(
+	const match = loop.indexOf("error.code.startsWith('SIGNER_')");
+	expect(match).toBeGreaterThan(-1);
+	expect(loop).toContain("typeof error.code === 'string'");
+	expect(loop.slice(match, loop.indexOf('break;', match))).toContain(
 		'bulkClaimError = error instanceof Error'
 	);
 });
+
+test.each(['PortfolioComponent', 'OptOutModal'])(
+	'%s shows a refused signer capture in its error area instead of throwing from the handler',
+	(component) => {
+		const text = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
+		// The stores can lag the rune store by a tick, so a guard can pass and the capture still refuse.
+		const capture = text.indexOf('signer = captureSigner();');
+		expect(capture).toBeGreaterThan(-1);
+		expect(text.slice(capture - 40, capture)).toMatch(/try \{\s*$/);
+		const catchBody = text.slice(capture, text.indexOf('return;', capture));
+		expect(catchBody).toMatch(/(optOutError|bulkClaimError) = captureError instanceof Error/);
+	}
+);
 
 test.each(['FungibleToken', 'ClaimableTokenCard', 'RegisterVoteKey', 'OptOutModal'])(
 	'%s has no live selection reads after its signing call',
