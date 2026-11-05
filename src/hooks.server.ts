@@ -2,7 +2,13 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import { createServerClient } from '@supabase/ssr';
 import type { Handle } from '@sveltejs/kit';
 import { withDeadline } from '$lib/server/fetchWithTimeout';
-import { isVanityPath, newNonce, nonceInlineScripts, vanityCsp } from '$lib/server/vanityCsp';
+import {
+	VANITY_CACHE_CONTROL,
+	isVanityPath,
+	newNonce,
+	nonceInlineScripts,
+	vanityCsp
+} from '$lib/server/vanityCsp';
 
 // TASK-85: Bound the entire auth validation so stalled requests cannot hold page loads.
 const AUTH_TIMEOUT_MS = 3000;
@@ -89,7 +95,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (event.url && isVanityPath(event.url.pathname)) {
 		const nonce = newNonce();
-		event.setHeaders({ 'content-security-policy': vanityCsp(nonce) });
+		event.setHeaders({
+			'content-security-policy': vanityCsp(nonce),
+			'cache-control': VANITY_CACHE_CONTROL
+		});
 		return resolve(event, {
 			filterSerializedResponseHeaders(name) {
 				return name === 'content-range' || name === 'x-supabase-api-version';
