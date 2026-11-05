@@ -9,7 +9,7 @@
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
 	import { getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import type { ContractDetails } from '$lib/types';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet } from '$lib/chain/wallet.svelte';
 
 	export let childAccounts: {
 		contractId: number;

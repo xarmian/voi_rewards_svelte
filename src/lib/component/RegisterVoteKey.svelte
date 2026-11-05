@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import Modal from './ui/Modal.svelte';
-	import { selectedWallet, signAndSendTransactions } from 'avm-wallet-svelte';
+	import {
+		signAndSendTransactions,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import { algodClient } from '$lib/utils/algod';
 	import {
@@ -167,8 +171,21 @@
 		}
 	}
 
+	// The account the user confirmed, taken before any await. A failure shows in the error area.
+	function signerOrError(): TransactionSigner | null {
+		try {
+			return captureSigner();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'No account is selected.';
+			transactionStatus = 'idle';
+			return null;
+		}
+	}
+
 	async function registerStakingContractVoteKey() {
 		console.log('Registering staking contract vote key');
+		const signer = signerOrError();
+		if (!signer) return;
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
@@ -249,7 +266,7 @@
 
 			transactionStatus = 'submitting';
 
-			const result = await signAndSendTransactions([txns]);
+			const result = await signAndSendTransactions([txns], signer);
 			if (result) {
 				transactionStatus = 'success';
 				transactionId = txid;
@@ -266,6 +283,8 @@
 	}
 
 	async function registerWalletVoteKey() {
+		const signer = signerOrError();
+		if (!signer) return;
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
@@ -284,7 +303,7 @@
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
-				signAndSend: signAndSendTransactions,
+				signAndSend: (groups) => signAndSendTransactions(groups, signer),
 				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4),
 				onSubmitted: (id) => {
 					transactionId = id;
@@ -303,6 +322,8 @@
 
 	async function goOfflineWalletVoteKey() {
 		error = null;
+		const signer = signerOrError();
+		if (!signer) return;
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
@@ -312,7 +333,7 @@
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
-				signAndSend: signAndSendTransactions,
+				signAndSend: (groups) => signAndSendTransactions(groups, signer),
 				waitForConfirmation: (id) => algosdk.waitForConfirmation(algodClient, id, 4),
 				onSubmitted: (id) => {
 					transactionId = id;
@@ -332,6 +353,8 @@
 	async function goOfflineStakingContractVoteKey() {
 		error = null;
 		console.log('Going offline for staking contract');
+		const signer = signerOrError();
+		if (!signer) return;
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
@@ -412,7 +435,7 @@
 
 			transactionStatus = 'submitting';
 
-			const result = await signAndSendTransactions([txns]);
+			const result = await signAndSendTransactions([txns], signer);
 			if (result) {
 				transactionStatus = 'success';
 				transactionId = txid;

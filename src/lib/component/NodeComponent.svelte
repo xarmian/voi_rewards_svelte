@@ -9,7 +9,7 @@
 	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 	import { dataTable } from '../../stores/dataTable';
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { selectedWallet } from '$lib/chain/wallet.svelte';
 
 	export let walletId: string;
 	export let parentWalletId: string | null;

@@ -13,7 +13,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { SearchOutline } from 'flowbite-svelte-icons';
 	import { debounce } from 'lodash-es';
-	import { connectedWallets } from 'avm-wallet-svelte';
+	import { connectedWallets } from '$lib/chain/wallet.svelte';
 	import NameAvatar from './NameAvatar.svelte';
 
 	export let searchText = '';
