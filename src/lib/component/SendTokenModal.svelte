@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import {
 		applyRecipientLookup,
@@ -50,6 +51,7 @@
 	const flow = createFlowPin();
 	let pinTick = 0;
 
+	export let accountAddress: string | undefined = undefined;
 	export let tokens: FungibleTokenType[];
 
 	$: availableTokens = tokens.filter((t) => !isLPToken(t)) as FungibleTokenType[];
@@ -124,12 +126,12 @@
 	// Fetch VOI balance only on initial modal open
 	$: {
 		void pinTick;
-		const address = flow.current($selectedWallet?.address);
+		const address = flow.current(accountAddress ?? $selectedWallet?.address);
 		if (open && address && isInitialLoad && !flow.pinned) {
 			isInitialLoad = false;
 			requireAccountInfo(address, { force: true })
 				.then((info) => {
-					if (address !== flow.current($selectedWallet?.address)) return;
+					if (address !== flow.current(accountAddress ?? $selectedWallet?.address)) return;
 					nativeVoiToken = {
 						...nativeVoiToken,
 						balance: Number(info.amount),
@@ -222,7 +224,7 @@
 	let keepOpenButton: HTMLButtonElement | undefined;
 	$: {
 		void pinTick;
-		syncTracker(open, flow.current($selectedWallet?.address));
+		syncTracker(open, flow.current(accountAddress ?? $selectedWallet?.address));
 	}
 	$: if (flow.pinned && (!open || (txState === 'idle' && !showResults && !isSending))) {
 		flow.release();
@@ -676,6 +678,10 @@
 			signer = captureSigner();
 		} catch (captureError) {
 			error = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		if (!signerMatchesAccount(signer, accountAddress)) {
+			error = wrongSignerMessage(accountAddress);
 			return;
 		}
 		// After a failed send the pin keeps this form (tracker, token, balance checks) on that account
@@ -1583,6 +1589,18 @@
 							</div>
 						</div>
 					{/if}
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						Signing account: {$selectedWallet?.address}
+					</p>
+					{#if $selectedWallet?.address !== accountAddress}
+						<div
+							role="alert"
+							class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg"
+						>
+							{wrongSignerMessage(accountAddress)}
+						</div>
+					{/if}
+
 					<div
 						class="flex flex-col sm:flex-row gap-3 items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700"
 					>
@@ -1608,7 +1626,9 @@
 								color="blue"
 								class="flex-1 sm:flex-none"
 								on:click={handleSend}
-								disabled={!canSubmit || txState !== 'idle'}
+								disabled={!canSubmit ||
+									txState !== 'idle' ||
+									$selectedWallet?.address !== accountAddress}
 							>
 								{#if txState === 'building'}
 									<svg

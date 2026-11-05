@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from 'vitest';
+import { createContext, runInContext } from 'node:vm';
+import ts from 'typescript';
+import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
+import { expect, test, vi } from 'vitest';
 
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 
@@ -101,4 +104,88 @@ test('each bulk claim result names the account that signed it', () => {
 	const start = source.indexOf('async function bulkClaimAllTokens()');
 	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
 	expect(fn.match(/wallet: claimAccount/g)).toHaveLength(2);
+});
+
+test.each(['Y', undefined])(
+	'opt-out requires the page account %j before building',
+	async (accountAddress) => {
+		const text = readFileSync(new URL('./OptOutModal.svelte', import.meta.url), 'utf8');
+		const handler = text.match(/async function handleOptOut\([^]*?\n\t\}/)?.[0];
+		expect(handler).toBeDefined();
+		for (const selected of ['X', 'Y']) {
+			const buildAssetTransfer = vi.fn().mockReturnValue({});
+			const buildPayment = vi.fn();
+			const buildCombinedPayment = vi.fn();
+			const signTransactions = vi.fn().mockResolvedValue([[1]]);
+			const sendRawTransaction = vi.fn(() => ({ do: async () => ({ txid: 'tx' }) }));
+			const context = createContext({
+				accountAddress,
+				signerMatchesAccount,
+				wrongSignerMessage,
+				$selectedWallet: { address: selected, app: 'Pera' },
+				captureSigner: () => ({ address: selected }),
+				buildAssetTransfer,
+				buildPayment,
+				buildCombinedPayment,
+				signTransactions,
+				algodClient: { getTransactionParams: () => ({ do: async () => ({}) }), sendRawTransaction },
+				algosdk: { waitForConfirmation: vi.fn() },
+				token: { id: '1' },
+				optOutError: null,
+				optOutSuccess: false,
+				onTokenOptedOut: vi.fn(),
+				setTimeout: vi.fn()
+			});
+			runInContext(ts.transpileModule(handler!, {}).outputText, context);
+			await runInContext('handleOptOut()', context);
+			if (selected !== accountAddress) {
+				expect(context.optOutError).toBe(wrongSignerMessage(accountAddress));
+				for (const call of [
+					buildAssetTransfer,
+					buildPayment,
+					buildCombinedPayment,
+					signTransactions,
+					sendRawTransaction
+				]) {
+					expect(call).not.toHaveBeenCalled();
+				}
+			} else {
+				expect(context.optOutError).toBeNull();
+				expect(buildAssetTransfer).toHaveBeenCalledWith(
+					expect.objectContaining({ from: 'Y', to: 'Y', closeRemainderTo: 'Y' })
+				);
+				expect(signTransactions).toHaveBeenCalledWith([[{}]], { address: 'Y' });
+				expect(sendRawTransaction).toHaveBeenCalledOnce();
+				expect(context.optOutSuccess).toBe(true);
+			}
+		}
+	}
+);
+
+test.each(['OptOutModal', 'SendTokenModal'])(
+	'%s displays and disables a mismatched signing account',
+	(component) => {
+		const text = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
+		expect(text).toMatch(/^\texport let accountAddress: string \| undefined = undefined;$/m);
+		expect(text).toContain('Signing account: {$selectedWallet?.address}');
+		expect(text).toMatch(
+			/\{#if \$selectedWallet\?\.address !== accountAddress\}\s*<[^>]*role="alert"[^>]*>\s*\{wrongSignerMessage\(accountAddress\)\}/
+		);
+		const button = text.match(/<Button\b[^>]*on:click=\{handle(?:OptOut|Send)\}[^>]*>/)?.[0];
+		expect(button).toMatch(
+			/disabled=\{[^}]*\|\|\s*\$selectedWallet\?\.address !== accountAddress\}/
+		);
+	}
+);
+
+test('every send and opt-out mount receives the displayed account', () => {
+	const fungible = readFileSync(new URL('./FungibleToken.svelte', import.meta.url), 'utf8');
+	for (const name of ['OptOutModal', 'SendTokenModal']) {
+		expect(fungible.match(new RegExp(`<${name}\\b[^]*?/>`))?.[0]).toMatch(
+			/accountAddress=\{walletId\}/
+		);
+	}
+	expect(source.match(/<svelte:component\s+this=\{SendTokenModal\}[^]*?\/>/)?.[0]).toMatch(
+		/accountAddress=\{walletAddress\}/
+	);
 });

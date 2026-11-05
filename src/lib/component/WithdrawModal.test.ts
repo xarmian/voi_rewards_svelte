@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from 'vitest';
+import { createContext, runInContext } from 'node:vm';
+import ts from 'typescript';
+import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
+import { expect, test, vi } from 'vitest';
 
 const source = readFileSync(new URL('./WithdrawModal.svelte', import.meta.url), 'utf8');
 
@@ -151,5 +154,77 @@ test('WithdrawModal never assigns the captured wallet inside a reactive block th
 	const blocks = source.match(/\n\t\$: \{[^]*?\n\t\}\n/g) ?? [];
 	for (const block of blocks) {
 		if (block.includes('activeWallet')) expect(block).not.toMatch(/\bflowWallet =/);
+	}
+});
+
+test('withdraw requires the contract owner before building or signing', async () => {
+	const handler = source.match(/async function handleWithdraw\([^]*?\n\t\}/)?.[0];
+	expect(handler).toBeDefined();
+	for (const selected of ['X', 'Z']) {
+		const withdraw = vi.fn().mockResolvedValue({ obj: {} });
+		const custom = vi.fn().mockResolvedValue({ txns: ['txn'] });
+		const CONTRACT = vi.fn(function () {
+			return {
+				withdraw,
+				custom,
+				setFee: vi.fn(),
+				setEnableGroupResourceSharing: vi.fn(),
+				setExtraTxns: vi.fn()
+			};
+		});
+		const signTransactions = vi.fn().mockResolvedValue([[1]]);
+		const signAndSendTransactions = vi.fn();
+		const sendWithdrawal = vi.fn(
+			async (_request: unknown, deps: { sign: (groups: unknown[][]) => Promise<unknown> }) => {
+				await deps.sign([[{}]]);
+				return { status: 'confirmed', txId: 'tx' };
+			}
+		);
+		const context = createContext({
+			$selectedWallet: { address: selected },
+			captureSigner: () => ({ address: selected }),
+			signerMatchesAccount,
+			wrongSignerMessage,
+			contract: { owner: 'Z', contractId: 1 },
+			canOfferWithdraw: () => true,
+			withdrawAmountVOI: 1,
+			availableBalanceVOI: 2,
+			error: null,
+			txStatus: 'idle',
+			VOIToMicroVOI: (amount: number) => amount * 1e6,
+			CONTRACT,
+			abi: { custom: {} },
+			algodClient: {},
+			Buffer,
+			algosdk: { decodeUnsignedTransaction: () => ({}) },
+			signTransactions,
+			signAndSendTransactions,
+			sendWithdrawal,
+			sendDeps: {}
+		});
+		runInContext(ts.transpileModule(handler!, {}).outputText, context);
+		await runInContext('handleWithdraw()', context);
+		if (selected !== 'Z') {
+			expect(context.error).toBe(wrongSignerMessage('Z'));
+			for (const call of [
+				CONTRACT,
+				withdraw,
+				custom,
+				sendWithdrawal,
+				signTransactions,
+				signAndSendTransactions
+			]) {
+				expect(call).not.toHaveBeenCalled();
+			}
+		} else {
+			expect(context.error).toBeNull();
+			expect(withdraw).toHaveBeenCalledWith(1000000);
+			expect(signTransactions).toHaveBeenCalledWith([[{}]], { address: 'Z' });
+			expect(sendWithdrawal).toHaveBeenCalledWith(
+				expect.objectContaining({ wallet: 'Z', contractId: 1 }),
+				expect.anything()
+			);
+			expect(context.txStatus).toBe('confirmed');
+		}
 	}
 });

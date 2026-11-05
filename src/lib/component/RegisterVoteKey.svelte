@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 	import { fade } from 'svelte/transition';
 	import Modal from './ui/Modal.svelte';
 	import {
@@ -192,6 +193,10 @@
 			error = 'Missing parent wallet address or contract ID';
 			return;
 		}
+		if (!signerMatchesAccount(signer, parentWalletAddress)) {
+			error = wrongSignerMessage(parentWalletAddress);
+			return;
+		}
 
 		try {
 			transactionStatus = 'building';
@@ -365,6 +370,10 @@
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
+			return;
+		}
+		if (!signerMatchesAccount(signer, parentWalletAddress)) {
+			error = wrongSignerMessage(parentWalletAddress);
 			return;
 		}
 

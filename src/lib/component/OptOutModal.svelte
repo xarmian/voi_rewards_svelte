@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 	import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 	import { Modal, Button } from 'flowbite-svelte';
 	import { signTransactions, selectedWallet, captureSigner } from '$lib/chain/wallet.svelte';
@@ -10,6 +11,7 @@
 
 	const dispatch = createEventDispatcher();
 
+	export let accountAddress: string | undefined = undefined;
 	export let open = false;
 	export let token: FungibleTokenType | LPToken;
 	export let onTokenOptedOut: () => void;
@@ -37,6 +39,10 @@
 			signer = captureSigner();
 		} catch (captureError) {
 			optOutError = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		if (!signerMatchesAccount(signer, accountAddress)) {
+			optOutError = wrongSignerMessage(accountAddress);
 			return;
 		}
 
@@ -102,8 +108,24 @@
 				</div>
 			{/if}
 
+			<p class="mb-6 text-gray-700 dark:text-gray-300">
+				Signing account: {$selectedWallet?.address}
+			</p>
+			{#if $selectedWallet?.address !== accountAddress}
+				<div
+					role="alert"
+					class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg"
+				>
+					{wrongSignerMessage(accountAddress)}
+				</div>
+			{/if}
+
 			<div class="flex justify-center gap-4">
-				<Button color="red" on:click={handleOptOut} disabled={isOptingOut}>
+				<Button
+					color="red"
+					on:click={handleOptOut}
+					disabled={isOptingOut || $selectedWallet?.address !== accountAddress}
+				>
 					{#if isOptingOut}
 						<svg
 							class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
