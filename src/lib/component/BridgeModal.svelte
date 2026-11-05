@@ -405,7 +405,8 @@
 			try {
 				signer = captureSigner();
 			} catch (captureError) {
-				if ($selectedWallet && captureError instanceof Error) noSignerMessage = captureError.message;
+				if ($selectedWallet && captureError instanceof Error)
+					noSignerMessage = captureError.message;
 			}
 			const sender = signer?.address;
 			if (sender) {

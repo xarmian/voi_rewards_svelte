@@ -45,10 +45,7 @@ function toWallet(account: ConnectedAccount): Wallet {
 function sameWallet(a: Wallet | null, b: Wallet | null): boolean {
 	if (a === null || b === null) return a === b;
 	return (
-		a.address === b.address &&
-		a.walletId === b.walletId &&
-		a.app === b.app &&
-		a.name === b.name
+		a.address === b.address && a.walletId === b.walletId && a.app === b.app && a.name === b.name
 	);
 }
 

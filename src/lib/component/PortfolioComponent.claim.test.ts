@@ -17,7 +17,9 @@ test('stops the bulk claim on a disconnected wallet or a sender mismatch, with t
 	expect(loop).toContain("error.code === 'SIGNER_DISCONNECTED'");
 	expect(loop).toContain("error.code === 'SIGNER_TRANSACTION_MISMATCH'");
 	const stop = loop.slice(loop.indexOf("error.code === 'SIGNER_DISCONNECTED'"));
-	expect(stop.slice(0, stop.indexOf('break;'))).toContain('bulkClaimError = error instanceof Error');
+	expect(stop.slice(0, stop.indexOf('break;'))).toContain(
+		'bulkClaimError = error instanceof Error'
+	);
 });
 
 test.each(['FungibleToken', 'ClaimableTokenCard', 'RegisterVoteKey', 'OptOutModal'])(
