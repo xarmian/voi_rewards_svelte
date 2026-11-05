@@ -157,73 +157,7 @@
 
 		try {
 			// Create a worker for better performance and to avoid blocking the UI
-			worker = new Worker(
-				URL.createObjectURL(
-					new Blob(
-						[
-							`
-              self.onmessage = function(e) {
-                const { prefix, suffix, maxAttempts } = e.data;
-                
-                // Import AlgoSDK (must be included in the worker)
-                importScripts('https://cdn.jsdelivr.net/npm/algosdk@2.9.0/dist/browser/algosdk.min.js');
-                
-                let attempts = 0;
-                let foundMatch = false;
-                let lastAddressChecked = ''; // Track the last generated address
-
-                const prefixLower = prefix.toLowerCase();
-                const suffixLower = suffix.toLowerCase();
-
-                while (!foundMatch && attempts < maxAttempts) {
-                  // Generate an account
-                  const account = algosdk.generateAccount();
-                  const address = account.addr;
-                  const mnemonic = algosdk.secretKeyToMnemonic(account.sk);
-                  
-                  attempts++;
-                  lastAddressChecked = address; // Update last checked address
-
-                  // Send progress update every 1000 attempts
-                  if (attempts % 1000 === 0) {
-                    self.postMessage({ 
-                      type: 'progress', 
-                      attempts,
-                      lastAddressChecked // Send the latest address checked
-                    });
-                  }
-                  
-                  // Check if it matches our conditions - always ignore case
-                  const addressLower = address.toLowerCase();
-                  
-                  const matchesPrefix = !prefixLower || addressLower.startsWith(prefixLower);
-                  const matchesSuffix = !suffixLower || addressLower.endsWith(suffixLower);
-                  
-                  if (matchesPrefix && matchesSuffix) {
-                    self.postMessage({ 
-                      type: 'result', 
-                      address, 
-                      mnemonic,
-                      attempts 
-                    });
-                    foundMatch = true;
-                  }
-                }
-                
-                if (!foundMatch) {
-                  self.postMessage({ 
-                    type: 'maxAttempts', 
-                    attempts,
-                    lastAddressChecked // Include last checked on max attempts too
-                  });
-                }
-              };
-              `
-						],
-						{ type: 'application/javascript' }
-					)
-				)
-			);
+			worker = new Worker(new URL('../../../lib/chain/vanity.worker.ts', import.meta.url), { type: 'module' });
 
 			// Set up event listeners
 			worker.onmessage = (e) => {
@@ -455,20 +389,12 @@
 
 	// Clean up on unmount
 	onMount(() => {
-		// Import font awesome - consider adding this via a layout or app.html
-		const link = document.createElement('link');
-		link.rel = 'stylesheet';
-		link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css';
-		document.head.appendChild(link);
-
 		return () => {
 			if (updateInterval) clearInterval(updateInterval);
 			if (worker) {
 				worker.terminate(); // Ensure worker is terminated on component destroy
 				worker = null;
 			}
-			// Remove font awesome link if it's only needed here
-			// document.head.removeChild(link);
 		};
 	});
 </script>
@@ -476,10 +402,6 @@
 <svelte:head>
 	<title>Vanity Address Generator | Voi</title>
 	<meta name="description" content="Generate a Voi vanity address with custom prefix and suffix" />
-	<script
-		src="https://cdn.jsdelivr.net/npm/algosdk@2.9.0/dist/browser/algosdk.min.js"
-		defer
-	></script>
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8 max-w-4xl">
