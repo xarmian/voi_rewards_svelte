@@ -80,6 +80,24 @@ describe('wallet seam', () => {
 		expect(get(connectedWallets)).toEqual([]);
 	});
 
+	// Components do work on every notification (fetch a balance, start a tracker), so a first
+	// subscriber that got the starting value twice would do that work twice on mount.
+	it.each([
+		['selectedWallet', selectedWallet],
+		['connectedWallets', connectedWallets]
+	] as const)('delivers the starting value of %s once to its first subscriber', (_name, store) => {
+		for (const stop of unsubscribers) stop();
+		unsubscribers = [];
+		walletStore.addAccounts([account(A, 'pera')]);
+		walletStore.selectAccount(account(A, 'pera'));
+		flushSync();
+		const calls: unknown[] = [];
+		const stop = store.subscribe((value) => calls.push(value));
+		flushSync();
+		stop();
+		expect(calls).toHaveLength(1);
+	});
+
 	it('maps the selected account to the legacy shape', () => {
 		walletStore.addAccounts([account(A, 'pera', 'alice')]);
 		walletStore.selectAccount(account(A, 'pera', 'alice'));
