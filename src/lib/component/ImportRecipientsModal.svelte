@@ -3,6 +3,11 @@
 	import type { Recipient } from '$lib/types/recipients';
 	import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
 	import algosdk from 'algosdk';
+	import {
+		buildHolderRecipients,
+		countValidHolders,
+		filterHolders
+	} from '$lib/utils/arc200Holders';
 
 	export let open = false;
 	export let onClose = () => {};
@@ -76,22 +81,12 @@
 		}
 
 		try {
-			// Get the creator address to exclude
-			const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
-
 			// Count holders with balance above minimum
-			const qualified = arc200TokenData.balances.filter((balance: any) => {
-				if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
-					return false;
-				}
-
-				if (balance.balance && balance.balance.startsWith('-')) {
-					return false;
-				}
-
-				const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
-				return tokenBalance >= minimumBalance;
-			}).length;
+			const qualified = filterHolders(
+				arc200TokenData.balances,
+				arc200TokenId,
+				minimumBalance
+			).length;
 
 			arc200QualifiedHolders = qualified;
 		} catch (err) {
@@ -800,17 +795,8 @@
 			arc200TokenDecimals = firstBalance.decimals || 0;
 			arc200TokenImageUrl = firstBalance.imageUrl || '';
 
-			// Get creator address to exclude
-			const creatorAddress = algosdk.getApplicationAddress(parseInt(id));
-
 			// Count valid holders (excluding zero address and creator)
-			arc200TokenHolders = allBalances.filter(
-				(balance: any) =>
-					balance.accountId !== zeroAddress &&
-					balance.accountId !== creatorAddress &&
-					balance.balance &&
-					!balance.balance.startsWith('-')
-			).length;
+			arc200TokenHolders = countValidHolders(allBalances, id);
 
 			// Initially, qualified holders equals total holders
 			arc200QualifiedHolders = arc200TokenHolders;
@@ -872,29 +858,8 @@
 			let validHolders = [];
 
 			if (arc200TokenData && arc200TokenData.balances) {
-				// Get the creator address to exclude it
-				const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
-
 				// Filter out zero address, creator address, negative balances, and balances below minimum
-				validHolders = arc200TokenData.balances.filter((balance: any) => {
-					// Skip zero address and creator address
-					if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
-						return false;
-					}
-
-					// Skip negative balances
-					if (balance.balance && balance.balance.startsWith('-')) {
-						return false;
-					}
-
-					// Apply minimum balance filter if specified
-					if (minimumBalance > 0) {
-						const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
-						return tokenBalance >= minimumBalance;
-					}
-
-					return true;
-				});
+				validHolders = filterHolders(arc200TokenData.balances, arc200TokenId, minimumBalance);
 			} else {
 				// We need to fetch the data with pagination
 				const allBalances = [];
@@ -935,75 +900,19 @@
 					}
 				} while (nextToken);
 
-				// Get the creator address to exclude it
-				const creatorAddress = algosdk.getApplicationAddress(parseInt(arc200TokenId));
-
 				// Filter out zero address, creator address, negative balances, and balances below minimum
-				validHolders = allBalances.filter((balance: any) => {
-					// Skip zero address and creator address
-					if (balance.accountId === zeroAddress || balance.accountId === creatorAddress) {
-						return false;
-					}
-
-					// Skip negative balances
-					if (balance.balance && balance.balance.startsWith('-')) {
-						return false;
-					}
-
-					// Apply minimum balance filter if specified
-					if (minimumBalance > 0) {
-						const tokenBalance = Number(balance.balance) / Math.pow(10, balance.decimals);
-						return tokenBalance >= minimumBalance;
-					}
-
-					return true;
-				});
+				validHolders = filterHolders(allBalances, arc200TokenId, minimumBalance);
 			}
 
 			if (validHolders.length === 0) {
 				throw new Error('No valid holders found for this token');
 			}
 
-			// Calculate total tokens for proportional distribution if needed
-			let totalTokenAmount = 0;
-
-			if (arc200DistributionType === 'proportional') {
-				// Sum all balances for proportional distribution
-				totalTokenAmount = validHolders.reduce((sum: number, holder: any) => {
-					const balance = Number(holder.balance) / Math.pow(10, holder.decimals);
-					return sum + balance;
-				}, 0);
-			}
-
-			// Create recipients array
-			const recipients: Recipient[] = [];
-
-			validHolders.forEach((holder: any) => {
-				let amount = '';
-				const holderBalance = Number(holder.balance) / Math.pow(10, holder.decimals);
-
-				if (arc200DistributionType !== 'equal') {
-					if (arc200DistributionType === 'per-holder') {
-						amount = String(amountValue);
-					} else if (arc200DistributionType === 'proportional' && totalTokenAmount > 0) {
-						// Calculate proportional amount based on holder's percentage of total
-						const percentage = holderBalance / totalTokenAmount;
-						amount = (Number(amountValue) * percentage).toFixed(8);
-					}
-				} else {
-					// Equal distribution (amount will be calculated by the recipient table)
-					amount = '';
-				}
-
-				recipients.push({
-					address: holder.accountId,
-					amount,
-					note: '',
-					info: null,
-					isLoading: false,
-					isValid: true
-				});
-			});
+			const recipients: Recipient[] = buildHolderRecipients(
+				validHolders,
+				arc200DistributionType,
+				amountValue
+			);
 
 			onConfirm(recipients);
 			handleClose();
