@@ -2,7 +2,13 @@
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Modal } from 'flowbite-svelte';
 	import { createEventDispatcher, onDestroy, tick } from 'svelte';
-	import { selectedWallet, signTransactions, connectedWallets } from 'avm-wallet-svelte';
+	import {
+		selectedWallet,
+		signTransactions,
+		connectedWallets,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import QRCode from 'qrcode';
 	import algosdk from 'algosdk';
 	import { onMount } from 'svelte';
@@ -393,7 +399,15 @@
 	async function handleSubmit() {
 		if (bridgeStatus !== 'idle' || !algosdk.isValidAddress(destinationAddress)) return;
 		if (isVoiToAlgorand) {
-			const sender = $selectedWallet?.address;
+			// The account the user confirmed, taken before any await; it signs whatever the picker does.
+			let signer: TransactionSigner | undefined;
+			let noSignerMessage = 'No wallet connected';
+			try {
+				signer = captureSigner();
+			} catch (captureError) {
+				if ($selectedWallet && captureError instanceof Error) noSignerMessage = captureError.message;
+			}
+			const sender = signer?.address;
 			if (sender) {
 				flow.pin(sender);
 				pinTick++;
@@ -421,8 +435,8 @@
 				bridgeStatus = 'signing';
 				bridgeError = null;
 
-				if (!sender || !senderTracker) {
-					throw new Error('No wallet connected');
+				if (!signer || !sender || !senderTracker) {
+					throw new Error(noSignerMessage);
 				}
 
 				// Get suggested params for the transaction
@@ -455,7 +469,7 @@
 				// Sign transaction
 				let signedTxns;
 				try {
-					signedTxns = await signTransactions([[txn]]);
+					signedTxns = await signTransactions([[txn]], signer);
 					if (!signedTxns) throw new Error('Transaction signing was rejected');
 				} catch (error) {
 					if (controller.signal.aborted) return;

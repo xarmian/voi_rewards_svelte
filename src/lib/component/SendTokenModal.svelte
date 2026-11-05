@@ -11,7 +11,12 @@
 	import { createFlowPin } from '$lib/chain/flowAccount';
 	import { iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
-	import { signTransactions, selectedWallet } from 'avm-wallet-svelte';
+	import {
+		signTransactions,
+		selectedWallet,
+		captureSigner,
+		type TransactionSigner
+	} from '$lib/chain/wallet.svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
 	import { onDestroy, tick } from 'svelte';
@@ -665,7 +670,15 @@
 			return;
 		}
 		const token = selectedToken;
-		const sender = $selectedWallet.address;
+		// The account the user confirmed; every batch signs as it.
+		let signer: TransactionSigner;
+		try {
+			signer = captureSigner();
+		} catch (captureError) {
+			error = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		const sender = signer.address;
 		const senderTracker = tracker;
 		if (!senderTracker) return;
 		const symbol = token.symbol;
@@ -810,7 +823,7 @@
 				currentTxnGroup = currentBatch;
 
 				// Sign all transactions in this batch (up to 16 groups) at once
-				const signedTransactions = await signTransactions([batchTransactions]);
+				const signedTransactions = await signTransactions([batchTransactions], signer);
 				if (!signedTransactions) {
 					throw new Error('User rejected transaction signing');
 				}

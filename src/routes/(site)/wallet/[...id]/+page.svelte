@@ -1,11 +1,7 @@
 <script lang="ts">
 	import { escapeHtml } from '$lib/utils/escapeHtml';
-	import {
-		Web3Wallet,
-		selectedWallet,
-		connectedWallets,
-		setOnSelectHandler
-	} from 'avm-wallet-svelte';
+	import { Web3Wallet, type ConnectedAccount } from 'avm-wallet-svelte';
+	import { selectedWallet, connectedWallets, selectWallet } from '$lib/chain/wallet.svelte';
 	import { get } from 'svelte/store';
 	import { pinnedFlows } from '$lib/chain/flowAccount';
 	import { pickNavigation, selectionFromRoute } from '$lib/utils/walletSelection';
@@ -86,26 +82,27 @@
 		}
 	}
 
+	// Fired by the wallet picker only when the user picks an account (not by restore or route sync),
+	// so only a user pick navigates (TASK-132).
+	function handleAccountPicked(pick: ConnectedAccount) {
+		const target = pickNavigation({
+			pick,
+			routeAddress: walletId,
+			parentAddress: parentWalletId,
+			pinned: get(pinnedFlows) > 0
+		});
+		if (target) goto(target, { invalidateAll: true });
+	}
+
 	onMount(() => {
 		if (browser) {
 			window.addEventListener('hashchange', handleHashChange);
 			document.addEventListener('click', handleClickOutside);
-
-			setOnSelectHandler((wallet) => {
-				const target = pickNavigation({
-					pick: wallet,
-					routeAddress: walletId,
-					parentAddress: parentWalletId,
-					pinned: get(pinnedFlows) > 0
-				});
-				if (target) goto(target, { invalidateAll: true });
-			});
 		}
 	});
 
 	onDestroy(() => {
 		if (browser) {
-			setOnSelectHandler(() => {});
 			window.removeEventListener('hashchange', handleHashChange);
 			document.removeEventListener('click', handleClickOutside);
 		}
@@ -269,7 +266,7 @@
 				selected: $selectedWallet,
 				pinned: get(pinnedFlows) > 0
 			});
-			if (next) selectedWallet.set(next);
+			if (next) selectWallet(next);
 
 			// Now load the wallet data
 			await updateAccountInfo(parentWalletId || walletId);
@@ -327,21 +324,21 @@
 				</button>
 			</div>
 			<Web3Wallet
-				availableWallets={['WalletConnect', 'Kibisis', 'LuteWallet', 'BiatecWallet', 'VoiWallet']}
-				showAuthButtons={false}
+				enabledWallets={['walletconnect', 'kibisis', 'lute', 'biatec', 'voiwallet']}
 				{algodClient}
 				indexerClient={algodIndexer}
-				wcProject={{
+				wcConfig={{
 					projectId: wcProjectId,
-					projectName: 'Voi Rewards Auditor',
-					projectDescription: 'Voi Rewards Auditor',
-					projectUrl: 'https://voirewards.com',
-					projectIcons: ['https://voirewards.com/android-chrome-192x192.png']
+					name: 'Voi Rewards Auditor',
+					description: 'Voi Rewards Auditor',
+					url: 'https://voirewards.com',
+					icons: ['https://voirewards.com/android-chrome-192x192.png']
 				}}
-				walletListClass="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
+				class="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
 				allowWatchAccounts={true}
-				showAuthenticated={false}
-				modalType="dropdown"
+				showSignInStatus={false}
+				displayMode="dropdown"
+				onAccountPicked={handleAccountPicked}
 			/>
 		</div>
 
@@ -754,27 +751,21 @@
 
 				<div class="">
 					<Web3Wallet
-						availableWallets={[
-							'WalletConnect',
-							'Kibisis',
-							'LuteWallet',
-							'BiatecWallet',
-							'VoiWallet'
-						]}
-						showAuthButtons={false}
+						enabledWallets={['walletconnect', 'kibisis', 'lute', 'biatec', 'voiwallet']}
 						{algodClient}
 						indexerClient={algodIndexer}
-						wcProject={{
+						wcConfig={{
 							projectId: wcProjectId,
-							projectName: 'Voi Rewards Auditor',
-							projectDescription: 'Voi Rewards Auditor',
-							projectUrl: 'https://voirewards.com',
-							projectIcons: ['https://voirewards.com/android-chrome-192x192.png']
+							name: 'Voi Rewards Auditor',
+							description: 'Voi Rewards Auditor',
+							url: 'https://voirewards.com',
+							icons: ['https://voirewards.com/android-chrome-192x192.png']
 						}}
-						walletListClass="bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
+						class="bg-gray-50 dark:bg-slate-700 dark:text-gray-200"
 						allowWatchAccounts={true}
-						showAuthenticated={false}
-						modalType="dropdown"
+						showSignInStatus={false}
+						displayMode="dropdown"
+						onAccountPicked={handleAccountPicked}
 					/>
 				</div>
 			</div>

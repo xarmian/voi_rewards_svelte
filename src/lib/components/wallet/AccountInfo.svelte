@@ -3,7 +3,8 @@
 	import { favorites } from '../../../stores/favorites';
 	import { copy } from 'svelte-copy';
 	import { toast } from '@zerodevx/svelte-toast';
-	import { selectedWallet } from 'avm-wallet-svelte';
+	import { get } from 'svelte/store';
+	import { connectedWallets, selectWallet } from '$lib/chain/wallet.svelte';
 	import { nicknames } from '$lib/stores/nicknames';
 	import NicknameManager from '$lib/components/NicknameManager.svelte';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
@@ -45,11 +46,11 @@
 		}
 	];
 
+	// v2 can only select an account that is connected, so an address that is not connected is left
+	// as it is; the page still shows it from the route.
 	function setAccount(address: string) {
-		selectedWallet.set({
-			address: address,
-			app: ''
-		});
+		const connected = get(connectedWallets).find((wallet) => wallet.address === address);
+		if (connected) selectWallet(connected);
 	}
 
 	function toggleExpand() {

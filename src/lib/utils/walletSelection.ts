@@ -1,4 +1,6 @@
-import type { WalletConnectionResult as Wallet } from 'avm-wallet-svelte';
+// The shape these helpers need from a wallet. Callers keep their own richer type (walletId, name),
+// so a selection returned from here can be handed straight to selectWallet.
+type Wallet = { address: string; app: string };
 
 export function pickNavigation({
 	pick,
@@ -6,7 +8,7 @@ export function pickNavigation({
 	parentAddress,
 	pinned
 }: {
-	pick: Wallet;
+	pick: Pick<Wallet, 'address'>;
 	routeAddress: string | null | undefined;
 	// The owner account when the route is one of its contracts: that pick is already "shown".
 	parentAddress?: string | null;
@@ -16,17 +18,17 @@ export function pickNavigation({
 	return `/wallet/${pick.address}`;
 }
 
-export function selectionFromRoute({
+export function selectionFromRoute<T extends Wallet>({
 	routeAddress,
 	connected,
 	selected,
 	pinned
 }: {
 	routeAddress: string | null | undefined;
-	connected: Wallet[];
+	connected: T[];
 	selected: Wallet | null | undefined;
 	pinned: boolean;
-}): Wallet | null {
+}): T | null {
 	if (pinned || !routeAddress) return null;
 	const withApp = connected.find((wallet) => wallet.address === routeAddress && wallet.app !== '');
 	// Already selected: only upgrade a selection that has no app to the connected entry.
