@@ -30,10 +30,10 @@ const params = {
 	fee: 0,
 	minFee: 1000,
 	flatFee: false,
-	firstRound: 4000000,
-	lastRound: 4001000,
+	firstValid: 4000000,
+	lastValid: 4001000,
 	genesisID: 'voimain-v1.0',
-	genesisHash: Buffer.alloc(32, 1).toString('base64')
+	genesisHash: new Uint8Array(32).fill(1)
 };
 const partkeyinfo = `Parent address: ${address}
 First round: ${keys.firstRound}
@@ -206,11 +206,12 @@ describe('buildWalletKeyregTxn', () => {
 
 	it('uses the flat minimum fee online and preserves key material', () => {
 		const txn = buildWalletKeyregTxn(online);
-		expect(txn.fee).toBe(1000);
-		expect(txn.flatFee).toBe(true);
-		expect(new Uint8Array(txn.voteKey)).toEqual(new Uint8Array(voteBytes));
-		expect(new Uint8Array(txn.selectionKey)).toEqual(new Uint8Array(selectionBytes));
-		expect(new Uint8Array(txn.stateProofKey)).toEqual(new Uint8Array(stateProofBytes));
+		expect(txn.fee).toBe(1000n);
+		expect(new Uint8Array(txn.keyreg?.voteKey ?? [])).toEqual(new Uint8Array(voteBytes));
+		expect(new Uint8Array(txn.keyreg?.selectionKey ?? [])).toEqual(new Uint8Array(selectionBytes));
+		expect(new Uint8Array(txn.keyreg?.stateProofKey ?? [])).toEqual(
+			new Uint8Array(stateProofBytes)
+		);
 		expect(params).toMatchObject({ fee: 0, flatFee: false });
 	});
 
@@ -219,21 +220,22 @@ describe('buildWalletKeyregTxn', () => {
 		expect(parsed.ok).toBe(true);
 		if (!parsed.ok) throw new Error(parsed.error);
 		const txn = buildWalletKeyregTxn({ params, sender: address, ...parsed.keys, fee: parsed.fee });
-		expect(txn.fee).toBe(2000000);
-		expect(txn.flatFee).toBe(true);
+		expect(txn.fee).toBe(2000000n);
 	});
 
 	it('uses the flat minimum fee offline', () => {
 		const txn = buildWalletKeyregTxn({ params, sender: address, offline: true });
-		expect(txn.fee).toBe(1000);
-		expect(txn.flatFee).toBe(true);
+		expect(txn.fee).toBe(1000n);
 	});
 
 	// TASK-78: nonpart on the wire would make the account permanently non-participating.
 	it('builds offline as a keyreg with no keys and no nonParticipation flag', () => {
 		const txn = buildWalletKeyregTxn({ params, sender: address, offline: true });
-		expect(txn.nonParticipation).toBe(false);
-		const wire = txn.get_obj_for_encoding() as unknown as Record<string, unknown>;
+		expect(txn.keyreg?.nonParticipation).toBe(false);
+		const wire = algosdk.msgpackRawDecode(algosdk.encodeUnsignedTransaction(txn)) as Record<
+			string,
+			unknown
+		>;
 		expect(wire.type).toBe('keyreg');
 		for (const field of [
 			'nonpart',
@@ -246,26 +248,28 @@ describe('buildWalletKeyregTxn', () => {
 		]) {
 			expect(wire).not.toHaveProperty(field);
 		}
-		const decoded = algosdk.decodeUnsignedTransaction(txn.toByte());
-		expect(decoded.nonParticipation).toBeFalsy();
-		expect(decoded.voteKey).toBeUndefined();
+		const decoded = algosdk.decodeUnsignedTransaction(algosdk.encodeUnsignedTransaction(txn));
+		expect(decoded.keyreg?.nonParticipation).toBeFalsy();
+		expect(decoded.keyreg?.voteKey).toBeUndefined();
 	});
 
 	it('raises a URI fee below the suggested minimum to that minimum', () => {
 		const raised = { ...online, params: { ...params, minFee: 1500 }, fee: 1000 };
-		expect(buildWalletKeyregTxn(raised).fee).toBe(1500);
+		expect(buildWalletKeyregTxn(raised).fee).toBe(1500n);
 	});
 
 	it('uses a suggested minimum when supplied and falls back to 1000 when absent', () => {
-		expect(buildWalletKeyregTxn({ ...online, params: { ...params, minFee: 1500 } }).fee).toBe(1500);
+		expect(buildWalletKeyregTxn({ ...online, params: { ...params, minFee: 1500 } }).fee).toBe(
+			1500n
+		);
 		expect(buildWalletKeyregTxn({ ...online, params: { ...params, minFee: undefined } }).fee).toBe(
-			1000
+			1000n
 		);
 	});
 
 	it('reproduces the old per-byte fee bug as a control', () => {
 		const txn = algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-			from: address,
+			sender: address,
 			voteKey: voteBytes,
 			selectionKey: selectionBytes,
 			stateProofKey: stateProofBytes,
@@ -274,7 +278,7 @@ describe('buildWalletKeyregTxn', () => {
 			voteKeyDilution: keys.keyDilution,
 			suggestedParams: { ...params, fee: 1000, flatFee: false }
 		});
-		expect(txn.fee).toBeGreaterThan(1000);
+		expect(txn.fee).toBeGreaterThan(1000n);
 	});
 });
 
@@ -354,9 +358,9 @@ describe('sendWalletKeyreg', () => {
 });
 
 describe('account check (r2)', () => {
-	const other = algosdk.generateAccount().addr;
+	const other = algosdk.generateAccount().addr.toString();
 	const appId = 40123456;
-	const appAddress = algosdk.getApplicationAddress(appId);
+	const appAddress = algosdk.getApplicationAddress(appId).toString();
 
 	it('accepts a URI for the plain account being registered', () => {
 		expect(parseKeyregInput(uri(), { account: address })).toEqual({ ok: true, keys, fee: null });
@@ -429,7 +433,7 @@ describe('keyregFee (r2)', () => {
 });
 
 describe('submit-time account re-check (r3)', () => {
-	const owner = algosdk.generateAccount().addr;
+	const owner = algosdk.generateAccount().addr.toString();
 	const accountFor = (contractId: number | null, walletAddress = address) =>
 		keyregAccount({
 			walletAddress,
@@ -456,7 +460,7 @@ describe('submit-time account re-check (r3)', () => {
 	});
 
 	it('refuses after a plain wallet switch', () => {
-		const other = algosdk.generateAccount().addr;
+		const other = algosdk.generateAccount().addr.toString();
 		expect(keyregSubmitError(accountFor(null), accountFor(null, other))).not.toBeNull();
 	});
 
@@ -487,15 +491,14 @@ describe('incentive opt-in (TASK-68)', () => {
 			fee: 0,
 			minFee: 1000,
 			flatFee: false,
-			firstRound: 4000000,
-			lastRound: 4001000,
+			firstValid: 4000000,
+			lastValid: 4001000,
 			genesisID: 'voimain-v1.0',
-			genesisHash: Buffer.alloc(32, 1).toString('base64')
+			genesisHash: new Uint8Array(32).fill(1)
 		};
 		const build = (on: boolean) =>
 			buildWalletKeyregTxn({ params, sender: address, ...keys, fee: incentiveKeyregFee(on) });
-		expect(build(true).fee).toBe(2000000);
-		expect(build(true).flatFee).toBe(true);
-		expect(build(false).fee).toBe(1000);
+		expect(build(true).fee).toBe(2000000n);
+		expect(build(false).fee).toBe(1000n);
 	});
 });

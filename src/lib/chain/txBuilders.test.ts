@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import algosdk from 'algosdk';
-import { buildAssetTransfer, buildCombinedPayment, buildPayment } from './txBuilders';
+import {
+	buildAssetTransfer,
+	buildCombinedPayment,
+	buildPayment,
+	withNoteNoGroup
+} from './txBuilders';
 import { buildWalletKeyregTxn } from './keyreg';
 
 // Golden bytes: the encoded unsigned transactions the app builds. They were captured on
@@ -11,12 +16,14 @@ const A = addr(1);
 const B = addr(2);
 const C = addr(3);
 
+// The same values the algosdk 2 capture used, in algosdk 3's parameter shape.
 const params = {
 	fee: 1000,
+	minFee: 1000,
 	flatFee: true,
-	firstRound: 1000,
-	lastRound: 2000,
-	genesisHash: Buffer.alloc(32, 7).toString('base64'),
+	firstValid: 1000,
+	lastValid: 2000,
+	genesisHash: new Uint8Array(32).fill(7),
 	genesisID: 'voimain-v1.0'
 };
 
@@ -143,5 +150,53 @@ describe('golden transactions', () => {
 	}
 	it('covers every case', () => {
 		expect(Object.keys(GOLDEN).sort()).toEqual(Object.keys(cases).sort());
+	});
+});
+
+describe('withNoteNoGroup', () => {
+	const big = 2n ** 60n + 7n;
+	const grouped = () => {
+		const first = buildPayment({ from: A, to: B, amount: big, note, suggestedParams: params });
+		const second = buildAssetTransfer({
+			from: A,
+			to: B,
+			assetIndex: 302190,
+			amount: 2n,
+			suggestedParams: params
+		});
+		return algosdk.assignGroupID([first, second]);
+	};
+
+	it('replaces the note, drops the group id and keeps every other field exactly', () => {
+		const [first] = grouped();
+		expect(first.group).toBeDefined();
+		const rebuilt = withNoteNoGroup(first, new TextEncoder().encode('7'));
+		const direct = buildPayment({
+			from: A,
+			to: B,
+			amount: big,
+			note: new TextEncoder().encode('7'),
+			suggestedParams: params
+		});
+		expect(rebuilt.group).toBeUndefined();
+		expect(rebuilt.payment?.amount).toBe(big);
+		expect(b64(rebuilt)).toBe(b64(direct));
+	});
+
+	it('keeps the existing note when none is given', () => {
+		const [first] = grouped();
+		const rebuilt = withNoteNoGroup(first);
+		expect(new TextDecoder().decode(rebuilt.note)).toBe('note-é');
+		expect(rebuilt.group).toBeUndefined();
+	});
+
+	it('works on an asset transfer and leaves the original untouched', () => {
+		const [first, second] = grouped();
+		const rebuilt = withNoteNoGroup(second, new TextEncoder().encode('n'));
+		expect(rebuilt.assetTransfer?.amount).toBe(2n);
+		expect(rebuilt.assetTransfer?.assetIndex).toBe(302190n);
+		expect(rebuilt.group).toBeUndefined();
+		expect(second.group).toBeDefined();
+		expect(first.group).toEqual(second.group);
 	});
 });

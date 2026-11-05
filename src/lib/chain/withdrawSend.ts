@@ -1,3 +1,4 @@
+import { httpStatus } from './algodShapes';
 import {
 	clearPendingWithdrawal,
 	getPendingWithdrawal,
@@ -155,32 +156,24 @@ export async function sendWithdrawal(
 			}
 		});
 		if (outcome.status === 'rejected') {
-			const error = submitError as
-				| {
-						status?: unknown;
-						message?: unknown;
-						response?: { body?: { message?: unknown }; text?: unknown };
-				  }
-				| undefined;
+			const error = submitError as { message?: unknown } | undefined;
 			// algosdk's own message is always non-empty: the status prefix, plus the algod body text only
 			// when the response carried a JSON message. A bare prefix (a proxy 400 with no algod body)
 			// proves nothing, so only the text after it counts.
 			const algosdkPrefix = /^\s*Network request error\. Received status \d+ \([^)]*\)\s*:?\s*/i;
 			const bodyText = (message: unknown) =>
 				typeof message === 'string' ? message.replace(algosdkPrefix, '').trim() : '';
-			// response.text is the raw body and is NOT evidence: a proxy can answer 400 with JSON that has
-			// no `message` key. algosdk copies the algod text into error.message only when the body had
-			// one, and response.body.message is that same field.
-			const messages = [bodyText(error?.message), bodyText(error?.response?.body?.message)].filter(
-				(message) => message.length > 0
-			);
+			// error.response.body is the raw body bytes and is NOT evidence: a proxy can answer 400 with
+			// JSON that has no `message` key. algosdk copies the algod text into error.message only when
+			// the body had one.
+			const messages = [bodyText(error?.message)].filter((message) => message.length > 0);
 			// Wording that says the TRANSACTION exists (ledger, pool, duplicate) keeps the hold. It must
 			// not match an asset, application or account that does not exist, or an ordinary rejection
 			// would hold the contract for a whole validity window for a transaction that never landed.
 			const alreadyExists =
 				/already\s+in\s+(the\s+)?(transaction\s+)?(ledger|pool)|already\s+(been\s+)?(committed|confirmed|submitted|included|known|seen)|duplicate|\b(transaction|txn|txgroup)\b[^.]{0,40}\bexists?\b|\bexists?\s+in\s+(the\s+)?(transaction\s+)?(ledger|pool)\b/i;
 			if (
-				error?.status !== 400 ||
+				httpStatus(submitError) !== 400 ||
 				messages.length === 0 ||
 				messages.some((message) => alreadyExists.test(message))
 			) {

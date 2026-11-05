@@ -60,11 +60,11 @@ test.each(['', '-1', 'abc', '1e-7', '0', '0.0000001'])(
 		const run = componentFunctions(['handleSend'], {
 			decimalToBaseUnits,
 			algosdk,
-			$selectedWallet: { address: algosdk.generateAccount().addr },
+			$selectedWallet: { address: algosdk.generateAccount().addr.toString() },
 			selectedToken: { decimals: 6, symbol: 'VOI' },
 			tracker: {},
 			recipients: ['1', amount].map((value) => ({
-				address: algosdk.generateAccount().addr,
+				address: algosdk.generateAccount().addr.toString(),
 				amount: value
 			})),
 			isSending: false,
@@ -83,11 +83,11 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 		decimalToBaseUnits,
 		sumBaseUnits,
 		algosdk,
-		$selectedWallet: { address: algosdk.generateAccount().addr },
+		$selectedWallet: { address: algosdk.generateAccount().addr.toString() },
 		selectedToken: { decimals: 6, symbol: 'VOI', balance: 9007199254740992 },
 		tracker: {},
 		recipients: ['9007199254.740993', '0.000001'].map((value) => ({
-			address: algosdk.generateAccount().addr,
+			address: algosdk.generateAccount().addr.toString(),
 			amount: value
 		})),
 		isSending: false,
@@ -100,10 +100,11 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 
 const suggestedParams = {
 	fee: 1000,
+	minFee: 1000,
 	flatFee: true,
-	firstRound: 1,
-	lastRound: 1000,
-	genesisHash: Buffer.alloc(32).toString('base64'),
+	firstValid: 1,
+	lastValid: 1000,
+	genesisHash: new Uint8Array(32),
 	genesisID: 'test'
 };
 
@@ -112,24 +113,26 @@ test.each(['buildVOITransaction', 'buildVSATransaction'])(
 	async (builder) => {
 		const run = componentFunctions([builder], {
 			algosdk,
-			sender: algosdk.generateAccount().addr,
-			recipient: algosdk.generateAccount().addr,
+			sender: algosdk.generateAccount().addr.toString(),
+			recipient: algosdk.generateAccount().addr.toString(),
 			suggestedParams
 		});
 		const txn = await run(
 			`${builder}({ id: '1' }, sender, recipient, 9007199254740993n, suggestedParams)`
 		);
-		expect(txn.amount).toBe(9007199254740993n);
+		expect(
+			builder === 'buildVOITransaction' ? txn.payment?.amount : txn.assetTransfer?.amount
+		).toBe(9007199254740993n);
 	}
 );
 
 test('combined ARC-200 payments sum exact raw units', () => {
-	const sender = algosdk.generateAccount().addr;
-	const recipient = algosdk.generateAccount().addr;
+	const sender = algosdk.generateAccount().addr.toString();
+	const recipient = algosdk.generateAccount().addr.toString();
 	const payments = [9007199254740993n, 2n].map((amount) => [
 		algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-			from: sender,
-			to: recipient,
+			sender,
+			receiver: recipient,
 			amount,
 			suggestedParams
 		})
@@ -142,5 +145,5 @@ test('combined ARC-200 payments sum exact raw units', () => {
 		payments
 	});
 	const groups = run('createOptimizedGroups(payments, [{}, {}])');
-	expect(groups[0][0].amount).toBe(9007199254740995n);
+	expect(groups[0][0].payment?.amount).toBe(9007199254740995n);
 });

@@ -19,7 +19,12 @@
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { createTrackingDeps } from '$lib/chain/trackingDeps';
-	import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
+	import {
+		buildAssetTransfer,
+		buildCombinedPayment,
+		buildPayment,
+		withNoteNoGroup
+	} from '$lib/chain/txBuilders';
 	import {
 		createOutcomeHandler,
 		createPendingTracker,
@@ -503,19 +508,18 @@
 		for (const txn of resp.txns) {
 			const bytes = Buffer.from(txn, 'base64');
 			const tx = algosdk.decodeUnsignedTransaction(bytes);
-			delete tx.group;
 
-			// if the transaction is a payment, append the index of this transaction to the tx.txn field
+			// if the transaction is a payment, append the index of this transaction to its note
+			let note: Uint8Array | undefined;
 			if (tx.type === 'pay') {
 				const existingNote = tx.note ? new TextDecoder().decode(tx.note) : '';
-				tx.note = new TextEncoder().encode(`${existingNote}${existingNote ? ' ' : ''}${index}`);
-			} else {
-				if (noteText) {
-					tx.note = new TextEncoder().encode(noteText);
-				}
+				note = new TextEncoder().encode(`${existingNote}${existingNote ? ' ' : ''}${index}`);
+			} else if (noteText) {
+				note = new TextEncoder().encode(noteText);
 			}
 
-			decodedTxns.push(tx);
+			// The group id is dropped here; the groups are assigned again later.
+			decodedTxns.push(withNoteNoGroup(tx, note));
 		}
 
 		return decodedTxns;
@@ -623,7 +627,7 @@
 			const paymentsToProcess = currentBatch.filter((pair) => pair.payment !== null);
 			if (paymentsToProcess.length > 0) {
 				const totalPaymentAmount = paymentsToProcess.reduce(
-					(sum, pair) => sum + BigInt(pair.payment?.amount ?? 0),
+					(sum, pair) => sum + BigInt(pair.payment?.payment?.amount ?? 0),
 					0n
 				);
 

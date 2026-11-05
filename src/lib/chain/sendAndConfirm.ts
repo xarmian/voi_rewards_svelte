@@ -1,4 +1,5 @@
 import algosdk from 'algosdk';
+import { httpStatus } from './algodShapes';
 import { indexerCaughtUpPast } from './indexerHealth';
 
 export type PendingOutcome = {
@@ -39,14 +40,8 @@ export function groupInfo(signedGroup: Uint8Array[]) {
 	return {
 		txIds,
 		firstTxId: txIds[0],
-		lastValid: Math.min(...transactions.map((txn) => txn.lastRound))
+		lastValid: Math.min(...transactions.map((txn) => Number(txn.lastValid)))
 	};
-}
-
-function httpStatus(error: unknown): number | undefined {
-	if (typeof error === 'object' && error !== null && 'status' in error) {
-		return typeof error.status === 'number' ? error.status : undefined;
-	}
 }
 
 export async function sendAndConfirm(

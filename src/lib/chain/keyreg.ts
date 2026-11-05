@@ -224,7 +224,7 @@ function base64UrlKey(value: string, bytes: number): string | null {
 	return padded;
 }
 
-type KeyregParams = algosdk.SuggestedParams & { minFee?: number };
+type KeyregParams = Omit<algosdk.SuggestedParams, 'minFee'> & { minFee?: number | bigint };
 
 type OnlineKeyreg = Pick<
 	ParsedKeys,
@@ -244,7 +244,7 @@ export function keyregAccount(opts: {
 	contractId: number | null;
 }): string {
 	if (opts.parentWalletAddress !== null && opts.contractId !== null) {
-		return algosdk.getApplicationAddress(Number(opts.contractId));
+		return algosdk.getApplicationAddress(Number(opts.contractId)).toString();
 	}
 	return opts.walletAddress;
 }
@@ -261,8 +261,11 @@ export function incentiveKeyregFee(payIncentiveFee: boolean): number | null {
 }
 
 // The flat fee a wallet keyreg carries: the URI fee, raised to the network minimum.
-export function keyregFee(fee: number | null | undefined, minFee: number | undefined): number {
-	const min = minFee ?? MIN_KEYREG_FEE;
+export function keyregFee(
+	fee: number | null | undefined,
+	minFee: number | bigint | undefined
+): number {
+	const min = minFee === undefined ? MIN_KEYREG_FEE : Number(minFee);
 	return Math.max(fee ?? min, min);
 }
 
@@ -274,12 +277,12 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 	// permanently non-participating, so it can never go online again (TASK-78).
 	if (input.offline) {
 		return algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-			from: input.sender,
-			suggestedParams: { ...input.params, fee: minFee, flatFee: true }
+			sender: input.sender,
+			suggestedParams: { ...input.params, minFee, fee: minFee, flatFee: true }
 		});
 	}
 	return algosdk.makeKeyRegistrationTxnWithSuggestedParamsFromObject({
-		from: input.sender,
+		sender: input.sender,
 		voteKey: Buffer.from(input.votingKey, 'base64'),
 		selectionKey: Buffer.from(input.selectionKey, 'base64'),
 		stateProofKey: Buffer.from(input.stateProofKey, 'base64'),
@@ -288,6 +291,7 @@ export function buildWalletKeyregTxn(input: WalletKeyregInput): algosdk.Transact
 		voteKeyDilution: input.keyDilution,
 		suggestedParams: {
 			...input.params,
+			minFee,
 			fee: keyregFee(input.fee, input.params.minFee),
 			flatFee: true
 		}

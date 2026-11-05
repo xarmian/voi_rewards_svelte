@@ -12,18 +12,19 @@ import { createTrackingDeps } from './trackingDeps';
 
 function signedGroup() {
 	const account = algosdk.generateAccount();
-	const txns = [100, 95].map((lastRound, i) =>
+	const txns = [100, 95].map((lastValid, i) =>
 		algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-			from: account.addr,
-			to: account.addr,
+			sender: account.addr,
+			receiver: account.addr,
 			amount: i + 1,
 			suggestedParams: {
 				fee: 1000,
+				minFee: 1000,
 				flatFee: true,
-				firstRound: 1,
-				lastRound,
+				firstValid: 1,
+				lastValid,
 				genesisID: 'voimain-v1.0',
-				genesisHash: Buffer.alloc(32).toString('base64')
+				genesisHash: new Uint8Array(32)
 			}
 		})
 	);
@@ -62,9 +63,9 @@ describe('sendAndConfirm', () => {
 	});
 
 	it.each([
-		[Object.assign(new Error('refused'), { status: 400 }), 'rejected'],
+		[Object.assign(new Error('refused'), { response: { status: 400 } }), 'rejected'],
 		[new Error('network disconnected'), 'pending'],
-		[Object.assign(new Error('server error'), { status: 500 }), 'pending']
+		[Object.assign(new Error('server error'), { response: { status: 500 } }), 'pending']
 	])('classifies a send error: %s as %s', async (error, status) => {
 		const { signed, txIds } = signedGroup();
 		const waitForConfirmation = vi.fn();

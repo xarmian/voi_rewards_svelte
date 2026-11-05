@@ -290,16 +290,17 @@ describe('pending send tracker', () => {
 		const groups = [1, 2].map((amount) => [
 			algosdk
 				.makePaymentTxnWithSuggestedParamsFromObject({
-					from: account.addr,
-					to: account.addr,
+					sender: account.addr,
+					receiver: account.addr,
 					amount,
 					suggestedParams: {
 						fee: 1000,
+						minFee: 1000,
 						flatFee: true,
-						firstRound: 1,
-						lastRound: 100,
+						firstValid: 1,
+						lastValid: 100,
 						genesisID: 'voimain-v1.0',
-						genesisHash: Buffer.alloc(32).toString('base64')
+						genesisHash: new Uint8Array(32)
 					}
 				})
 				.signTxn(account.sk)
@@ -307,7 +308,8 @@ describe('pending send tracker', () => {
 		const recipients = [[{ address: 'A', amount: '1' }], [{ address: 'B', amount: '2' }]];
 		const active = tracker();
 		const send = vi.fn(async (group: Uint8Array[]) => {
-			if (group[0] === groups[1][0]) throw Object.assign(new Error('refused'), { status: 400 });
+			if (group[0] === groups[1][0])
+				throw Object.assign(new Error('refused'), { response: { status: 400 } });
 		});
 		const waitForConfirmation = async () => {
 			throw new Error('lost wait');

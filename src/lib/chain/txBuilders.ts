@@ -27,8 +27,8 @@ export type AssetTransferInput = {
 
 export function buildPayment(input: PaymentInput): algosdk.Transaction {
 	return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-		from: input.from,
-		to: input.to,
+		sender: input.from,
+		receiver: input.to,
 		amount: input.amount,
 		note: input.note,
 		suggestedParams: input.suggestedParams,
@@ -38,8 +38,8 @@ export function buildPayment(input: PaymentInput): algosdk.Transaction {
 
 export function buildAssetTransfer(input: AssetTransferInput): algosdk.Transaction {
 	return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-		from: input.from,
-		to: input.to,
+		sender: input.from,
+		receiver: input.to,
 		assetIndex: input.assetIndex,
 		amount: input.amount,
 		note: input.note,
@@ -54,18 +54,32 @@ export function buildCombinedPayment(
 	first: algosdk.Transaction,
 	totalAmount: bigint
 ): algosdk.Transaction {
+	if (!first.payment)
+		throw new Error('The first transaction of a combined payment is not a payment');
 	return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-		from: algosdk.encodeAddress(first.from.publicKey),
-		to: algosdk.encodeAddress(first.to.publicKey),
+		sender: first.sender,
+		receiver: first.payment.receiver,
 		amount: totalAmount,
 		note: first.note,
 		suggestedParams: {
 			fee: first.fee,
-			firstRound: first.firstRound,
-			lastRound: first.lastRound,
-			genesisHash: Buffer.from(first.genesisHash).toString('base64'),
+			minFee: first.fee,
+			firstValid: first.firstValid,
+			lastValid: first.lastValid,
+			genesisHash: first.genesisHash,
 			genesisID: first.genesisID,
 			flatFee: true
 		}
 	});
+}
+
+// Transactions built by the contract client come back with a group id and a note we may need to
+// change before regrouping. algosdk 3 transactions are read-only, so this rebuilds one from its
+// wire form: every field is kept except the group id, which is dropped, and the note, which is
+// replaced when one is given.
+export function withNoteNoGroup(tx: algosdk.Transaction, note?: Uint8Array): algosdk.Transaction {
+	const data = tx.toEncodingData();
+	data.delete('grp');
+	if (note !== undefined) data.set('note', note);
+	return algosdk.Transaction.fromEncodingData(data);
 }
