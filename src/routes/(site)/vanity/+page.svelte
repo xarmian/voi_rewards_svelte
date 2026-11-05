@@ -402,7 +402,9 @@
 		let alreadyReloaded = true;
 		try {
 			alreadyReloaded = sessionStorage.getItem('vanity-reloaded') === '1';
-		} catch {}
+		} catch {
+			// Storage is unavailable: keep alreadyReloaded true, so a third-party script blocks.
+		}
 		const decision = decideVanityStart({ thirdParty, alreadyReloaded });
 		if (decision === 'reload') {
 			try {
@@ -420,7 +422,9 @@
 		}
 		try {
 			sessionStorage.removeItem('vanity-reloaded');
-		} catch {}
+		} catch {
+			// Nothing to clear when storage is unavailable.
+		}
 		ready = true;
 	});
 
