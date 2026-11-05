@@ -1226,9 +1226,14 @@
 		};
 	});
 
-	// Update the selectedDirection reactive declaration to default to algorand-to-voi when canSignTransactions is false
+	// Update the selectedDirection reactive declaration to default to algorand-to-voi when canSignTransactions is false,
+	// but never under a bridge that is already in flight: the switch clears the destination fields.
 	$: {
-		if (!canSignTransactions && selectedDirection === 'voi-to-algorand') {
+		if (
+			!canSignTransactions &&
+			selectedDirection === 'voi-to-algorand' &&
+			bridgeStatus === 'idle'
+		) {
 			selectedDirection = 'algorand-to-voi';
 		}
 	}
