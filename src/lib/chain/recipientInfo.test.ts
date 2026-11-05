@@ -115,7 +115,11 @@ describe('loadRecipientInfo', () => {
 			deps.arc200BalanceOf.mockResolvedValue({ success: true, returnValue });
 			await expect(loadRecipientInfo('wallet', { kind: 'arc200' }, deps)).resolves.toEqual({
 				status: 'loaded',
-				info: { balance: Number(rawAccount.amount), hasOptedIn: true, assetBalance: Number(returnValue) }
+				info: {
+					balance: Number(rawAccount.amount),
+					hasOptedIn: true,
+					assetBalance: Number(returnValue)
+				}
 			});
 			expect(deps.arc200BalanceOf).toHaveBeenCalledExactlyOnceWith('wallet');
 		}

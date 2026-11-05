@@ -26,11 +26,9 @@ beforeEach(() => {
 	vi.useFakeTimers();
 	vi.setSystemTime(1000);
 	mocks.account.mockReset().mockReturnValue({ do: vi.fn().mockResolvedValue({ amount: 100 }) });
-	mocks.supply
-		.mockReset()
-		.mockReturnValue({
-			do: vi.fn().mockResolvedValue({ currentRound: 1n, onlineMoney: 200n, totalMoney: 300n })
-		});
+	mocks.supply.mockReset().mockReturnValue({
+		do: vi.fn().mockResolvedValue({ currentRound: 1n, onlineMoney: 200n, totalMoney: 300n })
+	});
 	vi.stubGlobal(
 		'fetch',
 		vi.fn(async () => Response.json({ blacklist_balance_total: '50' }))

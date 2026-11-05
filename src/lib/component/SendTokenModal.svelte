@@ -128,7 +128,7 @@
 					nativeVoiToken = {
 						...nativeVoiToken,
 						balance: Number(info.amount),
-						value: (Number(info.amount)) / 1e6
+						value: Number(info.amount) / 1e6
 					};
 					// If the selected token is native VOI, update it too
 					if (isNativeToken(selectedToken)) {
@@ -398,8 +398,7 @@
 				? { kind: 'arc200' }
 				: { kind: 'vsa', assetId: Number(checkedToken.id) };
 		const result = await loadRecipientInfo(address, token, {
-			fetchAccount: async (a) =>
-				requireAccountInfo(a, { force: true }),
+			fetchAccount: async (a) => requireAccountInfo(a, { force: true }),
 			arc200BalanceOf: async (a) => {
 				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
 				const balance = await contract.arc200_balanceOf(a);
