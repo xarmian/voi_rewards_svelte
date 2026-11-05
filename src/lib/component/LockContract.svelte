@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { canSignFor } from '$lib/chain/signerGate';
 	import type { ContractDetails } from '$lib/types';
 	import { selectedWallet } from '$lib/chain/wallet.svelte';
 
@@ -152,11 +153,19 @@
 					<button
 						on:click={() => handleWithdrawClick(contract)}
 						class="w-full inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-						disabled={isWatchAccount}
+						disabled={isWatchAccount || !canSignFor($selectedWallet, contract.owner)}
+						title={!isWatchAccount && !canSignFor($selectedWallet, contract.owner)
+							? 'Connect the account that owns this contract.'
+							: undefined}
 					>
 						<i class="fas fa-wallet mr-2"></i>
 						Withdraw from Available Balance
 					</button>
+					{#if !isWatchAccount && !canSignFor($selectedWallet, contract.owner)}
+						<p class="text-xs text-gray-600 dark:text-gray-300">
+							Connect the account that owns this contract.
+						</p>
+					{/if}
 				{/if}
 			</div>
 
@@ -210,11 +219,19 @@
 					<button
 						on:click={() => handleRegisterVoteKey(contract)}
 						class="text-xs px-3 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-						disabled={isWatchAccount}
+						disabled={isWatchAccount || !canSignFor($selectedWallet, contract.owner)}
+						title={!isWatchAccount && !canSignFor($selectedWallet, contract.owner)
+							? 'Connect the account that owns this contract.'
+							: undefined}
 					>
 						<i class="fas fa-key"></i>
 						<span>{contract.isParticipating ? 'Update Key' : 'Register Key'}</span>
 					</button>
+					{#if !isWatchAccount && !canSignFor($selectedWallet, contract.owner)}
+						<p class="text-xs text-gray-600 dark:text-gray-300">
+							Connect the account that owns this contract.
+						</p>
+					{/if}
 				</div>
 				<div class="space-y-2">
 					{#if contract.isParticipating}

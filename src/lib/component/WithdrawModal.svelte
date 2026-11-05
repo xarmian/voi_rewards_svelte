@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 	import type { ContractDetails } from '$lib/types';
 	import { microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
 	import { abi, CONTRACT } from 'ulujs';
@@ -241,6 +242,10 @@
 			signer = captureSigner();
 		} catch (captureError) {
 			error = captureError instanceof Error ? captureError.message : String(captureError);
+			return;
+		}
+		if (!signerMatchesAccount(signer, contract.owner)) {
+			error = wrongSignerMessage(contract.owner);
 			return;
 		}
 		const wallet = signer.address;

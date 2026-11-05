@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 	import { fade } from 'svelte/transition';
 	import Modal from './ui/Modal.svelte';
 	import {
@@ -187,6 +188,10 @@
 		console.log('Registering staking contract vote key');
 		const signer = signerOrError();
 		if (!signer) return;
+		if (!signerMatchesAccount(signer, parentWalletAddress)) {
+			error = wrongSignerMessage(parentWalletAddress);
+			return;
+		}
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
@@ -362,6 +367,10 @@
 		console.log('Going offline for staking contract');
 		const signer = signerOrError();
 		if (!signer) return;
+		if (!signerMatchesAccount(signer, parentWalletAddress)) {
+			error = wrongSignerMessage(parentWalletAddress);
+			return;
+		}
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
