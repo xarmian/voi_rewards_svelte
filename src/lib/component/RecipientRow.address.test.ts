@@ -30,7 +30,9 @@ test('displays the same whole receiver used by Send transactions', () => {
 	expect(send).toMatch(/buildARC200Transaction\(token, sender, req.address,/);
 	expect(send).toMatch(/arc200_transfer\(recipientAddress,/);
 	// Combined payments retain the receiver from the already built payment.
-	expect(send).toContain('to: algosdk.encodeAddress(firstPayment.to.publicKey)');
+	expect(send).toContain('buildCombinedPayment(firstPayment,');
+	const builders = readFileSync(new URL('../chain/txBuilders.ts', import.meta.url), 'utf8');
+	expect(builders).toContain('receiver: first.payment.receiver');
 });
 test('editing clears selection and drops an in-flight result for its old ticket', async () => {
 	const handler = fn('handleRecipientEdit');

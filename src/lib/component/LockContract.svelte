@@ -224,7 +224,7 @@
 								<span class="font-medium text-gray-900 dark:text-white">
 									{formatDate(
 										new Date(
-											(contract.accountInfo?.participation['vote-last-valid'] -
+											(contract.accountInfo?.participation?.voteLastValid -
 												contract.accountInfo?.round) *
 												2.8 *
 												1000 +
@@ -237,7 +237,7 @@
 								<span class="text-gray-600 dark:text-gray-300">Time Until Expiry</span>
 								<span class="font-medium text-gray-900 dark:text-white">
 									{formatDuration(
-										(contract.accountInfo?.participation['vote-last-valid'] -
+										(contract.accountInfo?.participation?.voteLastValid -
 											contract.accountInfo?.round) *
 											2.8
 									)}

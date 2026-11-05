@@ -107,7 +107,7 @@ function lpPool(provider = 'humble'): PoolInfo {
 
 for (const failure of ['500', 'reject'] as const) {
 	test(`Nomadex escrow ARC200 ${failure} preserves tokens and reports partial`, async () => {
-		vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => ({ amount: 10_000_000 }) }) as unknown as ReturnType<typeof algodClient.accountInformation>);
+		vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => ({ amount: 10_000_000n }) }) as unknown as ReturnType<typeof algodClient.accountInformation>);
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
 			getLiquidityPools: async () => [lpPool('nomadex')],
 			fetch: async (input) => {
@@ -267,7 +267,7 @@ function nomadexSources(
 			});
 		}
 		assert.equal(url.pathname, '/arc200/balances');
-		assert.equal(url.searchParams.get('accountId'), algosdk.getApplicationAddress(poolId));
+		assert.equal(url.searchParams.get('accountId'), algosdk.getApplicationAddress(poolId).toString());
 		const contractId = url.searchParams.get('contractId');
 		if (contractId === String(poolId) && options.supplyFailure)
 			return new Response(null, { status: 500 });
@@ -286,11 +286,11 @@ function nomadexSources(
 	return { fetchFn, calls };
 }
 
-function mockEscrow(amount = 26303164359, assets: Record<string, number>[] = []) {
+function mockEscrow(amount = 26303164359, assets: { assetId: bigint; amount: bigint }[] = []) {
 	return vi.spyOn(algodClient, 'accountInformation').mockImplementation(
 		() =>
 			({
-				do: async () => ({ amount, assets })
+				do: async () => ({ amount: BigInt(amount), assets })
 			}) as unknown as ReturnType<typeof algodClient.accountInformation>
 	);
 }
@@ -330,7 +330,7 @@ test('TASK-91 a pool-valued token has a null USD value without a VOI price, not 
 });
 
 test('missing Mimir VOI/ASA pool reads both reserves from one escrow account response', async () => {
-	const accountRead = mockEscrow(98000000000, [{ 'asset-id': 48146090, amount: 24000000 }]);
+	const accountRead = mockEscrow(98000000000, [{ assetId: 48146090n, amount: 24000000n }]);
 	const { fetchFn } = nomadexSources(48787612);
 	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools, fetch: fetchFn });
 	assert.equal(result.tokens[0].poolInfo?.tokABalance, '98000000000');
@@ -342,8 +342,7 @@ test('missing Mimir VOI/ASA pool reads both reserves from one escrow account res
 });
 
 test('an ASA reserve is read from a camelCase holding too (algosdk v3 models)', async () => {
-	// algosdk 2.10 returns raw REST JSON (`asset-id`, measured 10-30 on the 48787612 escrow); v3 returns `assetId`.
-	mockEscrow(98000000000, [{ assetId: 48146090, amount: 24000000 }]);
+	mockEscrow(98000000000, [{ assetId: 48146090n, amount: 24000000n }]);
 	const { fetchFn } = nomadexSources(48787612);
 	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools, fetch: fetchFn });
 	assert.equal(result.tokens[0].poolInfo?.tokBBalance, '24000000');
@@ -371,7 +370,7 @@ test('missing Mimir VOI/ARC200 pool reads the token reserve through arc200 balan
 });
 
 test('failed Mimir dex call still values a held pool using escrow reserves and supply', async () => {
-	mockEscrow(26303164359, [{ 'asset-id': 302190, amount: 3376582 }]);
+	mockEscrow(26303164359, [{ assetId: 302190n, amount: 3376582n }]);
 	const { fetchFn } = nomadexSources(411756, { dexFailure: true });
 	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools, fetch: fetchFn });
 	assert.ok(Math.abs(result.tokens[0].value - 52606.328718 / 115.371457) < 1e-9);

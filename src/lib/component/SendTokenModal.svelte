@@ -18,7 +18,7 @@
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
-	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
 	import {
 		buildAssetTransfer,
 		buildCombinedPayment,
@@ -127,14 +127,14 @@
 					if (address !== flow.current($selectedWallet?.address)) return;
 					nativeVoiToken = {
 						...nativeVoiToken,
-						balance: info.amount as number,
-						value: (info.amount as number) / 1e6
+						balance: Number(info.amount),
+						value: (Number(info.amount)) / 1e6
 					};
 					// If the selected token is native VOI, update it too
 					if (isNativeToken(selectedToken)) {
 						selectedToken = {
 							...selectedToken,
-							balance: info.amount as number
+							balance: Number(info.amount)
 						};
 					}
 					// Force Svelte reactivity for available tokens
@@ -185,10 +185,7 @@
 	let groupOutcomes: (TrackedOutcome | undefined)[] = [];
 	let recipientsByGroup: Recipient[][] = [];
 	let pendingController: AbortController | undefined;
-	const sendDeps = {
-		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
-		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
-	};
+	const sendDeps = createSendDeps(algodClient);
 	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	$: retryList = retryRecipients(groupOutcomes, recipientsByGroup);
 	$: confirmedTotal = Number(
@@ -402,7 +399,7 @@
 				: { kind: 'vsa', assetId: Number(checkedToken.id) };
 		const result = await loadRecipientInfo(address, token, {
 			fetchAccount: async (a) =>
-				(await requireAccountInfo(a, { force: true })) as unknown as Record<string, unknown>,
+				requireAccountInfo(a, { force: true }),
 			arc200BalanceOf: async (a) => {
 				const contract = new Contract(Number(checkedToken.id), algodClient, algodIndexer);
 				const balance = await contract.arc200_balanceOf(a);

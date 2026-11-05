@@ -6,6 +6,7 @@
 	import { algodClient } from '$lib/utils/algod';
 	import { onDestroy } from 'svelte';
 	import { decodeLockContractState, type LockContractState } from '$lib/chain/lockContract';
+	import { globalStateEntries } from '$lib/chain/algodShapes';
 
 	export let address: string;
 	export let minimal = false;
@@ -98,10 +99,13 @@
 
 			// Get current balance from the contract address
 			const accountInfo = await requireAccountInfo(address, { force: true });
-			currentBalance = accountInfo.amount as number;
+			currentBalance = Number(accountInfo.amount);
 
 			// Decode the global state
-			contractData = decodeLockContractState(appInfo.params['global-state'], address);
+			contractData = decodeLockContractState(
+				globalStateEntries(appInfo.params?.globalState),
+				address
+			);
 
 			if (contractData) {
 				// Add the contract ID to the decoded data
@@ -198,7 +202,7 @@
 					}
 
 					// Calculate available withdrawal amount considering minimum balance
-					const minimumBalance = (accountInfo as unknown as Record<string, number>)['min-balance'];
+					const minimumBalance = Number(accountInfo.minBalance);
 					availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
 				}
 			}

@@ -105,8 +105,11 @@
 					totalSupply = data.tokens[0].totalSupply;
 				} else {
 					const assetInfo = await algodClient.getAssetByID(Number(token.id)).do();
-					creator = assetInfo.params.creator;
-					totalSupply = assetInfo.params.total;
+					const params = assetInfo.params;
+					creator = params ? params.creator.toString() : null;
+					// A total beyond the safe integer range is unavailable, not a rounded figure.
+					totalSupply =
+						params && params.total <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(params.total) : null;
 				}
 
 				// Fetch Envoi name for creator

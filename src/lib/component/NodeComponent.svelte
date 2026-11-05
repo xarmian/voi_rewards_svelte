@@ -4,6 +4,7 @@
 	import { config } from '../config';
 	import InfoButton from './ui/InfoButton.svelte';
 	import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
+	import type { Account } from '$lib/stores/accounts';
 	import { onMount } from 'svelte';
 	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 	import { dataTable } from '../../stores/dataTable';
@@ -14,7 +15,14 @@
 	export let parentWalletId: string | null;
 	export let contractId: number | null;
 
-	let accountInfo: any;
+	let accountInfo: Account | undefined;
+	// The vote key's last valid round (a bigint in algosdk 3) and the seconds left until it, at the
+	// network's ~2.8 s block time.
+	$: voteLastValid = accountInfo?.participation?.voteLastValid;
+	$: voteKeySecondsLeft =
+		accountInfo && voteLastValid !== undefined
+			? (Number(voteLastValid) - Number(accountInfo.round)) * 2.8
+			: 0;
 	let supply: any;
 	let showRegisterVoteKey = false;
 	let consensusError = false;
@@ -312,9 +320,7 @@
 						>
 							<span class="font-medium text-gray-600 dark:text-gray-400">Vote Key Expires:</span>
 							<span class="text-gray-800 dark:text-gray-200"
-								>{formatTime(
-									(accountInfo['participation']['vote-last-valid'] - accountInfo['round']) * 2.8
-								)}</span
+								>{formatTime(voteKeySecondsLeft)}</span
 							>
 						</p>
 						<p
@@ -323,9 +329,7 @@
 							<span class="font-medium text-gray-600 dark:text-gray-400">Expiry Date (approx):</span
 							>
 							<span class="text-gray-800 dark:text-gray-200"
-								>{dateFromSeconds(
-									(accountInfo['participation']['vote-last-valid'] - accountInfo['round']) * 2.8
-								)}</span
+								>{dateFromSeconds(voteKeySecondsLeft)}</span
 							>
 						</p>
 						<p
@@ -333,7 +337,7 @@
 						>
 							<span class="font-medium text-gray-600 dark:text-gray-400">Expiry Block:</span>
 							<span class="text-gray-800 dark:text-gray-200"
-								>{accountInfo['participation']['vote-last-valid'].toLocaleString()}</span
+								>{voteLastValid?.toLocaleString() ?? ''}</span
 							>
 						</p>
 						<p

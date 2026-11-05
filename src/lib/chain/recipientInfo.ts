@@ -1,5 +1,12 @@
-import { snapshotFromAlgodAccount } from '../portfolio/accountDetails';
+import {
+	safeNumber,
+	snapshotFromAlgodAccount,
+	type AlgodAccount
+} from '../portfolio/accountDetails';
 import type { Recipient } from '../types/recipients';
+
+// One asset an account holds. The id and amount are bigint in algosdk 3's account model.
+type AssetHolding = { assetId?: unknown; amount?: unknown };
 
 let lookupId = 0;
 
@@ -39,7 +46,7 @@ export function applyRecipientLookup(
 }
 
 export interface RecipientInfoDeps {
-	fetchAccount(address: string): Promise<Record<string, unknown>>;
+	fetchAccount(address: string): Promise<AlgodAccount & { assets?: readonly AssetHolding[] }>;
 	arc200BalanceOf(address: string): Promise<{ success: boolean; returnValue: unknown }>;
 }
 
@@ -51,7 +58,8 @@ export async function loadRecipientInfo(
 	try {
 		const raw = await deps.fetchAccount(address);
 		const { balance } = snapshotFromAlgodAccount(raw);
-		const assets = 'assets' in raw ? raw.assets : [];
+		// algosdk 3 models always carry the property, and leave it undefined when nothing is held.
+		const assets = raw.assets === undefined ? [] : raw.assets;
 		if (!Array.isArray(assets)) {
 			throw new Error('Invalid account: assets must be an array');
 		}
@@ -59,17 +67,14 @@ export async function loadRecipientInfo(
 		let assetBalance = 0;
 
 		if (token.kind === 'vsa') {
-			const holding = assets.find((asset) => asset?.['asset-id'] === token.assetId);
+			const holding = assets.find((asset) => Number(asset?.assetId) === token.assetId);
 			if (holding) {
-				if (
-					typeof holding.amount !== 'number' ||
-					!Number.isFinite(holding.amount) ||
-					holding.amount < 0
-				) {
+				const amount = safeNumber(holding.amount);
+				if (amount === undefined || amount < 0) {
 					throw new Error('Invalid account: asset amount must be a finite non-negative number');
 				}
 				hasOptedIn = true;
-				assetBalance = holding.amount;
+				assetBalance = amount;
 			}
 		} else if (token.kind === 'arc200') {
 			const result = await deps.arc200BalanceOf(address);

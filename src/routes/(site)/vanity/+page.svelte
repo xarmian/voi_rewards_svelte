@@ -373,7 +373,7 @@
 			const signedTxns = await signTransactions([[unsignedTxn]]);
 
 			// Send the signed transaction to the network
-			const { txId } = await algodClient.sendRawTransaction(signedTxns).do();
+			const { txid: txId } = await algodClient.sendRawTransaction(signedTxns).do();
 
 			// Wait for confirmation
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
@@ -420,7 +420,7 @@
 			const signedRekeyTxn = rekeyTxn.signTxn(vanityAccount.sk);
 
 			// Send the signed transaction to the network
-			const { txId } = await algodClient.sendRawTransaction(signedRekeyTxn).do();
+			const { txid: txId } = await algodClient.sendRawTransaction(signedRekeyTxn).do();
 
 			// Wait for confirmation
 			await algosdk.waitForConfirmation(algodClient, txId, 5);

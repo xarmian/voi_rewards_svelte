@@ -47,7 +47,7 @@
 
 			if (signedTxns) {
 				const response = await algodClient.sendRawTransaction(signedTxns[0]).do();
-				await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+				await algosdk.waitForConfirmation(algodClient, response.txid, 4);
 				optOutSuccess = true;
 				onTokenOptedOut();
 				setTimeout(() => {

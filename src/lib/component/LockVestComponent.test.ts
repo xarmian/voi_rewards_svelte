@@ -7,7 +7,7 @@ const source = readFileSync(new URL('./LockVestComponent.svelte', import.meta.ur
 
 const A = { contractId: 1, address: 'A', isParticipating: false, balance: 0 };
 const B = { contractId: 2, address: 'B', isParticipating: false, balance: 0 };
-const appInfo = { params: { 'global-state': [] } };
+const appInfo = { params: { globalState: [] } };
 
 // Runs the component script with its imports stubbed. Each getApplicationByID read is held until the test
 // settles it, so the test controls the order in which reloads finish.
@@ -36,8 +36,14 @@ function componentScript() {
 				}
 			})
 		},
-		requireAccountInfo: async () => ({ amount: 5_000_000, status: 'Offline', 'min-balance': 0 }),
+		requireAccountInfo: async () => ({
+			amount: 5_000_000n,
+			status: 'Offline',
+			minBalance: 0n,
+			round: 1n
+		}),
 		getConsensusInfo: async () => ({}),
+		globalStateEntries: () => [],
 		decodeLockContractState: () => ({ global_owner: 'OWNER' })
 	});
 	runInContext(

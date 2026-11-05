@@ -158,10 +158,10 @@ describe('trackPending', () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 	it('keeps a send pending across timed out passes with at most one hung status request per stale window', async () => {
-		const status = vi.fn(() => ({ do: () => new Promise<Record<string, unknown>>(() => {}) }));
+		const status = vi.fn(() => ({ do: () => new Promise<{ lastRound: bigint }>(() => {}) }));
 		const pendingInfo = vi.fn(async () => ({}));
-		const search = vi.fn(async () => ({ 'current-round': 200, transactions: [] }));
-		const lookupBlock = vi.fn(() => ({ do: async () => ({ round: 100 }) }));
+		const search = vi.fn(async () => ({ currentRound: 200n, transactions: [] }));
+		const lookupBlock = vi.fn(() => ({ do: async () => ({ round: 100n }) }));
 		const d = createTrackingDeps(
 			{ status, pendingTransactionInformation: () => ({ do: pendingInfo }) },
 			{ lookupBlock, searchForTransactions: () => ({ txid: () => ({ do: search }) }) }
@@ -360,13 +360,13 @@ describe('trackPending', () => {
 		const { createTrackingDeps } = await import('./trackingDeps');
 		const d = createTrackingDeps(
 			{
-				status: () => ({ do: async () => ({ 'last-round': 101 }) }),
+				status: () => ({ do: async () => ({ lastRound: 101n }) }),
 				pendingTransactionInformation: () => ({ do: async () => ({}) })
 			},
 			{
-				lookupBlock: () => ({ do: async () => ({ round: pending.lastValid - 1 }) }),
+				lookupBlock: () => ({ do: async () => ({ round: BigInt(pending.lastValid - 1) }) }),
 				searchForTransactions: () => ({
-					txid: () => ({ do: async () => ({ 'current-round': 110, transactions: [] }) })
+					txid: () => ({ do: async () => ({ currentRound: 110n, transactions: [] }) })
 				})
 			}
 		);

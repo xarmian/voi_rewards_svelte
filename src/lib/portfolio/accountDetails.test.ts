@@ -7,13 +7,13 @@ import {
 } from './accountDetails';
 
 const rawAccount = {
-	amount: 121614513500,
+	amount: 121614513500n,
 	status: 'Online',
-	'min-balance': 100000,
-	'pending-rewards': 1234567,
+	minBalance: 100000n,
+	pendingRewards: 1234567n,
 	rewards: 9876543,
-	round: 10000000,
-	participation: { 'vote-last-valid': 11000000 }
+	round: 10000000n,
+	participation: { voteLastValid: 11000000n }
 };
 const snapshot = {
 	balance: 121614513500,
@@ -24,7 +24,7 @@ const snapshot = {
 	voteLastValid: 11000000
 };
 const transactions: RewardsTransaction[] = [
-	{ sender: 'rewards', 'confirmed-round': 1520000, 'payment-transaction': { amount: 2000000 } }
+	{ sender: 'rewards', confirmedRound: 1520000, paymentTransaction: { amount: 2000000 } }
 ];
 
 function dependencies() {
@@ -267,15 +267,16 @@ describe('snapshotFromAlgodAccount', () => {
 		['negative amount', { amount: -1 }],
 		['NaN amount', { amount: NaN }],
 		['infinite amount', { amount: Infinity }],
+		['unsafe bigint amount', { amount: 2n ** 60n }],
 		['string amount', { amount: '100' }],
 		['empty status', { status: '' }],
 		['missing status', { status: undefined }],
-		['missing minimum balance', { 'min-balance': undefined }],
-		['string minimum balance', { 'min-balance': '100' }],
-		['NaN minimum balance', { 'min-balance': NaN }],
-		['missing pending rewards', { 'pending-rewards': undefined }],
-		['string pending rewards', { 'pending-rewards': '100' }],
-		['infinite pending rewards', { 'pending-rewards': Infinity }],
+		['missing minimum balance', { minBalance: undefined }],
+		['string minimum balance', { minBalance: '100' }],
+		['NaN minimum balance', { minBalance: NaN }],
+		['missing pending rewards', { pendingRewards: undefined }],
+		['string pending rewards', { pendingRewards: '100' }],
+		['infinite pending rewards', { pendingRewards: Infinity }],
 		['non-numeric round', { round: '100' }],
 		['NaN round', { round: NaN }]
 	])('rejects %s', (_label, fields) => {
@@ -289,8 +290,8 @@ describe('snapshotFromAlgodAccount', () => {
 			snapshotFromAlgodAccount({
 				...rawAccount,
 				amount: 0,
-				'min-balance': 0,
-				'pending-rewards': 0
+				minBalance: 0,
+				pendingRewards: 0
 			})
 		).toMatchObject({ balance: 0, minBalance: 0, pendingRewards: 0 });
 	});
@@ -300,10 +301,10 @@ describe('totalRewardsMicroVoi', () => {
 	test('skips rounds before 1520000 and non-payments, summing payment amounts', () => {
 		expect(
 			totalRewardsMicroVoi([
-				{ sender: 'r', 'confirmed-round': 1519999, 'payment-transaction': { amount: 999 } },
-				{ sender: 'r', 'confirmed-round': 1520000, 'payment-transaction': { amount: 100 } },
-				{ sender: 'r', 'confirmed-round': 1520001 },
-				{ sender: 'r', 'confirmed-round': 1520002, 'payment-transaction': { amount: 200 } }
+				{ sender: 'r', confirmedRound: 1519999, paymentTransaction: { amount: 999 } },
+				{ sender: 'r', confirmedRound: 1520000, paymentTransaction: { amount: 100 } },
+				{ sender: 'r', confirmedRound: 1520001 },
+				{ sender: 'r', confirmedRound: 1520002, paymentTransaction: { amount: 200 } }
 			])
 		).toBe(300);
 	});

@@ -12,7 +12,7 @@
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { buildAssetTransfer, buildPayment } from '$lib/chain/txBuilders';
 	import { createFlowPin } from '$lib/chain/flowAccount';
-	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
 	import { pollUntil } from '$lib/chain/singleFlightPoll';
 	import { checkDestinationConfirmation, checkAlgorandDeposit } from '$lib/chain/bridgeMonitor';
 	import type { ExpectedBridgeConfirmation } from '$lib/chain/bridgeConfirmation';
@@ -108,10 +108,7 @@
 	let monitorReview: { expected: bigint; actual: bigint } | null = null;
 	let bridgeError: string | null = null;
 	let pendingController: AbortController | undefined;
-	const sendDeps = {
-		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
-		waitForConfirmation: (txId: string) => algosdk.waitForConfirmation(algodClient, txId, 4)
-	};
+	const sendDeps = createSendDeps(algodClient);
 	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	let tracker: PendingTracker | undefined;
 	let trackerWallet: string | undefined;
@@ -801,13 +798,13 @@
 			if (address !== flow.current($selectedWallet?.address)) return;
 			if (selectedToken.voiAssetId === '0') {
 				// For VOI token
-				voiBalance = (accountInfo.amount as number) / 1e6;
+				voiBalance = Number(accountInfo.amount) / 1e6;
 			} else {
 				// For ASAs
-				const asset = accountInfo['assets']?.find(
-					(a: any) => a['asset-id'].toString() === selectedToken.voiAssetId
+				const asset = accountInfo.assets?.find(
+					(a) => a.assetId.toString() === selectedToken.voiAssetId
 				);
-				voiBalance = asset ? (asset.amount as number) / 1e6 : 0;
+				voiBalance = asset ? Number(asset.amount) / 1e6 : 0;
 			}
 		} catch (error) {
 			if (address !== flow.current($selectedWallet?.address)) return;

@@ -1,10 +1,10 @@
 import { calculateUserPoolAmounts, calculateUserPoolShare, isLPToken } from '$lib/tokens/lpStats';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the moved upstream payload handling. */
 import type { FungibleTokenType, LPToken } from '$lib/types/assets';
+import { globalStateEntries } from '$lib/chain/algodShapes';
 import { algodClient, algodIndexer } from '$lib/utils/algod';
 import { getEnvoiNames } from '$lib/utils/envoi';
 import {
-	decodeBase64Log,
 	identifyEventType,
 	isDepositOrWithdrawEvent,
 	decodeDepositEvent,
@@ -65,6 +65,28 @@ interface FetchTokenTransfersOptions {
 	onPagination?: (pagination: { nextToken: string | undefined; hasMore: boolean }) => void;
 }
 
+// A transaction the indexer calls a payment or asset transfer always carries that body. One that
+// does not is a broken response, and it fails the page, so the caller keeps its cursor and retries.
+function requirePayment(tx: {
+	id?: string;
+	paymentTransaction?: { receiver: string; amount: bigint };
+}) {
+	if (!tx.paymentTransaction) {
+		throw new Error(`Indexer transaction ${tx.id ?? ''} is a payment without a payment body`);
+	}
+	return tx.paymentTransaction;
+}
+
+function requireAssetTransfer(tx: {
+	id?: string;
+	assetTransferTransaction?: { receiver: string; amount: bigint };
+}) {
+	if (!tx.assetTransferTransaction) {
+		throw new Error(`Indexer transaction ${tx.id ?? ''} is an asset transfer without a body`);
+	}
+	return tx.assetTransferTransaction;
+}
+
 export async function fetchTokenTransfers({
 	token,
 	walletId,
@@ -97,56 +119,56 @@ export async function fetchTokenTransfers({
 				.do();
 
 			// Store the next token for pagination
-			currentNextToken = txns['next-token'];
+			currentNextToken = txns.nextToken ?? '';
 
 			// Process transactions from this batch
 			const batchTransfers: Transfer[] = [];
 
-			txns.transactions.forEach((tx: any) => {
+			txns.transactions.forEach((tx) => {
 				const transfers: Transfer[] = [];
 
 				// Handle different transaction types that affect VOI balance
-				if (tx['tx-type'] === 'pay') {
+				if (tx.txType === 'pay') {
 					// Regular payment transaction
+					const payment = requirePayment(tx);
 					transfers.push({
 						from: tx.sender,
-						to: tx['payment-transaction'].receiver,
-						amount: (tx['payment-transaction'].amount / Math.pow(10, token.decimals)).toString(),
-						round: tx['confirmed-round'],
-						transactionid: tx.id,
-						timestamp: tx['round-time'],
-						note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+						to: payment.receiver,
+						amount: (Number(payment.amount) / Math.pow(10, token.decimals)).toString(),
+						round: Number(tx.confirmedRound),
+						transactionid: tx.id ?? '',
+						timestamp: Number(tx.roundTime),
+						note: tx.note?.length ? Buffer.from(tx.note).toString() : undefined,
 						type: 'payment',
-						fee: tx.fee
+						fee: Number(tx.fee)
 					});
-				} else if (tx.sender === walletId && tx.fee > 0 && tx['tx-type'] !== 'pay') {
+				} else if (tx.sender === walletId && tx.fee > 0 && tx.txType !== 'pay') {
 					// Only add standalone fee transfer if this is not a payment transaction
 					transfers.push({
 						from: tx.sender,
 						to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
-						amount: (tx.fee / Math.pow(10, token.decimals)).toString(),
-						round: tx['confirmed-round'],
-						transactionid: tx.id,
-						timestamp: tx['round-time'],
-						note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined,
+						amount: (Number(tx.fee) / Math.pow(10, token.decimals)).toString(),
+						round: Number(tx.confirmedRound),
+						transactionid: tx.id ?? '',
+						timestamp: Number(tx.roundTime),
+						note: tx.note?.length ? Buffer.from(tx.note).toString() : undefined,
 						type: 'fee'
 					});
 				}
 
 				// Handle inner transactions for all transaction types
-				if (tx['inner-txns']) {
-					tx['inner-txns'].forEach((innerTx: any) => {
-						if (innerTx['tx-type'] === 'pay') {
+				if (tx.innerTxns) {
+					tx.innerTxns.forEach((innerTx) => {
+						if (innerTx.txType === 'pay') {
+							const innerPayment = requirePayment(innerTx);
 							transfers.push({
 								from: innerTx.sender,
-								to: innerTx['payment-transaction'].receiver,
-								amount: (
-									innerTx['payment-transaction'].amount / Math.pow(10, token.decimals)
-								).toString(),
-								round: tx['confirmed-round'],
-								transactionid: innerTx.id,
-								timestamp: tx['round-time'],
-								note: innerTx.note ? Buffer.from(innerTx.note, 'base64').toString() : undefined,
+								to: innerPayment.receiver,
+								amount: (Number(innerPayment.amount) / Math.pow(10, token.decimals)).toString(),
+								round: Number(tx.confirmedRound),
+								transactionid: innerTx.id ?? '',
+								timestamp: Number(tx.roundTime),
+								note: innerTx.note?.length ? Buffer.from(innerTx.note).toString() : undefined,
 								type: 'inner-payment',
 								parentTxId: tx.id,
 								fee: 0
@@ -246,8 +268,8 @@ export async function fetchTokenTransfers({
 						let needsTokenSwap = false;
 						let isHumbleFormat = false;
 
-						for (const logBase64 of txInfo.transaction.logs) {
-							const logBuffer = decodeBase64Log(logBase64);
+						for (const log of txInfo.transaction.logs) {
+							const logBuffer = Buffer.from(log);
 
 							// Extract the selector for token swap detection
 							const selector = logBuffer.slice(0, 4).toString('hex');
@@ -536,19 +558,22 @@ export async function fetchTokenTransfers({
 			.nextToken(append && nextToken ? nextToken : '')
 			.do();
 
-		const next = txns['next-token'];
+		const next = txns.nextToken;
 
 		newTransfers = txns.transactions
-			.filter((tx: any) => tx['tx-type'] === 'axfer')
-			.map((tx: any) => ({
-				from: tx.sender,
-				to: tx['asset-transfer-transaction'].receiver,
-				amount: (tx['asset-transfer-transaction'].amount / Math.pow(10, token.decimals)).toString(),
-				round: tx['confirmed-round'],
-				transactionid: tx.id,
-				timestamp: tx['round-time'],
-				note: tx.note ? Buffer.from(tx.note, 'base64').toString() : undefined
-			}));
+			.filter((tx) => tx.txType === 'axfer')
+			.map((tx) => {
+				const transfer = requireAssetTransfer(tx);
+				return {
+					from: tx.sender,
+					to: transfer.receiver,
+					amount: (Number(transfer.amount) / Math.pow(10, token.decimals)).toString(),
+					round: Number(tx.confirmedRound),
+					transactionid: tx.id ?? '',
+					timestamp: Number(tx.roundTime),
+					note: tx.note?.length ? Buffer.from(tx.note).toString() : undefined
+				};
+			});
 		nextToken = next;
 		hasMore = !!next;
 	}
@@ -610,7 +635,7 @@ export function fetchCurrentPoolBalance(
  */
 async function humbleContractOrderReversed(poolInfo: LPToken['poolInfo']): Promise<boolean> {
 	const app = await algodClient.getApplicationByID(Number(poolInfo.poolId)).do();
-	const state: { key: string; value: { bytes?: string } }[] = app.params?.['global-state'] ?? [];
+	const state = globalStateEntries(app.params?.globalState);
 	const entry = state.find((kv) => kv.key === 'AA==');
 	const bytes = entry?.value.bytes ? Buffer.from(entry.value.bytes, 'base64') : null;
 	if (!bytes || bytes.length < 16) throw new Error(`No token ids in pool ${poolInfo.poolId}`);

@@ -10,7 +10,8 @@
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { awaitWithdrawalConfirmation } from '$lib/chain/withdrawConfirmation';
 	import { trackPending } from '$lib/chain/sendAndConfirm';
-	import { createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
+	import { pendingInfoFrom } from '$lib/chain/algodShapes';
 	import {
 		clearPendingWithdrawal,
 		getPendingWithdrawal,
@@ -41,10 +42,7 @@
 	let flowWallet: string | undefined;
 	$: activeWallet = flowWallet ?? $selectedWallet?.address;
 
-	const sendDeps = {
-		send: (group: Uint8Array[]) => algodClient.sendRawTransaction(group).do(),
-		waitForConfirmation: (id: string) => algosdk.waitForConfirmation(algodClient, id, 4)
-	};
+	const sendDeps = createSendDeps(algodClient);
 
 	// Read storage before rendering, including on each open and cross-tab storage change.
 	$: {
@@ -104,7 +102,8 @@
 		}
 	}
 
-	const pendingInfo = (id: string) => algodClient.pendingTransactionInformation(id).do();
+	const pendingInfo = async (id: string) =>
+		pendingInfoFrom(await algodClient.pendingTransactionInformation(id).do());
 
 	async function trackWithdrawal(id: string, lastValid: number, wallet: string) {
 		const contractId = contract.contractId;
@@ -168,7 +167,7 @@
 						pendingInfo: async (id) => {
 							if (signal.aborted) return {};
 							const info = await pendingInfo(id);
-							if (!signal.aborted && !(info['confirmed-round'] > 0)) {
+							if (!signal.aborted && !((info['confirmed-round'] ?? 0) > 0)) {
 								foundUnconfirmed = true;
 								updateEstimate();
 							}

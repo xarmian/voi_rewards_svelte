@@ -7,7 +7,7 @@ describe('shared tracking dependencies', () => {
 		(component) => {
 			const source = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
 			expect(source).toMatch(
-				/import\s*\{\s*createTrackingDeps\s*\}\s*from\s*['"]\$lib\/chain\/trackingDeps['"]/
+				/import\s*\{[^}]*\bcreateTrackingDeps\b[^}]*\}\s*from\s*['"]\$lib\/chain\/trackingDeps['"]/
 			);
 			expect(source).not.toMatch(/indexerSearch\s*:/);
 			if (component === 'WithdrawModal') {

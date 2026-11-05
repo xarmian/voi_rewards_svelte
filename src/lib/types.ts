@@ -78,13 +78,6 @@ export interface ContractDetails {
 	accountInfo?: {
 		round: number;
 		status: string;
-		participation: {
-			'vote-first-valid': number;
-			'vote-last-valid': number;
-			'vote-key-dilution': number;
-			'selection-participation-key': string;
-			'vote-participation-key': string;
-			'state-proof-key': string;
-		};
+		participation?: { voteLastValid: number };
 	};
 }

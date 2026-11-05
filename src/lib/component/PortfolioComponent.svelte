@@ -319,13 +319,11 @@
 				.addressRole('receiver')
 				.beforeTime(new Date().toISOString())
 				.do()
-				.then((response) =>
-					response.transactions.filter((tx: { sender: string }) => tx.sender === sender)
-				)
+				.then((response) => response.transactions.filter((tx) => tx.sender === sender))
 		);
 
 		const allTransactions = await Promise.all(rewardsPromises);
-		return allTransactions.flat() as RewardsTransaction[];
+		return allTransactions.flat();
 	}
 
 	async function fetchAccountDetails(force = false) {
@@ -413,12 +411,15 @@
 		await loadAccountDetails(
 			requestedWallet,
 			{
-				fetchAccount: async (address) =>
-					(await requireAccountInfo(address, { force })) as unknown as Record<string, unknown>,
+				fetchAccount: (address) => requireAccountInfo(address, { force }),
 				lookupCreatedAt: async (address) => {
 					const info = await algodIndexer.lookupAccountByID(address).do();
-					const block = await algodIndexer.lookupBlock(info.account['created-at-round']).do();
-					return block.timestamp;
+					const createdAtRound = info.account.createdAtRound;
+					if (createdAtRound === undefined) {
+						throw new Error('The indexer did not report when this account was created');
+					}
+					const block = await algodIndexer.lookupBlock(createdAtRound).do();
+					return Number(block.timestamp);
 				},
 				fetchRewardsTransactions: fetchRewardsHistory
 			},
@@ -751,7 +752,7 @@
 					const response = await algodClient.sendRawTransaction(signedTxns).do();
 
 					// Wait for confirmation
-					await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+					await algosdk.waitForConfirmation(algodClient, response.txid, 4);
 
 					// Mark all in this batch as successful
 					batch.tokens.forEach(({ token }) => {

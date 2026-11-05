@@ -57,11 +57,11 @@ export async function arc200TransferFrom(
 		const response = await algodClient.sendRawTransaction(signedTxnBytes).do();
 
 		// Wait for confirmation
-		await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+		await algosdk.waitForConfirmation(algodClient, response.txid, 4);
 
 		return {
 			success: true,
-			txId: response.txId
+			txId: response.txid
 		};
 	} catch (error) {
 		console.error('Error in arc200TransferFrom:', error);
@@ -121,11 +121,11 @@ export async function arc200Approve(
 		const response = await algodClient.sendRawTransaction(signedTxnBytes).do();
 
 		// Wait for confirmation
-		await algosdk.waitForConfirmation(algodClient, response.txId, 4);
+		await algosdk.waitForConfirmation(algodClient, response.txid, 4);
 
 		return {
 			success: true,
-			txId: response.txId
+			txId: response.txid
 		};
 	} catch (error) {
 		console.error('Error in arc200Approve:', error);

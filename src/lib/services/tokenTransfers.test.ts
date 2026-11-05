@@ -47,11 +47,11 @@ const lp: LPToken = {
 };
 const transaction = {
 	sender: 'wallet',
-	'confirmed-round': 10,
+	confirmedRound: 10n,
 	id: 'tx',
-	'round-time': 20,
-	fee: 1,
-	note: Buffer.from('memo').toString('base64')
+	roundTime: 20,
+	fee: 1n,
+	note: new TextEncoder().encode('memo')
 };
 const arcTransfer = {
 	from: 'other',
@@ -184,18 +184,18 @@ describe('fetchTokenTransfers', () => {
 			transactions: [
 				{
 					...transaction,
-					'tx-type': 'pay',
-					'payment-transaction': { receiver: 'other', amount: 200 },
-					'inner-txns': [
+					txType: 'pay',
+					paymentTransaction: { receiver: 'other', amount: 200n },
+					innerTxns: [
 						{
 							id: 'inner',
 							sender: 'other',
-							'tx-type': 'pay',
-							'payment-transaction': { receiver: 'wallet', amount: 50 }
+							txType: 'pay',
+							paymentTransaction: { receiver: 'wallet', amount: 50n }
 						}
 					]
 				},
-				{ ...transaction, id: 'app', 'tx-type': 'appl' }
+				{ ...transaction, id: 'app', txType: 'appl' }
 			]
 		});
 		const result = await fetchTokenTransfers({
@@ -222,12 +222,12 @@ describe('fetchTokenTransfers', () => {
 			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 			if (type === 'vsa') {
 				query.do.mockResolvedValueOnce({
-					'next-token': 'advanced',
-					transactions: [{ ...transaction, 'tx-type': 'axfer' }]
+					nextToken: 'advanced',
+					transactions: [{ ...transaction, txType: 'axfer' }]
 				});
 			} else {
 				query.do
-					.mockResolvedValueOnce({ 'next-token': 'advanced', transactions: [] })
+					.mockResolvedValueOnce({ nextToken: 'advanced', transactions: [] })
 					.mockRejectedValueOnce(new Error('page two unavailable'));
 			}
 			try {
@@ -256,12 +256,12 @@ describe('fetchTokenTransfers', () => {
 	);
 	it('passes through VSA pagination and scales asset transfers', async () => {
 		query.do.mockResolvedValue({
-			'next-token': 'next',
+			nextToken: 'next',
 			transactions: [
 				{
 					...transaction,
-					'tx-type': 'axfer',
-					'asset-transfer-transaction': { receiver: 'other', amount: 300 }
+					txType: 'axfer',
+					assetTransferTransaction: { receiver: 'other', amount: 300n }
 				}
 			]
 		});
@@ -309,7 +309,7 @@ describe('fetchTokenTransfers', () => {
 			])
 		]);
 		vi.mocked(algodIndexer.lookupTransactionByID).mockReturnValue({
-			do: vi.fn().mockResolvedValue({ transaction: { logs: [deposit.toString('base64')] } })
+			do: vi.fn().mockResolvedValue({ transaction: { logs: [deposit] } })
 		} as unknown as ReturnType<typeof algodIndexer.lookupTransactionByID>);
 		const result = await fetchTokenTransfers({ token: lp, walletId: 'wallet' });
 		expect(result.transfers[0]).toMatchObject({
@@ -323,7 +323,7 @@ describe('fetchTokenTransfers', () => {
 		async (type) => {
 			query.do.mockResolvedValue({
 				transactions: [],
-				'next-token': type === 'native' ? undefined : 'next'
+				nextToken: type === 'native' ? undefined : 'next'
 			});
 			fetchMock.mockResolvedValue(Response.json({ data: [] }));
 			const previous = [{ ...arcTransfer }];
@@ -387,9 +387,7 @@ describe('Humble LP transfers (TASK-97)', () => {
 		vi.mocked(algodClient.getApplicationByID).mockReturnValue({
 			do: vi.fn().mockResolvedValue({
 				params: {
-					'global-state': [
-						{ key: Buffer.from([0]).toString('base64'), value: { bytes: state.toString('base64') } }
-					]
+					globalState: [{ key: Uint8Array.of(0), value: { type: 1n, bytes: state, uint: 0n } }]
 				}
 			})
 		} as unknown as ReturnType<typeof algodClient.getApplicationByID>);
@@ -397,7 +395,7 @@ describe('Humble LP transfers (TASK-97)', () => {
 	beforeEach(() => {
 		fetchMock.mockResolvedValue(Response.json({ data: [arcTransfer] }));
 		vi.mocked(algodIndexer.lookupTransactionByID).mockReturnValue({
-			do: vi.fn().mockResolvedValue({ transaction: { logs: [deposit.toString('base64')] } })
+			do: vi.fn().mockResolvedValue({ transaction: { logs: [deposit] } })
 		} as unknown as ReturnType<typeof algodIndexer.lookupTransactionByID>);
 	});
 

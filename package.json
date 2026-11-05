@@ -92,6 +92,7 @@
 			"algosdk": "^2.1.0"
 		},
 		"@perawallet/connect": {
+			".": "1.4.1",
 			"algosdk": "^2.1.0"
 		},
 		"svelte-markdown": {

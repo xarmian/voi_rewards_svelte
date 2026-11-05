@@ -63,14 +63,14 @@
 	onMount(async () => {
 		try {
 			const params = await algodClient.getTransactionParams().do();
-			minFee = params.minFee ?? MIN_KEYREG_FEE;
+			minFee = Number(params.minFee);
 		} catch (err) {
 			console.error('Error loading transaction params:', err);
 		}
 		if (!isStakingContract) {
 			try {
 				const info = await algodClient.accountInformation(walletAddress).exclude('all').do();
-				alreadyEligible = info['incentive-eligible'] === true;
+				alreadyEligible = info.incentiveEligible === true;
 			} catch (err) {
 				console.error('Error loading account eligibility:', err);
 			}

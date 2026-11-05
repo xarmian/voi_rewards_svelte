@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { httpStatus, pendingInfoFrom, roundNumber } from './algodShapes';
+import { globalStateEntries, httpStatus, pendingInfoFrom, roundNumber } from './algodShapes';
 
 describe('httpStatus', () => {
 	it('reads the status algosdk 3 keeps on error.response', () => {
@@ -39,5 +39,27 @@ describe('pendingInfoFrom', () => {
 	});
 	it('reports a pool error only when there is one', () => {
 		expect(pendingInfoFrom({ poolError: 'overspend' })).toEqual({ 'pool-error': 'overspend' });
+	});
+});
+
+describe('globalStateEntries', () => {
+	it('encodes keys and bytes as base64 and keeps a large uint exact', () => {
+		const entries = globalStateEntries([
+			{
+				key: new TextEncoder().encode('total'),
+				value: { type: 2n, bytes: new Uint8Array(), uint: 2n ** 60n + 7n }
+			},
+			{
+				key: new TextEncoder().encode('owner'),
+				value: { type: 1n, bytes: new Uint8Array([1, 2, 3]), uint: 0n }
+			}
+		]);
+		expect(entries).toEqual([
+			{ key: 'dG90YWw=', value: { type: 2, bytes: '', uint: 2n ** 60n + 7n } },
+			{ key: 'b3duZXI=', value: { type: 1, bytes: 'AQID', uint: 0n } }
+		]);
+	});
+	it('treats a missing global state as empty', () => {
+		expect(globalStateEntries(undefined)).toEqual([]);
 	});
 });

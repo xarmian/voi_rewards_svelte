@@ -1,5 +1,6 @@
+import algosdk from 'algosdk';
 import { httpStatus, pendingInfoFrom, roundNumber } from './algodShapes';
-import type { TrackingDependencies } from './sendAndConfirm';
+import type { SendDependencies, TrackingDependencies } from './sendAndConfirm';
 
 type Request<T> = { do(): Promise<T> };
 type SharedRequest<T> = { promise: Promise<T>; startedAtMs: number };
@@ -19,6 +20,15 @@ type Indexer = {
 	};
 	lookupBlock(round: number): Request<{ round: bigint }>;
 };
+
+/** How the send flows post a signed group and wait up to 4 rounds for it to confirm. */
+export function createSendDeps(client: algosdk.Algodv2): SendDependencies {
+	return {
+		send: (group) => client.sendRawTransaction(group).do(),
+		waitForConfirmation: async (txId) =>
+			pendingInfoFrom(await algosdk.waitForConfirmation(client, txId, 4))
+	};
+}
 
 export function createTrackingDeps(
 	algodClient: AlgodClient,

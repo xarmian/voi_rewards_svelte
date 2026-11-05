@@ -13,7 +13,8 @@ function clients(now = Date.now, staleMs = 15000) {
 	};
 	const indexer = {
 		searchForTransactions: () => ({ txid }),
-		lookupBlock: vi.fn(() => ({ do: block }))
+		// The block mock resolves malformed values on purpose; the real response is { round: bigint }.
+		lookupBlock: vi.fn(() => ({ do: block as unknown as () => Promise<{ round: bigint }> }))
 	};
 	return {
 		deps: createTrackingDeps(algod, indexer, now, staleMs),

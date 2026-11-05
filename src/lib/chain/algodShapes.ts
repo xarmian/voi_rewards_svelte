@@ -30,3 +30,30 @@ export function pendingInfoFrom(info: {
 		...(info.poolError ? { 'pool-error': info.poolError } : {})
 	};
 }
+
+export type GlobalStateEntry = {
+	key: string;
+	value: { type: number; bytes: string; uint: bigint | number };
+};
+
+/**
+ * An application's global state in the form the contract decoders read: base64 keys and bytes,
+ * a numeric type, and the uint left as the exact bigint algosdk 3 reports.
+ */
+export function globalStateEntries(
+	state:
+		| readonly {
+				key: Uint8Array;
+				value: { type: bigint | number; bytes: Uint8Array; uint: bigint | number };
+		  }[]
+		| undefined
+): GlobalStateEntry[] {
+	return (state ?? []).map(({ key, value }) => ({
+		key: Buffer.from(key).toString('base64'),
+		value: {
+			type: Number(value.type),
+			bytes: Buffer.from(value.bytes).toString('base64'),
+			uint: value.uint
+		}
+	}));
+}
