@@ -200,3 +200,62 @@ describe('withNoteNoGroup', () => {
 		expect(first.group).toEqual(second.group);
 	});
 });
+
+describe('withNoteNoGroup on an application call', () => {
+	// The ARC-200 transactions SendTokenModal rebuilds are application calls with app args, accounts,
+	// foreign references and boxes, none of which the payment cases above exercise.
+	const appCall = (callNote?: Uint8Array) =>
+		algosdk.makeApplicationNoOpTxnFromObject({
+			sender: A,
+			appIndex: 40153368,
+			appArgs: [Uint8Array.of(1, 2, 3), Uint8Array.of(9)],
+			accounts: [B, C],
+			foreignApps: [390001],
+			foreignAssets: [302190],
+			boxes: [{ appIndex: 0, name: Uint8Array.of(7, 7) }],
+			note: callNote,
+			suggestedParams: params
+		});
+
+	it('keeps every call field and replaces only the note and group', () => {
+		const grouped = algosdk.assignGroupID([
+			appCall(note),
+			buildPayment({ from: A, to: B, amount: 1n, suggestedParams: params })
+		]);
+		const rebuilt = withNoteNoGroup(grouped[0], new TextEncoder().encode('3'));
+		expect(rebuilt.group).toBeUndefined();
+		expect(b64(rebuilt)).toBe(b64(appCall(new TextEncoder().encode('3'))));
+	});
+
+	it('keeps the whole call when no note is given', () => {
+		const [call] = algosdk.assignGroupID([
+			appCall(note),
+			buildPayment({ from: A, to: B, amount: 1n, suggestedParams: params })
+		]);
+		expect(b64(withNoteNoGroup(call))).toBe(b64(appCall(note)));
+	});
+});
+
+describe('regrouping transactions that arrive already grouped', () => {
+	// PortfolioComponent merges transactions the server grouped separately into one batch: it clears
+	// each group id, then calls assignGroupID. That needs assignGroupID to hash the ungrouped
+	// transactions and to set the new id on the same objects it returns.
+	const make = (amount: number) =>
+		buildPayment({ from: A, to: B, amount, suggestedParams: params });
+	const same = (a?: Uint8Array, b?: Uint8Array) => !!a && !!b && Buffer.compare(a, b) === 0;
+
+	it('gives the merged batch the group id of its ungrouped transactions', () => {
+		const groupA = algosdk.assignGroupID([make(1), make(2)]);
+		const groupB = algosdk.assignGroupID([make(3), make(4)]);
+		const decoded = [...groupA, ...groupB].map((t) =>
+			algosdk.decodeUnsignedTransaction(algosdk.encodeUnsignedTransaction(t))
+		);
+		for (const t of decoded) delete t.group;
+		const returned = algosdk.assignGroupID(decoded);
+
+		const expected = algosdk.computeGroupID([make(1), make(2), make(3), make(4)]);
+		expect(returned).toBe(decoded);
+		for (const t of decoded) expect(same(t.group, expected)).toBe(true);
+		expect(same(decoded[0].group, groupA[0].group)).toBe(false);
+	});
+});
