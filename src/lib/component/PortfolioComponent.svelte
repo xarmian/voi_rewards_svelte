@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { canSignFor } from '$lib/chain/signerGate';
 	import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import { loadAccountDetails, totalRewardsMicroVoi } from '$lib/portfolio/accountDetails';
 	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
@@ -172,15 +173,13 @@
 		}
 	}
 
+	$: canSignTransactions = canSignFor($selectedWallet, walletAddress);
+
 	$: {
 		// TASK-108: browser only. On the server the relative /api/voi-price fetch fails and its error stays in the
 		// module-level store for every later render.
 		if (browser && walletAddress && walletAddress !== lastInitializedWallet) {
 			lastInitializedWallet = walletAddress;
-			canSignTransactions =
-				$selectedWallet?.address === walletAddress &&
-				$selectedWallet?.app !== '' &&
-				$selectedWallet?.app !== 'Watch';
 			fungibleTokens = [];
 			lastTokenPrice = 0;
 			tokensPrice = 0;
