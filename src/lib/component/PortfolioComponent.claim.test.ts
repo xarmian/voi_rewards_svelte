@@ -3,16 +3,21 @@ import { expect, test } from 'vitest';
 
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 
-test('stops before signing the next bulk claim batch when its account is no longer selected', () => {
+test('signs every bulk claim batch as the captured signer, whatever the picker does', () => {
 	const loop = source.slice(source.indexOf('for (const batch of transactionBatches)'));
 	const beforeSign = loop.slice(0, loop.indexOf('await signTransactions('));
-	expect(beforeSign).toMatch(/if \(\$selectedWallet\?\.address !== claimAccount\)/);
-	expect(beforeSign).toContain('break;');
-	expect(beforeSign).toContain(
-		'Your selected account changed during the claim, so it stopped before the next batch. Select'
-	);
-	expect(beforeSign).toContain('${claimAccount} to continue.');
+	// The old stop-when-the-selection-moved checks are gone: the signer is fixed at confirmation.
+	expect(beforeSign).not.toContain('$selectedWallet');
+	expect(loop).toContain('await signTransactions([grouped], signer)');
 	expect(source).toContain('{bulkClaimError}');
+});
+
+test('stops the bulk claim on a disconnected wallet or a sender mismatch, with the library message', () => {
+	const loop = source.slice(source.indexOf('for (const batch of transactionBatches)'));
+	expect(loop).toContain("error.code === 'SIGNER_DISCONNECTED'");
+	expect(loop).toContain("error.code === 'SIGNER_TRANSACTION_MISMATCH'");
+	const stop = loop.slice(loop.indexOf("error.code === 'SIGNER_DISCONNECTED'"));
+	expect(stop.slice(0, stop.indexOf('break;'))).toContain('bulkClaimError = error instanceof Error');
 });
 
 test.each(['FungibleToken', 'ClaimableTokenCard', 'RegisterVoteKey', 'OptOutModal'])(
@@ -33,24 +38,30 @@ test.each(['FungibleToken', 'ClaimableTokenCard', 'RegisterVoteKey', 'OptOutModa
 	}
 );
 
-test('bulk claim pins the account at start and rechecks it after signing, before submitting', () => {
+test('bulk claim captures its signer before any await and refuses another selection', () => {
 	const start = source.indexOf('async function bulkClaimAllTokens()');
 	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
-	expect(fn).toMatch(/const claimAccount = walletAddress;/);
-	const loop = fn.slice(fn.indexOf('for (const batch of transactionBatches)'));
-	expect(loop).not.toMatch(/\$selectedWallet\?\.address === walletAddress/);
-	const signAt = loop.indexOf('await signTransactions(');
-	const sendAt = loop.indexOf('sendRawTransaction(');
-	const between = loop.slice(signAt, sendAt);
-	expect(between).toMatch(/\$selectedWallet\?\.address !== claimAccount/);
-	expect(between).toContain('break;');
+	const capture = fn.indexOf('captureSigner()');
+	expect(capture).toBeGreaterThan(0);
+	expect(capture).toBeLessThan(fn.indexOf('await '));
+	// The account on screen must be the one that is selected, in a wallet that can sign.
+	const guard = fn.slice(0, capture);
+	expect(guard).toContain('selected?.address !== walletAddress');
+	expect(guard).toContain("selected.app === 'Watch'");
+	expect(fn).toMatch(/const claimAccount = signer\.address;/);
 });
 
 test('bulk claim builds its transactions from the captured account, not the live route address', () => {
 	const start = source.indexOf('async function bulkClaimAllTokens()');
 	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
-	const afterCapture = fn.slice(
-		fn.indexOf('const claimAccount = walletAddress;') + 'const claimAccount = walletAddress;'.length
-	);
+	const marker = 'const claimAccount = signer.address;';
+	expect(fn).toContain(marker);
+	const afterCapture = fn.slice(fn.indexOf(marker) + marker.length);
 	expect(afterCapture).not.toMatch(/\bwalletAddress\b/);
+});
+
+test('each bulk claim result names the account that signed it', () => {
+	const start = source.indexOf('async function bulkClaimAllTokens()');
+	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
+	expect(fn.match(/wallet: claimAccount/g)).toHaveLength(2);
 });

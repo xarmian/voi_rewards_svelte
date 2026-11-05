@@ -151,7 +151,7 @@
 			.map((address) => ({
 				address,
 				name:
-					$connectedWallets.find((w) => w.address === address)?.envoiName ||
+					$connectedWallets.find((w) => w.address === address)?.name ||
 					address.slice(0, 8) + '...' + address.slice(-8),
 				metadata: {},
 				cached: true

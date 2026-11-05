@@ -331,15 +331,6 @@ describe('sendWithdrawal', () => {
 		expect(d.read()).toEqual(d.entry);
 	});
 
-	it('skips group identity checks for inputs without txID', async () => {
-		const d = setup();
-		expect(await sendWithdrawal({ ...d.input, txns: [{}, {}] }, d.deps)).toMatchObject({
-			status: 'pending'
-		});
-		expect(d.send).toHaveBeenCalledOnce();
-		expect(d.read()).toEqual(d.entry);
-	});
-
 	it('clears on confirmation', async () => {
 		const d = setup();
 		d.waitForConfirmation.mockResolvedValue({ 'confirmed-round': 20 });
@@ -444,38 +435,34 @@ describe('canOfferWithdraw', () => {
 	});
 });
 
-describe('sendWithdrawal: wallet pinning and a record from another tab', () => {
-	it('signs nothing when the connected wallet changed after the form was submitted', async () => {
+describe('sendWithdrawal: the captured wallet and a record from another tab', () => {
+	// The signer is fixed when the user confirms, so the module no longer compares against a live
+	// selection: a picker move cannot change who signs, and the hold stays under the signer's key.
+	it('signs exactly the transactions it was given, once', async () => {
 		const d = setup();
-		const outcome = await sendWithdrawal(d.input, { ...d.deps, currentWallet: () => 'another' });
-		expect(outcome.status).toBe('not-signed');
-		expect(d.sign).not.toHaveBeenCalled();
-		expect(d.send).not.toHaveBeenCalled();
-		expect(d.read()).toBeUndefined();
+		await sendWithdrawal(d.input, d.deps);
+		expect(d.sign).toHaveBeenCalledExactlyOnceWith([d.input.txns]);
 	});
 
-	it('records and sends nothing when the wallet changed while the signing prompt was open', async () => {
+	it('keys the hold by the wallet that signed', async () => {
 		const d = setup();
-		let current = d.input.wallet;
-		const signed = await d.sign();
-		d.sign.mockImplementation(async () => {
-			current = 'another';
-			return signed;
-		});
-		const outcome = await sendWithdrawal(d.input, { ...d.deps, currentWallet: () => current });
-		expect(outcome.status).toBe('not-signed');
-		expect(d.send).not.toHaveBeenCalled();
-		expect(d.read()).toBeUndefined();
+		const outcome = await sendWithdrawal(d.input, d.deps);
+		expect(outcome.status).toBe('pending');
+		expect(d.read()).toEqual(d.entry);
+		const other = pendingWithdrawalStorageKey('another', d.input.contractId);
+		expect(d.storage.getItem(other)).toBeNull();
 	});
 
-	it('still sends when the connected wallet is the one captured at submit', async () => {
+	it('reports a disconnected signer as not-signed and records nothing', async () => {
 		const d = setup();
-		const outcome = await sendWithdrawal(d.input, {
-			...d.deps,
-			currentWallet: () => d.input.wallet
+		d.sign.mockRejectedValue(new Error('Account X: its wallet (pera) is disconnected.'));
+		const outcome = await sendWithdrawal(d.input, d.deps);
+		expect(outcome).toEqual({
+			status: 'not-signed',
+			error: 'Account X: its wallet (pera) is disconnected.'
 		});
-		expect(outcome.status).not.toBe('not-signed');
-		expect(d.send).toHaveBeenCalledTimes(1);
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.read()).toBeUndefined();
 	});
 
 	it('does not overwrite or broadcast over a live record for another transaction', async () => {

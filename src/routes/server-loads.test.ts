@@ -11,7 +11,11 @@ vi.mock('$lib/chain/wallet.svelte', async () => {
 	return { selectedWallet: writable(null) };
 });
 
-import { selectedWallet } from '$lib/chain/wallet.svelte';
+import type { Writable } from 'svelte/store';
+import { selectedWallet as seamSelectedWallet } from '$lib/chain/wallet.svelte';
+
+// The mock above is a writable; the real seam's store is read-only, so only this test writes it.
+const selectedWallet = seamSelectedWallet as unknown as Writable<unknown>;
 import { fetchProjects } from './(site)/phase2/[...slug]/projects';
 import { GET } from './api/relay-rewards/+server';
 

@@ -105,11 +105,16 @@ test('WithdrawModal keys every withdrawal read by the wallet captured at submit'
 		.filter((line) => line.includes('$selectedWallet') && !line.includes('import '));
 	expect(live.map((line) => line.trim())).toEqual([
 		'$: activeWallet = flowWallet ?? $selectedWallet?.address;',
-		'const wallet = $selectedWallet?.address;',
-		// The one deliberate live read: sendWithdrawal compares it with the captured wallet before and
-		// after signing, because the wallet library signs with whatever is selected at that moment.
-		'currentWallet: () => $selectedWallet?.address'
+		// The submit-time guard. Nothing reads the live selection after it: the signer is captured
+		// right below, and sendWithdrawal signs as it, so a picker move cannot change who signs.
+		'if (!$selectedWallet?.address) {'
 	]);
+	const withdraw = source.slice(source.indexOf('async function handleWithdraw()'));
+	const body = withdraw.slice(0, withdraw.indexOf('\n\t}\n'));
+	expect(body.indexOf('captureSigner()')).toBeGreaterThan(0);
+	expect(body.indexOf('captureSigner()')).toBeLessThan(body.indexOf('await '));
+	expect(body).toContain('const wallet = signer.address;');
+	expect(source).not.toContain('currentWallet');
 	expect(source).toMatch(/let flowWallet: string \| undefined;/);
 	expect(source).toMatch(/flowWallet = wallet;/);
 });

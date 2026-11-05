@@ -14,12 +14,8 @@
 	import { config } from '$lib/config';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
-	import {
-		selectedWallet,
-		signTransactions,
-		captureSigner,
-		type TransactionSigner
-	} from '$lib/chain/wallet.svelte';
+	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
+	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';

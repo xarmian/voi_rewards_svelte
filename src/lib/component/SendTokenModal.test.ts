@@ -33,6 +33,16 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 	return (code: string) => runInContext(code, context);
 }
 
+// handleSend takes its signer from the selection before it validates anything, as it does when the
+// user confirms, so the harness supplies both the store value and the capture.
+function selectedWalletGlobals() {
+	const address = algosdk.generateAccount().addr.toString();
+	return {
+		$selectedWallet: { address },
+		captureSigner: () => ({ address, walletId: 'pera' })
+	};
+}
+
 test('send conversions never use a floating point decimal scale', () => {
 	expect(
 		source,
@@ -60,7 +70,7 @@ test.each(['', '-1', 'abc', '1e-7', '0', '0.0000001'])(
 		const run = componentFunctions(['handleSend'], {
 			decimalToBaseUnits,
 			algosdk,
-			$selectedWallet: { address: algosdk.generateAccount().addr.toString() },
+			...selectedWalletGlobals(),
 			selectedToken: { decimals: 6, symbol: 'VOI' },
 			tracker: {},
 			recipients: ['1', amount].map((value) => ({
@@ -83,7 +93,7 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 		decimalToBaseUnits,
 		sumBaseUnits,
 		algosdk,
-		$selectedWallet: { address: algosdk.generateAccount().addr.toString() },
+		...selectedWalletGlobals(),
 		selectedToken: { decimals: 6, symbol: 'VOI', balance: 9007199254740992 },
 		tracker: {},
 		recipients: ['9007199254.740993', '0.000001'].map((value) => ({

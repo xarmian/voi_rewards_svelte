@@ -127,7 +127,7 @@ describe('wallet seam', () => {
 		walletStore.addAccounts([account(A, 'pera')]);
 		walletStore.selectAccount(account(A, 'pera'));
 		flushSync();
-		selectWallet({ address: B, app: 'pera', walletId: 'pera' });
+		selectWallet({ address: B, walletId: 'pera' });
 		flushSync();
 		expect(get(selectedWallet)).toMatchObject({ address: A });
 	});
