@@ -77,6 +77,16 @@ function requirePayment(tx: {
 	return tx.paymentTransaction;
 }
 
+// Base units to a decimal string without passing through a JS number, which rounds above 2^53.
+// Trailing zeros are trimmed, so 200n at 2 decimals is "2", as the number path gave.
+function scaleAmount(amount: bigint, decimals: number): string {
+	const negative = amount < 0n;
+	const digits = (negative ? -amount : amount).toString().padStart(decimals + 1, '0');
+	const whole = digits.slice(0, digits.length - decimals);
+	const fraction = digits.slice(digits.length - decimals).replace(/0+$/, '');
+	return `${negative ? '-' : ''}${whole}${fraction ? `.${fraction}` : ''}`;
+}
+
 function requireAssetTransfer(tx: {
 	id?: string;
 	assetTransferTransaction?: { receiver: string; amount: bigint };
@@ -134,7 +144,7 @@ export async function fetchTokenTransfers({
 					transfers.push({
 						from: tx.sender,
 						to: payment.receiver,
-						amount: (Number(payment.amount) / Math.pow(10, token.decimals)).toString(),
+						amount: scaleAmount(payment.amount, token.decimals),
 						round: Number(tx.confirmedRound),
 						transactionid: tx.id ?? '',
 						timestamp: Number(tx.roundTime),
@@ -147,7 +157,7 @@ export async function fetchTokenTransfers({
 					transfers.push({
 						from: tx.sender,
 						to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
-						amount: (Number(tx.fee) / Math.pow(10, token.decimals)).toString(),
+						amount: scaleAmount(tx.fee, token.decimals),
 						round: Number(tx.confirmedRound),
 						transactionid: tx.id ?? '',
 						timestamp: Number(tx.roundTime),
@@ -164,7 +174,7 @@ export async function fetchTokenTransfers({
 							transfers.push({
 								from: innerTx.sender,
 								to: innerPayment.receiver,
-								amount: (Number(innerPayment.amount) / Math.pow(10, token.decimals)).toString(),
+								amount: scaleAmount(innerPayment.amount, token.decimals),
 								round: Number(tx.confirmedRound),
 								transactionid: innerTx.id ?? '',
 								timestamp: Number(tx.roundTime),
@@ -567,7 +577,7 @@ export async function fetchTokenTransfers({
 				return {
 					from: tx.sender,
 					to: transfer.receiver,
-					amount: (Number(transfer.amount) / Math.pow(10, token.decimals)).toString(),
+					amount: scaleAmount(transfer.amount, token.decimals),
 					round: Number(tx.confirmedRound),
 					transactionid: tx.id ?? '',
 					timestamp: Number(tx.roundTime),

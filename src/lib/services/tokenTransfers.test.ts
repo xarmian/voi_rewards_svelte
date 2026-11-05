@@ -215,6 +215,32 @@ describe('fetchTokenTransfers', () => {
 			{ amount: '0.01', type: 'fee', to_name: 'Fee Sink' }
 		]);
 	});
+	it('keeps amounts above 2^53 exact for native and asset transfers', async () => {
+		// 2^53 + 1 is the first integer a JS number cannot hold; Number() would show ...992.
+		const big = 9007199254740993n;
+		query.do.mockResolvedValue({
+			transactions: [
+				{
+					...transaction,
+					txType: 'pay',
+					paymentTransaction: { receiver: 'other', amount: big }
+				}
+			]
+		});
+		const native = await fetchTokenTransfers({ token, walletId: 'wallet' });
+		expect(native.transfers[0].amount).toBe('90071992547409.93');
+		query.do.mockResolvedValue({
+			transactions: [
+				{
+					...transaction,
+					txType: 'axfer',
+					assetTransferTransaction: { receiver: 'other', amount: big }
+				}
+			]
+		});
+		const vsa = await fetchTokenTransfers({ token: { ...token, type: 'vsa' }, walletId: 'wallet' });
+		expect(vsa.transfers[0].amount).toBe('90071992547409.93');
+	});
 	it.each(['vsa', 'native'] as const)(
 		'retains the original %s cursor when the page fails',
 		async (type) => {
