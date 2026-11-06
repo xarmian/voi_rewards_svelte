@@ -14,7 +14,7 @@ const cases: [string, Parameters<typeof badgeText>[0], string][] = [
 			[
 				`${variant} stale`,
 				{ ...base, variant, status: { tone: 'warn', minutesOld: 7, unavailable: false } },
-				'data 7 min old'
+				'! Stale chain - Block 23,890,168 · 7 min old'
 			],
 			[
 				`${variant} unavailable`,
@@ -25,7 +25,7 @@ const cases: [string, Parameters<typeof badgeText>[0], string][] = [
 					seconds: null,
 					status: { tone: 'warn', minutesOld: null, unavailable: true }
 				},
-				'chain data unavailable'
+				'Block unavailable'
 			],
 			[
 				`${variant} neutral`,
@@ -51,4 +51,11 @@ for (const [name, input, expected] of cases) {
 test('freshness badge renders the shared text helper', () => {
 	const source = readFileSync(new URL('./FreshnessBadge.svelte', import.meta.url), 'utf8');
 	assert.match(source, /\{badgeText\(/);
+});
+
+test('chain wording names its scope and retains block context when stale', () => {
+	const text = badgeText({ ...base, status: { tone: 'warn', minutesOld: 9, unavailable: false } });
+	assert.match(text, /Stale chain/);
+	assert.match(text, /Block 23,890,168/);
+	assert.doesNotMatch(text, /data as of|Retrieved/);
 });

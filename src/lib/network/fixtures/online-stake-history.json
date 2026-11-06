@@ -1,0 +1,250 @@
+[
+	{
+		"date": "2026-10-07",
+		"avg_online_stake": 662438455210579.9,
+		"min_block": 23332426,
+		"max_block": 23363248,
+		"min_timestamp": "2026-10-07T00:00:03.000Z",
+		"max_timestamp": "2026-10-07T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-08",
+		"avg_online_stake": 476303289610767.1,
+		"min_block": 23363249,
+		"max_block": 23393930,
+		"min_timestamp": "2026-10-08T00:00:02.000Z",
+		"max_timestamp": "2026-10-08T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-09",
+		"avg_online_stake": 476601700231760.7,
+		"min_block": 23393931,
+		"max_block": 23424700,
+		"min_timestamp": "2026-10-09T00:00:01.000Z",
+		"max_timestamp": "2026-10-09T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-10",
+		"avg_online_stake": 476600304329554.5,
+		"min_block": 23424701,
+		"max_block": 23455455,
+		"min_timestamp": "2026-10-10T00:00:01.000Z",
+		"max_timestamp": "2026-10-10T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-11",
+		"avg_online_stake": 476615607183533.7,
+		"min_block": 23455456,
+		"max_block": 23486293,
+		"min_timestamp": "2026-10-11T00:00:00.000Z",
+		"max_timestamp": "2026-10-11T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-12",
+		"avg_online_stake": 476611814631947.44,
+		"min_block": 23486294,
+		"max_block": 23516900,
+		"min_timestamp": "2026-10-12T00:00:01.000Z",
+		"max_timestamp": "2026-10-12T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-13",
+		"avg_online_stake": 662775584009657.1,
+		"min_block": 23516901,
+		"max_block": 23547679,
+		"min_timestamp": "2026-10-13T00:00:02.000Z",
+		"max_timestamp": "2026-10-13T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-14",
+		"avg_online_stake": 719386064637933.1,
+		"min_block": 23547680,
+		"max_block": 23578530,
+		"min_timestamp": "2026-10-14T00:00:00.000Z",
+		"max_timestamp": "2026-10-14T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-15",
+		"avg_online_stake": 732768839375088.6,
+		"min_block": 23578531,
+		"max_block": 23609397,
+		"min_timestamp": "2026-10-15T00:00:00.000Z",
+		"max_timestamp": "2026-10-15T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-16",
+		"avg_online_stake": 732849925778395.5,
+		"min_block": 23609398,
+		"max_block": 23640126,
+		"min_timestamp": "2026-10-16T00:00:01.000Z",
+		"max_timestamp": "2026-10-16T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-17",
+		"avg_online_stake": 727146495052242.5,
+		"min_block": 23640127,
+		"max_block": 23670972,
+		"min_timestamp": "2026-10-17T00:00:00.000Z",
+		"max_timestamp": "2026-10-17T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-18",
+		"avg_online_stake": 727189254189950.6,
+		"min_block": 23670973,
+		"max_block": 23701814,
+		"min_timestamp": "2026-10-18T00:00:00.000Z",
+		"max_timestamp": "2026-10-18T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-19",
+		"avg_online_stake": 727328704480922.9,
+		"min_block": 23701815,
+		"max_block": 23732498,
+		"min_timestamp": "2026-10-19T00:00:01.000Z",
+		"max_timestamp": "2026-10-19T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-20",
+		"avg_online_stake": 726983383722926.9,
+		"min_block": 23732499,
+		"max_block": 23763293,
+		"min_timestamp": "2026-10-20T00:00:02.000Z",
+		"max_timestamp": "2026-10-20T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-21",
+		"avg_online_stake": 728145590358292.9,
+		"min_block": 23763294,
+		"max_block": 23794108,
+		"min_timestamp": "2026-10-21T00:00:02.000Z",
+		"max_timestamp": "2026-10-21T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-22",
+		"avg_online_stake": 727827718282379.6,
+		"min_block": 23794109,
+		"max_block": 23825004,
+		"min_timestamp": "2026-10-22T00:00:00.000Z",
+		"max_timestamp": "2026-10-22T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-23",
+		"avg_online_stake": 727317832874080.8,
+		"min_block": 23825005,
+		"max_block": 23855940,
+		"min_timestamp": "2026-10-23T00:00:02.000Z",
+		"max_timestamp": "2026-10-23T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-24",
+		"avg_online_stake": 725233234784948.5,
+		"min_block": 23855941,
+		"max_block": 23886780,
+		"min_timestamp": "2026-10-24T00:00:00.000Z",
+		"max_timestamp": "2026-10-24T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-25",
+		"avg_online_stake": 717982396302576.5,
+		"min_block": 23886781,
+		"max_block": 23917605,
+		"min_timestamp": "2026-10-25T00:00:00.000Z",
+		"max_timestamp": "2026-10-25T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-26",
+		"avg_online_stake": 705815669923895.6,
+		"min_block": 23917606,
+		"max_block": 23948889,
+		"min_timestamp": "2026-10-26T00:00:02.000Z",
+		"max_timestamp": "2026-10-26T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-27",
+		"avg_online_stake": 724576126201154.6,
+		"min_block": 23948890,
+		"max_block": 23979947,
+		"min_timestamp": "2026-10-27T00:00:02.000Z",
+		"max_timestamp": "2026-10-27T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-28",
+		"avg_online_stake": 728481062440673,
+		"min_block": 23979948,
+		"max_block": 24011411,
+		"min_timestamp": "2026-10-28T00:00:01.000Z",
+		"max_timestamp": "2026-10-28T23:59:57.000Z"
+	},
+	{
+		"date": "2026-10-29",
+		"avg_online_stake": 729934494154895.6,
+		"min_block": 24011412,
+		"max_block": 24042759,
+		"min_timestamp": "2026-10-29T00:00:00.000Z",
+		"max_timestamp": "2026-10-29T23:59:58.000Z"
+	},
+	{
+		"date": "2026-10-30",
+		"avg_online_stake": 729428847127841.9,
+		"min_block": 24042760,
+		"max_block": 24074147,
+		"min_timestamp": "2026-10-30T00:00:01.000Z",
+		"max_timestamp": "2026-10-30T23:59:59.000Z"
+	},
+	{
+		"date": "2026-10-31",
+		"avg_online_stake": 728797370778456,
+		"min_block": 24074148,
+		"max_block": 24105268,
+		"min_timestamp": "2026-10-31T00:00:01.000Z",
+		"max_timestamp": "2026-10-31T23:59:59.000Z"
+	},
+	{
+		"date": "2026-11-01",
+		"avg_online_stake": 728969246565590.1,
+		"min_block": 24105269,
+		"max_block": 24136433,
+		"min_timestamp": "2026-11-01T00:00:01.000Z",
+		"max_timestamp": "2026-11-01T23:59:57.000Z"
+	},
+	{
+		"date": "2026-11-02",
+		"avg_online_stake": 729437936001201.5,
+		"min_block": 24136434,
+		"max_block": 24167756,
+		"min_timestamp": "2026-11-02T00:00:00.000Z",
+		"max_timestamp": "2026-11-02T23:59:57.000Z"
+	},
+	{
+		"date": "2026-11-03",
+		"avg_online_stake": 729377810445884.9,
+		"min_block": 24167757,
+		"max_block": 24198948,
+		"min_timestamp": "2026-11-03T00:00:00.000Z",
+		"max_timestamp": "2026-11-03T23:59:58.000Z"
+	},
+	{
+		"date": "2026-11-04",
+		"avg_online_stake": 733048919950358.6,
+		"min_block": 24198949,
+		"max_block": 24230235,
+		"min_timestamp": "2026-11-04T00:00:01.000Z",
+		"max_timestamp": "2026-11-04T23:59:58.000Z"
+	},
+	{
+		"date": "2026-11-05",
+		"avg_online_stake": 734858547325793.9,
+		"min_block": 24230236,
+		"max_block": 24261410,
+		"min_timestamp": "2026-11-05T00:00:00.000Z",
+		"max_timestamp": "2026-11-05T23:59:58.000Z"
+	},
+	{
+		"date": "2026-11-06",
+		"avg_online_stake": 735308151180204.2,
+		"min_block": 24261411,
+		"max_block": 24265093,
+		"min_timestamp": "2026-11-06T00:00:01.000Z",
+		"max_timestamp": "2026-11-06T02:50:25.000Z"
+	}
+]

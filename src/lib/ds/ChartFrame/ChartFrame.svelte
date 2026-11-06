@@ -12,10 +12,11 @@
 		state?: DataState;
 		onretry?: () => void;
 		asOf?: string | number | Date;
+		freshnessText?: string;
 		actions?: Snippet;
 		children: Snippet<[ChartContext]>;
 		x: XSpec;
-		y: { domain: [number, number]; format?: (n: number) => string };
+		y: { domain: [number, number]; format?: (n: number) => string; scale?: 'linear' | 'log' };
 		markX?: (row: (string | number)[]) => number | string | Date;
 		describe?: (rowIndex: number) => string;
 		height?: number;
@@ -27,7 +28,7 @@
 <script lang="ts">
 	import Card from '../Card/Card.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
-	import { ago, compact } from '../format';
+	import { compact } from '../format';
 	import { slug } from '../slug';
 	import { makeX, makeY, tickValues } from '../charts/scales';
 	import { layoutAnnotations } from '../charts/annotations';
@@ -42,6 +43,7 @@
 		state: dataState = 'ready',
 		onretry,
 		asOf,
+		freshnessText,
 		actions,
 		children,
 		x,
@@ -56,7 +58,16 @@
 	let active: number | null = $state(null);
 	let hovered: number | null = $state(null);
 	let announcement = $state('');
-	const left = 48;
+	// The axis column grows with the longest y label so long values (a small USD price) are never clipped.
+	let yLabelChars = $derived(
+		Math.max(
+			0,
+			...makeY(y.domain, [1, 0], y.scale)
+				.ticks(4)
+				.map((value) => (y.format ?? compact)(value).length)
+		)
+	);
+	let left = $derived(Math.max(48, Math.ceil(yLabelChars * 6.5) + 14));
 	const right = 16;
 	let plotWidth = $derived(Math.max(1, width - left - right));
 	let xScale = $derived(makeX(x, [left, left + plotWidth]));
@@ -77,7 +88,7 @@
 	let labels = $derived(layoutAnnotations(labelItems, plotWidth));
 	let rows = $derived(labels.length ? Math.max(...labels.map((l) => l.row)) + 1 : 0);
 	let margin = $derived({ top: 24 + rows * 16, right, bottom: 28, left });
-	let yScale = $derived(makeY(y.domain, [height - margin.bottom, margin.top]));
+	let yScale = $derived(makeY(y.domain, [height - margin.bottom, margin.top], y.scale));
 	let ctx: ChartContext = $derived({
 		width,
 		height,
@@ -130,6 +141,15 @@
 			? value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 			: String(value);
 	}
+	function absoluteTime(value: typeof asOf) {
+		const time = value === undefined ? NaN : new Date(value).getTime();
+		return Number.isFinite(time)
+			? new Date(time)
+					.toISOString()
+					.replace('T', ' ')
+					.replace(/\.\d{3}Z$/, ' UTC')
+			: 'unavailable';
+	}
 	$effect(() => {
 		const element = container;
 		if (!element) return;
@@ -150,12 +170,24 @@
 		hovered = null;
 		clear();
 	});
+	// Retry swaps the alert for the loading placeholder. Keep keyboard focus inside the card by moving it to
+	// the plot container first, so it is not dropped to the document body when the Retry button unmounts.
+	const retry = $derived(
+		onretry
+			? () => {
+					container?.focus();
+					onretry();
+				}
+			: undefined
+	);
 </script>
 
 <Card {title} {headingLevel} {actions} id={`${id}-title`}>
+	<p class="mb-3 text-sm text-ink-muted">{data.caption}</p>
 	<div
 		bind:this={container}
-		class="relative min-w-0"
+		class="relative min-w-0 focus:outline-none"
+		tabindex="-1"
 		aria-busy={dataState === 'loading' ? 'true' : undefined}
 	>
 		{#if dataState === 'loading'}
@@ -163,13 +195,15 @@
 				<span class="sr-only">Loading {title}…</span>
 			</div>
 		{:else if dataState === 'error'}
-			<InlineAlert message={`Couldn't load ${title}.`} {onretry} />
+			<div style:min-height={`${height}px`}>
+				<InlineAlert message={`Couldn't load ${title}.`} onretry={retry} />
+			</div>
 		{:else if dataState === 'empty'}
 			<div
 				class="flex items-center justify-center text-sm text-ink-muted"
 				style:height={`${height}px`}
 			>
-				No data
+				No observations in this range
 			</div>
 		{:else}
 			<!-- A chart is intentionally one keyboard-operable group, as specified in §2.10. -->
@@ -278,6 +312,7 @@
 								? width - right
 								: (mark.center + marks[index + 1].center) / 2}
 						<rect
+							role="presentation"
 							x={start}
 							y={margin.top}
 							width={Math.max(0, end - start)}
@@ -326,14 +361,22 @@
 					{annotation.detail ?? annotation.label}
 				</li>{/each}
 		</ul>{/if}
-	{#if dataState === 'stale'}<p class="mt-2 text-label text-warn">
-			<span aria-hidden="true">!</span> as of {ago(asOf)}
-		</p>{/if}
+	{#if dataState === 'stale'}
+		<InlineAlert
+			tone="warn"
+			message={`Stale - ${freshnessText ?? `data as of ${absoluteTime(asOf)}`}`}
+			onretry={retry}
+		/>
+	{:else if asOf !== undefined || freshnessText}
+		<p class="mt-2 text-label text-ink-muted">
+			{freshnessText ?? `data as of ${absoluteTime(asOf)}`}
+		</p>
+	{/if}
 	{#if dataState !== 'loading' && dataState !== 'error'}
 		<details class="mt-3 text-sm">
 			<summary class="w-fit cursor-pointer text-accent">View data</summary>
-			<div class="mt-2 overflow-x-auto">
-				<table class="w-full text-sm">
+			<div class="mt-2">
+				<table class="w-full table-fixed break-words text-sm">
 					<caption class="mb-2 text-start text-label text-ink-muted">{data.caption}</caption><thead
 						><tr
 							>{#each data.columns as column, index (index)}<th

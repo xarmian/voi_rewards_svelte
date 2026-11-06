@@ -38,3 +38,21 @@ for (const width of [320, 1440])
 				assert.ok(x.position(ticks[i]) - x.position(ticks[i - 1]) >= 44 - 1e-8);
 		}
 	});
+
+test('log scale maps equal ratios to equal distances and rejects nonpositive samples', () => {
+	const y = makeY([0.0001, 0.01], [200, 0], 'log');
+	assert.ok(Math.abs(y(0.001) - y(0.0001) - (y(0.01) - y(0.001))) < 1e-8);
+	for (const value of [0, -1, NaN, Infinity]) assert.ok(Number.isNaN(y(value)));
+	assert.throws(() => makeY([0, 1], [200, 0], 'log'));
+	assert.throws(() => makeY([-1, 1], [200, 0], 'log'));
+	assert.ok(y.ticks(4).every((value) => value > 0));
+});
+
+test('a narrow log domain keeps its extent and a wide one gets a short readable tick list', () => {
+	const narrow = makeY([0.000121, 0.000127], [200, 0], 'log');
+	assert.ok(narrow(0.000121) > 150 && narrow(0.000127) < 50, 'the data fills the plot');
+	const ticks = narrow.ticks(4);
+	assert.ok(ticks.length >= 1 && ticks.length <= 5);
+	assert.ok(ticks.every((value) => value >= 0.000121 && value <= 0.000127));
+	assert.ok(makeY([0.0001, 0.1], [200, 0], 'log').ticks(4).length <= 5);
+});

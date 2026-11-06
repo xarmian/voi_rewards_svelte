@@ -13,9 +13,11 @@
 	);
 	const announcement = $derived(
 		status.tone === 'ok'
-			? 'Chain data is live'
+			? 'Chain is live'
 			: status.tone === 'warn'
-				? 'Chain data is stale'
+				? status.unavailable
+					? 'Block unavailable'
+					: 'Chain is stale'
 				: ''
 	);
 	// TASK-65: recalculate age only on poll completion, including failed polls.
