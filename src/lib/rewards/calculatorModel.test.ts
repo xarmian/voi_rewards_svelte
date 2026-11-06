@@ -128,6 +128,44 @@ test('does not mutate the input object or epoch rewards', () => {
 	expect(frozen).toEqual(original);
 });
 
+test('percentage-based cost also drives the yearly profit fields', () => {
+	const result = estimateRewards({ ...input, isPercentageBased: true, costPercentage: 10 })!;
+	const monthlyCost = result.monthlyRewardUSD * 0.1;
+	expect(result.yearlyProfit).toBeCloseTo(result.yearlyRewardUSD - monthlyCost * 12, 9);
+	expect(result.yearlyProfitPercentage).toBeCloseTo(
+		((result.yearlyRewardUSD - monthlyCost * 12) / (monthlyCost * 12)) * 100,
+		9
+	);
+});
+
+test.each([
+	['NaN', Number.NaN],
+	['zero', 0],
+	['undefined', undefined as unknown as number]
+])('returns null when online money is %s', (_name, onlineMoney) => {
+	expect(estimateRewards({ ...input, onlineMoney })).toBeNull();
+});
+
+test('an epoch list shorter than a year still gives finite results', () => {
+	const result = estimateRewards({ ...input, epochRewards: [1000, 900, 800, 700, 600] })!;
+	expect(result.weeklyReward).toBe(10);
+	expect(Object.values(result).every(Number.isFinite)).toBe(true);
+});
+
+test('the component assigns every model field to the variable of the same name', () => {
+	const source = readFileSync(
+		new URL('../component/CalculatorComponent.svelte', import.meta.url),
+		'utf8'
+	);
+	// yearlyProfit is not shown anywhere, so the component does not keep it.
+	const expected = Object.keys(estimateRewards(input)!)
+		.filter((key) => key !== 'yearlyProfit')
+		.sort();
+	const assigned = [...source.matchAll(/^\s*(\w+) = estimate\.(\w+);$/gm)];
+	for (const [line, variable, field] of assigned) expect(variable, line).toBe(field);
+	expect(assigned.map((match) => match[2]).sort()).toEqual(expected);
+});
+
 test('the calculator component delegates reward math to the model', () => {
 	const source = readFileSync(
 		new URL('../component/CalculatorComponent.svelte', import.meta.url),
