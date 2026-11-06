@@ -433,7 +433,7 @@
 	<meta name="description" content="Generate a Voi vanity address with custom prefix and suffix" />
 </svelte:head>
 
-<div class="container-page space-y-8 py-8 text-ink [overflow-wrap:anywhere] md:py-12">
+<div class="container-page space-y-8 py-8 text-ink md:py-12">
 	<header class="max-w-3xl">
 		<a href="/how_to_node" class="text-label text-accent underline underline-offset-4"
 			>← Run a node</a
@@ -506,9 +506,11 @@
 
 			{#if isGenerating}
 				<div class="mt-6 space-y-3 text-sm text-ink-muted">
-					<div aria-live="polite" class="space-y-3">
+					<div class="space-y-3">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<StatusPill tone="info" label="Checking addresses…" />
+							<div aria-live="polite">
+								<StatusPill tone="info" label="Checking addresses…" />
+							</div>
 							<span>{attempts.toLocaleString()} attempts</span>
 						</div>
 						<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -565,7 +567,7 @@
 					</div>
 					<InlineAlert
 						tone="warn"
-						message="Important Security Notice: Save your mnemonic phrase securely. Never share it. Anyone with this phrase can access your funds."
+						message="Important Security Notice: Save your mnemonic phrase securely offline. Never share it. Anyone with this phrase can access your funds."
 					/>
 				</div>
 			</Card>
@@ -645,11 +647,12 @@
 							</Button>
 						{/if}
 						{#if txnStatus === 'error'}
-							<InlineAlert message={`Funding failed. ${txnError}`} />
-						{/if}
-						{#if rekeyTxnStatus === 'error'}
 							<InlineAlert
-								message={`Rekey failed. The 1 VOI was already sent; this address is not yet rekeyed. ${txnError}`}
+								message={`Funding did not complete. Check the vanity address balance before trying again. ${txnError ?? ''}`}
+							/>
+						{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'}
+							<InlineAlert
+								message={`Funding completed, but the rekey did not. Check this address before trying again. ${txnError ?? ''}`}
 							/>
 						{/if}
 					</div>
@@ -691,8 +694,8 @@
 				</li>
 				<li>
 					<strong class="text-ink">Secure your mnemonic:</strong> Treat the generated mnemonic phrase
-					like digital cash. Write it down, store it securely, and never share it. Loss of the mnemonic
-					means loss of access to the address and any funds within it.
+					like digital cash. Write it down, store it securely offline, and never share it. Loss of the
+					mnemonic means loss of access to the address and any funds within it.
 				</li>
 				<li>
 					<strong class="text-ink">Performance:</strong> Generation speed depends heavily on your computer's

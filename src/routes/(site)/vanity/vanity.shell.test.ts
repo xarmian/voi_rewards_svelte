@@ -166,7 +166,7 @@ test('Aurora shell keeps navigation, labels, browser computation and the blocked
 test('Aurora shell removes legacy colors and icons outside the library picker', () => {
 	const withoutPicker = source.replace(/<Web3Wallet\b[^]*?\/>/g, '');
 	expect(withoutPicker).not.toMatch(
-		/bg-purple-|text-purple-|bg-gray-|dark:bg-|bg-green-|bg-yellow-|bg-red-|fas fa-|offline/i
+		/bg-purple-|text-purple-|bg-gray-|dark:bg-|bg-green-|bg-yellow-|bg-red-|fas fa-|(?:wholly|fully|works|runs|is an?) offline|no network requests/i
 	);
 });
 
@@ -247,14 +247,28 @@ test('Confirm is inside reviewOpen && plan and disabled when reviewDrifted', () 
 	expect(confirms).toBe(1);
 });
 
-test('funding and rekey failures have distinct messages in Step 2', () => {
+test('funding and rekey failures have distinct messages, and a stale rekey error is hidden on retry', () => {
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
 	expect(step2).toMatch(
-		/\{#if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding failed\. \$\{txnError\}`\}/
+		/\{#if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding did not complete\.[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'\}\s*<InlineAlert\s+message=\{`Funding completed, but the rekey did not\.[^`]*\$\{txnError \?\? ''\}`\}/
 	);
-	expect(step2).toMatch(
-		/\{#if rekeyTxnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Rekey failed\. The 1 VOI was already sent; this address is not yet rekeyed\. \$\{txnError\}`\}/
-	);
+	expect(markup).not.toMatch(/already sent|not yet rekeyed/);
+});
+
+test('progress counters are outside the live region; only the status label is announced', () => {
+	let regions = 0;
+	walk(template, (node) => {
+		if (!attributes(node).some((attr) => attr.name === 'aria-live')) return;
+		regions++;
+		const inner = textOf(node);
+		expect(inner).toContain('Checking addresses');
+		expect(inner).not.toMatch(/attempts|elapsedTime|attemptsPerSecond|estimatedTimeRemaining/);
+	});
+	expect(regions).toBe(1);
+});
+
+test('the mnemonic guidance keeps saying to store it offline', () => {
+	expect(markup.match(/securely offline/g)?.length).toBeGreaterThanOrEqual(2);
 });
 
 test('mnemonic is never in a live region or a copy announcement', () => {
