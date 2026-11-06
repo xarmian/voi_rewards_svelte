@@ -64,7 +64,7 @@ it('keeps unavailable circulating supply and market cap as em dashes', () => {
 	expect(body).not.toContain('$0.00');
 });
 
-it('keeps unavailable token supply as an em dash and FDV as a hyphen', () => {
+it('keeps unavailable token supply and FDV as em dashes, never zero', () => {
 	const body = html({
 		selectedToken: {
 			id: 1,
@@ -74,10 +74,14 @@ it('keeps unavailable token supply as an em dash and FDV as a hyphen', () => {
 			poolCount: 2,
 			imageUrl: null
 		},
-		tokenTotalSupplyAdjusted: null
+		tokenTotalSupplyAdjusted: null,
+		fullyDilutedMarketCap: 0
 	});
 	expect(body).toMatch(/Total Supply:\s*—/);
-	expect(text(body)).toContain('FDV -');
+	expect(text(body)).toContain('FDV —');
+	expect(text(body)).not.toMatch(/FDV\s+\$?0/);
+	expect(text(body)).not.toMatch(/Total Supply:\s*0/);
+	expect(body).not.toContain('$0.00');
 });
 
 it('announces loading for all four metrics instead of exposing stale numeric values', () => {
