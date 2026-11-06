@@ -244,7 +244,6 @@ test.each(['confirm', 'send'] as const)(
 	async (failure) => {
 		const f = await fundTimesOut(failure);
 		f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: '' });
-		f.statusRead.mockResolvedValue({ lastRound: expired });
 		await secondAttempt(f);
 		expect(f.context.algodClient.pendingTransactionInformation).toHaveBeenCalledWith('tx');
 		expectNoSend(f);
@@ -371,6 +370,78 @@ test('while a funding payment is unsettled the button reads as a retry and the s
 		'A funding payment may still land on this address. Wait a moment, then retry before starting a new search.'
 	);
 	expect(source).not.toContain('then fund again');
+});
+
+test('a stale pool entry does not block a payment once its last valid round has passed', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: '' });
+	f.statusRead.mockResolvedValue({ lastRound: expired });
+	await secondAttempt(f);
+	expect(f.buildPayment.mock.calls.filter(([p]) => p.amount === 1000000)).toHaveLength(1);
+	expect(f.context.fundingTxId).toBeNull();
+});
+
+test('a payment the node refused outright (HTTP 400) is forgotten and can be funded at once', async () => {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	f.send.mockRejectedValueOnce(
+		Object.assign(new Error('overspend'), { response: { status: 400 } })
+	);
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.context.txnStatus).toBe('error');
+	expect(f.context.fundingTxId).toBeNull();
+	expect(f.context.fundingLastValid).toBeNull();
+	// The node is still before the window's end and does not know the payment: nothing to wait for.
+	f.pendingRead.mockRejectedValue(new Error('transaction not found'));
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.buildPayment.mock.calls.filter(([p]) => p.amount === 1000000)).toHaveLength(2);
+	expect(f.context.txnStatus).toBe('success');
+});
+
+test.each([503, undefined])(
+	'a send that failed with status %s leaves the payment unknown and remembered',
+	async (status) => {
+		const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+		f.send.mockRejectedValueOnce(
+			Object.assign(new Error('send failed'), status ? { response: { status } } : {})
+		);
+		await runInContext('activateVanityAddress(plan, signer)', f.context);
+		expect(f.context.fundingTxId).toBe('tx');
+		expect(f.context.fundingLastValid).toBe(101n);
+	}
+);
+
+test('the retry stays in flight through the follow-up chain read after a failed rekey send', async () => {
+	const f = fixture();
+	f.send.mockRejectedValueOnce(new Error('rekey send failed'));
+	const followUp = Promise.withResolvers<object>();
+	f.read
+		.mockResolvedValueOnce({ amount: 1000000n, authAddr: undefined })
+		.mockReturnValueOnce(followUp.promise);
+	const retry = runInContext('retryRekey()', f.context);
+	await vi.waitFor(() => expect(f.read).toHaveBeenCalledTimes(2));
+	// The rekey send has already failed and released its own flag; the retry must hold it again.
+	expect(f.context.isRekeying).toBe(true);
+	expect(f.context.rekeyTxnStatus).toBe('sending');
+	await runInContext('retryRekey()', f.context);
+	expect(f.read).toHaveBeenCalledTimes(2);
+	expect(f.send).toHaveBeenCalledOnce();
+	followUp.resolve({ amount: 1000000n, authAddr: algosdk.Address.fromString(funder) });
+	await retry;
+	expect(f.context.rekeyTxnStatus).toBe('success');
+	expect(f.context.txnError).toBeNull();
+	expect(f.context.isRekeying).toBe(false);
+});
+
+test('a follow-up chain read that fails keeps the rekey error and releases the retry', async () => {
+	const f = fixture();
+	f.send.mockRejectedValueOnce(new Error('rekey send failed'));
+	f.read
+		.mockResolvedValueOnce({ amount: 1000000n, authAddr: undefined })
+		.mockRejectedValueOnce(new Error('follow-up read failed'));
+	await runInContext('retryRekey()', f.context);
+	expect(f.context.rekeyTxnStatus).toBe('error');
+	expect(f.context.txnError).toBe('rekey send failed');
+	expect(f.context.isRekeying).toBe(false);
 });
 
 test('a payment that was never signed is not remembered', async () => {
@@ -559,7 +630,7 @@ test('funded retry branch exposes only the reviewed target and the rekey action'
 	);
 	expect(branch).not.toMatch(/reviewActivation|confirmActivation|activateVanityAddress/);
 	expect(branch).toMatch(
-		/\{#if retryDrifted\}\s*<div class="\[overflow-wrap:anywhere\]">\s*<InlineAlert message="Your selected account changed\. Review again\."/
+		/\{#if retryDrifted\}\s*<div class="\[overflow-wrap:anywhere\]">\s*<InlineAlert\s+message="Your selected account changed\. Select the reviewed account again to retry\."/
 	);
 	// Parse the complete template too, so the branch must be valid Svelte.
 	expect(() => parse(source)).not.toThrow();

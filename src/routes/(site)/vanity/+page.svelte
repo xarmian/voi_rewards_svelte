@@ -344,11 +344,20 @@
 				return;
 			}
 			if (!(await rekeyVanityAddress(plan))) {
-				// An earlier rekey may have landed after the read above: the chain decides.
-				const after = await algodClient.accountInformation(plan.vanity).do();
-				if (after.authAddr?.toString() === plan.rekeyTo) {
-					rekeyTxnStatus = 'success';
-					txnError = null;
+				// An earlier rekey may have landed after the read above: the chain decides. The send
+				// path released the in-flight flag, so take it back before the follow-up read.
+				isRekeying = true;
+				rekeyTxnStatus = 'sending';
+				try {
+					const after = await algodClient.accountInformation(plan.vanity).do();
+					if (after.authAddr?.toString() === plan.rekeyTo) {
+						rekeyTxnStatus = 'success';
+						txnError = null;
+					} else {
+						rekeyTxnStatus = 'error';
+					}
+				} catch {
+					rekeyTxnStatus = 'error'; // keep the rekey error already shown
 				}
 			}
 		} catch (err) {
@@ -363,16 +372,16 @@
 	// last valid round. True when it landed. False only when it can no longer land. Otherwise throws,
 	// so nothing is sent while it could still land, or while its state cannot be read.
 	async function earlierFundingLanded(txId: string, lastValid: bigint | null, vanity: string) {
-		let inPool = false;
 		try {
 			const pending = await algodClient.pendingTransactionInformation(txId).do();
 			if (pending.confirmedRound && pending.confirmedRound > BigInt(0)) return true;
-			inPool = !pending.poolError;
 		} catch {
 			// The node does not know it (not received, dropped or expired): only expiry settles that.
 		}
+		// Still in a pool, rejected by one node, or unknown: none of it says the payment cannot land.
+		// Only its last valid round passing does.
 		const status = await algodClient.status().do();
-		if (inPool || lastValid === null || status.lastRound <= lastValid) {
+		if (lastValid === null || status.lastRound <= lastValid) {
 			throw new Error(
 				'The earlier funding payment may still land. Wait for it to confirm or expire before trying again.'
 			);
@@ -426,7 +435,18 @@
 			fundingLastValid = unsignedTxn.lastValid;
 
 			// Send the signed transaction to the network
-			const { txid: txId } = await algodClient.sendRawTransaction(signedTxns).do();
+			const { txid: txId } = await algodClient
+				.sendRawTransaction(signedTxns)
+				.do()
+				.catch((err: { response?: { status?: number } }) => {
+					// A 400 means the node refused the payment outright (for example too little balance):
+					// it cannot land, so there is nothing to wait for. Any other failure leaves it unknown.
+					if (err?.response?.status === 400) {
+						fundingTxId = null;
+						fundingLastValid = null;
+					}
+					throw err;
+				});
 
 			// Wait for confirmation
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
@@ -737,7 +757,9 @@
 									<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />
 									{#if retryDrifted}
 										<div class="[overflow-wrap:anywhere]">
-											<InlineAlert message="Your selected account changed. Review again." />
+											<InlineAlert
+												message="Your selected account changed. Select the reviewed account again to retry."
+											/>
 										</div>
 									{/if}
 									<Button
@@ -785,7 +807,11 @@
 							</Button>
 						{/if}
 						<div class="[overflow-wrap:anywhere]">
-							{#if txnStatus === 'error'}
+							{#if txnStatus === 'error' && fundingTxId}
+								<InlineAlert
+									message={`A funding payment may still land on this address. Wait a moment, then retry. ${txnError ?? ''}`}
+								/>
+							{:else if txnStatus === 'error'}
 								<InlineAlert
 									message={`Funding was not confirmed. Check the vanity address balance before trying again. ${txnError ?? ''}`}
 								/>

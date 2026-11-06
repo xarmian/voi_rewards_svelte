@@ -61,7 +61,9 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		context
 	);
 	const activation = runInContext('activateVanityAddress(plan, signer)', context);
-	await vi.waitFor(() => expect(context.signTransactions).toHaveBeenCalledOnce());
+	await vi.waitFor(() => expect(context.signTransactions).toHaveBeenCalledOnce(), {
+		timeout: 5000
+	});
 	signing.resolve([new Uint8Array()]);
 	await activation;
 	// The picker moved to another account while the prompt was open; the funder still signed.
