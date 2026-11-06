@@ -12,6 +12,7 @@
 		isPriceStale,
 		priceLabel,
 		resultsState,
+		profitPercentageText,
 		validateCustomPrice,
 		validateNodeCost,
 		validateStake
@@ -651,7 +652,11 @@
 				label="Monthly profit"
 				value={figures.usdFigures && estimate ? formatUSD(estimate.monthlyProfit) : 'Unavailable'}
 				detail={figures.usdFigures && estimate
-					? `${estimate.monthlyProfitPercentage.toFixed(2)}% monthly / ${estimate.yearlyProfitPercentage.toFixed(2)}% yearly profit on node cost`
+					? profitPercentageText(
+							Number(nodeCost),
+							estimate.monthlyProfitPercentage,
+							estimate.yearlyProfitPercentage
+						)
 					: figures.voiEstimates
 						? 'Unavailable without a price'
 						: undefined}

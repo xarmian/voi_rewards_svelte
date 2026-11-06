@@ -65,3 +65,13 @@ export function validateCustomPrice(value: unknown): string | null {
 export function isPriceStale(lastUpdated: Date | null, now: Date): boolean {
 	return lastUpdated !== null && now.getTime() - lastUpdated.getTime() > PRICE_STALE_MS;
 }
+
+/** A percentage of a zero (or unusable) cost has no value, so the text is left out. */
+export function profitPercentageText(
+	nodeCost: number,
+	monthlyPercentage: number,
+	yearlyPercentage: number
+): string | undefined {
+	if (!Number.isFinite(nodeCost) || nodeCost <= 0) return undefined;
+	return `${monthlyPercentage.toFixed(2)}% monthly / ${yearlyPercentage.toFixed(2)}% yearly profit on node cost`;
+}
