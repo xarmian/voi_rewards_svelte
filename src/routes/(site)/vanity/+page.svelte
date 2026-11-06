@@ -149,6 +149,11 @@
 	async function generateVanityAddress() {
 		if (!ready) return;
 		if (isActivating || isRekeying) return;
+		// Funded and not yet rekeyed: the phrase on this page is the only way to finish, so keep it.
+		if (txnStatus === 'success' && rekeyTxnStatus !== 'success') {
+			error = 'Retry the rekey before starting a new search. Your 1 VOI is on this address.';
+			return;
+		}
 		if (!validateInputs()) return;
 
 		// Reset state
@@ -319,6 +324,7 @@
 		isRekeying = true;
 		rekeyTxnStatus = 'sending';
 		txnError = null;
+		error = null;
 		try {
 			if (!result || result.address !== plan.vanity) {
 				throw new Error('The generated vanity address changed. Review again.');

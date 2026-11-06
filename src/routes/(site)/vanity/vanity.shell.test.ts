@@ -97,6 +97,8 @@ test.each([
 			URL,
 			isActivating: false,
 			isRekeying: false,
+			txnStatus: 'idle',
+			rekeyTxnStatus: 'idle',
 			isGenerating: false,
 			updateInterval: null,
 			worker: null,

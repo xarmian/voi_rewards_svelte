@@ -250,9 +250,55 @@ test('an unreadable earlier funding payment sends nothing', async () => {
 
 test('a new search forgets the earlier funding payment', async () => {
 	const f = fixture(['generateVanityAddress', 'validateInputs']);
-	f.context.fundingTxId = 'tx';
+	// Funding timed out: not confirmed, so a search is allowed.
+	Object.assign(f.context, { fundingTxId: 'tx', txnStatus: 'error' });
 	await runInContext('generateVanityAddress()', f.context);
 	expect(f.context.fundingTxId).toBeNull();
+});
+
+const refusal = 'Retry the rekey before starting a new search. Your 1 VOI is on this address.';
+
+test.each(['idle', 'error', 'sending'])(
+	'a search is refused while funding is confirmed and the rekey is %s, and keeps the work',
+	async (rekeyTxnStatus) => {
+		const f = fixture(['generateVanityAddress', 'validateInputs']);
+		Object.assign(f.context, { rekeyTxnStatus, error: null });
+		const before = { ...f.context };
+		await runInContext('generateVanityAddress()', f.context);
+		expect(f.context.error).toBe(refusal);
+		expect(f.context.Worker).not.toHaveBeenCalled();
+		expect(f.context.setInterval).not.toHaveBeenCalled();
+		for (const name of [
+			'plan',
+			'result',
+			'txnStatus',
+			'rekeyTxnStatus',
+			'txnError',
+			'reviewOpen'
+		]) {
+			expect(f.context[name], name).toBe(before[name]);
+		}
+	}
+);
+
+test.each([
+	{ txnStatus: 'success', rekeyTxnStatus: 'success' },
+	{ txnStatus: 'error', rekeyTxnStatus: 'idle' },
+	{ txnStatus: 'idle', rekeyTxnStatus: 'idle' }
+])('a search is allowed when funding is $txnStatus and the rekey is $rekeyTxnStatus', async (s) => {
+	const f = fixture(['generateVanityAddress', 'validateInputs']);
+	Object.assign(f.context, s);
+	await runInContext('generateVanityAddress()', f.context);
+	expect(f.context.Worker).toHaveBeenCalledOnce();
+	expect(f.context.error).toBeNull();
+	expect(f.context.txnStatus).toBe('idle');
+});
+
+test('a retry clears the refusal message when it starts', async () => {
+	const f = fixture();
+	f.context.error = refusal;
+	await runInContext('retryRekey()', f.context);
+	expect(f.context.error).toBeNull();
 });
 
 test('a new search clears the previous plan, review and transaction state', async () => {
