@@ -13,6 +13,10 @@ const plots = vi.hoisted(() => ({
 	points: [] as { x: unknown; y: number }[][],
 	scales: [] as (string | undefined)[]
 }));
+vi.mock('$lib/network/model', async (original) => {
+	const actual = await original<typeof import('$lib/network/model')>();
+	return { ...actual, createNetwork: vi.fn(actual.createNetwork) };
+});
 vi.mock('$lib/ds/charts/LineChart.svelte', async (original) => {
 	const actual = await original<typeof import('$lib/ds/charts/LineChart.svelte')>();
 	return {
@@ -56,8 +60,10 @@ function section(html: string, title: string) {
 			.find((s) => s.includes(`>${title}</h2>`)) ?? ''
 	);
 }
-const htmlFor = (model: ReturnType<typeof createNetwork>) =>
-	render(Page, { props: { model } }).body.replace(/<!--[\s\S]*?-->/g, '');
+const htmlFor = (model: ReturnType<typeof createNetwork>) => {
+	vi.mocked(createNetwork).mockReturnValueOnce(model);
+	return render(Page).body.replace(/<!--[\s\S]*?-->/g, '');
+};
 
 afterEach(() => {
 	plots.points = [];

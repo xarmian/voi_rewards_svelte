@@ -12,7 +12,7 @@
 	import type { DataState } from '$lib/ds/types';
 	import type { XSpec } from '$lib/ds/charts/types';
 
-	let { model = createNetwork() }: { model?: ReturnType<typeof createNetwork> } = $props();
+	const model = createNetwork();
 	onMount(() => {
 		void model.load();
 	});
