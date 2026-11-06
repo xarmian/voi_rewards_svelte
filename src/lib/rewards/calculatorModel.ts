@@ -1,3 +1,5 @@
+export const BREAK_EVEN_SEARCH_LIMIT = 10_000_000;
+
 export type EstimateInput = {
 	stake: number; // VOI to estimate
 	price: number; // USD per VOI
@@ -16,6 +18,7 @@ export type Estimate = {
 	apr: number;
 	apy: number;
 	profitabilityThreshold: number;
+	breakEvenReached: boolean;
 	weeklyReward: number;
 	weeklyRewardUSD: number;
 	monthlyReward: number;
@@ -95,33 +98,16 @@ export function estimateRewards(input: EstimateInput): Estimate | null {
 
 	// Calculate profitability threshold regardless of total balance
 	let testAmount = 1000; // Start with 1000 VOI
-	let monthlyRevenueAtTest = 0;
 
 	// Binary search for threshold
 	let min = 0;
-	let max = 10_000_000; // 10M VOI as upper limit
+	let max = BREAK_EVEN_SEARCH_LIMIT;
 	let iterations = 0;
 	const maxIterations = 20; // Prevent infinite loops
 
 	while (min <= max && iterations < maxIterations) {
 		testAmount = Math.floor((min + max) / 2);
-		const testShareOfStake = testAmount / (rewardStake / 1e6);
-
-		// Calculate monthly rewards at test amount
-		let testMonthlyReward = 0;
-		const monthlyEpochs = 30.44 / 7;
-
-		for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
-			testMonthlyReward += testShareOfStake * epochRewards[i];
-		}
-
-		monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
-		const testNodeCost = isPercentageBased
-			? monthlyRevenueAtTest * (costPercentage / 100)
-			: nodeCost;
-
-		// Ensure we're slightly above the node cost
-		const targetRevenue = testNodeCost * 1.01; // Target 1% above node cost
+		const { monthlyRevenueAtTest, targetRevenue } = breakEvenRevenue(testAmount, input);
 
 		if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
 			break;
@@ -136,6 +122,8 @@ export function estimateRewards(input: EstimateInput): Estimate | null {
 
 	// Round up to the nearest 100 VOI for a safety margin
 	const profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
+	const limit = breakEvenRevenue(BREAK_EVEN_SEARCH_LIMIT, input);
+	const breakEvenReached = limit.monthlyRevenueAtTest >= limit.targetRevenue;
 
 	if (totalBalance > 0) {
 		// Weekly reward (using current epoch)
@@ -187,6 +175,7 @@ export function estimateRewards(input: EstimateInput): Estimate | null {
 		apr,
 		apy,
 		profitabilityThreshold,
+		breakEvenReached,
 		weeklyReward,
 		weeklyRewardUSD,
 		monthlyReward,
@@ -205,4 +194,32 @@ export function estimateRewards(input: EstimateInput): Estimate | null {
 
 function calculateEpochReward(shareOfStake: number, epochRewardPool: number): number {
 	return shareOfStake * epochRewardPool;
+}
+
+function breakEvenRevenue(amount: number, input: EstimateInput) {
+	const {
+		rewardStake,
+		epochRewards,
+		price: effectivePrice,
+		isPercentageBased,
+		costPercentage,
+		nodeCost
+	} = input;
+	const testShareOfStake = amount / (rewardStake / 1e6);
+
+	// Calculate monthly rewards at test amount
+	let testMonthlyReward = 0;
+	const monthlyEpochs = 30.44 / 7;
+
+	for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
+		testMonthlyReward += testShareOfStake * epochRewards[i];
+	}
+
+	const monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
+	const testNodeCost = isPercentageBased ? monthlyRevenueAtTest * (costPercentage / 100) : nodeCost;
+
+	// Ensure we're slightly above the node cost
+	const targetRevenue = testNodeCost * 1.01; // Target 1% above node cost
+
+	return { monthlyRevenueAtTest, targetRevenue };
 }

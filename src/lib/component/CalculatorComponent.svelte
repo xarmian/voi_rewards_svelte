@@ -9,6 +9,7 @@
 	import { estimateRewards } from '$lib/rewards/calculatorModel';
 	import {
 		availability,
+		breakEvenTile,
 		isPriceStale,
 		priceLabel,
 		resultsState,
@@ -105,6 +106,12 @@
 		hasEstimate: estimate !== null
 	});
 	$: figures = availability({ hasEstimate: estimate !== null, effectivePrice });
+	$: shownBreakEven = breakEvenTile({
+		hasEstimate: estimate !== null,
+		effectivePrice,
+		reached: estimate?.breakEvenReached ?? false,
+		threshold: estimate?.profitabilityThreshold ?? 0
+	});
 	$: tileState = state === 'loading' ? 'loading' : 'ready';
 	$: shownPriceLabel = priceLabel({
 		useCustomPrice,
@@ -125,6 +132,7 @@
 		let apr: number;
 		let apy: number;
 		let profitabilityThreshold: number;
+		let breakEvenReached: boolean;
 		let weeklyReward: number;
 		let weeklyRewardUSD: number;
 		let monthlyReward: number;
@@ -144,6 +152,7 @@
 		apr = estimate.apr;
 		apy = estimate.apy;
 		profitabilityThreshold = estimate.profitabilityThreshold;
+		breakEvenReached = estimate.breakEvenReached;
 		weeklyReward = estimate.weeklyReward;
 		weeklyRewardUSD = estimate.weeklyRewardUSD;
 		monthlyReward = estimate.monthlyReward;
@@ -164,6 +173,7 @@
 			apr,
 			apy,
 			profitabilityThreshold,
+			breakEvenReached,
 			weeklyReward,
 			weeklyRewardUSD,
 			monthlyReward,
@@ -665,18 +675,12 @@
 			<div class="min-w-0 space-y-3">
 				<StatTile
 					label="Break-even stake"
-					value={figures.breakEven && estimate
-						? estimate.profitabilityThreshold.toLocaleString()
-						: 'Unavailable'}
-					unit={figures.breakEven ? 'VOI' : undefined}
-					detail={figures.breakEven && estimate
-						? formatUSD(estimate.profitabilityThreshold * effectivePrice)
-						: figures.voiEstimates
-							? 'Unavailable without a price'
-							: undefined}
+					value={shownBreakEven.value}
+					unit={shownBreakEven.unit}
+					detail={shownBreakEven.detail}
 					state={tileState}
 				/>
-				{#if figures.breakEven && estimate}<Button
+				{#if shownBreakEven.showUseButton}<Button
 						variant="ghost"
 						size="sm"
 						onclick={() => estimate && setFixedAmount(estimate.profitabilityThreshold)}

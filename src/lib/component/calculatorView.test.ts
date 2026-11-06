@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
 	availability,
+	breakEvenTile,
 	isPriceStale,
 	PRICE_STALE_MS,
 	priceLabel,
@@ -135,4 +136,62 @@ describe('profitPercentageText', () => {
 	test.each([0, -0, NaN, Infinity, -1])('omits the percentage when node cost is %s', (cost) => {
 		expect(profitPercentageText(cost, 0, 0)).toBeUndefined();
 	});
+});
+
+describe('breakEvenTile', () => {
+	const input = { hasEstimate: true, effectivePrice: 0.01, reached: true, threshold: 20300 };
+
+	test('a reached break-even shows its figure, USD detail and use button', () => {
+		expect(breakEvenTile(input)).toEqual({
+			value: (20300).toLocaleString(),
+			unit: 'VOI',
+			detail: '$203.00',
+			showUseButton: true
+		});
+	});
+
+	test('an unreached break-even shows the search limit without USD detail or use button', () => {
+		expect(breakEvenTile({ ...input, reached: false, threshold: 10_000_000 })).toEqual({
+			value: `More than ${(10_000_000).toLocaleString()}`,
+			unit: 'VOI',
+			detail: undefined,
+			showUseButton: false
+		});
+	});
+
+	test.each([0, -1, NaN, Infinity])(
+		'no usable price %s preserves the unavailable text',
+		(effectivePrice) => {
+			for (const reached of [true, false]) {
+				expect(breakEvenTile({ ...input, effectivePrice, reached })).toEqual({
+					value: 'Unavailable',
+					unit: undefined,
+					detail: 'Unavailable without a price',
+					showUseButton: false
+				});
+			}
+		}
+	);
+
+	test('no estimate shows unavailable without a use button', () => {
+		for (const effectivePrice of [0, 0.01]) {
+			expect(breakEvenTile({ ...input, hasEstimate: false, effectivePrice })).toEqual({
+				value: 'Unavailable',
+				unit: undefined,
+				detail: undefined,
+				showUseButton: false
+			});
+		}
+	});
+});
+
+test('the component delegates the break-even tile and button condition to the pure helper', () => {
+	expect(source).toMatch(/\$:\s*shownBreakEven\s*=\s*breakEvenTile\(/);
+	for (const field of ['value', 'unit', 'detail']) {
+		expect(source).toContain(`${field}={shownBreakEven.${field}}`);
+	}
+	expect(source).toContain('{#if shownBreakEven.showUseButton}');
+	expect(source).not.toMatch(/figures\.breakEven\s*&&\s*estimate/);
+	expect(source).not.toContain('estimate.profitabilityThreshold.toLocaleString()');
+	expect(source).not.toContain('formatUSD(estimate.profitabilityThreshold * effectivePrice)');
 });

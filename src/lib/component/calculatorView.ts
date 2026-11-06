@@ -1,3 +1,5 @@
+import { BREAK_EVEN_SEARCH_LIMIT } from '$lib/rewards/calculatorModel';
+
 export const PRICE_STALE_MS = 15 * 60 * 1000;
 
 export function resultsState({
@@ -74,4 +76,45 @@ export function profitPercentageText(
 ): string | undefined {
 	if (!Number.isFinite(nodeCost) || nodeCost <= 0) return undefined;
 	return `${monthlyPercentage.toFixed(2)}% monthly / ${yearlyPercentage.toFixed(2)}% yearly profit on node cost`;
+}
+
+export function breakEvenTile({
+	hasEstimate,
+	effectivePrice,
+	reached,
+	threshold
+}: {
+	hasEstimate: boolean;
+	effectivePrice: number;
+	reached: boolean;
+	threshold: number;
+}) {
+	const figures = availability({ hasEstimate, effectivePrice });
+	if (!figures.breakEven) {
+		return {
+			value: 'Unavailable',
+			unit: undefined,
+			detail: figures.voiEstimates ? 'Unavailable without a price' : undefined,
+			showUseButton: false
+		};
+	}
+	if (!reached) {
+		return {
+			value: `More than ${BREAK_EVEN_SEARCH_LIMIT.toLocaleString()}`,
+			unit: 'VOI',
+			detail: undefined,
+			showUseButton: false
+		};
+	}
+	return {
+		value: threshold.toLocaleString(),
+		unit: 'VOI',
+		detail: new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(threshold * effectivePrice),
+		showUseButton: true
+	};
 }
