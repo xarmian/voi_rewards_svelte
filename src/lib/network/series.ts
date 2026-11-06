@@ -48,7 +48,7 @@ function failed<T>(previous: Resource<T> | undefined): Resource<T> {
 	return previous &&
 		previous.rows.length &&
 		previous.receivedAt !== null &&
-		previous.status !== 'error'
+		(previous.status === 'ready' || previous.status === 'stale')
 		? { ...previous, status: 'stale' }
 		: {
 				status: 'error',
