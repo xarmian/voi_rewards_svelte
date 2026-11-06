@@ -2,6 +2,7 @@
 	import { Button, Chip } from '$lib/ds';
 	import TokenSelector from '$lib/components/TokenSelector.svelte';
 	import { formatPrice } from '$lib/markets/format';
+	import { logoVisible } from '$lib/markets/logoState';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type { PageData } from './$types';
 
@@ -44,29 +45,29 @@
 						? data.pageMetaTags?.imageUrl
 						: undefined)
 	);
+	// The URL that last failed to load. A different token's logo is shown again without remounting.
+	let failedUrl = $state<string | null>(null);
+	let showLogo = $derived(logoVisible(imageUrl, failedUrl));
 </script>
 
 <div class="flex min-w-0 flex-col gap-bento text-ink lg:flex-row lg:items-start lg:justify-between">
 	<div class="flex min-w-0 flex-col gap-bento">
 		<div class="flex min-w-0 items-center gap-4">
 			<div class="shrink-0">
-				{#if imageUrl}
+				{#if showLogo}
 					<img
 						src={imageUrl}
 						alt="{symbol} logo"
 						class="h-16 w-16 rounded-ds-md bg-surface object-cover"
-						onerror={(event) => {
-							(event.currentTarget as HTMLImageElement).style.display = 'none';
-							(event.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
-						}}
+						onerror={() => (failedUrl = imageUrl ?? null)}
 					/>
+				{:else}
+					<div
+						class="flex h-16 w-16 items-center justify-center rounded-ds-md bg-accent-soft text-accent"
+					>
+						<i class="fas fa-coins text-2xl" aria-hidden="true"></i>
+					</div>
 				{/if}
-				<div
-					class="h-16 w-16 items-center justify-center rounded-ds-md bg-accent-soft text-accent"
-					style:display={imageUrl ? 'none' : 'flex'}
-				>
-					<i class="fas fa-coins text-2xl" aria-hidden="true"></i>
-				</div>
 			</div>
 			<div class="min-w-0">
 				<h1 class="break-words text-title">{symbol} markets</h1>
