@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { estimateRewards, type Estimate, type EstimateInput } from './calculatorModel';
+import {
+	BREAK_EVEN_SEARCH_LIMIT,
+	estimateRewards,
+	type Estimate,
+	type EstimateInput
+} from './calculatorModel';
 
 const input: EstimateInput = {
 	stake: 1000,
@@ -45,6 +50,7 @@ test('preserves every output for an irregular descending epoch pool', () => {
 		apr: 15.794999999802561,
 		apy: 8.372165173820312,
 		profitabilityThreshold: 338500,
+		breakEvenReached: true,
 		weeklyReward: 374.9999965828125,
 		weeklyRewardUSD: 1.3953749872846453,
 		monthlyReward: 1765.824608908923,
@@ -61,7 +67,8 @@ test('preserves every output for an irregular descending epoch pool', () => {
 	};
 	expect(Object.keys(result).sort()).toEqual(Object.keys(expected).sort());
 	for (const key of Object.keys(expected) as (keyof Estimate)[]) {
-		expect(result[key], key).toBeCloseTo(expected[key], 9);
+		if (key === 'breakEvenReached') expect(result[key], key).toBe(expected[key]);
+		else expect(result[key], key).toBeCloseTo(expected[key], 9);
 	}
 });
 
@@ -79,6 +86,7 @@ test.each([0, -1])('uses potential rates but zero rewards and balances for stake
 		'apr',
 		'apy',
 		'profitabilityThreshold',
+		'breakEvenReached',
 		'expectedWeeklyBlocks',
 		'expectedMonthlyBlocks',
 		'expectedYearlyBlocks'
@@ -115,7 +123,11 @@ test.each([{ nodeCost: 0 }, { isPercentageBased: true, costPercentage: 0 }])(
 		const result = estimateRewards({ ...input, ...overrides })!;
 		expect(result.monthlyProfitPercentage).toBe(0);
 		expect(result.yearlyProfitPercentage).toBe(0);
-		expect(Object.values(result).every(Number.isFinite)).toBe(true);
+		expect(
+			Object.entries(result).every(([key, value]) =>
+				key === 'breakEvenReached' ? typeof value === 'boolean' : Number.isFinite(value)
+			)
+		).toBe(true);
 	}
 );
 
@@ -149,7 +161,11 @@ test.each([
 test('an epoch list shorter than a year still gives finite results', () => {
 	const result = estimateRewards({ ...input, epochRewards: [1000, 900, 800, 700, 600] })!;
 	expect(result.weeklyReward).toBe(10);
-	expect(Object.values(result).every(Number.isFinite)).toBe(true);
+	expect(
+		Object.entries(result).every(([key, value]) =>
+			key === 'breakEvenReached' ? typeof value === 'boolean' : Number.isFinite(value)
+		)
+	).toBe(true);
 });
 
 test('the component assigns every model field to the variable of the same name', () => {
@@ -161,6 +177,7 @@ test('the component assigns every model field to the variable of the same name',
 	const expected = Object.keys(estimateRewards(input)!)
 		.filter((key) => key !== 'yearlyProfit')
 		.sort();
+	expect(expected).toContain('breakEvenReached');
 	const assigned = [...source.matchAll(/^\s*(\w+) = estimate\.(\w+);$/gm)];
 	for (const [line, variable, field] of assigned) expect(variable, line).toBe(field);
 	expect(assigned.map((match) => match[2]).sort()).toEqual(expected);
@@ -176,4 +193,59 @@ test('the calculator component delegates reward math to the model', () => {
 	);
 	expect(source).toMatch(/\bestimateRewards\s*\(/);
 	expect(source).not.toContain('Binary search for threshold');
+});
+
+test('reports when a high node cost at a low price cannot break even within the search limit', () => {
+	const result = estimateRewards({ ...input, price: 0.001, nodeCost: 5000 })!;
+	expect(BREAK_EVEN_SEARCH_LIMIT).toBe(10_000_000);
+	expect(result.breakEvenReached).toBe(false);
+});
+
+test('reports a reached break-even without changing the normal pinned threshold', () => {
+	const result = estimateRewards(input)!;
+	expect(result.breakEvenReached).toBe(true);
+	expect(result.profitabilityThreshold).toBe(20300);
+});
+
+test.each([0.001, 0.01, 1000])('a 100 percent node cost cannot break even at price %s', (price) => {
+	const result = estimateRewards({
+		...input,
+		price,
+		isPercentageBased: true,
+		costPercentage: 100
+	})!;
+	expect(result.breakEvenReached).toBe(false);
+});
+
+test('a percentage cost below the cutoff can break even', () => {
+	expect(
+		estimateRewards({ ...input, isPercentageBased: true, costPercentage: 50 })!.breakEvenReached
+	).toBe(true);
+});
+
+test.each([
+	{ factor: 1 - 1e-8, reached: true },
+	{ factor: 1 + 1e-8, reached: false }
+])('checks revenue at the limit despite the rounded threshold: $reached', ({ factor, reached }) => {
+	// Five monthly epochs in this fixture; scale cost either side of revenue at the limit.
+	const revenueAtLimit =
+		(BREAK_EVEN_SEARCH_LIMIT / (input.rewardStake / 1e6)) * 1000 * 5 * input.price;
+	const nodeCost = (revenueAtLimit / 1.01) * factor;
+	const result = estimateRewards({ ...input, nodeCost })!;
+	// Both searches round to the limit, so the threshold alone cannot distinguish them.
+	expect(result.profitabilityThreshold).toBe(BREAK_EVEN_SEARCH_LIMIT);
+	expect(result.breakEvenReached).toBe(reached);
+});
+
+test.each([0, -1])('break-even reachability is independent of a non-positive stake %s', (stake) => {
+	for (const { nodeCost, price, reached } of [
+		{ nodeCost: 10, price: 0.01, reached: true },
+		{ nodeCost: 5000, price: 0.001, reached: false }
+	]) {
+		const result = estimateRewards({ ...input, stake, nodeCost, price })!;
+		const positive = estimateRewards({ ...input, stake: 1000, nodeCost, price })!;
+		expect(result.breakEvenReached).toBe(reached);
+		expect(result.breakEvenReached).toBe(positive.breakEvenReached);
+		expect(result.profitabilityThreshold).toBe(positive.profitabilityThreshold);
+	}
 });
