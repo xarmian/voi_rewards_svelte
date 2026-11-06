@@ -43,6 +43,22 @@ it('shows unavailable quote time when no timestamp is passed', () => {
 	expect(html()).toContain('Quote time unavailable');
 });
 
+it('does not date another token’s price with the VOI/USD quote time', () => {
+	const body = html({
+		quoteAsOf: '2026-11-06T16:03:45+02:00',
+		selectedToken: {
+			id: 1,
+			symbol: 'UNIT',
+			decimals: 6,
+			type: 'ARC200',
+			poolCount: 2,
+			imageUrl: null
+		}
+	});
+	expect(body).toContain('Quote time unavailable');
+	expect(body).not.toContain('Data as of');
+});
+
 it('names both search mechanisms and the refresh control', () => {
 	const body = html();
 	expect(body).toMatch(/<button\b[^>]*aria-label="Search tokens"[^>]*aria-haspopup="dialog"/);

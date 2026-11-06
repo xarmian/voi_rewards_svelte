@@ -93,7 +93,10 @@
 			{:else}
 				<p class="break-words text-stat num">{formatPrice(displayPrice)}</p>
 			{/if}
-			<p class="mt-2 text-label text-ink-muted">{quoteAsOfLabel(quoteAsOf)}</p>
+			<!-- quoteAsOf is the VOI/USD reference time: it dates the VOI price only, not another token's. -->
+			<p class="mt-2 text-label text-ink-muted">
+				{quoteAsOfLabel(symbol === 'VOI' ? quoteAsOf : null)}
+			</p>
 			<p class="mt-2 text-body text-ink-muted">
 				Volume-weighted average price across all exchanges
 			</p>
