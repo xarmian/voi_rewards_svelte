@@ -70,8 +70,9 @@ function result<T>(
 		rows,
 		receivedAt,
 		coverage,
+		// Without a source observation time the card says when it was retrieved, never "unavailable".
 		asOf:
-			observed === undefined
+			observed == null
 				? { kind: 'retrieved', time: receivedAt }
 				: { kind: 'observed', time: observed }
 	};

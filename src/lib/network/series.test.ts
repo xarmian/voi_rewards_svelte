@@ -96,6 +96,16 @@ it('converts a recorded daily stake row from micro-VOI and preserves missing UTC
 	expect(result.asOf).toEqual({ kind: 'observed', time: Date.parse(stake.at(-1)!.max_timestamp) });
 });
 
+it('falls back to the retrieval time when no stake row carries a source observation time', () => {
+	const result = stakeSeries(
+		stake.map(({ max_timestamp: _omitted, ...row }) => row),
+		undefined,
+		now
+	);
+	expect(result.status).toBe('ready');
+	expect(result.asOf).toEqual({ kind: 'retrieved', time: now });
+});
+
 it('does not coerce missing or invalid stake into zero', () => {
 	for (const value of [null, undefined, NaN, Infinity, -1]) {
 		const result = stakeSeries([{ ...stake.at(-1), avg_online_stake: value }], undefined, now);
