@@ -54,20 +54,25 @@
 	<div class="flex min-w-0 flex-col gap-bento">
 		<div class="flex min-w-0 items-center gap-4">
 			<div class="shrink-0">
-				{#if showLogo}
-					<img
-						src={imageUrl}
-						alt="{symbol} logo"
-						class="h-16 w-16 rounded-ds-md bg-surface object-cover"
-						onerror={() => (failedUrl = imageUrl ?? null)}
-					/>
-				{:else}
-					<div
-						class="flex h-16 w-16 items-center justify-center rounded-ds-md bg-accent-soft text-accent"
-					>
-						<i class="fas fa-coins text-2xl" aria-hidden="true"></i>
-					</div>
-				{/if}
+				<!-- Keyed on the URL so each logo gets its own element, and the handler records the URL
+				     this element was created for, never the current one. -->
+				{#key imageUrl}
+					{#if showLogo}
+						{@const url = imageUrl ?? null}
+						<img
+							src={imageUrl}
+							alt="{symbol} logo"
+							class="h-16 w-16 rounded-ds-md bg-surface object-cover"
+							onerror={() => (failedUrl = url)}
+						/>
+					{:else}
+						<div
+							class="flex h-16 w-16 items-center justify-center rounded-ds-md bg-accent-soft text-accent"
+						>
+							<i class="fas fa-coins text-2xl" aria-hidden="true"></i>
+						</div>
+					{/if}
+				{/key}
 			</div>
 			<div class="min-w-0">
 				<h1 class="break-words text-title">{symbol} markets</h1>
