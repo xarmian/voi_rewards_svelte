@@ -3,10 +3,10 @@
 
 	import type { IProject } from '$lib/data/types.js';
 	import type { PLeaderboard } from '$lib/supabase.js';
-	// import { fetchProjects } from "../../routes/(site)/phase2/[...slug]/projects.js";
-	import ProjectSlideout from '../../routes/(site)/quests/ProjectSlideout.svelte';
+	// import { fetchProjects } from "../../routes/(site)/archive/testnet/phase2/[...slug]/projects.js";
+	import ProjectSlideout from '../../routes/(site)/archive/testnet/quests/ProjectSlideout.svelte';
 	import { onMount } from 'svelte';
-	import fetchProjects from '../../routes/(site)/phase2/[...slug]/projects';
+	import fetchProjects from '../../routes/(site)/archive/testnet/phase2/[...slug]/projects';
 
 	export let walletId: string | undefined;
 	export let selectedTab = 0;

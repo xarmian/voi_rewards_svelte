@@ -12,10 +12,10 @@ import { GET as eligibility } from '../../routes/api/eligibility/+server';
 import { GET as ohlcv } from '../../routes/api/ohlcv/+server';
 import { GET as reports } from '../../routes/api/reports/+server';
 import { GET as quests } from '../../routes/api/quests/+server';
-import { load as leaderboardLoad } from '../../routes/(site)/leaderboard/+page.server';
-import { load as relaysLoad } from '../../routes/(site)/relays/+page.server';
-import { load as phase2Load } from '../../routes/(site)/phase2/[...slug]/+page.server';
-import { fetchProjects } from '../../routes/(site)/phase2/[...slug]/projects';
+import { load as leaderboardLoad } from '../../routes/(site)/archive/testnet/leaderboard/+page.server';
+import { load as relaysLoad } from '../../routes/(site)/archive/testnet/relays/+page.server';
+import { load as phase2Load } from '../../routes/(site)/archive/testnet/phase2/[...slug]/+page.server';
+import { fetchProjects } from '../../routes/(site)/archive/testnet/phase2/[...slug]/projects';
 
 const WALLET = 'A'.repeat(58);
 let stalled = '';

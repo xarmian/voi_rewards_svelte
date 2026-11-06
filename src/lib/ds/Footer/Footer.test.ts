@@ -9,10 +9,10 @@ test('footer provides the specified destinations and external-link announcements
 	assert.match(html, /voirewards.com · unofficial, community-run/);
 	const nav = html.match(/<nav aria-label="Footer"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? '';
 	const anchors = [...nav.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
-	assert.equal(anchors.length, 7);
+	assert.equal(anchors.length, 8);
 	assert.deepEqual(
 		footerLinks.map((link) => link.label),
-		['About', 'About Voi', 'FAQ', 'Privacy', 'Source', 'Discord', 'X']
+		['About', 'About Voi', 'FAQ', 'Privacy', 'Testnet archive', 'Source', 'Discord', 'X']
 	);
 	footerLinks.forEach((link, i) => {
 		assert.ok(anchors[i].includes(`href="${link.href}"`));
@@ -25,6 +25,7 @@ test('footer provides the specified destinations and external-link announcements
 	});
 	assert.match(anchors[1], /href="https:\/\/ecosystem\.voi\.network"/);
 	assert.match(anchors[1], /aria-hidden="true">↗/);
-	assert.ok(anchors[6].includes(`href="${X_URL}"`));
-	assert.doesNotMatch(html, /href="\/(?:ecosystem|archive)/);
+	assert.ok(anchors[7].includes(`href="${X_URL}"`));
+	assert.match(anchors[4], /href="\/archive\/testnet"/);
+	assert.doesNotMatch(html, /href="\/ecosystem/);
 });

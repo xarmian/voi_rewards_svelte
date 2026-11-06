@@ -28,7 +28,7 @@
 			}
 			const p = projects?.find((p) => p.id === selectedProjectId);
 
-			const newUrl = '/quests/' + encodeURIComponent(p?.title ?? '');
+			const newUrl = '/archive/testnet/quests/' + encodeURIComponent(p?.title ?? '');
 			history.pushState({ path: newUrl }, '', newUrl);
 		}
 	}
@@ -81,7 +81,7 @@
 		</p>
 		<p class="mt-2">
 			To view your estimated token rewards for Testnet Phase 2 participation, please visit the <a
-				href="/phase2"
+				href="/archive/testnet/phase2"
 				class="underline font-semibold hover:text-red-800">Phase 2 Rewards page</a
 			>.
 		</p>
@@ -137,7 +137,7 @@
 			<div class="flex flex-col justify-center items-center sm:w-3/4">
 				<button
 					class="py-4 px-8 text-xl bg-blue-500 text-white rounded-lg"
-					on:click={() => goto('/leaderboard')}>View Leaderboard</button
+					on:click={() => goto('/archive/testnet/leaderboard')}>View Leaderboard</button
 				>
 			</div>
 
@@ -255,7 +255,7 @@
 			Check out our Phase 2 Quest Tracker for more Projects, Quests, and Real-time Status Tracking.
 		</p>
 		<a
-			href="/phase2"
+			href="/archive/testnet/phase2"
 			class="bg-[#65DBAB] text-[#672ed9] font-bold py-2 px-4 rounded-full shadow-md hover:bg-[#672ed9] hover:text-white w-1/2 text-center"
 			>Go to Phase 2 Quest Tracker</a
 		>

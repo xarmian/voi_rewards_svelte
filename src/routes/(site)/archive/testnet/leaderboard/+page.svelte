@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ArchiveBanner } from '$lib/ds';
 	import Leaderboard from './Leaderboard.svelte';
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { VRPhase2 } from '$lib/supabase';
@@ -31,6 +32,8 @@
 		}
 	}
 </script>
+
+<ArchiveBanner programme="Phase 2 leaderboard" />
 
 <div class="bg-[rgb(111,42,226)] dark:bg-[#2C037A]">
 	<div class="container mx-auto pt-6 text-lg">

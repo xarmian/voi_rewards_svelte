@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchProjects } from '../../phase2/[...slug]/projects';
+	import { fetchProjects } from '../../archive/testnet/phase2/[...slug]/projects';
 	import type { IProject } from '$lib/data/types';
 
 	let projects: IProject[] = [];

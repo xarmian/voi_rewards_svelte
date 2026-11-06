@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ArchiveBanner } from '$lib/ds';
 	import { ariaSortFor } from '$lib/a11y/keyboard';
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { PageData } from './$types';
@@ -265,6 +266,8 @@
 		}
 	}
 </script>
+
+<ArchiveBanner programme="Relay rewards" />
 
 <div class="bg-blue-50 dark:bg-blue-900/80 min-h-screen">
 	<div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8 text-gray-900 dark:text-white">
