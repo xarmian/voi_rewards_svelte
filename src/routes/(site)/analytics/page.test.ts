@@ -57,7 +57,7 @@ function section(html: string, title: string) {
 	);
 }
 const htmlFor = (model: ReturnType<typeof createNetwork>) =>
-	render(Page, { props: { model } }).body;
+	render(Page, { props: { model } }).body.replace(/<!--[\s\S]*?-->/g, '');
 
 afterEach(() => {
 	plots.points = [];
@@ -95,9 +95,7 @@ it('keeps the APR card ready when the price resource fails', async () => {
 	expect(get(model).epochs?.status).toBe('ready');
 	expect(section(html, 'APR by epoch')).toContain('<svg');
 	expect(section(html, 'APR by epoch')).not.toContain('Retry');
-	expect(section(html, 'VOI price')).toContain(
-		'Couldn’t load VOI price'.replace('Couldn’t', "Couldn't")
-	);
+	expect(section(html, 'VOI price')).toContain("Couldn't load VOI price");
 	expect(section(html, 'VOI price')).toContain('Retry');
 });
 
