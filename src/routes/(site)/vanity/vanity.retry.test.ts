@@ -397,6 +397,27 @@ test('a payment the node refused outright (HTTP 400) is forgotten and can be fun
 	expect(f.context.txnStatus).toBe('success');
 });
 
+test.each([
+	'Network request error. Received status 400 (Bad Request): transaction already in ledger',
+	'Network request error. Received status 400 (Bad Request): txn already in the pool'
+])('a 400 that says the payment is already known keeps it remembered: %s', async (message) => {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	f.send.mockRejectedValueOnce(Object.assign(new Error(message), { response: { status: 400 } }));
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.context.txnStatus).toBe('error');
+	expect(f.context.fundingTxId).toBe('tx');
+	expect(f.context.fundingLastValid).toBe(101n);
+	// And a second attempt is refused until the window has passed, not sent.
+	f.context.signTransactions.mockClear();
+	f.send.mockClear();
+	f.context.algodClient.sendRawTransaction.mockClear();
+	f.buildPayment.mockClear();
+	f.pendingRead.mockRejectedValue(new Error('transaction not found'));
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expectNoSend(f);
+	expect(f.context.txnError).toContain('may still land');
+});
+
 test.each([503, undefined])(
 	'a send that failed with status %s leaves the payment unknown and remembered',
 	async (status) => {

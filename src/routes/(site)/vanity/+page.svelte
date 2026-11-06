@@ -438,10 +438,11 @@
 			const { txid: txId } = await algodClient
 				.sendRawTransaction(signedTxns)
 				.do()
-				.catch((err: { response?: { status?: number } }) => {
+				.catch((err: { response?: { status?: number }; message?: string }) => {
 					// A 400 means the node refused the payment outright (for example too little balance):
-					// it cannot land, so there is nothing to wait for. Any other failure leaves it unknown.
-					if (err?.response?.status === 400) {
+					// it cannot land, so there is nothing to wait for. A "such a payment is already known"
+					// 400 means this exact payment is on the network, and any other failure is unknown.
+					if (err?.response?.status === 400 && !/already/i.test(err?.message ?? '')) {
 						fundingTxId = null;
 						fundingLastValid = null;
 					}
