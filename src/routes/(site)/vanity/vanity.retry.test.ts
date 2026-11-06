@@ -22,13 +22,13 @@ function fixture(
 		...payment,
 		signTxn,
 		txID: () => 'tx',
-		lastValid: 100n
+		lastValid: (payment.suggestedParams as { lastValid?: bigint })?.lastValid ?? 0n
 	}));
 	const statusRead = vi.fn().mockResolvedValue({ lastRound: 50n });
 	const read = vi.fn().mockResolvedValue({ amount: 0n, authAddr: undefined });
 	const send = vi.fn().mockResolvedValue({ txid: 'tx' });
 	const pendingRead = vi.fn().mockResolvedValue({ confirmedRound: 0n, poolError: '' });
-	const params = vi.fn().mockResolvedValue({});
+	const params = vi.fn().mockResolvedValue({ firstValid: 1n, lastValid: 1001n });
 	const context = createContext({
 		$selectedWallet: { address: funder, app: 'Pera' },
 		plan: { funder, rekeyTo: funder, vanity },
@@ -45,6 +45,7 @@ function fixture(
 		retryDrifted: false,
 		fundingTxId: null,
 		fundingLastValid: null,
+		FUNDING_VALID_ROUNDS: 100,
 		selectionDrifted,
 		buildPayment,
 		signTransactions: vi.fn().mockResolvedValue([new Uint8Array([1])]),
@@ -135,7 +136,7 @@ test('retry sends exactly one zero-amount self rekey with the vanity key and no 
 		to: vanity,
 		amount: 0,
 		rekeyTo: funder,
-		suggestedParams: {}
+		suggestedParams: { firstValid: 1n, lastValid: 1001n }
 	});
 	expect(f.signTxn).toHaveBeenCalledExactlyOnceWith(new Uint8Array([3]));
 	expect(f.context.signTransactions).not.toHaveBeenCalled();
@@ -209,7 +210,7 @@ test('a funding account read error sends nothing and reports funding error', asy
 
 // A funding payment that was sent and not yet seen confirmed may still land until its last valid
 // round (100 in these fixtures; the node is at round 50): never send a second one before then.
-const expired = 101n;
+const expired = 102n;
 
 async function fundTimesOut(failure: 'confirm' | 'send' = 'confirm') {
 	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
@@ -225,7 +226,7 @@ async function fundTimesOut(failure: 'confirm' | 'send' = 'confirm') {
 	expect(f.context.txnStatus).toBe('error');
 	// Remembered before the send, so a lost response is not read as "not sent".
 	expect(f.context.fundingTxId).toBe('tx');
-	expect(f.context.fundingLastValid).toBe(100n);
+	expect(f.context.fundingLastValid).toBe(101n);
 	f.send.mockClear();
 	f.context.algodClient.sendRawTransaction.mockClear();
 	f.params.mockClear();
@@ -262,7 +263,7 @@ test.each(['confirm', 'send'] as const)(
 		expectNoSend(f);
 		expect(f.context.txnError).toContain('may still land');
 		expect(f.context.fundingTxId).toBe('tx');
-		expect(f.context.fundingLastValid).toBe(100n);
+		expect(f.context.fundingLastValid).toBe(101n);
 	}
 );
 
@@ -341,6 +342,37 @@ test('an unreadable round or earlier payment state sends nothing', async () => {
 	expect(b.context.txnError).toBe('balance read failed');
 });
 
+test('the 1 VOI payment gets a short validity window; the rekey keeps the node default', async () => {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	const payment = f.buildPayment.mock.calls.find(([p]) => p.amount === 1000000)![0];
+	expect(payment.suggestedParams).toMatchObject({ firstValid: 1n, lastValid: 101n });
+	const rekey = f.buildPayment.mock.calls.find(([p]) => p.amount === 0)![0];
+	expect(rekey.suggestedParams).toEqual({ firstValid: 1n, lastValid: 1001n });
+	// The window that was signed is the window that is remembered for settling.
+	const g = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	g.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('confirmation timed out'));
+	await runInContext('activateVanityAddress(plan, signer)', g.context);
+	expect(g.context.fundingLastValid).toBe(101n);
+});
+
+test('a payment whose send was refused after its window can be funded again once expired', async () => {
+	const f = await fundTimesOut('send');
+	f.pendingRead.mockRejectedValue(new Error('transaction not found'));
+	f.statusRead.mockResolvedValue({ lastRound: expired });
+	await secondAttempt(f);
+	expect(f.buildPayment.mock.calls.filter(([p]) => p.amount === 1000000)).toHaveLength(1);
+});
+
+test('while a funding payment is unsettled the button reads as a retry and the search message says wait', () => {
+	const button = source.match(/\{:else if fundingTxId\}\s*([^{]*?)\s*\{:else\}/)?.[1];
+	expect(button).toBe('Retry funding');
+	expect(source).toContain(
+		'A funding payment may still land on this address. Wait a moment, then retry before starting a new search.'
+	);
+	expect(source).not.toContain('then fund again');
+});
+
 test('a payment that was never signed is not remembered', async () => {
 	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
 	f.context.signTransactions.mockRejectedValueOnce(new Error('rejected in wallet'));
@@ -356,7 +388,7 @@ test('a search is refused while an earlier funding payment is unsettled, and kee
 		txnStatus: 'error',
 		rekeyTxnStatus: 'idle',
 		fundingTxId: 'tx',
-		fundingLastValid: 100n
+		fundingLastValid: 101n
 	});
 	await runInContext('generateVanityAddress()', f.context);
 	expect(f.context.error).toContain('A funding payment may still land');

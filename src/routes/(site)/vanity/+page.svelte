@@ -50,6 +50,7 @@
 	// The funding payment that was sent for the current vanity address and not yet seen confirmed.
 	let fundingTxId: string | null = null;
 	let fundingLastValid: bigint | null = null;
+	const FUNDING_VALID_ROUNDS = 100; // about 5 minutes at 2.8 s per round
 	$: if (reviewOpen && plan && selectionDrifted(plan, $selectedWallet)) reviewDrifted = true;
 	$: retryDrifted = !!plan && selectionDrifted(plan, $selectedWallet);
 
@@ -158,7 +159,7 @@
 		// A funding payment sent and not yet settled may still land on this address.
 		if (fundingTxId) {
 			error =
-				'A funding payment may still land on this address. Wait for it, then fund again or retry, before starting a new search.';
+				'A funding payment may still land on this address. Wait a moment, then retry before starting a new search.';
 			return;
 		}
 		if (!validateInputs()) return;
@@ -408,12 +409,13 @@
 			const params = await algodClient.getTransactionParams().do();
 
 			// Create an unsigned transaction to send 1 VOI to the vanity address
-			// 1 VOI = 1,000,000 microVOI
+			// 1 VOI = 1,000,000 microVOI. A short validity window (about 5 minutes) bounds how long an
+			// unconfirmed payment can still land, so a failed send is settled in minutes, not the default 45.
 			const unsignedTxn = buildPayment({
 				from: plan.funder,
 				to: plan.vanity,
 				amount: 1000000, // 1 VOI in microVOI
-				suggestedParams: params
+				suggestedParams: { ...params, lastValid: params.firstValid + BigInt(FUNDING_VALID_ROUNDS) }
 			});
 
 			// Ask user to sign the transaction
@@ -775,6 +777,8 @@
 									Funding Address...
 								{:else if isRekeying || rekeyTxnStatus === 'sending'}
 									Rekeying Address...
+								{:else if fundingTxId}
+									Retry funding
 								{:else}
 									Fund &amp; Rekey Address
 								{/if}

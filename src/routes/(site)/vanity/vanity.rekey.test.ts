@@ -32,6 +32,7 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		txnError: null,
 		fundingTxId: null,
 		fundingLastValid: null,
+		FUNDING_VALID_ROUNDS: 100,
 		error: null,
 		console,
 		buildPayment: makePayment,
@@ -43,7 +44,9 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 			accountInformation: () => ({
 				do: vi.fn().mockResolvedValue({ amount: 0n, authAddr: undefined })
 			}),
-			getTransactionParams: () => ({ do: vi.fn().mockResolvedValue({}) }),
+			getTransactionParams: () => ({
+				do: vi.fn().mockResolvedValue({ firstValid: 1n, lastValid: 1001n })
+			}),
 			sendRawTransaction: () => ({ do: vi.fn().mockResolvedValue({ txid: 'tx' }) })
 		}
 	});
