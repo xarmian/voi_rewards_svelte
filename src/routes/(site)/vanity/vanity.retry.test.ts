@@ -19,6 +19,7 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 	const buildPayment = vi.fn((payment: Record<string, unknown>) => ({ ...payment, signTxn }));
 	const read = vi.fn().mockResolvedValue({ amount: 0n, authAddr: undefined });
 	const send = vi.fn().mockResolvedValue({ txid: 'tx' });
+	const pendingRead = vi.fn().mockResolvedValue({ confirmedRound: 0n, poolError: '' });
 	const params = vi.fn().mockResolvedValue({});
 	const context = createContext({
 		$selectedWallet: { address: funder, app: 'Pera' },
@@ -34,6 +35,7 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 		reviewOpen: false,
 		reviewDrifted: false,
 		retryDrifted: false,
+		fundingTxId: null,
 		selectionDrifted,
 		buildPayment,
 		signTransactions: vi.fn().mockResolvedValue([new Uint8Array([1])]),
@@ -42,6 +44,7 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 		}),
 		algodClient: {
 			accountInformation: vi.fn(() => ({ do: read })),
+			pendingTransactionInformation: vi.fn(() => ({ do: pendingRead })),
 			getTransactionParams: vi.fn(() => ({ do: params })),
 			sendRawTransaction: vi.fn(() => ({ do: send }))
 		},
@@ -82,7 +85,7 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 		).outputText,
 		context
 	);
-	return { context, read, send, params, buildPayment, signTxn, signedRekey };
+	return { context, read, send, params, pendingRead, buildPayment, signTxn, signedRekey };
 }
 
 function expectNoSend(f: ReturnType<typeof fixture>) {
@@ -161,28 +164,95 @@ test('a retry account read error sends nothing and reports the current error', a
 test.each([1000000n, 2000000n])(
 	'a balance of %s is not funded again or automatically rekeyed',
 	async (amount) => {
-		const f = fixture(['activateVanityAddress']);
+		// The real rekeyVanityAddress is loaded, so an automatic rekey would show as a send.
+		const f = fixture(['activateVanityAddress', 'rekeyVanityAddress']);
 		f.read.mockResolvedValue({ amount, authAddr: undefined });
-		f.context.rekeyVanityAddress = vi.fn();
 		await runInContext('activateVanityAddress(plan, signer)', f.context);
 		expect(f.context.algodClient.accountInformation).toHaveBeenCalledExactlyOnceWith(vanity);
 		expectNoSend(f);
+		expect(f.params).not.toHaveBeenCalled();
 		expect(f.context.txnStatus).toBe('success');
 		expect(f.context.rekeyTxnStatus).toBe('idle');
-		expect(f.context.rekeyVanityAddress).not.toHaveBeenCalled();
 		expect(f.context.isActivating).toBe(false);
 	}
 );
 
 test('a funding account read error sends nothing and reports funding error', async () => {
-	const f = fixture(['activateVanityAddress']);
+	const f = fixture(['activateVanityAddress', 'rekeyVanityAddress']);
 	f.read.mockRejectedValue(new Error('funding read failed'));
-	f.context.rekeyVanityAddress = vi.fn();
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expectNoSend(f);
+	expect(f.params).not.toHaveBeenCalled();
+	expect(f.context.txnStatus).toBe('error');
+	expect(f.context.txnError).toBe('funding read failed');
+});
+
+// A payment that was sent but not yet seen in the balance may still land: never send a second one.
+async function fundTimesOut() {
+	const f = fixture(['activateVanityAddress', 'rekeyVanityAddress']);
+	f.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('confirmation timed out'));
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.send).toHaveBeenCalledOnce();
+	expect(f.context.txnStatus).toBe('error');
+	expect(f.context.fundingTxId).toBe('tx');
+	f.send.mockClear();
+	f.context.algodClient.sendRawTransaction.mockClear();
+	f.params.mockClear();
+	f.buildPayment.mockClear();
+	f.context.signTransactions.mockClear();
+	return f;
+}
+
+test('a funding payment still pending is not paid again', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: '' });
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.context.algodClient.pendingTransactionInformation).toHaveBeenCalledWith('tx');
+	expectNoSend(f);
+	expect(f.context.txnStatus).toBe('error');
+	expect(f.context.txnError).toContain('still pending');
+	expect(f.context.fundingTxId).toBe('tx');
+});
+
+test('a funding payment that confirmed late counts as funded and is not paid again or rekeyed', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockResolvedValue({ confirmedRound: 12n, poolError: '' });
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expectNoSend(f);
+	expect(f.params).not.toHaveBeenCalled();
+	expect(f.context.txnStatus).toBe('success');
+	expect(f.context.rekeyTxnStatus).toBe('idle');
+	expect(f.context.fundingTxId).toBeNull();
+});
+
+test('a funding payment the pool rejected may be sent again', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: 'transaction rejected' });
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.buildPayment.mock.calls[0][0]).toMatchObject({
+		from: funder,
+		to: vanity,
+		amount: 1000000
+	});
+	expect(f.context.signTransactions).toHaveBeenCalledOnce();
+	expect(f.send).toHaveBeenCalled();
+});
+
+test('an unreadable earlier funding payment sends nothing', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockRejectedValue(new Error('pending read failed'));
 	await runInContext('activateVanityAddress(plan, signer)', f.context);
 	expectNoSend(f);
 	expect(f.context.txnStatus).toBe('error');
-	expect(f.context.txnError).toBe('funding read failed');
-	expect(f.context.rekeyVanityAddress).not.toHaveBeenCalled();
+	expect(f.context.txnError).toBe('pending read failed');
+	expect(f.context.fundingTxId).toBe('tx');
+});
+
+test('a new search forgets the earlier funding payment', async () => {
+	const f = fixture(['generateVanityAddress', 'validateInputs']);
+	f.context.fundingTxId = 'tx';
+	await runInContext('generateVanityAddress()', f.context);
+	expect(f.context.fundingTxId).toBeNull();
 });
 
 test('a new search clears the previous plan, review and transaction state', async () => {
@@ -292,5 +362,9 @@ test('only review captures a target; retry cannot assign it or enter funding or 
 	const outsideReview = source.replace(fn('reviewActivation'), '');
 	expect(fn('reviewActivation')).toContain('plan = captured.plan');
 	expect(outsideReview).not.toMatch(/plan\.rekeyTo\s*=(?!=)|plan\s*=\s*\{/);
+	// Every assignment of the plan in the page: a search clears it, a review captures it, a cancel clears it.
+	const assignments = [...source.matchAll(/^\s*plan = .*$/gm)].map((m) => m[0].trim()).sort();
+	expect(assignments).toEqual(['plan = captured.plan;', 'plan = null;', 'plan = null;']);
+	expect(fn('retryRekey')).not.toMatch(/\bplan\s*=(?!=)/);
 	expect(fn('retryRekey')).not.toMatch(/activateVanityAddress|captureSigner|signTransactions/);
 });

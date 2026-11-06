@@ -28,6 +28,7 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		txnStatus: 'idle',
 		rekeyTxnStatus: 'idle',
 		txnError: null,
+		fundingTxId: null,
 		error: null,
 		console,
 		buildPayment: makePayment,

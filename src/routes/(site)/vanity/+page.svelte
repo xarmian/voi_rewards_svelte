@@ -47,6 +47,8 @@
 	let reviewOpen = false;
 	let reviewDrifted = false;
 	let retryDrifted = false;
+	// The funding payment that was sent for the current vanity address and not yet seen confirmed.
+	let fundingTxId: string | null = null;
 	$: if (reviewOpen && plan && selectionDrifted(plan, $selectedWallet)) reviewDrifted = true;
 	$: retryDrifted = !!plan && selectionDrifted(plan, $selectedWallet);
 
@@ -157,6 +159,7 @@
 		plan = null;
 		reviewOpen = false;
 		reviewDrifted = false;
+		fundingTxId = null;
 		txnStatus = 'idle';
 		rekeyTxnStatus = 'idle';
 		txnError = null;
@@ -344,8 +347,23 @@
 		try {
 			const info = await algodClient.accountInformation(plan.vanity).do();
 			if (info.amount >= BigInt(1000000)) {
+				fundingTxId = null;
 				txnStatus = 'success';
 				return;
+			}
+			// An earlier payment that was sent but not yet seen in the balance may still land.
+			if (fundingTxId) {
+				const pending = await algodClient.pendingTransactionInformation(fundingTxId).do();
+				if (pending.confirmedRound && pending.confirmedRound > BigInt(0)) {
+					fundingTxId = null;
+					txnStatus = 'success';
+					return;
+				}
+				if (!pending.poolError) {
+					throw new Error(
+						'The earlier funding payment is still pending. Wait for it to confirm before trying again.'
+					);
+				}
 			}
 			// Get parameters for the transaction
 			const params = await algodClient.getTransactionParams().do();
@@ -364,10 +382,12 @@
 
 			// Send the signed transaction to the network
 			const { txid: txId } = await algodClient.sendRawTransaction(signedTxns).do();
+			fundingTxId = txId;
 
 			// Wait for confirmation
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
 
+			fundingTxId = null;
 			txnStatus = 'success';
 
 			// After sending 1 VOI, we can now initiate the rekey transaction
