@@ -248,3 +248,20 @@ it('a price failure leaves the independently derived APR result ready', () => {
 	expect(apr.status).toBe('ready');
 	expect(apr.current?.apr).toBe(epochs.epochs.at(-1)!.apr);
 });
+
+it.each(['stake', 'price'] as const)(
+	'treats a gap-only %s result as unavailable after a failed refresh',
+	(kind) => {
+		const convert = kind === 'stake' ? stakeSeries : priceSeries;
+		const empty = convert(
+			kind === 'stake' ? [] : [{ time: prices[0].time, value: 0 }],
+			undefined,
+			now
+		);
+		expect(empty.status).toBe('empty');
+		expect(empty.rows.length).toBeGreaterThan(0);
+		const failed = convert(null, empty, now + 60_000);
+		expect(failed.status).toBe('error');
+		expect(failed.receivedAt).toBeNull();
+	}
+);
