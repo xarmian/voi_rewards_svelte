@@ -398,6 +398,47 @@ test('a payment the node refused outright (HTTP 400) is forgotten and can be fun
 });
 
 test.each([
+	'Network request error. Received status 400 (Bad Request): TransactionPool.Remember: transaction TX: overspend, account A, data {...}',
+	'Network request error. Received status 400 (Bad Request): TransactionPool.Remember: transaction TX: account A balance 0 below min 100000 (1 assets)',
+	'Network request error. Received status 400 (Bad Request): TransactionPool.Remember: transaction TX: txn dead: round 1100 outside of 1000--1100',
+	'Network request error. Received status 400 (Bad Request): invalid transaction'
+])('a 400 that positively says the payment was refused forgets it: %s', async (message) => {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	f.send.mockRejectedValueOnce(Object.assign(new Error(message), { response: { status: 400 } }));
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.context.txnStatus).toBe('error');
+	expect(f.context.fundingTxId).toBeNull();
+	expect(f.context.fundingLastValid).toBeNull();
+});
+
+test.each([
+	'Network request error. Received status 400 (Bad Request)',
+	'',
+	'Network request error. Received status 400 (Bad Request): something the page does not recognise'
+])(
+	'a 400 whose text does not say it was refused keeps the payment remembered: %s',
+	async (message) => {
+		const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+		f.send.mockRejectedValueOnce(Object.assign(new Error(message), { response: { status: 400 } }));
+		await runInContext('activateVanityAddress(plan, signer)', f.context);
+		expect(f.context.txnStatus).toBe('error');
+		expect(f.context.fundingTxId).toBe('tx');
+		expect(f.context.fundingLastValid).toBe(101n);
+	}
+);
+
+test('a refusal that also says already is not forgotten', async () => {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	f.send.mockRejectedValueOnce(
+		Object.assign(new Error('400: invalid: transaction already in ledger'), {
+			response: { status: 400 }
+		})
+	);
+	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	expect(f.context.fundingTxId).toBe('tx');
+});
+
+test.each([
 	'Network request error. Received status 400 (Bad Request): transaction already in ledger',
 	'Network request error. Received status 400 (Bad Request): txn already in the pool'
 ])('a 400 that says the payment is already known keeps it remembered: %s', async (message) => {
