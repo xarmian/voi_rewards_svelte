@@ -200,6 +200,68 @@ it('separates actual and projected weekly totals with Monday UTC boundaries', ()
 	expect(result.rows[0]).toEqual({ date: '2026-11-02', actual: 100, projected: 200 });
 });
 
+it('keeps a bucket the source skipped as an unavailable row, never zero and never dropped', () => {
+	const daily = transactionSeries(
+		{
+			data: [
+				{ bucket_start: '2026-11-01T00:00:00', tx_count: 10 },
+				{ bucket_start: '2026-11-03T00:00:00', tx_count: 30 }
+			]
+		},
+		undefined,
+		Date.parse('2026-11-10T00:00:00Z'),
+		'day'
+	);
+	expect(daily.rows.map((row) => [row.date, row.actual])).toEqual([
+		['2026-11-01', 10],
+		['2026-11-02', null],
+		['2026-11-03', 30]
+	]);
+	const weekly = transactionSeries(
+		{
+			data: [
+				{ bucket_start: '2026-10-19T00:00:00', tx_count: 1 },
+				{ bucket_start: '2026-11-02T00:00:00', tx_count: 3 }
+			]
+		},
+		undefined,
+		Date.parse('2026-11-20T00:00:00Z'),
+		'week'
+	);
+	expect(weekly.rows.map((row) => row.actual)).toEqual([1, null, 3]);
+});
+
+it('keeps buckets that are off the expected grid instead of dropping them', () => {
+	const result = transactionSeries(
+		{
+			data: [
+				{ bucket_start: '2026-11-02T00:00:00', tx_count: 1 },
+				{ bucket_start: '2026-11-05T00:00:00', tx_count: 2 }
+			]
+		},
+		undefined,
+		Date.parse('2026-11-20T00:00:00Z'),
+		'week'
+	);
+	expect(result.rows.map((row) => row.actual)).toEqual([1, 2]);
+});
+
+it('keeps an epoch number the source skipped as a row with no figures', () => {
+	const result = epochSeries(
+		{ current_epoch: 106, epochs: [epochs.epochs[102], epochs.epochs[105]] },
+		undefined,
+		now
+	);
+	expect(result.rows.map((row) => [row.epoch, row.apr === null])).toEqual([
+		[103, false],
+		[104, true],
+		[105, true],
+		[106, false]
+	]);
+	expect(result.rows[1].accounts).toBeNull();
+	expect(result.previous?.epoch).toBe(103);
+});
+
 it('rejects invalid transaction counts instead of creating zero buckets', () => {
 	const result = transactionSeries(
 		{

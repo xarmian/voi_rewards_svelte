@@ -20,7 +20,7 @@ export type EpochResource = Resource<EpochRow> & {
 	previous: EpochRow | null;
 };
 export type DailyRow = { date: string; value: number | null };
-export type TransactionRow = { date: string; actual: number; projected: number | null };
+export type TransactionRow = { date: string; actual: number | null; projected: number | null };
 
 const dayMs = 86_400_000;
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -130,9 +130,10 @@ export function epochSeries(
 	const completed = rows.filter(
 		(row) => finite(data.current_epoch) && !row.inProgress && row.epoch < data.current_epoch
 	);
+	const spaced = withEpochGaps(rows);
 	return {
 		...result(
-			rows,
+			spaced,
 			receivedAt,
 			rows.length ? `Epochs ${rows[0].epoch}–${rows.at(-1)!.epoch}` : null,
 			rows.length > 0
@@ -141,6 +142,22 @@ export function epochSeries(
 		previous: completed.at(-1) ?? null
 	};
 }
+/** An epoch number the source skipped stays as a row with no figures, so the line breaks there. */
+function withEpochGaps(rows: EpochRow[]): EpochRow[] {
+	if (rows.length < 2) return rows;
+	const first = rows[0].epoch;
+	const last = rows.at(-1)!.epoch;
+	if (last - first > 10_000) return rows;
+	const known = new Map(rows.map((row) => [row.epoch, row]));
+	const filled: EpochRow[] = [];
+	for (let epoch = first; epoch <= last; epoch++) {
+		filled.push(
+			known.get(epoch) ?? { epoch, apr: null, accounts: null, inProgress: false, split: null }
+		);
+	}
+	return filled;
+}
+
 export function epochRange(rows: readonly EpochRow[], range: Range): EpochRow[] {
 	return range === 'all' ? [...rows] : rows.slice(-Number(range));
 }
@@ -240,12 +257,30 @@ export function transactionSeries(
 			];
 		})
 		.sort((a, b) => a.date.localeCompare(b.date));
+	const filled = withGaps(rows, duration);
 	return result(
-		rows,
+		filled,
 		receivedAt,
-		rows.length ? `${rows[0].date}–${rows.at(-1)!.date} UTC` : null,
+		filled.length ? `${filled[0].date}–${filled.at(-1)!.date} UTC` : null,
 		rows.length > 0
 	);
+}
+
+/**
+ * A bucket the source did not return is unavailable, not zero and not absent: the row stays, with no
+ * count, so the line breaks there and the table says so. A real zero count keeps its own row.
+ */
+function withGaps(rows: TransactionRow[], step: number): TransactionRow[] {
+	if (rows.length < 2) return rows;
+	const known = new Map(rows.map((row) => [row.date, row]));
+	const filled: TransactionRow[] = [];
+	const end = Date.parse(`${rows.at(-1)!.date}T00:00:00Z`);
+	for (let time = Date.parse(`${rows[0].date}T00:00:00Z`); time <= end; time += step) {
+		const date = dateOf(time);
+		filled.push(known.get(date) ?? { date, actual: null, projected: null });
+	}
+	// Buckets off the expected grid (not one step apart) are kept as received rather than dropped.
+	return filled.filter((row) => row.actual !== null).length === rows.length ? filled : rows;
 }
 
 export function freshnessText(resource: Resource<unknown>): string {

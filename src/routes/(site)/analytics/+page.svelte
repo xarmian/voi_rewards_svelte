@@ -266,7 +266,7 @@
 		freshnessText={freshness($model.transactions)}
 		data={{
 			columns: ['UTC bucket start', 'Actual transactions', `projected full ${$model.period}`],
-			rows: txRows.map((r) => [r.date, r.actual, r.projected ?? 'Not projected']),
+			rows: txRows.map((r) => [r.date, r.actual ?? 'Unavailable', r.projected ?? 'Not projected']),
 			caption: `Actual transaction totals (solid), ${$model.period === 'day' ? 'last 30 days' : 'last 15 weeks'}. A dashed estimate is labelled projected full ${$model.period}; it extrapolates elapsed UTC time and is not an actual total. Weeks start Monday UTC.`
 		}}
 		x={timeAxis(txRows)}
@@ -286,7 +286,7 @@
 		{#snippet children(ctx)}
 			<LineChart
 				{ctx}
-				points={txRows.map((r) => ({ x: r.date, y: r.actual }))}
+				points={txRows.map((r) => ({ x: r.date, y: r.actual ?? NaN }))}
 				area={false}
 				labelLatest={!txRows.some((r) => r.projected !== null)}
 				format={(v) => `${num(v)} actual`}
@@ -295,7 +295,7 @@
 				<line
 					x1={ctx.x(row.date)}
 					x2={ctx.x(row.date)}
-					y1={ctx.y(row.actual)}
+					y1={ctx.y(row.actual!)}
 					y2={ctx.y(row.projected!)}
 					class="stroke-ink"
 					stroke-width="2.5"
@@ -310,7 +310,7 @@
 					stroke-width="4"
 					stroke-linejoin="round"
 					class="fill-ink stroke-surface"
-					>{num(row.actual)} actual · projected full {$model.period}: {num(row.projected!)}</text
+					>{num(row.actual!)} actual · projected full {$model.period}: {num(row.projected!)}</text
 				>
 			{/each}
 		{/snippet}
