@@ -8,6 +8,12 @@
 		loading,
 		onretry
 	}: { resource: EpochResource | null; loading: boolean; onretry: () => void } = $props();
+	let region: HTMLDivElement | undefined = $state();
+	// Retry swaps its alert for the loading placeholder: move focus to the region first so it is not dropped.
+	const retry = () => {
+		region?.focus();
+		onretry();
+	};
 	const split = $derived(resource?.current?.split);
 	const splitRows = $derived(
 		split
@@ -26,20 +32,25 @@
 	<p class="mb-3 text-sm text-ink-muted">
 		Current epoch stake in VOI. Community stake is online stake minus ballast.
 	</p>
-	<div aria-busy={loading ? 'true' : undefined} class="min-h-[230px]">
+	<div
+		bind:this={region}
+		tabindex="-1"
+		aria-busy={loading ? 'true' : undefined}
+		class="min-h-[230px] focus:outline-none"
+	>
 		{#if loading}
 			<div class="h-[230px] rounded-ds-xs bg-grid">
 				<span class="sr-only">Loading current stake split…</span>
 			</div>
 		{:else if resource?.status === 'error'}
-			<InlineAlert message="Couldn't load Current stake split." {onretry} />
+			<InlineAlert message="Couldn't load Current stake split." onretry={retry} />
 		{:else if resource?.status === 'empty'}
 			<p class="text-sm text-ink-muted">No observations in this range</p>
 		{:else if !split}
 			<InlineAlert
 				tone="warn"
 				message="Unavailable: current stake totals are missing or inconsistent."
-				{onretry}
+				onretry={retry}
 			/>
 		{:else}
 			<div
@@ -101,7 +112,7 @@
 		{/if}
 	</div>
 	{#if resource?.status === 'stale'}
-		<InlineAlert tone="warn" message={`Stale - ${freshnessText(resource)}`} {onretry} />
+		<InlineAlert tone="warn" message={`Stale - ${freshnessText(resource)}`} onretry={retry} />
 	{:else if resource?.receivedAt !== null && resource}
 		<p class="mt-2 text-label text-ink-muted">{freshnessText(resource)}</p>
 	{/if}

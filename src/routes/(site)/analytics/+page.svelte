@@ -93,11 +93,7 @@
 		freshnessText={freshness($model.epochs)}
 		data={{
 			columns: ['Epoch', 'APR (%)', 'Status'],
-			rows: aprRows.map((r) => [
-				r.epoch,
-				r.apr ?? 'Unavailable',
-				r.inProgress ? 'in progress' : 'completed'
-			]),
+			rows: aprRows.map((r) => [r.epoch, r.apr ?? 'Unavailable', r.status]),
 			caption:
 				'Annual percentage rate (APR, %) by epoch. The current epoch is in progress and its values are provisional. Missing observations remain gaps.'
 		}}

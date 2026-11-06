@@ -235,7 +235,7 @@ it('uses unavailable and empty states for absent account counts and an invalid s
 	const html = htmlFor(model);
 	expect(section(html, 'Accounts earning by epoch')).toContain('No observations in this range');
 	expect(section(html, 'Current stake split')).toContain('Unavailable');
-	expect(section(html, 'Current stake split')).not.toContain('none');
+	expect(section(html, 'Current stake split').replace(/<[^>]*>/g, ' ')).not.toMatch(/\bnone\b/i);
 });
 
 it('binds segmented controls to the tested range and period handlers with 44px targets', () => {

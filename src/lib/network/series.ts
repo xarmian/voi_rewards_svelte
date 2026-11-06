@@ -13,6 +13,8 @@ export type EpochRow = {
 	apr: number | null;
 	accounts: number | null;
 	inProgress: boolean;
+	/** unavailable when the source gave no usable current epoch to compare with. */
+	status: 'in progress' | 'completed' | 'unavailable';
 	split: Split | null;
 };
 export type EpochResource = Resource<EpochRow> & {
@@ -119,6 +121,13 @@ export function epochSeries(
 					apr: nonnegative(row?.apr),
 					accounts: nonnegative(row?.participating_wallets),
 					inProgress: epoch === data.current_epoch,
+					status: !finite(data.current_epoch)
+						? 'unavailable'
+						: epoch === data.current_epoch
+							? 'in progress'
+							: epoch < data.current_epoch
+								? 'completed'
+								: 'unavailable',
 					split: stakeSplit(row)
 				}
 			];
@@ -152,7 +161,14 @@ function withEpochGaps(rows: EpochRow[]): EpochRow[] {
 	const filled: EpochRow[] = [];
 	for (let epoch = first; epoch <= last; epoch++) {
 		filled.push(
-			known.get(epoch) ?? { epoch, apr: null, accounts: null, inProgress: false, split: null }
+			known.get(epoch) ?? {
+				epoch,
+				apr: null,
+				accounts: null,
+				inProgress: false,
+				status: 'unavailable' as const,
+				split: null
+			}
 		);
 	}
 	return filled;
