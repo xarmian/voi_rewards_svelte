@@ -13,14 +13,6 @@
 			}
 		},
 		"src/lib/component/CalculatorComponent.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 16,
-				"warnings": 0
-			},
 			"svelte/valid-compile": {
 				"errors": 2,
 				"warnings": 0
