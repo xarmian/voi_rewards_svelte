@@ -5,7 +5,15 @@ import { expect, test } from 'vitest';
 const site = 'src/routes/(site)';
 const archive = `${site}/archive/testnet`;
 const routes = ['phase1', 'phase2', 'leaderboard', 'quests', 'reports', 'relays'];
-const pages = ['phase1', 'phase2/[...slug]', 'leaderboard', 'quests', 'quests/[...projectId]', 'reports', 'relays'];
+const pages = [
+	'phase1',
+	'phase2/[...slug]',
+	'leaderboard',
+	'quests',
+	'quests/[...projectId]',
+	'reports',
+	'relays'
+];
 
 test.each(pages)('%s has an archive banner', (page) => {
 	const path = `${archive}/${page}/+page.svelte`;
@@ -23,7 +31,8 @@ test('the archive hub links all six programmes', () => {
 });
 
 test.each([...routes.map((route) => `${site}/${route}`), 'src/routes/arc72'])(
-	'%s has been removed', (path) => expect(existsSync(path)).toBe(false)
+	'%s has been removed',
+	(path) => expect(existsSync(path)).toBe(false)
 );
 
 function sourceFiles(directory: string): string[] {
@@ -35,14 +44,20 @@ function sourceFiles(directory: string): string[] {
 
 test('source links use the new destinations', () => {
 	const excluded = new Set([
-		'src/lib/server/redirects.ts', 'src/lib/server/redirects.test.ts',
+		'src/lib/server/redirects.ts',
+		'src/lib/server/redirects.test.ts',
 		'src/routes/archive.routes.test.ts'
 	]);
-	const stale = sourceFiles('src').filter((path) => !excluded.has(path)).flatMap((path) =>
-		readFileSync(path, 'utf8').split('\n').flatMap((line, i) =>
-			/href="\/(phase1|phase2|leaderboard|quests|reports|relays|arc72)/.test(line)
-				? [`${path}:${i + 1}: ${line.trim()}`] : []
-		)
-	);
+	const stale = sourceFiles('src')
+		.filter((path) => !excluded.has(path))
+		.flatMap((path) =>
+			readFileSync(path, 'utf8')
+				.split('\n')
+				.flatMap((line, i) =>
+					/href="\/(phase1|phase2|leaderboard|quests|reports|relays|arc72)/.test(line)
+						? [`${path}:${i + 1}: ${line.trim()}`]
+						: []
+				)
+		);
 	expect(stale).toEqual([]);
 });

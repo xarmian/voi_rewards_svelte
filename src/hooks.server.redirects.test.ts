@@ -27,22 +27,26 @@ function request(path: string, method = 'GET') {
 test.each([
 	['/phase1?x=1', 308, '/archive/testnet/phase1?x=1'],
 	['/arc72', 302, 'https://nftnavigator.xyz/']
-] as const)('%s redirects before creating a client or resolving', async (path, status, location) => {
-	const { event, resolve } = request(path);
-	const response = await handle({ event, resolve });
-	expect(response.status).toBe(status);
-	expect(response.headers.get('location')).toBe(location);
-	expect(await response.text()).toBe('');
-	expect(resolve).not.toHaveBeenCalled();
-	expect(createServerClient).not.toHaveBeenCalled();
-});
-
-test.each([['/directory', 'GET'], ['/accounts', 'POST']])(
-	'%s (%s) resolves normally', async (path, method) => {
-		const { event, resolve } = request(path, method);
+] as const)(
+	'%s redirects before creating a client or resolving',
+	async (path, status, location) => {
+		const { event, resolve } = request(path);
 		const response = await handle({ event, resolve });
-		expect(resolve).toHaveBeenCalledOnce();
-		expect(createServerClient).toHaveBeenCalledOnce();
-		expect(await response.text()).toBe('resolved');
+		expect(response.status).toBe(status);
+		expect(response.headers.get('location')).toBe(location);
+		expect(await response.text()).toBe('');
+		expect(resolve).not.toHaveBeenCalled();
+		expect(createServerClient).not.toHaveBeenCalled();
 	}
 );
+
+test.each([
+	['/directory', 'GET'],
+	['/accounts', 'POST']
+])('%s (%s) resolves normally', async (path, method) => {
+	const { event, resolve } = request(path, method);
+	const response = await handle({ event, resolve });
+	expect(resolve).toHaveBeenCalledOnce();
+	expect(createServerClient).toHaveBeenCalledOnce();
+	expect(await response.text()).toBe('resolved');
+});
