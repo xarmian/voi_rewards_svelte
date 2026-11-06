@@ -284,12 +284,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/ecosystem/ProjectCard.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/components/wallet/AccountInfo.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 2,
@@ -417,12 +411,6 @@
 			}
 		},
 		"src/routes/(site)/archive/testnet/relays/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/directory/[...category]/+page.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0

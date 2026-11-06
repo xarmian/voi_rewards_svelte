@@ -25,10 +25,38 @@ it('identifies the token with one markets heading and keeps the formatted price 
 	const body = html();
 	expect(body.match(/<h1\b/g)).toHaveLength(1);
 	expect(body).toMatch(/<h1\b[^>]*>\s*VOI markets\s*<\/h1>/);
+	expect(body).toMatch(/<h1\b[^>]*>\s*VOI markets\s*<\/h1>\s*<span\b[^>]*>Beta<\/span>/);
 	expect(body).toContain('$0.00123');
 	expect(body).toMatch(/Loaded markets[\s\S]*?>3<\/span>/);
 	expect(body).toContain('Volume-weighted average price across all exchanges');
 	expect(body).not.toContain('Last updated');
+});
+
+it('shows the quote timestamp in absolute UTC under the price', () => {
+	const body = html({ quoteAsOf: '2026-11-06T16:03:45+02:00' });
+	expect(body).toMatch(/\$0\.00123<\/p>\s*<p\b[^>]*>Data as of 2026-11-06 14:03 UTC<\/p>/);
+	expect(body).toContain('Volume-weighted average price across all exchanges');
+	expect(body).not.toContain('Last updated');
+});
+
+it('shows unavailable quote time when no timestamp is passed', () => {
+	expect(html()).toContain('Quote time unavailable');
+});
+
+it('does not date another token’s price with the VOI/USD quote time', () => {
+	const body = html({
+		quoteAsOf: '2026-11-06T16:03:45+02:00',
+		selectedToken: {
+			id: 1,
+			symbol: 'UNIT',
+			decimals: 6,
+			type: 'ARC200',
+			poolCount: 2,
+			imageUrl: null
+		}
+	});
+	expect(body).toContain('Quote time unavailable');
+	expect(body).not.toContain('Data as of');
 });
 
 it('names both search mechanisms and the refresh control', () => {

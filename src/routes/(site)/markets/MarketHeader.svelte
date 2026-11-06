@@ -2,6 +2,7 @@
 	import { Button, Chip } from '$lib/ds';
 	import TokenSelector from '$lib/components/TokenSelector.svelte';
 	import { formatPrice } from '$lib/markets/format';
+	import { quoteAsOfLabel } from '$lib/markets/framing';
 	import { logoVisible } from '$lib/markets/logoState';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type { PageData } from './$types';
@@ -13,6 +14,7 @@
 		realMarketData: PageData['marketData'];
 		fetchingMarketData: boolean;
 		displayPrice: number;
+		quoteAsOf?: string | null;
 		commandPaletteShortcut: string;
 		allTokens: UniqueToken[];
 		handleTokenSelect: (event: CustomEvent<UniqueToken>) => void;
@@ -28,6 +30,7 @@
 		realMarketData,
 		fetchingMarketData,
 		displayPrice,
+		quoteAsOf = null,
 		commandPaletteShortcut,
 		allTokens,
 		handleTokenSelect,
@@ -75,7 +78,10 @@
 				{/key}
 			</div>
 			<div class="min-w-0">
-				<h1 class="break-words text-title">{symbol} markets</h1>
+				<div class="flex min-w-0 flex-wrap items-center gap-2">
+					<h1 class="min-w-0 break-words text-title">{symbol} markets</h1>
+					<Chip label="Beta" />
+				</div>
 				<div class="mt-2">
 					<Chip tone="neutral" label="Loaded markets" count={realMarketData.length} />
 				</div>
@@ -87,6 +93,10 @@
 			{:else}
 				<p class="break-words text-stat num">{formatPrice(displayPrice)}</p>
 			{/if}
+			<!-- quoteAsOf is the VOI/USD reference time: it dates the VOI price only, not another token's. -->
+			<p class="mt-2 text-label text-ink-muted">
+				{quoteAsOfLabel(symbol === 'VOI' ? quoteAsOf : null)}
+			</p>
 			<p class="mt-2 text-body text-ink-muted">
 				Volume-weighted average price across all exchanges
 			</p>

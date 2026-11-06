@@ -13,6 +13,8 @@ for (const [path, expected] of [
 	['/vanity', 'node'],
 	['/directory', 'ecosystem'],
 	['/directory/defi', 'ecosystem'],
+	['/directory/Wallets', 'ecosystem'],
+	['/directory/New', 'ecosystem'],
 	['/markets', 'ecosystem'],
 	['/about', null],
 	['/walletx', null],
@@ -27,6 +29,11 @@ for (const [path, expected] of [
 		assert.equal(navCurrent(path === '/' ? '/' : `${path}/`), expected);
 	});
 }
+test('token query URLs keep Markets in the Ecosystem section using their pathname', () => {
+	const url = new URL('/markets?token=123', 'https://voirewards.com');
+	assert.equal(navCurrent(url.pathname), 'ecosystem');
+});
+
 test('navigation destinations and labels', () => {
 	assert.deepEqual(navItems, [
 		{ key: 'home', label: 'Home', href: '/' },

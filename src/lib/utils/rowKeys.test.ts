@@ -64,7 +64,7 @@ describe('external-data lists key through rowKeys', () => {
 		['components/reports/GrantsReport.svelte', 'data.grants_submitted_in_progress', 'i', 'grantKeys', 'const grantKeys = $derived('],
 		['component/SendTokenModal.svelte', 'availableTokens', 'i', 'tokenKeys', '$: tokenKeys = rowKeys('],
 		['ds/DataTable/DataTable.svelte', 'shown', 'index', 'shownKeys', 'const shownKeys = $derived('],
-		['../routes/(site)/directory/[...category]/+page.svelte', 'filteredProjects', 'i', 'projectKeys', '$: projectKeys = rowKeys(']
+		['../routes/(site)/directory/[...category]/+page.svelte', 'filteredProjects', 'i', 'projectKeys', 'let projectKeys = $derived(']
 	])('%s', (file, list, index, keys, decl) => {
 		const src = read(file);
 		expect(src).toMatch(new RegExp(`\\{#each ${esc(list)} as \\w+, ${index} \\(${keys}\\[${index}\\]\\)\\}`));
