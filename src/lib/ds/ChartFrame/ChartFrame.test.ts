@@ -112,7 +112,7 @@ test('stale resource retains its own absolute time and has a scoped retry', () =
 	const html = render(ChartFrame, {
 		props: { ...props, state: 'stale', asOf: '2026-10-25T02:38:47Z', onretry() {} }
 	}).body;
-	assert.match(html, /! Stale - data as of 2026-10-25 02:38:47 UTC/);
+	assert.match(html.replace(/<[^>]*>/g, ' '), /!\s+Stale - data as of 2026-10-25 02:38:47 UTC/);
 	assert.match(html, /Retry/);
 	assert.doesNotMatch(html, /overflow-x-auto/);
 });

@@ -14,8 +14,9 @@ export function badgeText({
 	variant: 'hero' | 'bar';
 	epoch?: number;
 }): string {
-	if (status.unavailable) return 'chain data unavailable';
-	if (status.tone === 'warn') return `data ${comma(status.minutesOld)} min old`;
+	if (status.unavailable) return 'Block unavailable';
+	if (status.tone === 'warn')
+		return `! Stale chain - Block ${comma(round)} · ${comma(status.minutesOld)} min old`;
 	if (round === null) return 'Checking chain…';
 	if (variant === 'hero') {
 		return epoch === undefined

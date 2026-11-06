@@ -12,11 +12,7 @@
 		freshness($chainStatus, $chainStatus.checkedAt ?? $chainStatus.startedAt ?? 0)
 	);
 	const announcement = $derived(
-		status.tone === 'ok'
-			? 'Chain data is live'
-			: status.tone === 'warn'
-				? 'Chain data is stale'
-				: ''
+		status.tone === 'ok' ? 'Chain is live' : status.tone === 'warn' ? 'Chain is stale' : ''
 	);
 	// TASK-65: recalculate age only on poll completion, including failed polls.
 	const seconds = $derived(

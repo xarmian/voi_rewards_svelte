@@ -1,4 +1,4 @@
-import { scaleBand, scaleLinear, scaleUtc } from 'd3-scale';
+import { scaleBand, scaleLinear, scaleLog, scaleUtc } from 'd3-scale';
 import type { XSpec } from './types';
 type XValue = number | string | Date;
 export function makeX(spec: XSpec, range: [number, number]) {
@@ -28,8 +28,20 @@ export function makeX(spec: XSpec, range: [number, number]) {
 		ticks: (count: number) => scale.ticks(count)
 	};
 }
-export function makeY(domain: [number, number], range: [number, number]) {
-	return scaleLinear().domain(domain).range(range).nice();
+export function makeY(
+	domain: [number, number],
+	range: [number, number],
+	kind: 'linear' | 'log' = 'linear'
+) {
+	if (kind === 'log' && domain.some((n) => !Number.isFinite(n) || n <= 0)) {
+		throw new Error('Log scale requires a finite positive domain');
+	}
+	const scale = (kind === 'log' ? scaleLog() : scaleLinear()).domain(domain).range(range).nice();
+	return Object.assign(
+		(value: number) =>
+			Number.isFinite(value) && (kind !== 'log' || value > 0) ? scale(value) : NaN,
+		{ ticks: (count: number) => scale.ticks(count) }
+	);
 }
 /** D3's tick count is a hint; the final filter guarantees 44 physical pixels. */
 export function tickValues(x: ReturnType<typeof makeX>, width: number): XValue[] {

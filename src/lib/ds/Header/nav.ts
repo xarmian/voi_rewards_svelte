@@ -11,7 +11,7 @@ export function navCurrent(pathname: string): NavKey | null {
 	const path = pathname.replace(/\/+$/, '') || '/';
 	if (path === '/') return 'home';
 	if (path === '/wallet' || path.startsWith('/wallet/')) return 'staking';
-	if (path === '/analytics') return 'network';
+	if (path === '/analytics' || path.startsWith('/analytics/')) return 'network';
 	if (['/how_to_node', '/calculator', '/faq', '/vanity'].includes(path)) return 'node';
 	if (path === '/directory' || path.startsWith('/directory/') || path === '/markets')
 		return 'ecosystem';

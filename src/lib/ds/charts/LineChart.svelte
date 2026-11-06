@@ -22,24 +22,26 @@
 		tone = 'accent'
 	}: LineChartProps = $props();
 	let plotted = $derived(
-		points
-			.map((p) => ({ x: ctx.x(p.x) + ctx.bandwidth / 2, y: ctx.y(p.y), value: p.y }))
-			.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.value))
+		points.map((p) => ({ x: ctx.x(p.x) + ctx.bandwidth / 2, y: ctx.y(p.y), value: p.y }))
 	);
+	const defined = (p: (typeof plotted)[number]) =>
+		Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.value);
 	let linePath = $derived(
 		line<(typeof plotted)[number]>()
+			.defined(defined)
 			.x((p) => p.x)
 			.y((p) => p.y)
 			.curve(curveMonotoneX)(plotted) ?? ''
 	);
 	let areaPath = $derived(
 		areaShape<(typeof plotted)[number]>()
+			.defined(defined)
 			.x((p) => p.x)
 			.y0(ctx.height - ctx.margin.bottom)
 			.y1((p) => p.y)
 			.curve(curveMonotoneX)(plotted) ?? ''
 	);
-	let latest = $derived(plotted[plotted.length - 1]);
+	let latest = $derived(plotted.filter(defined).at(-1));
 </script>
 
 {#if plotted.length}
