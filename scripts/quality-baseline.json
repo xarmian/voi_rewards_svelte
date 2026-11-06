@@ -446,12 +446,6 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/how_to_node/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/routes/(site)/markets/+page.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 4,
