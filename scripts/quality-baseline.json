@@ -7,10 +7,6 @@
 			}
 		},
 		"src/lib/component/BridgeModal.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 2,
 				"warnings": 0
@@ -58,7 +54,7 @@
 		},
 		"src/lib/component/ImportRecipientsModal.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 9,
+				"errors": 3,
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-vars": {
@@ -68,7 +64,7 @@
 		},
 		"src/lib/component/NodeComponent.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
+				"errors": 2,
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-vars": {
@@ -146,7 +142,7 @@
 		},
 		"src/lib/component/RegisterVoteKey.svelte": {
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 5,
+				"errors": 4,
 				"warnings": 0
 			}
 		},
@@ -227,34 +223,6 @@
 			},
 			"svelte/valid-compile": {
 				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/TokenDetail.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/TokenTransactionHistory.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 4,
 				"warnings": 0
 			}
 		},
@@ -424,6 +392,70 @@
 				"warnings": 0
 			}
 		},
+		"src/routes/(site)/archive/testnet/leaderboard/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/leaderboard/Leaderboard.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/phase1/+page.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/phase2/[...slug]/+page.svelte": {
+			"@typescript-eslint/ban-ts-comment": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 4,
+				"warnings": 0
+			},
+			"svelte/valid-compile": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/quests/ProjectModal.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/quests/ProjectSlideout.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/quests/QuestsPage.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/relays/+page.svelte": {
+			"@typescript-eslint/no-unused-vars": {
+				"errors": 1,
+				"warnings": 0
+			}
+		},
 		"src/routes/(site)/directory/[...category]/+page.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
@@ -441,18 +473,6 @@
 			}
 		},
 		"src/routes/(site)/how_to_node/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/leaderboard/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/leaderboard/Leaderboard.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0
@@ -482,59 +502,7 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/phase1/+page.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/phase2/[...slug]/+page.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 4,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
 		"src/routes/(site)/privacy/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/quests/ProjectModal.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/quests/ProjectSlideout.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/quests/QuestsPage.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/relays/+page.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0
@@ -597,60 +565,6 @@
 		"src/routes/api/token-info/+server.ts": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/routes/arc72/+layout.svelte": {
-			"svelte/valid-compile": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/routes/arc72/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 3,
-				"warnings": 0
-			}
-		},
-		"src/routes/arc72/collection/[cid]/+page.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 4,
-				"warnings": 0
-			}
-		},
-		"src/routes/arc72/collection/[cid]/token/[tokenid]/+page.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/arc72/portfolio/[id]/+page.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 4,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 3,
 				"warnings": 0
 			}
 		},
@@ -734,12 +648,6 @@
 				"warnings": 1
 			}
 		},
-		"src/lib/component/ui/TokenDetail.svelte": {
-			"svelte:a11y_missing_attribute": {
-				"errors": 0,
-				"warnings": 1
-			}
-		},
 		"src/lib/components/OHLCVChart.svelte": {
 			"svelte:element_invalid_self_closing_tag": {
 				"errors": 0,
@@ -792,6 +700,38 @@
 				"warnings": 12
 			}
 		},
+		"src/routes/(site)/archive/testnet/phase1/+page.svelte": {
+			"svelte:a11y_consider_explicit_label": {
+				"errors": 0,
+				"warnings": 1
+			},
+			"ts:2322": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:2532": {
+				"errors": 2,
+				"warnings": 0
+			}
+		},
+		"src/routes/(site)/archive/testnet/phase2/[...slug]/+page.svelte": {
+			"css:unknownAtRules": {
+				"errors": 0,
+				"warnings": 2
+			},
+			"svelte:css_unused_selector": {
+				"errors": 0,
+				"warnings": 4
+			},
+			"ts:18048": {
+				"errors": 1,
+				"warnings": 0
+			},
+			"ts:7053": {
+				"errors": 4,
+				"warnings": 0
+			}
+		},
 		"src/routes/(site)/faq/+page.svelte": {
 			"css:unknownAtRules": {
 				"errors": 0,
@@ -818,54 +758,6 @@
 			"ts:2741": {
 				"errors": 2,
 				"warnings": 0
-			}
-		},
-		"src/routes/(site)/phase1/+page.svelte": {
-			"svelte:a11y_consider_explicit_label": {
-				"errors": 0,
-				"warnings": 1
-			},
-			"ts:2322": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:2532": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/phase2/[...slug]/+page.svelte": {
-			"css:unknownAtRules": {
-				"errors": 0,
-				"warnings": 2
-			},
-			"svelte:css_unused_selector": {
-				"errors": 0,
-				"warnings": 4
-			},
-			"ts:18048": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:7053": {
-				"errors": 4,
-				"warnings": 0
-			}
-		},
-		"src/routes/arc72/+layout.svelte": {
-			"svelte:a11y_click_events_have_key_events": {
-				"errors": 0,
-				"warnings": 1
-			},
-			"svelte:a11y_no_static_element_interactions": {
-				"errors": 0,
-				"warnings": 1
-			}
-		},
-		"src/routes/arc72/collection/[cid]/token/[tokenid]/+page.svelte": {
-			"svelte:a11y_consider_explicit_label": {
-				"errors": 0,
-				"warnings": 1
 			}
 		}
 	}
