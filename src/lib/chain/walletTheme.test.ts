@@ -1,16 +1,16 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
-// avm-wallet-svelte 3 styles its components entirely through --avm-* CSS variables and defines them
-// in a stylesheet it exports separately. Without that import the wallet picker, account list and
-// modals render with no colours, backgrounds or borders (TASK-138).
+// avm-wallet-svelte styles its components through --avm-* CSS variables. From 3.1.0 the widget
+// imports the stylesheet that defines them itself, at zero specificity, so this app imports nothing.
+// These tests keep a library upgrade from leaving those variables undefined.
 const root = new URL('../../../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
 const libraryDist = 'node_modules/avm-wallet-svelte/dist/';
 
-test('the root layout imports the wallet library theme', () => {
-	expect(read('src/routes/+layout.svelte')).toMatch(
-		/^\s*import 'avm-wallet-svelte\/styles\/theme\.css';$/m
+test('the wallet widget imports its own theme', () => {
+	expect(read(`${libraryDist}components/Web3Wallet.svelte`)).toMatch(
+		/^\s*import '\.\.\/styles\/theme\.css';$/m
 	);
 });
 
@@ -37,6 +37,6 @@ test('the theme defines every variable the installed wallet components read', ()
 });
 
 test('the theme darkens under the class this app toggles on the root element', () => {
-	expect(read(`${libraryDist}styles/theme.css`)).toMatch(/^\.dark,/m);
+	expect(read(`${libraryDist}styles/theme.css`)).toMatch(/^:where\(\.dark[,)]/m);
 	expect(read('src/app.html')).toContain("classList.toggle('dark'");
 });
