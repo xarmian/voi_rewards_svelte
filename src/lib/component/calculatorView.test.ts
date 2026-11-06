@@ -6,6 +6,7 @@ import {
 	PRICE_STALE_MS,
 	priceLabel,
 	resultsState,
+	profitPercentageText,
 	validateCustomPrice,
 	validateNodeCost,
 	validateStake
@@ -123,4 +124,15 @@ test('calculator removes recommendations, legacy palette and whole-component loa
 	}
 	expect(source).toContain('loadData');
 	expect(source).toContain('Your price');
+});
+
+describe('profitPercentageText', () => {
+	test('shows both percentages for a positive node cost', () => {
+		expect(profitPercentageText(10, 12.345, -98.32)).toBe(
+			'12.35% monthly / -98.32% yearly profit on node cost'
+		);
+	});
+	test.each([0, -0, NaN, Infinity, -1])('omits the percentage when node cost is %s', (cost) => {
+		expect(profitPercentageText(cost, 0, 0)).toBeUndefined();
+	});
 });
