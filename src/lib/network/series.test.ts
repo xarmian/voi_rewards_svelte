@@ -98,7 +98,7 @@ it('converts a recorded daily stake row from micro-VOI and preserves missing UTC
 
 it('falls back to the retrieval time when no stake row carries a source observation time', () => {
 	const result = stakeSeries(
-		stake.map(({ max_timestamp: _omitted, ...row }) => row),
+		stake.map((row) => ({ ...row, max_timestamp: undefined })),
 		undefined,
 		now
 	);
