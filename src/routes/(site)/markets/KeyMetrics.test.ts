@@ -96,3 +96,20 @@ it('preserves unavailable aggregates and zero values as distinct states', () => 
 	expect(zero.match(/\$0\.00/g)).toHaveLength(2);
 	expect(text(zero)).toContain('Active markets 0');
 });
+
+it('keeps the supply line visible while market data refreshes, as before the restyle', () => {
+	const refreshingVoi = html({ fetchingMarketData: true });
+	expect(refreshingVoi).toContain('Circulating: 2,000,000');
+	const refreshingOther = html({
+		fetchingMarketData: true,
+		selectedToken: {
+			id: 1,
+			symbol: 'UNIT',
+			decimals: 6,
+			type: 'ARC200',
+			poolCount: 2,
+			imageUrl: null
+		}
+	});
+	expect(refreshingOther).toContain('Total Supply: 1,000,000');
+});

@@ -64,7 +64,7 @@
 	/>
 	<div class="min-w-0">
 		<StatTile label={isVoi ? 'Market Cap' : 'FDV'} value={marketCap} detail={supply} {state} />
-		{#if !fetchingMarketData && marketCap === '—'}
+		{#if fetchingMarketData || marketCap === '—'}
 			<p class="mt-2 text-label text-ink-muted">{supply}</p>
 		{/if}
 	</div>
