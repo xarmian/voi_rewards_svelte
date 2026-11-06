@@ -53,7 +53,10 @@
 	let loadState = $state<DataState>('loading');
 	let refreshFailed = $state(false);
 	let now = $state(Date.now());
-	let showNode = $state(false);
+	let showNode = $state(untrack(() => tabs.hash.toLowerCase() === '#consensus'));
+	$effect(() => {
+		if (tabs.hash.toLowerCase() === '#consensus') showNode = true;
+	});
 	let sequence = 0;
 	let loadedAddress = '';
 	const viewContracts = $derived(
