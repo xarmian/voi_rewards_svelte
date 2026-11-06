@@ -95,6 +95,12 @@ test.each([
 			error: null,
 			Worker,
 			URL,
+			isActivating: false,
+			isRekeying: false,
+			txnStatus: 'idle',
+			rekeyTxnStatus: 'idle',
+			fundingTxId: null,
+			fundingLastValid: null,
 			isGenerating: false,
 			updateInterval: null,
 			worker: null,
@@ -217,8 +223,16 @@ test('Fund & Rekey opens review and only Confirm can start activation', () => {
 		['activateVanityAddress', 'rekeyVanityAddress']
 	]) {
 		expect(fn(caller)).toMatch(new RegExp(`await ${callee}\\(`));
-		expect(source.match(new RegExp(`\\b${callee}\\s*\\(`, 'g'))).toHaveLength(2);
-		const outsideCaller = source.replace(fn(caller), '').replace(fn(callee), '');
+		expect(source.match(new RegExp(`\\b${callee}\\s*\\(`, 'g'))).toHaveLength(
+			callee === 'rekeyVanityAddress' ? 3 : 2
+		);
+		const outsideCaller = source
+			.replace(fn(caller), '')
+			.replace(fn(callee), '')
+			.replace(callee === 'rekeyVanityAddress' ? fn('retryRekey') : '', '');
+		if (callee === 'rekeyVanityAddress') {
+			expect(fn('retryRekey')).toMatch(/await rekeyVanityAddress\(plan\)/);
+		}
 		expect(outsideCaller).not.toMatch(new RegExp(`\\b${callee}\\s*\\(`));
 	}
 	const outsideSigning = source
@@ -250,7 +264,7 @@ test('Confirm is inside reviewOpen && plan and disabled when reviewDrifted', () 
 test('source guard: funding and rekey failures have distinct messages, and the rekey one is gated on funding success', () => {
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
 	expect(step2).toMatch(
-		/\{#if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding was not confirmed\.[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'\}\s*<InlineAlert\s+message=\{`Funding was confirmed, but the rekey was not\.[^`]*\$\{txnError \?\? ''\}`\}/
+		/\{#if txnStatus === 'error' && fundingTxId\}\s*<InlineAlert\s+message=\{`A funding payment may still land[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding was not confirmed\.[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'\}\s*<InlineAlert\s+message=\{`Funding was confirmed, but the rekey was not\.[^`]*\$\{txnError \?\? ''\}`\}/
 	);
 	expect(markup).not.toMatch(/already sent|not yet rekeyed/);
 });
@@ -284,7 +298,7 @@ test('source guard: an error shows under the form in every state, and again besi
 test('failure alerts wrap unbroken error text', () => {
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
 	expect(step2).toMatch(
-		/overflow-wrap:anywhere[^>]*>\s*\{#if txnStatus === 'error'\}[^]*?\{\/if\}\s*<\/div>/
+		/overflow-wrap:anywhere[^>]*>\s*\{#if txnStatus === 'error'( && fundingTxId)?\}[^]*?\{\/if\}\s*<\/div>/
 	);
 });
 

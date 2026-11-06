@@ -15,7 +15,9 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 	const signing = Promise.withResolvers<Uint8Array[]>();
 	const makePayment = vi.fn((payment: Record<string, unknown>) => ({
 		...payment,
-		signTxn: vi.fn(() => new Uint8Array())
+		signTxn: vi.fn(() => new Uint8Array()),
+		txID: () => 'tx',
+		lastValid: 100n
 	}));
 	const context = createContext({
 		$selectedWallet: { address: funder, app: 'Pera' },
@@ -28,6 +30,9 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		txnStatus: 'idle',
 		rekeyTxnStatus: 'idle',
 		txnError: null,
+		fundingTxId: null,
+		fundingLastValid: null,
+		FUNDING_VALID_ROUNDS: 100,
 		error: null,
 		console,
 		buildPayment: makePayment,
@@ -36,8 +41,13 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 			waitForConfirmation: vi.fn().mockResolvedValue({})
 		},
 		algodClient: {
-			getTransactionParams: () => ({ do: vi.fn().mockResolvedValue({}) }),
-			sendRawTransaction: () => ({ do: vi.fn().mockResolvedValue({ txId: 'tx' }) })
+			accountInformation: () => ({
+				do: vi.fn().mockResolvedValue({ amount: 0n, authAddr: undefined })
+			}),
+			getTransactionParams: () => ({
+				do: vi.fn().mockResolvedValue({ firstValid: 1n, lastValid: 1001n })
+			}),
+			sendRawTransaction: () => ({ do: vi.fn().mockResolvedValue({ txid: 'tx' }) })
 		}
 	});
 	context.signTransactions = vi.fn(() => {
@@ -51,7 +61,9 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 		context
 	);
 	const activation = runInContext('activateVanityAddress(plan, signer)', context);
-	await vi.waitFor(() => expect(context.signTransactions).toHaveBeenCalledOnce());
+	await vi.waitFor(() => expect(context.signTransactions).toHaveBeenCalledOnce(), {
+		timeout: 5000
+	});
 	signing.resolve([new Uint8Array()]);
 	await activation;
 	// The picker moved to another account while the prompt was open; the funder still signed.

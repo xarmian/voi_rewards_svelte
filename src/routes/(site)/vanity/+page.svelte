@@ -46,7 +46,13 @@
 	let plan: VanityPlan | null = null;
 	let reviewOpen = false;
 	let reviewDrifted = false;
+	let retryDrifted = false;
+	// The funding payment that was sent for the current vanity address and not yet seen confirmed.
+	let fundingTxId: string | null = null;
+	let fundingLastValid: bigint | null = null;
+	const FUNDING_VALID_ROUNDS = 100; // about 5 minutes at 2.8 s per round
 	$: if (reviewOpen && plan && selectionDrifted(plan, $selectedWallet)) reviewDrifted = true;
+	$: retryDrifted = !!plan && selectionDrifted(plan, $selectedWallet);
 
 	// Method to validate inputs
 	function validateInputs(): boolean {
@@ -144,6 +150,18 @@
 	// Generate the vanity address
 	async function generateVanityAddress() {
 		if (!ready) return;
+		if (isActivating || isRekeying) return;
+		// Funded and not yet rekeyed: the phrase on this page is the only way to finish, so keep it.
+		if (txnStatus === 'success' && rekeyTxnStatus !== 'success') {
+			error = 'Retry the rekey before starting a new search. Your 1 VOI is on this address.';
+			return;
+		}
+		// A funding payment sent and not yet settled may still land on this address.
+		if (fundingTxId) {
+			error =
+				'A funding payment may still land on this address. Wait a moment, then retry before starting a new search.';
+			return;
+		}
 		if (!validateInputs()) return;
 
 		// Reset state
@@ -151,6 +169,14 @@
 		attempts = 0;
 		progress = 0;
 		result = null;
+		plan = null;
+		reviewOpen = false;
+		reviewDrifted = false;
+		fundingTxId = null;
+		fundingLastValid = null;
+		txnStatus = 'idle';
+		rekeyTxnStatus = 'idle';
+		txnError = null;
 		error = null; // Clear previous errors
 		lastAddressCheckedByWorker = null; // Clear last checked address
 		startTime = Date.now();
@@ -298,34 +324,144 @@
 		await activateVanityAddress(plan, signer);
 	}
 
+	async function retryRekey() {
+		if (!plan || txnStatus !== 'success' || isActivating || isRekeying) return;
+		if (selectionDrifted(plan, $selectedWallet)) {
+			retryDrifted = true;
+			return;
+		}
+		isRekeying = true;
+		rekeyTxnStatus = 'sending';
+		txnError = null;
+		error = null;
+		try {
+			if (!result || result.address !== plan.vanity) {
+				throw new Error('The generated vanity address changed. Review again.');
+			}
+			const info = await algodClient.accountInformation(plan.vanity).do();
+			if (info.authAddr?.toString() === plan.rekeyTo) {
+				rekeyTxnStatus = 'success';
+				return;
+			}
+			if (!(await rekeyVanityAddress(plan))) {
+				// An earlier rekey may have landed after the read above: the chain decides. The send
+				// path released the in-flight flag, so take it back before the follow-up read.
+				isRekeying = true;
+				rekeyTxnStatus = 'sending';
+				try {
+					const after = await algodClient.accountInformation(plan.vanity).do();
+					if (after.authAddr?.toString() === plan.rekeyTo) {
+						rekeyTxnStatus = 'success';
+						txnError = null;
+					} else {
+						rekeyTxnStatus = 'error';
+					}
+				} catch {
+					rekeyTxnStatus = 'error'; // keep the rekey error already shown
+				}
+			}
+		} catch (err) {
+			rekeyTxnStatus = 'error';
+			txnError = err instanceof Error ? err.message : String(err);
+		} finally {
+			isRekeying = false;
+		}
+	}
+
+	// An earlier funding payment that was sent and not yet seen confirmed can still land until its
+	// last valid round. True when it landed. False only when it can no longer land. Otherwise throws,
+	// so nothing is sent while it could still land, or while its state cannot be read.
+	async function earlierFundingLanded(txId: string, lastValid: bigint | null, vanity: string) {
+		try {
+			const pending = await algodClient.pendingTransactionInformation(txId).do();
+			if (pending.confirmedRound && pending.confirmedRound > BigInt(0)) return true;
+		} catch {
+			// The node does not know it (not received, dropped or expired): only expiry settles that.
+		}
+		// Still in a pool, rejected by one node, or unknown: none of it says the payment cannot land.
+		// Only its last valid round passing does.
+		const status = await algodClient.status().do();
+		if (lastValid === null || status.lastRound <= lastValid) {
+			throw new Error(
+				'The earlier funding payment may still land. Wait for it to confirm or expire before trying again.'
+			);
+		}
+		const info = await algodClient.accountInformation(vanity).do();
+		return info.amount >= BigInt(1000000);
+	}
+
 	// Send 1 VOI from the reviewed account, then rekey to that same account.
 	async function activateVanityAddress(plan: VanityPlan, signer: TransactionSigner) {
 		isActivating = true;
 		txnStatus = 'sending';
+		rekeyTxnStatus = 'idle';
 		txnError = null;
 
 		try {
+			const info = await algodClient.accountInformation(plan.vanity).do();
+			if (info.amount >= BigInt(1000000)) {
+				fundingTxId = null;
+				fundingLastValid = null;
+				txnStatus = 'success';
+				return;
+			}
+			if (fundingTxId) {
+				const landed = await earlierFundingLanded(fundingTxId, fundingLastValid, plan.vanity);
+				fundingTxId = null;
+				fundingLastValid = null;
+				if (landed) {
+					txnStatus = 'success';
+					return;
+				}
+			}
 			// Get parameters for the transaction
 			const params = await algodClient.getTransactionParams().do();
 
 			// Create an unsigned transaction to send 1 VOI to the vanity address
-			// 1 VOI = 1,000,000 microVOI
+			// 1 VOI = 1,000,000 microVOI. A short validity window (about 5 minutes) bounds how long an
+			// unconfirmed payment can still land, so a failed send is settled in minutes, not the default 45.
 			const unsignedTxn = buildPayment({
 				from: plan.funder,
 				to: plan.vanity,
 				amount: 1000000, // 1 VOI in microVOI
-				suggestedParams: params
+				suggestedParams: { ...params, lastValid: params.firstValid + BigInt(FUNDING_VALID_ROUNDS) }
 			});
 
 			// Ask user to sign the transaction
 			const signedTxns = await signTransactions([[unsignedTxn]], signer);
 
+			// Remember the payment before it leaves: a lost response must not look like "not sent".
+			fundingTxId = unsignedTxn.txID();
+			fundingLastValid = unsignedTxn.lastValid;
+
 			// Send the signed transaction to the network
-			const { txid: txId } = await algodClient.sendRawTransaction(signedTxns).do();
+			const { txid: txId } = await algodClient
+				.sendRawTransaction(signedTxns)
+				.do()
+				.catch((err: { response?: { status?: number }; message?: string }) => {
+					// Forget the payment only when the node says the sender cannot pay for it (too little
+					// balance): that depends on the account, not on which node answered, so it cannot land.
+					// Every other failure is unknown, including a 400 with no readable text, a payment that is
+					// already known, and a window the node finds dead (an expired payment is settled by the
+					// last valid round on the next attempt). Unknown costs a wait of at most the window,
+					// never a second payment.
+					const message = err?.message ?? '';
+					if (
+						err?.response?.status === 400 &&
+						/overspend|below min/i.test(message) &&
+						!/already/i.test(message)
+					) {
+						fundingTxId = null;
+						fundingLastValid = null;
+					}
+					throw err;
+				});
 
 			// Wait for confirmation
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
 
+			fundingTxId = null;
+			fundingLastValid = null;
 			txnStatus = 'success';
 
 			// After sending 1 VOI, we can now initiate the rekey transaction
@@ -343,6 +479,7 @@
 	async function rekeyVanityAddress(plan: VanityPlan) {
 		isRekeying = true;
 		rekeyTxnStatus = 'sending';
+		txnError = null;
 
 		try {
 			if (!result || result.address !== plan.vanity) {
@@ -374,10 +511,12 @@
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
 
 			rekeyTxnStatus = 'success';
+			return true;
 		} catch (err) {
 			console.error('Failed to rekey address:', err);
 			rekeyTxnStatus = 'error';
 			txnError = err instanceof Error ? err.message : String(err);
+			return false;
 		} finally {
 			isRekeying = false;
 		}
@@ -621,6 +760,29 @@
 								tone="ok"
 								label="Success! Your vanity address is now rekeyed to the reviewed account."
 							/>
+						{:else if txnStatus === 'success'}
+							{#if plan}
+								<div class="space-y-3">
+									<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />
+									{#if retryDrifted}
+										<div class="[overflow-wrap:anywhere]">
+											<InlineAlert
+												message="Your selected account changed. Select the reviewed account again to retry."
+											/>
+										</div>
+									{/if}
+									<Button
+										onclick={retryRekey}
+										disabled={retryDrifted || isActivating || isRekeying}
+									>
+										{#if isRekeying || rekeyTxnStatus === 'sending'}
+											Rekeying Address...
+										{:else}
+											Retry rekey
+										{/if}
+									</Button>
+								</div>
+							{/if}
 						{:else if reviewOpen && plan}
 							<div class="space-y-3" aria-label="Review vanity activation">
 								<ResolvedAddress address={plan.vanity} label="Vanity address" />
@@ -646,13 +808,19 @@
 									Funding Address...
 								{:else if isRekeying || rekeyTxnStatus === 'sending'}
 									Rekeying Address...
+								{:else if fundingTxId}
+									Retry funding
 								{:else}
 									Fund &amp; Rekey Address
 								{/if}
 							</Button>
 						{/if}
 						<div class="[overflow-wrap:anywhere]">
-							{#if txnStatus === 'error'}
+							{#if txnStatus === 'error' && fundingTxId}
+								<InlineAlert
+									message={`A funding payment may still land on this address. Wait a moment, then retry. ${txnError ?? ''}`}
+								/>
+							{:else if txnStatus === 'error'}
 								<InlineAlert
 									message={`Funding was not confirmed. Check the vanity address balance before trying again. ${txnError ?? ''}`}
 								/>
