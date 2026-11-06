@@ -166,7 +166,7 @@ test('Aurora shell keeps navigation, labels, browser computation and the blocked
 test('Aurora shell removes legacy colors and icons outside the library picker', () => {
 	const withoutPicker = source.replace(/<Web3Wallet\b[^]*?\/>/g, '');
 	expect(withoutPicker).not.toMatch(
-		/bg-purple-|text-purple-|bg-gray-|dark:bg-|bg-green-|bg-yellow-|bg-red-|text-(?:red|green|gray|yellow|amber|blue)-|border-(?:gray|red|green)-|fas fa-|(?:wholly|fully|works|runs|is an?) offline|no network requests/i
+		/bg-purple-|text-purple-|bg-gray-|dark:bg-|bg-green-|bg-yellow-|bg-red-|(?:bg|text)-(?:red|green|gray|yellow|amber|blue)-|border-(?:gray|red|green)-|fas fa-|(?:wholly|fully|works|runs|is an?) offline|no network requests/i
 	);
 });
 
@@ -250,7 +250,7 @@ test('Confirm is inside reviewOpen && plan and disabled when reviewDrifted', () 
 test('source guard: funding and rekey failures have distinct messages, and the rekey one is gated on funding success', () => {
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
 	expect(step2).toMatch(
-		/\{#if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding did not complete\.[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'\}\s*<InlineAlert\s+message=\{`Funding completed, but the rekey did not\.[^`]*\$\{txnError \?\? ''\}`\}/
+		/\{#if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding was not confirmed\.[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'\}\s*<InlineAlert\s+message=\{`Funding was confirmed, but the rekey was not\.[^`]*\$\{txnError \?\? ''\}`\}/
 	);
 	expect(markup).not.toMatch(/already sent|not yet rekeyed/);
 });
@@ -271,19 +271,21 @@ test('the mnemonic guidance keeps saying to store it offline', () => {
 	expect(markup.match(/securely offline/g)?.length).toBeGreaterThanOrEqual(2);
 });
 
-test('source guard: generation errors show under the form until a result exists, then beside the Step 2 button', () => {
+test('source guard: an error shows under the form in every state, and again beside the Step 2 button once a result exists', () => {
 	expect(markup).toMatch(
-		/\{#if error && !result\}\s*<div[^>]*overflow-wrap:anywhere[^>]*>\s*<InlineAlert message=\{error\}/
+		/\{#if error\}\s*<div[^>]*overflow-wrap:anywhere[^>]*>\s*<InlineAlert message=\{error\}/
 	);
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
 	expect(step2).toMatch(
-		/\{#if error\}\s*<div[^>]*overflow-wrap:anywhere[^>]*>\s*<InlineAlert message=\{error\}/
+		/\{#if error && result\}\s*<div[^>]*overflow-wrap:anywhere[^>]*>\s*<InlineAlert message=\{error\}/
 	);
 });
 
 test('failure alerts wrap unbroken error text', () => {
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
-	expect(step2).toMatch(/overflow-wrap:anywhere[^>]*>\s*\{#if txnStatus === 'error'\}/);
+	expect(step2).toMatch(
+		/overflow-wrap:anywhere[^>]*>\s*\{#if txnStatus === 'error'\}[^]*?\{\/if\}\s*<\/div>/
+	);
 });
 
 test('the mnemonic expression only feeds the text node and the CopyButton text prop', () => {

@@ -530,7 +530,7 @@
 					{/if}
 				</div>
 			{/if}
-			{#if error && !result}
+			{#if error}
 				<div class="mt-6 [overflow-wrap:anywhere]">
 					<InlineAlert message={error} />
 					{#if isGenerating && lastAddressCheckedByWorker}
@@ -607,7 +607,7 @@
 					</div>
 					<div class="space-y-4 border-t border-line pt-6">
 						<h3 class="text-h2">Step 2: Fund &amp; Rekey Address</h3>
-						{#if error}
+						{#if error && result}
 							<div class="[overflow-wrap:anywhere]">
 								<InlineAlert message={error} />
 							</div>
@@ -654,11 +654,11 @@
 						<div class="[overflow-wrap:anywhere]">
 							{#if txnStatus === 'error'}
 								<InlineAlert
-									message={`Funding did not complete. Check the vanity address balance before trying again. ${txnError ?? ''}`}
+									message={`Funding was not confirmed. Check the vanity address balance before trying again. ${txnError ?? ''}`}
 								/>
 							{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'}
 								<InlineAlert
-									message={`Funding completed, but the rekey did not. Check this address before trying again. ${txnError ?? ''}`}
+									message={`Funding was confirmed, but the rekey was not. Check this address before trying again. ${txnError ?? ''}`}
 								/>
 							{/if}
 						</div>
