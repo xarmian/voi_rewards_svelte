@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
+import { readFileSync } from 'node:fs';
+import { parse } from 'svelte/compiler';
 import { resolveHash, WALLET_TABS } from '$lib/ds/Tabs/hash';
 const url = vi.hoisted(() => ({ hash: '' }));
 vi.mock('$lib/chain/wallet.svelte', async () => {
@@ -38,6 +40,29 @@ vi.mock('$lib/component/CalculatorComponent.svelte', async () => {
 	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy calculator content' }) };
 });
 import Page from './[...id]/+page.svelte';
+it('keeps the single Web3Wallet outside KeyBlock, IfBlock and EachBlock ancestors', () => {
+	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
+	const ast = parse(source, { modern: true });
+	const pickerAncestors: string[][] = [];
+	function visit(value: unknown, ancestors: string[] = []) {
+		if (!value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			value.forEach((child) => visit(child, ancestors));
+			return;
+		}
+		const node = value as { type?: string; name?: string };
+		if (node.type === 'Component' && node.name === 'Web3Wallet') {
+			pickerAncestors.push(ancestors);
+		}
+		const next = node.type ? [...ancestors, node.type] : ancestors;
+		Object.values(value).forEach((child) => visit(child, next));
+	}
+	visit(ast.fragment);
+	expect(pickerAncestors).toHaveLength(1);
+	expect(
+		pickerAncestors[0].filter((type) => ['KeyBlock', 'IfBlock', 'EachBlock'].includes(type))
+	).toEqual([]);
+});
 describe('wallet shell hash integration', () => {
 	it.each([
 		['#portfolio', 'holdings', 'portfolio'],

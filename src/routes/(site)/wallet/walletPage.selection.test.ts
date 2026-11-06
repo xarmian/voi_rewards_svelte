@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 // Source-text pin (there is no DOM runner, TASK-124): the wallet page may navigate only from the
-// library's pick event, never from a selectedWallet change, and routes every route-to-selection
-// write through selectionFromRoute.
+// library's pick event, never from a selectedWallet change. Route synchronization is exercised
+// against the real module and stores in routeSync.svelte.test.ts.
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, '[...id]', '+page.svelte'), 'utf8');
 
@@ -20,20 +20,8 @@ describe('wallet page selection wiring (TASK-132)', () => {
 		expect(handler.slice(0, handler.indexOf('\n\t}\n'))).toMatch(/pickNavigation\s*\(/);
 	});
 
-	test('the one route-to-selection write goes through selectionFromRoute, in initializeWallet only', () => {
-		expect(source.match(/selectionFromRoute\s*\(/g)?.length).toBe(1);
-		expect(source.match(/selectWallet\s*\(/g)?.length).toBe(1);
-		expect(source).not.toMatch(/selectedWallet\.set\s*\(/);
-		const update = source.slice(
-			source.indexOf('const updateAccountInfo'),
-			source.indexOf('async function initializeWallet')
-		);
-		expect(update.length).toBeGreaterThan(0);
-		expect(update).not.toMatch(/selectWallet|selectionFromRoute/);
-	});
-
-	test('the pick handler and the route write both check the live pin count', () => {
-		expect(source.match(/pinned:\s*get\(pinnedFlows\)\s*>\s*0/g)?.length).toBe(2);
+	test('the pick handler checks the live pin count and parent address', () => {
+		expect(source.match(/pinned:\s*get\(pinnedFlows\)\s*>\s*0/g)?.length).toBe(1);
 		expect(source).toMatch(/parentAddress:\s*parentWalletId/);
 	});
 

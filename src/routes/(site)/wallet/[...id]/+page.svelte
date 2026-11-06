@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Web3Wallet, type ConnectedAccount } from 'avm-wallet-svelte';
-	import { selectedWallet, connectedWallets, selectWallet } from '$lib/chain/wallet.svelte';
+	import { selectedWallet } from '$lib/chain/wallet.svelte';
 	import { get } from 'svelte/store';
 	import { pinnedFlows } from '$lib/chain/flowAccount';
-	import { pickNavigation, selectionFromRoute } from '$lib/utils/walletSelection';
+	import { pickNavigation } from '$lib/utils/walletSelection';
 	import { canSignFor } from '$lib/chain/signerGate';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
@@ -26,6 +26,7 @@
 	} from '$lib/ds';
 	import { WALLET_TABS } from '$lib/ds/Tabs/hash';
 	import type { DataState } from '$lib/ds';
+	import { createWalletRouteSync } from '$lib/wallet/routeSync.svelte';
 	import { summarizeWallet } from '$lib/wallet/summary';
 	import { loadWallet, type LegacyAccount, type WalletSnapshot } from '$lib/wallet/load';
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
@@ -129,30 +130,11 @@
 			refreshFailed = snapshot !== null;
 		}
 	};
-	async function initializeWallet() {
-		if (!browser || !walletId) return;
-
-		try {
-			const next = selectionFromRoute({
-				routeAddress: walletId,
-				connected: $connectedWallets,
-				selected: $selectedWallet,
-				pinned: get(pinnedFlows) > 0
-			});
-			if (next) selectWallet(next);
-
-			// Now load the wallet data
-			await updateAccountInfo(parentWalletId || walletId);
-		} catch (error) {
-			console.error('Error initializing wallet:', error);
-		}
-	}
-
-	// TASK-109 / TASK-165: only route changes initialize; asynchronous reads of selection and
-	// connected wallets must not turn connect/restore notifications into route synchronization.
-	$effect.pre(() => {
-		if (browser && walletId) untrack(() => initializeWallet());
-	});
+	createWalletRouteSync(
+		() => walletId,
+		() => parentWalletId,
+		updateAccountInfo
+	);
 	onMount(() => {
 		const timer = setInterval(() => {
 			now = Date.now();

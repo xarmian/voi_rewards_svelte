@@ -18,7 +18,7 @@ vi.hoisted(() => {
 	});
 });
 import { walletStore } from 'avm-wallet-svelte';
-import { connectedWallets, selectedWallet, selectWallet } from '$lib/chain/wallet.svelte';
+import { connectedWallets, selectedWallet } from '$lib/chain/wallet.svelte';
 
 const page = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
 const library = readFileSync(
@@ -101,15 +101,10 @@ it('one picker lifecycle restores without replacing a user pick and keeps its su
 		flushSync();
 		expect(get(selectedWallet)?.address).toBe(B.address);
 		expect(seen.at(-1)).toContain(A.address);
-		// An unconnected read-only route must leave that pick intact. Connected route changes are
-		// deliberately pinned below: the base helper DOES replace a different selection there.
 		const goto = vi.fn();
 		const context = {
-			browser: true,
 			walletId: 'UNCONNECTED',
 			parentWalletId: null,
-			$connectedWallets: get(connectedWallets),
-			$selectedWallet: get(selectedWallet),
 			pinnedFlows: {
 				subscribe: (run: (n: number) => void) => {
 					run(0);
@@ -117,18 +112,9 @@ it('one picker lifecycle restores without replacing a user pick and keeps its su
 				}
 			},
 			get,
-			selectionFromRoute,
-			selectWallet,
-			updateAccountInfo: vi.fn(),
-			console,
 			goto,
 			pickNavigation
 		};
-		const sync = runInNewContext(`${code(page, 'initializeWallet')}; initializeWallet`, context);
-		await sync();
-		flushSync();
-		expect(get(selectedWallet)?.address).toBe(B.address);
-		expect(goto).not.toHaveBeenCalled();
 		const picked = runInNewContext(
 			`${code(page, 'handleAccountPicked')}; handleAccountPicked`,
 			context
@@ -150,7 +136,6 @@ it('one picker lifecycle restores without replacing a user pick and keeps its su
 		stop();
 		stopSelected();
 	}
-	expect(page.match(/<Web3Wallet\b/g)).toHaveLength(1);
 });
 it('pins the existing exception: an unpinned connected route replaces a different selection', () => {
 	const connected = [A, B].map((a) => ({ ...a, app: a.walletId }));
