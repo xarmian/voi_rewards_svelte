@@ -74,7 +74,7 @@ test('signing functions never read the live selection', () => {
 });
 
 test('activation opens a cancellable review of full addresses before confirming its plan', () => {
-	expect(source).toContain('on:click={reviewActivation}');
+	expect(source).toContain('onclick={() => reviewActivation()}');
 	expect(fn('reviewActivation')).toContain('capturePlan($selectedWallet, result?.address)');
 	expect(source).toMatch(/<ResolvedAddress\s+address=\{plan\.vanity\}/);
 	expect(source).toMatch(/<ResolvedAddress\s+address=\{plan\.rekeyTo\}/);

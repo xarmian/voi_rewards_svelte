@@ -217,6 +217,7 @@ test('Fund & Rekey opens review and only Confirm can start activation', () => {
 		['activateVanityAddress', 'rekeyVanityAddress']
 	]) {
 		expect(fn(caller)).toMatch(new RegExp(`await ${callee}\\(`));
+		expect(source.match(new RegExp(`\\b${callee}\\s*\\(`, 'g'))).toHaveLength(2);
 		const outsideCaller = source.replace(fn(caller), '').replace(fn(callee), '');
 		expect(outsideCaller).not.toMatch(new RegExp(`\\b${callee}\\s*\\(`));
 	}
