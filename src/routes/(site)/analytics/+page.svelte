@@ -46,7 +46,7 @@
 		const max = Math.max(...finite);
 		if (!log) return [0, max > 0 ? max * 1.1 : 1];
 		const min = Math.min(...finite);
-		return min === max ? [min / 1.1, max * 1.1] : [min, max];
+		return [min / 1.05, max * 1.05];
 	}
 	function timeAxis(rows: { date: string }[]): XSpec {
 		const start = new Date(`${rows[0]?.date ?? '1970-01-01'}T00:00:00Z`);
@@ -242,7 +242,7 @@
 				true
 			),
 			scale: 'log',
-			format: (v) => v.toExponential(1)
+			format: (v) => `$${v.toPrecision(3)}`
 		}}
 		height={230}
 	>
@@ -288,6 +288,7 @@
 				{ctx}
 				points={txRows.map((r) => ({ x: r.date, y: r.actual }))}
 				area={false}
+				labelLatest={!txRows.some((r) => r.projected !== null)}
 				format={(v) => `${num(v)} actual`}
 			/>
 			{#each txRows.filter((r) => r.projected !== null) as row (row.date)}
@@ -302,10 +303,14 @@
 				/>
 				<text
 					x={ctx.x(row.date) - 6}
-					y={Math.max(ctx.margin.top + 12, ctx.y(row.projected!) - 8)}
+					y={Math.max(ctx.margin.top + 12, ctx.y(row.projected!) - 14)}
 					text-anchor="end"
 					font-size="11"
-					class="fill-ink">projected full {$model.period}: {num(row.projected!)}</text
+					paint-order="stroke"
+					stroke-width="4"
+					stroke-linejoin="round"
+					class="fill-ink stroke-surface"
+					>{num(row.actual)} actual · projected full {$model.period}: {num(row.projected!)}</text
 				>
 			{/each}
 		{/snippet}

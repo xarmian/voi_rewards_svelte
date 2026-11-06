@@ -58,7 +58,16 @@
 	let active: number | null = $state(null);
 	let hovered: number | null = $state(null);
 	let announcement = $state('');
-	const left = 48;
+	// The axis column grows with the longest y label so long values (a small USD price) are never clipped.
+	let yLabelChars = $derived(
+		Math.max(
+			0,
+			...makeY(y.domain, [1, 0], y.scale)
+				.ticks(4)
+				.map((value) => (y.format ?? compact)(value).length)
+		)
+	);
+	let left = $derived(Math.max(48, Math.ceil(yLabelChars * 6.5) + 14));
 	const right = 16;
 	let plotWidth = $derived(Math.max(1, width - left - right));
 	let xScale = $derived(makeX(x, [left, left + plotWidth]));

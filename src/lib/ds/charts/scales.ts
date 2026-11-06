@@ -36,11 +36,22 @@ export function makeY(
 	if (kind === 'log' && domain.some((n) => !Number.isFinite(n) || n <= 0)) {
 		throw new Error('Log scale requires a finite positive domain');
 	}
-	const scale = (kind === 'log' ? scaleLog() : scaleLinear()).domain(domain).range(range).nice();
+	const base = (kind === 'log' ? scaleLog() : scaleLinear()).domain(domain).range(range);
+	// A log domain is not rounded to whole decades: that would stretch a narrow price range over
+	// several decades and flatten the line.
+	const scale = kind === 'log' ? base : base.nice();
 	return Object.assign(
 		(value: number) =>
 			Number.isFinite(value) && (kind !== 'log' || value > 0) ? scale(value) : NaN,
-		{ ticks: (count: number) => scale.ticks(count) }
+		{
+			ticks: (count: number) => {
+				const ticks = scale.ticks(count);
+				if (kind !== 'log' || ticks.length <= count + 1) return ticks;
+				// Log ticks fall on every integer multiple of a power of ten: thin them to the count.
+				const step = Math.ceil(ticks.length / (count + 1));
+				return ticks.filter((_, index) => index % step === 0);
+			}
+		}
 	);
 }
 /** D3's tick count is a hint; the final filter guarantees 44 physical pixels. */
