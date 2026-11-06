@@ -62,9 +62,9 @@ test('the form and result UI require readiness and the handler also checks it', 
 	const source = readFileSync(page, 'utf8');
 	expect(source).toMatch(/async function generateVanityAddress\(\) \{\s*if \(!ready\) return;/);
 	expect(source).toMatch(
-		/\{#if ready\}\s*<form[^]*\{#if result\}[^]*<Web3Wallet[^]*\{\/if\}\s*\{\/if\}\s*<\/div>/
+		/\{#if ready\}\s*<Card title="Choose your pattern">[^]*<form[^]*<\/form>[^]*<\/Card>\s*\{#if result\}[^]*<Web3Wallet[^]*<\/Card>\s*\{\/if\}\s*\{\/if\}/
 	);
 	expect(source).toMatch(
-		/\{#if blocked\}\s*<p[^>]*role="alert"[^>]*>\s*Key generation is switched off because another script is loaded in this page\.\s+Open\s+voirewards\.com\/vanity directly in a new tab\./
+		/\{#if blocked\}\s*<InlineAlert\s+message="Key generation is switched off because another script is loaded in this page\.\s+Open\s+voirewards\.com\/vanity directly in a new tab\."\s*\/>\s*\{\/if\}/
 	);
 });

@@ -8,6 +8,7 @@
 		type TransactionSigner
 	} from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
+	import { Button, Card, CopyButton, InlineAlert, StatusPill } from '$lib/ds';
 	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
 	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
 	import { hasThirdPartyScript, decideVanityStart } from '$lib/chain/vanityGuard';
@@ -256,17 +257,6 @@
 		attemptsPerSecond = 0;
 	}
 
-	// Copy text to clipboard
-	async function copyToClipboard(text: string) {
-		try {
-			await navigator.clipboard.writeText(text);
-			// Maybe add a small visual confirmation?
-		} catch (err) {
-			console.error('Failed to copy: ', err);
-			// Maybe show a temporary error message?
-		}
-	}
-
 	function reviewActivation() {
 		const captured = capturePlan($selectedWallet, result?.address);
 		if (!captured.ok) {
@@ -443,219 +433,155 @@
 	<meta name="description" content="Generate a Voi vanity address with custom prefix and suffix" />
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-4xl">
-	<h1 class="text-3xl font-bold text-center mb-8 text-purple-900 dark:text-purple-300">
-		Voi Vanity Address Generator
-	</h1>
-
-	<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-		<p class="text-gray-700 dark:text-gray-300 mb-6">
-			Generate a Voi address that starts and/or ends with specific characters. Computation happens
-			in your browser; keys are never sent anywhere.
+<div class="container-page space-y-8 py-8 text-ink md:py-12">
+	<header class="max-w-3xl">
+		<a href="/how_to_node" class="text-label text-accent underline underline-offset-4"
+			>← Run a node</a
+		>
+		<h1 class="mt-4 text-display">Vanity address generator</h1>
+		<p class="mt-4 text-body text-ink-muted">
+			Create a Voi address with a chosen prefix or suffix.
 		</p>
+	</header>
 
-		{#if blocked}
-			<p role="alert" class="text-red-700 dark:text-red-300">
-				Key generation is switched off because another script is loaded in this page. Open
-				voirewards.com/vanity directly in a new tab.
+	{#if blocked}
+		<InlineAlert
+			message="Key generation is switched off because another script is loaded in this page. Open voirewards.com/vanity directly in a new tab."
+		/>
+	{/if}
+
+	{#if ready}
+		<Card title="Choose your pattern">
+			<p class="mb-6 text-body text-ink-muted">
+				Computation happens in your browser; keys are never sent anywhere.
 			</p>
-		{/if}
-
-		{#if ready}
 			<form on:submit|preventDefault={generateVanityAddress} class="space-y-6">
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<div>
-						<label
-							for="prefix"
-							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-						>
-							Prefix (Start of address)
-						</label>
+				<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+					<div class="min-w-0">
+						<label for="prefix" class="mb-2 block text-label">Prefix · start of address</label>
 						<input
 							id="prefix"
 							type="text"
 							bind:value={prefix}
 							placeholder="e.g. VOI"
-							class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+							class="min-h-11 w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-4 py-2 text-body text-ink placeholder:text-ink-muted"
 							disabled={isGenerating}
 							maxlength="10"
 							pattern="[a-zA-Z0-9]*"
 							title="Prefix must contain only letters and numbers"
+							aria-describedby="prefix-help"
 						/>
-						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						<p id="prefix-help" class="mt-2 text-sm text-ink-muted">
 							Case-insensitive. Must be valid Base32 (A-Z, 2-7). Max 10 chars.
 						</p>
 					</div>
-
-					<div>
-						<label
-							for="suffix"
-							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-						>
-							Suffix (End of address)
-						</label>
+					<div class="min-w-0">
+						<label for="suffix" class="mb-2 block text-label">Suffix · end of address</label>
 						<input
 							id="suffix"
 							type="text"
 							bind:value={suffix}
 							placeholder="e.g. 777"
-							class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+							class="min-h-11 w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-4 py-2 text-body text-ink placeholder:text-ink-muted"
 							disabled={isGenerating}
 							maxlength="10"
 							pattern="[A-Z2-7]*"
 							title="Suffix must contain only A-Z and 2-7"
+							aria-describedby="suffix-help suffix-warning"
 						/>
-						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						<p id="suffix-help" class="mt-2 text-sm text-ink-muted">
 							Case-insensitive. Must be valid Base32 (A-Z, 2-7). Max 10 chars.
 						</p>
-						<p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
-							<i class="fas fa-exclamation-triangle mr-1"></i> Note: Due to address checksum constraints,
-							finding a specific suffix may be limited.
+						<p id="suffix-warning" class="mt-2 text-sm text-warn">
+							Note: Due to address checksum constraints, finding a specific suffix may be limited.
 						</p>
 					</div>
 				</div>
-
 				{#if !isGenerating}
-					<button
-						type="submit"
-						class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition disabled:opacity-50"
-						disabled={!prefix && !suffix}
-					>
-						Generate Vanity Address
-					</button>
+					<Button type="submit" disabled={!prefix && !suffix}>Generate Vanity Address</Button>
 				{:else}
-					<button
-						type="button"
-						on:click={stopSearch}
-						class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition"
-					>
-						Stop Search
-					</button>
+					<Button variant="soft" onclick={stopSearch}>Stop Search</Button>
 				{/if}
 			</form>
 
-			{#if error}
-				<div
-					class="mt-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 dark:bg-red-900/50 dark:text-red-300 rounded"
-				>
-					<p>{error}</p>
-					{#if isGenerating && lastAddressCheckedByWorker}
-						<p class="text-xs mt-1 font-mono">Last checked: {lastAddressCheckedByWorker}</p>
-					{/if}
-				</div>
-			{/if}
-
 			{#if isGenerating}
-				<div class="mt-6">
-					<div class="flex justify-between text-sm text-gray-700 dark:text-gray-300 mb-2">
-						<span>Progress: Checking addresses...</span>
-						<span>{attempts.toLocaleString()} attempts</span>
-					</div>
-					<!-- Progress bar is less meaningful with random generation, maybe remove or change? -->
-					<!-- <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mb-4">
-          <div class="bg-purple-600 h-2.5 rounded-full" style="width: {progress}%"></div>
-        </div> -->
-
-					<div
-						class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700 dark:text-gray-300 mt-4"
-					>
-						<div>
-							<span class="font-medium">Time elapsed:</span>
-							{elapsedTime.toFixed(1)}s
+				<div class="mt-6 space-y-3 text-sm text-ink-muted">
+					<div class="space-y-3">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<div aria-live="polite">
+								<StatusPill tone="info" label="Checking addresses…" />
+							</div>
+							<span>{attempts.toLocaleString()} attempts</span>
 						</div>
-						<div>
-							<span class="font-medium">Speed:</span>
-							{attemptsPerSecond.toFixed(1)} addr/sec
-						</div>
-						<div>
-							<span class="font-medium">Est. time:</span>
-							{estimatedTimeRemaining || 'Calculating...'}
+						<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+							<div><span class="font-bold">Time elapsed:</span> {elapsedTime.toFixed(1)}s</div>
+							<div>
+								<span class="font-bold">Speed:</span>
+								{attemptsPerSecond.toFixed(1)} addr/sec
+							</div>
+							<div>
+								<span class="font-bold">Est. time:</span>
+								{estimatedTimeRemaining || 'Calculating...'}
+							</div>
 						</div>
 					</div>
 					{#if lastAddressCheckedByWorker}
-						<div class="mt-2 text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
-							Last checked: {lastAddressCheckedByWorker}
-						</div>
+						<p class="break-all font-mono text-xs">Last checked: {lastAddressCheckedByWorker}</p>
 					{/if}
 				</div>
 			{/if}
+			{#if error}
+				<div class="mt-6 [overflow-wrap:anywhere]">
+					<InlineAlert message={error} />
+					{#if isGenerating && lastAddressCheckedByWorker}
+						<p class="mt-2 break-all font-mono text-xs text-ink-muted">
+							Last checked: {lastAddressCheckedByWorker}
+						</p>
+					{/if}
+				</div>
+			{/if}
+		</Card>
 
-			{#if result}
-				<div
-					class="mt-8 p-6 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded-lg"
-				>
-					<h3 class="text-xl font-medium text-green-800 dark:text-green-200 mb-4">
-						<i class="fas fa-check-circle mr-2"></i>Address Found!
-					</h3>
-
-					<div class="mb-4">
-						<div class="flex justify-between items-center">
-							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">Address:</span>
-							<button
-								on:click={() => result && copyToClipboard(result.address)}
-								class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm px-2 py-1 rounded hover:bg-purple-100 dark:hover:bg-purple-900/50"
-								title="Copy address"
-							>
-								<i class="fas fa-copy mr-1"></i> Copy
-							</button>
-						</div>
-						<div
-							class="mt-1 p-3 bg-gray-100 dark:bg-gray-700 rounded-md break-all font-mono text-sm"
-						>
-							{result?.address || ''}
-						</div>
-					</div>
-
+		{#if result}
+			<Card title="Address found">
+				<div class="space-y-6">
 					<div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm font-medium text-gray-700 dark:text-gray-300"
-								>Mnemonic (Secret Recovery Phrase):</span
-							>
-							<button
-								on:click={() => result && copyToClipboard(result.mnemonic)}
-								class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm px-2 py-1 rounded hover:bg-purple-100 dark:hover:bg-purple-900/50"
-								title="Copy mnemonic"
-							>
-								<i class="fas fa-copy mr-1"></i> Copy
-							</button>
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<h3 class="text-label">Address</h3>
+							<CopyButton text={result.address} what="address" />
 						</div>
-						<div
-							class="mt-1 p-3 bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-700 rounded-md break-words font-mono text-sm"
+						<p class="mt-2 rounded-ds-sm bg-surface-2 p-3 break-all font-mono text-sm">
+							{result?.address || ''}
+						</p>
+					</div>
+					<div>
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<h3 class="text-label">Mnemonic (Secret Recovery Phrase)</h3>
+							<CopyButton text={result.mnemonic} what="mnemonic" />
+						</div>
+						<p
+							class="mt-2 rounded-ds-sm border border-line bg-surface-2 p-3 font-mono text-sm [overflow-wrap:anywhere]"
 						>
 							{result?.mnemonic || ''}
-						</div>
-					</div>
-
-					<div
-						class="mt-6 bg-yellow-100 dark:bg-yellow-900/50 border-l-4 border-yellow-500 text-yellow-700 dark:text-yellow-200 p-4 rounded"
-					>
-						<p class="font-bold flex items-center">
-							<i class="fas fa-exclamation-triangle mr-2"></i>Important Security Notice
-						</p>
-						<p class="mt-1 text-sm">
-							Save your mnemonic phrase securely offline. Never share it. Anyone with this phrase
-							can access your funds.
 						</p>
 					</div>
+					<InlineAlert
+						tone="warn"
+						message="Important Security Notice: Save your mnemonic phrase securely offline. Never share it. Anyone with this phrase can access your funds."
+					/>
+				</div>
+			</Card>
 
-					<!-- New section for wallet connection and rekey -->
-					<div class="mt-6 border-t border-gray-200 dark:border-gray-600 pt-6">
-						<h4 class="text-lg font-medium text-purple-800 dark:text-purple-300 mb-4">
-							Secure Your Vanity Address
-						</h4>
-
-						<p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
-							To use this address securely, you can rekey it to your primary wallet. This allows you
-							to control the vanity address without exposing its private key.
-						</p>
-
-						<!-- Step 1: Connect Wallet -->
-						<div class="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-							<h5 class="font-medium text-gray-800 dark:text-gray-200 mb-2">
-								Step 1: Connect Your Main Wallet
-							</h5>
-
-							<Web3Wallet
+			<Card title="Secure your vanity address">
+				<p class="mb-6 text-body text-ink-muted">
+					To use this address securely, you can rekey it to your primary wallet. This allows you to
+					control the vanity address without exposing its private key.
+				</p>
+				<div class="space-y-6">
+					<div>
+						<h3 class="mb-3 text-h2">Step 1: Connect Your Main Wallet</h3>
+						<!-- prettier-ignore -->
+						<Web3Wallet
 								enabledWallets={['walletconnect', 'kibisis', 'lute', 'biatec', 'voiwallet']}
 								class="bg-gray-100 dark:bg-slate-600 dark:text-gray-200"
 								allowWatchAccounts={false}
@@ -671,147 +597,118 @@
 									icons: ['https://voirewards.com/android-chrome-192x192.png']
 								}}
 							/>
-							{#if plan}
+						{#if plan}
+							<div class="mt-3">
 								<ResolvedAddress address={plan.rekeyTo} label="Activation account" />
-							{:else if $selectedWallet?.address && $selectedWallet?.app !== 'Watch'}
-								<div class="flex items-center justify-between">
-									<div>
-										<span class="text-green-600 dark:text-green-400 mr-2"
-											><i class="fas fa-check-circle"></i></span
-										>
-										<span class="font-mono text-sm truncate"
-											>Connected: {$selectedWallet.address}</span
-										>
-									</div>
-								</div>
-							{/if}
-						</div>
-
-						<!-- Step 2: Fund and Rekey -->
-						<div class="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-							<h5 class="font-medium text-gray-800 dark:text-gray-200 mb-2">
-								Step 2: Fund & Rekey Address
-							</h5>
-
-							<p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-								This process will send 1 VOI to your vanity address, then rekey it to the account
-								you review below.
-							</p>
-
-							{#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
-								<div
-									class="bg-green-100 dark:bg-green-900/50 p-3 rounded-md text-green-800 dark:text-green-200 mb-3"
-								>
-									<i class="fas fa-check-circle mr-2"></i>
-									Success! Your vanity address is now rekeyed to the reviewed account.
-								</div>
-							{:else if reviewOpen && plan}
-								<div class="space-y-3" aria-label="Review vanity activation">
-									<ResolvedAddress address={plan.vanity} label="Vanity address" />
-									<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />
-									{#if reviewDrifted}
-										<p role="alert" class="text-red-700 dark:text-red-300">
-											Your selected account changed. Review again.
-										</p>
-									{/if}
-									<button
-										on:click={confirmActivation}
-										disabled={reviewDrifted}
-										class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
-										>Confirm</button
-									>
-									<button on:click={cancelActivation} class="py-2 px-4">Cancel</button>
-								</div>
-							{:else}
-								<button
-									on:click={reviewActivation}
-									disabled={!($selectedWallet?.address && $selectedWallet?.app !== 'Watch') ||
-										isActivating ||
-										isRekeying ||
-										txnStatus === 'sending' ||
-										rekeyTxnStatus === 'sending'}
-									class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									{#if isActivating || txnStatus === 'sending'}
-										<i class="fas fa-spinner fa-spin mr-2"></i> Funding Address...
-									{:else if isRekeying || rekeyTxnStatus === 'sending'}
-										<i class="fas fa-spinner fa-spin mr-2"></i> Rekeying Address...
-									{:else}
-										Fund & Rekey Address
-									{/if}
-								</button>
-							{/if}
-
-							{#if txnError}
-								<div
-									class="mt-3 p-3 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 rounded-md text-sm"
-								>
-									<i class="fas fa-exclamation-circle mr-2"></i>
-									{txnError}
-								</div>
-							{/if}
-						</div>
-
-						<!-- What happens next explanation -->
-						{#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
-							<div
-								class="p-4 bg-blue-50 dark:bg-blue-900/50 rounded-lg text-sm text-blue-800 dark:text-blue-200"
-							>
-								<h5 class="font-medium mb-2">What Now?</h5>
-								<p class="mb-2">Your vanity address is now fully set up:</p>
-								<ul class="list-disc pl-5 space-y-1">
-									<li>You can now use this address from your main wallet.</li>
-									<li>The original seed phrase is no longer needed for signing transactions.</li>
-								</ul>
 							</div>
+						{:else if $selectedWallet?.address && $selectedWallet?.app !== 'Watch'}
+							<p class="mt-3 break-all font-mono text-sm">Connected: {$selectedWallet.address}</p>
 						{/if}
 					</div>
+					<div class="space-y-4 border-t border-line pt-6">
+						<h3 class="text-h2">Step 2: Fund &amp; Rekey Address</h3>
+						{#if error && result}
+							<div class="[overflow-wrap:anywhere]">
+								<InlineAlert message={error} />
+							</div>
+						{/if}
+						<p class="text-body text-ink-muted">
+							This process will send 1 VOI to your vanity address, then rekey it to the account you
+							review below.
+						</p>
+						{#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
+							<StatusPill
+								tone="ok"
+								label="Success! Your vanity address is now rekeyed to the reviewed account."
+							/>
+						{:else if reviewOpen && plan}
+							<div class="space-y-3" aria-label="Review vanity activation">
+								<ResolvedAddress address={plan.vanity} label="Vanity address" />
+								<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />
+								{#if reviewDrifted}
+									<InlineAlert message="Your selected account changed. Review again." />
+								{/if}
+								<div class="flex flex-wrap gap-3">
+									<Button onclick={confirmActivation} disabled={reviewDrifted}>Confirm</Button>
+									<Button variant="ghost" onclick={cancelActivation}>Cancel</Button>
+								</div>
+							</div>
+						{:else}
+							<Button
+								onclick={() => reviewActivation()}
+								disabled={!($selectedWallet?.address && $selectedWallet?.app !== 'Watch') ||
+									isActivating ||
+									isRekeying ||
+									txnStatus === 'sending' ||
+									rekeyTxnStatus === 'sending'}
+							>
+								{#if isActivating || txnStatus === 'sending'}
+									Funding Address...
+								{:else if isRekeying || rekeyTxnStatus === 'sending'}
+									Rekeying Address...
+								{:else}
+									Fund &amp; Rekey Address
+								{/if}
+							</Button>
+						{/if}
+						<div class="[overflow-wrap:anywhere]">
+							{#if txnStatus === 'error'}
+								<InlineAlert
+									message={`Funding was not confirmed. Check the vanity address balance before trying again. ${txnError ?? ''}`}
+								/>
+							{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'}
+								<InlineAlert
+									message={`Funding was confirmed, but the rekey was not. Check this address before trying again. ${txnError ?? ''}`}
+								/>
+							{/if}
+						</div>
+					</div>
+					{#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
+						<div class="space-y-2 rounded-ds-sm bg-accent-soft p-4 text-sm text-accent">
+							<h3 class="font-bold">What now?</h3>
+							<p>Your vanity address is now fully set up:</p>
+							<ul class="list-disc space-y-1 pl-5">
+								<li>You can now use this address from your main wallet.</li>
+								<li>The original seed phrase is no longer needed for signing transactions.</li>
+							</ul>
+						</div>
+					{/if}
 				</div>
-			{/if}
+			</Card>
 		{/if}
-	</div>
+	{/if}
 
-	<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-		<h2 class="text-xl font-bold mb-4 text-purple-900 dark:text-purple-300">
-			About Vanity Addresses
-		</h2>
-
-		<div class="space-y-4 text-gray-700 dark:text-gray-300 text-sm">
+	<Card title="About vanity addresses">
+		<div class="space-y-4 text-body text-ink-muted">
 			<p>
 				Vanity addresses are standard Voi addresses with a personalized touch, containing specific
 				characters at the beginning or end. They function identically to regular addresses.
 			</p>
-
-			<p>
-				<strong>Key Points:</strong>
-			</p>
-
-			<ul class="list-disc pl-5 space-y-2">
+			<ul class="list-disc space-y-3 pl-5">
 				<li>
-					<strong>Difficulty Increases Exponentially:</strong> Each additional character you specify
-					makes finding a match significantly harder (roughly 32 times harder per character due to Base32
-					encoding). Short prefixes/suffixes are much faster.
+					<strong class="text-ink">Difficulty increases exponentially:</strong> Each additional character
+					you specify makes finding a match significantly harder (roughly 32 times harder per character
+					due to Base32 encoding). Short prefixes/suffixes are much faster.
 				</li>
 				<li>
-					<strong>Valid Characters:</strong> Voi addresses use Base32 encoding (A-Z and 2-7).
+					<strong class="text-ink">Valid characters:</strong> Voi addresses use Base32 encoding (A-Z
+					and 2-7).
 				</li>
 				<li>
-					<strong>Client-Side Generation:</strong> All calculations happen within your browser. Your
-					secret mnemonic phrase is generated locally and is never transmitted over the network.
+					<strong class="text-ink">Client-side generation:</strong> All calculations happen within your
+					browser. Your secret mnemonic phrase is generated locally and is never transmitted over the
+					network.
 				</li>
 				<li>
-					<strong
-						><span class="font-bold text-red-600 dark:text-red-400">Secure Your Mnemonic:</span
-						></strong
-					> Treat the generated mnemonic phrase like digital cash. Write it down, store it securely offline,
-					and never share it. Loss of the mnemonic means loss of access to the address and any funds
-					within it.
+					<strong class="text-ink">Secure your mnemonic:</strong> Treat the generated mnemonic phrase
+					like digital cash. Write it down, store it securely offline, and never share it. Loss of the
+					mnemonic means loss of access to the address and any funds within it.
 				</li>
 				<li>
-					<strong>Performance:</strong> Generation speed depends heavily on your computer's processing
-					power. Complex patterns can take a very long time.
+					<strong class="text-ink">Performance:</strong> Generation speed depends heavily on your computer's
+					processing power. Complex patterns can take a very long time.
 				</li>
 			</ul>
 		</div>
-	</div>
+	</Card>
 </div>
