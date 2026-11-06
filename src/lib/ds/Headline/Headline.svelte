@@ -37,14 +37,17 @@
 <p
 	class="text-lede text-on-hero"
 	aria-busy={summary.state === 'loading' ? 'true' : undefined}
-	role={summary.state === 'error' || !summary.contractsReady ? 'alert' : undefined}
+	role={summary.state === 'error' ||
+	(summary.state !== 'loading' && summary.contractSet === 'unavailable')
+		? 'alert'
+		: undefined}
 >
 	{#if summary.state === 'loading'}
 		<span class="sr-only">Loading staking data…</span><span
 			aria-hidden="true"
 			class="block h-6 max-w-xl rounded bg-on-hero-surface"
 		></span>
-	{:else if summary.state === 'error' || !summary.contractsReady}
+	{:else if summary.state === 'error' || summary.contractSet === 'unavailable'}
 		We couldn't load {name}'s staking data. {#if onretry}<Button
 				variant="soft"
 				size="sm"

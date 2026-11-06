@@ -39,6 +39,7 @@
 	} = $props();
 	const loading = $derived(summary.state === 'loading');
 	const failed = $derived(summary.state === 'error');
+	const stakingUnavailable = $derived(summary.contractSet === 'unavailable');
 	const bars = $derived(
 		summary.history.map((epoch) => ({
 			x: epoch.epoch,
@@ -49,7 +50,7 @@
 	const chartState = $derived(
 		loading
 			? 'loading'
-			: failed
+			: failed || stakingUnavailable
 				? 'error'
 				: historyState === 'error'
 					? 'error'
@@ -83,7 +84,8 @@
 	</div>
 {/snippet}
 {#snippet healthStatus()}
-	{#if !loading && !failed}<StatusPill
+	{#if !loading && !failed && stakingUnavailable}<StatusPill tone="neutral" label="Unavailable" />
+	{:else if !loading && !failed}<StatusPill
 			tone={summary.healthTone}
 			label={summary.onlineAccounts === 0
 				? 'Offline'
@@ -95,14 +97,17 @@
 
 <div class="grid min-w-0 grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-12">
 	<Card title="Node health" span={{ lg: 5 }} actions={healthStatus}>
-		{#if failed}<InlineAlert message="Unable to load node health." onretry={onrefresh} />
+		{#if !loading && (failed || stakingUnavailable)}<InlineAlert
+				message="Node health unavailable."
+				onretry={onrefresh}
+			/>
 		{:else}
 			<div class="flex flex-wrap items-center gap-5">
 				<HealthRing
 					value={summary.onlineContracts}
 					total={summary.contractCount}
 					tone={summary.healthTone}
-					state={loading ? 'loading' : !summary.contractsReady ? 'error' : 'ready'}
+					state={loading ? 'loading' : 'ready'}
 				/>
 				{#if loading}<div class="min-w-0 flex-1">{@render skeleton('node health')}</div>
 				{:else}
@@ -126,13 +131,9 @@
 							detail={`Oldest vote among online accounts · last block ${summary.lastBlock === null ? 'unavailable' : `${summary.lastBlockAt ? ago(summary.lastBlockAt, now) + ' · ' : ''}#${comma(summary.lastBlock)}`}`}
 						/>
 						<HealthItem
-							tone={!summary.contractsReady ? 'neutral' : summary.idleCount ? 'warn' : 'ok'}
-							title={summary.contractsReady
-								? `${comma(summary.idleCount)} contracts not staking`
-								: 'Contract status unavailable'}
-							detail={summary.contractsReady
-								? `${compact(summary.idleBalance, 1)} VOI idle`
-								: 'Retry to load lock contracts.'}
+							tone={summary.idleCount ? 'warn' : 'ok'}
+							title={`${comma(summary.idleCount)} contracts not staking`}
+							detail={`${compact(summary.idleBalance, 1)} VOI idle`}
 						/>
 					</ul>
 				{/if}
@@ -146,7 +147,10 @@
 				<div aria-hidden="true" class="h-14 rounded bg-on-hero-surface"></div>
 				<div aria-hidden="true" class="h-6 rounded bg-on-hero-surface"></div>
 			</div>
-		{:else if failed}<InlineAlert message="Unable to load this epoch." onretry={onrefresh} />
+		{:else if failed || stakingUnavailable}<InlineAlert
+				message="This epoch unavailable. Earned rewards and luck unavailable."
+				onretry={onrefresh}
+			/>
 		{:else}
 			<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
 				<strong class="text-hero-num" title={String(summary.current.reward ?? '')}
@@ -275,8 +279,8 @@
 	<Card title="Next unlocks" span={{ lg: 4 }}>
 		{#if loading}{@render skeleton('next unlocks')}
 		{:else if failed || !summary.contractsReady}<InlineAlert
-				message="Unable to load unlock schedules."
-				onretry={onrefresh}
+				message="Unlock schedules unavailable."
+				onretry={failed || stakingUnavailable ? onrefresh : undefined}
 			/>
 		{:else}
 			{#if summary.unlocks.length}
@@ -324,7 +328,7 @@
 			{current}
 			{pageAddress}
 			{selected}
-			state={loading ? 'loading' : !summary.contractsReady ? 'error' : summary.state}
+			state={loading ? 'loading' : stakingUnavailable ? 'error' : summary.state}
 			{asOf}
 			{onrefresh}
 		/>
@@ -332,9 +336,14 @@
 	<Card title="Holdings" span={{ lg: 4 }}>
 		{#if loading}{@render skeleton('holdings')}
 		{:else if failed || holdings.state === 'error'}<InlineAlert
-				message="Holdings valuation unavailable."
-				onretry={onrefresh}
+				message={summary.contractsReady
+					? 'Holdings valuation unavailable.'
+					: 'Holdings valuation unavailable. Locked balance unavailable.'}
+				onretry={failed || stakingUnavailable || summary.contractsReady ? onrefresh : undefined}
 			/>
+			{#if !failed}<p class="mt-3 text-label">
+					Liquid: <strong>{comma(holdings.liquid)} VOI</strong>
+				</p>{/if}
 		{:else}
 			<p>
 				<strong class="text-stat" title={`${holdings.total} VOI`}>{compact(holdings.total)}</strong>

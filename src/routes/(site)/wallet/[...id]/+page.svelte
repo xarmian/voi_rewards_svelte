@@ -74,7 +74,7 @@
 		summarizeWallet({
 			owner: viewOwner,
 			contracts: viewContracts,
-			contractsState: snapshot?.contractsState ?? 'loading',
+			contractSet: snapshot?.contractSet ?? 'unavailable',
 			current: snapshot?.current ?? null,
 			history: snapshot?.history ?? [],
 			state: dataState,
@@ -211,7 +211,7 @@
 					{#if snapshot}<StatusPill
 							onHero
 							tone="info"
-							label={snapshot.contractsState === 'error'
+							label={snapshot.contractSet === 'unavailable'
 								? 'Lock contracts unavailable'
 								: `${viewContracts.length} lock ${viewContracts.length === 1 ? 'contract' : 'contracts'}`}
 						/>{/if}
@@ -283,7 +283,7 @@
 					<EpochComponent walletAddress={walletId} /><ProposalsComponent {walletId} />
 				</div>
 			{:else if tabs.current === 'contracts'}
-				{#if snapshot?.contractsState === 'error'}
+				{#if snapshot?.contractSet === 'unavailable'}
 					<InlineAlert message="Lock contracts unavailable." onretry={refresh} />
 				{:else}<div class="legacy-panel"><LockVestComponent {childAccounts} /></div>{/if}
 			{:else if tabs.current === 'calculator'}

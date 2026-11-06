@@ -71,3 +71,30 @@ it.each([
 	}).body;
 	expect(html.includes('aria-haspopup="menu"')).toBe(visible);
 });
+
+it('keeps the owner liquid balance visible while contract holdings are unavailable', () => {
+	const summary = summarizeWallet({
+		owner: {
+			address: 'OWNER',
+			contractId: 0,
+			balance: 1234,
+			isParticipating: false,
+			round: 100,
+			voteLastValid: null,
+			lastVoteAt: null,
+			lastBlock: null
+		},
+		contracts: [],
+		contractSet: 'unavailable',
+		current: null,
+		history: [],
+		state: 'ready',
+		now: 0
+	});
+	const html = render(WalletOverview, {
+		props: { summary, contracts: [], current: null, pageAddress: 'OWNER', selected: null, now: 0 }
+	}).body;
+	const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+	expect(text).toContain('Liquid: 1,234 VOI');
+	expect(text).toContain('Holdings valuation unavailable');
+});

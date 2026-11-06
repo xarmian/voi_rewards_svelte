@@ -68,6 +68,7 @@ export type WalletSummary = {
 	history: EpochSummary[];
 	earnedHistory: number | null;
 	historyRatio: number | null;
+	contractSet: 'ready' | 'unavailable';
 	contractsReady: boolean;
 	withdrawable: number | null;
 	unlocks: { date: string; amount: number; count: number }[];
@@ -83,7 +84,7 @@ export function summarizeWallet({
 	state,
 	now,
 	tokens,
-	contractsState = 'ready',
+	contractSet = 'ready',
 	price = null
 }: {
 	owner: WalletAccount | null;
@@ -94,7 +95,7 @@ export function summarizeWallet({
 	now: number;
 	tokens?: TokenValues;
 	price?: number | null;
-	contractsState?: DataState;
+	contractSet?: 'ready' | 'unavailable';
 }): WalletSummary {
 	// A contract route can be supplied as the primary account too: never count it twice.
 	const accounts = [
@@ -129,6 +130,16 @@ export function summarizeWallet({
 	);
 
 	function metrics(epoch: WalletEpoch): EpochSummary {
+		if (contractSet === 'unavailable')
+			return {
+				epoch: epoch.epoch,
+				progress: epoch.progress,
+				blocks: null,
+				expected: null,
+				ratio: null,
+				reward: null,
+				share: null
+			};
 		const produced = accounts.reduce(
 			(total, account) => total + (epoch.blocks[account.address] ?? 0),
 			0
@@ -176,7 +187,7 @@ export function summarizeWallet({
 	const incompleteHealth =
 		online.some((account) => account.voteLastValid === null) || votes.length !== online.length;
 	const contractsReady =
-		contractsState === 'ready' &&
+		contractSet === 'ready' &&
 		contracts.every((contract) => contract.details !== null && contract.details !== undefined);
 	const unlocks = new Map<string, { date: string; amount: number; count: number }>();
 	const years = new Map<number, number>();
@@ -215,6 +226,7 @@ export function summarizeWallet({
 	const holdingsReady = contractsReady && tokens?.state === 'ready';
 	const total = holdingsReady ? liquid + locked + other + tokens.lp : null;
 	return {
+		contractSet,
 		contractsReady,
 		withdrawable: contractsReady ? withdrawable : null,
 		unlocks: [...unlocks.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4),

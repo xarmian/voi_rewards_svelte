@@ -119,3 +119,15 @@ it('rule 4 attributes owner stake separately and pluralises one contract', () =>
 		'earning across the owner and 3 contracts,'
 	);
 });
+
+it('initial contract loading is busy, not an error alert', () => {
+	const result = html({
+		...base,
+		state: 'loading',
+		contractSet: 'unavailable',
+		contractsReady: false
+	});
+	expect(result).toContain('aria-busy="true"');
+	expect(result).not.toContain('role="alert"');
+	expect(html({ ...base, state: 'error' })).toContain('role="alert"');
+});

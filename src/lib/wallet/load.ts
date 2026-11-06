@@ -25,7 +25,7 @@ export type LegacyAccount = Account & { contractId: number };
 export type WalletSnapshot = {
 	owner: WalletAccount;
 	contracts: WalletContract[];
-	contractsState: DataState;
+	contractSet: 'ready' | 'unavailable';
 	primary: LegacyAccount;
 	children: LegacyAccount[];
 	current: WalletEpoch;
@@ -340,7 +340,9 @@ export async function loadWallet(
 				epochs.find((epoch) => epoch.epoch_number === date.epoch)?.eligible_online_stake
 			);
 			if (stake === null || stake <= 0) throw new Error('Historical stake unavailable');
-			const result = await readEpoch(date, stake / 1e6, force);
+			// /api/epochs eligible_online_stake is already VOI, like account balances.
+			// Refresh only bypasses the live epoch cache; completed rows remain cached.
+			const result = await readEpoch(date, stake, false);
 			// The date range has ended; snapshots can stop before the final instant if there was no block then.
 			return { ...result.value, progress: 1 };
 		})
@@ -352,7 +354,7 @@ export async function loadWallet(
 	return {
 		owner,
 		contracts,
-		contractsState: locks === null ? 'error' : 'ready',
+		contractSet: locks === null ? 'unavailable' : 'ready',
 		primary: legacy(owner, stake, live.value.pool),
 		children: children
 			.map((account) => legacy(account, stake, live.value.pool))
