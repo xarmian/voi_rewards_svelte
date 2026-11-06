@@ -1,6 +1,7 @@
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import { createServerClient } from '@supabase/ssr';
 import type { Handle } from '@sveltejs/kit';
+import { building } from '$app/environment';
 import { withDeadline } from '$lib/server/fetchWithTimeout';
 import {
 	VANITY_CACHE_CONTROL,
@@ -22,7 +23,10 @@ function requestUrl(input: RequestInfo | URL): string {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const redirect = event.url ? redirectFor(event.url, event.request?.method ?? 'GET') : null;
+	// Prerendering also runs through this hook: a prerendered page must not become a redirect (and
+	// SvelteKit forbids reading url.search then), so the table applies only to real requests.
+	const redirect =
+		!building && event.url ? redirectFor(event.url, event.request?.method ?? 'GET') : null;
 	if (redirect) {
 		return new Response(null, {
 			status: redirect.status,

@@ -267,7 +267,7 @@
 	}
 </script>
 
-<ArchiveBanner programme="Relay rewards" frozenAt="the week of 12 November 2025" />
+<ArchiveBanner programme="Relay rewards" />
 
 <div class="bg-blue-50 dark:bg-blue-900/80 min-h-screen">
 	<div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8 text-gray-900 dark:text-white">

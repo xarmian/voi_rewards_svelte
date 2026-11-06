@@ -35,6 +35,20 @@ test.each([...routes.map((route) => `${site}/${route}`), 'src/routes/arc72'])(
 	(path) => expect(existsSync(path)).toBe(false)
 );
 
+// A prerendered page is written out as a static file, and the host serves a static file before any
+// server hook runs, so a prerendered redirect source would never redirect in production. Every route
+// that the redirect table sends elsewhere and that still has files on disk must be rendered on request.
+test.each(['what_is_voi', 'ecosystem/[...category]', 'accounts', 'accounts/auth'])(
+	'the redirect source %s is not prerendered',
+	(route) => {
+		for (const file of ['+page.ts', '+page.server.ts']) {
+			const path = `${site}/${route}/${file}`;
+			if (!existsSync(path)) continue;
+			expect(readFileSync(path, 'utf8')).not.toMatch(/export\s+const\s+prerender\s*=\s*true/);
+		}
+	}
+);
+
 function sourceFiles(directory: string): string[] {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
 		const path = join(directory, entry.name);
