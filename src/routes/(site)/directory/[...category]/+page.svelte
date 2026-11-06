@@ -137,7 +137,9 @@
 		<div class="space-y-3">
 			<h2 class="text-h2">No matching projects</h2>
 			<p class="text-body text-ink-muted">
-				Search: “{searchTerm}” · Category: {selectedCategory}
+				{#if searchTerm}Search: “{searchTerm}”{/if}
+				{#if searchTerm && selectedCategory !== 'All'}·{/if}
+				{#if selectedCategory !== 'All'}Category: {selectedCategory}{/if}
 			</p>
 			<Button
 				href="/directory"
