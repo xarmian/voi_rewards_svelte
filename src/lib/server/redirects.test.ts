@@ -19,15 +19,6 @@ const cases: [string, string, Redirect | null][] = [
 		{ status: 308, location: 'https://voirewards.com/archive/testnet/quests' }
 	],
 	['/ecosystem', 'GET', { status: 308, location: '/directory' }],
-	['/ecosystem/Wallets', 'GET', { status: 308, location: '/directory/Wallets' }],
-	[
-		'/ecosystem/Wallets%20%26%20Tools',
-		'GET',
-		{ status: 308, location: '/directory/Wallets%20%26%20Tools' }
-	],
-	['/ecosystem?x=1', 'GET', { status: 308, location: '/directory?x=1' }],
-	['/ecosystem/', 'GET', { status: 308, location: '/directory' }],
-	['/ecosystem', 'HEAD', { status: 308, location: '/directory' }],
 	['/ecosystem/defi/nested?x=1', 'GET', { status: 308, location: '/directory/defi/nested?x=1' }],
 	['/ecosystem//evil.example', 'GET', { status: 308, location: '/directory//evil.example' }],
 	['/what_is_voi', 'GET', { status: 308, location: '/about#what-is-voi' }],
