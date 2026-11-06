@@ -6,6 +6,7 @@ import {
 	PRICE_STALE_MS,
 	priceLabel,
 	resultsState,
+	validateCustomPrice,
 	validateNodeCost,
 	validateStake
 } from './calculatorView';
@@ -42,7 +43,8 @@ describe('priceLabel', () => {
 
 for (const [name, validate, message] of [
 	['stake', validateStake, 'Enter a stake of 0 or more.'],
-	['monthly cost', validateNodeCost, 'Enter a monthly cost of 0 or more.']
+	['monthly cost', validateNodeCost, 'Enter a monthly cost of 0 or more.'],
+	['custom price', validateCustomPrice, 'Enter a price of 0 or more.']
 ] as const) {
 	describe(`${name} validation`, () => {
 		test.each([-1, NaN, Infinity, -Infinity, '', '  ', undefined, null])('rejects %s', (value) => {
