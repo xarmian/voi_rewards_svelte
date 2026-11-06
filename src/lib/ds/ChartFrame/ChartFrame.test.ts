@@ -142,3 +142,13 @@ test('line preserves a missing observation as a gap instead of connecting across
 	assert.equal((path.match(/M/g) ?? []).length, 2);
 	assert.doesNotMatch(path, /NaN/);
 });
+
+test('the plot container is a programmatic focus target so Retry can keep focus inside the card', () => {
+	for (const state of ['error', 'stale', 'loading'] as const) {
+		const html = render(ChartFrame, { props: { ...props, state, onretry: () => {} } }).body;
+		assert.match(
+			html,
+			/<div[^>]*tabindex="-1"[^>]*class="relative min-w-0|<div[^>]*class="relative min-w-0[^"]*"[^>]*tabindex="-1"/
+		);
+	}
+});

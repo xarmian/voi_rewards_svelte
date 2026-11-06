@@ -58,6 +58,17 @@ it('returns the previous completed epoch even when the source is shuffled or inc
 	expect(result.previous?.epoch).toBe(104);
 });
 
+it.each([undefined, null, NaN, 'soon'])(
+	'names no completed or in-progress epoch when current_epoch is unusable: %j',
+	(current_epoch) => {
+		const result = epochSeries({ current_epoch, epochs: epochs.epochs.slice(-3) }, undefined, now);
+		expect(result.rows).toHaveLength(3);
+		expect(result.current).toBeNull();
+		expect(result.previous).toBeNull();
+		expect(result.rows.some((row) => row.inProgress)).toBe(false);
+	}
+);
+
 it('derives the community, ballast and eligible split in VOI', () => {
 	const row = epochs.epochs[0];
 	expect(stakeSplit(row)).toEqual({

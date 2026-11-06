@@ -170,13 +170,24 @@
 		hovered = null;
 		clear();
 	});
+	// Retry swaps the alert for the loading placeholder. Keep keyboard focus inside the card by moving it to
+	// the plot container first, so it is not dropped to the document body when the Retry button unmounts.
+	const retry = $derived(
+		onretry
+			? () => {
+					container?.focus();
+					onretry();
+				}
+			: undefined
+	);
 </script>
 
 <Card {title} {headingLevel} {actions} id={`${id}-title`}>
 	<p class="mb-3 text-sm text-ink-muted">{data.caption}</p>
 	<div
 		bind:this={container}
-		class="relative min-w-0"
+		class="relative min-w-0 focus:outline-none"
+		tabindex="-1"
 		aria-busy={dataState === 'loading' ? 'true' : undefined}
 	>
 		{#if dataState === 'loading'}
@@ -185,7 +196,7 @@
 			</div>
 		{:else if dataState === 'error'}
 			<div style:min-height={`${height}px`}>
-				<InlineAlert message={`Couldn't load ${title}.`} {onretry} />
+				<InlineAlert message={`Couldn't load ${title}.`} onretry={retry} />
 			</div>
 		{:else if dataState === 'empty'}
 			<div
@@ -354,7 +365,7 @@
 		<InlineAlert
 			tone="warn"
 			message={`Stale - ${freshnessText ?? `data as of ${absoluteTime(asOf)}`}`}
-			{onretry}
+			onretry={retry}
 		/>
 	{:else if asOf !== undefined || freshnessText}
 		<p class="mt-2 text-label text-ink-muted">

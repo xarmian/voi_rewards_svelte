@@ -125,8 +125,10 @@ export function epochSeries(
 		})
 		.sort((a, b) => a.epoch - b.epoch);
 	const current = rows.find((row) => row.inProgress) ?? null;
+	// Without a valid current_epoch no row can be called completed or in progress, so the previous-epoch
+	// figure stays unavailable rather than possibly naming the epoch still running.
 	const completed = rows.filter(
-		(row) => !row.inProgress && (!finite(data.current_epoch) || row.epoch < data.current_epoch)
+		(row) => finite(data.current_epoch) && !row.inProgress && row.epoch < data.current_epoch
 	);
 	return {
 		...result(
