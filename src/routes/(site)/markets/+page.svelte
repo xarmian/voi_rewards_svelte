@@ -1,14 +1,19 @@
 <script lang="ts">
 	import {
-		weightedAveragePrice as getWeightedAveragePrice, displayPrice as getDisplayPrice,
-		circulatingMarketCap as getCirculatingMarketCap, tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
-		fullyDilutedMarketCap as getFullyDilutedMarketCap, sortMarkets, filterMarkets as getFilteredMarkets
+		weightedAveragePrice as getWeightedAveragePrice,
+		displayPrice as getDisplayPrice,
+		circulatingMarketCap as getCirculatingMarketCap,
+		tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
+		fullyDilutedMarketCap as getFullyDilutedMarketCap,
+		sortMarkets,
+		filterMarkets as getFilteredMarkets
 	} from '$lib/markets/derive';
 	import {
-		createVoiUsdReference, fetchTokenChartData as loadTokenChartData,
+		createVoiUsdReference,
+		fetchTokenChartData as loadTokenChartData,
 		fetchVOIChartData as loadVOIChartData
 	} from '$lib/markets/chartData';
-	import { Alert } from 'flowbite-svelte';
+	import { InlineAlert } from '$lib/ds';
 	import { onMount } from 'svelte';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
 	import type { PageData } from './$types';
@@ -24,18 +29,28 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import type { UniqueToken } from '../../api/tokens/+server';
 	import type {
-		TokenPair, OHLCVData, VolumeData, Resolution, ChartSettings
+		TokenPair,
+		OHLCVData,
+		VolumeData,
+		Resolution,
+		ChartSettings
 	} from '$lib/types/ohlcv.types';
 	import {
-		convertVoiQuotedCandlesToUsd, convertVoiQuotedVolumesToUsd, clampCandlesByMAD
+		convertVoiQuotedCandlesToUsd,
+		convertVoiQuotedVolumesToUsd,
+		clampCandlesByMAD
 	} from '$lib/utils/price-conversion';
 	import {
-		convertVOItoOHLCV, createVOITokenPair, shouldUseVOIData,
-		getDefaultChartType, getDefaultResolution
+		convertVOItoOHLCV,
+		createVOITokenPair,
+		shouldUseVOIData,
+		getDefaultChartType,
+		getDefaultResolution
 	} from '$lib/utils/chart-adapters';
 
 	export let data: PageData;
-	let { marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } = data;
+	let { marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } =
+		data;
 	$: ({ marketData, aggregates, circulatingSupply, tokenPairs, tokenAnalytics, resolvedToken } =
 		data);
 
@@ -419,9 +434,17 @@
 
 	// Calculate market caps
 	// VOI: use circulating supply from server; Others: use totalSupply from tokenInfo (FDV)
-	$: circulatingMarketCap = getCirculatingMarketCap(selectedToken, weightedAveragePrice, realCirculatingSupply);
+	$: circulatingMarketCap = getCirculatingMarketCap(
+		selectedToken,
+		weightedAveragePrice,
+		realCirculatingSupply
+	);
 	$: tokenTotalSupplyAdjusted = getTokenTotalSupplyAdjusted(tokenInfo);
-	$: fullyDilutedMarketCap = getFullyDilutedMarketCap(tokenTotalSupplyAdjusted, weightedAveragePrice, selectedToken);
+	$: fullyDilutedMarketCap = getFullyDilutedMarketCap(
+		tokenTotalSupplyAdjusted,
+		weightedAveragePrice,
+		selectedToken
+	);
 
 	let isRefreshing = false;
 	async function refreshData() {
@@ -832,69 +855,85 @@
 		}
 	}
 </script>
-<!-- Modern Token Analytics Interface -->
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-	<!-- Beta Disclaimer Banner -->
-	<div class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-			<Alert color="yellow" class="!bg-transparent !border-0 !p-0">
-				<div class="flex items-center gap-3">
-					<i class="fas fa-exclamation-triangle text-amber-600 dark:text-amber-400 text-lg"></i>
-					<div>
-						<span class="font-semibold text-amber-800 dark:text-amber-300">Beta Feature:</span>
-						<span class="text-amber-700 dark:text-amber-400">
-							Markets data is currently in beta and under active development. All information should
-							be verified independently before making any trading decisions.
-						</span>
-					</div>
-				</div>
-			</Alert>
-		</div>
-	</div>
-	<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-			<MarketHeader
-				{selectedToken} {tokenInfo} {data} {realMarketData} {fetchingMarketData} {displayPrice}
-				{commandPaletteShortcut} {allTokens} {handleTokenSelect} {refreshData} {isRefreshing} onSearch={() => (commandPaletteOpen = true)}
-			/>
 
-			<KeyMetrics
-				{selectedToken} {fetchingMarketData} {totalVolume24h} {totalTvlAll} {circulatingMarketCap}
-				{tokenTotalSupplyAdjusted} {fullyDilutedMarketCap} {realCirculatingSupply} {activeMarketsCount} {realMarketData}
-			/>
+<div class="min-h-screen bg-canvas text-ink">
+	<div class="container-page flex flex-col gap-bento py-6">
+		<MarketHeader
+			{selectedToken}
+			{tokenInfo}
+			{data}
+			{realMarketData}
+			{fetchingMarketData}
+			{displayPrice}
+			{commandPaletteShortcut}
+			{allTokens}
+			{handleTokenSelect}
+			{refreshData}
+			{isRefreshing}
+			onSearch={() => (commandPaletteOpen = true)}
+		/>
+		<InlineAlert
+			tone="warn"
+			message="Beta Feature: Markets data is currently in beta and under active development. All information should be verified independently before making any trading decisions."
+		/>
 
-			<!-- Chart + Markets side-by-side -->
-			<section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-				<ChartPanel
-					{showTokenChart} {selectedToken} {tokenChartLoading} {tokenChartError} {tokenChartData}
-					{tokenChartVolumes} bind:currentQuoteCurrency {chartSettings}
-					{handleChartResolutionChange} {handleChartTypeChange} {fetchVOIChartData} {fetchTokenChartData} on:refreshData
-				>
-					<PriceChart data={priceHistory} {selectedPeriod} onPeriodChange={handlePeriodChange} {selectedMarket} />
-				</ChartPanel>
-				<MarketsPanel
-					{voiUsdStatus} {voiUsdAsOf} {tokenAnalytics} {sortedMarketData} {searchQuery} onSearchQueryChange={(query) => (searchQuery = query)}
-					{filterMarkets} {sortColumn} {sortDirection} {sortData} {selectedTradingPairId} onRowClick={handleMarketRowClick}
-					{marketDataError} {refreshData} {isRefreshing}
+		<KeyMetrics
+			{selectedToken}
+			{fetchingMarketData}
+			{totalVolume24h}
+			{totalTvlAll}
+			{circulatingMarketCap}
+			{tokenTotalSupplyAdjusted}
+			{fullyDilutedMarketCap}
+			{realCirculatingSupply}
+			{activeMarketsCount}
+			{realMarketData}
+		/>
+
+		<section class="grid grid-cols-1 gap-bento">
+			<ChartPanel
+				{showTokenChart}
+				{selectedToken}
+				{tokenChartLoading}
+				{tokenChartError}
+				{tokenChartData}
+				{tokenChartVolumes}
+				bind:currentQuoteCurrency
+				{chartSettings}
+				{handleChartResolutionChange}
+				{handleChartTypeChange}
+				{fetchVOIChartData}
+				{fetchTokenChartData}
+				on:refreshData
+			>
+				<PriceChart
+					data={priceHistory}
+					{selectedPeriod}
+					onPeriodChange={handlePeriodChange}
+					{selectedMarket}
 				/>
-			</section>
-		</div>
+			</ChartPanel>
+			<MarketsPanel
+				{voiUsdStatus}
+				{voiUsdAsOf}
+				{tokenAnalytics}
+				{sortedMarketData}
+				{searchQuery}
+				onSearchQueryChange={(query) => (searchQuery = query)}
+				{filterMarkets}
+				{sortColumn}
+				{sortDirection}
+				{sortData}
+				{selectedTradingPairId}
+				onRowClick={handleMarketRowClick}
+				{marketDataError}
+				{refreshData}
+				{isRefreshing}
+			/>
+		</section>
 	</div>
 </div>
 <CommandPalette
 	bind:open={commandPaletteOpen}
 	onselect={(token) => handleTokenSelect(new CustomEvent('tokenSelect', { detail: token }))}
 />
-<style>
-	/* Smooth transitions for view mode switches */
-	section {
-		transition: all 0.3s ease-in-out;
-	}
-	/* Enhanced mobile responsiveness */
-	@media (max-width: 768px) {
-		.max-w-7xl {
-			padding-left: 1rem;
-			padding-right: 1rem;
-		}
-	}
-</style>
