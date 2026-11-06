@@ -56,6 +56,7 @@
 	let now = $state(Date.now());
 	let showNode = $state(untrack(() => tabs.hash.toLowerCase() === '#consensus'));
 	$effect(() => {
+		void tabs.revision;
 		if (tabs.hash.toLowerCase() === '#consensus') showNode = true;
 	});
 	let sequence = 0;

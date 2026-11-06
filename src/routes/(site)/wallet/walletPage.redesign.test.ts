@@ -81,3 +81,66 @@ describe('wallet shell hash integration', () => {
 		if (hash === '#consensus') expect(html).toMatch(/<details[^>]* open/);
 	});
 });
+
+it('wires route sync exactly once to the page wallet and parent getters without direct selection writes', () => {
+	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
+	const ast = parse(source, { modern: true });
+	const calls: import('estree').CallExpression[] = [];
+	function visit(value: unknown) {
+		if (!value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			value.forEach(visit);
+			return;
+		}
+		const node = value as { type?: string };
+		if (node.type === 'CallExpression') calls.push(value as import('estree').CallExpression);
+		Object.values(value).forEach(visit);
+	}
+	visit(ast);
+	const routeCalls = calls.filter(
+		(call) => call.callee.type === 'Identifier' && call.callee.name === 'createWalletRouteSync'
+	);
+	expect(routeCalls).toHaveLength(1);
+	for (const [index, name] of ['walletId', 'parentWalletId'].entries()) {
+		expect(routeCalls[0].arguments[index]).toMatchObject({
+			type: 'ArrowFunctionExpression',
+			params: [],
+			body: { type: 'Identifier', name }
+		});
+	}
+	expect(source).not.toMatch(/\bselectWallet\s*\(/);
+	expect(source).not.toMatch(/\bselectedWallet\s*\.\s*set\s*\(/);
+});
+
+it('binds the legacy Node panel disclosure to showNode', () => {
+	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
+	const ast = parse(source, { modern: true });
+	let found = false;
+	function visit(value: unknown, insidePanel = false) {
+		if (!value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			value.forEach((child) => visit(child, insidePanel));
+			return;
+		}
+		const node = value as {
+			type?: string;
+			name?: string;
+			attributes?: { type: string; name: string; expression?: { type: string; name?: string } }[];
+		};
+		const bound =
+			insidePanel ||
+			(node.type === 'RegularElement' &&
+				node.name === 'details' &&
+				!!node.attributes?.some(
+					(attr) =>
+						attr.type === 'BindDirective' &&
+						attr.name === 'open' &&
+						attr.expression?.type === 'Identifier' &&
+						attr.expression.name === 'showNode'
+				));
+		if (node.type === 'Component' && node.name === 'NodeComponent' && bound) found = true;
+		Object.values(value).forEach((child) => visit(child, bound));
+	}
+	visit(ast.fragment);
+	expect(found).toBe(true);
+});

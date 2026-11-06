@@ -17,11 +17,11 @@ export function createHashTabs({
 }: HashTabsOptions) {
 	let current = $state(fallback);
 	let hash = $state('');
+	let revision = $state(0);
 	let resync = () => {};
 	if (browser) afterNavigate(() => resync());
 	onMount(() => {
 		let alive = true;
-		let revision = 0;
 		async function sync(user: boolean) {
 			const version = ++revision;
 			hash = window.location.hash;
@@ -59,6 +59,10 @@ export function createHashTabs({
 		};
 	});
 	return {
+		// A fresh navigation can request the same legacy hash after URL normalization.
+		get revision() {
+			return revision;
+		},
 		get hash() {
 			return hash;
 		},
