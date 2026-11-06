@@ -1,242 +1,156 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import { directoryView, fetchDirectoryProjects } from '../projects';
-	import type { IProject } from '$lib/data/types';
+	import { Button, Card, InlineAlert, Tabs } from '$lib/ds';
 	import ProjectCard from '$lib/components/ecosystem/ProjectCard.svelte';
-	import Share from '$lib/component/ui/Share.svelte';
 	import { rowKeys } from '$lib/utils/rowKeys';
+	import type { PageData } from './$types';
+	import {
+		categoriesOf,
+		categoryHref,
+		directoryView,
+		fetchDirectoryProjects,
+		filterProjects,
+		formatReceivedAt,
+		nextFeedState,
+		orderProjects,
+		type FeedState
+	} from '../projects';
 
-	export let data;
-
-	let projects: IProject[] = [];
-	let status: 'loading' | 'ok' | 'error' = 'loading';
-	let filteredProjects: IProject[] = [];
-	let searchTerm = '';
-	let selectedCategory = data.category;
-
-	// primary sorting for categories
-	const categorySort = ['Wallets', 'DEXes', 'NFTs', 'Infrastructure', 'Tools'];
-
-	onMount(() => {
-		loadProjects();
-	});
+	let { data }: { data: PageData } = $props();
+	let feed = $state.raw<FeedState>({ status: 'loading', projects: [], receivedAt: null });
+	let refreshing = $state(false);
+	let searchTerm = $state('');
+	let selectedCategory = $derived(data.category);
+	let activeProjects = $derived(filterProjects(feed.projects, { category: 'All', term: '' }));
+	let categories = $derived(categoriesOf(activeProjects));
+	let filteredProjects = $derived(
+		orderProjects(filterProjects(activeProjects, { category: selectedCategory, term: searchTerm }))
+	);
+	// Duplicate feed IDs must not make a row unreachable.
+	let projectKeys = $derived(rowKeys(filteredProjects, (project) => String(project.id)));
+	let view = $derived(
+		directoryView({
+			status: feed.status,
+			total: activeProjects.length,
+			shown: filteredProjects.length
+		})
+	);
+	let receivedLabel = $derived(feed.receivedAt === null ? '' : formatReceivedAt(feed.receivedAt));
 
 	async function loadProjects() {
-		status = 'loading';
+		if (refreshing) return;
+		refreshing = true;
 		const result = await fetchDirectoryProjects();
-		if (result.ok) {
-			projects = result.projects;
-			status = 'ok';
-		} else {
-			status = 'error';
-		}
+		feed = nextFeedState(feed, result, Date.now());
+		refreshing = false;
 	}
 
-	$: activeProjects = projects.filter((project) => project.status === 'active');
-	// Supabase rows; nothing in the repo guarantees id is unique, and a repeat would throw.
-	$: projectKeys = rowKeys(filteredProjects, (project) => String(project.id));
-	$: view = directoryView({
-		status,
-		total: activeProjects.length,
-		shown: filteredProjects.length
+	onMount(() => {
+		void loadProjects();
 	});
-
-	$: {
-		filteredProjects = activeProjects
-			.filter(
-				(project) =>
-					(project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-						project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-						project.category.toLowerCase().includes(searchTerm.toLowerCase())) &&
-					(selectedCategory === 'All' ||
-						(selectedCategory === 'New' && project.new === true) ||
-						project.category === selectedCategory)
-			)
-			.sort((a, b) => {
-				const indexA = categorySort.indexOf(a.category);
-				const indexB = categorySort.indexOf(b.category);
-				if (indexA === -1 && indexB === -1) return 0;
-				if (indexA === -1) return 1;
-				if (indexB === -1) return -1;
-				return indexA - indexB;
-			});
-	}
-
-	$: categories = ['All', ...new Set(activeProjects.map((p) => p.category))];
-
-	function clearFilters() {
-		searchTerm = '';
-		selectedCategory = 'All';
-		updateURL('All');
-	}
-
-	function handleCategoryClick(event: CustomEvent<string>) {
-		selectedCategory = event.detail;
-		updateURL(selectedCategory);
-	}
-
-	function updateURL(category: string) {
-		const newPath = category === 'All' ? '/directory' : `/directory/${category}`;
-		goto(newPath, { replaceState: true });
-	}
-
-	let url = '';
-	let text = '';
-
-	$: if (selectedCategory !== 'All') {
-		text = `${selectedCategory}? @Voi_Net has that. Check out ${selectedCategory} in the Voi Ecosystem, right here! #Voiagers`;
-		url = data.url.href;
-	} else {
-		text = 'Do you know about the @Voi_Net Ecosystem Directory? Check it out here! #Voiagers';
-		url = data.url.href;
-	}
 </script>
 
-<div class="min-h-screen">
-	<!-- Header Section -->
-	<div class="relative">
-		<!-- Background gradient -->
-		<div
-			class="absolute inset-0 -z-10 bg-gradient-to-br from-violet-50 via-white to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 opacity-40"
-		></div>
+<div
+	class="container-page min-w-0 space-y-6 py-8 text-ink [overflow-wrap:anywhere] md:py-12"
+	aria-busy={feed.status === 'loading' || refreshing}
+>
+	<header class="max-w-3xl space-y-4">
+		<h1 class="text-display">Find your next tool on Voi</h1>
+		<p class="text-body text-ink-muted">Explore projects, wallets and services building on Voi.</p>
+		<Tabs
+			variant="nav"
+			label="Explore the ecosystem"
+			onHero={false}
+			current="projects"
+			items={[
+				{ id: 'projects', label: 'Projects', href: '/directory' },
+				{ id: 'markets', label: 'Markets Beta', href: '/markets' }
+			]}
+		/>
+	</header>
 
-		<!-- Content wrapper -->
-		<div class="mx-auto max-w-7xl px-6 lg:px-8 pt-10 pb-24">
-			<div class="flex flex-col md:flex-row items-center justify-between gap-8">
-				<div class="w-12"></div>
-				<div class="text-center">
-					<h1
-						class="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 dark:from-violet-300 dark:via-fuchsia-300 dark:to-pink-300 mb-4"
-					>
-						Voi Directory
-					</h1>
-					<p class="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-						Discover the innovative projects building on Voi
-					</p>
-				</div>
-				<div class="md:self-start relative z-20">
-					<Share {url} {text} />
-				</div>
-			</div>
+	<section aria-label="Project filters" class="space-y-4">
+		<div class="w-full md:max-w-md">
+			<label for="project-search" class="mb-2 block text-label">Search projects</label>
+			<input
+				id="project-search"
+				type="search"
+				bind:value={searchTerm}
+				placeholder="Title, description or category"
+				class="min-h-11 w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-body text-ink placeholder:text-ink-muted"
+			/>
 		</div>
-	</div>
-
-	<!-- Main Content -->
-	<div class="container mx-auto px-4 -mt-12 pb-16 relative z-10">
-		<div
-			class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-white/5 p-6"
-		>
-			<!-- Search and Filters -->
-			<div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
-				<div class="relative w-full md:w-1/3">
-					<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-						<i class="fas fa-search text-gray-400 dark:text-gray-500"></i>
-					</div>
-					<input
-						type="text"
-						placeholder="Search projects..."
-						aria-label="Search projects"
-						bind:value={searchTerm}
-						class="w-full pl-12 pr-4 py-3 rounded-2xl bg-white/50 dark:bg-gray-900/50
-                   border border-violet-100/50 dark:border-violet-400/10
-                   text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400
-                   focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-violet-400/20
-                   transition-all duration-300"
-					/>
-				</div>
-
-				<div class="flex flex-wrap justify-center gap-2">
-					{#each categories as category}
-						<button
-							class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300
-                {selectedCategory === category
-								? 'bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 text-white shadow-lg shadow-violet-500/25'
-								: 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-violet-100/50 dark:border-violet-400/10 hover:bg-violet-50 dark:hover:bg-violet-900/30'}"
-							on:click={() => {
-								selectedCategory = category;
-								updateURL(category);
-							}}
-						>
-							{category}
-						</button>
-					{/each}
-					<button
-						class="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300
-              {selectedCategory === 'New'
-							? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/25'
-							: 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-green-100/50 dark:border-green-400/10 hover:bg-green-50 dark:hover:bg-green-900/30'}"
-						on:click={() => {
-							selectedCategory = 'New';
-							updateURL('New');
-						}}
-					>
-						New
-					</button>
-				</div>
+		<nav aria-label="Categories" class="flex flex-wrap gap-2">
+			{#each categories as category (category)}
+				<a
+					href={categoryHref(category)}
+					data-sveltekit-noscroll
+					data-sveltekit-keepfocus
+					aria-current={selectedCategory === category ? 'page' : undefined}
+					class="inline-flex min-h-11 max-w-full items-center rounded-ds-sm px-3 py-2 text-label {selectedCategory ===
+					category
+						? 'bg-accent-soft font-bold text-accent underline underline-offset-4'
+						: 'text-ink-muted hover:bg-surface-2'}">{category}</a
+				>
+			{/each}
+		</nav>
+		{#if feed.receivedAt !== null}
+			<div class="flex flex-wrap items-center gap-3">
+				<p class="text-sm text-ink-muted">
+					Retrieved {receivedLabel} · content age unknown
+				</p>
+				<Button variant="ghost" size="sm" onclick={loadProjects} disabled={refreshing}
+					>Refresh</Button
+				>
 			</div>
+		{/if}
+	</section>
 
-			<!-- Projects Grid -->
-			{#if view === 'list'}
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-					{#each filteredProjects as project, i (projectKeys[i])}
-						<ProjectCard {project} on:categoryClick={handleCategoryClick} />
-					{/each}
-				</div>
-			{:else}
-				<!-- Each state is its own element, so an alert is inserted with its text (TASK-41). -->
-				<div class="flex flex-col items-center justify-center py-16 text-center">
-					{#if view === 'loading'}
-						<div role="status" class="flex flex-col items-center">
-							<div
-								class="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-violet-500/20 to-pink-500/20 dark:from-violet-400/10 dark:to-pink-400/10 flex items-center justify-center"
-							>
-								<i
-									class="fas fa-spinner-third animate-spin text-2xl text-violet-500 dark:text-violet-400"
-									aria-hidden="true"
-								></i>
-							</div>
-							<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">Loading projects…</p>
-						</div>
-					{:else if view === 'error'}
-						<p role="alert" class="text-2xl font-medium text-gray-600 dark:text-gray-300">
-							We couldn't load the directory.
-						</p>
-						<button
-							type="button"
-							class="mt-6 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-violet-100/50 dark:border-violet-400/10 hover:bg-violet-50 dark:hover:bg-violet-900/30"
-							on:click={loadProjects}
-						>
-							Retry
-						</button>
-					{:else if view === 'empty'}
-						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">
-							No projects are listed yet.
-						</p>
-					{:else if view === 'no-match'}
-						<p class="text-2xl font-medium text-gray-600 dark:text-gray-300">No matches</p>
-						<p class="mt-2 text-gray-600 dark:text-gray-300">
-							{#if searchTerm}Search: "{searchTerm}"{/if}
-							{#if searchTerm && selectedCategory !== 'All'}
-								·
-							{/if}
-							{#if selectedCategory !== 'All'}Category: {selectedCategory}{/if}
-						</p>
-						<button
-							type="button"
-							class="mt-6 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-violet-100/50 dark:border-violet-400/10 hover:bg-violet-50 dark:hover:bg-violet-900/30"
-							on:click={clearFilters}
-						>
-							Clear filters
-						</button>
-					{/if}
-				</div>
-			{/if}
+	<p aria-live="polite" class="sr-only">
+		{#if feed.receivedAt !== null}{filteredProjects.length} projects{/if}
+	</p>
+
+	{#if feed.status === 'stale'}
+		<InlineAlert
+			tone="warn"
+			message={`Stale · Retrieved ${receivedLabel}. The latest refresh failed.`}
+			onretry={loadProjects}
+		/>
+	{/if}
+
+	{#if view === 'loading'}
+		<div role="status" class="text-body text-ink-muted">Loading projects</div>
+		<div aria-hidden="true" class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-3">
+			{#each [1, 2, 3] as skeleton (skeleton)}
+				<Card>
+					<div class="h-10 w-10 rounded-ds-sm bg-surface-2"></div>
+					<div class="mt-4 h-5 w-2/3 rounded-ds-sm bg-surface-2"></div>
+					<div class="mt-3 h-16 rounded-ds-sm bg-surface-2"></div>
+				</Card>
+			{/each}
 		</div>
-	</div>
+	{:else if view === 'error'}
+		<InlineAlert message="Couldn't load the directory" onretry={loadProjects} retryLabel="Retry" />
+	{:else if view === 'empty'}
+		<p class="text-h2">No projects are listed yet</p>
+	{:else if view === 'no-match'}
+		<div class="space-y-3">
+			<h2 class="text-h2">No matching projects</h2>
+			<p class="text-body text-ink-muted">
+				Search: “{searchTerm}” · Category: {selectedCategory}
+			</p>
+			<Button
+				href="/directory"
+				variant="soft"
+				data-sveltekit-noscroll
+				onclick={() => (searchTerm = '')}>Clear filters</Button
+			>
+		</div>
+	{:else}
+		<div class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-3">
+			{#each filteredProjects as project, i (projectKeys[i])}
+				<ProjectCard {project} categoryHref={categoryHref(project.category)} />
+			{/each}
+		</div>
+	{/if}
 </div>
-
-<style>
-	/* Add any additional styles here */
-</style>

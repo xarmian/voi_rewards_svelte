@@ -90,7 +90,7 @@ it('card uses sibling links and plain text identity without a clickable root', (
 	]) {
 		expect(card).toContain(required);
 	}
-	const anchors = [...card.matchAll(/<a\s|<\/a>/g)];
+	const anchors = [...card.matchAll(/<a\s|<\/a\s*>/g)];
 	let depth = 0;
 	for (const [tag] of anchors) {
 		depth += tag.startsWith('</') ? -1 : 1;
