@@ -12,6 +12,7 @@
 		isPriceStale,
 		priceLabel,
 		resultsState,
+		validateCustomPrice,
 		validateNodeCost,
 		validateStake
 	} from './calculatorView';
@@ -61,6 +62,7 @@
 	$: if (!hasPrice) inputMode = 'voi';
 	$: stakeError = validateStake(inputMode === 'usd' ? calculationAmountUSD : calculationAmount);
 	$: nodeCostError = validateNodeCost(nodeCost);
+	$: priceError = useCustomPrice ? validateCustomPrice(customPrice) : null;
 	$: if (hasPrice && !priceInitialized) {
 		if (!validateStake(inputMode === 'usd' ? calculationAmountUSD : calculationAmount)) {
 			if (walletBalance > 0 || stakeEdited) {
@@ -80,6 +82,7 @@
 		loadError ||
 		stakeError ||
 		nodeCostError ||
+		priceError ||
 		!Number.isFinite(Number(supply?.['online-money'])) ||
 		!Number.isFinite(rewardStake) ||
 		epochRewards.length === 0 ||
@@ -96,7 +99,7 @@
 					costPercentage
 				});
 	$: state = resultsState({
-		isLoading: isLoading && !stakeError && !nodeCostError,
+		isLoading: isLoading && !stakeError && !nodeCostError && !priceError,
 		loadFailed: Boolean(loadError),
 		hasEstimate: estimate !== null
 	});
@@ -551,8 +554,13 @@
 							min="0"
 							step="0.00000001"
 							bind:value={customPrice}
+							aria-invalid={Boolean(priceError)}
+							aria-describedby={priceError ? 'custom-price-error' : undefined}
 							class="block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink"
 						/>
+						{#if priceError}<p id="custom-price-error" role="alert" class="text-label text-danger">
+								{priceError}
+							</p>{/if}
 						<div class="flex flex-wrap gap-2">
 							<Button variant="soft" size="sm" onclick={() => adjustCustomPrice(-0.05)}>-5%</Button
 							><Button variant="soft" size="sm" onclick={() => adjustCustomPrice(0.05)}>+5%</Button>
@@ -582,9 +590,11 @@
 		<h2 id="estimated-rewards-heading" class="text-h2">Your estimated rewards</h2>
 		{#if state === 'unavailable'}
 			<InlineAlert
-				message={[loadError, stakeError, nodeCostError].filter(Boolean).join(' ') ||
+				message={[loadError, stakeError, nodeCostError, priceError].filter(Boolean).join(' ') ||
 					'Error loading data. Please try again later.'}
-				onretry={loadError || (!stakeError && !nodeCostError) ? () => void loadData() : undefined}
+				onretry={loadError || (!stakeError && !nodeCostError && !priceError)
+					? () => void loadData()
+					: undefined}
 			/>
 		{/if}
 		<div class="grid gap-bento md:grid-cols-3">

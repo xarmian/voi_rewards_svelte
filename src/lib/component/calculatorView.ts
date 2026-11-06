@@ -58,6 +58,10 @@ export function validateNodeCost(value: unknown): string | null {
 	return isNonnegative(value) ? null : 'Enter a monthly cost of 0 or more.';
 }
 
+export function validateCustomPrice(value: unknown): string | null {
+	return isNonnegative(value) ? null : 'Enter a price of 0 or more.';
+}
+
 export function isPriceStale(lastUpdated: Date | null, now: Date): boolean {
 	return lastUpdated !== null && now.getTime() - lastUpdated.getTime() > PRICE_STALE_MS;
 }
