@@ -238,16 +238,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/EpochStats.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 8,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/components/EpochTable.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 1,
@@ -302,16 +292,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/TransactionCountsChart.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/components/ecosystem/ProjectCard.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
@@ -321,12 +301,6 @@
 		"src/lib/components/wallet/AccountInfo.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/ds/ChartFrame/ChartFrame.svelte": {
-			"svelte/valid-compile": {
-				"errors": 1,
 				"warnings": 0
 			}
 		},
@@ -676,22 +650,6 @@
 			"ts:2345": {
 				"errors": 1,
 				"warnings": 0
-			}
-		},
-		"src/lib/components/TransactionCountsChart.svelte": {
-			"ts:2339": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"ts:2353": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/ds/ChartFrame/ChartFrame.svelte": {
-			"svelte:a11y_no_static_element_interactions": {
-				"errors": 0,
-				"warnings": 1
 			}
 		},
 		"src/routes/(site)/HomeRewards.svelte": {
