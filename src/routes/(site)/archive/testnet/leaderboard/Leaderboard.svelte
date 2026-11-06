@@ -45,7 +45,7 @@
 					class="px-1 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
 					title={row.address}
 				>
-					<a href="/phase2/{row.address}" class="hover:underline text-blue-600">
+					<a href="/archive/testnet/phase2/{row.address}" class="hover:underline text-blue-600">
 						{row.address.slice(0, 8)}...{row.address.slice(-8)}
 					</a>
 				</td>

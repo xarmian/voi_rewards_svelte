@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { fetchProjects } from '../../(site)/phase2/[...slug]/projects';
+import { fetchProjects } from '../../(site)/archive/testnet/phase2/[...slug]/projects';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async () => {

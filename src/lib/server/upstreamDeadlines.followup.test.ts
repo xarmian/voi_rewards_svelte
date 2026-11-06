@@ -12,10 +12,10 @@ import { GET as eligibility } from '../../routes/api/eligibility/+server';
 import { GET as ohlcv } from '../../routes/api/ohlcv/+server';
 import { GET as reports } from '../../routes/api/reports/+server';
 import { GET as quests } from '../../routes/api/quests/+server';
-import { load as leaderboardLoad } from '../../routes/(site)/leaderboard/+page.server';
-import { load as relaysLoad } from '../../routes/(site)/relays/+page.server';
-import { load as phase2Load } from '../../routes/(site)/phase2/[...slug]/+page.server';
-import { fetchProjects } from '../../routes/(site)/phase2/[...slug]/projects';
+import { load as leaderboardLoad } from '../../routes/(site)/archive/testnet/leaderboard/+page.server';
+import { load as relaysLoad } from '../../routes/(site)/archive/testnet/relays/+page.server';
+import { load as phase2Load } from '../../routes/(site)/archive/testnet/phase2/[...slug]/+page.server';
+import { fetchProjects } from '../../routes/(site)/archive/testnet/phase2/[...slug]/projects';
 
 const WALLET = 'A'.repeat(58);
 let stalled = '';
@@ -30,7 +30,11 @@ function singleResult(single: 'single' | 'maybe' | null) {
 	if (!single) return null;
 	const pgrst116 = (n: number) => ({
 		data: null,
-		error: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned', details: `The result contains ${n} rows` }
+		error: {
+			code: 'PGRST116',
+			message: 'JSON object requested, multiple (or no) rows returned',
+			details: `The result contains ${n} rows`
+		}
 	});
 	if (rows === 'many') return pgrst116(2);
 	if (rows === 'none') return single === 'single' ? pgrst116(0) : { data: null, error: null };
@@ -60,16 +64,29 @@ function query(site: string) {
 				site === failed
 					? Promise.resolve({ data: null, count: null, error: { message: 'upstream failed' } })
 					: site === stalled
-					? new Promise((done) => {
-							const abort = () => done({ data: null, error: { message: 'upstream aborted' } });
-							if (signal?.aborted) abort();
-							else signal?.addEventListener('abort', abort, { once: true });
-						})
-					: Promise.resolve(singleResult(single) ?? { data: [], count: 3, error: null });
+						? new Promise((done) => {
+								const abort = () => done({ data: null, error: { message: 'upstream aborted' } });
+								if (signal?.aborted) abort();
+								else signal?.addEventListener('abort', abort, { once: true });
+							})
+						: Promise.resolve(singleResult(single) ?? { data: [], count: 3, error: null });
 			return result.then(resolve, reject);
 		}
 	};
-	for (const method of ['select', 'eq', 'not', 'gte', 'lte', 'lt', 'in', 'or', 'order', 'limit', 'range', 'returns'])
+	for (const method of [
+		'select',
+		'eq',
+		'not',
+		'gte',
+		'lte',
+		'lt',
+		'in',
+		'or',
+		'order',
+		'limit',
+		'range',
+		'returns'
+	])
 		builder[method] = () => builder;
 	return builder;
 }
@@ -104,7 +121,10 @@ beforeEach(() => {
 	rows = 'one';
 	failed = '';
 	mocks.from.mockImplementation((site: string) => query(site));
-	vi.stubGlobal('fetch', vi.fn<typeof fetch>(() => new Promise(() => {})));
+	vi.stubGlobal(
+		'fetch',
+		vi.fn<typeof fetch>(() => new Promise(() => {}))
+	);
 });
 
 afterEach(() => {
@@ -128,16 +148,19 @@ it.each([
 	['phase2 csv count', phase2, '/api/phase2?fetchAll=true&csv=true', 'vr_phase2'],
 	['eligibility', eligibility, `/api/eligibility?wallet=${WALLET}`, 'addresses'],
 	['ohlcv', ohlcv, '/api/ohlcv?baseTokenId=0&quoteTokenId=302190', 'price_candles']
-] as const)('%s answers 500 by the deadline when its query stalls', async (_, handler, path, site) => {
-	stalled = site;
-	const { early, outcome } = await settle(() => Promise.resolve(handler(event(path) as never)));
-	expect(early, 'must not settle before the deadline').toBeUndefined();
-	expect(outcome?.value, 'handler must settle by its deadline').toBeInstanceOf(Response);
-	const response = outcome!.value as Response;
-	expect(response.status).toBe(500);
-	expect((await response.json()).error).toBeTruthy();
-	expectAborted(site);
-});
+] as const)(
+	'%s answers 500 by the deadline when its query stalls',
+	async (_, handler, path, site) => {
+		stalled = site;
+		const { early, outcome } = await settle(() => Promise.resolve(handler(event(path) as never)));
+		expect(early, 'must not settle before the deadline').toBeUndefined();
+		expect(outcome?.value, 'handler must settle by its deadline').toBeInstanceOf(Response);
+		const response = outcome!.value as Response;
+		expect(response.status).toBe(500);
+		expect((await response.json()).error).toBeTruthy();
+		expectAborted(site);
+	}
+);
 
 it.each([
 	['a failed count is a 500, not an empty CSV', '/api/phase2?fetchAll=true&csv=true'],
@@ -174,12 +197,15 @@ it('relays fails its load by the deadline when vr_relay_peers stalls', async () 
 	expectAborted('vr_relay_peers');
 });
 
-it.each(['vr_projects', 'vr_quests'])('fetchProjects keeps its [] contract when %s stalls', async (site) => {
-	stalled = site;
-	const { outcome } = await settle(() => fetchProjects());
-	expect(outcome?.value).toEqual([]);
-	expectAborted(site);
-});
+it.each(['vr_projects', 'vr_quests'])(
+	'fetchProjects keeps its [] contract when %s stalls',
+	async (site) => {
+		stalled = site;
+		const { outcome } = await settle(() => fetchProjects());
+		expect(outcome?.value).toEqual([]);
+		expectAborted(site);
+	}
+);
 
 it.each(['leaderboard', 'vr_phase2', 'vr_quests'])(
 	'the phase2 page load settles by the deadline when its %s wallet query stalls',
@@ -195,7 +221,11 @@ it.each(['leaderboard', 'vr_phase2', 'vr_quests'])(
 
 it.each([
 	['reports', () => reports(event('/api/reports', globalThis.fetch) as never), []],
-	['quests', () => quests(event(`/api/quests?project=Algoleagues&wallet=${WALLET}`) as never), { error: 'Invalid project' }]
+	[
+		'quests',
+		() => quests(event(`/api/quests?project=Algoleagues&wallet=${WALLET}`) as never),
+		{ error: 'Invalid project' }
+	]
 ] as const)('%s bounds stalled headers AND bodies', async (_, run, fallback) => {
 	for (const stage of ['headers', 'body']) {
 		const upstream = Response.json({});
@@ -216,9 +246,13 @@ it('the markets load renders with an empty chart when price history fails', asyn
 	const { load } = await import('../../routes/(site)/markets/+page');
 	const fetcher = vi.fn(async (path: string) => {
 		if (path.startsWith('/api/price-history')) throw new TypeError('network down');
-		if (path.startsWith('/api/markets')) return Response.json({ marketData: [{ trading_pair_id: 1 }] });
+		if (path.startsWith('/api/markets'))
+			return Response.json({ marketData: [{ trading_pair_id: 1 }] });
 		return Response.json({});
 	});
-	const data = await load({ fetch: fetcher, url: new URL('https://example.test/markets') } as never);
+	const data = await load({
+		fetch: fetcher,
+		url: new URL('https://example.test/markets')
+	} as never);
 	expect(data).toMatchObject({ priceHistory: [], marketData: [{ trading_pair_id: 1 }] });
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ArchiveBanner } from '$lib/ds';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
@@ -57,6 +58,8 @@
 	}
 </script>
 
+<ArchiveBanner programme="Phase 2 TestNet rewards" />
+
 <div class="flex flex-col bg-[rgb(111,42,226)]">
 	<div class="flex flex-col">
 		<img
@@ -94,7 +97,7 @@
 			</div>
 			<WalletSearch
 				onSubmit={(v) => {
-					goto(`/phase2/${v}`);
+					goto(`/archive/testnet/phase2/${v}`);
 				}}
 				{searchText}
 			/>
@@ -181,8 +184,9 @@
 									{data.props.leaderboardData.row_number ?? 0}
 								</div>
 								<!--<div class="text-2xl font-semibold text-gray-800 dark:text-white">Not Available</div>-->
-								<a class="text-blue-500 underline hover:text-blue-400 pointer" href="/leaderboard"
-									>Leaderboard Position</a
+								<a
+									class="text-blue-500 underline hover:text-blue-400 pointer"
+									href="/archive/testnet/leaderboard">Leaderboard Position</a
 								>
 							</div>
 						</div>

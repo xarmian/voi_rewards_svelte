@@ -16,7 +16,7 @@ import { selectedWallet as seamSelectedWallet } from '$lib/chain/wallet.svelte';
 
 // The mock above is a writable; the real seam's store is read-only, so only this test writes it.
 const selectedWallet = seamSelectedWallet as unknown as Writable<unknown>;
-import { fetchProjects } from './(site)/phase2/[...slug]/projects';
+import { fetchProjects } from './(site)/archive/testnet/phase2/[...slug]/projects';
 import { GET } from './api/relay-rewards/+server';
 
 // TASK-32: record when Supabase's lazy thenables start, before releasing any response.
@@ -69,7 +69,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('TASK-32 leaderboard server load', () => {
 	it('starts rows and exact count together and preserves the success shape', async () => {
-		const { load } = await import('./(site)/leaderboard/+page.server');
+		const { load } = await import('./(site)/archive/testnet/leaderboard/+page.server');
 		const rows = query();
 		const count = query();
 		mocks.from.mockReturnValueOnce(rows.builder).mockReturnValueOnce(count.builder);
@@ -96,7 +96,7 @@ describe('TASK-32 leaderboard server load', () => {
 	});
 
 	it.each(['rows', 'count'])('keeps the %s error return serializable', async (failure) => {
-		const { load } = await import('./(site)/leaderboard/+page.server');
+		const { load } = await import('./(site)/archive/testnet/leaderboard/+page.server');
 		const rows = query();
 		const count = query();
 		mocks.from.mockReturnValueOnce(rows.builder).mockReturnValueOnce(count.builder);
@@ -154,7 +154,7 @@ describe('TASK-32 phase2 server load', () => {
 	}
 
 	it('starts fetchProjects and all three wallet queries together, preserving the quest filter', async () => {
-		const { load } = await import('./(site)/phase2/[...slug]/+page.server');
+		const { load } = await import('./(site)/archive/testnet/phase2/[...slug]/+page.server');
 		const queries = setup();
 		const pending = load({ params: { slug: 'W/kibisis' } } as never);
 		await vi.waitFor(() => {
@@ -197,7 +197,7 @@ describe('TASK-32 phase2 server load', () => {
 	it.each(['leaderboard', 'phase2', 'activeQuests'] as const)(
 		'ignores a %s error independently',
 		async (failure) => {
-			const { load } = await import('./(site)/phase2/[...slug]/+page.server');
+			const { load } = await import('./(site)/archive/testnet/phase2/[...slug]/+page.server');
 			const queries = setup();
 			queries.projects.resolve([project]);
 			queries.allQuests.resolve(quests);
@@ -224,7 +224,7 @@ describe('TASK-32 phase2 server load', () => {
 	);
 
 	it('does not query wallet data when there is no wallet', async () => {
-		const { load } = await import('./(site)/phase2/[...slug]/+page.server');
+		const { load } = await import('./(site)/archive/testnet/phase2/[...slug]/+page.server');
 		const queries = setup();
 		queries.projects.resolve([project]);
 		queries.allQuests.resolve(quests);
@@ -375,7 +375,7 @@ describe('TASK-32 wallet loads', () => {
 
 describe('TASK-32 quests server loads', () => {
 	it('returns projects and preserves /quests metadata', async () => {
-		const { load } = await import('./(site)/quests/+page.server');
+		const { load } = await import('./(site)/archive/testnet/quests/+page.server');
 		const projects = query();
 		const allQuests = query();
 		mocks.from.mockReturnValueOnce(projects.builder).mockReturnValueOnce(allQuests.builder);
@@ -392,7 +392,7 @@ describe('TASK-32 quests server loads', () => {
 	});
 
 	it('passes the selected project and fetched projects with the original metadata', async () => {
-		const { load } = await import('./(site)/quests/[...projectId]/+page.server');
+		const { load } = await import('./(site)/archive/testnet/quests/[...projectId]/+page.server');
 		const projects = query();
 		const allQuests = query();
 		mocks.from.mockReturnValueOnce(projects.builder).mockReturnValueOnce(allQuests.builder);
@@ -410,7 +410,7 @@ describe('TASK-32 quests server loads', () => {
 	});
 
 	it('keeps the project-not-found return serializable', async () => {
-		const { load } = await import('./(site)/quests/[...projectId]/+page.server');
+		const { load } = await import('./(site)/archive/testnet/quests/[...projectId]/+page.server');
 		const projects = query();
 		const allQuests = query();
 		mocks.from.mockReturnValueOnce(projects.builder).mockReturnValueOnce(allQuests.builder);
@@ -424,7 +424,7 @@ describe('TASK-32 quests server loads', () => {
 
 describe('TASK-32 relays server load', () => {
 	it('builds week ranges up to the latest peer date', async () => {
-		const { load } = await import('./(site)/relays/+page.server');
+		const { load } = await import('./(site)/archive/testnet/relays/+page.server');
 		const maxDate = query();
 		mocks.from.mockReturnValueOnce(maxDate.builder);
 		maxDate.resolve({ peer_date: '2024-10-08' });
@@ -438,7 +438,7 @@ describe('TASK-32 relays server load', () => {
 	});
 
 	it('still throws when the max date query fails', async () => {
-		const { load } = await import('./(site)/relays/+page.server');
+		const { load } = await import('./(site)/archive/testnet/relays/+page.server');
 		const maxDate = query();
 		mocks.from.mockReturnValueOnce(maxDate.builder);
 		maxDate.resolve(null, { message: 'boom' });
@@ -448,11 +448,11 @@ describe('TASK-32 relays server load', () => {
 
 it('TASK-32 keeps DB loads on the server and only wallet merging universal', () => {
 	for (const route of [
-		'leaderboard',
-		'relays',
-		'phase2/[...slug]',
-		'quests',
-		'quests/[...projectId]',
+		'archive/testnet/leaderboard',
+		'archive/testnet/relays',
+		'archive/testnet/phase2/[...slug]',
+		'archive/testnet/quests',
+		'archive/testnet/quests/[...projectId]',
 		'wallet/[...id]'
 	]) {
 		const base = new URL(`./(site)/${route}/`, import.meta.url);

@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { ArchiveBanner } from '$lib/ds';
 	import { onMount } from 'svelte';
 	export let data;
 
-	import InfoButton from '../../../lib/component/ui/InfoButton.svelte';
+	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { Card, Popover } from 'flowbite-svelte';
@@ -67,6 +68,8 @@
 		}
 	});
 </script>
+
+<ArchiveBanner programme="Phase 1 TestNet rewards" />
 
 <div class="flex flex-col bg-white dark:bg-gray-800">
 	<div class="flex flex-col mt-4">
