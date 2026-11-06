@@ -115,22 +115,21 @@ export function epochSeries(
 			const row = record(entry);
 			const epoch = row?.epoch_number;
 			if (!finite(epoch) || !Number.isInteger(epoch) || epoch <= 0) return [];
-			return [
-				{
-					epoch,
-					apr: nonnegative(row?.apr),
-					accounts: nonnegative(row?.participating_wallets),
-					inProgress: epoch === data.current_epoch,
-					status: !finite(data.current_epoch)
-						? 'unavailable'
-						: epoch === data.current_epoch
-							? 'in progress'
-							: epoch < data.current_epoch
-								? 'completed'
-								: 'unavailable',
-					split: stakeSplit(row)
-				}
-			];
+			const entryRow: EpochRow = {
+				epoch,
+				apr: nonnegative(row?.apr),
+				accounts: nonnegative(row?.participating_wallets),
+				inProgress: epoch === data.current_epoch,
+				status: !finite(data.current_epoch)
+					? 'unavailable'
+					: epoch === data.current_epoch
+						? 'in progress'
+						: epoch < data.current_epoch
+							? 'completed'
+							: 'unavailable',
+				split: stakeSplit(row)
+			};
+			return [entryRow];
 		})
 		.sort((a, b) => a.epoch - b.epoch);
 	const current = rows.find((row) => row.inProgress) ?? null;
