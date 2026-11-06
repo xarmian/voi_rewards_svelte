@@ -6,6 +6,7 @@
 	import { getAccountInfo } from '$lib/stores/accounts';
 	import { getCurrentEpoch } from '$lib/utils/epoch-utils';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
+	import { estimateRewards } from '$lib/rewards/calculatorModel';
 
 	export let walletAddress: string | undefined = undefined;
 	export let childAccounts: any[] = [];
@@ -40,7 +41,6 @@
 	let monthlyRewardUSD = 0;
 	let yearlyRewardUSD = 0;
 	let monthlyProfit = 0;
-	let yearlyProfit = 0;
 	let monthlyProfitPercentage = 0;
 	let yearlyProfitPercentage = 0;
 	let initialInvestmentUSD = 0;
@@ -49,12 +49,6 @@
 	let balanceAfterWeek = 0;
 	let balanceAfterMonth = 0;
 	let balanceAfterYear = 0;
-
-	// Add new variables for block calculations
-	let blocksPerDay = (24 * 60 * 60) / 2.8; // Assuming 2.8 seconds per block
-	let weeklyBlocks = blocksPerDay * 7;
-	let monthlyBlocks = blocksPerDay * 30.44;
-	let yearlyBlocks = blocksPerDay * 365.25;
 
 	// Add variables for block participation
 	let expectedWeeklyBlocks = 0;
@@ -343,145 +337,36 @@
 		totalBalance = calculationAmount;
 		initialInvestmentUSD = totalBalance * effectivePrice;
 
-		if (!supply?.['online-money'] || !rewardStake || rewardStake <= 0) {
-			return;
-		}
+		const estimate = estimateRewards({
+			stake: totalBalance,
+			price: effectivePrice,
+			onlineMoney: Number(supply?.['online-money']),
+			rewardStake,
+			epochRewards,
+			nodeCost,
+			isPercentageBased,
+			costPercentage
+		});
+		if (estimate === null) return;
 
-		// Calculate with 1 VOI if balance is 0 to show potential rates
-		const calculationBalance = totalBalance > 0 ? totalBalance : 1;
-
-		const onlineMoney = Number(supply['online-money']);
-		let shareOfStake = calculationBalance / (rewardStake / 1e6);
-		let shareOfTotalStake = calculationBalance / (onlineMoney / 1e6);
-
-		// Calculate expected blocks based on stake share
-		expectedWeeklyBlocks = weeklyBlocks * shareOfTotalStake;
-		expectedMonthlyBlocks = monthlyBlocks * shareOfTotalStake;
-		expectedYearlyBlocks = yearlyBlocks * shareOfTotalStake;
-
-		// Calculate APR and potential APY regardless of balance
-		let potentialWeeklyReward = shareOfStake * epochRewards[0];
-		apr = (potentialWeeklyReward / calculationBalance) * 52 * 100;
-
-		// Calculate potential APY with compound interest
-		let simulatedBalance = calculationBalance;
-		let currentShareOfStake = shareOfStake;
-		for (let i = 0; i < EPOCHS_PER_YEAR && i < epochRewards.length; i++) {
-			const epochReward = calculateEpochReward(currentShareOfStake, epochRewards[i]);
-			simulatedBalance += epochReward;
-			currentShareOfStake = simulatedBalance / (rewardStake / 1e6);
-		}
-		apy = (simulatedBalance / calculationBalance - 1) * 100;
-
-		// Calculate profitability threshold regardless of total balance
-		let testAmount = 1000; // Start with 1000 VOI
-		let monthlyRevenueAtTest = 0;
-
-		// Binary search for threshold
-		let min = 0;
-		let max = 10_000_000; // 10M VOI as upper limit
-		let iterations = 0;
-		const maxIterations = 20; // Prevent infinite loops
-
-		while (min <= max && iterations < maxIterations) {
-			testAmount = Math.floor((min + max) / 2);
-			let testShareOfStake = testAmount / (rewardStake / 1e6);
-
-			// Calculate monthly rewards at test amount
-			let testMonthlyReward = 0;
-			const monthlyEpochs = 30.44 / 7;
-
-			for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
-				testMonthlyReward += testShareOfStake * epochRewards[i];
-			}
-
-			monthlyRevenueAtTest = testMonthlyReward * effectivePrice;
-			const testNodeCost = isPercentageBased
-				? monthlyRevenueAtTest * (costPercentage / 100)
-				: nodeCost;
-
-			// Ensure we're slightly above the node cost
-			const targetRevenue = testNodeCost * 1.01; // Target 1% above node cost
-
-			if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
-				break;
-			} else if (monthlyRevenueAtTest < targetRevenue) {
-				min = testAmount + 1;
-			} else {
-				max = testAmount - 1;
-			}
-
-			iterations++;
-		}
-
-		// Round up to the nearest 100 VOI for a safety margin
-		profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
-
-		if (totalBalance > 0) {
-			// Weekly reward (using current epoch)
-			weeklyReward = shareOfStake * epochRewards[0];
-			weeklyRewardUSD = weeklyReward * effectivePrice;
-
-			// Monthly reward (approximately 4.33 weeks)
-			const monthlyEpochs = 30.44 / 7;
-			monthlyReward = 0;
-			for (let i = 0; i < monthlyEpochs && i < epochRewards.length; i++) {
-				const epochReward = calculateEpochReward(shareOfStake, epochRewards[i]);
-				monthlyReward += epochReward;
-			}
-			monthlyRewardUSD = monthlyReward * effectivePrice;
-
-			// Calculate node cost based on type
-			const effectiveNodeCost = isPercentageBased
-				? monthlyRewardUSD * (costPercentage / 100)
-				: nodeCost;
-
-			monthlyProfit = monthlyRewardUSD - effectiveNodeCost;
-			monthlyProfitPercentage = (monthlyProfit / effectiveNodeCost) * 100;
-
-			// Yearly reward with compound interest
-			yearlyReward = 0;
-			let actualBalance = totalBalance;
-			currentShareOfStake = shareOfStake;
-			for (let i = 0; i < EPOCHS_PER_YEAR && i < epochRewards.length; i++) {
-				const epochReward = calculateEpochReward(currentShareOfStake, epochRewards[i]);
-				yearlyReward += epochReward;
-				actualBalance += epochReward;
-				currentShareOfStake = actualBalance / (rewardStake / 1e6);
-			}
-			yearlyRewardUSD = yearlyReward * effectivePrice;
-			const yearlyNodeCost = effectiveNodeCost * 12;
-			yearlyProfit = yearlyRewardUSD - yearlyNodeCost;
-			yearlyProfitPercentage = (yearlyProfit / yearlyNodeCost) * 100;
-
-			balanceAfterWeek = totalBalance + weeklyReward;
-			balanceAfterMonth = totalBalance + monthlyReward;
-			balanceAfterYear = actualBalance;
-		} else {
-			// Reset all values when there's no balance
-			resetCalculations();
-		}
-	}
-
-	function resetCalculations() {
-		weeklyReward = 0;
-		monthlyReward = 0;
-		yearlyReward = 0;
-		weeklyRewardUSD = 0;
-		monthlyRewardUSD = 0;
-		yearlyRewardUSD = 0;
-		monthlyProfit = 0;
-		yearlyProfit = 0;
-		monthlyProfitPercentage = 0;
-		yearlyProfitPercentage = 0;
-		balanceAfterWeek = 0;
-		balanceAfterMonth = 0;
-		balanceAfterYear = 0;
-	}
-
-	// Helper function to calculate rewards for a specific epoch
-	function calculateEpochReward(shareOfStake: number, epochRewardPool: number): number {
-		return shareOfStake * epochRewardPool;
+		expectedWeeklyBlocks = estimate.expectedWeeklyBlocks;
+		expectedMonthlyBlocks = estimate.expectedMonthlyBlocks;
+		expectedYearlyBlocks = estimate.expectedYearlyBlocks;
+		apr = estimate.apr;
+		apy = estimate.apy;
+		profitabilityThreshold = estimate.profitabilityThreshold;
+		weeklyReward = estimate.weeklyReward;
+		weeklyRewardUSD = estimate.weeklyRewardUSD;
+		monthlyReward = estimate.monthlyReward;
+		monthlyRewardUSD = estimate.monthlyRewardUSD;
+		monthlyProfit = estimate.monthlyProfit;
+		monthlyProfitPercentage = estimate.monthlyProfitPercentage;
+		yearlyReward = estimate.yearlyReward;
+		yearlyRewardUSD = estimate.yearlyRewardUSD;
+		yearlyProfitPercentage = estimate.yearlyProfitPercentage;
+		balanceAfterWeek = estimate.balanceAfterWeek;
+		balanceAfterMonth = estimate.balanceAfterMonth;
+		balanceAfterYear = estimate.balanceAfterYear;
 	}
 
 	// Format currency for USD values
