@@ -36,6 +36,9 @@ test('the real activation and rekey keep the confirmed funder when selection cha
 			waitForConfirmation: vi.fn().mockResolvedValue({})
 		},
 		algodClient: {
+			accountInformation: () => ({
+				do: vi.fn().mockResolvedValue({ amount: 0n, authAddr: undefined })
+			}),
 			getTransactionParams: () => ({ do: vi.fn().mockResolvedValue({}) }),
 			sendRawTransaction: () => ({ do: vi.fn().mockResolvedValue({ txId: 'tx' }) })
 		}

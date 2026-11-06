@@ -95,6 +95,8 @@ test.each([
 			error: null,
 			Worker,
 			URL,
+			isActivating: false,
+			isRekeying: false,
 			isGenerating: false,
 			updateInterval: null,
 			worker: null,
@@ -217,8 +219,16 @@ test('Fund & Rekey opens review and only Confirm can start activation', () => {
 		['activateVanityAddress', 'rekeyVanityAddress']
 	]) {
 		expect(fn(caller)).toMatch(new RegExp(`await ${callee}\\(`));
-		expect(source.match(new RegExp(`\\b${callee}\\s*\\(`, 'g'))).toHaveLength(2);
-		const outsideCaller = source.replace(fn(caller), '').replace(fn(callee), '');
+		expect(source.match(new RegExp(`\\b${callee}\\s*\\(`, 'g'))).toHaveLength(
+			callee === 'rekeyVanityAddress' ? 3 : 2
+		);
+		const outsideCaller = source
+			.replace(fn(caller), '')
+			.replace(fn(callee), '')
+			.replace(callee === 'rekeyVanityAddress' ? fn('retryRekey') : '', '');
+		if (callee === 'rekeyVanityAddress') {
+			expect(fn('retryRekey')).toMatch(/await rekeyVanityAddress\(plan\)/);
+		}
 		expect(outsideCaller).not.toMatch(new RegExp(`\\b${callee}\\s*\\(`));
 	}
 	const outsideSigning = source
