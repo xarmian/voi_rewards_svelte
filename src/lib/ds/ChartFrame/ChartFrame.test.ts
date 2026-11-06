@@ -80,7 +80,7 @@ test('empty retains an empty captioned table and stale retains data with freshne
 	const empty = render(ChartFrame, {
 		props: { ...props, state: 'empty', data: { ...data, rows: [] } }
 	}).body;
-	assert.match(empty, /No data/);
+	assert.match(empty, /No observations in this range/);
 	assert.match(empty, /<table/);
 	assert.doesNotMatch(empty, /<tbody>[^]*?<tr/);
 	const stale = render(ChartFrame, {
@@ -106,4 +106,39 @@ test('out-of-domain annotations remain in notes but have no plot label', () => {
 	}).body;
 	assert.match(html, /Note remains available/);
 	assert.doesNotMatch(html, />Outside domain<\/text>/);
+});
+
+test('stale resource retains its own absolute time and has a scoped retry', () => {
+	const html = render(ChartFrame, {
+		props: { ...props, state: 'stale', asOf: '2026-10-25T02:38:47Z', onretry() {} }
+	}).body;
+	assert.match(html, /! Stale - data as of 2026-10-25 02:38:47 UTC/);
+	assert.match(html, /Retry/);
+	assert.doesNotMatch(html, /overflow-x-auto/);
+});
+
+test('line preserves a missing observation as a gap instead of connecting across it', () => {
+	const ctx: ChartContext = {
+		width: 300,
+		height: 230,
+		x: Number,
+		y: Number,
+		bandwidth: 0,
+		margin: { top: 20, right: 10, bottom: 28, left: 48 }
+	};
+	const html = render(LineChart, {
+		props: {
+			ctx,
+			area: false,
+			labelLatest: false,
+			points: [
+				{ x: 1, y: 10 },
+				{ x: 2, y: NaN },
+				{ x: 3, y: 30 }
+			]
+		}
+	}).body;
+	const path = html.match(/d="([^"]*)"/)?.[1] ?? '';
+	assert.equal((path.match(/M/g) ?? []).length, 2);
+	assert.doesNotMatch(path, /NaN/);
 });

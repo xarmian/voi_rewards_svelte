@@ -134,6 +134,8 @@ test('unchanged rounds become stale, failed polls keep the last data, and a new 
 	await vi.advanceTimersByTimeAsync(30_000);
 	assert.equal(context.state().round, 123);
 	assert.equal(context.state().error, true);
+	assert.equal(context.state().lastRoundAt, start + 7 * 60_000 - 3000);
+	assert.equal(context.state().lastChangeAt, start - 3000);
 	assert.equal(context.state().checkedAt, Date.now());
 	context.fetch.mockResolvedValueOnce(response(124));
 	await vi.advanceTimersByTimeAsync(30_000);

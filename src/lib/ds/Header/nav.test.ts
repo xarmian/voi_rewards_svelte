@@ -19,7 +19,7 @@ for (const [path, expected] of [
 	['/ds', null],
 	['/ecosystem', null],
 	['/directoryx', null],
-	['/analytics/other', null],
+	['/analytics/other', 'network'],
 	['/faq/other', null]
 ] as const) {
 	test(`navCurrent ${path} matches whole segments and ignores trailing slashes`, () => {

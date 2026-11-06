@@ -63,3 +63,10 @@ test('desktop navigation and header search start at lg', () => {
 	assert.match(html.match(/<button[^>]*aria-label="Menu"[^>]*>/)?.[0] ?? '', /lg:hidden/);
 	assert.match(html.match(/<form id="ds-search-header-form"[^>]*>/)?.[0] ?? '', /hidden lg:block/);
 });
+
+test('Network is the selected main navigation item', () => {
+	const html = render(Header, { props: { variant: 'bar', current: 'network' } }).body;
+	const nav = html.match(/<nav aria-label="Main"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? '';
+	assert.match(nav, /<a[^>]*href="\/analytics"[^>]*aria-current="page"/);
+	assert.equal((nav.match(/aria-current="page"/g) ?? []).length, 1);
+});

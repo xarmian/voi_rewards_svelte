@@ -38,3 +38,12 @@ for (const width of [320, 1440])
 				assert.ok(x.position(ticks[i]) - x.position(ticks[i - 1]) >= 44 - 1e-8);
 		}
 	});
+
+test('log scale maps equal ratios to equal distances and rejects nonpositive samples', () => {
+	const y = makeY([0.0001, 0.01], [200, 0], 'log');
+	assert.ok(Math.abs(y(0.001) - y(0.0001) - (y(0.01) - y(0.001))) < 1e-8);
+	for (const value of [0, -1, NaN, Infinity]) assert.ok(Number.isNaN(y(value)));
+	assert.throws(() => makeY([0, 1], [200, 0], 'log'));
+	assert.throws(() => makeY([-1, 1], [200, 0], 'log'));
+	assert.ok(y.ticks(4).every((value) => value > 0));
+});
