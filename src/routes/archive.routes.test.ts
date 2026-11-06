@@ -23,6 +23,13 @@ test.each(pages)('%s has an archive banner', (page) => {
 	expect(source).toContain('programme=');
 });
 
+// A banner that names a date states a fact about the page's data that the loader does not guarantee
+// (the relays page shows the latest week in the database), so banners say only that a programme ended.
+test.each(pages)('%s banner states no hard-coded date', (page) => {
+	const source = readFileSync(`${archive}/${page}/+page.svelte`, 'utf8');
+	expect(source).not.toMatch(/<ArchiveBanner[^>]*\b(frozenAt|endedOn)\s*=/);
+});
+
 test('the archive hub links all six programmes', () => {
 	const path = `${archive}/+page.svelte`;
 	expect(existsSync(path)).toBe(true);
