@@ -1,128 +1,135 @@
 <script lang="ts">
-	import { LinkOutline } from 'flowbite-svelte-icons';
-	import { A } from 'flowbite-svelte';
-	import faucetImg from '$lib/assets/voi-testnet-faucet.png';
+	import { goto } from '$app/navigation';
+	import { Button, Card, Chip, SearchBox } from '$lib/ds';
+	import { guideGroups } from './guides';
+	import type { PageData } from './$types';
 
-	let categories = [
-		{
-			heading: 'Participation Node Setup Guides',
-			links: [
-				{
-					text: 'Official VOI *Technical Documentation*',
-					url: 'https://docs.voi.network/'
-				},
-				{
-					text: 'Guide to running a node with *Voi Swarm* (Linux)',
-					url: 'https://voinetwork.github.io/voi-swarm'
-				},
-				{
-					text: "Funk's Ultimate Node Controller (*FUNC*) for Windows, macOS and Linux",
-					url: 'https://github.com/GalaxyPay/func'
-				},
-				{
-					text: 'Guide to Setting up a *Participation Node* on Ubuntu by D13',
-					url: 'https://d13.co/posts/set-up-voi-participation-node/'
-				},
-				{
-					text: 'Guide to Setting up a Participation Node on *Docker*',
-					url: 'https://github.com/xarmian/voinode'
-				},
-				{
-					text: 'Guide to Setting up a Participation Node on *DappNode*',
-					url: 'https://github.com/scholtz/dappnode-participation-node-voitest/blob/main/README.md'
-				}
-			]
-		},
-		{
-			heading: 'Additional Resources and Guides',
-			links: [
-				/*{
-                text: 'VOI Node Metrics (Node Health Stats and History)',
-                url: 'https://voi-nodes.dev/',
-            },*/
-				{
-					text: 'Guide to Setting up a *Relay Node*',
-					url: 'https://voinetwork.github.io/voi-swarm/advanced-node-running/relay-node/'
-				},
-				{
-					text: 'VOI Node Running System Requirements (for Voi Swarm)',
-					url: 'https://voinetwork.github.io/voi-swarm/installation/system-requirements/'
-				}
-			]
-		},
-		{
-			heading: 'Need Help?',
-			subheading: 'More Links and Resources',
-			links: [
-				{
-					text: 'VOI Website',
-					url: 'https://voi.network'
-				},
-				{
-					text: 'VOI Discord',
-					url: 'https://discord.gg/vnFbrJrHeW'
-				},
-				{
-					text: '@Voi_Net Twitter',
-					url: 'https://twitter.com/Voi_Net'
-				},
-				{
-					text: 'Voi Subreddit',
-					url: 'https://www.reddit.com/r/Voi_Net/'
-				}
-			]
-		}
-	];
+	let { data }: { data: Pick<PageData, 'faqHighlights'> } = $props();
 </script>
 
-<div
-	class="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-purple-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8"
->
-	<div class="max-w-4xl mx-auto">
-		<header class="bg-white dark:bg-gray-800 shadow-lg rounded-2xl p-6 mb-8">
-			<h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">Node Running Resources</h1>
-			<p class="mt-2 text-xl text-gray-600 dark:text-gray-300">
-				Interested in Running a Node? Check out the resources and links below
-			</p>
-			<p class="mt-4 text-gray-600 dark:text-gray-400">
-				Node Runners earn block rewards for each block they propose. Block proposals are a key part
-				of the Voi consensus mechanism.
-			</p>
-		</header>
+{#snippet guideGroup(group: (typeof guideGroups)[number])}
+	<Card title={group.heading}>
+		{#if group.subheading}
+			<p class="mb-4 text-body text-ink-muted">{group.subheading}</p>
+		{/if}
+		<ul class="space-y-4">
+			{#each group.links as link}
+				<li>
+					<a
+						href={link.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-accent underline underline-offset-4"
+					>
+						{#each link.text.split('*') as text, i}{#if i % 2 === 0}{text}{:else}<strong
+									>{text}</strong
+								>{/if}{/each}<span class="sr-only">{' (opens in a new tab)'}</span>
+					</a>
+				</li>
+			{/each}
+		</ul>
+	</Card>
+{/snippet}
 
-		{#each categories as category}
-			<section class="mb-8 bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
-				<header class="bg-purple-600 dark:bg-purple-800 py-4 px-6">
-					<h2 class="text-2xl font-bold text-white">{category.heading}</h2>
-					{#if category.subheading}
-						<p class="text-purple-200 dark:text-purple-300 mt-1">{category.subheading}</p>
-					{/if}
-				</header>
-				<ul class="py-4">
-					{#each category.links as link}
-						<li
-							class="px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out"
-						>
-							<A
-								href={link.url}
-								target="_blank"
-								class="flex items-center text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
-							>
-								<LinkOutline class="w-5 h-5 mr-3" />
-								<span>
-									{#each link.text.split('*') as text, i}
-										{#if i % 2 === 0}
-											<span>{text}</span>
-										{:else}
-											<span class="font-semibold text-purple-600 dark:text-purple-400">{text}</span>
-										{/if}
-									{/each}
-								</span>
-							</A>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/each}
-	</div>
+<div class="container-page space-y-8 py-8 text-ink break-words md:py-12">
+	<header class="max-w-3xl">
+		<h1 class="text-display">Run a node</h1>
+		<p class="mt-4 text-lede">Set up. Estimate. Check.</p>
+		<p class="mt-4 text-body text-ink-muted">
+			Node Runners earn block rewards for each block they propose. Block proposals are a key part of
+			the Voi consensus mechanism.
+		</p>
+	</header>
+
+	<ol aria-label="Run a node in three steps" class="grid gap-bento lg:grid-cols-3">
+		<li class="min-w-0">
+			<Card>
+				<Chip label="1" />
+				<h2 class="mt-3 text-h2">Read a guide</h2>
+				<p class="mt-3 text-body text-ink-muted">
+					Choose a setup guide for your system and get your node online.
+				</p>
+				<Button href="#guides" variant="soft" class="mt-4">Browse setup guides</Button>
+			</Card>
+		</li>
+		<li class="min-w-0">
+			<Card>
+				<Chip label="2" />
+				<h2 class="mt-3 text-h2">Estimate rewards</h2>
+				<p class="mt-3 text-body text-ink-muted">
+					Explore potential block rewards for the amount you plan to stake.
+				</p>
+				<Button href="/calculator" variant="soft" class="mt-4">Open rewards calculator</Button>
+			</Card>
+		</li>
+		<li class="min-w-0">
+			<Card>
+				<Chip label="3" />
+				<h2 class="mt-3 text-h2">Check it's working</h2>
+				<p class="mt-3 text-body text-ink-muted">
+					Look up your node's wallet to check its status and rewards.
+				</p>
+				<Button href="#wallet-check" variant="soft" class="mt-4">Check your wallet</Button>
+			</Card>
+		</li>
+	</ol>
+
+	<section id="guides" aria-label="Node guides and support" class="grid gap-bento lg:grid-cols-12">
+		<div class="min-w-0 space-y-6 lg:col-span-8">
+			{#each guideGroups.slice(0, 2) as group}
+				{@render guideGroup(group)}
+			{/each}
+		</div>
+		<aside class="min-w-0 lg:col-span-4">
+			{@render guideGroup(guideGroups[2])}
+		</aside>
+	</section>
+
+	<section id="wallet-check" aria-labelledby="node-wallet-heading">
+		<Card title="Check your node's wallet" id="node-wallet-heading" as="div">
+			<p class="mb-4 max-w-3xl text-body text-ink-muted">
+				Enter a wallet address or an enVoi name to check your node. For a locked stake, use the
+				contract account.
+			</p>
+			<div class="max-w-3xl">
+				<SearchBox
+					variant="hero"
+					tone="surface"
+					collapsible={false}
+					id="node-wallet-check"
+					formLabel="Node wallet check"
+					onsubmit={(address) => void goto('/wallet/' + address)}
+				/>
+			</div>
+		</Card>
+	</section>
+
+	<Card title="Node questions">
+		<div class="divide-y divide-line">
+			{#each data.faqHighlights as highlight}
+				<details class="py-4 first:pt-0">
+					<summary class="cursor-pointer text-body font-bold">
+						{#each highlight.question.split('**') as text, i}{#if i % 2 === 0}{text}{:else}<strong
+									>{text}</strong
+								>{/if}{/each}
+					</summary>
+					<p class="mt-3 max-w-3xl text-body text-ink-muted">{highlight.excerpt}</p>
+					<a
+						href={`/faq#${highlight.slug}`}
+						class="mt-3 inline-block text-accent underline underline-offset-4"
+						>Read the full answer</a
+					>
+				</details>
+			{/each}
+		</div>
+		<a href="/faq" class="inline-block text-accent underline underline-offset-4"
+			>See all questions</a
+		>
+	</Card>
+
+	<Card title="Tools">
+		<p class="text-accent underline underline-offset-4">
+			<a href="/vanity" data-sveltekit-reload>Vanity address generator</a>
+		</p>
+	</Card>
 </div>
