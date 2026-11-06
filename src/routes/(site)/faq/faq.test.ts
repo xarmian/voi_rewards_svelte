@@ -11,7 +11,11 @@ it('uses native disclosures with non-interactive summaries and a sibling copy co
 		expect(summary).not.toMatch(/<a\b|<button\b|role="button"|<CopyButton\b/);
 	}
 	expect(source).toMatch(/<details\b/);
-	expect(source).toMatch(/<\/summary>\s*<[^>]*>\s*<CopyButton\b|<\/summary>\s*<CopyButton\b/);
+	// The copy control follows the closing details tag, so it stays visible while a question is closed.
+	expect(source).toMatch(/<\/details>\s*<div[^>]*>\s*<CopyButton\b/);
+	for (const [, details] of source.matchAll(/<details\b[^>]*>([\s\S]*?)<\/details>/g)) {
+		expect(details).not.toContain('<CopyButton');
+	}
 	expect(source).toContain('what="link to this question"');
 });
 

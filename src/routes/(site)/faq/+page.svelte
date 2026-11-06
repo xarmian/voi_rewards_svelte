@@ -140,27 +140,33 @@
 			<Card title={category}>
 				<div class="divide-y divide-line">
 					{#each items as item (item.question)}
-						<details
-							id={slugify(item.question)}
-							open={openIds.has(slugify(item.question))}
-							ontoggle={(event) => toggleQuestion(slugify(item.question), event.currentTarget.open)}
-							class="min-w-0 scroll-mt-6 py-4 first:pt-0"
-						>
-							<summary class="mb-3 cursor-pointer break-words text-body font-bold">
-								{#each item.question.split('**') as part, index}
-									{#if index % 2 === 0}{part}{:else}<strong class="text-accent">{part}</strong>{/if}
-								{/each}
-							</summary>
-							<CopyButton
-								text={copyUrl(page.url.origin, page.url.pathname, item.question)}
-								what="link to this question"
-							/>
-							<div
-								class="markdown min-w-0 max-w-none break-words text-body text-ink [overflow-wrap:anywhere]"
+						<div class="relative min-w-0 py-4">
+							<details
+								id={slugify(item.question)}
+								open={openIds.has(slugify(item.question))}
+								ontoggle={(event) =>
+									toggleQuestion(slugify(item.question), event.currentTarget.open)}
+								class="min-w-0 scroll-mt-6"
 							>
-								<Markdown source={item.answer} renderers={{ link: ExternalLink }} />
+								<summary class="cursor-pointer break-words pr-14 text-body font-bold">
+									{#each item.question.split('**') as part, index}
+										{#if index % 2 === 0}{part}{:else}<strong class="text-accent">{part}</strong
+											>{/if}
+									{/each}
+								</summary>
+								<div
+									class="markdown mt-3 min-w-0 max-w-none break-words text-body text-ink [overflow-wrap:anywhere]"
+								>
+									<Markdown source={item.answer} renderers={{ link: ExternalLink }} />
+								</div>
+							</details>
+							<div class="absolute right-0 top-3">
+								<CopyButton
+									text={copyUrl(page.url.origin, page.url.pathname, item.question)}
+									what="link to this question"
+								/>
 							</div>
-						</details>
+						</div>
 					{/each}
 				</div>
 			</Card>
