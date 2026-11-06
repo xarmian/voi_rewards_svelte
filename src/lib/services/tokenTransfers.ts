@@ -1,5 +1,4 @@
 import { calculateUserPoolAmounts, calculateUserPoolShare, isLPToken } from '$lib/tokens/lpStats';
-/* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the moved upstream payload handling. */
 import type { FungibleTokenType, LPToken } from '$lib/types/assets';
 import { globalStateEntries } from '$lib/chain/algodShapes';
 import { algodClient, algodIndexer } from '$lib/utils/algod';
