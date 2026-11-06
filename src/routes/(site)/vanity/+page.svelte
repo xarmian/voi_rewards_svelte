@@ -46,7 +46,9 @@
 	let plan: VanityPlan | null = null;
 	let reviewOpen = false;
 	let reviewDrifted = false;
+	let retryDrifted = false;
 	$: if (reviewOpen && plan && selectionDrifted(plan, $selectedWallet)) reviewDrifted = true;
+	$: retryDrifted = !!plan && selectionDrifted(plan, $selectedWallet);
 
 	// Method to validate inputs
 	function validateInputs(): boolean {
@@ -144,6 +146,7 @@
 	// Generate the vanity address
 	async function generateVanityAddress() {
 		if (!ready) return;
+		if (isActivating || isRekeying) return;
 		if (!validateInputs()) return;
 
 		// Reset state
@@ -151,6 +154,12 @@
 		attempts = 0;
 		progress = 0;
 		result = null;
+		plan = null;
+		reviewOpen = false;
+		reviewDrifted = false;
+		txnStatus = 'idle';
+		rekeyTxnStatus = 'idle';
+		txnError = null;
 		error = null; // Clear previous errors
 		lastAddressCheckedByWorker = null; // Clear last checked address
 		startTime = Date.now();
@@ -298,13 +307,46 @@
 		await activateVanityAddress(plan, signer);
 	}
 
+	async function retryRekey() {
+		if (!plan || txnStatus !== 'success' || isActivating || isRekeying) return;
+		if (selectionDrifted(plan, $selectedWallet)) {
+			retryDrifted = true;
+			return;
+		}
+		isRekeying = true;
+		rekeyTxnStatus = 'sending';
+		txnError = null;
+		try {
+			if (!result || result.address !== plan.vanity) {
+				throw new Error('The generated vanity address changed. Review again.');
+			}
+			const info = await algodClient.accountInformation(plan.vanity).do();
+			if (info.authAddr?.toString() === plan.rekeyTo) {
+				rekeyTxnStatus = 'success';
+				return;
+			}
+			await rekeyVanityAddress(plan);
+		} catch (err) {
+			rekeyTxnStatus = 'error';
+			txnError = err instanceof Error ? err.message : String(err);
+		} finally {
+			isRekeying = false;
+		}
+	}
+
 	// Send 1 VOI from the reviewed account, then rekey to that same account.
 	async function activateVanityAddress(plan: VanityPlan, signer: TransactionSigner) {
 		isActivating = true;
 		txnStatus = 'sending';
+		rekeyTxnStatus = 'idle';
 		txnError = null;
 
 		try {
+			const info = await algodClient.accountInformation(plan.vanity).do();
+			if (info.amount >= BigInt(1000000)) {
+				txnStatus = 'success';
+				return;
+			}
 			// Get parameters for the transaction
 			const params = await algodClient.getTransactionParams().do();
 
@@ -343,6 +385,7 @@
 	async function rekeyVanityAddress(plan: VanityPlan) {
 		isRekeying = true;
 		rekeyTxnStatus = 'sending';
+		txnError = null;
 
 		try {
 			if (!result || result.address !== plan.vanity) {
@@ -621,6 +664,23 @@
 								tone="ok"
 								label="Success! Your vanity address is now rekeyed to the reviewed account."
 							/>
+						{:else if txnStatus === 'success'}
+							{#if plan}
+								<div class="space-y-3">
+									<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />
+									{#if retryDrifted}
+										<div class="[overflow-wrap:anywhere]">
+											<InlineAlert message="Your selected account changed. Review again." />
+										</div>
+									{/if}
+									<Button
+										onclick={retryRekey}
+										disabled={retryDrifted || isActivating || isRekeying}
+									>
+										Retry rekey
+									</Button>
+								</div>
+							{/if}
 						{:else if reviewOpen && plan}
 							<div class="space-y-3" aria-label="Review vanity activation">
 								<ResolvedAddress address={plan.vanity} label="Vanity address" />
