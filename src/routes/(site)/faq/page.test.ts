@@ -1,65 +1,43 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { faqData } from '$lib/faqData';
 
 const environment = vi.hoisted(() => ({ browser: true }));
 vi.mock('$app/environment', () => environment);
 import { load } from './+page';
 
 type LoadResult = Exclude<Awaited<ReturnType<typeof load>>, void>;
-
-const event = (fetcher: unknown) =>
+const event = (fetcher: unknown, hash = '') =>
 	({
-		url: new URL('https://example.test/faq'),
+		url: new URL(`https://example.test/faq${hash}`),
 		fetch: fetcher,
-		data: { faqData: [] }
+		data: { faqData }
 	}) as never;
 
 afterEach(() => {
 	environment.browser = true;
 });
 
-it('returns immediately with a pending posts promise when Medium never responds', async () => {
-	let result: LoadResult | undefined;
-	const pending = Promise.resolve(load(event(vi.fn(() => new Promise(() => {}))))).then((value) => {
-		result = value as LoadResult;
-	});
-	for (let i = 0; i < 10; i++) await Promise.resolve();
-	expect(result).toBeDefined();
-	await pending;
-	expect(result!.lastFivePosts).toBeInstanceOf(Promise);
-	let settled = false;
-	Promise.resolve(result!.lastFivePosts).then(() => {
-		settled = true;
-	});
-	await Promise.resolve();
-	expect(settled).toBe(false);
+it.each([true, false])('loads FAQ without fetching when browser is %s', async (browser) => {
+	environment.browser = browser;
+	const fetcher = vi.fn(() => Promise.resolve(Response.json([])));
+	const result = (await load(event(fetcher))) as LoadResult;
+	expect(fetcher).not.toHaveBeenCalled();
+	expect(result).not.toHaveProperty('lastFivePosts');
+	expect(result.faqData).toBe(faqData);
+	expect(result.recentFAQs).toEqual(faqData.filter((item) => item.recent === 'true').slice(0, 3));
 });
 
-it.each(['reject', 'non-json', 'non-array', 'throw', 'http error'])(
-	'posts resolve to [] on %s',
-	async (failure) => {
-		const fetcher = vi.fn(() => {
-			if (failure === 'throw') throw new Error('failed');
-			if (failure === 'reject') return Promise.reject(new Error('failed'));
-			return Promise.resolve(
-				failure === 'non-json'
-					? new Response('broken')
-					: Response.json({}, { status: failure === 'http error' ? 503 : 200 })
-			);
-		});
-		const result = (await load(event(fetcher))) as LoadResult;
-		expect(await result!.lastFivePosts).toEqual([]);
-	}
-);
+it('uses a legacy hash for the highlighted FAQ and meta title', async () => {
+	const question = 'Can **Locked** or Non-vested Voi tokens earn block rewards?';
+	const result = (await load(
+		event(vi.fn(), '#can-locked-or-non-vested-voi-tokens-earn-block-rewards-')
+	)) as LoadResult;
+	expect(result.highlightedFAQ).toBe(faqData.find((item) => item.question === question));
+	expect(result.pageMetaTags.title).toBe(`FAQ: ${question} | Voi Network`);
+});
 
-it('SSR renders FAQ without starting a Medium request that hydration would repeat', async () => {
-	environment.browser = false;
-	const fetcher = vi.fn(() => new Promise(() => {}));
-	let result: LoadResult | undefined;
-	Promise.resolve(load(event(fetcher))).then((value) => {
-		result = value as LoadResult;
-	});
-	for (let i = 0; i < 10; i++) await Promise.resolve();
-	expect(result).toBeDefined();
-	expect(fetcher).not.toHaveBeenCalled();
-	expect(await result!.lastFivePosts).toEqual([]);
+it('keeps the default title and a null highlight for an unknown hash', async () => {
+	const result = (await load(event(vi.fn(), '#no-such-question'))) as LoadResult;
+	expect(result.highlightedFAQ).toBeNull();
+	expect(result.pageMetaTags.title).toBe('Frequently Asked Questions | Voi Network');
 });

@@ -428,16 +428,6 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/faq/+page.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 6,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/routes/(site)/markets/+page.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 4,
@@ -673,20 +663,6 @@
 			},
 			"ts:7053": {
 				"errors": 4,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/faq/+page.svelte": {
-			"css:unknownAtRules": {
-				"errors": 0,
-				"warnings": 1
-			},
-			"ts:18046": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"ts:2345": {
-				"errors": 1,
 				"warnings": 0
 			}
 		},

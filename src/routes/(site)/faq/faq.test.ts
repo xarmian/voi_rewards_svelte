@@ -1,15 +1,85 @@
-import { test } from 'vitest';
-import assert from 'node:assert/strict';
+import { expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { navCurrent } from '$lib/ds/Header/nav';
 
-test('accordion header slots contain only non-interactive question content', () => {
-	const source = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
-	const headers = [
-		...source.matchAll(/<svelte:fragment slot="header">([\s\S]*?)<\/svelte:fragment>/g)
-	];
-	assert.equal(headers.length, 2);
-	for (const [, header] of headers) {
-		assert.doesNotMatch(header, /<a\b|<button\b|role="button"/);
+const source = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+
+it('uses native disclosures with non-interactive summaries and a sibling copy control', () => {
+	const summaries = [...source.matchAll(/<summary\b[^>]*>([\s\S]*?)<\/summary>/g)];
+	expect(summaries.length).toBeGreaterThan(0);
+	for (const [, summary] of summaries) {
+		expect(summary).not.toMatch(/<a\b|<button\b|role="button"|<CopyButton\b/);
 	}
-	assert.equal((source.match(/aria-label="Copy link to this question"/g) ?? []).length, 2);
+	expect(source).toMatch(/<details\b/);
+	// The copy control follows the closing details tag, so it stays visible while a question is closed.
+	expect(source).toMatch(/<\/details>\s*<div[^>]*>\s*<CopyButton\b/);
+	for (const [, details] of source.matchAll(/<details\b[^>]*>([\s\S]*?)<\/details>/g)) {
+		expect(details).not.toContain('<CopyButton');
+	}
+	expect(source).toContain('what="link to this question"');
+});
+
+it('removes the old feed, widgets and color classes', () => {
+	for (const removed of [
+		'Accordion',
+		'Drawer',
+		'lastFivePosts',
+		'medium',
+		'Latest from',
+		'bg-purple-',
+		'text-purple-',
+		'bg-gray-',
+		'dark:bg-gray-',
+		'from-purple-',
+		'bg-green-',
+		'flowbite',
+		'formatDate',
+		'formatDistanceToNow',
+		'showToast'
+	])
+		expect(source).not.toContain(removed);
+});
+
+it('provides navigation, persistent filter labels, recovery and a live result count', () => {
+	for (const required of [
+		'/how_to_node',
+		'Clear filters',
+		'Question not found',
+		'aria-live="polite"',
+		'container-page',
+		'text-display',
+		'Recently added'
+	]) {
+		expect(source).toContain(required);
+	}
+	expect(source).toMatch(/<label\b[^>]*for="faq-category"[^>]*>\s*Category\s*<\/label>/);
+	expect(source).toMatch(/<select\b[^>]*id="faq-category"/);
+	expect(source).toMatch(/<label\b[^>]*for="faq-search"[^>]*>\s*Search questions\s*<\/label>/);
+	expect(source).toMatch(/<input\b[^>]*id="faq-search"[^>]*type="search"/);
+	expect(navCurrent('/faq')).toBe('node');
+});
+
+it('renders each answer and its legacy id through a single details template', () => {
+	expect([...source.matchAll(/<details\b/g)]).toHaveLength(1);
+	expect([...source.matchAll(/\bid=\{/g)]).toHaveLength(1);
+	expect(source).toMatch(/<details\b[^>]*id=\{slugify\(item.question\)\}/);
+	expect([...source.matchAll(/<Markdown\b[^>]*source=\{[^}]*answer\}/g)]).toHaveLength(1);
+	expect(source).not.toMatch(/\{#if\s+highlightedFAQ|highlightedFAQ\.answer/);
+});
+
+it('wires hydrated and later hash arrivals to the pure resolver, scroll and summary focus', () => {
+	for (const required of [
+		'onMount(',
+		"'hashchange'",
+		'location.hash',
+		'visibleAfterResolve(',
+		'scrollIntoView(',
+		'.focus(',
+		'ontoggle=',
+		'openIds',
+		"split('**')"
+	])
+		expect(source).toContain(required);
+	expect(source).not.toContain('on:click');
+	expect(source).toContain('$props()');
 });
