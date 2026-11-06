@@ -677,7 +677,11 @@
 										onclick={retryRekey}
 										disabled={retryDrifted || isActivating || isRekeying}
 									>
-										Retry rekey
+										{#if isRekeying || rekeyTxnStatus === 'sending'}
+											Rekeying Address...
+										{:else}
+											Retry rekey
+										{/if}
 									</Button>
 								</div>
 							{/if}

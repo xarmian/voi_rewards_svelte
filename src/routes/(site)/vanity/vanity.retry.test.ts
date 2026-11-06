@@ -278,7 +278,7 @@ test('funded retry branch exposes only the reviewed target and the rekey action'
 	expect(branch).not.toContain('Fund &amp; Rekey Address');
 	expect(branch).toContain('<ResolvedAddress address={plan.rekeyTo} label="Rekey target" />');
 	expect(branch).toMatch(
-		/<Button\s+onclick=\{retryRekey\}\s+disabled=\{retryDrifted \|\| isActivating \|\| isRekeying\}\s*>\s*Retry rekey\s*<\/Button>/
+		/<Button\s+onclick=\{retryRekey\}\s+disabled=\{retryDrifted \|\| isActivating \|\| isRekeying\}\s*>\s*\{#if isRekeying \|\| rekeyTxnStatus === 'sending'\}\s*Rekeying Address\.\.\.\s*\{:else\}\s*Retry rekey\s*\{\/if\}\s*<\/Button>/
 	);
 	expect(branch).not.toMatch(/reviewActivation|confirmActivation|activateVanityAddress/);
 	expect(branch).toMatch(
