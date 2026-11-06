@@ -439,14 +439,16 @@
 				.sendRawTransaction(signedTxns)
 				.do()
 				.catch((err: { response?: { status?: number }; message?: string }) => {
-					// Forget the payment only when the node says in so many words that it refused it (for
-					// example too little balance): it cannot land, so there is nothing to wait for. Every
-					// other failure is unknown, including a 400 with no readable text or one that says the
-					// payment is already known. Unknown costs a wait until the window ends, never a second payment.
+					// Forget the payment only when the node says the sender cannot pay for it (too little
+					// balance): that depends on the account, not on which node answered, so it cannot land.
+					// Every other failure is unknown, including a 400 with no readable text, a payment that is
+					// already known, and a window the node finds dead (an expired payment is settled by the
+					// last valid round on the next attempt). Unknown costs a wait of at most the window,
+					// never a second payment.
 					const message = err?.message ?? '';
 					if (
 						err?.response?.status === 400 &&
-						/overspend|below min|txn dead|malformed|invalid/i.test(message) &&
+						/overspend|below min/i.test(message) &&
 						!/already/i.test(message)
 					) {
 						fundingTxId = null;
