@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import type { Handle } from '@sveltejs/kit';
 import { withDeadline } from '$lib/server/fetchWithTimeout';
 import { isVanityPath, newNonce, nonceInlineScripts, vanityCsp } from '$lib/server/vanityCsp';
+import { redirectFor } from '$lib/server/redirects';
 
 // TASK-85: Bound the entire auth validation so stalled requests cannot hold page loads.
 const AUTH_TIMEOUT_MS = 3000;
@@ -15,6 +16,14 @@ function requestUrl(input: RequestInfo | URL): string {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	const redirect = event.url ? redirectFor(event.url, event.request?.method ?? 'GET') : null;
+	if (redirect) {
+		return new Response(null, {
+			status: redirect.status,
+			headers: { location: redirect.location }
+		});
+	}
+
 	const authAbort = new AbortController();
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		global: {
