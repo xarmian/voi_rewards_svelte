@@ -13,7 +13,7 @@
 		fetchTokenChartData as loadTokenChartData,
 		fetchVOIChartData as loadVOIChartData
 	} from '$lib/markets/chartData';
-	import { InlineAlert } from '$lib/ds';
+	import { InlineAlert, Tabs } from '$lib/ds';
 	import { onMount } from 'svelte';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
 	import type { PageData } from './$types';
@@ -858,6 +858,25 @@
 
 <div class="min-h-screen bg-canvas text-ink">
 	<div class="container-page flex flex-col gap-bento py-6">
+		<nav aria-label="Breadcrumb">
+			<ol class="flex flex-wrap items-center gap-2 text-label text-ink-muted">
+				<li><a href="/directory" class="text-accent hover:underline">Ecosystem</a></li>
+				<li class="flex items-center gap-2">
+					<span aria-hidden="true">/</span>
+					<span aria-current="page">Markets</span>
+				</li>
+			</ol>
+		</nav>
+		<Tabs
+			variant="nav"
+			label="Explore the ecosystem"
+			onHero={false}
+			current="markets"
+			items={[
+				{ id: 'projects', label: 'Projects', href: '/directory' },
+				{ id: 'markets', label: 'Markets Beta', href: '/markets' }
+			]}
+		/>
 		<MarketHeader
 			{selectedToken}
 			{tokenInfo}
@@ -865,6 +884,7 @@
 			{realMarketData}
 			{fetchingMarketData}
 			{displayPrice}
+			quoteAsOf={voiUsdAsOf}
 			{commandPaletteShortcut}
 			{allTokens}
 			{handleTokenSelect}

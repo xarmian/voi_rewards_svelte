@@ -39,7 +39,7 @@
 				: formatCurrency(circulatingMarketCap)
 			: tokenTotalSupplyAdjusted != null
 				? formatCurrency(fullyDilutedMarketCap)
-				: '-'
+				: '—'
 	);
 	let supply = $derived(
 		isVoi
