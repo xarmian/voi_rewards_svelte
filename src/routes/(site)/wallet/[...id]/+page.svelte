@@ -159,13 +159,13 @@
 	<div class="on-hero rounded-b-hero bg-hero pb-[70px] pt-8 text-on-hero md:pb-[84px]">
 		<div class="container-page min-w-0 space-y-5">
 			<div class="flex min-w-0 flex-wrap items-start justify-between gap-5">
-				<div class="flex min-w-0 flex-1 flex-wrap items-center gap-4">
+				<div class="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-4">
 					<div
 						aria-hidden="true"
 						class="h-16 w-16 shrink-0 rounded-ds-md"
 						style:background={avatar}
 					></div>
-					<div class="min-w-0 flex-1">
+					<div class="min-w-0 flex-1 basis-40">
 						<h1 class="break-words text-title">
 							{walletId ? shortAddr(walletId) : 'Check a wallet'}
 						</h1>

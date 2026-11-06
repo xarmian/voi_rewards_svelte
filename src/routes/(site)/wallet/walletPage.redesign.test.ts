@@ -149,3 +149,11 @@ it('binds the legacy Node panel disclosure to showNode', () => {
 	visit(ast.fragment);
 	expect(found).toBe(true);
 });
+
+it('gives the hero identity a minimum width so the picker wraps instead of crushing the name at 320 px', () => {
+	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
+	// Without a flex basis the identity group collapses to a sliver beside the picker and the
+	// address wraps letter by letter (seen in the production build at 320 px).
+	expect(source).toMatch(/class="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-4"/);
+	expect(source).toMatch(/class="min-w-0 flex-1 basis-40">\s*<h1/);
+});
