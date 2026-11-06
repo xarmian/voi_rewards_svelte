@@ -166,7 +166,7 @@ test('Aurora shell keeps navigation, labels, browser computation and the blocked
 test('Aurora shell removes legacy colors and icons outside the library picker', () => {
 	const withoutPicker = source.replace(/<Web3Wallet\b[^]*?\/>/g, '');
 	expect(withoutPicker).not.toMatch(
-		/bg-purple-|text-purple-|bg-gray-|dark:bg-|bg-green-|bg-yellow-|bg-red-|fas fa-|(?:wholly|fully|works|runs|is an?) offline|no network requests/i
+		/bg-purple-|text-purple-|bg-gray-|dark:bg-|bg-green-|bg-yellow-|bg-red-|text-(?:red|green|gray|yellow|amber|blue)-|border-(?:gray|red|green)-|fas fa-|(?:wholly|fully|works|runs|is an?) offline|no network requests/i
 	);
 });
 
@@ -247,7 +247,7 @@ test('Confirm is inside reviewOpen && plan and disabled when reviewDrifted', () 
 	expect(confirms).toBe(1);
 });
 
-test('funding and rekey failures have distinct messages, and a stale rekey error is hidden on retry', () => {
+test('source guard: funding and rekey failures have distinct messages, and the rekey one is gated on funding success', () => {
 	const step2 = markup.slice(markup.indexOf('Step 2:'));
 	expect(step2).toMatch(
 		/\{#if txnStatus === 'error'\}\s*<InlineAlert\s+message=\{`Funding did not complete\.[^`]*\$\{txnError \?\? ''\}`\}\s*\/>\s*\{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'\}\s*<InlineAlert\s+message=\{`Funding completed, but the rekey did not\.[^`]*\$\{txnError \?\? ''\}`\}/
@@ -269,6 +269,37 @@ test('progress counters are outside the live region; only the status label is an
 
 test('the mnemonic guidance keeps saying to store it offline', () => {
 	expect(markup.match(/securely offline/g)?.length).toBeGreaterThanOrEqual(2);
+});
+
+test('source guard: generation errors show under the form until a result exists, then beside the Step 2 button', () => {
+	expect(markup).toMatch(
+		/\{#if error && !result\}\s*<div[^>]*overflow-wrap:anywhere[^>]*>\s*<InlineAlert message=\{error\}/
+	);
+	const step2 = markup.slice(markup.indexOf('Step 2:'));
+	expect(step2).toMatch(
+		/\{#if error\}\s*<div[^>]*overflow-wrap:anywhere[^>]*>\s*<InlineAlert message=\{error\}/
+	);
+});
+
+test('failure alerts wrap unbroken error text', () => {
+	const step2 = markup.slice(markup.indexOf('Step 2:'));
+	expect(step2).toMatch(/overflow-wrap:anywhere[^>]*>\s*\{#if txnStatus === 'error'\}/);
+});
+
+test('the mnemonic expression only feeds the text node and the CopyButton text prop', () => {
+	let uses = 0;
+	walk(template, (node, ancestors) => {
+		if (node.type !== 'MemberExpression' || !/^result\??\.mnemonic$/.test(textOf(node))) return;
+		uses++;
+		const attr = ancestors.find((parent) => parent.type === 'Attribute');
+		if (attr) {
+			const owner = ancestors.find((parent) => parent.name === 'CopyButton');
+			expect(owner && attr.name === 'text', `mnemonic in attribute ${attr.name}`).toBe(true);
+		}
+	});
+	expect(uses).toBeGreaterThan(0);
+	expect(source).not.toMatch(/(?:error|txnError)\s*=[^;\n]*mnemonic/);
+	expect(markup).not.toMatch(/\bwhat=\{[^}]*(?:mnemonic|address)/);
 });
 
 test('mnemonic is never in a live region or a copy announcement', () => {

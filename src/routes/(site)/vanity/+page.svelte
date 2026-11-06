@@ -530,8 +530,8 @@
 					{/if}
 				</div>
 			{/if}
-			{#if error}
-				<div class="mt-6">
+			{#if error && !result}
+				<div class="mt-6 [overflow-wrap:anywhere]">
 					<InlineAlert message={error} />
 					{#if isGenerating && lastAddressCheckedByWorker}
 						<p class="mt-2 break-all font-mono text-xs text-ink-muted">
@@ -607,6 +607,11 @@
 					</div>
 					<div class="space-y-4 border-t border-line pt-6">
 						<h3 class="text-h2">Step 2: Fund &amp; Rekey Address</h3>
+						{#if error}
+							<div class="[overflow-wrap:anywhere]">
+								<InlineAlert message={error} />
+							</div>
+						{/if}
 						<p class="text-body text-ink-muted">
 							This process will send 1 VOI to your vanity address, then rekey it to the account you
 							review below.
@@ -646,15 +651,17 @@
 								{/if}
 							</Button>
 						{/if}
-						{#if txnStatus === 'error'}
-							<InlineAlert
-								message={`Funding did not complete. Check the vanity address balance before trying again. ${txnError ?? ''}`}
-							/>
-						{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'}
-							<InlineAlert
-								message={`Funding completed, but the rekey did not. Check this address before trying again. ${txnError ?? ''}`}
-							/>
-						{/if}
+						<div class="[overflow-wrap:anywhere]">
+							{#if txnStatus === 'error'}
+								<InlineAlert
+									message={`Funding did not complete. Check the vanity address balance before trying again. ${txnError ?? ''}`}
+								/>
+							{:else if rekeyTxnStatus === 'error' && txnStatus === 'success'}
+								<InlineAlert
+									message={`Funding completed, but the rekey did not. Check this address before trying again. ${txnError ?? ''}`}
+								/>
+							{/if}
+						</div>
 					</div>
 					{#if txnStatus === 'success' && rekeyTxnStatus === 'success'}
 						<div class="space-y-2 rounded-ds-sm bg-accent-soft p-4 text-sm text-accent">
