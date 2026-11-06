@@ -292,6 +292,7 @@
 								? width - right
 								: (mark.center + marks[index + 1].center) / 2}
 						<rect
+							role="presentation"
 							x={start}
 							y={margin.top}
 							width={Math.max(0, end - start)}
