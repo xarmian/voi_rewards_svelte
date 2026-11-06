@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fade } from 'svelte/transition';
+	import { StatTile } from '$lib/ds';
 	import { formatCurrency, formatNumber } from '$lib/markets/format';
 	import type { UniqueToken } from '../../api/tokens/+server';
 
@@ -29,105 +29,54 @@
 		activeMarketsCount,
 		realMarketData
 	}: Props = $props();
+
+	let state: 'loading' | 'ready' = $derived(fetchingMarketData ? 'loading' : 'ready');
+	let isVoi = $derived((selectedToken?.symbol || 'VOI') === 'VOI');
+	let marketCap = $derived(
+		isVoi
+			? circulatingMarketCap === null
+				? '—'
+				: formatCurrency(circulatingMarketCap)
+			: tokenTotalSupplyAdjusted != null
+				? formatCurrency(fullyDilutedMarketCap)
+				: '-'
+	);
+	let supply = $derived(
+		isVoi
+			? `Circulating: ${realCirculatingSupply ? formatNumber(realCirculatingSupply.circulatingSupply, 0) : '—'}`
+			: `Total Supply: ${tokenTotalSupplyAdjusted != null ? formatNumber(tokenTotalSupplyAdjusted, 0) : '—'}`
+	);
+	let exchanges = $derived(
+		`Across ${new Set(realMarketData.map((m) => m.exchange)).size} exchanges`
+	);
 </script>
 
-<!-- Key Metrics -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
-	<!-- Total Volume -->
-	<div
-		class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-		transition:fade={{ duration: 300, delay: 200 }}
-	>
-		<div class="flex items-center justify-between mb-2">
-			<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">24h Volume</h3>
-			<i class="fas fa-chart-bar text-blue-500"></i>
-		</div>
-		<div class="text-2xl font-bold text-gray-900 dark:text-white">
-			{#if fetchingMarketData}
-				<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-20"></div>
-			{:else}
-				{totalVolume24h === null ? '—' : formatCurrency(totalVolume24h)}
-			{/if}
-		</div>
+<div class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-4">
+	<StatTile
+		label="24h Volume"
+		value={totalVolume24h === null ? '—' : formatCurrency(totalVolume24h)}
+		{state}
+	/>
+	<StatTile
+		label="Total TVL"
+		value={totalTvlAll === null ? '—' : formatCurrency(totalTvlAll)}
+		{state}
+	/>
+	<div class="min-w-0">
+		<StatTile label={isVoi ? 'Market Cap' : 'FDV'} value={marketCap} detail={supply} {state} />
+		{#if fetchingMarketData || marketCap === '—'}
+			<p class="mt-2 text-label text-ink-muted">{supply}</p>
+		{/if}
 	</div>
-
-	<!-- Total TVL -->
-	<div
-		class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-		transition:fade={{ duration: 300, delay: 250 }}
-	>
-		<div class="flex items-center justify-between mb-2">
-			<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Total TVL</h3>
-			<i class="fas fa-lock text-green-500"></i>
-		</div>
-		<div class="text-2xl font-bold text-gray-900 dark:text-white">
-			{#if fetchingMarketData}
-				<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-24"></div>
-			{:else}
-				{totalTvlAll === null ? '—' : formatCurrency(totalTvlAll)}
-			{/if}
-		</div>
-	</div>
-
-	<!-- Market Cap / FDV -->
-	<div
-		class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-		transition:fade={{ duration: 300, delay: 300 }}
-	>
-		<div class="flex items-center justify-between mb-2">
-			<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">
-				{(selectedToken?.symbol || 'VOI') === 'VOI' ? 'Market Cap' : 'FDV'}
-			</h3>
-			<i class="fas fa-coins text-purple-500"></i>
-		</div>
-		<div class="text-2xl font-bold text-gray-900 dark:text-white">
-			{#if fetchingMarketData}
-				<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-28"></div>
-			{:else}
-				{(selectedToken?.symbol || 'VOI') === 'VOI'
-					? circulatingMarketCap === null
-						? '—'
-						: formatCurrency(circulatingMarketCap)
-					: tokenTotalSupplyAdjusted != null
-						? formatCurrency(fullyDilutedMarketCap)
-						: '-'}
-			{/if}
-		</div>
-		<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-			{#if (selectedToken?.symbol || 'VOI') === 'VOI'}
-				Circulating: {realCirculatingSupply
-					? formatNumber(realCirculatingSupply.circulatingSupply, 0)
-					: '—'}
-			{:else}
-				Total Supply: {tokenTotalSupplyAdjusted != null
-					? formatNumber(tokenTotalSupplyAdjusted, 0)
-					: '—'}
-			{/if}
-		</div>
-	</div>
-
-	<!-- Active Markets -->
-	<div
-		class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4"
-		transition:fade={{ duration: 300, delay: 350 }}
-	>
-		<div class="flex items-center justify-between mb-2">
-			<h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Markets</h3>
-			<i class="fas fa-exchange-alt text-orange-500"></i>
-		</div>
-		<div class="text-2xl font-bold text-gray-900 dark:text-white">
-			{#if fetchingMarketData}
-				<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-8 w-12"></div>
-			{:else}
-				{activeMarketsCount === null ? '—' : activeMarketsCount}
-			{/if}
-		</div>
-		<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-			{#if fetchingMarketData}
-				<div class="animate-pulse bg-gray-300 dark:bg-gray-600 rounded h-3 w-20"></div>
-			{:else}
-				Across {new Set(realMarketData.map((m) => m.exchange)).size} exchanges
-			{/if}
-		</div>
+	<div class="min-w-0">
+		<StatTile
+			label="Active markets"
+			value={activeMarketsCount === null ? '—' : String(activeMarketsCount)}
+			detail={exchanges}
+			{state}
+		/>
+		{#if !fetchingMarketData && activeMarketsCount === null}
+			<p class="mt-2 text-label text-ink-muted">{exchanges}</p>
+		{/if}
 	</div>
 </div>
