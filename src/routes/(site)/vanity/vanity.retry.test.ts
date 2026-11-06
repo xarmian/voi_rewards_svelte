@@ -13,10 +13,18 @@ const funder = algosdk.encodeAddress(new Uint8Array(32));
 const switched = algosdk.encodeAddress(new Uint8Array(32).fill(1));
 const vanity = algosdk.encodeAddress(new Uint8Array(32).fill(2));
 
-function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAddress']) {
+function fixture(
+	names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAddress', 'earlierFundingLanded']
+) {
 	const signedRekey = new Uint8Array([2]);
 	const signTxn = vi.fn(() => signedRekey);
-	const buildPayment = vi.fn((payment: Record<string, unknown>) => ({ ...payment, signTxn }));
+	const buildPayment = vi.fn((payment: Record<string, unknown>) => ({
+		...payment,
+		signTxn,
+		txID: () => 'tx',
+		lastValid: 100n
+	}));
+	const statusRead = vi.fn().mockResolvedValue({ lastRound: 50n });
 	const read = vi.fn().mockResolvedValue({ amount: 0n, authAddr: undefined });
 	const send = vi.fn().mockResolvedValue({ txid: 'tx' });
 	const pendingRead = vi.fn().mockResolvedValue({ confirmedRound: 0n, poolError: '' });
@@ -36,6 +44,7 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 		reviewDrifted: false,
 		retryDrifted: false,
 		fundingTxId: null,
+		fundingLastValid: null,
 		selectionDrifted,
 		buildPayment,
 		signTransactions: vi.fn().mockResolvedValue([new Uint8Array([1])]),
@@ -45,6 +54,7 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 		algodClient: {
 			accountInformation: vi.fn(() => ({ do: read })),
 			pendingTransactionInformation: vi.fn(() => ({ do: pendingRead })),
+			status: vi.fn(() => ({ do: statusRead })),
 			getTransactionParams: vi.fn(() => ({ do: params })),
 			sendRawTransaction: vi.fn(() => ({ do: send }))
 		},
@@ -85,7 +95,17 @@ function fixture(names = ['retryRekey', 'rekeyVanityAddress', 'activateVanityAdd
 		).outputText,
 		context
 	);
-	return { context, read, send, params, pendingRead, buildPayment, signTxn, signedRekey };
+	return {
+		context,
+		read,
+		send,
+		params,
+		pendingRead,
+		statusRead,
+		buildPayment,
+		signTxn,
+		signedRekey
+	};
 }
 
 function expectNoSend(f: ReturnType<typeof fixture>) {
@@ -165,7 +185,7 @@ test.each([1000000n, 2000000n])(
 	'a balance of %s is not funded again or automatically rekeyed',
 	async (amount) => {
 		// The real rekeyVanityAddress is loaded, so an automatic rekey would show as a send.
-		const f = fixture(['activateVanityAddress', 'rekeyVanityAddress']);
+		const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
 		f.read.mockResolvedValue({ amount, authAddr: undefined });
 		await runInContext('activateVanityAddress(plan, signer)', f.context);
 		expect(f.context.algodClient.accountInformation).toHaveBeenCalledExactlyOnceWith(vanity);
@@ -178,7 +198,7 @@ test.each([1000000n, 2000000n])(
 );
 
 test('a funding account read error sends nothing and reports funding error', async () => {
-	const f = fixture(['activateVanityAddress', 'rekeyVanityAddress']);
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
 	f.read.mockRejectedValue(new Error('funding read failed'));
 	await runInContext('activateVanityAddress(plan, signer)', f.context);
 	expectNoSend(f);
@@ -187,14 +207,25 @@ test('a funding account read error sends nothing and reports funding error', asy
 	expect(f.context.txnError).toBe('funding read failed');
 });
 
-// A payment that was sent but not yet seen in the balance may still land: never send a second one.
-async function fundTimesOut() {
-	const f = fixture(['activateVanityAddress', 'rekeyVanityAddress']);
-	f.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('confirmation timed out'));
+// A funding payment that was sent and not yet seen confirmed may still land until its last valid
+// round (100 in these fixtures; the node is at round 50): never send a second one before then.
+const expired = 101n;
+
+async function fundTimesOut(failure: 'confirm' | 'send' = 'confirm') {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	if (failure === 'confirm') {
+		f.context.algosdk.waitForConfirmation.mockRejectedValueOnce(
+			new Error('confirmation timed out')
+		);
+	} else {
+		f.send.mockRejectedValueOnce(new Error('response lost'));
+	}
 	await runInContext('activateVanityAddress(plan, signer)', f.context);
 	expect(f.send).toHaveBeenCalledOnce();
 	expect(f.context.txnStatus).toBe('error');
+	// Remembered before the send, so a lost response is not read as "not sent".
 	expect(f.context.fundingTxId).toBe('tx');
+	expect(f.context.fundingLastValid).toBe(100n);
 	f.send.mockClear();
 	f.context.algodClient.sendRawTransaction.mockClear();
 	f.params.mockClear();
@@ -203,21 +234,87 @@ async function fundTimesOut() {
 	return f;
 }
 
-test('a funding payment still pending is not paid again', async () => {
-	const f = await fundTimesOut();
-	f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: '' });
+async function secondAttempt(f: Awaited<ReturnType<typeof fundTimesOut>>) {
 	await runInContext('activateVanityAddress(plan, signer)', f.context);
-	expect(f.context.algodClient.pendingTransactionInformation).toHaveBeenCalledWith('tx');
+}
+
+test.each(['confirm', 'send'] as const)(
+	'a payment whose %s step failed and is still in the pool is not paid again',
+	async (failure) => {
+		const f = await fundTimesOut(failure);
+		f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: '' });
+		f.statusRead.mockResolvedValue({ lastRound: expired });
+		await secondAttempt(f);
+		expect(f.context.algodClient.pendingTransactionInformation).toHaveBeenCalledWith('tx');
+		expectNoSend(f);
+		expect(f.context.txnStatus).toBe('error');
+		expect(f.context.txnError).toContain('may still land');
+		expect(f.context.fundingTxId).toBe('tx');
+	}
+);
+
+test.each(['confirm', 'send'] as const)(
+	'a payment the node does not know is not paid again before its last valid round (%s step failed)',
+	async (failure) => {
+		const f = await fundTimesOut(failure);
+		f.pendingRead.mockRejectedValue(new Error('transaction not found'));
+		await secondAttempt(f);
+		expectNoSend(f);
+		expect(f.context.txnError).toContain('may still land');
+		expect(f.context.fundingTxId).toBe('tx');
+		expect(f.context.fundingLastValid).toBe(100n);
+	}
+);
+
+test('a payment the pool rejected is not paid again before its last valid round', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: 'rejected by this node' });
+	await secondAttempt(f);
 	expectNoSend(f);
-	expect(f.context.txnStatus).toBe('error');
-	expect(f.context.txnError).toContain('still pending');
 	expect(f.context.fundingTxId).toBe('tx');
 });
 
-test('a funding payment that confirmed late counts as funded and is not paid again or rekeyed', async () => {
+test.each([
+	['unknown to the node', () => Promise.reject(new Error('transaction not found'))],
+	['rejected by the pool', () => Promise.resolve({ confirmedRound: 0n, poolError: 'rejected' })]
+])(
+	'a payment %s may be sent again once its last valid round has passed',
+	async (_name, pending) => {
+		const f = await fundTimesOut();
+		f.pendingRead.mockImplementation(pending);
+		f.statusRead.mockResolvedValue({ lastRound: expired });
+		await secondAttempt(f);
+		expect(f.buildPayment.mock.calls[0][0]).toMatchObject({
+			from: funder,
+			to: vanity,
+			amount: 1000000
+		});
+		expect(f.context.signTransactions).toHaveBeenCalledOnce();
+		// Exactly one new payment of 1 VOI (the automatic rekey after it is the other send).
+		expect(f.buildPayment.mock.calls.filter(([p]) => p.amount === 1000000)).toHaveLength(1);
+		expect(f.context.fundingTxId).toBeNull();
+	}
+);
+
+test('a payment that landed late and is visible after expiry counts as funded and sends nothing', async () => {
+	const f = await fundTimesOut();
+	f.pendingRead.mockRejectedValue(new Error('transaction not found'));
+	f.statusRead.mockResolvedValue({ lastRound: expired });
+	// The first balance read is unfunded; the one after expiry shows the payment.
+	f.read.mockResolvedValueOnce({ amount: 0n }).mockResolvedValueOnce({ amount: 1000000n });
+	await secondAttempt(f);
+	expectNoSend(f);
+	expect(f.params).not.toHaveBeenCalled();
+	expect(f.context.txnStatus).toBe('success');
+	expect(f.context.rekeyTxnStatus).toBe('idle');
+	expect(f.context.fundingTxId).toBeNull();
+	expect(f.context.fundingLastValid).toBeNull();
+});
+
+test('a payment that confirmed late counts as funded and is not paid again or rekeyed', async () => {
 	const f = await fundTimesOut();
 	f.pendingRead.mockResolvedValue({ confirmedRound: 12n, poolError: '' });
-	await runInContext('activateVanityAddress(plan, signer)', f.context);
+	await secondAttempt(f);
 	expectNoSend(f);
 	expect(f.params).not.toHaveBeenCalled();
 	expect(f.context.txnStatus).toBe('success');
@@ -225,35 +322,67 @@ test('a funding payment that confirmed late counts as funded and is not paid aga
 	expect(f.context.fundingTxId).toBeNull();
 });
 
-test('a funding payment the pool rejected may be sent again', async () => {
-	const f = await fundTimesOut();
-	f.pendingRead.mockResolvedValue({ confirmedRound: 0n, poolError: 'transaction rejected' });
-	await runInContext('activateVanityAddress(plan, signer)', f.context);
-	expect(f.buildPayment.mock.calls[0][0]).toMatchObject({
-		from: funder,
-		to: vanity,
-		amount: 1000000
-	});
-	expect(f.context.signTransactions).toHaveBeenCalledOnce();
-	expect(f.send).toHaveBeenCalled();
+test('an unreadable round or earlier payment state sends nothing', async () => {
+	const a = await fundTimesOut();
+	a.pendingRead.mockRejectedValue(new Error('pending read failed'));
+	a.statusRead.mockRejectedValue(new Error('status read failed'));
+	await secondAttempt(a);
+	expectNoSend(a);
+	expect(a.context.txnError).toBe('status read failed');
+	expect(a.context.fundingTxId).toBe('tx');
+	const b = await fundTimesOut();
+	b.pendingRead.mockRejectedValue(new Error('transaction not found'));
+	b.statusRead.mockResolvedValue({ lastRound: expired });
+	b.read
+		.mockResolvedValueOnce({ amount: 0n })
+		.mockRejectedValueOnce(new Error('balance read failed'));
+	await secondAttempt(b);
+	expectNoSend(b);
+	expect(b.context.txnError).toBe('balance read failed');
 });
 
-test('an unreadable earlier funding payment sends nothing', async () => {
-	const f = await fundTimesOut();
-	f.pendingRead.mockRejectedValue(new Error('pending read failed'));
+test('a payment that was never signed is not remembered', async () => {
+	const f = fixture(['activateVanityAddress', 'earlierFundingLanded', 'rekeyVanityAddress']);
+	f.context.signTransactions.mockRejectedValueOnce(new Error('rejected in wallet'));
 	await runInContext('activateVanityAddress(plan, signer)', f.context);
-	expectNoSend(f);
-	expect(f.context.txnStatus).toBe('error');
-	expect(f.context.txnError).toBe('pending read failed');
+	expect(f.send).not.toHaveBeenCalled();
+	expect(f.context.fundingTxId).toBeNull();
+	expect(f.context.fundingLastValid).toBeNull();
+});
+
+test('a search is refused while an earlier funding payment is unsettled, and keeps it', async () => {
+	const f = fixture(['generateVanityAddress', 'validateInputs']);
+	Object.assign(f.context, {
+		txnStatus: 'error',
+		rekeyTxnStatus: 'idle',
+		fundingTxId: 'tx',
+		fundingLastValid: 100n
+	});
+	await runInContext('generateVanityAddress()', f.context);
+	expect(f.context.error).toContain('A funding payment may still land');
+	expect(f.context.Worker).not.toHaveBeenCalled();
+	expect(f.context.plan).not.toBeNull();
+	expect(f.context.result).not.toBeNull();
 	expect(f.context.fundingTxId).toBe('tx');
 });
 
-test('a new search forgets the earlier funding payment', async () => {
-	const f = fixture(['generateVanityAddress', 'validateInputs']);
-	// Funding timed out: not confirmed, so a search is allowed.
-	Object.assign(f.context, { fundingTxId: 'tx', txnStatus: 'error' });
-	await runInContext('generateVanityAddress()', f.context);
-	expect(f.context.fundingTxId).toBeNull();
+test('a rekey that landed after the retry read is reported as success, not as an error', async () => {
+	const f = fixture();
+	f.send.mockRejectedValueOnce(new Error('transaction already in ledger'));
+	f.read
+		.mockResolvedValueOnce({ amount: 1000000n, authAddr: undefined })
+		.mockResolvedValueOnce({ amount: 1000000n, authAddr: algosdk.Address.fromString(funder) });
+	await runInContext('retryRekey()', f.context);
+	expect(f.context.rekeyTxnStatus).toBe('success');
+	expect(f.context.txnError).toBeNull();
+});
+
+test('a rekey that did not land after the retry read stays an error', async () => {
+	const f = fixture();
+	f.send.mockRejectedValueOnce(new Error('network down'));
+	await runInContext('retryRekey()', f.context);
+	expect(f.context.rekeyTxnStatus).toBe('error');
+	expect(f.context.txnError).toBe('network down');
 });
 
 const refusal = 'Retry the rekey before starting a new search. Your 1 VOI is on this address.';

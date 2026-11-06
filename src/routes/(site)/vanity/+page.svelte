@@ -49,6 +49,7 @@
 	let retryDrifted = false;
 	// The funding payment that was sent for the current vanity address and not yet seen confirmed.
 	let fundingTxId: string | null = null;
+	let fundingLastValid: bigint | null = null;
 	$: if (reviewOpen && plan && selectionDrifted(plan, $selectedWallet)) reviewDrifted = true;
 	$: retryDrifted = !!plan && selectionDrifted(plan, $selectedWallet);
 
@@ -154,6 +155,12 @@
 			error = 'Retry the rekey before starting a new search. Your 1 VOI is on this address.';
 			return;
 		}
+		// A funding payment sent and not yet settled may still land on this address.
+		if (fundingTxId) {
+			error =
+				'A funding payment may still land on this address. Wait for it, then fund again or retry, before starting a new search.';
+			return;
+		}
 		if (!validateInputs()) return;
 
 		// Reset state
@@ -165,6 +172,7 @@
 		reviewOpen = false;
 		reviewDrifted = false;
 		fundingTxId = null;
+		fundingLastValid = null;
 		txnStatus = 'idle';
 		rekeyTxnStatus = 'idle';
 		txnError = null;
@@ -334,13 +342,42 @@
 				rekeyTxnStatus = 'success';
 				return;
 			}
-			await rekeyVanityAddress(plan);
+			if (!(await rekeyVanityAddress(plan))) {
+				// An earlier rekey may have landed after the read above: the chain decides.
+				const after = await algodClient.accountInformation(plan.vanity).do();
+				if (after.authAddr?.toString() === plan.rekeyTo) {
+					rekeyTxnStatus = 'success';
+					txnError = null;
+				}
+			}
 		} catch (err) {
 			rekeyTxnStatus = 'error';
 			txnError = err instanceof Error ? err.message : String(err);
 		} finally {
 			isRekeying = false;
 		}
+	}
+
+	// An earlier funding payment that was sent and not yet seen confirmed can still land until its
+	// last valid round. True when it landed. False only when it can no longer land. Otherwise throws,
+	// so nothing is sent while it could still land, or while its state cannot be read.
+	async function earlierFundingLanded(txId: string, lastValid: bigint | null, vanity: string) {
+		let inPool = false;
+		try {
+			const pending = await algodClient.pendingTransactionInformation(txId).do();
+			if (pending.confirmedRound && pending.confirmedRound > BigInt(0)) return true;
+			inPool = !pending.poolError;
+		} catch {
+			// The node does not know it (not received, dropped or expired): only expiry settles that.
+		}
+		const status = await algodClient.status().do();
+		if (inPool || lastValid === null || status.lastRound <= lastValid) {
+			throw new Error(
+				'The earlier funding payment may still land. Wait for it to confirm or expire before trying again.'
+			);
+		}
+		const info = await algodClient.accountInformation(vanity).do();
+		return info.amount >= BigInt(1000000);
 	}
 
 	// Send 1 VOI from the reviewed account, then rekey to that same account.
@@ -354,21 +391,17 @@
 			const info = await algodClient.accountInformation(plan.vanity).do();
 			if (info.amount >= BigInt(1000000)) {
 				fundingTxId = null;
+				fundingLastValid = null;
 				txnStatus = 'success';
 				return;
 			}
-			// An earlier payment that was sent but not yet seen in the balance may still land.
 			if (fundingTxId) {
-				const pending = await algodClient.pendingTransactionInformation(fundingTxId).do();
-				if (pending.confirmedRound && pending.confirmedRound > BigInt(0)) {
-					fundingTxId = null;
+				const landed = await earlierFundingLanded(fundingTxId, fundingLastValid, plan.vanity);
+				fundingTxId = null;
+				fundingLastValid = null;
+				if (landed) {
 					txnStatus = 'success';
 					return;
-				}
-				if (!pending.poolError) {
-					throw new Error(
-						'The earlier funding payment is still pending. Wait for it to confirm before trying again.'
-					);
 				}
 			}
 			// Get parameters for the transaction
@@ -386,14 +419,18 @@
 			// Ask user to sign the transaction
 			const signedTxns = await signTransactions([[unsignedTxn]], signer);
 
+			// Remember the payment before it leaves: a lost response must not look like "not sent".
+			fundingTxId = unsignedTxn.txID();
+			fundingLastValid = unsignedTxn.lastValid;
+
 			// Send the signed transaction to the network
 			const { txid: txId } = await algodClient.sendRawTransaction(signedTxns).do();
-			fundingTxId = txId;
 
 			// Wait for confirmation
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
 
 			fundingTxId = null;
+			fundingLastValid = null;
 			txnStatus = 'success';
 
 			// After sending 1 VOI, we can now initiate the rekey transaction
@@ -443,10 +480,12 @@
 			await algosdk.waitForConfirmation(algodClient, txId, 5);
 
 			rekeyTxnStatus = 'success';
+			return true;
 		} catch (err) {
 			console.error('Failed to rekey address:', err);
 			rekeyTxnStatus = 'error';
 			txnError = err instanceof Error ? err.message : String(err);
+			return false;
 		} finally {
 			isRekeying = false;
 		}

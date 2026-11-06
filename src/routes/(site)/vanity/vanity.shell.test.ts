@@ -99,6 +99,8 @@ test.each([
 			isRekeying: false,
 			txnStatus: 'idle',
 			rekeyTxnStatus: 'idle',
+			fundingTxId: null,
+			fundingLastValid: null,
 			isGenerating: false,
 			updateInterval: null,
 			worker: null,
