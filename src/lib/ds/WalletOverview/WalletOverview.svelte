@@ -102,7 +102,7 @@
 					value={summary.onlineContracts}
 					total={summary.contractCount}
 					tone={summary.healthTone}
-					state={loading ? 'loading' : 'ready'}
+					state={loading ? 'loading' : !summary.contractsReady ? 'error' : 'ready'}
 				/>
 				{#if loading}<div class="min-w-0 flex-1">{@render skeleton('node health')}</div>
 				{:else}
@@ -126,9 +126,13 @@
 							detail={`Oldest vote among online accounts · last block ${summary.lastBlock === null ? 'unavailable' : `${summary.lastBlockAt ? ago(summary.lastBlockAt, now) + ' · ' : ''}#${comma(summary.lastBlock)}`}`}
 						/>
 						<HealthItem
-							tone={summary.idleCount ? 'warn' : 'ok'}
-							title={`${comma(summary.idleCount)} contracts not staking`}
-							detail={`${compact(summary.idleBalance, 1)} VOI idle`}
+							tone={!summary.contractsReady ? 'neutral' : summary.idleCount ? 'warn' : 'ok'}
+							title={summary.contractsReady
+								? `${comma(summary.idleCount)} contracts not staking`
+								: 'Contract status unavailable'}
+							detail={summary.contractsReady
+								? `${compact(summary.idleBalance, 1)} VOI idle`
+								: 'Retry to load lock contracts.'}
 						/>
 					</ul>
 				{/if}
@@ -297,7 +301,7 @@
 				{#each summary.lockedByYear as year (year.year)}
 					<div>
 						<dl class="flex flex-wrap justify-between gap-2 text-label">
-							<dt>Vesting starts {year.year}</dt>
+							<dt>Locked · vesting-start year {year.year}</dt>
 							<dd>{compact(year.amount)} VOI</dd>
 						</dl>
 						<div aria-hidden="true" class="mt-1 h-2 rounded-full bg-grid">
@@ -320,7 +324,7 @@
 			{current}
 			{pageAddress}
 			{selected}
-			state={summary.state}
+			state={loading ? 'loading' : !summary.contractsReady ? 'error' : summary.state}
 			{asOf}
 			{onrefresh}
 		/>

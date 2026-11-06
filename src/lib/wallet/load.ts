@@ -1,4 +1,5 @@
 import { get } from 'svelte/store';
+import { vestingStartTime } from './vesting';
 import { algodClient } from '$lib/utils/algod';
 import { decodeLockContractState } from '$lib/chain/lockContract';
 import { globalStateEntries } from '$lib/chain/algodShapes';
@@ -24,6 +25,7 @@ export type LegacyAccount = Account & { contractId: number };
 export type WalletSnapshot = {
 	owner: WalletAccount;
 	contracts: WalletContract[];
+	contractsState: DataState;
 	primary: LegacyAccount;
 	children: LegacyAccount[];
 	current: WalletEpoch;
@@ -83,8 +85,13 @@ async function readContract(account: WalletAccount, force: boolean): Promise<Con
 			remainingVestingAmount = totalBalance;
 		} else if (elapsedTime >= fullVestingTime) {
 			// If there's no lockup period, we start counting from funding time
-			const vestingStartTime = lockupPeriod === 0 ? fundingTime : fundingTime + fullVestingTime;
-			const vestingElapsedTime = now - vestingStartTime;
+			const start = vestingStartTime(
+				fundingTime,
+				lockupPeriod,
+				Number(decodedState.global_vesting_delay ?? 0),
+				Number(decodedState.global_period_seconds ?? 0)
+			);
+			const vestingElapsedTime = now - start;
 			const periodsPassed = Math.floor(
 				vestingElapsedTime / Number(decodedState.global_distribution_seconds ?? 1)
 			);
@@ -98,8 +105,7 @@ async function readContract(account: WalletAccount, force: boolean): Promise<Con
 				remainingVestingAmount = 0;
 			} else {
 				const nextVestingTime =
-					vestingStartTime +
-					(periodsPassed + 1) * Number(decodedState.global_distribution_seconds ?? 0);
+					start + (periodsPassed + 1) * Number(decodedState.global_distribution_seconds ?? 0);
 				nextVestingDate = new Date(nextVestingTime * 1000);
 
 				const amountPerPeriod = totalBalance / Number(decodedState.global_distribution_count ?? 1);
@@ -194,10 +200,11 @@ function legacy(account: WalletAccount, stake: number, pool: number): LegacyAcco
 
 async function readEpoch(
 	date: DateRange,
-	stake: number | null
+	stake: number | null,
+	force: boolean
 ): Promise<{ value: WalletEpoch; asOf: string }> {
 	const [raw, pool] = await Promise.all([
-		bounded(dataTable.fetchData(date.id)),
+		bounded(dataTable.fetchData(date.id, force)),
 		getTokensByEpoch(date.epoch)
 	]);
 	const rows = raw as EpochResponse;
@@ -271,7 +278,10 @@ export async function loadWallet(
 	const priceRequest = bounded(fetchVoiPrice(force)).catch(() => undefined);
 	const [supply, locks, dates] = await Promise.all([
 		bounded(getSupplyInfo()),
-		bounded(getLockContractsByOwner(ownerAddress)),
+		bounded(getLockContractsByOwner(ownerAddress)).catch((error) => {
+			console.error('Lockvest lookup failed:', error);
+			return null;
+		}),
 		bounded(dataTable.fetchDateRanges(force))
 	]);
 	if (!supply || !dates.length) throw new Error('Wallet network data unavailable');
@@ -306,8 +316,8 @@ export async function loadWallet(
 	const latest = dates[dates.length - 1];
 	const [owner, children, live, epochs] = await Promise.all([
 		readAccount(ownerAddress),
-		Promise.all(locks.map((lock) => readAccount(lock.contractAddress, lock.contractId))),
-		readEpoch(latest, stake),
+		Promise.all((locks ?? []).map((lock) => readAccount(lock.contractAddress, lock.contractId))),
+		readEpoch(latest, stake, force),
 		epochDetails
 	]);
 	const contracts = await Promise.all(
@@ -330,7 +340,7 @@ export async function loadWallet(
 				epochs.find((epoch) => epoch.epoch_number === date.epoch)?.eligible_online_stake
 			);
 			if (stake === null || stake <= 0) throw new Error('Historical stake unavailable');
-			const result = await readEpoch(date, stake);
+			const result = await readEpoch(date, stake / 1e6, force);
 			// The date range has ended; snapshots can stop before the final instant if there was no block then.
 			return { ...result.value, progress: 1 };
 		})
@@ -342,6 +352,7 @@ export async function loadWallet(
 	return {
 		owner,
 		contracts,
+		contractsState: locks === null ? 'error' : 'ready',
 		primary: legacy(owner, stake, live.value.pool),
 		children: children
 			.map((account) => legacy(account, stake, live.value.pool))

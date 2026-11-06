@@ -119,7 +119,7 @@ function createDataTable() {
 		return dates[dates.length - 1].id;
 	}
 
-	async function fetchData(dateRange?: string) {
+	async function fetchData(dateRange?: string, force = false) {
 		const requestGeneration = generation;
 		activeRequests++;
 		update((state) => ({ ...state, loading: true, error: null }));
@@ -130,7 +130,12 @@ function createDataTable() {
 			const store = get({ subscribe });
 			const cachedData = store.data[targetRange];
 			const lastUpdate = store.lastUpdated[targetRange];
-			if (cachedData && lastUpdate && Date.now() - lastUpdate.getTime() < CACHE_EXPIRATION) {
+			if (
+				!force &&
+				cachedData &&
+				lastUpdate &&
+				Date.now() - lastUpdate.getTime() < CACHE_EXPIRATION
+			) {
 				if (requestGeneration === generation) {
 					update((state) => ({ ...state, currentRange: targetRange }));
 				}

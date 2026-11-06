@@ -20,8 +20,11 @@
 
 {#snippet earnings()}
 	{name} has <strong>{compact(summary.stakedOnline, 1)} VOI</strong> earning
-	{#if summary.onlineContracts > 0}across {summary.onlineContracts} contracts{:else}in this account{/if},
-	on track for
+	{#if summary.onlineContracts > 0}across {summary.onlineAccounts > summary.onlineContracts
+			? 'the owner and '
+			: ''}{summary.onlineContracts}
+		{summary.onlineContracts === 1 ? 'contract' : 'contracts'}{:else}in this account{/if}, on track
+	for
 	<strong>≈{compact(summary.current.reward, 1)} VOI</strong> this epoch (<strong
 		>{pct(summary.current.ratio === null ? null : summary.current.ratio * 100, 0)}</strong
 	> of expected).
@@ -34,14 +37,14 @@
 <p
 	class="text-lede text-on-hero"
 	aria-busy={summary.state === 'loading' ? 'true' : undefined}
-	role={summary.state === 'error' ? 'alert' : undefined}
+	role={summary.state === 'error' || !summary.contractsReady ? 'alert' : undefined}
 >
 	{#if summary.state === 'loading'}
 		<span class="sr-only">Loading staking data…</span><span
 			aria-hidden="true"
 			class="block h-6 max-w-xl rounded bg-on-hero-surface"
 		></span>
-	{:else if summary.state === 'error'}
+	{:else if summary.state === 'error' || !summary.contractsReady}
 		We couldn't load {name}'s staking data. {#if onretry}<Button
 				variant="soft"
 				size="sm"

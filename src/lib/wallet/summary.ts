@@ -1,5 +1,8 @@
 import type { DataState, Tone } from '$lib/ds/types';
 import type { ContractDetails } from '$lib/types';
+import { vestingStartTime } from './vesting';
+
+export const IDLE_CONTRACT_MIN_BALANCE = 0.1;
 
 /** Display amounts are VOI. ContractDetails retains the existing modal's microVOI units. */
 export type WalletAccount = {
@@ -80,6 +83,7 @@ export function summarizeWallet({
 	state,
 	now,
 	tokens,
+	contractsState = 'ready',
 	price = null
 }: {
 	owner: WalletAccount | null;
@@ -90,6 +94,7 @@ export function summarizeWallet({
 	now: number;
 	tokens?: TokenValues;
 	price?: number | null;
+	contractsState?: DataState;
 }): WalletSummary {
 	// A contract route can be supplied as the primary account too: never count it twice.
 	const accounts = [
@@ -97,7 +102,9 @@ export function summarizeWallet({
 	];
 	const online = accounts.filter((account) => account.isParticipating);
 	const stakedOnline = online.reduce((total, account) => total + account.balance, 0);
-	const idle = contracts.filter((account) => !account.isParticipating);
+	const idle = contracts.filter(
+		(account) => !account.isParticipating && account.balance > IDLE_CONTRACT_MIN_BALANCE
+	);
 	const keyDays = accounts
 		.filter((account) => account.voteLastValid !== null && Number.isFinite(account.voteLastValid))
 		.map((account) => ((account.voteLastValid! - account.round) * 2.8) / 86400);
@@ -168,9 +175,9 @@ export function summarizeWallet({
 			};
 	const incompleteHealth =
 		online.some((account) => account.voteLastValid === null) || votes.length !== online.length;
-	const contractsReady = contracts.every(
-		(contract) => contract.details !== null && contract.details !== undefined
-	);
+	const contractsReady =
+		contractsState === 'ready' &&
+		contracts.every((contract) => contract.details !== null && contract.details !== undefined);
 	const unlocks = new Map<string, { date: string; amount: number; count: number }>();
 	const years = new Map<number, number>();
 	let locked = 0;
@@ -178,7 +185,8 @@ export function summarizeWallet({
 	for (const account of contracts) {
 		const detail = account.details;
 		if (!detail) continue;
-		locked += Math.min(account.balance, detail.lockedBalance / 1e6);
+		const lockedAmount = Math.min(account.balance, detail.lockedBalance / 1e6);
+		locked += lockedAmount;
 		withdrawable += detail.availableForWithdrawal / 1e6;
 		if (detail.nextVestingDate && detail.nextVestingAmount > 0) {
 			const date = detail.nextVestingDate.toISOString().slice(0, 10);
@@ -188,12 +196,14 @@ export function summarizeWallet({
 			unlocks.set(date, entry);
 		}
 		if (detail.fundingTime && detail.lockedBalance > 0) {
-			const start =
-				detail.fundingTime +
-				detail.lockupPeriod +
-				Math.max(1, detail.vestingDelay) * detail.periodSeconds;
+			const start = vestingStartTime(
+				detail.fundingTime,
+				detail.lockupPeriod,
+				detail.vestingDelay,
+				detail.periodSeconds
+			);
 			const year = new Date(start * 1000).getUTCFullYear();
-			years.set(year, (years.get(year) ?? 0) + detail.lockedBalance / 1e6);
+			years.set(year, (years.get(year) ?? 0) + lockedAmount);
 		}
 	}
 	const liquid =

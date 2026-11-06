@@ -101,3 +101,65 @@ describe('owner and contracts roll-up', () => {
 		expect(result.historyRatio).toBeCloseTo(1.06);
 	});
 });
+
+it('drained contracts do not count as idle or warn an otherwise healthy owner', () => {
+	const drained = { ...owner, address: 'DRAINED', balance: 0.1 };
+	const result = summarize([drained], epoch, online('OWNER'));
+	expect(result.idleCount).toBe(0);
+	expect(result.idleBalance).toBe(0);
+	expect(result.healthTone).toBe('ok');
+	const funded = summarize([{ ...drained, balance: 5 }]);
+	expect(funded.idleCount).toBe(1);
+	expect(funded.idleBalance).toBe(5);
+});
+
+it('buckets zero-lockup vesting in its December funding year and caps bars at the Locked total', () => {
+	const contract = {
+		...online('C0'),
+		balance: 5,
+		details: {
+			fundingTime: Date.parse('2026-12-31T00:00:00Z') / 1000,
+			lockupPeriod: 0,
+			vestingDelay: 2,
+			periodSeconds: 86400,
+			lockedBalance: 10e6,
+			availableForWithdrawal: 0,
+			nextVestingDate: null
+		}
+	} as WalletAccount;
+	const result = summarize([contract]);
+	expect(result.lockedByYear).toEqual([{ year: 2026, amount: 5 }]);
+	expect(result.holdings.locked).toBe(5);
+	const delayed = summarize([
+		{ ...contract, details: { ...contract.details!, lockupPeriod: 86400 } }
+	]);
+	expect(delayed.lockedByYear).toEqual([{ year: 2027, amount: 5 }]);
+});
+
+it('deduplicates an address used as both owner and contract for stake and blocks', () => {
+	const account = online('C0');
+	const result = summarize([account], epoch, account);
+	expect(result.onlineAccounts).toBe(1);
+	expect(result.stakedOnline).toBe(10000);
+	expect(result.current.blocks).toBe(1060);
+	expect(result.current.expected).toBe(1000);
+});
+it('excludes a contract-route owner from liquid holdings', () => {
+	const account = {
+		...online('C0'),
+		details: { lockedBalance: 6000e6, availableForWithdrawal: 0, nextVestingDate: null }
+	} as WalletAccount;
+	const result = summarizeWallet({
+		owner: account,
+		contracts: [account],
+		current: epoch,
+		history: [],
+		state: 'ready',
+		now: 0,
+		tokens: { state: 'ready', lp: 0, other: 0, lpCount: 0, tokenCount: 0 }
+	});
+	expect(result.holdings.liquid).toBe(0);
+	expect(result.holdings.locked).toBe(6000);
+	expect(result.holdings.other).toBe(4000);
+	expect(result.holdings.total).toBe(10000);
+});

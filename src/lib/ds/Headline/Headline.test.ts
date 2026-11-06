@@ -79,3 +79,43 @@ it('SSR loading never claims the account is offline or has zero stake', () => {
 	expect(result).toContain('aria-busy="true"');
 	expect(result).not.toContain("isn't staking");
 });
+
+it('rule 6 ignores drained contracts but includes a 5 VOI offline contract', () => {
+	const owner = {
+		address: 'OWNER',
+		balance: 0,
+		isParticipating: false,
+		contractId: 0,
+		voteLastValid: null,
+		round: 0,
+		lastVoteAt: null,
+		lastBlock: null
+	};
+	const rollup = (balance: number) =>
+		summarizeWallet({
+			owner,
+			contracts: [{ ...owner, address: 'C', balance }],
+			current: null,
+			history: [],
+			state: 'ready',
+			now: 0
+		});
+	expect(text({ ...rollup(0.1), contractsReady: true })).not.toContain(
+		"in contracts that aren't staking"
+	);
+	expect(text({ ...rollup(5), contractsReady: true })).toContain(
+		"5 VOI in contracts that aren't staking"
+	);
+});
+
+it('rule 4 attributes owner stake separately and pluralises one contract', () => {
+	expect(text({ ...earning, onlineContracts: 1, onlineAccounts: 2 })).toContain(
+		'earning across the owner and 1 contract,'
+	);
+	expect(text({ ...earning, onlineContracts: 1, onlineAccounts: 1 })).toContain(
+		'earning across 1 contract,'
+	);
+	expect(text({ ...earning, onlineContracts: 3, onlineAccounts: 4 })).toContain(
+		'earning across the owner and 3 contracts,'
+	);
+});
