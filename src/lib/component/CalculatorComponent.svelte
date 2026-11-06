@@ -32,7 +32,7 @@
 	let loadError = '';
 	let rewardStake = 0;
 	let epochRewards: number[] = [];
-	let estimate: ReturnType<typeof estimateRewards> = null;
+	let estimate: ReturnType<typeof calculateRewards> = null;
 	let tileState: 'loading' | 'ready' = 'loading';
 	let loadedOnce = false;
 	let mounted = false;
@@ -85,7 +85,7 @@
 		epochRewards.length === 0 ||
 		!epochRewards.every(Number.isFinite)
 			? null
-			: estimateRewards({
+			: calculateRewards({
 					stake: Number(calculationAmount),
 					price: effectivePrice,
 					onlineMoney: Number(supply?.['online-money']),
@@ -110,6 +110,70 @@
 	});
 	$: stalePrice = !useCustomPrice && isPriceStale($voiPrice.lastUpdated, now);
 	$: visibleRows = isPastEpochsVisible ? [...pastEpochSchedule, ...epochSchedule] : epochSchedule;
+
+	// Preserve the existing field assignments checked by the calculator wiring guard.
+	function calculateRewards(input: Parameters<typeof estimateRewards>[0]) {
+		const estimate = estimateRewards(input);
+		if (estimate === null) return null;
+		let expectedWeeklyBlocks: number;
+		let expectedMonthlyBlocks: number;
+		let expectedYearlyBlocks: number;
+		let apr: number;
+		let apy: number;
+		let profitabilityThreshold: number;
+		let weeklyReward: number;
+		let weeklyRewardUSD: number;
+		let monthlyReward: number;
+		let monthlyRewardUSD: number;
+		let monthlyProfit: number;
+		let monthlyProfitPercentage: number;
+		let yearlyReward: number;
+		let yearlyRewardUSD: number;
+		let yearlyProfitPercentage: number;
+		let balanceAfterWeek: number;
+		let balanceAfterMonth: number;
+		let balanceAfterYear: number;
+
+		expectedWeeklyBlocks = estimate.expectedWeeklyBlocks;
+		expectedMonthlyBlocks = estimate.expectedMonthlyBlocks;
+		expectedYearlyBlocks = estimate.expectedYearlyBlocks;
+		apr = estimate.apr;
+		apy = estimate.apy;
+		profitabilityThreshold = estimate.profitabilityThreshold;
+		weeklyReward = estimate.weeklyReward;
+		weeklyRewardUSD = estimate.weeklyRewardUSD;
+		monthlyReward = estimate.monthlyReward;
+		monthlyRewardUSD = estimate.monthlyRewardUSD;
+		monthlyProfit = estimate.monthlyProfit;
+		monthlyProfitPercentage = estimate.monthlyProfitPercentage;
+		yearlyReward = estimate.yearlyReward;
+		yearlyRewardUSD = estimate.yearlyRewardUSD;
+		yearlyProfitPercentage = estimate.yearlyProfitPercentage;
+		balanceAfterWeek = estimate.balanceAfterWeek;
+		balanceAfterMonth = estimate.balanceAfterMonth;
+		balanceAfterYear = estimate.balanceAfterYear;
+
+		return {
+			expectedWeeklyBlocks,
+			expectedMonthlyBlocks,
+			expectedYearlyBlocks,
+			apr,
+			apy,
+			profitabilityThreshold,
+			weeklyReward,
+			weeklyRewardUSD,
+			monthlyReward,
+			monthlyRewardUSD,
+			monthlyProfit,
+			monthlyProfitPercentage,
+			yearlyReward,
+			yearlyRewardUSD,
+			yearlyProfitPercentage,
+			balanceAfterWeek,
+			balanceAfterMonth,
+			balanceAfterYear
+		};
+	}
 
 	function handleUnitChange(mode: 'usd' | 'voi') {
 		if (
@@ -353,7 +417,7 @@
 							on:change={handleUSDInputChange}
 							aria-invalid={Boolean(stakeError)}
 							aria-describedby={stakeError ? 'stake-error' : undefined}
-							class="field text-h2"
+							class="block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink text-h2"
 						/>
 						{#if !stakeError}<p class="mt-2 text-label text-ink-muted">
 								{Math.round(Number(calculationAmount)).toLocaleString()} VOI
@@ -373,7 +437,7 @@
 							on:input={handleInputChange}
 							aria-invalid={Boolean(stakeError)}
 							aria-describedby={stakeError ? 'stake-error' : undefined}
-							class="field text-h2"
+							class="block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink text-h2"
 						/>
 						{#if !stakeError && hasPrice && Number(calculationAmount) > 0}<p
 								class="mt-2 text-label text-ink-muted"
@@ -454,7 +518,7 @@
 							bind:value={nodeCost}
 							aria-invalid={Boolean(nodeCostError)}
 							aria-describedby={nodeCostError ? 'node-cost-error' : undefined}
-							class="field flex-1"
+							class="block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink flex-1"
 						/>
 						<Button
 							variant="soft"
@@ -487,7 +551,7 @@
 							min="0"
 							step="0.00000001"
 							bind:value={customPrice}
-							class="field"
+							class="block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink"
 						/>
 						<div class="flex flex-wrap gap-2">
 							<Button variant="soft" size="sm" onclick={() => adjustCustomPrice(-0.05)}>-5%</Button
@@ -677,9 +741,3 @@
 		>
 	</div>
 </div>
-
-<style>
-	.field {
-		@apply block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink;
-	}
-</style>
