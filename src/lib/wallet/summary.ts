@@ -207,12 +207,21 @@ export function summarizeWallet({
 			unlocks.set(date, entry);
 		}
 		if (detail.fundingTime && detail.lockedBalance > 0) {
-			const start = vestingStartTime(
-				detail.fundingTime,
-				detail.lockupPeriod,
-				detail.vestingDelay,
-				detail.periodSeconds
-			);
+			// Same rule as the loader: until funding + lockup + delay has passed, vesting starts then
+			// (the date shown as the next unlock); the zero-lockup shortcut to funding time applies after.
+			const firstWindowEnd =
+				detail.fundingTime +
+				detail.lockupPeriod +
+				Math.max(1, detail.vestingDelay) * detail.periodSeconds;
+			const start =
+				now / 1000 < firstWindowEnd
+					? firstWindowEnd
+					: vestingStartTime(
+							detail.fundingTime,
+							detail.lockupPeriod,
+							detail.vestingDelay,
+							detail.periodSeconds
+						);
 			const year = new Date(start * 1000).getUTCFullYear();
 			years.set(year, (years.get(year) ?? 0) + lockedAmount);
 		}

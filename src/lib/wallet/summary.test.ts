@@ -113,7 +113,7 @@ it('drained contracts do not count as idle or warn an otherwise healthy owner', 
 	expect(funded.idleBalance).toBe(5);
 });
 
-it('buckets zero-lockup vesting in its December funding year and caps bars at the Locked total', () => {
+it('buckets vesting-start years by the loader rule (first window, then funding year) and caps bars at the Locked total', () => {
 	const contract = {
 		...online('C0'),
 		balance: 5,
@@ -127,9 +127,22 @@ it('buckets zero-lockup vesting in its December funding year and caps bars at th
 			nextVestingDate: null
 		}
 	} as WalletAccount;
+	// Still inside its first window at the test clock: vesting starts at funding + delay (Jan 2, 2027),
+	// the same date the loader reports as the next unlock.
 	const result = summarize([contract]);
-	expect(result.lockedByYear).toEqual([{ year: 2026, amount: 5 }]);
+	expect(result.lockedByYear).toEqual([{ year: 2027, amount: 5 }]);
 	expect(result.holdings.locked).toBe(5);
+	// Past its first window, the zero-lockup shortcut applies: vesting counts from the funding year.
+	const started = summarize([
+		{
+			...contract,
+			details: {
+				...contract.details!,
+				fundingTime: Date.parse('2026-01-05T00:00:00Z') / 1000
+			}
+		}
+	]);
+	expect(started.lockedByYear).toEqual([{ year: 2026, amount: 5 }]);
 	const delayed = summarize([
 		{ ...contract, details: { ...contract.details!, lockupPeriod: 86400 } }
 	]);
