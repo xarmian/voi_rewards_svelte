@@ -341,7 +341,7 @@
 					: 'Holdings valuation unavailable. Locked balance unavailable.'}
 				onretry={failed || stakingUnavailable || summary.contractsReady ? onrefresh : undefined}
 			/>
-			{#if !failed}<p class="mt-3 text-label">
+			{#if !failed && holdings.liquidKnown}<p class="mt-3 text-label">
 					Liquid: <strong>{comma(holdings.liquid)} VOI</strong>
 				</p>{/if}
 		{:else}

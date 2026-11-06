@@ -98,3 +98,30 @@ it('keeps the owner liquid balance visible while contract holdings are unavailab
 	expect(text).toContain('Liquid: 1,234 VOI');
 	expect(text).toContain('Holdings valuation unavailable');
 });
+
+it('does not print a liquid balance on a contract route while holdings are unavailable', () => {
+	// A contract route has no owner in view, so `liquid` is a placeholder zero, not a balance.
+	const summary = summarizeWallet({
+		owner: null,
+		contracts: [],
+		contractSet: 'unavailable',
+		current: null,
+		history: [],
+		state: 'ready',
+		now: 0
+	});
+	expect(summary.holdings.liquidKnown).toBe(false);
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts: [],
+			current: null,
+			pageAddress: 'CONTRACT',
+			selected: null,
+			now: 0
+		}
+	}).body;
+	const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+	expect(text).toContain('Holdings valuation unavailable');
+	expect(text).not.toContain('Liquid:');
+});

@@ -141,8 +141,8 @@ it.each(['Offline', 'Online'])(
 			'0 VOI',
 			'0 blocks',
 			'All online accounts OK',
-			'1.2k VOI',
-			'4096 blocks'
+			'Staked online',
+			'4,096 blocks'
 		]) {
 			expect(text).not.toContain(claim);
 		}

@@ -45,6 +45,8 @@ export type TokenValues = {
 export type WalletHoldings = TokenValues & {
 	locked: number;
 	liquid: number;
+	/** False on a contract route: no owner is in view, so `liquid` is a placeholder, not a balance. */
+	liquidKnown: boolean;
 	total: number | null;
 	usd: number | null;
 };
@@ -244,6 +246,7 @@ export function summarizeWallet({
 			state: state === 'loading' ? 'loading' : holdingsReady ? 'ready' : 'error',
 			locked,
 			liquid,
+			liquidKnown: owner !== null,
 			lp: tokens?.lp ?? 0,
 			other,
 			total,

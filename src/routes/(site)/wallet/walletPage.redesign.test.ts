@@ -108,6 +108,11 @@ it('wires route sync exactly once to the page wallet and parent getters without 
 			body: { type: 'Identifier', name }
 		});
 	}
+	// The third argument is the loader: a no-op here would stop client navigation from loading data.
+	expect(routeCalls[0].arguments[2]).toMatchObject({
+		type: 'Identifier',
+		name: 'updateAccountInfo'
+	});
 	expect(source).not.toMatch(/\bselectWallet\s*\(/);
 	expect(source).not.toMatch(/\bselectedWallet\s*\.\s*set\s*\(/);
 });
