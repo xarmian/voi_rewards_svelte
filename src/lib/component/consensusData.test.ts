@@ -7,15 +7,26 @@ import ts from 'typescript';
 // Exercise the component scripts with controlled dependencies, without a browser or live APIs.
 function componentScript(name: string, dependencies: Record<string, unknown>) {
 	const source = readFileSync(new URL(`./${name}.svelte`, import.meta.url), 'utf8');
-	const script = source.split('<script lang="ts">')[1].split('</script>')[0]
-		.replace(/^\s*import .*;$/gm, '').replace(/export let /g, 'let ');
+	const script = source
+		.split('<script lang="ts">')[1]
+		.split('</script>')[0]
+		.replace(/^\s*import .*;$/gm, '')
+		.replace(/export let /g, 'let ');
 	const context = createContext({
-		console: { log() {}, error() {} }, browser: false, onMount() {}, onDestroy() {},
-		config: { proposalApiBaseUrl: '/proposals' }, AbortSignal, ...dependencies
+		console: { log() {}, error() {} },
+		browser: false,
+		onMount() {},
+		onDestroy() {},
+		config: { proposalApiBaseUrl: '/proposals' },
+		AbortSignal,
+		...dependencies
 	});
-	runInContext(ts.transpileModule(script, {
-		compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
-	}).outputText, context);
+	runInContext(
+		ts.transpileModule(script, {
+			compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
+		}).outputText,
+		context
+	);
 	return (code: string) => runInContext(code, context);
 }
 
@@ -68,15 +79,26 @@ for (const stage of stages) {
 					fetchData: () => result('epoch', { blacklist_balance_total: 0 })
 				},
 				getTokensByEpoch: () => result('rewards', 10),
-				getAccountInfo: (wallet: string) => result('account', { amount: wallet === 'B' ? 200 : 100 }),
-				getConsensusInfo: (wallet: string) => result('consensus', { total_blocks: wallet === 'B' ? 2 : 1 })
+				getAccountInfo: (wallet: string) =>
+					result('account', { amount: wallet === 'B' ? 200 : 100 }),
+				getConsensusInfo: (wallet: string) =>
+					result('consensus', { total_blocks: wallet === 'B' ? 2 : 1 })
 			});
 			const first = run('walletId = "A"; fetchNodeData()');
 			await reached.promise;
 			await run('walletId = "B"; fetchNodeData()');
 			if (fails) pending.reject(new Error('wallet A failed'));
-			else pending.resolve({ supply, dates, epoch: { blacklist_balance_total: 0 }, rewards: 10,
-				account: { amount: 100 }, consensus: { total_blocks: 1 } }[stage]);
+			else
+				pending.resolve(
+					{
+						supply,
+						dates,
+						epoch: { blacklist_balance_total: 0 },
+						rewards: 10,
+						account: { amount: 100 },
+						consensus: { total_blocks: 1 }
+					}[stage]
+				);
 			await first;
 			assert.equal(run('balance'), 200);
 			assert.equal(run('accountInfo.amount'), 200);
@@ -92,10 +114,12 @@ test('a new wallet clears old account data and an obsolete request cannot stop i
 	const second = Promise.withResolvers<unknown>();
 	let calls = 0;
 	const run = componentScript('NodeComponent', {
-		getSupplyInfo: () => ++calls === 1 ? first.promise : second.promise
+		getSupplyInfo: () => (++calls === 1 ? first.promise : second.promise)
 	});
 	const a = run('walletId = "A"; fetchNodeData()');
-	const b = run('accountInfo = { amount: 100 }; apiData = { total_blocks: 1 }; balance = 100; walletId = "B"; fetchNodeData()');
+	const b = run(
+		'accountInfo = { amount: 100 }; apiData = { total_blocks: 1 }; balance = 100; walletId = "B"; fetchNodeData()'
+	);
 	assert.equal(run('accountInfo'), undefined);
 	assert.equal(run('Object.keys(apiData).length'), 0);
 	assert.equal(run('balance'), 0);
