@@ -45,3 +45,5 @@ export { Footer } from './Footer';
 export { Headline } from './Headline';
 export { WalletOverview } from './WalletOverview';
 export { WalletAvatar } from './WalletAvatar';
+export { WalletHoldings } from './WalletHoldings';
+export { WalletNfts } from './WalletNfts';

@@ -10,11 +10,12 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 	const script = source
 		.split('<script lang="ts">')[1]
 		.split('</script>')[0]
-		.replace(/^\s*import .*;$/gm, '')
+		.replace(/^\s*import[\s\S]*?from ['"][^'"]+['"];$/gm, '')
 		.replace(/export let /g, 'let ');
 	const error = vi.fn();
 	const context = createContext({
 		canSignFor,
+		createHoldingsTokenLoader: () => vi.fn(),
 		$selectedWallet: undefined,
 		$voiPrice: { price: 0 },
 		browser: false,

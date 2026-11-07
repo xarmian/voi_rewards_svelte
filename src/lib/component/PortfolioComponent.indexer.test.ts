@@ -4,15 +4,11 @@ import { expect, test } from 'vitest';
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 const transfers = readFileSync(new URL('./TokenTransfersModal.svelte', import.meta.url), 'utf8');
 
-function loadedAccountBranches() {
-	return [
-		...source.matchAll(
-			/\{#if [^}]*accountPart\.status === 'loaded'[^}]*\}([\s\S]*?)(?=\{:else|\{\/if\})/g
-		)
-	]
-		.map((match) => match[1])
-		.join('\n');
-}
+const presenter = readFileSync(
+	new URL('../ds/WalletHoldings/WalletHoldings.svelte', import.meta.url),
+	'utf8'
+);
+const display = readFileSync(new URL('../wallet/holdings.ts', import.meta.url), 'utf8');
 
 test('account balance and status no longer come from the indexer', () => {
 	for (const field of ['amount', 'status']) {
@@ -31,29 +27,22 @@ test('PortfolioComponent imports and calls the independent account loader', () =
 	);
 });
 
-test('balance rendering requires a loaded account and offers retry on failure', () => {
-	expect(source, 'An unavailable balance must be labelled explicitly').toContain(
-		'Balance unavailable'
-	);
-	expect(source, 'A failed lookup must offer Retry').toMatch(
-		/on:click=\{retryAccountDetails\}[^>]*>\s*Retry\s*</
-	);
-	const balanceLine = '{(accountBalance / 1e6).toLocaleString()} VOI';
-	expect(
-		loadedAccountBranches(),
-		'Only a loaded algod account may render the VOI balance'
-	).toContain(balanceLine);
-	expect(
-		source.split(balanceLine).length - 1,
-		'Do not leave a second, unguarded balance line'
-	).toBe(1);
+test('balance rendering delegates the raw account state and its real retry to the presenter', () => {
+	expect(source).toContain('account={accountPart}');
+	expect(source).toContain('onretryAccount={retryAccountDetails}');
+	expect(presenter).toContain("account.status === 'unavailable'");
+	expect(presenter).toContain('VOI balance unavailable');
+	expect(presenter).toContain('onretry={onretryAccount}');
+	expect(display).toMatch(/account.status === 'loaded' \? account.value.balance \/ 1e6 : null/);
 });
 
-test('ConsensusDetails requires a loaded account part', () => {
-	expect(
-		loadedAccountBranches(),
-		'ConsensusDetails must only receive a loaded algod snapshot'
-	).toContain('<ConsensusDetails');
+test('Holdings no longer mounts the legacy consensus summary; the route retains its Overview disclosure', () => {
+	expect(source).not.toMatch(/<ConsensusDetails\b/);
+	const route = readFileSync(
+		new URL('../../routes/(site)/wallet/[...id]/+page.svelte', import.meta.url),
+		'utf8'
+	);
+	expect(route).toContain('Consensus details');
 });
 
 test('the transfers modal labels an unavailable balance without reading token.balance', () => {

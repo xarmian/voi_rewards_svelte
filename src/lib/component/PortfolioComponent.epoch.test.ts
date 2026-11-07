@@ -7,10 +7,6 @@ function epochBlock() {
 	return source.match(/const epochLoading = \(async \(\) => \{[\s\S]*?\n\t\t\}\)\(\);/)?.[0] ?? '';
 }
 
-function currentEpochRow() {
-	return source.match(/Current Epoch<\/span>[\s\S]*?<\/div>/)?.[0] ?? '';
-}
-
 test('the epoch block has its own loading state, reset on every fetch', () => {
 	expect(source, 'Declare an epochPart state like the other parts').toMatch(/let epochPart\b/);
 	const fetchStart = source.match(
@@ -35,16 +31,8 @@ test('an epoch failure marks the part unavailable instead of leaving a 0', () =>
 	);
 });
 
-test('Current Epoch needs both a loaded account and a loaded epoch part', () => {
-	const row = currentEpochRow();
-	expect(row, 'Render the figure only when the epoch part is loaded').toMatch(
-		/epochPart\.status === 'loaded'/
-	);
-	expect(row, 'Show Unavailable with Retry when the epoch part failed').toMatch(
-		/Unavailable[\s\S]*on:click=\{retryAccountDetails\}[^>]*>\s*Retry\s*</
-	);
-	expect(
-		source.split('pendingRewards / 1e6 + currentEpochRewards').length - 1,
-		'Keep exactly one place that adds the epoch figure'
-	).toBe(1);
+test('Holdings no longer presents the legacy reward figure; the Rewards tab remains separate', () => {
+	const template = source.split('</script>')[1];
+	expect(template).not.toContain('pendingRewards / 1e6 + currentEpochRewards');
+	expect(template).not.toContain('Rewards Overview');
 });

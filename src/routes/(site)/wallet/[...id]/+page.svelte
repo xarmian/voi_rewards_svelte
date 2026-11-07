@@ -272,10 +272,18 @@
 						</div>{/if}
 				</details>
 			{:else if tabs.current === 'holdings'}
-				<div class="legacy-panel">
+				<div class="min-w-0">
 					<PortfolioComponent
 						walletAddress={walletId}
 						parentWalletAddress={parentWalletId ?? null}
+						holdingsSplit={snapshot
+							? {
+									pageAddress: walletId,
+									owner: viewOwner,
+									contracts: viewContracts,
+									contractSet: snapshot.contractSet
+								}
+							: undefined}
 					/>
 				</div>
 			{:else if tabs.current === 'rewards'}
