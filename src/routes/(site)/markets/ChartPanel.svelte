@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Spinner } from 'flowbite-svelte';
+	import Card from '$lib/ds/Card/Card.svelte';
+	import InlineAlert from '$lib/ds/InlineAlert/InlineAlert.svelte';
 	import type { Snippet } from 'svelte';
 	import OHLCVChart from '$lib/components/OHLCVChart.svelte';
 	import type { UniqueToken } from '../../api/tokens/+server';
@@ -42,31 +43,17 @@
 	}: Props = $props();
 </script>
 
-<div
-	class="min-w-0 col-span-full {showTokenChart && selectedToken
-		? 'p-0'
-		: 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4'} overflow-hidden flex flex-col"
-	style="height: 640px;"
->
+<Card>
+	{#if tokenChartError}
+		<InlineAlert message={tokenChartError} />
+	{/if}
 	{#if showTokenChart && selectedToken}
 		{#if tokenChartLoading}
-			<div
-				class="flex items-center justify-center h-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
-			>
-				<Spinner size="8" />
-				<span class="ml-2 text-gray-600 dark:text-gray-400">Loading chart...</span>
-			</div>
+			<p role="status" class="py-4 text-ink-muted">Loading chart...</p>
 		{:else if tokenChartError}
-			<div
-				class="flex items-center justify-center h-full text-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
-			>
-				<div>
-					<i class="fas fa-exclamation-triangle text-2xl text-yellow-500 mb-2"></i>
-					<p class="text-gray-600 dark:text-gray-400">{tokenChartError}</p>
-				</div>
-			</div>
+			<!-- The alert above also remains visible when the fetch selects the fallback. -->
 		{:else if tokenChartData.length > 0}
-			<div class="flex-1 min-h-0">
+			<div class="min-w-0">
 				<OHLCVChart
 					tokenPair={selectedToken.id === 0
 						? {
@@ -112,11 +99,15 @@
 					}}
 				/>
 			</div>
+		{:else}
+			<p class="py-4 text-ink-muted">No chart data available.</p>
 		{/if}
+	{:else if tokenChartLoading && selectedToken}
+		<p role="status" class="py-4 text-ink-muted">Loading chart...</p>
 	{:else}
-		<!-- Default Price Chart for VOI or when no token selected -->
-		<div class="flex-1 min-h-0">
+		<p class="mb-3 text-label text-ink-muted">Fallback price chart</p>
+		<div class="min-w-0">
 			{@render children()}
 		</div>
 	{/if}
-</div>
+</Card>

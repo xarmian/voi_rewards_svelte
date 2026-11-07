@@ -1,7 +1,9 @@
 <!-- PriceChart.svelte -->
 <script lang="ts">
-	import { theme, onThemeChange } from '$lib/theme.svelte';
-	import { onMount, tick } from 'svelte';
+	import { onThemeChange } from '$lib/theme.svelte';
+	import { onMount } from 'svelte';
+	import Tabs from '$lib/ds/Tabs/Tabs.svelte';
+	import { chartThemeOptions, resolveChartTokens } from '$lib/markets/chartTheme';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import { createChart, type IChartApi, type ISeriesApi, type LineData } from 'lightweight-charts';
 
@@ -17,7 +19,6 @@
 	let chart: IChartApi | undefined;
 	let series: ISeriesApi<'Line'> | undefined;
 	const lifecycle = createChartLifecycle();
-	let isDarkMode = false;
 
 	// Time period selection
 	export let selectedPeriod: '24h' | '7d';
@@ -60,152 +61,71 @@
 		}
 	}
 
-	// Watch for theme changes
 	function updateChartTheme() {
-		if (!chart) return;
+		if (!chart || !chartContainer) return;
+		const options = chartThemeOptions(resolveChartTokens(getComputedStyle(chartContainer)));
+		chart.applyOptions(options.chart);
+		series?.applyOptions(options.line);
+	}
 
-		isDarkMode = theme.current === 'dark';
-		const gridColor = isDarkMode ? '#2D3748' : '#E5E7EB';
-		const textColor = isDarkMode ? '#9CA3AF' : '#4B5563';
-
-		chart.applyOptions({
-			layout: {
-				background: { color: 'transparent' },
-				textColor: textColor
-			},
-			grid: {
-				vertLines: { color: gridColor },
-				horzLines: { color: gridColor }
-			},
+	function initializeChart() {
+		if (lifecycle.disposed || chart || !chartContainer) return;
+		const { clientWidth: width, clientHeight: plotHeight } = chartContainer;
+		if (!width || !plotHeight) return;
+		const options = chartThemeOptions(resolveChartTokens(getComputedStyle(chartContainer)));
+		chart = createChart(chartContainer, {
+			...options.chart,
+			width,
+			height: plotHeight,
 			rightPriceScale: {
-				borderColor: gridColor,
-				scaleMargins: {
-					top: 0.2,
-					bottom: 0.2
-				},
+				...options.chart.rightPriceScale,
+				scaleMargins: { top: 0.2, bottom: 0.2 },
 				mode: 1
 			},
 			timeScale: {
-				borderColor: gridColor,
+				...options.chart.timeScale,
 				timeVisible: true,
 				secondsVisible: false,
-				tickMarkFormatter: (time: number) => {
-					return formatTimeByPeriod(time, selectedPeriod);
-				}
-			}
+				tickMarkFormatter: (time: number) => formatTimeByPeriod(time, selectedPeriod)
+			},
+			localization: {
+				timeFormatter: (time: number) => new Date(time * 1000).toLocaleString()
+			},
+			crosshair: { ...options.chart.crosshair, mode: 1 }
 		});
-	}
-
-	function handleResize() {
-		if (chartContainer && chart) {
-			const newWidth = chartContainer.clientWidth;
-			const newHeight = height;
-			chart.resize(newWidth, newHeight);
+		const instance = chart;
+		lifecycle.add(() => {
+			instance.remove();
+			chart = undefined;
+			series = undefined;
+		});
+		series = chart.addLineSeries({
+			...options.line,
+			lineWidth: 2,
+			crosshairMarkerVisible: true,
+			lastValueVisible: true,
+			priceLineVisible: true,
+			priceFormat: { type: 'price', precision: 6, minMove: 0.000001 }
+		});
+		if (data.length) {
+			series.setData(data);
+			chart.timeScale().fitContent();
 		}
 	}
 
 	onMount(() => {
-		// TASK-31: return cleanup synchronously and guard the pending tick after unmount.
-		tick().then(() => {
-			if (lifecycle.disposed || !chartContainer) return;
-			chart = createChart(chartContainer, {
-				height,
-				width: chartContainer.clientWidth,
-				layout: {
-					background: { color: 'transparent' },
-					textColor: '#4B5563'
-				},
-				grid: {
-					vertLines: { color: '#E5E7EB' },
-					horzLines: { color: '#E5E7EB' }
-				},
-				rightPriceScale: {
-					borderColor: '#E5E7EB',
-					scaleMargins: {
-						top: 0.2,
-						bottom: 0.2
-					},
-					mode: 1
-				},
-				timeScale: {
-					borderColor: '#E5E7EB',
-					timeVisible: true,
-					secondsVisible: false,
-					tickMarkFormatter: (time: number) => {
-						return formatTimeByPeriod(time, selectedPeriod);
-					}
-				},
-				localization: {
-					timeFormatter: (time: number) => {
-						const date = new Date(time * 1000);
-						return date.toLocaleString();
-					}
-				},
-				crosshair: {
-					mode: 1,
-					vertLine: {
-						labelVisible: true
-					},
-					horzLine: {
-						labelVisible: true
-					}
-				}
-			});
-
-			const instance = chart;
-			lifecycle.add(() => {
-				instance.remove();
-				chart = undefined;
-				series = undefined;
-			});
-
-			series = chart.addLineSeries({
-				color: '#8B5CF6',
-				lineWidth: 2,
-				crosshairMarkerVisible: true,
-				lastValueVisible: true,
-				priceLineVisible: true
-			});
-
-			series.applyOptions({
-				priceFormat: {
-					type: 'price',
-					precision: 6,
-					minMove: 0.000001
-				}
-			});
-
-			if (data.length > 0) {
-				series.setData(data);
-				// Fit content after setting data
-				chart.timeScale().fitContent();
+		const resizeObserver = new ResizeObserver(() => {
+			initializeChart();
+			if (chart && chartContainer.clientWidth && chartContainer.clientHeight) {
+				chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
 			}
-
-			// Subscribe to theme changes
-			lifecycle.add(onThemeChange(updateChartTheme));
-
-			// Initial theme setup
-			updateChartTheme();
-
-			// Initial resize
-			handleResize();
-
-			// Add resize observer for container size changes
-			const resizeObserver = new ResizeObserver(() => {
-				if (chartContainer && chart) {
-					const newWidth = chartContainer.clientWidth;
-					chart.applyOptions({
-						width: newWidth
-					});
-					chart.timeScale().fitContent();
-				}
-			});
-			lifecycle.add(() => resizeObserver.disconnect());
-			resizeObserver.observe(chartContainer);
-
-			// Add window resize listener
-			window.addEventListener('resize', handleResize);
-			lifecycle.add(() => window.removeEventListener('resize', handleResize));
+		});
+		lifecycle.add(() => resizeObserver.disconnect());
+		resizeObserver.observe(chartContainer);
+		lifecycle.add(onThemeChange(updateChartTheme));
+		initializeChart();
+		document.fonts?.ready.then(() => {
+			if (!lifecycle.disposed) updateChartTheme();
 		});
 		return lifecycle.dispose;
 	});
@@ -218,9 +138,9 @@
 	}
 </script>
 
-<div class="flex flex-col gap-4 w-full">
-	<div class="flex justify-between items-center">
-		<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+<div class="flex w-full flex-col gap-4">
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<h3 class="text-h2 text-ink">
 			Price Chart
 			{#if selectedMarket}
 				- {selectedMarket.exchange} {selectedMarket.pair}
@@ -228,23 +148,27 @@
 				- All Markets Aggregated
 			{/if}
 		</h3>
-		<div class="flex gap-2">
-			{#each periods as period}
-				<button
-					class="px-3 py-1 text-sm rounded-lg transition-colors
-                        {selectedPeriod === period.value
-						? 'bg-purple-600 text-white'
-						: 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}"
-					on:click={() => onPeriodChange(period.value as '24h' | '7d')}
-				>
-					{period.label}
-				</button>
-			{/each}
+		<div class="flex max-w-full flex-col gap-1">
+			<span class="text-label text-ink-muted">Period</span>
+			<Tabs
+				variant="segmented"
+				label="Period"
+				options={periods}
+				value={selectedPeriod}
+				onchange={(value) => onPeriodChange(value as '24h' | '7d')}
+			/>
 		</div>
 	</div>
-	<div class="w-full h-[400px]" bind:this={chartContainer}></div>
+	<div class="plot w-full" style:--plot-height={`${height}px`} bind:this={chartContainer}></div>
 </div>
 
 <style>
-	/* Chart styles */
+	.plot {
+		height: var(--plot-height, 400px);
+	}
+	@media (max-width: 639px) {
+		.plot {
+			height: 280px;
+		}
+	}
 </style>
