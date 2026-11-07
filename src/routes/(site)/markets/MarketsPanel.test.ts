@@ -148,6 +148,9 @@ it('keeps named chart selection, safe pool links and new-tab context', () => {
 	);
 });
 
+it("marks each row's chart button so a click on the row can press it", () => {
+	expect(panel()).toMatch(/<button\b[^>]*aria-label="Show VOI\/USDC chart"[^>]*data-market-chart/);
+});
 it('connects responsive details to unique exchange, network and pair identities', () => {
 	const body = panel({
 		sortedMarketData: [row(), row({ exchange: 'PactFi', network: 'Algorand' })]

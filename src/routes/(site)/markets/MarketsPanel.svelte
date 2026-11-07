@@ -10,6 +10,7 @@
 	} from '$lib/markets/format';
 	import type { MarketDataState } from '$lib/markets/marketDataLoader';
 	import type { PageData } from './$types';
+	import { activateRowChart } from './rowChart';
 
 	type Market = PageData['marketData'][number];
 	interface Props {
@@ -118,6 +119,7 @@
 			size="sm"
 			aria-label={`Show ${normalizePair(market.pair)} chart`}
 			aria-pressed={selectedTradingPairId === market.trading_pair_id}
+			data-market-chart
 			class="min-w-10 [@media(pointer:coarse)]:min-w-11"
 			onclick={() => onRowClick(market)}
 		>
@@ -214,7 +216,12 @@
 				</select>
 			</div>
 		</div>
-		<div aria-busy={fetchingMarketData || undefined}>
+		<!-- Pointer shortcut only: the chart button in each row stays the keyboard and screen reader path. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+		<div
+			aria-busy={fetchingMarketData || undefined}
+			onclick={(event) => activateRowChart(event.target)}
+		>
 			{#if fetchingMarketData || isRefreshing}<p
 					role="status"
 					class="mb-2 text-label text-ink-muted"
