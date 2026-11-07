@@ -236,7 +236,7 @@ it('a contract page needs its own discovered contract before showing a native sp
 	}
 });
 
-it.each([{ balance: NaN }, { decimals: 256 }, { id: 123 as unknown as string }])(
+it.each([{ balance: NaN }, { decimals: 256 }, { id: 1 as unknown as string }])(
 	'invalid token fields keep the original population and mark only the bad row unavailable (%j)',
 	async (invalid) => {
 		const tokens = [token(), token({ ...invalid, name: 'Invalid token', id: invalid.id ?? 'bad' })];

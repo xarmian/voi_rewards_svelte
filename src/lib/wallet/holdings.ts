@@ -82,7 +82,8 @@ export function deriveHoldingsRows(
 	const seen = new Set<string>();
 	const all: HoldingsRow[] = [];
 	for (const token of tokens) {
-		const key = `${pageAddress}:${token.type ?? 'vsa'}:${token.id}${token.poolInfo ? ':' + (token.poolInfo.provider ?? 'unknown') : ''}`;
+		const id = typeof token.id === 'string' ? token.id : `${typeof token.id}:${token.id}`;
+		const key = `${pageAddress}:${token.type ?? 'vsa'}:${id}${token.poolInfo ? ':' + (token.poolInfo.provider ?? 'unknown') : ''}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
 		const valid = validToken(token);
