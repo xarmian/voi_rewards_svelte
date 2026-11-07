@@ -63,7 +63,7 @@
 		if (tabs.hash.toLowerCase() === '#consensus') showNode = true;
 	});
 	let sequence = 0;
-	let loadedAddress = '';
+	let loadedAddress = $state('');
 	const viewContracts = $derived(
 		snapshot?.contracts.filter((contract) => !parentWalletId || contract.address === walletId) ?? []
 	);
@@ -272,10 +272,18 @@
 						</div>{/if}
 				</details>
 			{:else if tabs.current === 'holdings'}
-				<div class="legacy-panel">
+				<div class="min-w-0">
 					<PortfolioComponent
 						walletAddress={walletId}
 						parentWalletAddress={parentWalletId ?? null}
+						holdingsSplit={snapshot
+							? {
+									pageAddress: loadedAddress,
+									owner: viewOwner,
+									contracts: viewContracts,
+									contractSet: snapshot.contractSet
+								}
+							: undefined}
 					/>
 				</div>
 			{:else if tabs.current === 'rewards'}
