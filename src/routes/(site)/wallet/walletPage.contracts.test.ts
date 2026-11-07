@@ -57,7 +57,7 @@ it('failed refresh keeps the last good contracts only for the same page and owne
 	context.loadContracts.mockRejectedValue(new Error('failed'));
 	await load(true);
 	expect(context.contractsSnapshot).toEqual({ ...good, contractSet: 'unavailable' });
-	expect(context.contractsSnapshot.contracts).toBe(good.contracts);
+	expect((context.contractsSnapshot as { contracts: unknown }).contracts).toBe(good.contracts);
 	expect(context.contractsLoadState).toBe('stale');
 	expect(context.contractsRefreshFailed).toBe(true);
 	context.walletId = 'OTHER';

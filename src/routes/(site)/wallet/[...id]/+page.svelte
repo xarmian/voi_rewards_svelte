@@ -260,7 +260,7 @@
 			return Promise.all([
 				updateContracts(true),
 				updateAccountInfo(parentWalletId || walletId, true)
-			]);
+			]).then(() => undefined);
 		return updateAccountInfo(parentWalletId || walletId, true);
 	}
 </script>
