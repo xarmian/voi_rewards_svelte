@@ -61,6 +61,14 @@ it('distinguishes payout failure from a complete empty result', () => {
 		tone: 'warn'
 	});
 });
+it('shows payouts that are still loading as loading, not as unavailable', () => {
+	expect(rows({ state: 'loading' })[0]).toMatchObject({
+		status: null,
+		actual: null,
+		payoutText: 'Loading payouts',
+		estimate: 140
+	});
+});
 it('keeps recorded zero payments distinct from absence and estimates', () => {
 	expect(rows(payments(tx('zero', 0)))[0]).toMatchObject({
 		status: 'Paid',

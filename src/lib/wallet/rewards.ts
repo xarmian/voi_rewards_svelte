@@ -407,17 +407,20 @@ export function mergeRewardRows(
 		const actual = payments.length
 			? payments.reduce((sum, payment) => sum + payment.amount, 0)
 			: null;
+		const loading = payouts.state === 'loading';
 		const status = noBlocks
 			? null
 			: epoch.current
 				? 'In progress'
-				: !known
-					? 'Unavailable'
-					: payments.length
-						? 'Paid'
-						: now < end
-							? 'Pending'
-							: 'Not found';
+				: loading
+					? null
+					: !known
+						? 'Unavailable'
+						: payments.length
+							? 'Paid'
+							: now < end
+								? 'Pending'
+								: 'Not found';
 		const tone: Tone =
 			status === 'Paid'
 				? 'ok'
@@ -439,11 +442,13 @@ export function mergeRewardRows(
 			explanation: status === 'Not found' ? 'No payment found in the following week.' : '',
 			payoutText: noBlocks
 				? 'No blocks'
-				: status === 'In progress' || status === 'Pending'
-					? 'Not yet reported'
-					: status === 'Paid'
-						? ''
-						: (status ?? 'Unavailable')
+				: loading && !epoch.current
+					? 'Loading payouts'
+					: status === 'In progress' || status === 'Pending'
+						? 'Not yet reported'
+						: status === 'Paid'
+							? ''
+							: (status ?? 'Unavailable')
 		};
 	});
 }
