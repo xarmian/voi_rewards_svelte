@@ -727,8 +727,8 @@
 				</label>
 				<p id="incentive-fee-help" class="mt-1 ml-7 text-xs text-gray-600 dark:text-gray-400">
 					{#if isStakingContract}
-						Not available for staking contracts: the contract always registers keys with the
-						normal 0.001 VOI fee.
+						Not available for staking contracts: the contract always registers keys with the normal
+						0.001 VOI fee.
 					{:else}
 						The fee is paid once, at key registration, and is not refundable. Off means the normal
 						0.001 VOI fee.

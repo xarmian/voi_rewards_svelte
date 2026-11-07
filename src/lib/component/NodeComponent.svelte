@@ -75,7 +75,11 @@
 			// Get latest epoch data
 			const dates = await dataTable.fetchDateRanges();
 			if (requestId !== nodeRequestId) return;
-			if (!Array.isArray(dates) || dates.length === 0 || !Number.isFinite(dates[dates.length - 1]?.epoch)) {
+			if (
+				!Array.isArray(dates) ||
+				dates.length === 0 ||
+				!Number.isFinite(dates[dates.length - 1]?.epoch)
+			) {
 				consensusError = true;
 				return;
 			}
@@ -125,7 +129,6 @@
 			estimatedRewardsPerDay = calculateRewardsForPeriod(1 / 7); // 1/7 of a week
 			estimatedRewardsPerWeek = calculateRewardsForPeriod(1);
 			estimatedRewardsPerMonth = calculateRewardsForPeriod(30.44 / 7); // ~4.33 weeks
-
 		} catch (error) {
 			if (requestId !== nodeRequestId) return;
 			consensusError = true;
@@ -230,7 +233,11 @@
 			{:else if consensusError}
 				<div class="text-center text-gray-600 dark:text-gray-400 py-8" role="status">
 					Couldn't load consensus data.
-					<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => fetchNodeData(true)}>Retry</button>
+					<button
+						type="button"
+						class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+						on:click={() => fetchNodeData(true)}>Retry</button
+					>
 				</div>
 			{:else if balance == 0 || Number(supply?.['online-money'] ?? 0) == 0}
 				<div class="flex justify-center items-center h-24">
@@ -319,9 +326,7 @@
 							class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700"
 						>
 							<span class="font-medium text-gray-600 dark:text-gray-400">Vote Key Expires:</span>
-							<span class="text-gray-800 dark:text-gray-200"
-								>{formatTime(voteKeySecondsLeft)}</span
-							>
+							<span class="text-gray-800 dark:text-gray-200">{formatTime(voteKeySecondsLeft)}</span>
 						</p>
 						<p
 							class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700"
