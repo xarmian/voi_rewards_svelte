@@ -176,3 +176,10 @@ export function buildVestingTimeline(contracts: ContractRow[], now = Date.now())
 	}
 	return { complete: unavailable.length === 0, unavailable, events, months };
 }
+
+/** Chart time domain: always contains every plotted point, even when the clock is past a loaded release. */
+export function scheduleDomain(months: { date: string }[], now: number): [Date, Date] {
+	const first = months[0] ? Date.parse(months[0].date) : now;
+	const last = months.at(-1) ? Date.parse(months.at(-1)!.date) : now + 86400000;
+	return [new Date(Math.min(now, first)), new Date(Math.max(last, Math.min(now, first)))];
+}

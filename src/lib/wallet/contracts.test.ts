@@ -16,7 +16,12 @@ vi.mock('./load', async (original) => {
 	return { ...actual, readContract: vi.fn(actual.readContract) };
 });
 import { readContract } from './load';
-import { loadContracts, buildVestingTimeline, summarizeContracts } from './contracts';
+import {
+	loadContracts,
+	buildVestingTimeline,
+	summarizeContracts,
+	scheduleDomain
+} from './contracts';
 import { summarizeWallet } from './summary';
 
 beforeEach(() => {
@@ -189,4 +194,16 @@ it('keeps the loaded schedule when the clock passes the first release', () => {
 	expect(Date.parse(timeline.months[0].date)).toBeLessThanOrEqual(
 		Date.parse(timeline.events[0].date)
 	);
+});
+
+it('starts the chart domain at the first plotted point when the clock is past a release', () => {
+	const row = contractFixture(1);
+	const later = Date.parse('2027-01-02T06:00:00Z');
+	const timeline = buildVestingTimeline([row], later);
+	const [start, end] = scheduleDomain(timeline.months, later);
+	for (const month of timeline.months) {
+		expect(Date.parse(month.date)).toBeGreaterThanOrEqual(start.getTime());
+		expect(Date.parse(month.date)).toBeLessThanOrEqual(end.getTime());
+	}
+	expect(scheduleDomain([], later)[0].getTime()).toBe(later);
 });

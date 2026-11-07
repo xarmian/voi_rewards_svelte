@@ -88,3 +88,10 @@ it('failed list retains an actual Retry and never claims no contracts', () => {
 	expect(text(html)).toContain('Retry');
 	expect(text(html)).not.toContain('No lock contracts');
 });
+
+it('derives the chart time domain from the plotted points, not the clock alone', async () => {
+	const { readFileSync } = await import('node:fs');
+	const source = readFileSync(new URL('./WalletContractsPanel.svelte', import.meta.url), 'utf8');
+	expect(source).toContain('scheduleDomain(timeline.months, now)');
+	expect(source).not.toMatch(/domain:\s*\[new Date\(now\)/);
+});

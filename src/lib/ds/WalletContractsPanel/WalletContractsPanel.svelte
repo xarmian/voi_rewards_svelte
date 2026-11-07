@@ -3,6 +3,7 @@
 	import type { WalletEpoch } from '$lib/wallet/summary';
 	import {
 		buildVestingTimeline,
+		scheduleDomain,
 		summarizeContracts,
 		type ContractRow
 	} from '$lib/wallet/contracts';
@@ -67,7 +68,7 @@
 	const points = $derived(
 		timeline.months.map((month) => ({ x: new Date(month.date), y: month.cumulative }))
 	);
-	const end = $derived(points.at(-1)?.x ?? new Date(now + 86400000));
+	const domain = $derived(scheduleDomain(timeline.months, now));
 </script>
 
 <div class="grid min-w-0 grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-12">
@@ -110,7 +111,7 @@
 				{asOf}
 				onretry={onrefresh}
 				height={240}
-				x={{ kind: 'time', domain: [new Date(now), end] }}
+				x={{ kind: 'time', domain }}
 				y={{
 					domain: [0, Math.max(1, timeline.months.at(-1)?.cumulative ?? 0)],
 					format: (n) => compact(n, 1)
