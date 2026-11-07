@@ -47,3 +47,5 @@ export { WalletOverview } from './WalletOverview';
 export { WalletAvatar } from './WalletAvatar';
 export { WalletHoldings } from './WalletHoldings';
 export { WalletNfts } from './WalletNfts';
+
+export { WalletContractsPanel } from './WalletContractsPanel';
