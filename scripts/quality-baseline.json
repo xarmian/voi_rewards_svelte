@@ -244,12 +244,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/wallet/AccountInfo.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
 		"src/lib/ds/Header/MobileMenu.svelte": {
 			"svelte/no-unused-svelte-ignore": {
 				"errors": 2,
