@@ -252,6 +252,7 @@
 	function refresh() {
 		if (!browser || !walletId) return;
 		if (ownerLookup === 'unavailable') return invalidate('wallet:id');
+		if (tabs.current === 'contracts') return updateContracts(true);
 		return updateAccountInfo(parentWalletId || walletId, true);
 	}
 </script>
@@ -427,8 +428,13 @@
 						<time datetime={snapshot.asOf}>{new Date(snapshot.asOf).toUTCString()}</time
 						>{:else}Wallet data loads in your browser.{/if}
 				</p>
-				<Button variant="soft" size="sm" onclick={refresh} disabled={loadState === 'loading'}
-					>Refresh wallet data</Button
+				<Button
+					variant="soft"
+					size="sm"
+					onclick={refresh}
+					disabled={tabs.current === 'contracts'
+						? contractsLoadState === 'loading'
+						: loadState === 'loading'}>Refresh wallet data</Button
 				>
 			</div>
 			{#if dataState === 'stale'}<div class="mt-3">

@@ -99,6 +99,8 @@ it('refresh retries the server ownership source before treating the route as an 
 		walletId: 'PAGE',
 		parentWalletId: null,
 		ownerLookup: 'unavailable',
+		tabs: { current: 'overview' },
+		updateContracts: vi.fn(),
 		invalidate: vi.fn().mockResolvedValue(undefined),
 		updateAccountInfo: vi.fn().mockResolvedValue(undefined)
 	};
@@ -109,4 +111,22 @@ it('refresh retries the server ownership source before treating the route as an 
 	context.ownerLookup = 'ok';
 	await refresh();
 	expect(context.updateAccountInfo).toHaveBeenCalledExactlyOnceWith('PAGE', true);
+});
+
+it('the page refresh updates visible contract rows without requesting Overview data', async () => {
+	const context = {
+		browser: true,
+		walletId: 'PAGE',
+		parentWalletId: null,
+		ownerLookup: 'ok',
+		tabs: { current: 'contracts' },
+		invalidate: vi.fn(),
+		updateAccountInfo: vi.fn(),
+		updateContracts: vi.fn().mockResolvedValue(undefined)
+	};
+	const refresh = runInNewContext(`${code('refresh')}; refresh`, context);
+	await refresh();
+	expect(context.updateContracts).toHaveBeenCalledExactlyOnceWith(true);
+	expect(context.updateAccountInfo).not.toHaveBeenCalled();
+	expect(context.invalidate).not.toHaveBeenCalled();
 });
