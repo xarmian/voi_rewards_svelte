@@ -1,13 +1,20 @@
 <script lang="ts">
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import { createEventDispatcher } from 'svelte';
 	import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
 	import { arc200Approve, arc200RevokeApproval, fetchOutgoingApprovals } from '$lib/utils/arc200';
-	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
+	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import WalletSearch from './WalletSearch.svelte';
 	import ResolvedAddress from './ResolvedAddress.svelte';
 
 	const dispatch = createEventDispatcher();
+	$: accountState = pageAccountState(walletId, $connectedWallets);
+	$: canSignTransactions = accountState.state === 'yours';
 
 	export let open = false;
 	export let token: FungibleTokenType;
@@ -16,7 +23,6 @@
 	let isLoading = false;
 	let isRevoking: string | null = null;
 	let isApproving = false;
-	let signingPinned = false;
 	let approvalError: string | null = null;
 	let approvalSuccess = false;
 	let successTxId: string | null = null;
@@ -29,11 +35,6 @@
 	let refreshTrigger = 0; // Used to trigger re-fetches
 	let hasChanges = false; // Track if any changes were made
 
-	$: canSignTransactions =
-		(signingPinned && (isApproving || isRevoking !== null)) ||
-		($selectedWallet?.address === walletId &&
-			$selectedWallet?.app !== '' &&
-			$selectedWallet?.app !== 'Watch');
 	$: isArc200 = token.type === 'arc200';
 	$: tokenName = token.name;
 	$: tokenSymbol = token.symbol;
@@ -94,15 +95,23 @@
 
 	async function handleCreateApproval() {
 		if (isApproving || isRevoking !== null) return;
-		if (!walletId || !canSignTransactions || !spenderAddress || !approvalAmount) {
+		if (!canSignTransactions) {
+			approvalError = wrongSignerMessage();
+			return;
+		}
+		if (!walletId || !spenderAddress || !approvalAmount) {
 			approvalError = 'Please fill in all fields';
 			return;
 		}
 
-		signingPinned = canSignTransactions;
 		try {
 			// The account the user confirmed, taken before any await.
-			const signer = captureSigner();
+			const target = walletId;
+			const signer = capturePageSigner(target);
+			if (!signerMatchesAccount(signer, target)) {
+				approvalError = wrongSignerMessage();
+				return;
+			}
 			isApproving = true;
 			approvalError = null;
 			approvalSuccess = false;
@@ -150,7 +159,6 @@
 			approvalError = error instanceof Error ? error.message : 'Failed to create approval';
 		} finally {
 			isApproving = false;
-			signingPinned = false;
 		}
 	}
 
@@ -161,12 +169,19 @@
 
 	async function handleRevokeApproval(approval: TokenApproval) {
 		if (isApproving || isRevoking !== null) return;
-		if (!walletId || !canSignTransactions) return;
+		if (!walletId || !canSignTransactions) {
+			approvalError = wrongSignerMessage();
+			return;
+		}
 
-		signingPinned = canSignTransactions;
 		try {
 			// The account the user confirmed, taken before any await.
-			const signer = captureSigner();
+			const target = walletId;
+			const signer = capturePageSigner(target);
+			if (!signerMatchesAccount(signer, target)) {
+				approvalError = wrongSignerMessage();
+				return;
+			}
 			isRevoking = approval.transactionId;
 			approvalError = null;
 			approvalSuccess = false;
@@ -202,7 +217,6 @@
 			approvalError = error instanceof Error ? error.message : 'Failed to revoke approval';
 		} finally {
 			isRevoking = null;
-			signingPinned = false;
 		}
 	}
 
@@ -262,89 +276,83 @@
 						<p>Approvals are only available for ARC-200 tokens.</p>
 					</div>
 				{:else}
-					<!-- Create new approval section -->
-					<div class="mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
-						<h4 class="text-lg font-medium text-gray-900 dark:text-white mb-3">
-							Create New Approval
-						</h4>
+					{#if canSignTransactions}
+						<!-- Create new approval section -->
+						<div class="mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+							<h4 class="text-lg font-medium text-gray-900 dark:text-white mb-3">
+								Create New Approval
+							</h4>
 
-						<div class="space-y-4">
-							<div>
-								<label
-									for="spender"
-									class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-								>
-									Spender Address
-								</label>
-								<WalletSearch
-									inputId="spender"
-									onSubmit={handleSpenderSelected}
-									onEdit={() => (spenderAddress = '')}
-									loadPreviousValue={false}
-									storeAddress={false}
-									clearOnSubmit={false}
-									hideSubmitButton={true}
-									bind:searchText={spenderText}
-								/>
-								{#if algosdk.isValidAddress(spenderAddress) && spenderText !== spenderAddress}
-									<ResolvedAddress address={spenderAddress} />
-								{/if}
-							</div>
-
-							<div>
-								<label
-									for="amount"
-									class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-								>
-									Amount
-								</label>
-								<div class="flex items-center">
-									<input
-										type="text"
-										id="amount"
-										bind:value={approvalAmount}
-										placeholder="Enter amount"
-										class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-										disabled={isApproving}
-									/>
-									<span
-										class="px-3 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
+							<div class="space-y-4">
+								<div>
+									<label
+										for="spender"
+										class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
 									>
-										{tokenSymbol}
-									</span>
+										Spender Address
+									</label>
+									<WalletSearch
+										inputId="spender"
+										onSubmit={handleSpenderSelected}
+										onEdit={() => (spenderAddress = '')}
+										loadPreviousValue={false}
+										storeAddress={false}
+										clearOnSubmit={false}
+										hideSubmitButton={true}
+										bind:searchText={spenderText}
+									/>
+									{#if algosdk.isValidAddress(spenderAddress) && spenderText !== spenderAddress}
+										<ResolvedAddress address={spenderAddress} />
+									{/if}
 								</div>
-								<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-									Your balance: {formatTokenAmount(token.balance.toString(), tokenDecimals)}
-									{tokenSymbol}
-								</p>
+
+								<div>
+									<label
+										for="amount"
+										class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+									>
+										Amount
+									</label>
+									<div class="flex items-center">
+										<input
+											type="text"
+											id="amount"
+											bind:value={approvalAmount}
+											placeholder="Enter amount"
+											class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+											disabled={isApproving}
+										/>
+										<span
+											class="px-3 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
+										>
+											{tokenSymbol}
+										</span>
+									</div>
+									<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+										Your balance: {formatTokenAmount(token.balance.toString(), tokenDecimals)}
+										{tokenSymbol}
+									</p>
+								</div>
+
+								{#if canSignTransactions}<button
+										on:click={handleCreateApproval}
+										class="w-full px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+										disabled={isApproving ||
+											!algosdk.isValidAddress(spenderAddress) ||
+											!approvalAmount}
+									>
+										{#if isApproving}
+											<div
+												class="w-4 h-4 border-t-2 border-r-2 border-white rounded-full animate-spin mr-2"
+											></div>
+											Creating Approval...
+										{:else}
+											Create Approval
+										{/if}
+									</button>{/if}
 							</div>
-
-							<button
-								on:click={handleCreateApproval}
-								class="w-full px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-								disabled={isApproving ||
-									!canSignTransactions ||
-									!algosdk.isValidAddress(spenderAddress) ||
-									!approvalAmount}
-							>
-								{#if isApproving}
-									<div
-										class="w-4 h-4 border-t-2 border-r-2 border-white rounded-full animate-spin mr-2"
-									></div>
-									Creating Approval...
-								{:else}
-									Create Approval
-								{/if}
-							</button>
-
-							{#if !canSignTransactions}
-								<p class="text-xs text-red-500 mt-1">
-									Connect your wallet to create new approvals.
-								</p>
-							{/if}
 						</div>
-					</div>
-
+					{/if}
 					<!-- Existing approvals section -->
 					<div>
 						<div class="flex justify-between items-center mb-3">
