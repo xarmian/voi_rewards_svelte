@@ -202,7 +202,7 @@
 		},
 		"src/lib/components/OHLCVChart.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 9,
+				"errors": 6,
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-vars": {

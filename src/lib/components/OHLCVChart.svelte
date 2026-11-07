@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { onThemeChange } from '$lib/theme.svelte';
 	import { onMount, createEventDispatcher } from 'svelte';
+	import { chartTimestamp, describeOHLCV, displayedByTime } from '$lib/markets/chartDescription';
+	import {
+		clearInspection,
+		inspect,
+		isInspectionKey,
+		inspectionInstructions
+	} from '$lib/markets/chartInspection';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
 	import Button from '$lib/ds/Button/Button.svelte';
 	import Tabs from '$lib/ds/Tabs/Tabs.svelte';
@@ -57,14 +64,40 @@
 	let chartTokens: ChartTokens;
 	let prevPairKey: string | null = null;
 	let isInitializing = false;
-	let hovered: {
-		time?: number;
-		open?: number;
-		high?: number;
-		low?: number;
-		close?: number;
-		volume?: number;
-	} | null = null;
+	let inspection = clearInspection();
+	$: displayedData = displayedByTime(data);
+	$: displayedVolumes = displayedByTime(volumes);
+	$: visibleVolumes = settings.showVolume && displayedData.length > 0 ? displayedVolumes : [];
+	$: quote =
+		tokenPair.quoteSymbol === 'aUSDC' && quoteCurrency === 'USD'
+			? 'USD'
+			: tokenPair.quoteSymbol || quoteCurrency;
+	$: description = describeOHLCV(displayedData, visibleVolumes, {
+		selection: `${tokenPair.baseSymbol}/${quote}`,
+		period: settings.resolution,
+		quote
+	});
+	$: inspectedText =
+		inspection.index === null ? '' : (description.observations[inspection.index] ?? '');
+	$: {
+		void data;
+		void volumes;
+		void tokenPair;
+		void settings.resolution;
+		void settings.showVolume;
+		void chartType;
+		void quoteCurrency;
+		void description;
+		clearChartInspection();
+	}
+	function clearChartInspection() {
+		inspection = inspect(inspection, { reset: true }, description.observations);
+	}
+	function handleInspectionKey(event: KeyboardEvent) {
+		if (!isInspectionKey(event.key)) return;
+		event.preventDefault();
+		inspection = inspect(inspection, { key: event.key }, description.observations);
+	}
 
 	// Local chart type state to avoid mutating parent prop object
 	let chartType: 'candlestick' | 'line' = settings.chartType;
@@ -204,62 +237,14 @@
 		updateChartTheme();
 		applyTimeFormatter();
 
-		// Subscribe to crosshair to update footer stats with hovered values
-		const handleCrosshairMove = (param: any) => {
-			try {
-				if (!param || !mainSeries) {
-					hovered = null;
-					return;
-				}
-				const seriesData =
-					param.seriesData?.get?.(mainSeries as any) ||
-					param.seriesPrices?.get?.(mainSeries as any);
-				if (seriesData && typeof seriesData === 'object') {
-					// For candlesticks we get {open,high,low,close}; for line we get {value}
-					const t = param.time
-						? typeof param.time === 'number'
-							? param.time
-							: param.time?.year
-								? Math.floor(
-										new Date(
-											param.time.year,
-											(param.time.month || 1) - 1,
-											param.time.day || 1
-										).getTime() / 1000
-									)
-								: 0
-						: undefined;
-					// Try to lookup a volume value at the same time
-					let vol: number | undefined = undefined;
-					if (t && Array.isArray(volumes) && volumes.length) {
-						const match = volumes.find((v) => v.time === t);
-						if (match) vol = match.value;
-					}
-					if ('open' in seriesData) {
-						hovered = {
-							time: t,
-							open: seriesData.open,
-							high: seriesData.high,
-							low: seriesData.low,
-							close: seriesData.close,
-							volume: vol
-						};
-					} else if ('value' in seriesData) {
-						hovered = {
-							time: t,
-							open: seriesData.value,
-							high: seriesData.value,
-							low: seriesData.value,
-							close: seriesData.value,
-							volume: vol
-						};
-					}
-				} else {
-					hovered = null;
-				}
-			} catch (e) {
-				console.warn('crosshair handler error', e);
-			}
+		// Pointer and keyboard inspection select the same displayed observation text.
+		const handleCrosshairMove = (param: import('lightweight-charts').MouseEventParams) => {
+			const time = param.time === undefined ? undefined : toUnixSeconds(param.time);
+			const index =
+				time === undefined
+					? null
+					: description.rows.findIndex((row) => row[0] === chartTimestamp(time));
+			inspection = inspect(inspection, { pointer: index }, description.observations);
 		};
 		chart.subscribeCrosshairMove(handleCrosshairMove);
 		lifecycle.add(() => instance.unsubscribeCrosshairMove(handleCrosshairMove));
@@ -347,15 +332,7 @@
 			return;
 		}
 
-		// Sort data by time and deduplicate (keep last entry for each timestamp)
-		// lightweight-charts requires unique timestamps
-		const sorted = [...data].sort((a, b) => a.time - b.time);
-		const deduped = new Map<number, OHLCVData>();
-		for (const item of sorted) {
-			deduped.set(item.time, item);
-		}
-		const sortedData = Array.from(deduped.values());
-
+		const sortedData = displayedData;
 		// Dynamically adjust price precision based on value range
 		try {
 			const lows = sortedData.map((d) => (Number.isFinite(d.low) ? d.low : d.close));
@@ -394,13 +371,7 @@
 				if (!volumeSeries) {
 					createVolumeSeries();
 				}
-				// Sort and deduplicate volume data (keep last entry for each timestamp)
-				const sortedVols = [...volumes].sort((a, b) => a.time - b.time);
-				const dedupedVols = new Map<number, VolumeData>();
-				for (const item of sortedVols) {
-					dedupedVols.set(item.time, item);
-				}
-				volumeSeries?.setData(themedVolumes(Array.from(dedupedVols.values())));
+				volumeSeries?.setData(themedVolumes(displayedVolumes));
 				chart.priceScale('right').applyOptions({
 					scaleMargins: { top: 0.1, bottom: 0.4 }
 				});
@@ -484,11 +455,13 @@
 	// Reactive updates: update chart whenever new data arrives or resolution changes
 	let prevSig = '';
 	$: {
-		const firstTs = data?.[0]?.time ?? 0;
-		const lastTs = data?.[data.length - 1]?.time ?? 0;
-		const firstClose = data?.[0]?.close ?? 0;
-		const lastClose = data?.[data.length - 1]?.close ?? 0;
-		const sig = `${data?.length || 0}:${firstTs}-${lastTs}:${firstClose}:${lastClose}:${settings.resolution}:${chartType}`;
+		const sig = JSON.stringify([
+			displayedData,
+			displayedVolumes,
+			settings.resolution,
+			chartType,
+			settings.showVolume
+		]);
 		if (sig !== prevSig) {
 			prevSig = sig;
 			if (chart && mainSeries) {
@@ -556,10 +529,10 @@
 	}
 </script>
 
-<div class="flex min-w-0 flex-col gap-4">
+<section aria-labelledby="ohlcv-chart-title" class="flex min-w-0 flex-col gap-4">
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div class="min-w-0">
-			<h3 class="text-h2 text-ink">
+			<h2 id="ohlcv-chart-title" class="text-h2 text-ink">
 				{#if (tokenPair.baseSymbol || '').toUpperCase() === 'VOI'}
 					VOI/{tokenPair.quoteSymbol === 'aUSDC'
 						? quoteCurrency === 'USD'
@@ -571,7 +544,7 @@
 						? 'VOI'
 						: tokenPair.baseSymbol}/{tokenPair.quoteSymbol || 'VOI'}
 				{/if}
-			</h3>
+			</h2>
 			<p class="text-label text-ink-muted">Pool ID: {tokenPair.poolId || 'N/A'}</p>
 			{#if loading}<p role="status" class="text-label text-ink-muted">Loading chart data...</p>{/if}
 		</div>
@@ -626,71 +599,95 @@
 		>
 		<Button size="sm" variant="ghost" onclick={handleRefresh} disabled={loading}>Refresh</Button>
 	</div>
-	<div class="plot relative w-full" style:--plot-height={`${height}px`}>
-		<div bind:this={chartContainer} class="absolute inset-0 bg-surface" />
-		{#if loading && data.length === 0}
-			<div role="status" class="absolute inset-0 flex items-center justify-center text-ink-muted">
-				Loading chart data...
-			</div>
-		{:else if data.length === 0}
-			<div
-				class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-ink-muted"
-			>
-				<p>No data available for this token pair</p>
-				<p class="text-label">Try selecting a different time resolution or refresh the data</p>
-			</div>
-		{/if}
+	<p id="ohlcv-chart-description" class="text-label text-ink-muted">{description.summary}</p>
+	<p id="ohlcv-chart-instructions" class="text-label text-ink-muted">{inspectionInstructions}</p>
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<div
+		role="group"
+		tabindex="0"
+		aria-roledescription="chart"
+		aria-labelledby="ohlcv-chart-title"
+		aria-describedby="ohlcv-chart-description ohlcv-chart-instructions"
+		class="chart-inspection rounded-ds-sm"
+		onkeydown={handleInspectionKey}
+	>
+		<div class="plot relative w-full" style:--plot-height={`${height}px`}>
+			<div bind:this={chartContainer} class="absolute inset-0 bg-surface" />
+			{#if loading && data.length === 0}
+				<div role="status" class="absolute inset-0 flex items-center justify-center text-ink-muted">
+					Loading chart data...
+				</div>
+			{:else if data.length === 0}
+				<div
+					class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-ink-muted"
+				>
+					<p>No data available for this token pair</p>
+					<p class="text-label">Try selecting a different time resolution or refresh the data</p>
+				</div>
+			{/if}
+		</div>
 	</div>
-	{#if data.length > 0}
+	<p class="text-label text-ink">{inspectedText}</p>
+	<p class="sr-only" aria-live="polite" aria-atomic="true">{inspection.announcement}</p>
+	{#if displayedData.length > 0}
 		<div
 			class="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-4 text-label"
 		>
 			<dl class="flex flex-wrap gap-x-6 gap-y-2">
-				<div class="flex flex-wrap gap-1">
-					<dt class="text-ink-muted">Open:</dt>
-					<dd class="num font-medium text-ink">
-						{hovered ? (hovered.open?.toFixed(6) ?? '—') : data[0]?.open.toFixed(6) || '—'}
-					</dd>
-				</div>
-				<div class="flex flex-wrap gap-1">
-					<dt class="text-ink-muted">High:</dt>
-					<dd class="num font-medium text-ink">
-						{hovered
-							? (hovered.high?.toFixed(6) ?? '—')
-							: Math.max(...data.map((d) => d.high)).toFixed(6)}
-					</dd>
-				</div>
-				<div class="flex flex-wrap gap-1">
-					<dt class="text-ink-muted">Low:</dt>
-					<dd class="num font-medium text-ink">
-						{hovered
-							? (hovered.low?.toFixed(6) ?? '—')
-							: Math.min(...data.map((d) => d.low)).toFixed(6)}
-					</dd>
-				</div>
-				<div class="flex flex-wrap gap-1">
-					<dt class="text-ink-muted">Close:</dt>
-					<dd class="num font-medium text-ink">
-						{hovered
-							? (hovered.close?.toFixed(6) ?? '—')
-							: data[data.length - 1]?.close.toFixed(6) || '—'}
-					</dd>
-				</div>
-				{#if settings.showVolume}
+				{#each ['Open', 'High', 'Low', 'Close'] as label}
 					<div class="flex flex-wrap gap-1">
-						<dt class="text-ink-muted">Volume:</dt>
+						<dt class="text-ink-muted">{label}:</dt>
 						<dd class="num font-medium text-ink">
-							{hovered?.volume ?? volumes.reduce((sum, v) => sum + v.value, 0).toLocaleString()}
+							{description.period[label.toLowerCase() as 'open' | 'high' | 'low' | 'close']}
 						</dd>
 					</div>
-				{/if}
+				{/each}
+				{#if settings.showVolume}<div class="flex flex-wrap gap-1">
+						<dt class="text-ink-muted">Volume:</dt>
+						<dd class="num font-medium text-ink">{description.period.volume}</dd>
+					</div>{/if}
 			</dl>
-			<p class="text-ink-muted">{data.length} data points</p>
+			<p class="text-ink-muted">{displayedData.length} data points</p>
 		</div>
 	{/if}
-</div>
+	<details class="min-w-0 text-label">
+		<summary class="w-fit cursor-pointer text-accent">View data</summary>
+		<!-- A named data region is keyboard scrollable when its table overflows. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div
+			role="region"
+			aria-label="OHLCV chart data"
+			tabindex="0"
+			class="chart-inspection mt-2 max-w-full overflow-x-auto rounded-ds-sm"
+		>
+			<table class="w-full text-label">
+				<caption class="mb-2 text-start text-ink-muted">{description.caption}</caption>
+				<thead
+					><tr
+						>{#each description.headers as header}<th
+								scope="col"
+								class="border-b border-line p-2 text-start">{header}</th
+							>{/each}</tr
+					></thead
+				>
+				<tbody
+					>{#each description.rows as row}<tr
+							>{#each row as cell}<td class="num whitespace-nowrap border-b border-line p-2"
+									>{cell}</td
+								>{/each}</tr
+						>{/each}</tbody
+				>
+			</table>
+		</div>
+	</details>
+</section>
 
 <style>
+	.chart-inspection:focus-visible {
+		outline: 2px solid rgb(var(--c-focus));
+		outline-offset: 2px;
+	}
 	.plot {
 		height: var(--plot-height, 400px);
 	}

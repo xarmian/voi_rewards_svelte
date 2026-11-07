@@ -43,7 +43,7 @@
 	}: Props = $props();
 </script>
 
-<Card>
+<Card title="Market chart">
 	{#if tokenChartError}
 		<InlineAlert message={tokenChartError} />
 	{/if}
