@@ -57,6 +57,8 @@ it('reflects alternative selections and Volume off', () => {
 	for (const label of ['VOI', 'Line', '1 day'])
 		expect(pressed(body, label)).toContain('aria-pressed="true"');
 	expect(pressed(body, 'Volume')).toContain('aria-pressed="false"');
+	expect(pressed(body, 'Volume')).not.toContain('bg-accent-soft');
+	expect(pressed(chart(), 'Volume')).toContain('bg-accent-soft');
 });
 
 it('keeps loading, empty and ready states distinct', () => {

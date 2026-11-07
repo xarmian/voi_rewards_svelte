@@ -615,8 +615,11 @@
 				onchange={(value) => handleResolutionChange(value as Resolution)}
 			/>
 		</div>
-		<Button size="sm" variant="soft" aria-pressed={settings.showVolume} onclick={toggleVolume}
-			>Volume</Button
+		<Button
+			size="sm"
+			variant={settings.showVolume ? 'soft' : 'ghost'}
+			aria-pressed={settings.showVolume}
+			onclick={toggleVolume}>Volume</Button
 		>
 		<Button size="sm" variant="ghost" onclick={handleRefresh} disabled={loading}>Refresh</Button>
 	</div>
