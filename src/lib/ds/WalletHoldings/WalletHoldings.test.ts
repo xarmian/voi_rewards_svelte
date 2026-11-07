@@ -4,6 +4,7 @@ import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
+import { compile } from 'svelte/compiler';
 import WalletHoldings from './WalletHoldings.svelte';
 import { tokens as population } from './fixtures';
 
@@ -48,6 +49,80 @@ it('confirmed native zero is ready, token failure is unavailable, and NFTs do no
 	expect(html).toContain('Show collectibles');
 	expect(html).not.toContain('0 NFTs');
 	expect(html).not.toContain('No liquidity positions');
+});
+it('expansion only adds rows and permanently removes the page limit', async () => {
+	const source = readFileSync(new URL('./WalletHoldings.svelte', import.meta.url), 'utf8');
+	const script = source.split('</script>')[0].replace('<script lang="ts">', '');
+	const ast = ts.createSourceFile('presenter.ts', script, ts.ScriptTarget.Latest, true);
+	const states = ast.statements.filter(
+		(node) => ts.isVariableStatement(node) && /\$state\(false\)/.test(node.getText(ast))
+	);
+	const context = createContext({ $state: (value: boolean) => value });
+	runInContext(
+		ts.transpileModule(states.map((node) => node.getText(ast)).join('\n'), {}).outputText,
+		context
+	);
+	const limit = source.match(/limit=\{([^}]+)\}/)?.[1];
+	expect(limit, 'The page owns the token limit').toBe('tokensExpanded ? undefined : 10');
+	expect(runInContext(limit!, context)).toBe(10);
+	const handlers = [...source.matchAll(/onclick=\{(\(\) => \([^}]+\))\}/g)].map(
+		(match) => match[1]
+	);
+	const expansions: string[] = [];
+	for (const state of ['tokensExpanded', 'showDust']) {
+		const expand = handlers.find((handler) => handler.includes(state));
+		expect(expand, `An expansion handler sets ${state}`).toBeDefined();
+		expansions.push(`(${expand})();`);
+		runInContext(`(${expand})()`, context);
+		expect(runInContext(state, context)).toBe(true);
+		// Repeating any available expansion cannot return either state to false.
+		runInContext(`(${expand})()`, context);
+		expect(runInContext(state, context)).toBe(true);
+	}
+	expect(runInContext(limit!, context)).toBeUndefined();
+	expect(source).not.toMatch(/Show fewer|Show less|Hide dust|Collapse/);
+	expect(source).toContain('{#if !tokensExpanded && display.rows.tokens.length > 10}');
+	expect(source).toContain('{#if !showDust}');
+	const html = render(WalletHoldings, {
+		props: { pageAddress: 'Y', account, tokens: population, tokenState: 'ready' }
+	}).body;
+	expect(html).toContain('Show 5 more tokens');
+	expect(html).not.toMatch(/Show fewer|Show less|Hide dust|Collapse/);
+	// Render the actual presenter with the state produced by those same expansion handlers.
+	const expandedSource = source.replace(
+		'const display =',
+		`${expansions.join('\n')}\nconst display =`
+	);
+	const compiled = compile(expandedSource, {
+		generate: 'server',
+		filename: 'WalletHoldings.svelte'
+	}).js.code;
+	const imports = [
+		...new Set([...compiled.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => match[1]))
+	];
+	const modules = new Map(
+		await Promise.all(
+			imports.map(
+				async (id) =>
+					[id, await import(id.startsWith('.') ? new URL(id, import.meta.url).href : id)] as const
+			)
+		)
+	);
+	const expandedContext = createContext({ exports: {}, require: (id: string) => modules.get(id) });
+	runInContext(
+		ts.transpileModule(compiled, {
+			compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+		}).outputText,
+		expandedContext
+	);
+	const expandedHtml = render(expandedContext.exports.default, {
+		props: { pageAddress: 'Y', account, tokens: population, tokenState: 'ready' }
+	}).body;
+	expect(expandedHtml).toContain('data-token-id="14"');
+	expect(expandedHtml).toContain('data-token-id="zero"');
+	expect(expandedHtml).not.toMatch(
+		/Show \d+ more tokens|Show dust|Show fewer|Show less|Hide dust|Collapse/
+	);
 });
 it('controller delegates presentation using full raw population and the original snippets', () => {
 	const source = controller();

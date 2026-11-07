@@ -10,6 +10,7 @@
 	} from '$lib/wallet/holdings';
 	import type { DataState } from '../types';
 	import type { Column, SortState } from '../DataTable/types';
+	import { sortRows } from '../DataTable/sort';
 	import Card from '../Card/Card.svelte';
 	import StatTile from '../StatTile/StatTile.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
@@ -66,6 +67,7 @@
 		onretryNfts?: () => void;
 	} = $props();
 	let showDust = $state(false);
+	let tokensExpanded = $state(false);
 	let tokenSort = $state<SortState>({ key: 'value', dir: 'desc' });
 	let lpSort = $state<SortState>({ key: 'value', dir: 'desc' });
 	const display = $derived(
@@ -134,6 +136,12 @@
 		columns[2],
 		columns[3]
 	]);
+	// Own the initial slice so DataTable never offers its reversible list expansion.
+	const tokenRows = $derived.by(() => {
+		const column = columns.find((column) => column.key === tokenSort.key)!;
+		const sorted = sortRows(display.rows.tokens, column, tokenSort.dir);
+		return tokensExpanded ? sorted : sorted.slice(0, 10);
+	});
 	const tableState = $derived(tokenState);
 </script>
 
@@ -195,9 +203,9 @@
 		<Button variant="soft" onclick={onretryTokens} disabled={tokenState === 'loading'}
 			>Refresh tokens</Button
 		>
-		<Button variant="soft" aria-pressed={showDust} onclick={() => (showDust = !showDust)}
-			>{showDust ? 'Hide dust' : 'Show dust'}</Button
-		>
+		{#if !showDust}
+			<Button variant="soft" onclick={() => (showDust = true)}>Show dust</Button>
+		{/if}
 	</div>
 {/snippet}
 {#snippet nativeControls()}<div class="flex flex-wrap gap-2">
@@ -273,14 +281,14 @@
 			/>
 		{:else}<DataTable
 				{columns}
-				rows={display.rows.tokens}
+				rows={tokenRows}
 				rowKey={(r) => r.key}
 				rowName={(r) => r.token.name}
 				caption="Page address token holdings"
 				id="ds-holdings-tokens"
 				density="compact"
 				bind:sort={tokenSort}
-				limit={10}
+				limit={tokensExpanded ? undefined : 10}
 				moreLabel={(n) => `Show ${n} more tokens`}
 				{detail}
 				state={tableState}
@@ -289,6 +297,11 @@
 					? 'No tokens above the dust threshold. Show dust.'
 					: 'No tokens in this account'}
 			/>{/if}
+		{#if !tokensExpanded && display.rows.tokens.length > 10}
+			<Button variant="ghost" onclick={() => (tokensExpanded = true)}
+				>Show {display.rows.tokens.length - 10} more tokens</Button
+			>
+		{/if}
 		<div class="mt-4 min-w-0">{@render claims?.()}</div>
 	</Card>
 	<Card title="Liquidity positions" span={{ lg: 12, md: 2 }}>

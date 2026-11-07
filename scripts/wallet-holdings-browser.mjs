@@ -282,17 +282,55 @@ try {
 		`document.querySelector('.wallet-claim-legacy').textContent.includes('Fixture signing refused')`
 	);
 
-	// Section 9 requires a pending money component to survive collapsing the top-ten view.
+	// Expanded rows keep their real controllers while a transaction is pending.
 	// Hold only the transaction boundary; run the real FungibleToken claim handler and DataTable.
 	await evaluate(
 		`window.__holdClaim=true;window.pendingClaimCard=document.querySelector('[data-token-id="14"] .wallet-token-legacy');[...pendingClaimCard.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
 	);
 	await wait(`pendingClaimCard.textContent.includes('Claiming...')`);
-	await evaluate(`clickText('Show fewer');`);
+	const assertPendingController = async () => {
+		assert.equal(
+			await evaluate(
+				`pendingClaimCard.isConnected && pendingClaimCard === document.querySelector('[data-token-id="14"] .wallet-token-legacy')`
+			),
+			true,
+			'Expanded token 14 retains the same connected controller while Claim is pending'
+		);
+	};
+	assert.equal(
+		await evaluate(
+			`buttons().concat([...document.querySelectorAll('a')]).some(el => /^(Show fewer|Show less|Hide dust|Collapse)$/i.test(el.textContent.trim()))`
+		),
+		false,
+		'Expanded holdings expose no list collapse control'
+	);
+	await assertPendingController();
+	// Sort both ways, close/reopen the detail, and change the selected wallet.
+	for (const column of ['Token', 'Quantity', 'VOI equivalent', '≈USD']) {
+		for (let direction = 0; direction < 2; direction++) {
+			await evaluate(
+				`document.querySelector('#ds-holdings-tokens th').closest('thead').querySelectorAll('button')[${['Token', 'Quantity', 'VOI equivalent', '≈USD'].indexOf(column)}].click()`
+			);
+			await assertPendingController();
+		}
+	}
+	for (let n = 0; n < 2; n++) {
+		await evaluate(
+			`document.querySelector('button[aria-controls="'+pendingClaimCard.closest('tr').id+'"]').click()`
+		);
+		await assertPendingController();
+	}
+	for (let n = 0; n < 2; n++) {
+		await evaluate(`clickText('Toggle signing')`);
+		await assertPendingController();
+	}
 	assert.equal(
 		await evaluate(`pendingClaimCard.isConnected`),
 		true,
-		'Section 9: Show fewer must retain the mounted row 14 money controller while its Claim is pending'
+		'Pending approval Claim remains mounted after the available controls are exercised'
+	);
+	console.log(
+		'PASS one-way expansion retains the same pending Claim controller through sorting, detail toggles and wallet changes'
 	);
 	assert.equal(errors.length, 0, JSON.stringify(errors));
 	await mkdir('/tmp/task-152-browser', { recursive: true });
