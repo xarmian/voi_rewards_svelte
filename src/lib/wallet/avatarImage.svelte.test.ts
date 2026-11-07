@@ -94,6 +94,35 @@ it('does not start a new generation when the src has not changed', () => {
 	expect(image.generation).toBe(generation);
 });
 
+it('shows the next image after the previous one failed', () => {
+	let src = $state<string | null>(a);
+	const image = setup(() => src);
+	image.onerror(image.generation);
+	expect(image.show).toBe(false);
+	src = b;
+	flushSync();
+	expect(image.show).toBe(false);
+	image.onload(image.generation);
+	expect(image.show).toBe(true);
+});
+
+it('starts a new generation, hidden, when an earlier URL comes back (A, B, A)', () => {
+	let src = $state<string | null>(a);
+	const image = setup(() => src);
+	const firstA = image.generation;
+	image.onload(firstA);
+	src = b;
+	flushSync();
+	const onlyB = image.generation;
+	image.onload(onlyB);
+	expect(image.show).toBe(true);
+	src = a;
+	flushSync();
+	expect(image.generation).not.toBe(onlyB);
+	expect(image.generation).not.toBe(firstA);
+	expect(image.show).toBe(false);
+});
+
 it('ignores an event with no usable generation', () => {
 	const image = setup(() => a);
 	image.onload(Number.NaN);

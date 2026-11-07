@@ -48,6 +48,9 @@ it.each([
 	['localhost', 'https://localhost/x.png'],
 	['.local host', 'https://printer.local/x.png'],
 	['explicit port', 'https://host.example:8443/x.png'],
+	['.localdomain host', 'https://localhost.localdomain/x.png'],
+	['.home.arpa host', 'https://router.home.arpa/x.png'],
+	['.internal host', 'https://api.internal/x.png'],
 	// WHATWG keeps a trailing dot in the hostname, so a suffix check on `.local` or `localhost` misses it.
 	['trailing dot on a local host', 'https://printer.local./a.png'],
 	['trailing dot on localhost', 'https://localhost./x.png'],
@@ -104,6 +107,32 @@ it.each([
 	['an address split by a no-break space', ADDRESS.slice(0, 29) + '\u00a0' + ADDRESS.slice(29)],
 	['an address split by an ideographic space', ADDRESS.slice(0, 29) + '\u3000' + ADDRESS.slice(29)],
 	['a long name with no dot', 'a'.repeat(33)],
+	['a short dotless name shaped like the short address', 'G3MSA7UIFQ'],
+	['a dotless name without the .voi label', 'shelly'],
+	['a name under another label', 'shelly.eth'],
+	['a name made only of underscores', '___.voi'],
+	['a name made only of hyphens', '---.voi'],
+	['a label that starts with a hyphen', '-a.voi'],
+	['a label of 64 characters', 'a'.repeat(64) + '.voi'],
+	['the full address with .voi after it', ADDRESS + '.voi'],
+	['the full address as a label before another', 'x.' + ADDRESS + '.voi'],
+	['the full address in Lisu capitals with .voi', '\ua4d6' + ADDRESS.slice(1) + '.voi'],
+	['a Lisu tone mark that looks like a dot', 'G3MSA7\ua4f8\ua4f8\ua4f8UIFQ'],
+	['Lisu marks standing in for the dot of a name', 'xarmian\ua4f8voi'],
+	['Arabic-Indic zeros that look like dots', 'G3MSA7\u0660\u0660\u0660UIFQ'],
+	['a sinological dot', 'G3MSA7\ua78f\ua78f\ua78fUIFQ'],
+	['a modifier letter triangular colon', 'G3MSA7\u02d0UIFQ'],
+	['three combining dots above', 'G3MSA7\u20dbUIFQ'],
+	['an Armenian letter among Latin ones', 's\u0570elly.voi'],
+	['an Armenian letter in a later label', 'shelly.\u0585f.voi'],
+	['a Cherokee letter', '\u13daelly.voi'],
+	['a Lisu letter', 'X\ua4eeRMIAN.voi'],
+	['a Latin small capital', 'sh\u1d07lly.voi'],
+	['a dotless i', 'xarm\u0131an.voi'],
+	['a stack of combining marks', 'p' + '\u0338'.repeat(40) + '.voi'],
+	['an emoji', '\ud83d\udd25.voi'],
+	['an accented name', 'caf\u00e9.voi'],
+	['a Cyrillic name', '\u043f\u0440\u0438\u0432\u0435\u0442.voi'],
 	['a combining grapheme joiner', 'sh\u034felly.voi'],
 	['a variation selector', 'a\ufe0fb.voi'],
 	['a hangul filler', 'a\u3164b.voi'],
@@ -117,12 +146,14 @@ it.each([
 });
 
 it.each([
-	'café.voi',
+	'shelly.voi',
 	'shelly.of.voi',
 	'name-1_x.voi',
-	'привет.voi',
-	'a'.repeat(32),
-	'a'.repeat(60) + '.voi'
+	'Shelly.VOI',
+	'a.voi',
+	'0.voi',
+	'ab8'.repeat(21) + '.voi',
+	'a'.repeat(57) + '.voi'
 ])('keeps the ordinary name %s', (name) => {
 	expect(parseWalletIdentity('A', [{ ...named, name }]).name).toBe(name);
 });

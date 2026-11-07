@@ -3,34 +3,24 @@ import { getEnvoiNames } from '$lib/utils/envoi';
 type WalletIdentity = { name: string | null; avatar: string | null };
 const NONE: WalletIdentity = { name: null, avatar: null };
 
-// Both strings come from a third party and are shown on a page with signing actions, so anything that
-// is not plainly a name is refused and the hero falls back to the address (it fails safe).
-// A name is letters, numbers, combining marks, dots, hyphens and underscores; control, format,
-// default-ignorable (zero-width, variation selectors, fillers) characters are refused first.
-// Names that read as an account address (58 base32 characters, a long string with no dot, the
-// hero's own short-address shape) and names that mix Latin with Cyrillic or Greek letters are refused.
-// Whole-script look-alikes cannot be told from real names here; the full address stays below the heading.
-const NAME_REFUSED = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u;
-const NAME_ALLOWED = /^[\p{L}\p{N}\p{M}._-]+$/u;
-const MIXED_SCRIPT_A = /\p{Script=Latin}/u;
-const MIXED_SCRIPT_B = /[\p{Script=Cyrillic}\p{Script=Greek}]/u;
-const ADDRESS_LIKE = /^[A-Z2-7]{58}$/;
+// Both strings come from a third party and are shown on a page with signing actions, so only a plain
+// name is shown and anything else makes the hero fall back to the address (it fails safe).
+// Blocking look-alike characters one class at a time never finishes, so the rule is an allowlist: dotted
+// labels of ASCII letters, digits, hyphens and underscores (each label starting and ending with a letter
+// or digit, at most 63 characters), ending in the `.voi` label. That leaves no character that can pass for
+// a dot, a letter of another script or a space. A name is also refused when it holds a run of 58 base32
+// characters, so it can never show another account's full address in the heading.
+// A name outside this form (other scripts, emoji) is not shown; the page keeps the short address.
+const NAME_ALLOWED = /^(?:[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?\.)+voi$/i;
+const ADDRESS_RUN = /[A-Z2-7]{58}/i;
 const NAME_MAX = 128;
-const DOTLESS_MAX = 32;
 const AVATAR_MAX = 2048;
 const IPV4_LIKE = /^[\d.]+$/;
 
 function validName(raw: string): string | null {
 	const name = raw.trim();
 	if (!name || name.length > NAME_MAX) return null;
-	if (NAME_REFUSED.test(name) || !NAME_ALLOWED.test(name)) return null;
-	if (!name.includes('.') && name.length > DOTLESS_MAX) return null;
-	if (ADDRESS_LIKE.test(name.toUpperCase())) return null;
-	const labels = name.split('.');
-	// An empty label (`..`, a leading or trailing dot) is not a name, e.g. the short-address shape `G3MS...UIFQ`.
-	if (labels.some((label) => label === '')) return null;
-	// Latin mixed with Cyrillic or Greek inside ONE label is the look-alike pattern; `привет.voi` is fine.
-	if (labels.some((label) => MIXED_SCRIPT_A.test(label) && MIXED_SCRIPT_B.test(label))) return null;
+	if (!NAME_ALLOWED.test(name) || ADDRESS_RUN.test(name)) return null;
 	return name;
 }
 
@@ -50,7 +40,9 @@ function validAvatar(raw: unknown): string | null {
 		// WHATWG form), no undotted name, no local name, none of which should be asked of the visitor's network.
 		if (host.split('.').some((label) => label === '')) return null;
 		if (!host.includes('.') || host.startsWith('[') || IPV4_LIKE.test(host)) return null;
-		if (/\.(local|localhost|internal)$/i.test(host)) return null;
+		// A public DNS name can still point at a private address (such as an IP written into a wildcard
+		// domain); no host check catches that. The request is a plain image GET with no referrer.
+		if (/\.(local|localhost|localdomain|internal|home\.arpa)$/i.test(host)) return null;
 		return url.href;
 	} catch {
 		return null;
