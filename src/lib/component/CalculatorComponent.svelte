@@ -1,11 +1,24 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Card, Chip, DataTable, InlineAlert, StatTile, Tabs, type Column } from '$lib/ds';
-	import { getSupplyInfo, getAccountInfo } from '$lib/stores/accounts';
-	import { dataTable } from '../../stores/dataTable';
+	import {
+		Button,
+		Card,
+		Chip,
+		DataTable,
+		InlineAlert,
+		StatTile,
+		Tabs,
+		compact,
+		type Column
+	} from '$lib/ds';
+	import { createReadSource, type Source } from '$lib/wallet/read';
+	import {
+		loadCalculatorInputs,
+		loadCalculatorBalance,
+		loadCalculatorPrice
+	} from '$lib/wallet/calculator';
 	import { getTokensByEpoch } from '$lib/utils';
-	import { getCurrentEpoch } from '$lib/utils/epoch-utils';
-	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
+	import { voiPrice } from '$lib/stores/price';
 	import { estimateRewards } from '$lib/rewards/calculatorModel';
 	import {
 		availability,
@@ -29,20 +42,24 @@
 	const costPercentage = 10;
 	let calculationAmount: number | undefined = 0;
 	let calculationAmountUSD: number | undefined = 10;
-	let walletBalance = 0;
-	let supply: Awaited<ReturnType<typeof getSupplyInfo>> = null;
+	let walletBalance: number | null = null;
+	let prefilled = false;
+	let loadedAddress: string | undefined;
+	let networkSource: Source<Awaited<ReturnType<typeof loadCalculatorInputs>>> = {
+		state: 'loading'
+	};
+	let balanceSource: Source<number> = { state: 'loading' };
+	let priceSource: Source<number> = { state: 'loading' };
+	let supply: { 'online-money': number } | null = null;
 	let isLoading = true;
 	let loadError = '';
 	let rewardStake = 0;
 	let epochRewards: number[] = [];
 	let estimate: ReturnType<typeof calculateRewards> = null;
 	let tileState: 'loading' | 'ready' = 'loading';
-	let loadedOnce = false;
 	let mounted = false;
 	let now = new Date();
 
-	const EPOCHS_PER_YEAR = 52;
-	const PAST_EPOCHS_TO_SHOW = 12;
 	const EPOCH_START_DATE = new Date('2024-10-30');
 	let isRewardScheduleVisible = false;
 	let isPastEpochsVisible = false;
@@ -59,23 +76,34 @@
 	let inputMode: 'usd' | 'voi' = 'usd';
 
 	$: effectivePrice =
-		useCustomPrice && customPrice !== null ? Number(customPrice) : $voiPrice.price;
+		useCustomPrice && customPrice !== null
+			? Number(customPrice)
+			: priceSource.error
+				? NaN
+				: (priceSource.value ?? NaN);
 	$: hasPrice = Number.isFinite(effectivePrice) && effectivePrice > 0;
 	$: if (!hasPrice) inputMode = 'voi';
 	$: stakeError = validateStake(inputMode === 'usd' ? calculationAmountUSD : calculationAmount);
 	$: nodeCostError = validateNodeCost(nodeCost);
 	$: priceError = useCustomPrice ? validateCustomPrice(customPrice) : null;
-	$: if (hasPrice && !priceInitialized) {
-		if (!validateStake(inputMode === 'usd' ? calculationAmountUSD : calculationAmount)) {
-			if (walletBalance > 0 || stakeEdited) {
-				if (!stakeEdited) calculationAmount = walletBalance;
-				calculationAmountUSD = Math.round(Number(calculationAmount) * effectivePrice * 100) / 100;
-				sliderValue = calculationAmountUSD;
-			} else {
-				calculationAmount = Number(calculationAmountUSD) / effectivePrice;
-			}
-		}
+	$: if (hasPrice) syncPrice(effectivePrice, prefilled, stakeEdited);
+
+	function syncPrice(price = effectivePrice, hasPrefill = prefilled, edited = stakeEdited) {
+		if (!hasPrice) return;
+		if (!priceInitialized && !walletAddress && !edited && !hasPrefill)
+			calculationAmount = Number(calculationAmountUSD) / price;
+		calculationAmountUSD = Math.round(Number(calculationAmount) * price * 100) / 100;
+		sliderValue = calculationAmountUSD;
 		priceInitialized = true;
+	}
+	function applyBalance(value: number) {
+		walletBalance = value;
+		if (!prefilled && !stakeEdited) {
+			calculationAmount = value;
+			inputMode = 'voi';
+		}
+		prefilled = true;
+		syncPrice();
 	}
 
 	// Explicit dependencies ensure every input and data change replaces the previous estimate.
@@ -116,8 +144,8 @@
 	$: shownPriceLabel = priceLabel({
 		useCustomPrice,
 		customPrice,
-		marketPrice: $voiPrice.price,
-		error: $voiPrice.error
+		marketPrice: priceSource.value ?? NaN,
+		error: priceSource.error ?? $voiPrice.error
 	});
 	$: stalePrice = !useCustomPrice && isPriceStale($voiPrice.lastUpdated, now);
 	$: visibleRows = isPastEpochsVisible ? [...pastEpochSchedule, ...epochSchedule] : epochSchedule;
@@ -202,7 +230,7 @@
 
 	function handleSliderChange(event: Event) {
 		const value = Number((event.target as HTMLInputElement).value);
-		stakeEdited = false;
+		stakeEdited = true;
 		calculationAmountUSD = Math.round(value * 100) / 100;
 		sliderValue = value;
 		if (hasPrice) calculationAmount = value / effectivePrice;
@@ -220,6 +248,7 @@
 	}
 
 	function handleUSDInputChange(event: Event) {
+		stakeEdited = true;
 		const input = event.target as HTMLInputElement;
 		calculationAmountUSD = input.value === '' ? undefined : input.valueAsNumber;
 		if (validateStake(calculationAmountUSD)) return;
@@ -230,6 +259,7 @@
 	}
 
 	function setUSDAmount(amount: number) {
+		stakeEdited = true;
 		calculationAmountUSD = amount;
 		sliderValue = amount;
 		if (hasPrice) calculationAmount = amount / effectivePrice;
@@ -253,87 +283,75 @@
 		if (customPrice != null) customPrice = Math.max(0, customPrice * (1 + percentChange));
 	}
 
-	async function updateWalletBalance() {
-		if (!walletAddress) return;
-		try {
-			const accountInfo = await getAccountInfo(walletAddress);
-			const newBalance = Number(accountInfo?.amount || 0) / 1e6;
-			if (newBalance !== walletBalance) {
-				walletBalance = newBalance;
-				setFixedAmount(walletBalance);
-			}
-		} catch (error) {
-			console.error('Error updating wallet balance:', error);
-			walletBalance = 0;
+	const networkReader = createReadSource(loadCalculatorInputs, (result) => {
+		networkSource = result;
+		isLoading = result.state === 'loading';
+		loadError = result.state === 'error' ? 'Calculator inputs unavailable' : '';
+		if (result.value) {
+			supply = { 'online-money': result.value.onlineMoney };
+			rewardStake = result.value.rewardStake;
+			epochRewards = result.value.epochRewards;
+			const date = new Date();
+			epochSchedule = scheduleRows(
+				epochRewards,
+				result.value.currentEpochNumber,
+				EPOCH_START_DATE,
+				date
+			);
+			const past = result.value.pastEpochRewards;
+			pastEpochSchedule = scheduleRows(
+				past,
+				result.value.currentEpochNumber - past.length,
+				EPOCH_START_DATE,
+				date
+			)
+				.slice(0, past.length)
+				.map((row) => ({ ...row, isCurrent: false }));
+		} else {
+			supply = null;
+			rewardStake = 0;
+			epochRewards = [];
+			epochSchedule = [];
+			pastEpochSchedule = [];
+		}
+	});
+	const balanceReader = createReadSource(loadCalculatorBalance, (result) => {
+		balanceSource = result;
+		if (result.value !== undefined) applyBalance(result.value);
+	});
+	const priceReader = createReadSource(loadCalculatorPrice, (result) => {
+		priceSource = result;
+	});
+	async function loadData() {
+		await networkReader.load(walletAddress ?? '', true);
+	}
+	function changeAddress(address: string | undefined) {
+		loadedAddress = address;
+		balanceReader.dispose();
+		walletBalance = null;
+		prefilled = false;
+		stakeEdited = false;
+		if (address) {
 			calculationAmount = 0;
 			calculationAmountUSD = 0;
-			sliderValue = 0;
+			inputMode = 'voi';
 		}
+		void networkReader.load(address ?? '');
+		if (address) void balanceReader.load(address);
+		void priceReader.load(address ?? '');
 	}
-
-	// Loading again must not reinitialize the user's stake or price/cost choices.
-	async function loadData() {
-		isLoading = true;
-		loadError = '';
-		estimate = null;
-		rewardStake = 0;
-		epochRewards = [];
-		epochSchedule = [];
-		pastEpochSchedule = [];
-		try {
-			await fetchVoiPrice();
-			const [supplyData, dates] = await Promise.all([getSupplyInfo(), dataTable.fetchDateRanges()]);
-			supply = supplyData;
-			const latestEpoch = dates[dates.length - 1];
-			if (!latestEpoch) throw new Error('No epoch data');
-			epochRewards = await Promise.all(
-				Array.from({ length: EPOCHS_PER_YEAR }, (_, i) => getTokensByEpoch(latestEpoch.epoch + i))
-			);
-			const epochData = await dataTable.fetchData(latestEpoch.id);
-			if (epochData && supply?.['online-money']) {
-				rewardStake = Number(supply['online-money']) - Number(epochData?.blacklist_balance_total);
-				if (walletAddress && !loadedOnce) await updateWalletBalance();
-			}
-			await initializeEpochSchedule();
-		} catch (error) {
-			console.error('Calculator load error:', error);
-			loadError = 'Error loading data. Please try again later.';
-		} finally {
-			isLoading = false;
-			loadedOnce = true;
-		}
-	}
-
 	onMount(() => {
 		mounted = true;
-		void loadData();
-		const timer = setInterval(() => (now = new Date()), 30_000);
-		return () => clearInterval(timer);
+		changeAddress(walletAddress);
+		const timer = setInterval(() => (now = new Date()), 30000);
+		return () => {
+			clearInterval(timer);
+			networkReader.dispose();
+			balanceReader.dispose();
+			priceReader.dispose();
+		};
 	});
-	// Track wallet changes, independently of Retry's loading state.
-	$: if (mounted && walletAddress && loadedOnce) void updateWalletBalance();
-
-	async function initializeEpochSchedule() {
-		const currentDate = new Date();
-		const currentEpochNumber = getCurrentEpoch(currentDate, EPOCH_START_DATE);
-		epochSchedule = scheduleRows(epochRewards, currentEpochNumber, EPOCH_START_DATE, currentDate);
-		const maxPastEpochs = Math.min(PAST_EPOCHS_TO_SHOW, currentEpochNumber);
-		if (maxPastEpochs > 0) {
-			const pastRewards = await Promise.all(
-				Array.from({ length: maxPastEpochs }, (_, i) =>
-					getTokensByEpoch(currentEpochNumber - (maxPastEpochs - i) + 1)
-				)
-			);
-			pastEpochSchedule = scheduleRows(
-				pastRewards,
-				currentEpochNumber - maxPastEpochs,
-				EPOCH_START_DATE,
-				currentDate
-			)
-				.slice(0, maxPastEpochs)
-				.map((row) => ({ ...row, isCurrent: false }));
-		}
-	}
+	$: if (mounted && walletAddress !== loadedAddress) changeAddress(walletAddress);
 
 	function formatUSD(value: number, maxDecimals = 2): string {
 		return new Intl.NumberFormat('en-US', {
@@ -402,7 +420,29 @@
 
 <div class="min-w-0 space-y-6 text-body text-ink">
 	<div class="grid min-w-0 gap-bento lg:grid-cols-2">
-		<Card title="Your stake">
+		<section aria-label="Your stake" class="min-w-0 space-y-4">
+			<h2 class="text-h2">Your stake</h2>
+			{#if walletAddress}
+				<p class="text-label text-ink-muted">Prefilled from this address; editable estimate.</p>
+				{#if balanceSource.state === 'loading'}<div
+						aria-busy="true"
+						class="h-6 rounded-ds-xs bg-grid"
+					>
+						<span class="sr-only">Loading wallet balance…</span>
+					</div>{/if}
+				{#if balanceSource.state === 'stale'}<p class="text-label text-warn">
+						Balance as of {new Date(balanceSource.asOf).toUTCString()}{balanceSource.error
+							? ' · Refresh failed'
+							: ''}
+					</p>{/if}
+				{#if balanceSource.error}<InlineAlert
+						message="Wallet balance unavailable"
+						onretry={() => void balanceReader.load(walletAddress!, true)}
+					/>{/if}
+				{#if walletBalance === 0}<p class="text-label text-ink-muted">
+						This address has no VOI; enter an amount to explore.
+					</p>{/if}
+			{/if}
 			<div class="space-y-4">
 				<Tabs
 					variant="segmented"
@@ -490,12 +530,15 @@
 				<div>
 					<p class="mb-2 text-label text-ink-muted">Quick Select</p>
 					<div class="flex flex-wrap gap-2" role="group" aria-label="Quick Select">
-						{#if walletBalance > 0}<Button
+						{#if walletAddress}<Button
+								disabled={walletBalance === null}
 								variant="soft"
-								onclick={() => setFixedAmount(walletBalance)}
-								>Wallet · {hasPrice
-									? formatUSD(walletBalance * effectivePrice)
-									: `${walletBalance.toLocaleString()} VOI`}</Button
+								onclick={() => walletBalance !== null && setFixedAmount(walletBalance)}
+								>Reset to wallet · {walletBalance === null
+									? 'Unavailable'
+									: hasPrice
+										? formatUSD((walletBalance ?? 0) * effectivePrice)
+										: `${(walletBalance ?? 0).toLocaleString()} VOI`}</Button
 							>{/if}
 						{#if hasPrice}
 							{#each [10, 100, 1000] as amount}<Button
@@ -511,9 +554,14 @@
 					</div>
 				</div>
 			</div>
-		</Card>
-		<Card title="Cost and price">
+		</section>
+		<section aria-label="Cost and price" class="min-w-0 space-y-4">
+			<h2 class="text-h2">Cost and price</h2>
 			<div class="space-y-6">
+				{#if priceSource.error && !useCustomPrice}<InlineAlert
+						message="Market price unavailable. VOI estimates remain available."
+						onretry={() => void priceReader.load(walletAddress ?? '', true)}
+					/>{/if}
 				<div>
 					<label for="monthly-node-cost" class="mb-2 block text-label text-ink-muted"
 						>Monthly node cost (USD)</label
@@ -553,8 +601,8 @@
 						{#if useCustomPrice}
 							<label for="custom-price" class="text-label text-ink-muted">Your price</label>
 						{:else}<span class="text-label text-ink-muted">{shownPriceLabel}</span>{/if}
-						{#if !useCustomPrice && !$voiPrice.error && Number.isFinite($voiPrice.price) && $voiPrice.price > 0}<strong
-								class="text-accent">{formatUSD($voiPrice.price, 6)}</strong
+						{#if !useCustomPrice && !priceSource.error && Number.isFinite(priceSource.value) && (priceSource.value ?? 0) > 0}<strong
+								class="text-accent">{formatUSD(priceSource.value ?? 0, 6)}</strong
 							>{/if}
 						{#if stalePrice}<Chip label="Stale price" tone="warn" />{/if}
 					</div>
@@ -584,7 +632,8 @@
 						{#if !useCustomPrice}<Button
 								variant="ghost"
 								size="sm"
-								onclick={() => void fetchVoiPrice(true)}>↻ Refresh price</Button
+								onclick={() => void priceReader.load(walletAddress ?? '', true)}
+								>↻ Refresh price</Button
 							>{/if}
 					</div>
 					{#if hasPrice}<p class="text-label text-ink-muted">
@@ -594,10 +643,18 @@
 						</p>{/if}
 				</div>
 			</div>
-		</Card>
+		</section>
 	</div>
 
 	<section aria-labelledby="estimated-rewards-heading" class="space-y-4">
+		{#if networkSource.state === 'stale'}<p class="text-label text-warn">
+				As of {new Date(networkSource.asOf).toUTCString()}
+			</p>
+			{#if networkSource.error}<InlineAlert
+					tone="warn"
+					message="Refresh failed; showing the last loaded calculator inputs."
+					onretry={() => void loadData()}
+				/>{/if}{/if}
 		<h2 id="estimated-rewards-heading" class="text-h2">Your estimated rewards</h2>
 		{#if state === 'unavailable'}
 			<InlineAlert
@@ -611,7 +668,7 @@
 		<div class="grid gap-bento md:grid-cols-3">
 			<StatTile
 				label="Weekly"
-				value={figures.voiEstimates && estimate ? estimate.weeklyReward.toFixed(0) : 'Unavailable'}
+				value={figures.voiEstimates && estimate ? compact(estimate.weeklyReward, 1) : 'Unavailable'}
 				unit={figures.voiEstimates ? 'VOI' : undefined}
 				detail={figures.usdFigures && estimate
 					? formatUSD(estimate.weeklyRewardUSD)
@@ -624,7 +681,7 @@
 				<StatTile
 					label="Monthly"
 					value={figures.voiEstimates && estimate
-						? estimate.monthlyReward.toFixed(0)
+						? compact(estimate.monthlyReward, 1)
 						: 'Unavailable'}
 					unit={figures.voiEstimates ? 'VOI' : undefined}
 					detail={figures.usdFigures && estimate
@@ -637,7 +694,7 @@
 			</div>
 			<StatTile
 				label="Yearly"
-				value={figures.voiEstimates && estimate ? estimate.yearlyReward.toFixed(0) : 'Unavailable'}
+				value={figures.voiEstimates && estimate ? compact(estimate.yearlyReward, 1) : 'Unavailable'}
 				unit={figures.voiEstimates ? 'VOI' : undefined}
 				detail={figures.usdFigures && estimate
 					? formatUSD(estimate.yearlyRewardUSD)
@@ -724,11 +781,7 @@
 				>{isDownloadingCSV ? 'Generating...' : 'Download CSV'}</Button
 			>
 		</div>
-		<div
-			id="reward-schedule"
-			hidden={!isRewardScheduleVisible}
-			class="mt-4 min-w-0 overflow-x-auto"
-		>
+		<div id="reward-schedule" hidden={!isRewardScheduleVisible} class="mt-4 min-w-0">
 			{#if pastEpochSchedule.length > 0}<Button
 					variant="ghost"
 					size="sm"
@@ -738,13 +791,15 @@
 			<DataTable
 				columns={[
 					{ key: 'epochNumber', header: 'Epoch', priority: 1, cell: epochCell },
-					{ key: 'dates', header: 'Date range', priority: 1, cell: dateCell },
+					{ key: 'dates', header: 'Date range', priority: 2, cell: dateCell },
 					{ key: 'rewardPool', header: 'Reward pool', priority: 1, numeric: true, cell: poolCell }
 				] satisfies Column<ScheduleRow>[]}
 				rows={visibleRows}
 				rowKey={(row) => String(row.epochNumber)}
 				caption="Epoch reward schedule"
 				density="compact"
+				expandable
+				rowName={(row) => `epoch ${row.epochNumber + 1}`}
 				state={isLoading ? 'loading' : loadError || !epochSchedule.length ? 'error' : 'ready'}
 				onretry={() => void loadData()}
 			/>

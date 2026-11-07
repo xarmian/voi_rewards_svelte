@@ -1,7 +1,7 @@
 export const LEGACY_HASHES: Record<string, string> = {
 	portfolio: 'holdings',
 	consensus: 'overview',
-	proposals: 'rewards',
+	proposals: 'overview',
 	epochs: 'rewards',
 	lockvest: 'contracts'
 };

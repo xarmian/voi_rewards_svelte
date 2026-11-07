@@ -34,35 +34,13 @@ function PortfolioComponentRewards(
 	return { totalBlocksProduced, userBlocksProduced, expectedReward };
 }
 
-function EpochComponentRewards(
-	epochData: Snapshot,
-	date: { epoch: number },
-	walletAddress: string,
-	tokens: number
-): Rewards {
-	const communityBlocks = epochData.total_blocks ?? 0;
-	const totalBlocksProduced = Math.round(
-		date.epoch >= 62
-			? communityBlocks
-			: communityBlocks + Math.min(epochData.ballast_blocks ?? 0, communityBlocks / 3)
-	);
-	const userBlocksProduced = Number(epochData.proposers[walletAddress] ?? 0) || 0;
-
-	const expectedReward = tokens * (userBlocksProduced / totalBlocksProduced);
-	return { totalBlocksProduced, userBlocksProduced, expectedReward };
-}
-
-function inlineRewards(component: string) {
-	return component === 'PortfolioComponent' ? PortfolioComponentRewards : EpochComponentRewards;
-}
-
-for (const component of ['PortfolioComponent', 'EpochComponent', 'calculateEpochRewards']) {
+for (const component of ['PortfolioComponent', 'calculateEpochRewards']) {
 	describe(`${component} inline epoch-reward characterization`, () => {
 		const calculate =
 			component === 'calculateEpochRewards'
 				? (snapshot: Snapshot, date: { epoch: number }, wallet: string, tokens: number) =>
 						calculateEpochRewards(snapshot, date.epoch, snapshot.proposers[wallet], tokens)
-				: inlineRewards(component);
+				: PortfolioComponentRewards;
 		const snapshot: Snapshot = {
 			total_blocks: 120,
 			ballast_blocks: 20,

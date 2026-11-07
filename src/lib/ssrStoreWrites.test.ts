@@ -119,9 +119,9 @@ test('NodeComponent does not fetch node data during a server render', async () =
 	});
 });
 
-test('EpochComponent does not load epochs during a server render', async () => {
-	await assertNoServerWrites(() => import('$lib/component/EpochComponent.svelte'), {
-		walletAddress: WALLET
+test('WalletRewards does not load sources during a server render', async () => {
+	await assertNoServerWrites(() => import('$lib/ds/WalletRewards/WalletRewards.svelte'), {
+		pageAddress: WALLET
 	});
 });
 

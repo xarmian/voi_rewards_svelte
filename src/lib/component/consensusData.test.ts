@@ -46,61 +46,6 @@ for (const [label, epochData, dateRanges, reward] of [
 	});
 }
 
-for (const stage of ['fetch', 'json', 'history'] as const) {
-	for (const fails of [false, true]) {
-		test(`proposals keep wallet B after wallet A's late ${stage} ${fails ? 'failure' : 'result'}`, async () => {
-			const pending = Promise.withResolvers<unknown>();
-			const reached = Promise.withResolvers<void>();
-			let paused = false;
-			const result = (at: string, value: unknown) => {
-				if (at === stage && !paused) {
-					paused = true;
-					reached.resolve();
-					return pending.promise;
-				}
-				return Promise.resolve(value);
-			};
-			const aData = { '2026-10-25': [{ block: 1 }] };
-			const history = [{ date: '2026-10-25', avg_online_stake: 1_000_000 }];
-			const aResponse = { ok: true, json: () => result('json', aData) };
-			const run = componentScript('ProposalsComponent', {
-				fetch: (url: string) => result('fetch', url.endsWith('wallet=A')
-					? aResponse : Response.json({ '2026-10-25': [{ block: 2 }, { block: 3 }] })),
-				getAccountInfo: async (wallet: string) => ({ amount: wallet === 'B' ? 200 : 100 }),
-				getSupplyInfo: async () => supply,
-				onlineStakeStore: { getData: () => result('history', history) }
-			});
-			const first = run('walletId = "A"; updateChartData()');
-			await reached.promise;
-			await run('walletId = "B"; updateChartData()');
-			if (fails) pending.reject(new Error('wallet A failed'));
-			else pending.resolve({ fetch: aResponse, json: aData, history }[stage]);
-			await first;
-			assert.equal(run('accountInfo.amount'), 200);
-			assert.equal(run('data[0].actual'), 2);
-			assert.equal(run('apiData["2026-10-25"].length'), 2);
-			assert.equal(run('loadError'), null);
-			assert.equal(run('isLoading'), false);
-		});
-	}
-}
-
-for (const history of [null, [{ date: '2026-10-24', avg_online_stake: 1_000_000 }]]) {
-	test(`proposals preserve actual counts and null expectations for ${history === null ? 'unavailable history' : 'a missing date'}`, async () => {
-		const run = componentScript('ProposalsComponent', {
-			fetch: async () => Response.json({ '2026-10-25': [{ block: 1 }] }),
-			getAccountInfo: async () => ({ amount: 100, status: 'Online' }),
-			getSupplyInfo: async () => supply,
-			onlineStakeStore: { getData: async () => history }
-		});
-		await run('walletId = "A"; updateChartData()');
-		assert.equal(run('loadError'), null);
-		assert.equal(run('data[0].actual'), 1);
-		assert.equal(run('data[0].expected'), null);
-		assert.equal(run('expectedUnavailable'), history === null);
-	});
-}
-
 const stages = ['supply', 'dates', 'epoch', 'rewards', 'account', 'consensus'] as const;
 for (const stage of stages) {
 	for (const fails of [false, true]) {

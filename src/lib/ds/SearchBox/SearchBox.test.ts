@@ -108,3 +108,41 @@ test('focusout never collapses the revealed form (TASK-65: Safari click focus)',
 	assert.ok(body, 'focusout handler found');
 	assert.doesNotMatch(body, /revealed/);
 });
+
+test('Retry reuses the captured failed query through the existing submit handler', async () => {
+	const { runInNewContext } = await import('node:vm');
+	const ts = await import('typescript');
+	const source = readFileSync(new URL('./SearchBox.svelte', import.meta.url), 'utf8');
+	const script = source.split('<script lang="ts">')[1].split('</script>')[0];
+	const ast = ts.createSourceFile('component.ts', script, ts.ScriptTarget.Latest, true);
+	const functions = ['submit', 'retry']
+		.map((name) => {
+			const fn = ast.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === name);
+			assert.ok(fn, `Missing function ${name}`);
+			return ts.transpile(fn.getText(ast));
+		})
+		.join('\n');
+	const calls: string[] = [];
+	const context = {
+		text: 'unresolved.voi',
+		picked: undefined,
+		failedQuery: '',
+		failedPicked: undefined,
+		submitting: false,
+		submission: 0,
+		error: '',
+		close() {},
+		resolver: {
+			resolve: async (q: string) => {
+				calls.push(q);
+				return { ok: false, message: 'No match' };
+			}
+		}
+	};
+	await runInNewContext(`${functions}; submit()`, context);
+	assert.equal(context.text, 'unresolved.voi');
+	await runInNewContext(`${functions}; retry()`, context);
+	assert.deepEqual(calls, ['unresolved.voi', 'unresolved.voi']);
+	assert.match(source, /onclick=\{retry\}/);
+	assert.match(source, /Could not resolve this entry\. Check it or retry/);
+});

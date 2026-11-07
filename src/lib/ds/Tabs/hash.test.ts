@@ -25,3 +25,11 @@ describe('wallet hashes', () => {
 		assert.deepEqual(resolveHash('#REWARDS', WALLET_TABS), { id: 'rewards', replace: null });
 	});
 });
+
+test('proposals routes to Overview while epochs stays in Rewards', () => {
+	assert.deepEqual(resolveHash('#proposals', WALLET_TABS), {
+		id: 'overview',
+		replace: '#overview'
+	});
+	assert.deepEqual(resolveHash('#epochs', WALLET_TABS), { id: 'rewards', replace: '#rewards' });
+});

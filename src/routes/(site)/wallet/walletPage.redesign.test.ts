@@ -19,14 +19,6 @@ vi.mock('$lib/component/NodeComponent.svelte', async () => {
 	const { default: Panel } = await import('./LegacyPanel.test.svelte');
 	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy consensus content' }) };
 });
-vi.mock('$lib/component/ProposalsComponent.svelte', async () => {
-	const { default: Panel } = await import('./LegacyPanel.test.svelte');
-	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy proposals content' }) };
-});
-vi.mock('$lib/component/EpochComponent.svelte', async () => {
-	const { default: Panel } = await import('./LegacyPanel.test.svelte');
-	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy epochs content' }) };
-});
 vi.mock('$lib/component/LockVestComponent.svelte', async () => {
 	const { default: Panel } = await import('./LegacyPanel.test.svelte');
 	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy lockvest content' }) };
@@ -67,7 +59,7 @@ describe('wallet shell hash integration', () => {
 	it.each([
 		['#portfolio', 'holdings', 'portfolio'],
 		['#consensus', 'overview', 'consensus'],
-		['#proposals', 'rewards', 'proposals'],
+		['#proposals', 'overview', 'overview'],
 		['#epochs', 'rewards', 'epochs'],
 		['#lockvest', 'contracts', 'lockvest'],
 		['#calculator', 'calculator', 'calculator']
@@ -76,7 +68,9 @@ describe('wallet shell hash integration', () => {
 		const html = render(Page, {
 			props: { data: { walletId: 'OWNER', parentWalletId: null } }
 		}).body;
-		if (content === 'lockvest') expect(html).toContain('Scheduled unlocks');
+		if (content === 'overview') expect(html).toContain('Node health');
+		else if (content === 'lockvest') expect(html).toContain('Scheduled unlocks');
+		else if (content === 'epochs') expect(html).toContain('Rewards by epoch');
 		else expect(html).toContain(`Legacy ${content} content`);
 		expect(html).toMatch(new RegExp(`href="#${expected}"[^>]*aria-current="page"`));
 		if (hash === '#consensus') expect(html).toMatch(/<details[^>]* open/);
@@ -201,4 +195,24 @@ it('contracts uses an independent full panel and removes only the replaced walle
 	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
 	expect(source).toContain('WalletContractsPanel');
 	expect(source).not.toContain('import LockVestComponent');
+});
+
+it.each(['', '#calculator', '#rewards'])(
+	'addressless %s always renders search without account panels',
+	(hash) => {
+		url.hash = hash;
+		const html = render(Page, { props: { data: { walletId: null, parentWalletId: null } } }).body;
+		expect(html).toContain('wallet-search-hero-input');
+		expect(html).toContain('Recent wallets');
+		expect(html).not.toContain('Wallet sections');
+		expect(html).not.toContain('Legacy calculator content');
+		expect(html).not.toContain('Loading account status');
+		expect(html).not.toContain('wallet-avatar');
+	}
+);
+it('the calculator branch has no legacy scrolling wrapper', () => {
+	url.hash = '#calculator';
+	const html = render(Page, { props: { data: { walletId: 'Y', parentWalletId: null } } }).body;
+	expect(html).toContain('Calculator');
+	expect(html).not.toContain('legacy-panel');
 });

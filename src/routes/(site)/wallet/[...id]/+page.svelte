@@ -16,7 +16,8 @@
 		CopyButton,
 		Headline,
 		InlineAlert,
-		SearchBox,
+		WalletSearchPage,
+		WalletRewards,
 		StatusPill,
 		Tabs,
 		WalletOverview,
@@ -34,9 +35,7 @@
 	import { loadWallet, type LegacyAccount, type WalletSnapshot } from '$lib/wallet/load';
 	import { loadContracts, type ContractsSnapshot } from '$lib/wallet/contracts';
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
-	import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
 	import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
-	import EpochComponent from '$lib/component/EpochComponent.svelte';
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
 
 	let {
@@ -130,6 +129,9 @@
 		return `linear-gradient(135deg, hsl(${20 + (hash % 311)} 75% 72%), hsl(${20 + ((hash + 90) % 311)} 75% 58%))`;
 	});
 
+	function searchWallet(address: string) {
+		void goto(`/wallet/${address}`, { invalidateAll: true });
+	}
 	// Only a user pick navigates. Restore and store notifications never call this handler (TASK-132).
 	function handleAccountPicked(pick: ConnectedAccount) {
 		const target = pickNavigation({
@@ -271,26 +273,30 @@
 >
 
 <div class="min-w-0">
-	<div class="on-hero rounded-b-hero bg-hero pb-[70px] pt-8 text-on-hero md:pb-[84px]">
+	<div
+		class={walletId
+			? 'on-hero rounded-b-hero bg-hero pb-[70px] pt-8 text-on-hero md:pb-[84px]'
+			: 'on-hero bg-hero pt-6 text-on-hero'}
+	>
 		<div class="container-page min-w-0 space-y-5">
 			<div class="flex min-w-0 flex-wrap items-start justify-between gap-5">
-				<div class="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-4">
-					<WalletAvatar gradient={avatar} src={identity.avatar} />
-					<div class="min-w-0 flex-1 basis-40">
-						<h1 class="break-words text-title">
-							{walletId ? (identity.name ?? shortAddr(walletId)) : 'Check a wallet'}
-						</h1>
-						{#if walletId}<div
-								class="mt-2 flex min-w-0 items-center gap-2 text-label text-on-hero-muted"
-							>
-								<span class="min-w-0 break-all">{walletId}</span><CopyButton
-									onHero
-									text={walletId}
-									what="wallet address"
-								/>
-							</div>{/if}
-					</div>
-				</div>
+				{#if walletId}<div class="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-4">
+						<WalletAvatar gradient={avatar} src={identity.avatar} />
+						<div class="min-w-0 flex-1 basis-40">
+							<h1 class="break-words text-title">
+								{walletId ? (identity.name ?? shortAddr(walletId)) : 'Check a wallet'}
+							</h1>
+							{#if walletId}<div
+									class="mt-2 flex min-w-0 items-center gap-2 text-label text-on-hero-muted"
+								>
+									<span class="min-w-0 break-all">{walletId}</span><CopyButton
+										onHero
+										text={walletId}
+										what="wallet address"
+									/>
+								</div>{/if}
+						</div>
+					</div>{/if}
 				<div class="wallet-picker relative ml-auto max-w-full">
 					<Web3Wallet
 						enabledWallets={['walletconnect', 'kibisis', 'lute', 'biatec', 'voiwallet']}
@@ -339,16 +345,18 @@
 						href={`/wallet/${parentWalletId}`}
 						>View owner {shortAddr(parentWalletId)} and all contracts →</a
 					>{/if}
-			{:else}
-				<SearchBox
-					variant="compact"
-					onsubmit={(address) => goto(`/wallet/${address}`, { invalidateAll: true })}
-				/>
 			{/if}
-			<Tabs variant="nav" items={sections} current={tabs.current} label="Wallet sections" />
+			{#if walletId}<Tabs
+					variant="nav"
+					items={sections}
+					current={tabs.current}
+					label="Wallet sections"
+				/>{/if}
 		</div>
 	</div>
+	{#if !walletId}<WalletSearchPage onsubmit={searchWallet} />{/if}
 	<div
+		hidden={!walletId}
 		bind:this={panel}
 		tabindex="-1"
 		role="region"
@@ -401,9 +409,7 @@
 					/>
 				</div>
 			{:else if tabs.current === 'rewards'}
-				<div class="legacy-panel space-y-6">
-					<EpochComponent walletAddress={walletId} /><ProposalsComponent {walletId} />
-				</div>
+				<WalletRewards pageAddress={walletId} />
 			{:else if tabs.current === 'contracts'}
 				<WalletContractsPanel
 					contracts={contractsMatch ? (contractsSnapshot?.contracts ?? []) : []}
@@ -425,9 +431,11 @@
 					</div>{/if}
 			{:else if tabs.current === 'calculator'}
 				<Card title="Calculator"
-					><div class="legacy-panel">
-						<CalculatorComponent walletAddress={walletId} {childAccounts} {primaryAccountInfo} />
-					</div></Card
+					><CalculatorComponent
+						walletAddress={walletId}
+						{childAccounts}
+						{primaryAccountInfo}
+					/></Card
 				>
 			{/if}
 			<div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-label text-ink-muted">
@@ -454,14 +462,6 @@
 						onretry={refresh}
 					/>
 				</div>{/if}
-		{:else if tabs.current === 'calculator'}
-			<Card title="Calculator"><div class="legacy-panel"><CalculatorComponent /></div></Card>
-		{:else}
-			<Card title="Wallet overview"
-				><p class="text-ink-muted">
-					Connect a wallet or search for an address to view account information.
-				</p></Card
-			>
 		{/if}
 	</div>
 </div>

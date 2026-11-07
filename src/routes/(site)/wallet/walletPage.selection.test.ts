@@ -41,3 +41,9 @@ describe('wallet page selection wiring (TASK-132)', () => {
 		expect(source.match(/onAccountPicked=\{handleAccountPicked\}/g)?.length).toBe(pickers);
 	});
 });
+
+test('read-only panels receive the page address and search only navigates', () => {
+	expect(source).toMatch(/<WalletRewards\s+pageAddress=\{walletId\}/);
+	expect(source).toMatch(/<WalletSearchPage\s+onsubmit=\{searchWallet\}/);
+	expect(source).not.toMatch(/selectWallet\s*\(|selectedWallet\.set\s*\(/);
+});
