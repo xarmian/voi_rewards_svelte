@@ -32,6 +32,15 @@
 			limit = 12;
 		}
 	});
+	const keyedTokens = $derived.by(() => {
+		const occurrences = new Map<string, number>();
+		return (tokens ?? []).map((token) => {
+			const base = `${token.contractId}:${token.tokenId}`;
+			const occurrence = occurrences.get(base) ?? 0;
+			occurrences.set(base, occurrence + 1);
+			return { token, key: `${base}${occurrence ? ':' + occurrence : ''}` };
+		});
+	});
 	function toggle() {
 		expanded = !expanded;
 		if (expanded) onexpand?.();
@@ -39,7 +48,11 @@
 </script>
 
 <Card title="NFTs" span={{ lg: 12, md: 2 }}>
-	<Button variant="ghost" onclick={toggle} aria-expanded={expanded} aria-controls="wallet-nfts-grid"
+	<Button
+		variant="ghost"
+		onclick={toggle}
+		aria-expanded={expanded}
+		aria-controls={expanded ? 'wallet-nfts-grid' : undefined}
 		>{expanded ? 'Hide collectibles' : 'Show collectibles'}{tokens
 			? ` · ${tokens.length} NFTs`
 			: ''}</Button
@@ -72,7 +85,7 @@
 					</p>{/if}
 				{#if !tokens.length}<p class="text-sm text-ink-muted">No NFTs returned for this address.</p>
 				{:else}<ul class="mt-3 grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-						{#each tokens.slice(0, limit) as token (`${token.contractId}:${token.tokenId}`)}<li
+						{#each keyedTokens.slice(0, limit) as { token, key } (key)}<li
 								class="min-w-0 rounded-ds-sm border border-line bg-surface-2 p-2"
 							>
 								<a

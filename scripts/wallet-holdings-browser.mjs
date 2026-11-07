@@ -47,8 +47,13 @@ try {
 						return `import {tokens} from '/src/lib/ds/WalletHoldings/fixtures.ts';
 							const scenario = new URL(location.href).searchParams.get('case');
 							const asset = (id, value, balance=1000000) => ({...tokens[0],id,name:'Asset '+id,value,balance,approvals:[]});
-							globalThis.__tokenPopulation = scenario==='dust'
-								? [...Array.from({length:5},(_,i)=>asset('priced'+i,10-i)), ...Array.from({length:3},(_,i)=>asset('unknown'+i,0)), ...Array.from({length:5},(_,i)=>asset('zero'+i,0,0))]
+							globalThis.__tokenPopulation = scenario.startsWith('decimals-') ? [asset('ok',12), {...tokens[0],id:'bad',decimals:scenario==='decimals-undefined'?undefined:scenario==='decimals-negative'?-1:null}]
+								: scenario==='claim-value' ? [{...tokens[0],value:0.004}]
+								: scenario==='claim-ids' ? [asset('ok',12), ...[NaN,NaN,5,'5'].map((id,i)=>({...tokens[0],id,name:'Claim '+i}))]
+								: scenario==='row-duplicates' ? [tokens[0],{...tokens[0],name:'Another balance',balance:2}]
+								: scenario==='view-details' ? [...tokens, {...asset('dust',0.05),approvals:[]}]
+								: scenario==='dust'
+								? [...Array.from({length:5},(_,i)=>asset('priced'+i,10-i)), ...Array.from({length:3},(_,i)=>asset('unknown'+i,0)), ...Array.from({length:8},(_,i)=>asset('zero'+i,0,0))]
 								: scenario==='duplicates' ? [tokens[0], {...tokens[0]}] : scenario==='membership-dust' ? [asset('unpriced',0),...tokens.slice(0,3)] : scenario==='keys' ? tokens.slice(0,3) : scenario==='amount' ? tokens.slice(0,9).map(t=>({...t,approvals:t.approvals.map(a=>({...a,amount:'4000'}))})) : tokens;
 							export const fetchFungibleTokens = async address => {
 								globalThis.__tokenReads=(globalThis.__tokenReads||0)+1;
@@ -180,6 +185,7 @@ try {
 	const wait = async (expression) => {
 		for (let n = 0; n < 300; n++) {
 			if (await evaluate(expression)) return;
+			assert.equal(errors.length, 0, JSON.stringify(errors));
 			await pause(100);
 		}
 		throw new Error(
@@ -201,6 +207,8 @@ try {
 		mobile: false
 	});
 	const open = async (scenario) => {
+		nftReads = 0;
+		pendingNft = undefined;
 		await send('Page.navigate', { url: 'http://127.0.0.1:4182/__holdings?case=' + scenario });
 		await wait(`document.querySelector('#ds-holdings-tokens [data-token-id]')`);
 		await evaluate(
@@ -210,6 +218,15 @@ try {
 	const cases = process.env.HOLDINGS_CASE
 		? process.env.HOLDINGS_CASE.split(',')
 		: [
+				'decimals-undefined',
+				'decimals-negative',
+				'decimals-null',
+				'claim-value',
+				'claim-ids',
+				'row-duplicates',
+				'view-details',
+				'nft-duplicates',
+				'nft-controls',
 				'membership-rank',
 				'membership-dust',
 				'membership-removal',
@@ -229,7 +246,116 @@ try {
 			];
 	for (const scenario of cases.filter((name) => name !== 'controls')) {
 		await open(scenario);
-		if (scenario.startsWith('membership-')) {
+		if (scenario.startsWith('decimals-')) {
+			await wait(`document.querySelectorAll('.wallet-claim-legacy').length===1`);
+			assert.equal(
+				await evaluate(
+					`[...document.querySelectorAll('.wallet-claim-legacy')].find(card=>card.textContent.includes('Asset 1')).previousElementSibling.textContent.includes('Unavailable')`
+				),
+				true,
+				'Malformed decimals display Unavailable'
+			);
+		} else if (scenario === 'claim-value') {
+			assert.equal(
+				await evaluate(
+					`document.querySelector('.wallet-claim-legacy').previousElementSibling.textContent.includes('<0.01 VOI equivalent')`
+				),
+				true,
+				'Small claim values remain positive'
+			);
+		} else if (scenario === 'claim-ids') {
+			await wait(`document.querySelectorAll('.wallet-claim-legacy').length===4`);
+			assert.equal(errors.length, 0, JSON.stringify(errors));
+		} else if (scenario === 'row-duplicates') {
+			assert.equal(
+				await evaluate(
+					`document.querySelectorAll('#ds-holdings-tokens div[data-token-id="1"]').length`
+				),
+				2,
+				'Distinct duplicate token entries both render'
+			);
+			assert.equal(errors.length, 0, JSON.stringify(errors));
+		} else if (scenario === 'view-details') {
+			await evaluate(
+				`clickText('Show claimable tokens'); window.scrolled=null; Element.prototype.scrollIntoView=function(){window.scrolled=this;};window.targetDetail=document.querySelector('#ds-holdings-tokens div[data-token-id="1"]').closest('tr');window.targetRow=targetDetail.previousElementSibling;`
+			);
+			await evaluate(
+				`buttons(document.querySelectorAll('.wallet-claim-legacy')[0]).find(b=>b.textContent.trim()==='View Details').click()`
+			);
+			await wait(`!targetDetail.hidden`);
+			assert.equal(
+				await evaluate(`scrolled===targetRow && targetRow.classList.contains('ring-2')`),
+				true,
+				'Claim details open and highlight the token table row'
+			);
+			await evaluate(
+				`buttons(document.querySelectorAll('.wallet-claim-legacy')[0]).find(b=>b.textContent.trim()==='View Details').click()`
+			);
+			assert.equal(
+				await evaluate(`!targetDetail.hidden`),
+				true,
+				'An expanded token stays expanded'
+			);
+			await evaluate(`clickText('Show 9 More')`);
+			await evaluate(
+				`buttons(document.querySelectorAll('.wallet-claim-legacy')[13]).find(b=>b.textContent.trim()==='View Details').click()`
+			);
+			assert.equal(
+				await evaluate(
+					`scrolled.contains(document.querySelector('#ds-holdings-tokens')) && scrolled!==targetRow`
+				),
+				true,
+				'An unrendered token scrolls to the Tokens card'
+			);
+			await evaluate(
+				`__tokenPopulation=__tokenPopulation.map(t=>t.id==='dust'?{...t,approvals:__tokenPopulation[0].approvals}:t);clickText('Refresh tokens')`
+			);
+			await wait(`document.querySelectorAll('.wallet-claim-legacy').length===16`);
+			await evaluate(
+				`buttons(document.querySelectorAll('.wallet-claim-legacy')[15]).find(b=>b.textContent.trim()==='View Details').click()`
+			);
+			assert.equal(
+				await evaluate(`scrolled.contains(document.querySelector('#ds-holdings-tokens'))`),
+				true,
+				'An unrendered small token scrolls to the Tokens card'
+			);
+		} else if (scenario === 'nft-controls') {
+			assert.equal(
+				await evaluate(
+					`buttons().find(b=>b.textContent.includes('Show collectibles')).hasAttribute('aria-controls')`
+				),
+				false,
+				'Collapsed collectibles have no missing controlled target'
+			);
+		} else if (scenario === 'nft-duplicates') {
+			await evaluate(`clickText('Show collectibles')`);
+			await wait(`document.body.textContent.includes('Loading NFT ownership')`);
+			await send('Fetch.fulfillRequest', {
+				requestId: pendingNft,
+				responseCode: 200,
+				responseHeaders: [
+					{ name: 'Content-Type', value: 'application/json' },
+					{ name: 'Access-Control-Allow-Origin', value: '*' }
+				],
+				body: Buffer.from(
+					JSON.stringify({
+						tokens: [
+							{ contractId: 1, tokenId: '7', metadata: 'broken' },
+							{ contractId: 1, tokenId: '7', metadata: 'broken' }
+						]
+					})
+				).toString('base64')
+			});
+			await wait(`document.querySelectorAll('#wallet-nfts-grid li').length===2`);
+			assert.equal(
+				await evaluate(
+					`document.getElementById(buttons().find(b=>b.textContent.includes('Hide collectibles')).getAttribute('aria-controls'))!==null`
+				),
+				true,
+				'Expanded collectibles reference their grid'
+			);
+			assert.equal(errors.length, 0, JSON.stringify(errors));
+		} else if (scenario.startsWith('membership-')) {
 			const id = scenario === 'membership-dust' ? 'unpriced' : '10';
 			await evaluate(
 				`window.keptNode=document.querySelector('[data-token-id="${id}"]'); window.keptController=keptNode.querySelector('.wallet-token-legacy');document.querySelector('button[aria-controls="'+keptNode.closest('tr').id+'"]').click();`
@@ -251,6 +377,11 @@ try {
 				'A rendered row keeps the same mounted node after its value changes'
 			);
 			if (scenario === 'membership-rank') {
+				assert.equal(
+					await evaluate(`buttons().some(b=>b.textContent.trim()==='Show 4 more tokens')`),
+					true,
+					'Only unrendered tokens are counted'
+				);
 				assert.equal(
 					await evaluate(`keptDialog.isConnected && visible(keptDialog)`),
 					true,
@@ -359,7 +490,7 @@ try {
 				await evaluate(
 					`document.querySelectorAll('#ds-holdings-tokens div[data-token-id]').length`
 				),
-				13,
+				16,
 				'Show dust expands the full population'
 			);
 			assert.equal(
