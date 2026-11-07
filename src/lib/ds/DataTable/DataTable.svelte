@@ -24,6 +24,7 @@
 		moreLabel,
 		lessLabel = 'Show fewer',
 		rowActions,
+		rowHasActions = () => true,
 		favourite,
 		expandable = false,
 		detail,
@@ -52,6 +53,8 @@
 		lessLabel?: string;
 		/** Render native <button type="button" role="menuitem"> items. */
 		rowActions?: Snippet<[T]>;
+		/** Omit the action trigger for rows without actions. Other rows retain the shared column. */
+		rowHasActions?: (row: T) => boolean;
 		favourite?: { pressed: (row: T) => boolean; ontoggle: (row: T) => void };
 		expandable?: boolean;
 		detail?: Snippet<[T]>;
@@ -291,23 +294,25 @@
 						{/each}
 						{#if rowActions}
 							<td class="relative {padding}">
-								<button
-									type="button"
-									aria-haspopup="menu"
-									aria-expanded={openMenu?.key === key}
-									aria-controls={openMenu?.key === key ? menuId : undefined}
-									class="text-accent"
-									onclick={(event) => toggleMenu(key, event.currentTarget)}
-									><span aria-hidden="true">⋯</span><span class="sr-only"
-										>Actions for {name(row)}</span
-									></button
-								>
-								{#if openMenu?.key === key}<RowMenu
-										id={menuId}
-										name={name(row)}
-										trigger={openMenu.trigger}
-										onclose={closeMenu}>{@render rowActions(row)}</RowMenu
-									>{/if}
+								{#if rowHasActions(row)}
+									<button
+										type="button"
+										aria-haspopup="menu"
+										aria-expanded={openMenu?.key === key}
+										aria-controls={openMenu?.key === key ? menuId : undefined}
+										class="text-accent"
+										onclick={(event) => toggleMenu(key, event.currentTarget)}
+										><span aria-hidden="true">⋯</span><span class="sr-only"
+											>Actions for {name(row)}</span
+										></button
+									>
+									{#if openMenu?.key === key}<RowMenu
+											id={menuId}
+											name={name(row)}
+											trigger={openMenu.trigger}
+											onclose={closeMenu}>{@render rowActions(row)}</RowMenu
+										>{/if}
+								{/if}
 							</td>
 						{/if}
 						{#if disclosure}
