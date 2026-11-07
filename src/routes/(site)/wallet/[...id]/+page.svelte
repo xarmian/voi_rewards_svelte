@@ -63,7 +63,7 @@
 		if (tabs.hash.toLowerCase() === '#consensus') showNode = true;
 	});
 	let sequence = 0;
-	let loadedAddress = '';
+	let loadedAddress = $state('');
 	const viewContracts = $derived(
 		snapshot?.contracts.filter((contract) => !parentWalletId || contract.address === walletId) ?? []
 	);
@@ -278,7 +278,7 @@
 						parentWalletAddress={parentWalletId ?? null}
 						holdingsSplit={snapshot
 							? {
-									pageAddress: walletId,
+									pageAddress: loadedAddress,
 									owner: viewOwner,
 									contracts: viewContracts,
 									contractSet: snapshot.contractSet

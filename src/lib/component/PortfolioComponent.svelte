@@ -8,6 +8,8 @@
 	import {
 		createHoldingsTokenLoader,
 		holdingsClaimKey,
+		decimalsKnown,
+		holdingsAmount,
 		loadWalletNfts,
 		enrichWalletNfts,
 		type HoldingsSplit
@@ -963,11 +965,15 @@
 {/snippet}
 
 {#snippet claimAmount(amount: number, decimals: number)}
-	{@const precision = Math.min(decimals, 6)}
-	{#if amount > 0 && amount < 10 ** -precision}
-		&lt;{(10 ** -precision).toFixed(precision)}
+	{#if !decimalsKnown(decimals)}
+		Unavailable
 	{:else}
-		{amount.toLocaleString('en-US', { maximumFractionDigits: precision })}
+		{@const precision = Math.min(decimals, 6)}
+		{#if amount > 0 && amount < 10 ** -precision}
+			&lt;{(10 ** -precision).toFixed(precision)}
+		{:else}
+			{amount.toLocaleString('en-US', { maximumFractionDigits: precision })}
+		{/if}
 	{/if}
 {/snippet}
 
@@ -1009,7 +1015,7 @@
 							<p class="mb-2 break-words text-sm">
 								{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
 								{claimableItem.token.symbol} · {claimableItem.totalValue > 0
-									? formatNumber(claimableItem.totalValue, 2) + ' VOI equivalent'
+									? holdingsAmount(claimableItem.totalValue) + ' VOI equivalent'
 									: 'Value unavailable'}
 							</p>
 							<div class="wallet-claim-legacy">
@@ -1020,7 +1026,30 @@
 									totalValue={claimableItem.totalValue}
 									{canSignTransactions}
 									walletId={walletAddress}
-									on:viewDetails={handleClaimableTokenViewDetails}
+									on:viewDetails={(event) => {
+										const { tokenId } = event.detail;
+										const marker = [
+											...document.querySelectorAll<HTMLElement>('[data-holdings-token-id]')
+										].find(
+											(element) =>
+												element.dataset.holdingsTokenId === `${typeof tokenId}:${tokenId}`
+										);
+										const row = marker?.closest('tr');
+										const disclosure =
+											row?.querySelector<HTMLButtonElement>('button[aria-controls]');
+										if (disclosure?.getAttribute('aria-expanded') === 'false') disclosure.click();
+										const target =
+											row ?? document.getElementById('ds-holdings-tokens')?.closest('section');
+										if (target) {
+											target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+											target.classList.add('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+											setTimeout(
+												() =>
+													target.classList.remove('ring-2', 'ring-yellow-400', 'ring-opacity-50'),
+												3000
+											);
+										}
+									}}
 									on:tokenClaimed={handleTokenClaimed}
 								/>
 							</div>

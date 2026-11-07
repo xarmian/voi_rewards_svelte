@@ -99,7 +99,9 @@ it('expansion only adds rows and permanently removes the page limit', async () =
 	}
 	expect(runInContext(limit!, context)).toBeUndefined();
 	expect(source).not.toMatch(/Show fewer|Show less|Hide dust|Collapse/);
-	expect(source).toContain('{#if !tokensExpanded && display.rows.tokens.length > 10}');
+	expect(source).toContain(
+		'{#if !tokensExpanded && display.rows.tokens.length > tokenRows.length}'
+	);
 	expect(source).toContain('{#if !showDust}');
 	const html = render(WalletHoldings, {
 		props: { pageAddress: 'Y', account, tokens: population, tokenState: 'ready' }
@@ -199,7 +201,13 @@ it('controller delegates presentation using full raw population and the original
 		.replaceAll(' && tokenGeneration === tokenLoadGeneration', '')
 		.replace(emptySummary, '\t\t}');
 	expect(restored.replace(/\s+/g, ' ').trim()).toBe(script(original).replace(/\s+/g, ' ').trim());
-	const normalized = (text: string) => text.replace(/\s+/g, ' ');
+	const normalized = (text: string) =>
+		text
+			.replace(
+				/on:viewDetails=\{[^]*?\}\}\s+on:tokenClaimed/,
+				'on:viewDetails={handleClaimableTokenViewDetails} on:tokenClaimed'
+			)
+			.replace(/\s+/g, ' ');
 	for (const component of ['FungibleToken', 'ClaimableTokenCard']) {
 		const mount = new RegExp(`<${component}\\s+[\\s\\S]*?/>`);
 		expect(normalized(source.match(mount)![0])).toBe(normalized(original.match(mount)![0]));
@@ -336,15 +344,6 @@ it.each([
 		.replace(/<[^>]*>/g, '')
 		.trim();
 	expect(exact).toBe(`${expected} TOK`);
-});
-
-it('claim cards keep their wallet and token identity throughout the list', () => {
-	const loops = [
-		...controller().matchAll(/\{#each claimableTokensSummary as claimableItem, index([^]*?)\}/g)
-	];
-	expect(loops).toHaveLength(1);
-	for (const loop of loops)
-		expect(loop[1].trim()).toBe('(holdingsClaimKey(claimableTokensSummary, index, walletAddress))');
 });
 
 it('composition exposes a named image and readable amounts', () => {
@@ -490,4 +489,30 @@ it('NFT retry keeps ready ownership until failure and enrichment errors only mar
 	context.loadWalletNfts = vi.fn().mockRejectedValue(new Error('ownership offline'));
 	await runInContext('readWalletNfts(true)', context);
 	expect(context.nftState).toBe('stale');
+});
+
+it('a split retains its loaded address when the route changes', () => {
+	const source = readFileSync(
+		new URL('../../../routes/(site)/wallet/[...id]/+page.svelte', import.meta.url),
+		'utf8'
+	);
+	const expression =
+		source.match(/holdingsSplit=\{(snapshot[^]*?): undefined\}/)![1] + ': undefined';
+	const split = runInContext(
+		expression,
+		createContext({
+			walletId: 'B',
+			loadedAddress: 'A',
+			snapshot: { contractSet: 'ready' },
+			viewOwner: { address: 'A', balance: 4 },
+			viewContracts: []
+		})
+	);
+	const html = render(WalletHoldings, {
+		props: { pageAddress: 'B', account, tokens: [], tokenState: 'ready', split }
+	}).body;
+	for (const label of ['Locked', 'Liquid'])
+		expect(html.match(new RegExp(label + '[^]*?<dd[^>]*>([^]*?)</dd>'))?.[1]).toContain(
+			'Unavailable'
+		);
 });

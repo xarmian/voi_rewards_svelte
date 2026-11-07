@@ -169,8 +169,10 @@
 	const tableState = $derived(tokenState);
 </script>
 
-{#snippet identity(row: HoldingsRow)}<span class="break-words" title={row.token.name}
-		>{row.token.name}</span
+{#snippet identity(row: HoldingsRow)}<span
+		class="break-words"
+		title={row.token.name}
+		data-holdings-token-id={`${typeof row.token.id}:${row.token.id}`}>{row.token.name}</span
 	>{/snippet}
 {#snippet quantity(row: HoldingsRow)}<span title={holdingsExactQuantity(row.token)}
 		>{holdingsAmount(row.quantity)} {row.token.symbol}</span
@@ -324,9 +326,9 @@
 					? 'No tokens above the dust threshold. Show dust.'
 					: 'No tokens in this account'}
 			/>{/if}
-		{#if !tokensExpanded && display.rows.tokens.length > 10}
+		{#if !tokensExpanded && display.rows.tokens.length > tokenRows.length}
 			<Button variant="ghost" onclick={() => (tokensExpanded = true)}
-				>Show {display.rows.tokens.length - 10} more tokens</Button
+				>Show {display.rows.tokens.length - tokenRows.length} more tokens</Button
 			>
 		{/if}
 		<div class="mt-4 min-w-0">{@render claims?.()}</div>
