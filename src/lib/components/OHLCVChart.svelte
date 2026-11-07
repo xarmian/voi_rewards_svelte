@@ -144,7 +144,10 @@
 				renderedCandles.map((point) => ({ ...point, time: toUnixSeconds(point.time) })),
 				chartTokens
 			);
+			// Keep the user's zoom and pan across the recolor, whatever setData does to the range.
+			const range = chart.timeScale().getVisibleLogicalRange();
 			(mainSeries as ISeriesApi<'Candlestick'>).setData(renderedCandles);
+			if (range) chart.timeScale().setVisibleLogicalRange(range);
 		}
 	}
 

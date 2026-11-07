@@ -102,6 +102,8 @@
 		{:else}
 			<p class="py-4 text-ink-muted">No chart data available.</p>
 		{/if}
+	{:else if tokenChartLoading && selectedToken}
+		<p role="status" class="py-4 text-ink-muted">Loading chart...</p>
 	{:else}
 		<p class="mb-3 text-label text-ink-muted">Fallback price chart</p>
 		<div class="min-w-0">

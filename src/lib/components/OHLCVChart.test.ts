@@ -86,6 +86,14 @@ it('updates layout and all active series on theme changes without refetching or 
 	expect(update).toContain('chart.applyOptions(options.chart)');
 	expect(update).toContain('mainSeries?.applyOptions(');
 	expect(update).toContain('volumeSeries?.applyOptions(options.volume)');
-	expect(update).not.toMatch(/fetch|fitContent|setVisible|scrollTo|updateChartData/);
+	expect(update).not.toMatch(/fetch|fitContent|scrollTo|updateChartData/);
+	// The recolor keeps the user's zoom and pan: capture the range, setData, restore the same range.
+	const capture = update!.indexOf('getVisibleLogicalRange()');
+	const replace = update!.indexOf('.setData(renderedCandles)');
+	const restore = update!.indexOf('setVisibleLogicalRange(range)');
+	expect(capture).toBeGreaterThan(-1);
+	expect(replace).toBeGreaterThan(capture);
+	expect(restore).toBeGreaterThan(replace);
+	expect(update!.match(/setVisibleLogicalRange\(/g)).toHaveLength(1);
 	expect(source).toContain('onThemeChange(updateChartTheme)');
 });

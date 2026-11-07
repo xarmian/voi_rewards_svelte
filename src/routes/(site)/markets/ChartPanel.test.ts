@@ -59,3 +59,14 @@ it('keeps loading, error, empty and ready OHLCV states distinct inside one card'
 	).toBe(1);
 	expect(body).not.toMatch(/height: 640px|overflow-hidden|Fallback price chart/);
 });
+it('shows a first OHLCV load as loading, not as the fallback chart', () => {
+	const body = panel({ showTokenChart: false, tokenChartLoading: true });
+	expect(body).toContain('Loading chart...');
+	expect(body).not.toContain('Fallback price chart');
+	expect(body).not.toContain('Price fixture');
+});
+it('shows the labelled fallback when nothing is loading and no OHLCV chart is showing', () => {
+	const body = panel({ showTokenChart: false, tokenChartLoading: false });
+	expect(body).toContain('Fallback price chart');
+	expect(body).toContain('Price fixture');
+});
