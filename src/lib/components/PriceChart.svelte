@@ -2,6 +2,13 @@
 <script lang="ts">
 	import { onThemeChange } from '$lib/theme.svelte';
 	import { onMount } from 'svelte';
+	import { chartTimestamp, describeLine } from '$lib/markets/chartDescription';
+	import {
+		clearInspection,
+		inspect,
+		isInspectionKey,
+		inspectionInstructions
+	} from '$lib/markets/chartInspection';
 	import Tabs from '$lib/ds/Tabs/Tabs.svelte';
 	import { chartThemeOptions, resolveChartTokens } from '$lib/markets/chartTheme';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
@@ -28,6 +35,36 @@
 		{ value: '24h', label: '24H' },
 		{ value: '7d', label: '7D' }
 	];
+
+	let inspection = clearInspection();
+	$: selection = selectedMarket
+		? `${selectedMarket.exchange} ${selectedMarket.pair}`
+		: 'All Markets Aggregated';
+	$: description = describeLine(data, selection, selectedPeriod);
+	$: inspectedText =
+		inspection.index === null ? '' : (description.observations[inspection.index] ?? '');
+	$: {
+		void data;
+		void selectedMarket;
+		void selectedPeriod;
+		void description;
+		clearChartInspection();
+	}
+	function clearChartInspection() {
+		inspection = inspect(inspection, { reset: true }, description.observations);
+	}
+	function handleInspectionKey(event: KeyboardEvent) {
+		if (!isInspectionKey(event.key)) return;
+		event.preventDefault();
+		inspection = inspect(inspection, { key: event.key }, description.observations);
+	}
+	function handleCrosshairMove(param: import('lightweight-charts').MouseEventParams) {
+		const index =
+			param.time === undefined
+				? null
+				: description.rows.findIndex((row) => row[0] === chartTimestamp(param.time!));
+		inspection = inspect(inspection, { pointer: index }, description.observations);
+	}
 
 	function formatTimeByPeriod(timestamp: number, period: '24h' | '7d'): string {
 		const date = new Date(timestamp * 1000);
@@ -107,6 +144,8 @@
 			priceLineVisible: true,
 			priceFormat: { type: 'price', precision: 6, minMove: 0.000001 }
 		});
+		chart.subscribeCrosshairMove(handleCrosshairMove);
+		lifecycle.add(() => instance.unsubscribeCrosshairMove(handleCrosshairMove));
 		if (data.length) {
 			series.setData(data);
 			chart.timeScale().fitContent();
@@ -138,16 +177,9 @@
 	}
 </script>
 
-<div class="flex w-full flex-col gap-4">
+<section aria-labelledby="price-chart-title" class="flex min-w-0 w-full flex-col gap-4">
 	<div class="flex flex-wrap items-center justify-between gap-3">
-		<h3 class="text-h2 text-ink">
-			Price Chart
-			{#if selectedMarket}
-				- {selectedMarket.exchange} {selectedMarket.pair}
-			{:else}
-				- All Markets Aggregated
-			{/if}
-		</h3>
+		<h2 id="price-chart-title" class="text-h2 text-ink">Price Chart - {selection}</h2>
 		<div class="flex max-w-full flex-col gap-1">
 			<span class="text-label text-ink-muted">Period</span>
 			<Tabs
@@ -159,10 +191,60 @@
 			/>
 		</div>
 	</div>
-	<div class="plot w-full" style:--plot-height={`${height}px`} bind:this={chartContainer}></div>
-</div>
+	<p id="price-chart-description" class="text-label text-ink-muted">{description.summary}</p>
+	<p id="price-chart-instructions" class="text-label text-ink-muted">{inspectionInstructions}</p>
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<div
+		role="group"
+		tabindex="0"
+		aria-roledescription="chart"
+		aria-labelledby="price-chart-title"
+		aria-describedby="price-chart-description price-chart-instructions"
+		class="chart-inspection rounded-ds-sm"
+		onkeydown={handleInspectionKey}
+	>
+		<div class="plot w-full" style:--plot-height={`${height}px`} bind:this={chartContainer}></div>
+	</div>
+	<p class="text-label text-ink">{inspectedText}</p>
+	<p class="sr-only" aria-live="polite" aria-atomic="true">{inspection.announcement}</p>
+	<details class="min-w-0 text-label">
+		<summary class="w-fit cursor-pointer text-accent">View data</summary>
+		<!-- A named data region is keyboard scrollable when its table overflows. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div
+			role="region"
+			aria-label="Price chart data"
+			tabindex="0"
+			class="chart-inspection mt-2 max-w-full overflow-x-auto rounded-ds-sm"
+		>
+			<table class="w-full text-label">
+				<caption class="mb-2 text-start text-ink-muted">{description.caption}</caption>
+				<thead
+					><tr
+						>{#each description.headers as header}<th
+								scope="col"
+								class="border-b border-line p-2 text-start">{header}</th
+							>{/each}</tr
+					></thead
+				>
+				<tbody
+					>{#each description.rows as row}<tr
+							>{#each row as cell}<td class="num whitespace-nowrap border-b border-line p-2"
+									>{cell}</td
+								>{/each}</tr
+						>{/each}</tbody
+				>
+			</table>
+		</div>
+	</details>
+</section>
 
 <style>
+	.chart-inspection:focus-visible {
+		outline: 2px solid rgb(var(--c-focus));
+		outline-offset: 2px;
+	}
 	.plot {
 		height: var(--plot-height, 400px);
 	}

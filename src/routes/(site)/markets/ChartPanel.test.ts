@@ -82,6 +82,6 @@ it('names the existing chart Card region in every state', () => {
 		const section = body.match(/<section\b[^>]*aria-labelledby="([^"]+)"/);
 		expect(section).toBeTruthy();
 		expect(body).toContain('id="' + section![1] + '"');
-		expect(body).toMatch(/<h2\b[^>]*>Market chart<\/h2>/);
+		expect(body).toMatch(/<h2\b[^>]*>Market chart(?:<!--[\s\S]*?-->)*<\/h2>/);
 	}
 });

@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
 import { readFileSync } from 'node:fs';
 import PriceChart from './PriceChart.svelte';
+import type { UTCTimestamp } from 'lightweight-charts';
 
 it.each(['24h', '7d'] as const)(
 	'names the period group and exposes selected %s',
@@ -35,9 +36,9 @@ it('connects the named chart, instructions, summary and complete native data dis
 	const body = render(PriceChart, {
 		props: {
 			data: [
-				{ time: 20, value: 2 },
-				{ time: 10, value: 1 },
-				{ time: 20, value: 3 }
+				{ time: 20 as UTCTimestamp, value: 2 },
+				{ time: 10 as UTCTimestamp, value: 1 },
+				{ time: 20 as UTCTimestamp, value: 3 }
 			],
 			selectedMarket: { exchange: 'Example', pair: 'TOKEN/VOI', trading_pair_id: 1 },
 			selectedPeriod: '7d',
@@ -75,4 +76,7 @@ it('wires pointer and keyboard through the shared inspection state and clears on
 		expect(source).toContain('void ' + dependency + ';');
 	expect(source).toContain('subscribeCrosshairMove(handleCrosshairMove)');
 	expect(source).not.toMatch(/\.focus\(/);
+	expect(source).not.toMatch(/display\s*:\s*none/);
+	expect(source).toContain('clearChartInspection();');
+	expect(source).toContain('void description;');
 });

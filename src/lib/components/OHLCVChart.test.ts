@@ -140,4 +140,23 @@ it('wires pointer and keyboard through the shared inspection state and clears on
 		expect(source).toContain('void ' + dependency + ';');
 	expect(source).toContain('subscribeCrosshairMove(handleCrosshairMove)');
 	expect(source).not.toMatch(/\.focus\(/);
+	expect(source).not.toMatch(/display\s*:\s*none/);
+	expect(source).toContain('clearChartInspection();');
+	expect(source).toContain('void description;');
+});
+
+it('does not disclose a volume series when volume is off or no candles are rendered', () => {
+	for (const props of [{ settings: { ...settings, showVolume: false } }, { data: [] }]) {
+		const body = chart({ ...props, volumes: [{ time: 1, value: 99 }] });
+		expect(body).not.toContain('Volume (USD)');
+		expect(body).not.toContain('>99</td>');
+	}
+});
+it('updates renderer data for changes inside the displayed series', () => {
+	const source = readFileSync(new URL('./OHLCVChart.svelte', import.meta.url), 'utf8');
+	expect(source).toContain('const sortedData = displayedData;');
+	expect(source).toContain('themedVolumes(displayedVolumes)');
+	const signature = source.match(/const sig = JSON.stringify\(([\s\S]*?)\);/)?.[1];
+	expect(signature).toContain('displayedData');
+	expect(signature).toContain('displayedVolumes');
 });
