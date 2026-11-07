@@ -5,7 +5,6 @@
 		circulatingMarketCap as getCirculatingMarketCap,
 		tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
 		fullyDilutedMarketCap as getFullyDilutedMarketCap,
-		sortMarkets,
 		filterMarkets as getFilteredMarkets
 	} from '$lib/markets/derive';
 	import {
@@ -412,19 +411,6 @@
 	// Sorting state - default to TVL descending (largest first)
 	let sortColumn = 'tvl';
 	let sortDirection: 'asc' | 'desc' = 'desc';
-
-	// Sorting function
-	const sortData = (column: string) => {
-		if (sortColumn === column) {
-			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-		} else {
-			sortColumn = column;
-			sortDirection = 'desc';
-		}
-	};
-
-	// Reactive sorted data - sort filtered data by TVL descending
-	$: sortedMarketData = sortMarkets(filteredMarketData, sortColumn, sortDirection);
 
 	// Calculate volume-weighted average price
 	$: weightedAveragePrice = getWeightedAveragePrice(realMarketData, selectedToken);
@@ -937,13 +923,18 @@
 				{voiUsdStatus}
 				{voiUsdAsOf}
 				{tokenAnalytics}
-				{sortedMarketData}
+				sortedMarketData={filteredMarketData}
 				{searchQuery}
 				onSearchQueryChange={(query) => (searchQuery = query)}
 				{filterMarkets}
-				{sortColumn}
-				{sortDirection}
-				{sortData}
+				bind:sort={
+					() => ({ key: sortColumn, dir: sortDirection }),
+					(value) => {
+						sortColumn = value.key;
+						sortDirection = value.dir;
+					}
+				}
+				{fetchingMarketData}
 				{selectedTradingPairId}
 				onRowClick={handleMarketRowClick}
 				{marketDataError}

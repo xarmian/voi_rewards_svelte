@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from 'flowbite-svelte';
-	import { ariaSortFor } from '$lib/a11y/keyboard';
+	import { Button, Card, Chip, DataTable, InlineAlert } from '$lib/ds';
+	import type { Column, SortState } from '$lib/ds/DataTable/types';
 	import {
 		formatPrice,
 		formatCurrency,
@@ -10,6 +10,7 @@
 	import type { MarketDataState } from '$lib/markets/marketDataLoader';
 	import type { PageData } from './$types';
 
+	type Market = PageData['marketData'][number];
 	interface Props {
 		voiUsdStatus: MarketDataState['voiUsdStatus'];
 		voiUsdAsOf: string | null;
@@ -18,14 +19,13 @@
 		searchQuery: string;
 		onSearchQueryChange: (query: string) => void;
 		filterMarkets: (query: string) => void;
-		sortColumn: string;
-		sortDirection: 'asc' | 'desc';
-		sortData: (column: string) => void;
+		sort?: SortState;
 		selectedTradingPairId: number | null;
-		onRowClick: (market: PageData['marketData'][number]) => void;
+		onRowClick: (market: Market) => void;
 		marketDataError: string | null;
 		refreshData: () => Promise<void>;
 		isRefreshing: boolean;
+		fetchingMarketData?: boolean;
 	}
 
 	let {
@@ -36,273 +36,203 @@
 		searchQuery,
 		onSearchQueryChange,
 		filterMarkets,
-		sortColumn,
-		sortDirection,
-		sortData,
+		sort = $bindable({ key: 'tvl', dir: 'desc' }),
 		selectedTradingPairId,
 		onRowClick,
 		marketDataError,
 		refreshData,
-		isRefreshing
+		isRefreshing,
+		fetchingMarketData = false
 	}: Props = $props();
+
+	const columns: Column<Market>[] = [
+		{ key: 'pair', header: 'Pair', priority: 1, cell: pairCell },
+		{ key: 'exchange', header: 'Exchange', priority: 2, cell: exchangeCell },
+		{
+			key: 'price',
+			header: 'Price',
+			priority: 2,
+			numeric: true,
+			align: 'end',
+			sortable: true,
+			sortValue: (row) => row.price,
+			cell: priceCell
+		},
+		{
+			key: 'tvl',
+			header: 'TVL (USD)',
+			priority: 2,
+			numeric: true,
+			align: 'end',
+			sortable: true,
+			sortValue: (row) => row.tvl,
+			cell: tvlCell
+		},
+		{
+			key: 'volume_24h',
+			header: '24h Volume',
+			priority: 3,
+			numeric: true,
+			align: 'end',
+			sortable: true,
+			sortValue: (row) => row.volume_24h,
+			cell: volumeCell
+		},
+		{
+			key: 'change',
+			header: '24h Change',
+			priority: 3,
+			numeric: true,
+			align: 'end',
+			cell: changeCell
+		}
+	];
+	let tableState = $derived(
+		sortedMarketData.length > 0
+			? 'ready'
+			: fetchingMarketData
+				? 'loading'
+				: marketDataError
+					? 'error'
+					: 'empty'
+	);
+	const rowKey = (market: Market) =>
+		`${market.exchange}-${market.network}-${market.trading_pair_id}-${market.pair}`;
 </script>
 
-<!-- Keep legacy DOM event directives to preserve the original event timing. -->
-<div
-	class="min-w-0 col-span-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-	style="height: 640px;"
->
-	<div
-		class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600 flex-shrink-0"
-	>
-		{#if voiUsdStatus === 'stale'}
-			<p class="text-sm text-gray-600 dark:text-gray-400">
-				VOI/USD reference is stale (as of {voiUsdAsOf
-					? new Date(voiUsdAsOf).toLocaleString()
-					: 'unknown time'}). USD values may be out of date.
-			</p>
-		{:else if voiUsdStatus === 'invalid' || voiUsdStatus === 'unavailable'}
-			<p class="text-sm text-gray-600 dark:text-gray-400">
-				VOI/USD reference unavailable. USD values for VOI-quoted pools are missing.
-			</p>
-		{/if}
-		{#if tokenAnalytics?.partial}
-			<p class="text-sm text-gray-600 dark:text-gray-400">Some analytics are unavailable.</p>
-		{/if}
-
-		<div class="flex items-center justify-between mb-4">
-			<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Token Markets</h2>
-			<span class="text-sm text-gray-600 dark:text-gray-400">{sortedMarketData.length} active</span>
-		</div>
-
-		<!-- Search Bar -->
-		<div class="relative">
-			<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-				<i class="fas fa-search text-gray-400"></i>
-			</div>
-			<!-- svelte-ignore event_directive_deprecated -->
-			<input
-				id="market-search"
-				type="text"
-				bind:value={() => searchQuery, onSearchQueryChange}
-				on:input={() => filterMarkets(searchQuery)}
-				placeholder="Search markets, exchanges, networks..."
-				class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400"
-			/>
-			{#if searchQuery}
-				<!-- Preserve the existing unlabeled clear button. -->
-				<!-- svelte-ignore a11y_consider_explicit_label -->
-				<!-- svelte-ignore event_directive_deprecated -->
-				<button
-					type="button"
-					on:click={() => {
-						onSearchQueryChange('');
-						filterMarkets('');
-					}}
-					class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-				>
-					<i class="fas fa-times"></i>
-				</button>
-			{/if}
-		</div>
-	</div>
-	<div class="flex-1 overflow-auto min-h-0">
-		<table class="w-full">
-			<thead
-				class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 sticky top-0 z-10"
+{#snippet pairCell(market: Market)}
+	<div class="flex flex-wrap items-center gap-2">
+		{#if market.pool_url}
+			<a
+				href={market.pool_url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="text-accent hover:underline"
 			>
-				<tr>
-					<th
-						scope="col"
-						class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-						>Pair</th
-					>
-					<th
-						scope="col"
-						class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-						>Exchange</th
-					>
-					<th
-						scope="col"
-						aria-sort={ariaSortFor(sortColumn, 'price', sortDirection)}
-						class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-					>
-						<!-- svelte-ignore event_directive_deprecated -->
-						<button
-							type="button"
-							class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-							on:click={() => sortData('price')}
-						>
-							Price
-							{#if sortColumn === 'price'}
-								<i
-									aria-hidden="true"
-									class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
-								></i>
-							{/if}
-						</button>
-					</th>
-					<th
-						scope="col"
-						aria-sort={ariaSortFor(sortColumn, 'tvl', sortDirection)}
-						class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-					>
-						<!-- svelte-ignore event_directive_deprecated -->
-						<button
-							type="button"
-							class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-							on:click={() => sortData('tvl')}
-						>
-							TVL (USD)
-							{#if sortColumn === 'tvl'}
-								<i
-									aria-hidden="true"
-									class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
-								></i>
-							{/if}
-						</button>
-					</th>
-					<th
-						scope="col"
-						aria-sort={ariaSortFor(sortColumn, 'volume_24h', sortDirection)}
-						class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-					>
-						<!-- svelte-ignore event_directive_deprecated -->
-						<button
-							type="button"
-							class="block w-full px-6 py-3 text-left uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-							on:click={() => sortData('volume_24h')}
-						>
-							24h Volume
-							{#if sortColumn === 'volume_24h'}
-								<i
-									aria-hidden="true"
-									class="fas fa-sort-{sortDirection === 'asc' ? 'up' : 'down'} ml-1"
-								></i>
-							{/if}
-						</button>
-					</th>
-					<th
-						scope="col"
-						class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-						>24h Change</th
-					>
-				</tr>
-			</thead>
-			<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-				{#each sortedMarketData as market}
-					<!-- svelte-ignore event_directive_deprecated -->
-					<tr
-						class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-						on:click={() => onRowClick(market)}
-					>
-						<td class="px-6 py-3 whitespace-nowrap text-sm">
-							<div class="flex items-center gap-2">
-								{#if market.pool_url}
-									<!-- svelte-ignore event_directive_deprecated -->
-									<a
-										href={market.pool_url}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
-										on:click|stopPropagation
-									>
-										{normalizePair(market.pair)}
-										<i class="fas fa-external-link-alt text-xs opacity-50" aria-hidden="true"></i>
-									</a>
-									<!-- svelte-ignore event_directive_deprecated -->
-									<button
-										type="button"
-										aria-label={`Show ${normalizePair(market.pair)} chart`}
-										aria-pressed={selectedTradingPairId === market.trading_pair_id}
-										class="p-1 text-purple-600 dark:text-purple-400 rounded focus-visible:ring-2 focus-visible:ring-focus"
-										on:click|stopPropagation={() => onRowClick(market)}
-									>
-										<i class="fas fa-chart-line" aria-hidden="true"></i>
-									</button>
-								{:else}
-									<!-- svelte-ignore event_directive_deprecated -->
-									<button
-										type="button"
-										aria-label={`Show ${normalizePair(market.pair)} chart`}
-										aria-pressed={selectedTradingPairId === market.trading_pair_id}
-										class="text-gray-900 dark:text-white rounded focus-visible:ring-2 focus-visible:ring-focus"
-										on:click|stopPropagation={() => onRowClick(market)}
-									>
-										{normalizePair(market.pair)}
-									</button>
-								{/if}
-							</div>
-						</td>
-						<td class="px-6 py-3 whitespace-nowrap text-sm">
-							<span
-								class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {market.exchange ===
-								'humble'
-									? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-									: market.exchange === 'Humble'
-										? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-										: market.exchange === 'Tinyman' || market.exchange.startsWith('Tinyman')
-											? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-											: market.exchange === 'PactFi'
-												? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-												: market.exchange === 'Uniswap'
-													? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300'
-													: market.exchange === 'MEXC'
-														? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
-														: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300'}"
-							>
-								{market.exchange === 'humble' ? 'Humble' : market.exchange}
-							</span>
-						</td>
-						<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-							>{formatPrice(market.price)}</td
-						>
-						<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-							>{formatCurrency(market.tvl)}</td
-						>
-						<td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white"
-							>{market.volume_24h === null
-								? '—'
-								: market.volume_24h
-									? formatCurrency(market.volume_24h)
-									: '-'}</td
-						>
-						<td class="px-6 py-3 whitespace-nowrap text-sm">
-							<span
-								class={(market.price_change_percentage_24h ?? 0) > 0
-									? 'text-green-600 dark:text-green-400'
-									: (market.price_change_percentage_24h ?? 0) < 0
-										? 'text-red-600 dark:text-red-400'
-										: 'text-gray-600 dark:text-gray-400'}
-							>
-								{formatPercentage(market.price_change_percentage_24h)}
-							</span>
-						</td>
-					</tr>
-				{:else}
-					{#if marketDataError}
-						<tr>
-							<td colspan="6" class="text-center py-12">
-								<p class="text-gray-600 dark:text-gray-400 mb-3">
-									Couldn't load markets for this token.
-								</p>
-								<Button size="sm" color="alternative" on:click={refreshData} disabled={isRefreshing}
-									>Retry</Button
-								>
-							</td>
-						</tr>
-					{/if}
-				{/each}
-			</tbody>
-		</table>
+				{normalizePair(market.pair)}<span class="sr-only"> (opens in a new tab)</span>
+			</a>
+		{/if}
+		<Button
+			variant="ghost"
+			size="sm"
+			aria-label={`Show ${normalizePair(market.pair)} chart`}
+			aria-pressed={selectedTradingPairId === market.trading_pair_id}
+			class="min-w-10 [@media(pointer:coarse)]:min-w-11"
+			onclick={() => onRowClick(market)}
+		>
+			{#if market.pool_url}<i class="fas fa-chart-line" aria-hidden="true"
+				></i>{:else}{normalizePair(market.pair)}{/if}
+		</Button>
 	</div>
-</div>
+{/snippet}
+{#snippet exchangeCell(market: Market)}
+	<Chip tone="neutral" label={market.exchange === 'humble' ? 'Humble' : market.exchange} />
+{/snippet}
+{#snippet priceCell(market: Market)}{formatPrice(market.price)}{/snippet}
+{#snippet tvlCell(market: Market)}{formatCurrency(market.tvl)}{/snippet}
+{#snippet volumeCell(market: Market)}{market.volume_24h === null
+		? '—'
+		: market.volume_24h
+			? formatCurrency(market.volume_24h)
+			: '-'}{/snippet}
+{#snippet changeCell(market: Market)}
+	<span
+		class={(market.price_change_percentage_24h ?? 0) > 0
+			? 'text-ok'
+			: (market.price_change_percentage_24h ?? 0) < 0
+				? 'text-danger'
+				: 'text-ink-muted'}>{formatPercentage(market.price_change_percentage_24h)}</span
+	>
+{/snippet}
 
-<style>
-	/* Improved focus indicators for accessibility */
-	button:focus-visible,
-	input:focus-visible {
-		outline: 2px solid #8b5cf6;
-		outline-offset: 2px;
-	}
-</style>
+<div class="col-span-full min-w-0">
+	<Card title="Token Markets">
+		{#snippet actions()}<Chip
+				tone="neutral"
+				label="Shown markets"
+				count={sortedMarketData.length}
+			/>{/snippet}
+		<div class="mb-4 space-y-3">
+			{#if voiUsdStatus === 'stale'}
+				<InlineAlert
+					tone="warn"
+					message={`VOI/USD reference is stale (as of ${voiUsdAsOf ? new Date(voiUsdAsOf).toLocaleString() : 'unknown time'}). USD values may be out of date.`}
+				/>
+			{:else if voiUsdStatus === 'invalid' || voiUsdStatus === 'unavailable'}
+				<InlineAlert
+					tone="warn"
+					message="VOI/USD reference unavailable. USD values for VOI-quoted pools are missing."
+				/>
+			{/if}
+			{#if tokenAnalytics?.partial}<InlineAlert
+					tone="warn"
+					message="Some analytics are unavailable."
+				/>{/if}
+			<div class="flex flex-wrap items-end gap-2">
+				<div class="min-w-0 flex-1">
+					<label for="market-search" class="mb-1 block text-label text-ink">Filter markets</label>
+					<input
+						id="market-search"
+						type="text"
+						value={searchQuery}
+						oninput={(event) => {
+							onSearchQueryChange(event.currentTarget.value);
+							filterMarkets(event.currentTarget.value);
+						}}
+						placeholder="Search markets, exchanges, networks..."
+						class="block min-h-10 w-full rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink placeholder:text-ink-muted"
+					/>
+				</div>
+				{#if searchQuery}
+					<Button
+						variant="ghost"
+						size="sm"
+						aria-label="Clear market filter"
+						onclick={() => {
+							onSearchQueryChange('');
+							filterMarkets('');
+						}}>Clear</Button
+					>
+				{/if}
+			</div>
+			<div>
+				<label for="market-sort" class="mb-1 block text-label text-ink">Sort markets</label>
+				<select
+					id="market-sort"
+					class="min-h-10 max-w-full rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink"
+					value={`${sort.key}:${sort.dir}`}
+					onchange={(event) => {
+						const [key, dir] = event.currentTarget.value.split(':');
+						sort = { key, dir: dir as SortState['dir'] };
+					}}
+				>
+					{#each columns.filter((column) => column.sortable) as column (column.key)}
+						<option value={`${column.key}:desc`}>{column.header}: descending</option>
+						<option value={`${column.key}:asc`}>{column.header}: ascending</option>
+					{/each}
+				</select>
+			</div>
+		</div>
+		<div aria-busy={fetchingMarketData || undefined}>
+			{#if fetchingMarketData || isRefreshing}<p
+					role="status"
+					class="mb-2 text-label text-ink-muted"
+				>
+					Updating markets...
+				</p>{/if}
+			<DataTable
+				{columns}
+				rows={sortedMarketData}
+				{rowKey}
+				caption="Token markets"
+				rowName={(market) =>
+					`${normalizePair(market.pair)} on ${market.exchange} (${market.network})`}
+				bind:sort
+				expandable
+				state={tableState}
+				onretry={refreshData}
+				emptyText={searchQuery.trim() ? 'No markets match this filter.' : 'No markets available.'}
+			/>
+		</div>
+	</Card>
+</div>
