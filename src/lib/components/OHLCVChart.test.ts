@@ -97,3 +97,47 @@ it('updates layout and all active series on theme changes without refetching or 
 	expect(update!.match(/setVisibleLogicalRange\(/g)).toHaveLength(1);
 	expect(source).toContain('onThemeChange(updateChartTheme)');
 });
+
+it('connects the named chart, instructions, summary and complete native data disclosure', () => {
+	const body = chart({
+		data: [
+			{ time: 20, open: 2, high: 9, low: 1, close: 3, volume: 1 },
+			...data,
+			{ time: 20, open: 3, high: 6, low: 2, close: 4, volume: 2 }
+		],
+		volumes: [{ time: 20, value: 7 }]
+	});
+	const group = body.match(/<div\b[^>]*role="group"[^>]*tabindex="0"[^>]*>/)?.[0];
+	expect(group).toBeDefined();
+	for (const attribute of ['aria-labelledby', 'aria-describedby']) {
+		const ids = group!.match(new RegExp(attribute + '="([^"]+)"'))?.[1].split(' ');
+		expect(ids?.length).toBeGreaterThan(0);
+		for (const id of ids!) expect(body).toContain('id="' + id + '"');
+	}
+	expect(body).toMatch(/<h2\b[^>]*id="[^"]+"/);
+	for (const key of ['Left', 'Right', 'Home', 'End', 'Escape']) expect(body).toContain(key);
+	expect(body).toMatch(/<details\b[\s\S]*?<summary\b[^>]*>View data<\/summary>/);
+	expect(body).toMatch(/<caption\b[^>]*>[\s\S]+?<\/caption>/);
+	expect(body).toContain('scope="col"');
+	expect(body).toMatch(/role="region"[^>]*aria-label="[^"]+"[^>]*tabindex="0"/);
+	expect(body).toMatch(/aria-live="polite"[^>]*>(?:<!--[\s\S]*?-->)*<\/p>/);
+	expect(body).not.toMatch(/display\s*:\s*none/);
+	const rows = [...body.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)][0]?.[1];
+	expect(rows?.match(/<tr>/g)).toHaveLength(2);
+	for (const header of ['Open (USD)', 'High (USD)', 'Low (USD)', 'Close (USD)', 'Volume (USD)'])
+		expect(body).toContain('>' + header + '</th>');
+	expect(rows).toContain('4.000000');
+	expect(body).toContain('2 data points');
+	expect(body).not.toContain('9.000000');
+});
+it('wires pointer and keyboard through the shared inspection state and clears on input changes', () => {
+	const source = readFileSync(new URL('./OHLCVChart.svelte', import.meta.url), 'utf8');
+	expect(source).toContain('onkeydown={handleInspectionKey}');
+	expect(source).toContain('inspect(inspection, { key: event.key }, description.observations)');
+	expect(source).toContain('inspect(inspection, { pointer: index }, description.observations)');
+	expect(source).toContain('inspect(inspection, { reset: true }, description.observations)');
+	for (const dependency of ['data', 'volumes', 'tokenPair', 'settings.resolution', 'quoteCurrency'])
+		expect(source).toContain('void ' + dependency + ';');
+	expect(source).toContain('subscribeCrosshairMove(handleCrosshairMove)');
+	expect(source).not.toMatch(/\.focus\(/);
+});

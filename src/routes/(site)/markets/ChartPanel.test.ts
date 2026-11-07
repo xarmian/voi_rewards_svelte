@@ -70,3 +70,18 @@ it('shows the labelled fallback when nothing is loading and no OHLCV chart is sh
 	expect(body).toContain('Fallback price chart');
 	expect(body).toContain('Price fixture');
 });
+
+it('names the existing chart Card region in every state', () => {
+	for (const props of [
+		{},
+		{ showTokenChart: true },
+		{ showTokenChart: true, tokenChartLoading: true },
+		{ tokenChartError: 'Failed' }
+	]) {
+		const body = panel(props);
+		const section = body.match(/<section\b[^>]*aria-labelledby="([^"]+)"/);
+		expect(section).toBeTruthy();
+		expect(body).toContain('id="' + section![1] + '"');
+		expect(body).toMatch(/<h2\b[^>]*>Market chart<\/h2>/);
+	}
+});
