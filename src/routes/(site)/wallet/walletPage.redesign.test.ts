@@ -157,3 +157,37 @@ it('gives the hero identity a minimum width so the picker wraps instead of crush
 	expect(source).toMatch(/class="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-4"/);
 	expect(source).toMatch(/class="min-w-0 flex-1 basis-40">\s*<h1/);
 });
+
+it('wires wallet identity once to walletId and renders its avatar and name with the address fallback', () => {
+	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
+	const ast = parse(source, { modern: true });
+	const calls: import('estree').CallExpression[] = [];
+	const components: import('svelte/compiler').AST.Component[] = [];
+	function visit(value: unknown) {
+		if (!value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			value.forEach(visit);
+			return;
+		}
+		const node = value as { type?: string };
+		if (node.type === 'CallExpression') calls.push(value as import('estree').CallExpression);
+		if (node.type === 'Component')
+			components.push(value as import('svelte/compiler').AST.Component);
+		Object.values(value).forEach(visit);
+	}
+	visit(ast);
+	const identityCalls = calls.filter(
+		(call) => call.callee.type === 'Identifier' && call.callee.name === 'createWalletIdentity'
+	);
+	expect(identityCalls).toHaveLength(1);
+	expect(identityCalls[0].arguments).toMatchObject([
+		{ type: 'ArrowFunctionExpression', params: [], body: { type: 'Identifier', name: 'walletId' } }
+	]);
+	const avatars = components.filter((node) => node.name === 'WalletAvatar');
+	expect(avatars).toHaveLength(1);
+	expect(source.slice(avatars[0].start, avatars[0].end)).toContain('src={identity.avatar}');
+	expect(source.slice(avatars[0].start, avatars[0].end)).toContain('gradient={avatar}');
+	expect(source.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1]).toMatch(
+		/walletId\s*\?\s*\(?identity.name\s*\?\?\s*shortAddr\(walletId\)\)?\s*:\s*'Check a wallet'/
+	);
+});

@@ -20,6 +20,7 @@
 		StatusPill,
 		Tabs,
 		WalletOverview,
+		WalletAvatar,
 		createHashTabs,
 		shortAddr,
 		comma
@@ -27,6 +28,7 @@
 	import { WALLET_TABS } from '$lib/ds/Tabs/hash';
 	import type { DataState } from '$lib/ds';
 	import { createWalletRouteSync } from '$lib/wallet/routeSync.svelte';
+	import { createWalletIdentity } from '$lib/wallet/identity.svelte';
 	import { summarizeWallet } from '$lib/wallet/summary';
 	import { loadWallet, type LegacyAccount, type WalletSnapshot } from '$lib/wallet/load';
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
@@ -40,6 +42,7 @@
 		data
 	}: { data: { walletId: string | null; parentWalletId: string | null; hash?: string } } = $props();
 	const walletId = $derived(data.walletId ?? '');
+	const identity = createWalletIdentity(() => walletId);
 	const parentWalletId = $derived(data.parentWalletId);
 	let panel: HTMLDivElement | undefined = $state();
 	const tabs = createHashTabs({ ids: WALLET_TABS, panel: () => panel });
@@ -160,14 +163,10 @@
 		<div class="container-page min-w-0 space-y-5">
 			<div class="flex min-w-0 flex-wrap items-start justify-between gap-5">
 				<div class="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-4">
-					<div
-						aria-hidden="true"
-						class="h-16 w-16 shrink-0 rounded-ds-md"
-						style:background={avatar}
-					></div>
+					<WalletAvatar gradient={avatar} src={identity.avatar} />
 					<div class="min-w-0 flex-1 basis-40">
 						<h1 class="break-words text-title">
-							{walletId ? shortAddr(walletId) : 'Check a wallet'}
+							{walletId ? (identity.name ?? shortAddr(walletId)) : 'Check a wallet'}
 						</h1>
 						{#if walletId}<div
 								class="mt-2 flex min-w-0 items-center gap-2 text-label text-on-hero-muted"

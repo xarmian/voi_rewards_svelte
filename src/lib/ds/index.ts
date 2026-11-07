@@ -44,3 +44,4 @@ export type { NavKey } from './Header';
 export { Footer } from './Footer';
 export { Headline } from './Headline';
 export { WalletOverview } from './WalletOverview';
+export { WalletAvatar } from './WalletAvatar';
