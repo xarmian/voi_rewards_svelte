@@ -2,7 +2,7 @@
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
 	import { selectedWallet } from '$lib/chain/wallet.svelte';
 	import type { Writable } from 'svelte/store';
-	const fixtureSelection = selectedWallet as Writable<{ address: string; app: string }>;
+	const fixtureSelection = selectedWallet as unknown as Writable<{ address: string; app: string }>;
 	let signing = $state(true);
 	function toggle() {
 		signing = !signing;

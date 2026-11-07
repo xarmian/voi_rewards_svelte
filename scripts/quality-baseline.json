@@ -72,19 +72,11 @@
 		},
 		"src/lib/component/PortfolioComponent.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 12,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 4,
+				"errors": 11,
 				"warnings": 0
 			},
 			"no-case-declarations": {
 				"errors": 6,
-				"warnings": 0
-			},
-			"svelte/no-at-html-tags": {
-				"errors": 2,
 				"warnings": 0
 			}
 		},
