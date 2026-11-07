@@ -200,7 +200,9 @@ it('uses live counts and suppresses early projections', () => {
 	).toBeNull();
 });
 it('uses only the existing payout endpoint, senders and receiver and fails HTTP errors', async () => {
-	const fetcher = vi.fn(async (_url: string) => Response.json({ data: [tx()] }));
+	const fetcher = vi.fn<(url: string) => Promise<Response>>(async () =>
+		Response.json({ data: [tx()] })
+	);
 	vi.stubGlobal('fetch', fetcher);
 	expect(await loadPayouts(address, true)).toMatchObject({
 		complete: true,
