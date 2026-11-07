@@ -175,7 +175,7 @@
 		data-holdings-token-id={`${typeof row.token.id}:${row.token.id}`}>{row.token.name}</span
 	>{/snippet}
 {#snippet quantity(row: HoldingsRow)}<span title={holdingsExactQuantity(row.token)}
-		>{holdingsAmount(row.quantity)} {row.token.symbol}</span
+		>{holdingsAmount(row.quantity)}{row.quantity === null ? '' : ` ${row.token.symbol}`}</span
 	>{/snippet}
 {#snippet value(row: HoldingsRow)}<span
 		title={row.value === null ? 'Unavailable' : `${row.value} VOI equivalent`}
@@ -194,7 +194,9 @@
 						? 'Approximate quantity'
 						: 'Exact quantity'}
 				</dt>
-				<dd>{holdingsExactQuantity(row.token)} {row.token.symbol}</dd>
+				<dd>
+					{holdingsExactQuantity(row.token)}{row.quantity === null ? '' : ` ${row.token.symbol}`}
+				</dd>
 			</div>
 			<div>
 				<dt class="text-ink-muted">Token ID</dt>
@@ -288,6 +290,7 @@
 					<dd class="text-h2" title={part.value === null ? undefined : `${part.value} VOI`}>
 						{holdingsAmount(part.value)}{part.value === null ? '' : ' VOI'}
 					</dd>
+					{#if part.note}<p class="text-label text-ink-muted">{part.note}</p>{/if}
 				</div>{/each}
 		</dl>
 		{#if display.parts[0].value === null}<p class="mt-3 text-sm text-ink-muted">

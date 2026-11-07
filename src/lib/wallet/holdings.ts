@@ -210,18 +210,19 @@ export function deriveHoldingsDisplay({
 			? 0
 			: pageLiquid
 		: null;
-	const valuesReady =
-		!partial &&
-		(tokenState === 'ready' || tokenState === 'empty') &&
-		rows.all.every((row) => row.value !== null && row.quantity !== null);
-	const lp = rows.lp.every((r) => r.value !== null)
-		? rows.lp.reduce((sum, r) => sum + r.value!, 0)
-		: null;
+	const sourceReady = !partial && (tokenState === 'ready' || tokenState === 'empty');
+	const valued = (row: { value: number | null; quantity: number | null }) =>
+		row.value !== null && row.quantity !== null;
+	const valuesReady = sourceReady && rows.all.every(valued);
+	// Each figure depends only on its own rows: an unpriced token must not hide the LP figure.
+	const lp =
+		sourceReady && rows.lp.every(valued) ? rows.lp.reduce((sum, r) => sum + r.value!, 0) : null;
 	const regular = rows.all.filter((r) => !r.token.poolInfo);
-	const other =
-		unlocked !== null && regular.every((r) => r.value !== null)
-			? unlocked + regular.reduce((sum, r) => sum + r.value!, 0)
-			: null;
+	const unpriced = regular.filter((r) => !valued(r)).length;
+	const known = regular.filter(valued).reduce((sum, r) => sum + r.value!, 0);
+	const other = sourceReady && unlocked !== null && unpriced === 0 ? unlocked + known : null;
+	// Some regular tokens have no price: the known part is shown, labelled, and never as a total.
+	const otherSubtotal = sourceReady && unlocked !== null && unpriced > 0 ? unlocked + known : null;
 	const total =
 		nativeReady &&
 		valuesReady &&
@@ -231,10 +232,17 @@ export function deriveHoldingsDisplay({
 		other !== null
 			? liquid + locked + lp + other
 			: null;
-	const parts = [
+	const parts: { label: string; value: number | null; color: string; note?: string }[] = [
 		{ label: 'Locked', value: locked, color: 'bg-accent-fill' },
-		{ label: 'LP', value: valuesReady ? lp : null, color: 'bg-hi' },
-		{ label: 'Tokens and other', value: valuesReady ? other : null, color: 'bg-series-3' },
+		{ label: 'LP', value: lp, color: 'bg-hi' },
+		otherSubtotal !== null
+			? {
+					label: 'Tokens and other',
+					value: otherSubtotal,
+					color: 'bg-series-3',
+					note: `Known subtotal; ${unpriced} ${unpriced === 1 ? 'token has' : 'tokens have'} no price`
+				}
+			: { label: 'Tokens and other', value: other, color: 'bg-series-3' },
 		{ label: 'Liquid', value: liquid, color: 'bg-ink-muted' }
 	];
 	return {
