@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { FungibleTokenType, NFTToken } from '$lib/types/assets';
 	import {
 		deriveHoldingsDisplay,
@@ -20,11 +20,12 @@
 	import Button from '../Button/Button.svelte';
 	import CopyButton from '../CopyButton/CopyButton.svelte';
 	import WalletNfts from '../WalletNfts/WalletNfts.svelte';
-	import { comma, usd } from '../format';
+	import { usd } from '../format';
 
 	let {
 		scopeLabel = 'Account and listed contracts',
 		pageAddress,
+		parentWalletAddress = null,
 		account,
 		tokens,
 		tokenState = 'loading',
@@ -47,6 +48,7 @@
 	}: {
 		scopeLabel?: string;
 		pageAddress: string;
+		parentWalletAddress?: string | null;
 		account: HoldingsAccount;
 		tokens: FungibleTokenType[];
 		tokenState?: DataState;
@@ -71,16 +73,20 @@
 	let tokensExpanded = $state(false);
 	let tokenSort = $state<SortState>({ key: 'value', dir: 'desc' });
 	let lpSort = $state<SortState>({ key: 'value', dir: 'desc' });
+	// Membership grows without making Set mutations reactive. A new page owns a fresh set.
+	const membership = $derived({ address: pageAddress, keys: new Set<string>() });
 	const display = $derived(
 		deriveHoldingsDisplay({
 			pageAddress,
+			parentWalletAddress,
 			account,
 			tokens,
 			tokenState,
 			partial,
 			split,
 			price,
-			showDust
+			showDust,
+			remembered: membership.keys
 		})
 	);
 	const columns = $derived<Column<HoldingsRow>[]>([
@@ -146,10 +152,19 @@
 			'desc'
 		);
 		return sortRows(
-			tokensExpanded ? defaultOrder : defaultOrder.slice(0, 10),
+			tokensExpanded
+				? defaultOrder
+				: defaultOrder.filter((row, index) => index < 10 || membership.keys.has(row.key)),
 			column,
 			tokenSort.dir
 		);
+	});
+	$effect(() => {
+		const rendered = [...tokenRows, ...display.rows.lp];
+		const keys = membership.keys;
+		untrack(() => {
+			for (const row of rendered) keys.add(row.key);
+		});
 	});
 	const tableState = $derived(tokenState);
 </script>
@@ -172,7 +187,11 @@
 	<div class="min-w-0 space-y-3 break-words" data-token-id={row.token.id}>
 		<dl class="grid min-w-0 grid-cols-1 gap-2 text-sm md:grid-cols-2">
 			<div>
-				<dt class="text-ink-muted">Exact quantity</dt>
+				<dt class="text-ink-muted">
+					{row.quantity !== null && !Number.isSafeInteger(row.token.balance)
+						? 'Approximate quantity'
+						: 'Exact quantity'}
+				</dt>
 				<dd>{holdingsExactQuantity(row.token)} {row.token.symbol}</dd>
 			</div>
 			<div>
@@ -182,9 +201,7 @@
 			<div>
 				<dt class="text-ink-muted">VOI equivalent</dt>
 				<dd>
-					{row.value === null ? 'Unavailable' : comma(row.value, 2)}{row.value === null
-						? ''
-						: ' VOI'}
+					{holdingsAmount(row.value)}{row.value === null ? '' : ' VOI'}
 				</dd>
 			</div>
 			<div>
@@ -230,7 +247,7 @@
 		<StatTile
 			label="Page VOI balance"
 			value={holdingsAmount(display.pageLiquid)}
-			unit="VOI"
+			unit={display.pageLiquid === null ? undefined : 'VOI'}
 			state={account.status === 'loading' ? 'loading' : 'ready'}
 		/>
 		{#if account.status === 'loaded'}<p class="mt-3 text-sm text-ink-muted">
@@ -298,7 +315,7 @@
 				id="ds-holdings-tokens"
 				density="compact"
 				bind:sort={tokenSort}
-				limit={tokensExpanded ? undefined : 10}
+				limit={tokensExpanded ? undefined : Math.max(10, tokenRows.length)}
 				moreLabel={(n) => `Show ${n} more tokens`}
 				{detail}
 				state={tableState}

@@ -16,7 +16,7 @@
 
 <div class="mx-auto max-w-7xl p-4">
 	<button onclick={toggle}>Toggle signing</button>
-	<button onclick={() => (pageAddress = 'B')}>Switch page</button>
+	<button onclick={() => (pageAddress = pageAddress === 'Y' ? 'B' : 'Y')}>Switch page</button>
 	{#if presenterOnly}
 		<WalletHoldings {pageAddress} {tokens} tokenState="ready" account={{ status: 'loading' }} />
 	{:else}

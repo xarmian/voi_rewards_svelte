@@ -73,13 +73,15 @@ it('expansion only adds rows and permanently removes the page limit', async () =
 	const states = ast.statements.filter(
 		(node) => ts.isVariableStatement(node) && /\$state\(false\)/.test(node.getText(ast))
 	);
-	const context = createContext({ $state: (value: boolean) => value });
+	const context = createContext({ $state: (value: boolean) => value, tokenRows: Array(10) });
 	runInContext(
 		ts.transpileModule(states.map((node) => node.getText(ast)).join('\n'), {}).outputText,
 		context
 	);
 	const limit = source.match(/limit=\{([^}]+)\}/)?.[1];
-	expect(limit, 'The page owns the token limit').toBe('tokensExpanded ? undefined : 10');
+	expect(limit, 'The page owns the token limit').toBe(
+		'tokensExpanded ? undefined : Math.max(10, tokenRows.length)'
+	);
 	expect(runInContext(limit!, context)).toBe(10);
 	const handlers = [...source.matchAll(/onclick=\{(\(\) => \([^}]+\))\}/g)].map(
 		(match) => match[1]
@@ -342,7 +344,7 @@ it('claim cards keep their wallet and token identity throughout the list', () =>
 	];
 	expect(loops).toHaveLength(1);
 	for (const loop of loops)
-		expect(loop[1].trim()).toBe("(walletAddress + ':' + claimableItem.token.id)");
+		expect(loop[1].trim()).toBe('(holdingsClaimKey(claimableTokensSummary, index, walletAddress))');
 });
 
 it('composition exposes a named image and readable amounts', () => {
@@ -418,3 +420,74 @@ it.each(['refreshTokens', 'initializePortfolio'])(
 		expect(context.tokensAsOf).toBeUndefined();
 	}
 );
+
+it('small positive detail values preserve the table amount', () => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [{ ...token, value: 0.004, approvals: population[0].approvals }],
+			tokenState: 'ready'
+		}
+	}).body;
+	const detail = html
+		.match(/data-token-id="1"[^]*?VOI equivalent<\/dt>[^]*?<dd>([^]*?)<\/dd>/)?.[1]
+		?.replace(/<[^>]*>/g, '')
+		.trim();
+	expect(detail).toBe('&lt;0.01 VOI');
+});
+it('unsafe raw balances display an approximate quantity', () => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [{ ...token, balance: 10 ** 18, decimals: 6 }],
+			tokenState: 'ready'
+		}
+	}).body;
+	expect(html).toMatch(/Approximate quantity<\/dt>\s*<dd>[^]*?≈ 1000000000000 TOK/);
+	expect(html).not.toContain('Exact quantity');
+});
+it('an unavailable page balance has no currency unit', () => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account: { status: 'unavailable', error: 'offline' },
+			tokens: [],
+			tokenState: 'ready'
+		}
+	}).body;
+	const tile = html.match(/Page VOI balance[^]*?<\/p>/)?.[0];
+	expect(tile).toContain('Unavailable');
+	expect(tile?.slice(tile.indexOf('Unavailable'))).not.toContain('VOI');
+});
+it('NFT retry keeps ready ownership until failure and enrichment errors only mark metadata partial', async () => {
+	const handler = controller().match(/\tasync function readWalletNfts\([^]*?\n\t\}/)![0];
+	const owned = [{ contractId: '1', tokenId: '2' }];
+	const read = Promise.withResolvers<unknown[]>();
+	const context = createContext({
+		walletAddress: 'Y',
+		nftGeneration: 0,
+		nfts: owned,
+		nftState: 'ready',
+		nftPartial: false,
+		nftMetadataLoading: false,
+		loadWalletNfts: vi.fn(() => read.promise),
+		enrichWalletNfts: vi.fn().mockRejectedValue(new Error('metadata offline'))
+	});
+	runInContext(
+		ts.transpileModule(handler, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText,
+		context
+	);
+	const pending = runInContext('readWalletNfts(true)', context);
+	expect(context.nftState).toBe('ready');
+	read.resolve(owned);
+	await pending;
+	expect(context.nfts).toBe(owned);
+	expect(context.nftState).toBe('ready');
+	expect(context.nftPartial).toBe(true);
+	expect(context.nftMetadataLoading).toBe(false);
+	context.loadWalletNfts = vi.fn().mockRejectedValue(new Error('ownership offline'));
+	await runInContext('readWalletNfts(true)', context);
+	expect(context.nftState).toBe('stale');
+});

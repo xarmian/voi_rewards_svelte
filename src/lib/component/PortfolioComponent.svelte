@@ -7,6 +7,7 @@
 	import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';
 	import {
 		createHoldingsTokenLoader,
+		holdingsClaimKey,
 		loadWalletNfts,
 		enrichWalletNfts,
 		type HoldingsSplit
@@ -63,14 +64,17 @@
 		const address = walletAddress;
 		if (!address || (!force && (nfts !== undefined || nftState === 'loading'))) return;
 		const generation = ++nftGeneration;
-		nftState = nfts ? 'stale' : 'loading';
+		nftState = nfts ? 'ready' : 'loading';
 		try {
 			const owned = await loadWalletNfts(address, force);
 			if (address !== walletAddress || generation !== nftGeneration) return;
 			nfts = owned;
 			nftState = 'ready';
 			nftMetadataLoading = true;
-			const enriched = await enrichWalletNfts(owned);
+			const enriched = await enrichWalletNfts(owned).catch(() => ({
+				tokens: owned,
+				partial: true
+			}));
 			if (address !== walletAddress || generation !== nftGeneration) return;
 			nfts = enriched.tokens;
 			nftPartial = enriched.partial;
@@ -1000,7 +1004,7 @@
 			</div>
 			<div hidden={!showClaimableSection}>
 				<div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each claimableTokensSummary as claimableItem, index (walletAddress + ':' + claimableItem.token.id)}
+					{#each claimableTokensSummary as claimableItem, index (holdingsClaimKey(claimableTokensSummary, index, walletAddress))}
 						<div class="min-w-0" hidden={index >= 6 && !isExpandingClaimableSection}>
 							<p class="mb-2 break-words text-sm">
 								{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
@@ -1044,6 +1048,7 @@
 {/snippet}
 
 <WalletHoldings
+	{parentWalletAddress}
 	scopeLabel={parentWalletAddress ? 'Contract account only' : 'Account and listed contracts'}
 	pageAddress={walletAddress ?? ''}
 	account={accountPart}

@@ -49,10 +49,10 @@ try {
 							const asset = (id, value, balance=1000000) => ({...tokens[0],id,name:'Asset '+id,value,balance,approvals:[]});
 							globalThis.__tokenPopulation = scenario==='dust'
 								? [...Array.from({length:5},(_,i)=>asset('priced'+i,10-i)), ...Array.from({length:3},(_,i)=>asset('unknown'+i,0)), ...Array.from({length:5},(_,i)=>asset('zero'+i,0,0))]
-								: scenario==='keys' ? tokens.slice(0,3) : scenario==='amount' ? tokens.slice(0,9).map(t=>({...t,approvals:t.approvals.map(a=>({...a,amount:'4000'}))})) : tokens;
+								: scenario==='duplicates' ? [tokens[0], {...tokens[0]}] : scenario==='membership-dust' ? [asset('unpriced',0),...tokens.slice(0,3)] : scenario==='keys' ? tokens.slice(0,3) : scenario==='amount' ? tokens.slice(0,9).map(t=>({...t,approvals:t.approvals.map(a=>({...a,amount:'4000'}))})) : tokens;
 							export const fetchFungibleTokens = async address => {
 								globalThis.__tokenReads=(globalThis.__tokenReads||0)+1;
-								if(address==='B') { if(scenario==='address-failure') throw new Error('Token read refused'); return {tokens:[],partial:false}; }
+								if(address==='B' && scenario!=='membership-address') { if(scenario==='address-failure') throw new Error('Token read refused'); return {tokens:[],partial:false}; }
 								if(globalThis.__holdTokens) await new Promise((resolve,reject)=>{globalThis.__releaseTokens=resolve;globalThis.__rejectTokens=reject;});
 								return {tokens:globalThis.__tokenPopulation,partial:false};
 							};`;
@@ -210,6 +210,11 @@ try {
 	const cases = process.env.HOLDINGS_CASE
 		? process.env.HOLDINGS_CASE.split(',')
 		: [
+				'membership-rank',
+				'membership-dust',
+				'membership-removal',
+				'membership-address',
+				'duplicates',
 				'refresh',
 				'sort',
 				'dust',
@@ -224,7 +229,77 @@ try {
 			];
 	for (const scenario of cases.filter((name) => name !== 'controls')) {
 		await open(scenario);
-		if (scenario === 'refresh' || scenario === 'sort') {
+		if (scenario.startsWith('membership-')) {
+			const id = scenario === 'membership-dust' ? 'unpriced' : '10';
+			await evaluate(
+				`window.keptNode=document.querySelector('[data-token-id="${id}"]'); window.keptController=keptNode.querySelector('.wallet-token-legacy');document.querySelector('button[aria-controls="'+keptNode.closest('tr').id+'"]').click();`
+			);
+			if (scenario === 'membership-rank') {
+				await evaluate(`buttons(keptController).find(b=>b.textContent.trim()==='Send').click();`);
+				await wait(`!!document.querySelector('[role="dialog"]')`);
+				await evaluate(`window.keptDialog=document.querySelector('[role="dialog"]');`);
+			}
+			await evaluate(
+				`__tokenPopulation=__tokenPopulation.map(t=>({...t, value:${scenario === 'membership-rank' ? "t.id==='11'?11.5:t.value" : "t.id==='" + id + "'?0.05:t.value"},approvals:t.id==='${id}'?[]:t.approvals}));clickText('Refresh tokens');`
+			);
+			await wait(`!buttons().find(b=>b.textContent.trim()==='Refresh tokens')?.disabled`);
+			assert.equal(
+				await evaluate(
+					`keptNode.isConnected && keptNode===document.querySelector('[data-token-id="${id}"]') && keptController.isConnected`
+				),
+				true,
+				'A rendered row keeps the same mounted node after its value changes'
+			);
+			if (scenario === 'membership-rank') {
+				assert.equal(
+					await evaluate(`keptDialog.isConnected && visible(keptDialog)`),
+					true,
+					'The token Send dialog stays open after the rank changes'
+				);
+			} else if (scenario === 'membership-removal') {
+				await evaluate(
+					`__tokenPopulation=__tokenPopulation.filter(t=>t.id!=='${id}');clickText('Refresh tokens');`
+				);
+				await wait(`!keptNode.isConnected`);
+				assert.equal(
+					await evaluate(`document.querySelector('[data-token-id="${id}"]')===null`),
+					true,
+					'A token removed from the source leaves the table'
+				);
+			} else if (scenario === 'membership-address') {
+				await evaluate(`clickText('Switch page');`);
+				await wait(`document.querySelector('[data-token-id="1"]') && !keptNode.isConnected`);
+				assert.equal(
+					await evaluate(
+						`document.querySelectorAll('#ds-holdings-tokens div[data-token-id]').length`
+					),
+					10,
+					'The new address starts with its own top ten'
+				);
+				assert.equal(
+					await evaluate(`document.querySelector('[data-token-id="10"]')===null`),
+					true,
+					'The previous address has no remembered membership'
+				);
+				await evaluate(
+					`window.otherAddressNode=document.querySelector('div[data-token-id="1"]');clickText('Switch page');`
+				);
+				await wait(
+					`!otherAddressNode.isConnected && document.querySelector('div[data-token-id="1"]') && !buttons().find(b=>b.textContent.trim()==='Refresh tokens')?.disabled`
+				);
+				assert.equal(
+					await evaluate(`document.querySelector('[data-token-id="10"]')===null`),
+					true,
+					'Returning to an address also starts with a fresh membership'
+				);
+			}
+		} else if (scenario === 'duplicates') {
+			await pause(100);
+			assert.equal(errors.length, 0, JSON.stringify(errors));
+			await evaluate(`clickText('Show claimable tokens');`);
+			await wait(`document.querySelectorAll('.wallet-claim-legacy').length===2`);
+			assert.equal(errors.length, 0, JSON.stringify(errors));
+		} else if (scenario === 'refresh' || scenario === 'sort') {
 			await evaluate(
 				`window.initialRows=[...document.querySelectorAll('#ds-holdings-tokens div[data-token-id]')].map(detail=>({detail,row:detail.closest('tr'),id:detail.dataset.tokenId}));window.pendingClaimCard=document.querySelector('[data-token-id="1"] .wallet-token-legacy');document.querySelector('button[aria-controls="'+pendingClaimCard.closest('tr').id+'"]').click();`
 			);
