@@ -1,16 +1,22 @@
 <script lang="ts">
-	import { theme, onThemeChange } from '$lib/theme.svelte';
+	import { onThemeChange } from '$lib/theme.svelte';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { createChartLifecycle } from '$lib/utils/chartLifecycle';
-	import { Button, ButtonGroup, Spinner } from 'flowbite-svelte';
+	import Button from '$lib/ds/Button/Button.svelte';
+	import Tabs from '$lib/ds/Tabs/Tabs.svelte';
+	import {
+		chartThemeOptions,
+		resolveChartTokens,
+		themedCandles,
+		themedVolumes,
+		type ChartTokens
+	} from '$lib/markets/chartTheme';
 	import {
 		createChart,
 		type IChartApi,
 		type ISeriesApi,
 		type CandlestickData,
-		type LineData,
-		type HistogramData,
-		ColorType
+		type LineData
 	} from 'lightweight-charts';
 	import type {
 		OHLCVData,
@@ -31,7 +37,7 @@
 	export let data: OHLCVData[] = [];
 	export let volumes: VolumeData[] = [];
 	export let loading = false;
-	export let height = 500;
+	export let height = 400;
 	export let settings: ChartSettings = {
 		chartType: 'candlestick',
 		resolution: '1h',
@@ -47,7 +53,8 @@
 	const lifecycle = createChartLifecycle();
 	let mainSeries: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | undefined;
 	let volumeSeries: ISeriesApi<'Histogram'> | undefined;
-	let isDarkMode = false;
+	let renderedCandles: CandlestickData[] = [];
+	let chartTokens: ChartTokens;
 	let prevPairKey: string | null = null;
 	let isInitializing = false;
 	let hovered: {
@@ -115,45 +122,30 @@
 	}
 
 	const resolutions: { value: Resolution; label: string }[] = [
-		{ value: '1m', label: '1M' },
-		{ value: '5m', label: '5M' },
-		{ value: '15m', label: '15M' },
-		{ value: '1h', label: '1H' },
-		{ value: '4h', label: '4H' },
-		{ value: '1d', label: '1D' }
+		{ value: '1m', label: '1 minute' },
+		{ value: '5m', label: '5 minutes' },
+		{ value: '15m', label: '15 minutes' },
+		{ value: '1h', label: '1 hour' },
+		{ value: '4h', label: '4 hours' },
+		{ value: '1d', label: '1 day' }
 	];
 
 	function updateChartTheme() {
-		if (!chart) return;
-
-		isDarkMode = theme.current === 'dark';
-		const backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
-		const gridColor = isDarkMode ? '#374151' : '#E5E7EB';
-		const textColor = isDarkMode ? '#D1D5DB' : '#4B5563';
-		const borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
-
-		chart.applyOptions({
-			layout: {
-				background: { type: ColorType.Solid, color: backgroundColor },
-				textColor: textColor
-			},
-			grid: {
-				vertLines: { color: gridColor },
-				horzLines: { color: gridColor }
-			},
-			rightPriceScale: {
-				borderColor: borderColor,
-				scaleMargins: {
-					top: 0.1,
-					bottom: settings.showVolume ? 0.4 : 0.1
-				}
-			},
-			timeScale: {
-				borderColor: borderColor,
-				timeVisible: true,
-				secondsVisible: false
-			}
-		});
+		if (!chart || !chartContainer) return;
+		chartTokens = resolveChartTokens(getComputedStyle(chartContainer));
+		const options = chartThemeOptions(chartTokens);
+		chart.applyOptions(options.chart);
+		mainSeries?.applyOptions(chartType === 'candlestick' ? options.candles : options.line);
+		volumeSeries?.applyOptions(options.volume);
+		// Candlestick point overrides include neutral candles. Recolor only renderer copies;
+		// setData retains the existing time scale, and this path never fits the range.
+		if (chartType === 'candlestick' && mainSeries && renderedCandles.length) {
+			renderedCandles = themedCandles(
+				renderedCandles.map((point) => ({ ...point, time: toUnixSeconds(point.time) })),
+				chartTokens
+			);
+			(mainSeries as ISeriesApi<'Candlestick'>).setData(renderedCandles);
+		}
 	}
 
 	function initializeChart() {
@@ -167,34 +159,21 @@
 			return;
 		}
 
-		if (chartContainer.clientWidth === 0) {
-			console.warn('Chart container has zero width, retrying...');
-			// TASK-31: retries are tracked and cannot initialize after disposal.
-			lifecycle.deferred(initializeChart, 100);
-			return;
-		}
+		if (!chartContainer.clientWidth || !chartContainer.clientHeight) return;
 
 		isInitializing = true;
+		chartTokens = resolveChartTokens(getComputedStyle(chartContainer));
+		const options = chartThemeOptions(chartTokens);
 		chart = createChart(chartContainer, {
-			height,
+			...options.chart,
+			height: chartContainer.clientHeight,
 			width: chartContainer.clientWidth,
-			layout: {
-				background: { type: ColorType.Solid, color: '#FFFFFF' },
-				textColor: '#4B5563'
-			},
-			grid: {
-				vertLines: { color: '#E5E7EB' },
-				horzLines: { color: '#E5E7EB' }
-			},
 			rightPriceScale: {
-				borderColor: '#D1D5DB',
-				scaleMargins: {
-					top: 0.1,
-					bottom: settings.showVolume ? 0.4 : 0.1
-				}
+				...options.chart.rightPriceScale,
+				scaleMargins: { top: 0.1, bottom: settings.showVolume ? 0.4 : 0.1 }
 			},
 			timeScale: {
-				borderColor: '#D1D5DB',
+				...options.chart.timeScale,
 				timeVisible: true,
 				secondsVisible: false,
 				tickMarkFormatter: (time: number) => {
@@ -202,15 +181,7 @@
 					return formatTimeByResolution(ts, settings.resolution);
 				}
 			},
-			crosshair: {
-				mode: 1,
-				vertLine: {
-					labelVisible: true
-				},
-				horzLine: {
-					labelVisible: true
-				}
-			}
+			crosshair: { ...options.chart.crosshair, mode: 1 }
 		});
 
 		const instance = chart;
@@ -296,22 +267,6 @@
 		}
 
 		isInitializing = false;
-
-		// Set up resize observer
-		const resizeObserver = new ResizeObserver(() => {
-			if (chart && chartContainer) {
-				chart.applyOptions({
-					width: chartContainer.clientWidth
-				});
-				// Auto-fit on container resize for better automatic zoom
-				chart.timeScale().fitContent();
-			}
-		});
-		lifecycle.add(() => resizeObserver.disconnect());
-		resizeObserver.observe(chartContainer);
-
-		// Subscribe to theme changes
-		lifecycle.add(onThemeChange(updateChartTheme));
 	}
 
 	function createMainSeries() {
@@ -329,17 +284,12 @@
 		if (chartType === 'candlestick') {
 			mainSeries = chart.addCandlestickSeries({
 				priceScaleId: 'right',
-				upColor: '#22c55e',
-				downColor: '#ef4444',
-				borderDownColor: '#ef4444',
-				borderUpColor: '#22c55e',
-				wickDownColor: '#ef4444',
-				wickUpColor: '#22c55e'
+				...chartThemeOptions(chartTokens).candles
 			});
 		} else {
 			mainSeries = chart.addLineSeries({
 				priceScaleId: 'right',
-				color: '#8B5CF6',
+				...chartThemeOptions(chartTokens).line,
 				lineWidth: 2,
 				crosshairMarkerVisible: true,
 				lastValueVisible: true,
@@ -374,7 +324,7 @@
 		if (!chart || volumeSeries) return;
 
 		volumeSeries = chart.addHistogramSeries({
-			color: '#E5E7EB',
+			...chartThemeOptions(chartTokens).volume,
 			priceFormat: {
 				type: 'volume'
 			},
@@ -425,14 +375,8 @@
 		}
 
 		if (chartType === 'candlestick') {
-			const candlestickData: CandlestickData[] = sortedData.map((item) => ({
-				time: item.time,
-				open: item.open,
-				high: item.high,
-				low: item.low,
-				close: item.close
-			}));
-			(mainSeries as ISeriesApi<'Candlestick'>).setData(candlestickData);
+			renderedCandles = themedCandles(sortedData, chartTokens);
+			(mainSeries as ISeriesApi<'Candlestick'>).setData(renderedCandles);
 		} else {
 			const lineData: LineData[] = sortedData.map((item) => ({
 				time: item.time,
@@ -453,12 +397,7 @@
 				for (const item of sortedVols) {
 					dedupedVols.set(item.time, item);
 				}
-				const volumeData: HistogramData[] = Array.from(dedupedVols.values()).map((item) => ({
-					time: item.time,
-					value: item.value,
-					color: item.color || '#E5E7EB'
-				}));
-				volumeSeries?.setData(volumeData);
+				volumeSeries?.setData(themedVolumes(Array.from(dedupedVols.values())));
 				chart.priceScale('right').applyOptions({
 					scaleMargins: { top: 0.1, bottom: 0.4 }
 				});
@@ -523,8 +462,19 @@
 	}
 
 	onMount(() => {
-		// TASK-31: the mount owns both deferred initialization and all chart resources.
-		lifecycle.deferred(initializeChart, 100);
+		const resizeObserver = new ResizeObserver(() => {
+			initializeChart();
+			if (chart && chartContainer.clientWidth && chartContainer.clientHeight) {
+				chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+			}
+		});
+		lifecycle.add(() => resizeObserver.disconnect());
+		resizeObserver.observe(chartContainer);
+		lifecycle.add(onThemeChange(updateChartTheme));
+		initializeChart();
+		document.fonts?.ready.then(() => {
+			if (!lifecycle.disposed) updateChartTheme();
+		});
 		return lifecycle.dispose;
 	});
 
@@ -543,6 +493,7 @@
 					updateChartData();
 				} else {
 					// Clear series when no data and reset scales/volume
+					renderedCandles = [];
 					if (chartType === 'candlestick') {
 						(mainSeries as ISeriesApi<'Candlestick'>).setData([]);
 					} else {
@@ -602,231 +553,144 @@
 	}
 </script>
 
-<div
-	class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
->
-	<!-- Chart Header -->
-	<div class="flex flex-col gap-4 p-4 border-b border-gray-200 dark:border-gray-700">
-		<div class="flex items-center justify-between w-full">
-			<div>
-				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-					{#if (tokenPair.baseSymbol || '').toUpperCase() === 'VOI'}
-						VOI/{tokenPair.quoteSymbol === 'aUSDC'
-							? quoteCurrency === 'USD'
-								? 'USD'
-								: 'aUSDC'
-							: tokenPair.quoteSymbol || 'USD'}
-					{:else}
-						{(tokenPair.baseSymbol || '').toUpperCase() === 'WVOI'
-							? 'VOI'
-							: tokenPair.baseSymbol}/{tokenPair.quoteSymbol || 'VOI'}
-					{/if}
-					{#if loading}
-						<Spinner size="4" class="ml-2" />
-					{/if}
-				</h3>
-				<p class="text-sm text-gray-500 dark:text-gray-400">
-					Pool ID: {tokenPair.poolId || 'N/A'}
-				</p>
-			</div>
-
-			<!-- Quote Currency Slider -->
-			<div class="flex items-center gap-3">
-				<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Quote:</span>
-				<div class="relative">
-					<div class="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
-						<button
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200"
-							class:bg-white={quoteCurrency === 'VOI'}
-							class:dark:bg-gray-800={quoteCurrency === 'VOI'}
-							class:text-gray-900={quoteCurrency === 'VOI'}
-							class:dark:text-white={quoteCurrency === 'VOI'}
-							class:shadow-sm={quoteCurrency === 'VOI'}
-							class:text-gray-600={quoteCurrency !== 'VOI'}
-							class:dark:text-gray-400={quoteCurrency !== 'VOI'}
-							class:hover:text-gray-900={quoteCurrency !== 'VOI'}
-							class:dark:hover:text-white={quoteCurrency !== 'VOI'}
-							on:click={() => {
-								if (quoteCurrency !== 'VOI') {
-									quoteCurrency = 'VOI';
-									dispatch('quoteChange', quoteCurrency);
-								}
-							}}
-						>
-							VOI
-						</button>
-						<button
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200"
-							class:bg-white={quoteCurrency === 'USD'}
-							class:dark:bg-gray-800={quoteCurrency === 'USD'}
-							class:text-gray-900={quoteCurrency === 'USD'}
-							class:dark:text-white={quoteCurrency === 'USD'}
-							class:shadow-sm={quoteCurrency === 'USD'}
-							class:text-gray-600={quoteCurrency !== 'USD'}
-							class:dark:text-gray-400={quoteCurrency !== 'USD'}
-							class:hover:text-gray-900={quoteCurrency !== 'USD'}
-							class:dark:hover:text-white={quoteCurrency !== 'USD'}
-							on:click={() => {
-								if (quoteCurrency !== 'USD') {
-									quoteCurrency = 'USD';
-									dispatch('quoteChange', quoteCurrency);
-								}
-							}}
-						>
-							USD
-						</button>
-					</div>
-				</div>
-			</div>
+<div class="flex min-w-0 flex-col gap-4">
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0">
+			<h3 class="text-h2 text-ink">
+				{#if (tokenPair.baseSymbol || '').toUpperCase() === 'VOI'}
+					VOI/{tokenPair.quoteSymbol === 'aUSDC'
+						? quoteCurrency === 'USD'
+							? 'USD'
+							: 'aUSDC'
+						: tokenPair.quoteSymbol || 'USD'}
+				{:else}
+					{(tokenPair.baseSymbol || '').toUpperCase() === 'WVOI'
+						? 'VOI'
+						: tokenPair.baseSymbol}/{tokenPair.quoteSymbol || 'VOI'}
+				{/if}
+			</h3>
+			<p class="text-label text-ink-muted">Pool ID: {tokenPair.poolId || 'N/A'}</p>
+			{#if loading}<p role="status" class="text-label text-ink-muted">Loading chart data...</p>{/if}
 		</div>
-
-		<div class="flex flex-wrap items-center gap-2 justify-between">
-			<!-- Chart Type Toggle -->
-			<ButtonGroup>
-				<Button
-					size="sm"
-					color={chartType === 'candlestick' ? 'primary' : 'alternative'}
-					on:click={() => handleChartTypeChange('candlestick')}
-				>
-					<i class="fas fa-chart-bar mr-1"></i>
-					Candles
-				</Button>
-				<Button
-					size="sm"
-					color={chartType === 'line' ? 'primary' : 'alternative'}
-					on:click={() => handleChartTypeChange('line')}
-				>
-					<i class="fas fa-chart-line mr-1"></i>
-					Line
-				</Button>
-			</ButtonGroup>
-
-			<!-- Resolution Selector -->
-			<ButtonGroup>
-				{#each resolutions as resolution}
-					<Button
-						size="sm"
-						color={settings.resolution === resolution.value ? 'primary' : 'alternative'}
-						on:click={() => handleResolutionChange(resolution.value)}
-					>
-						{resolution.label}
-					</Button>
-				{/each}
-			</ButtonGroup>
-
-			<!-- Volume Toggle -->
-			<Button
-				size="sm"
-				color={settings.showVolume ? 'primary' : 'alternative'}
-				on:click={toggleVolume}
+		<div class="flex max-w-full flex-col gap-1">
+			<span class="text-label text-ink-muted">Quote</span>
+			<Tabs
+				variant="segmented"
+				label="Quote"
+				options={[
+					{ value: 'VOI', label: 'VOI' },
+					{ value: 'USD', label: 'USD' }
+				]}
+				value={quoteCurrency}
+				onchange={(value) => {
+					if (quoteCurrency !== value) {
+						quoteCurrency = value as 'VOI' | 'USD';
+						dispatch('quoteChange', quoteCurrency);
+					}
+				}}
+			/>
+		</div>
+	</div>
+	<div class="flex flex-wrap items-end justify-between gap-3">
+		<div class="flex max-w-full flex-col gap-1">
+			<span class="text-label text-ink-muted">Chart type</span>
+			<Tabs
+				variant="segmented"
+				label="Chart type"
+				options={[
+					{ value: 'candlestick', label: 'Candles' },
+					{ value: 'line', label: 'Line' }
+				]}
+				value={chartType}
+				onchange={(value) => handleChartTypeChange(value as 'candlestick' | 'line')}
+			/>
+		</div>
+		<div class="flex max-w-full flex-col gap-1">
+			<span class="text-label text-ink-muted">Resolution</span>
+			<Tabs
+				variant="segmented"
+				label="Resolution"
+				options={resolutions}
+				value={settings.resolution}
+				onchange={(value) => handleResolutionChange(value as Resolution)}
+			/>
+		</div>
+		<Button size="sm" variant="soft" aria-pressed={settings.showVolume} onclick={toggleVolume}
+			>Volume</Button
+		>
+		<Button size="sm" variant="ghost" onclick={handleRefresh} disabled={loading}>Refresh</Button>
+	</div>
+	<div class="plot relative w-full" style:--plot-height={`${height}px`}>
+		<div bind:this={chartContainer} class="absolute inset-0 bg-surface" />
+		{#if loading && data.length === 0}
+			<div role="status" class="absolute inset-0 flex items-center justify-center text-ink-muted">
+				Loading chart data...
+			</div>
+		{:else if data.length === 0}
+			<div
+				class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-ink-muted"
 			>
-				<i class="fas fa-chart-area mr-1"></i>
-				Volume
-			</Button>
-
-			<!-- Refresh Button -->
-			<Button size="sm" color="light" on:click={handleRefresh} disabled={loading}>
-				<i class="fas fa-sync-alt {loading ? 'animate-spin' : ''} mr-1"></i>
-				Refresh
-			</Button>
-		</div>
+				<p>No data available for this token pair</p>
+				<p class="text-label">Try selecting a different time resolution or refresh the data</p>
+			</div>
+		{/if}
 	</div>
-
-	<!-- Chart Container -->
-	<div class="p-4">
-		<div class="relative" style="height: {height}px; width: 100%; min-height: 400px;">
-			<div bind:this={chartContainer} class="absolute inset-0 bg-gray-50 dark:bg-gray-900" />
-			{#if loading && data.length === 0}
-				<div class="absolute inset-0 flex items-center justify-center">
-					<div class="text-center">
-						<Spinner size="8" class="mb-4" />
-						<p class="text-gray-500 dark:text-gray-400">Loading chart data...</p>
-					</div>
-				</div>
-			{:else if data.length === 0}
-				<div class="absolute inset-0 flex items-center justify-center">
-					<div class="text-center">
-						<i class="fas fa-chart-line text-4xl text-gray-400 mb-4"></i>
-						<p class="text-gray-500 dark:text-gray-400">No data available for this token pair</p>
-						<p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-							Try selecting a different time resolution or refresh the data
-						</p>
-					</div>
-				</div>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Chart Footer with Stats -->
 	{#if data.length > 0}
 		<div
-			class="flex flex-wrap items-center justify-between gap-4 p-4 border-t border-gray-200 dark:border-gray-700 text-sm"
+			class="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-4 text-label"
 		>
-			<div class="flex gap-6">
-				{#if hovered}
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Open:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1"
-							>{hovered.open?.toFixed(6) ?? '—'}</span
-						>
-					</div>
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">High:</span>
-						<span class="font-medium text-green-600 dark:text-green-400 ml-1"
-							>{hovered.high?.toFixed(6) ?? '—'}</span
-						>
-					</div>
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Low:</span>
-						<span class="font-medium text-red-600 dark:text-red-400 ml-1"
-							>{hovered.low?.toFixed(6) ?? '—'}</span
-						>
-					</div>
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Close:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1"
-							>{hovered.close?.toFixed(6) ?? '—'}</span
-						>
-					</div>
-				{:else}
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Open:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1"
-							>{data[0]?.open.toFixed(6) || '—'}</span
-						>
-					</div>
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">High:</span>
-						<span class="font-medium text-green-600 dark:text-green-400 ml-1"
-							>{Math.max(...data.map((d) => d.high)).toFixed(6)}</span
-						>
-					</div>
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Low:</span>
-						<span class="font-medium text-red-600 dark:text-red-400 ml-1"
-							>{Math.min(...data.map((d) => d.low)).toFixed(6)}</span
-						>
-					</div>
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Close:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1"
-							>{data[data.length - 1]?.close.toFixed(6) || '—'}</span
-						>
-					</div>
-				{/if}
+			<dl class="flex flex-wrap gap-x-6 gap-y-2">
+				<div class="flex flex-wrap gap-1">
+					<dt class="text-ink-muted">Open:</dt>
+					<dd class="num font-medium text-ink">
+						{hovered ? (hovered.open?.toFixed(6) ?? '—') : data[0]?.open.toFixed(6) || '—'}
+					</dd>
+				</div>
+				<div class="flex flex-wrap gap-1">
+					<dt class="text-ink-muted">High:</dt>
+					<dd class="num font-medium text-ink">
+						{hovered
+							? (hovered.high?.toFixed(6) ?? '—')
+							: Math.max(...data.map((d) => d.high)).toFixed(6)}
+					</dd>
+				</div>
+				<div class="flex flex-wrap gap-1">
+					<dt class="text-ink-muted">Low:</dt>
+					<dd class="num font-medium text-ink">
+						{hovered
+							? (hovered.low?.toFixed(6) ?? '—')
+							: Math.min(...data.map((d) => d.low)).toFixed(6)}
+					</dd>
+				</div>
+				<div class="flex flex-wrap gap-1">
+					<dt class="text-ink-muted">Close:</dt>
+					<dd class="num font-medium text-ink">
+						{hovered
+							? (hovered.close?.toFixed(6) ?? '—')
+							: data[data.length - 1]?.close.toFixed(6) || '—'}
+					</dd>
+				</div>
 				{#if settings.showVolume}
-					<div>
-						<span class="text-gray-500 dark:text-gray-400">Volume:</span>
-						<span class="font-medium text-gray-900 dark:text-white ml-1"
-							>{hovered?.volume ??
-								volumes.reduce((sum, v) => sum + v.value, 0).toLocaleString()}</span
-						>
+					<div class="flex flex-wrap gap-1">
+						<dt class="text-ink-muted">Volume:</dt>
+						<dd class="num font-medium text-ink">
+							{hovered?.volume ?? volumes.reduce((sum, v) => sum + v.value, 0).toLocaleString()}
+						</dd>
 					</div>
 				{/if}
-			</div>
-			<div class="text-gray-400 dark:text-gray-500">
-				{data.length} data points
-			</div>
+			</dl>
+			<p class="text-ink-muted">{data.length} data points</p>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.plot {
+		height: var(--plot-height, 400px);
+	}
+	@media (max-width: 639px) {
+		.plot {
+			height: 280px;
+		}
+	}
+</style>
