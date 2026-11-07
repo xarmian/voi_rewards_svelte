@@ -6,21 +6,23 @@ const NONE: WalletIdentity = { name: null, avatar: null };
 // Both strings come from a third party and are shown on a page with signing actions, so only a plain
 // name is shown and anything else makes the hero fall back to the address (it fails safe).
 // Blocking look-alike characters one class at a time never finishes, so the rule is an allowlist: dotted
-// labels of ASCII letters, digits, hyphens and underscores (each label starting and ending with a letter
-// or digit, at most 63 characters), ending in the `.voi` label. That leaves no character that can pass for
-// a dot, a letter of another script or a space. A name is also refused when it holds a run of 58 base32
-// characters, so it can never show another account's full address in the heading.
-// A name outside this form (other scripts, emoji) is not shown; the page keeps the short address.
-const NAME_ALLOWED = /^(?:[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?\.)+voi$/i;
-const ADDRESS_RUN = /[A-Z2-7]{58}/i;
-const NAME_MAX = 128;
+// labels of lower-case ASCII letters, digits, hyphens and underscores (each label starting and ending with
+// a letter or digit, at most 63 characters), ending in the `voi` label. That leaves no character that can
+// pass for a dot, a letter of another script, a space, or (by being upper case) an `l`. The whole name is
+// at most 56 characters, which is shorter than an account address (58), so however an address is split
+// or its characters swapped it cannot fit in the heading.
+// A name outside this form (other scripts, emoji, upper case) is not shown; the page keeps the short
+// address, and the full address stays on the page under the heading.
+const NAME_ALLOWED = /^(?:[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?\.)+voi$/;
+const NAME_MAX = 56;
 const AVATAR_MAX = 2048;
 const IPV4_LIKE = /^[\d.]+$/;
+const SITE_HOST = /(^|\.)voirewards\.com$/;
 
 function validName(raw: string): string | null {
 	const name = raw.trim();
 	if (!name || name.length > NAME_MAX) return null;
-	if (!NAME_ALLOWED.test(name) || ADDRESS_RUN.test(name)) return null;
+	if (!NAME_ALLOWED.test(name)) return null;
 	return name;
 }
 
@@ -39,6 +41,8 @@ function validAvatar(raw: unknown): string | null {
 		// has a plain dotted name: no empty labels, no trailing dot, no IP literal (IPv6, or IPv4 in any
 		// WHATWG form), no undotted name, no local name, none of which should be asked of the visitor's network.
 		if (host.split('.').some((label) => label === '')) return null;
+		// The site's own hosts are not an image host either (the page would ask its own server for it).
+		if (SITE_HOST.test(host) || host === globalThis.location?.hostname) return null;
 		if (!host.includes('.') || host.startsWith('[') || IPV4_LIKE.test(host)) return null;
 		// A public DNS name can still point at a private address (such as an IP written into a wildcard
 		// domain); no host check catches that. The request is a plain image GET with no referrer.

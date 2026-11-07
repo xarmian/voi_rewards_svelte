@@ -51,6 +51,8 @@ it.each([
 	['.localdomain host', 'https://localhost.localdomain/x.png'],
 	['.home.arpa host', 'https://router.home.arpa/x.png'],
 	['.internal host', 'https://api.internal/x.png'],
+	['the site itself', 'https://voirewards.com/api/x'],
+	['a subdomain of the site', 'https://www.voirewards.com/x.png'],
 	// WHATWG keeps a trailing dot in the hostname, so a suffix check on `.local` or `localhost` misses it.
 	['trailing dot on a local host', 'https://printer.local./a.png'],
 	['trailing dot on localhost', 'https://localhost./x.png'],
@@ -115,6 +117,29 @@ it.each([
 	['a label that starts with a hyphen', '-a.voi'],
 	['a label of 64 characters', 'a'.repeat(64) + '.voi'],
 	['the full address with .voi after it', ADDRESS + '.voi'],
+	['the lower-case address with .voi after it', ADDRESS.toLowerCase() + '.voi'],
+	['an address with a zero for an O, then .voi', ADDRESS.replace('O', '0') + '.voi'],
+	['an address with a one for an I, then .voi', ADDRESS.replace('I', '1') + '.voi'],
+	[
+		'an address split by a hyphen, then .voi',
+		ADDRESS.slice(0, 29) + '-' + ADDRESS.slice(29) + '.voi'
+	],
+	[
+		'an address split by an underscore, then .voi',
+		ADDRESS.slice(0, 29) + '_' + ADDRESS.slice(29) + '.voi'
+	],
+	['an address split by a dot, then .voi', ADDRESS.slice(0, 29) + '.' + ADDRESS.slice(29) + '.voi'],
+	['upper case', 'Shelly.voi'],
+	['an upper-case VOI label', 'shelly.VOI'],
+	['a capital I standing in for l', 'sheIIy.voi'],
+	['the short-address shape with a hyphen', 'G3MSA7-UIFQ.voi'],
+	['text after the .voi label', 'shelly.voix'],
+	['text after the .voi label, separated by a space', 'shelly.voi evil'],
+	['a right-to-left override after the label', 'shelly.voi‮gnp'],
+	['a name over 56 characters', ('a0'.repeat(13) + '.').repeat(2) + 'voi'],
+	['a label of 64 characters that is not a base32 run', 'a0'.repeat(32) + '.voi'],
+	['a label ending in a hyphen', 'shelly-.voi'],
+	['a label ending in an underscore', 'shelly_.voi'],
 	['the full address as a label before another', 'x.' + ADDRESS + '.voi'],
 	['the full address in Lisu capitals with .voi', '\ua4d6' + ADDRESS.slice(1) + '.voi'],
 	['a Lisu tone mark that looks like a dot', 'G3MSA7\ua4f8\ua4f8\ua4f8UIFQ'],
@@ -149,11 +174,10 @@ it.each([
 	'shelly.voi',
 	'shelly.of.voi',
 	'name-1_x.voi',
-	'Shelly.VOI',
 	'a.voi',
 	'0.voi',
-	'ab8'.repeat(21) + '.voi',
-	'a'.repeat(57) + '.voi'
+	'ab8'.repeat(17) + '.voi',
+	'a'.repeat(52) + '.voi'
 ])('keeps the ordinary name %s', (name) => {
 	expect(parseWalletIdentity('A', [{ ...named, name }]).name).toBe(name);
 });
