@@ -1,3 +1,4 @@
+import { isEqual } from 'lodash-es';
 import { browser } from '$app/environment';
 import { fetchFungibleTokens } from '$lib/services/accounts';
 import type { FungibleTokenType, NFTToken } from '$lib/types/assets';
@@ -25,7 +26,7 @@ export type HoldingsRow = {
 
 const nonnegative = (n: unknown): n is number =>
 	typeof n === 'number' && Number.isFinite(n) && n >= 0;
-const decimalsKnown = (n: unknown): n is number =>
+export const decimalsKnown = (n: unknown): n is number =>
 	Number.isInteger(n) && Number(n) >= 0 && Number(n) <= 255;
 const validToken = (token: FungibleTokenType) =>
 	!!token &&
@@ -34,13 +35,17 @@ const validToken = (token: FungibleTokenType) =>
 	Number.isInteger(token.balance) &&
 	decimalsKnown(token.decimals);
 
+const holdingsId = (id: unknown) => `${typeof id}:${id}`;
+
 export function holdingsClaimKey(
-	items: { token: { id: string } }[],
+	items: { token: { id: unknown } }[],
 	index: number,
 	address: string | undefined
 ) {
-	const id = items[index].token.id;
-	const occurrence = items.slice(0, index).filter((item) => item.token.id === id).length;
+	const id = holdingsId(items[index].token.id);
+	const occurrence = items
+		.slice(0, index)
+		.filter((item) => holdingsId(item.token.id) === id).length;
 	return `${address}:${id}${occurrence ? ':' + occurrence : ''}`;
 }
 
@@ -79,13 +84,17 @@ export function deriveHoldingsRows(
 		remembered?: ReadonlySet<string>;
 	} = {}
 ) {
-	const seen = new Set<string>();
+	const seen = new Map<string, FungibleTokenType[]>();
 	const all: HoldingsRow[] = [];
 	for (const token of tokens) {
-		const id = typeof token.id === 'string' ? token.id : `${typeof token.id}:${token.id}`;
-		const key = `${pageAddress}:${token.type ?? 'vsa'}:${id}${token.poolInfo ? ':' + (token.poolInfo.provider ?? 'unknown') : ''}`;
-		if (seen.has(key)) continue;
-		seen.add(key);
+		const id = holdingsId(token.id);
+		const baseKey = `${pageAddress}:${token.type ?? 'vsa'}:${id}`;
+		const entries = seen.get(baseKey) ?? [];
+		if (entries.some((entry) => isEqual(entry, token))) continue;
+		const occurrence = entries.length;
+		const key = `${baseKey}${occurrence ? ':' + occurrence : ''}`;
+		entries.push(token);
+		seen.set(baseKey, entries);
 		const valid = validToken(token);
 		const quantity = valid ? token.balance / 10 ** token.decimals : null;
 		// The service uses zero as its unavailable valuation placeholder. Positive raw balances cannot prove $0.

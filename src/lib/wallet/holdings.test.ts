@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { FungibleTokenType } from '$lib/types/assets';
 import {
+	holdingsClaimKey,
 	deriveHoldingsRows,
 	deriveHoldingsDisplay,
 	createHoldingsTokenLoader,
@@ -267,4 +268,56 @@ it('a token read completing after 20 seconds still publishes', async () => {
 	);
 	await vi.advanceTimersByTimeAsync(20000);
 	expect(await published).toEqual({ value: result });
+});
+
+it('token identity survives pool discovery and provider changes', () => {
+	const key = (poolInfo?: FungibleTokenType['poolInfo']) =>
+		deriveHoldingsRows([token({ poolInfo })], { pageAddress: 'Y' }).all[0].key;
+	expect(key({ provider: 'humble' })).toBe(key());
+	expect(key({ provider: 'humble' })).toBe(key({}));
+	expect(key({ provider: 'humble' })).toBe(key({ provider: 'pact' }));
+});
+
+it('distinct source entries with the same token identity remain reachable', () => {
+	const first = token();
+	const second = token({ balance: 2, name: 'Another balance' });
+	const rows = deriveHoldingsRows([first, { ...first }, second]);
+	expect(rows.all.map((row) => row.token)).toEqual([first, second]);
+	expect(new Set(rows.all.map((row) => row.key)).size).toBe(2);
+	expect(rows.all[1].key).toBe(rows.all[0].key + ':1');
+});
+
+it('claim identities distinguish malformed repeats and typed ids', () => {
+	const items = [NaN, NaN, 5, '5'].map((id) => ({ token: { id: id as string } }));
+	const keys = items.map((_, index) => holdingsClaimKey(items, index, 'Y'));
+	expect(new Set(keys).size).toBe(4);
+	expect(keys[1]).toBe(keys[0] + ':1');
+});
+
+it('remembered rows survive dust filtering through both derivations', () => {
+	const tokens = [token({ id: 'kept', value: 0.05 }), token({ id: 'hidden', value: 0.05 })];
+	const remembered = new Set(
+		deriveHoldingsRows(tokens, { pageAddress: 'Y', showDust: true })
+			.all.slice(0, 1)
+			.map((row) => row.key)
+	);
+	expect(
+		deriveHoldingsRows(tokens, { pageAddress: 'Y', remembered }).tokens.map((row) => row.token.id)
+	).toEqual(['kept']);
+	expect(
+		deriveHoldingsDisplay({ pageAddress: 'Y', account, tokens, remembered }).rows.tokens.map(
+			(row) => row.token.id
+		)
+	).toEqual(['kept']);
+	expect(deriveHoldingsRows(tokens, { pageAddress: 'Y' }).tokens).toHaveLength(0);
+	expect(deriveHoldingsDisplay({ pageAddress: 'Y', account, tokens }).rows.tokens).toHaveLength(0);
+});
+
+it('typed token ids keep their keys when malformed neighbours disappear', () => {
+	const valid = token();
+	const malformed = token({ id: 1 as unknown as string });
+	const withNeighbour = deriveHoldingsRows([malformed, valid]).all.find(
+		(row) => row.token === valid
+	)!;
+	expect(withNeighbour.key).toBe(deriveHoldingsRows([valid]).all[0].key);
 });
