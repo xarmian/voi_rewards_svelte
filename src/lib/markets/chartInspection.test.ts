@@ -21,7 +21,7 @@ it('steps through many observations and clamps at both ends', () => {
 	expect(inspect(clearInspection(), { key: 'ArrowLeft' }, points).index).toBe(2);
 });
 it('selects Home and End and clears on Escape', () => {
-	let state = inspect(clearInspection(), { key: 'End' }, points);
+	const state = inspect(clearInspection(), { key: 'End' }, points);
 	expect(state.index).toBe(2);
 	expect(inspect(state, { key: 'Home' }, points).index).toBe(0);
 	expect(inspect(state, { key: 'Escape' }, points)).toEqual(clearInspection());
@@ -37,10 +37,7 @@ it('pointer and keyboard select the same text but only keyboard announces', () =
 	expect(keyboard.announcement).toBe(points[pointer.index!]);
 	expect(inspect(keyboard, { pointer: null }, points)).toEqual(clearInspection());
 });
-it.each(['data', 'token', 'resolution', 'quote', 'volume'])(
-	'clears selection and announcements on %s change',
-	() => {
-		const state = inspect(clearInspection(), { key: 'End' }, points);
-		expect(inspect(state, { reset: true }, points)).toEqual(clearInspection());
-	}
-);
+it('clears selection and announcements when chart inputs change', () => {
+	const state = inspect(clearInspection(), { key: 'End' }, points);
+	expect(inspect(state, { reset: true }, points)).toEqual(clearInspection());
+});
