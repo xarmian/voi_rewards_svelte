@@ -24,16 +24,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/EpochComponent.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 4,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/FungibleToken.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 1,
@@ -97,12 +87,6 @@
 			},
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 4,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ProposalsComponent.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 10,
 				"warnings": 0
 			}
 		},
@@ -213,22 +197,6 @@
 		"src/lib/components/CommandPalette.svelte": {
 			"svelte/no-unused-svelte-ignore": {
 				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/EpochChart.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/EpochTable.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
 				"warnings": 0
 			}
 		},

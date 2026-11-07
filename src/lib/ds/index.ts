@@ -49,3 +49,6 @@ export { WalletHoldings } from './WalletHoldings';
 export { WalletNfts } from './WalletNfts';
 
 export { WalletContractsPanel } from './WalletContractsPanel';
+
+export { WalletRewards } from './WalletRewards';
+export { WalletSearchPage } from './WalletSearchPage';

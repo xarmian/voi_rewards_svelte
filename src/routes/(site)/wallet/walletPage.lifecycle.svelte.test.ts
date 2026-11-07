@@ -151,3 +151,15 @@ it('pins the existing exception: an unpinned connected route replaces a differen
 		selectionFromRoute({ routeAddress: A.address, connected, selected: connected[1], pinned: true })
 	).toBeNull();
 });
+
+it('search navigation leaves a connected selection and pin count unchanged', () => {
+	walletStore.addAccounts([A]);
+	walletStore.selectAccount(A);
+	flushSync();
+	const goto = vi.fn();
+	const search = runInNewContext(`${code(page, 'searchWallet')}; searchWallet`, { goto });
+	search(B.address);
+	flushSync();
+	expect(goto).toHaveBeenCalledWith(`/wallet/${B.address}`, { invalidateAll: true });
+	expect(get(selectedWallet)?.address).toBe(A.address);
+});

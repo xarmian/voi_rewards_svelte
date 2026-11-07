@@ -47,6 +47,8 @@
 	let open = $state(false);
 	let revealed = $state(false);
 	let error = $state('');
+	let failedQuery = '';
+	let failedPicked: Suggestion | undefined;
 	let submitting = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let revision = 0;
@@ -117,7 +119,8 @@
 		error = '';
 		submitting = true;
 		const version = ++submission;
-		const result = await resolver.resolve(text, option);
+		const query = text;
+		const result = await resolver.resolve(query, option);
 		if (version !== submission) return;
 		submitting = false;
 		if (result.ok) {
@@ -129,8 +132,14 @@
 			onsubmit(result.address);
 		} else {
 			close();
-			error = result.message;
+			failedQuery = query;
+			failedPicked = option;
+			error = query.trim() ? 'Could not resolve this entry. Check it or retry.' : result.message;
 		}
+	}
+	function retry() {
+		text = failedQuery;
+		return submit(failedPicked);
 	}
 	function keydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -293,6 +302,7 @@
 			{/if}
 			{#if error}<p id={`${id}-error`} role="alert" class={errorClass(variant, tone)}>
 					{error}
+					<button type="button" class="ml-2 underline" onclick={retry}>Retry</button>
 				</p>{/if}
 		</div>
 	</form>
