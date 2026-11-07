@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button, Card, Chip, DataTable, InlineAlert } from '$lib/ds';
 	import type { Column, SortState } from '$lib/ds/DataTable/types';
+	import type { DataState } from '$lib/ds/types';
 	import {
 		formatPrice,
 		formatCurrency,
@@ -87,7 +88,7 @@
 			cell: changeCell
 		}
 	];
-	let tableState = $derived(
+	let tableState: DataState = $derived(
 		sortedMarketData.length > 0
 			? 'ready'
 			: fetchingMarketData
