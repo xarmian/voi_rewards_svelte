@@ -52,6 +52,7 @@ export type WalletHoldings = TokenValues & {
 };
 export type WalletSummary = {
 	state: DataState;
+	ownerLookup?: 'ok' | 'unavailable';
 	contractCount: number;
 	onlineContracts: number;
 	onlineAccounts: number;
@@ -240,6 +241,7 @@ export function summarizeWallet({
 	const holdingsReady = contractsReady && tokens?.state === 'ready';
 	const total = holdingsReady ? liquid + locked + other + tokens.lp : null;
 	return {
+		ownerLookup,
 		contractSet,
 		contractsReady,
 		withdrawable: contractsReady ? withdrawable : null,

@@ -92,3 +92,21 @@ it('a failed list refresh preserves same-page rows for display while marking the
 	expect(context.contractsLoadState).toBe('stale');
 	expect(context.contractsRefreshFailed).toBe(true);
 });
+
+it('refresh retries the server ownership source before treating the route as an ordinary account', async () => {
+	const context = {
+		browser: true,
+		walletId: 'PAGE',
+		parentWalletId: null,
+		ownerLookup: 'unavailable',
+		invalidate: vi.fn().mockResolvedValue(undefined),
+		updateAccountInfo: vi.fn().mockResolvedValue(undefined)
+	};
+	const refresh = runInNewContext(`${code('refresh')}; refresh`, context);
+	await refresh();
+	expect(context.invalidate).toHaveBeenCalledExactlyOnceWith('wallet:id');
+	expect(context.updateAccountInfo).not.toHaveBeenCalled();
+	context.ownerLookup = 'ok';
+	await refresh();
+	expect(context.updateAccountInfo).toHaveBeenCalledExactlyOnceWith('PAGE', true);
+});

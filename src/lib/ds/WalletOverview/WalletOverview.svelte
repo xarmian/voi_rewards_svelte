@@ -343,7 +343,7 @@
 			/>
 			{#if !failed && holdings.liquidKnown}<p class="mt-3 text-label">
 					Liquid: <strong>{comma(holdings.liquid)} VOI</strong>
-				</p>{:else if !failed}<p class="mt-3 text-label">
+				</p>{:else if !failed && summary.ownerLookup === 'unavailable'}<p class="mt-3 text-label">
 					Liquid: <strong>Unavailable</strong>
 				</p>{/if}
 		{:else}

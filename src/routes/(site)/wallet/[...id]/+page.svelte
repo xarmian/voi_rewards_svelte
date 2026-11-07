@@ -7,7 +7,7 @@
 	import { canSignFor } from '$lib/chain/signerGate';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import {
@@ -250,7 +250,9 @@
 		contractsSequence++;
 	});
 	function refresh() {
-		if (browser && walletId) return updateAccountInfo(parentWalletId || walletId, true);
+		if (!browser || !walletId) return;
+		if (ownerLookup === 'unavailable') return invalidate('wallet:id');
+		return updateAccountInfo(parentWalletId || walletId, true);
 	}
 </script>
 
@@ -403,13 +405,13 @@
 					contractSet={ownerLookup === 'ok' ? contractsSnapshot?.contractSet : 'unavailable'}
 					asOf={contractsSnapshot?.asOf}
 					{now}
-					onrefresh={() => updateContracts(true)}
+					onrefresh={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
 				/>
 				{#if contractsRefreshFailed && contractsLoadState === 'stale'}<div class="mt-3">
 						<InlineAlert
 							tone="warn"
 							message="Refresh failed; showing the last loaded contracts."
-							onretry={() => updateContracts(true)}
+							onretry={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
 						/>
 					</div>{/if}
 			{:else if tabs.current === 'calculator'}
