@@ -336,12 +336,84 @@ it.each([
 	expect(exact).toBe(`${expected} TOK`);
 });
 
-it('claim cards keep their token identity in both grids', () => {
+it('claim cards keep their token identity throughout the list', () => {
 	const loops = [
-		...controller().matchAll(
-			/\{#each claimableTokensSummary\.slice\([^]*? as claimableItem([^]*?)\}/g
-		)
+		...controller().matchAll(/\{#each claimableTokensSummary as claimableItem, index([^]*?)\}/g)
 	];
-	expect(loops).toHaveLength(2);
+	expect(loops).toHaveLength(1);
 	for (const loop of loops) expect(loop[1].trim()).toBe('(claimableItem.token.id)');
 });
+
+it('composition exposes a named image and readable amounts', () => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [],
+			tokenState: 'ready',
+			split: {
+				pageAddress: 'Y',
+				owner: { address: 'Y', balance: 0 },
+				contracts: [],
+				contractSet: 'ready'
+			}
+		}
+	}).body;
+	const bar = html.match(/<div[^>]*aria-label="Holdings composition"[^>]*>/)?.[0];
+	expect(bar).toContain('role="img"');
+	for (const label of ['Locked', 'LP', 'Tokens and other', 'Liquid']) {
+		expect(html).toContain(label);
+	}
+	expect(html).toMatch(/<dd[^>]*>[^]*?0 VOI[^]*?<\/dd>/);
+});
+
+it.each(['refreshTokens', 'initializePortfolio'])(
+	'%s ignores a token read after leaving and returning to its address',
+	async (name) => {
+		const source = controller();
+		const reset = source.match(/\$:\s*if \(walletAddress !== sourceAddress\) \{[^]*?\n\t\}/)![0];
+		const handler = source.match(new RegExp(`\\tasync function ${name}\\([^]*?\\n\\t\\}`))![0];
+		const read = Promise.withResolvers<{ tokens: (typeof token)[]; partial: boolean }>();
+		const current = [{ ...token, id: 'current' }];
+		const context = createContext({
+			walletAddress: 'A',
+			sourceAddress: 'A',
+			tokenLoadGeneration: 0,
+			nftGeneration: 0,
+			fungibleTokens: current,
+			tokensAsOf: undefined,
+			tokensError: null,
+			tokensPartial: false,
+			isLoadingTokens: false,
+			isLoadingLPTokens: false,
+			isLoadingPortfolio: false,
+			lastTokenPrice: 0,
+			tokensPrice: 0,
+			$voiPrice: { price: 1 },
+			holdingsTokenLoader: vi.fn(() => read.promise),
+			fetchAccountDetails: vi.fn(async () => {}),
+			fetchVoiPrice: vi.fn(async () => {}),
+			recomputeTotals: vi.fn(),
+			console: { error: vi.fn() }
+		});
+		const run = (code: string) =>
+			runInContext(
+				ts.transpileModule(code, {
+					compilerOptions: { target: ts.ScriptTarget.ES2022 }
+				}).outputText,
+				context
+			);
+		run(handler);
+		const pending = run(`${name}()`);
+		await vi.waitFor(() => expect(context.holdingsTokenLoader).toHaveBeenCalled());
+		expect(context.holdingsTokenLoader).toHaveBeenCalledExactlyOnceWith('A', 1);
+		for (const address of ['B', 'A']) {
+			context.walletAddress = address;
+			run(reset);
+		}
+		read.resolve({ tokens: [{ ...token, id: 'obsolete' }], partial: false });
+		await pending;
+		expect(context.fungibleTokens).toBe(current);
+		expect(context.tokensAsOf).toBeUndefined();
+	}
+);

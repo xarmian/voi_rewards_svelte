@@ -997,10 +997,10 @@
 					>{showClaimableSection ? 'Hide claimable tokens' : 'Show claimable tokens'}</button
 				>
 			</div>
-			{#if showClaimableSection}
+			<div hidden={!showClaimableSection}>
 				<div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each claimableTokensSummary.slice(0, 6) as claimableItem (claimableItem.token.id)}
-						<div class="min-w-0">
+					{#each claimableTokensSummary as claimableItem, index (claimableItem.token.id)}
+						<div class="min-w-0" hidden={index >= 6 && !isExpandingClaimableSection}>
 							<p class="mb-2 break-words text-sm">
 								{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
 								{claimableItem.token.symbol} · {claimableItem.totalValue > 0
@@ -1020,48 +1020,24 @@
 								/>
 							</div>
 						</div>
+						{#if index === 5 && claimableTokensSummary.length > 6}
+							<div class="col-span-full">
+								<button
+									on:click={() => (isExpandingClaimableSection = !isExpandingClaimableSection)}
+									class="min-h-10 rounded-ds-sm border border-edge px-3 text-accent"
+									>{isExpandingClaimableSection
+										? 'Show Less'
+										: `Show ${claimableTokensSummary.length - 6} More`}</button
+								>
+							</div>
+						{/if}
 					{/each}
 				</div>
-				{#if claimableTokensSummary.length > 6}
-					<button
-						on:click={() => (isExpandingClaimableSection = !isExpandingClaimableSection)}
-						class="min-h-10 rounded-ds-sm border border-edge px-3 text-accent"
-						>{isExpandingClaimableSection
-							? 'Show Less'
-							: `Show ${claimableTokensSummary.length - 6} More`}</button
-					>
-					{#if isExpandingClaimableSection}
-						<div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-							{#each claimableTokensSummary.slice(6) as claimableItem (claimableItem.token.id)}
-								<div class="min-w-0">
-									<p class="mb-2 break-words text-sm">
-										{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
-										{claimableItem.token.symbol} · {claimableItem.totalValue > 0
-											? formatNumber(claimableItem.totalValue, 2) + ' VOI equivalent'
-											: 'Value unavailable'}
-									</p>
-									<div class="wallet-claim-legacy">
-										<ClaimableTokenCard
-											token={claimableItem.token}
-											approvals={claimableItem.approvals}
-											totalAmount={claimableItem.totalAmount}
-											totalValue={claimableItem.totalValue}
-											{canSignTransactions}
-											walletId={walletAddress}
-											on:viewDetails={handleClaimableTokenViewDetails}
-											on:tokenClaimed={handleTokenClaimed}
-										/>
-									</div>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				{/if}
 				{#if isBulkClaiming}<p role="status" class="text-sm">
 						Bulk Claim Progress: {Math.round(bulkClaimProgress)}%. Processing {bulkClaimResults.length}
 						of {claimableTokensSummary.reduce((sum, item) => sum + item.approvals.length, 0)} approvals...
 					</p>{/if}
-			{/if}
+			</div>
 		</div>
 	{/if}
 {/snippet}

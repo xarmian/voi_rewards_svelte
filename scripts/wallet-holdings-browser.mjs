@@ -209,7 +209,19 @@ try {
 	};
 	const cases = process.env.HOLDINGS_CASE
 		? process.env.HOLDINGS_CASE.split(',')
-		: ['refresh', 'sort', 'dust', 'address-empty', 'address-failure', 'keys', 'amount', 'controls'];
+		: [
+				'refresh',
+				'sort',
+				'dust',
+				'address-empty',
+				'address-failure',
+				'address-identity',
+				'keys',
+				'amount',
+				'claim-hide',
+				'claim-less',
+				'controls'
+			];
 	for (const scenario of cases.filter((name) => name !== 'controls')) {
 		await open(scenario);
 		if (scenario === 'refresh' || scenario === 'sort') {
@@ -279,6 +291,60 @@ try {
 				await evaluate(`buttons().some(b=>/Show \\d+ more tokens/.test(b.textContent))`),
 				false,
 				'Show dust removes the page limit permanently'
+			);
+		} else if (scenario === 'claim-hide' || scenario === 'claim-less') {
+			await evaluate(`clickText('Show claimable tokens')`);
+			await wait(`buttons().some(b=>/^Show \\d+ More$/.test(b.textContent.trim()))`);
+			await evaluate(`buttons().find(b=>/^Show \\d+ More$/.test(b.textContent.trim())).click()`);
+			await wait(`buttons().some(b=>b.textContent.trim()==='Show Less')`);
+			await evaluate(
+				`window.claimCards=[...document.querySelectorAll('.wallet-claim-legacy')];window.pendingCard=claimCards[6];window.firstCard=claimCards[0];window.__holdClaim=true;for(const card of [firstCard,pendingCard]) buttons(card).find(b=>b.textContent.trim()==='Claim').click();`
+			);
+			await wait(
+				`firstCard.textContent.includes('Claiming...') && pendingCard.textContent.includes('Claiming...')`
+			);
+			await evaluate(
+				scenario === 'claim-hide' ? `clickText('Hide claimable tokens')` : `clickText('Show Less')`
+			);
+			assert.equal(
+				await evaluate(
+					`pendingCard.isConnected && firstCard.isConnected && pendingCard.textContent.includes('Claiming...') && firstCard.textContent.includes('Claiming...')`
+				),
+				true,
+				'Hiding claim cards retains the same connected cards with pending claims'
+			);
+			assert.equal(
+				await evaluate(`visible(pendingCard)`),
+				false,
+				'The collapsed claim card is visually hidden'
+			);
+			assert.equal(
+				await evaluate(`visible(firstCard)`),
+				scenario !== 'claim-hide',
+				'Only the requested claim cards are hidden'
+			);
+			await evaluate(
+				scenario === 'claim-hide'
+					? `clickText('Show claimable tokens')`
+					: `buttons().find(b=>/^Show \\d+ More$/.test(b.textContent.trim())).click()`
+			);
+			assert.equal(
+				await evaluate(
+					`pendingCard===document.querySelectorAll('.wallet-claim-legacy')[6] && visible(pendingCard) && pendingCard.textContent.includes('Claiming...')`
+				),
+				true,
+				'Showing claim cards restores visibility without replacing a pending card'
+			);
+		} else if (scenario === 'address-identity') {
+			await evaluate(
+				`window.previousRows=[...document.querySelectorAll('div[data-token-id]')].map(detail=>({detail,row:detail.closest('tr'),id:detail.dataset.tokenId}));clickText('Switch page');`
+			);
+			assert.equal(
+				await evaluate(
+					`previousRows.length>0 && previousRows.every(({detail,row,id})=>!row.isConnected && detail!==document.querySelector('div[data-token-id="'+id+'"]') && !!document.querySelector('div[data-token-id="'+id+'"]'))`
+				),
+				true,
+				'Changing the page address replaces token and liquidity row instances for the same tokens'
 			);
 		} else if (scenario.startsWith('address-')) {
 			await evaluate(
