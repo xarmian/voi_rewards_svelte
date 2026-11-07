@@ -120,3 +120,20 @@ it('looks up once per address change without tracking unrelated lookup state', a
 	flushSync();
 	expect(lookup).toHaveBeenCalledTimes(2);
 });
+
+it('ignores a response that arrives after the page is torn down', async () => {
+	const late = deferred();
+	let identity!: ReturnType<typeof createWalletIdentity>;
+	const stop = $effect.root(() => {
+		identity = createWalletIdentity(
+			() => 'A',
+			() => late.promise
+		);
+	});
+	flushSync();
+	stop();
+	flushSync();
+	late.resolve(A);
+	await settle();
+	expect({ ...identity }).toEqual({ name: null, avatar: null });
+});

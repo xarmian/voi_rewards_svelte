@@ -16,10 +16,11 @@
 				src={image.src}
 				alt=""
 				referrerpolicy="no-referrer"
+				decoding="async"
 				class="absolute inset-0 h-full w-full object-cover"
 				class:opacity-0={!image.show}
-				onload={image.onload}
-				onerror={image.onerror}
+				onload={(event) => image.onload(event.currentTarget.getAttribute('src'))}
+				onerror={(event) => image.onerror(event.currentTarget.getAttribute('src'))}
 			/>
 		{/if}
 	{/key}

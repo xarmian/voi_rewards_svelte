@@ -1,34 +1,35 @@
+import { untrack } from 'svelte';
+
+// State is keyed by the src an image was asked to load. Every event names the src of the element that
+// fired it (the element's own attribute), so a late load or error from an image that has since been
+// replaced changes nothing for the current one. That matters because a replaced <img> that is still
+// loading keeps its listener, and a handler written as `image.onload` is re-read on every event.
 export function createAvatarImage(getSrc: () => string | null) {
-	// Each source gets its own state and handlers, so late events cannot affect the next image.
-	const image = $derived.by(() => {
-		const src = getSrc();
-		let loaded = $state(false);
-		let failed = $state(false);
-		return {
-			src,
-			get show() {
-				return src !== null && loaded && !failed;
-			},
-			onload() {
-				loaded = true;
-			},
-			onerror() {
-				failed = true;
-			}
-		};
+	const src = $derived(getSrc());
+	let loadedSrc = $state<string | null>(null);
+	let failedSrc = $state<string | null>(null);
+
+	// A new src, including the same one coming back, starts hidden again.
+	$effect.pre(() => {
+		void src;
+		untrack(() => {
+			loadedSrc = null;
+			failedSrc = null;
+		});
 	});
+
 	return {
 		get src() {
-			return image.src;
+			return src;
 		},
 		get show() {
-			return image.show;
+			return src !== null && loadedSrc === src && failedSrc !== src;
 		},
-		get onload() {
-			return image.onload;
+		onload(forSrc: string | null) {
+			if (forSrc !== null) loadedSrc = forSrc;
 		},
-		get onerror() {
-			return image.onerror;
+		onerror(forSrc: string | null) {
+			if (forSrc !== null) failedSrc = forSrc;
 		}
 	};
 }

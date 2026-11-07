@@ -22,6 +22,7 @@ it('server renders exactly one hidden decorative image without sending a referre
 	expect(images[0]).toContain(`src="${src}"`);
 	expect(images[0]).toContain('referrerpolicy="no-referrer"');
 	expect(images[0]).toContain('alt=""');
+	expect(images[0]).toContain('decoding="async"');
 	expect(images[0]).toContain('opacity-0');
 	expect(images[0]).toContain('object-cover');
 	expect(images[0]).not.toContain('crossorigin');
@@ -55,14 +56,22 @@ it('uses only an img for the avatar and wires the module load and error handlers
 			(call) => call.callee.type === 'Identifier' && call.callee.name === 'createAvatarImage'
 		)
 	).toHaveLength(1);
+	// Each handler must name the src of the element that fired it. Svelte re-reads a member-expression
+	// handler on every event, and a replaced image that is still loading keeps its listener, so a bare
+	// `image.onload` would hand a late event from the previous account's image to the current one.
 	for (const name of ['onload', 'onerror']) {
-		expect(
-			images[0].attributes.find((attr) => attr.type === 'Attribute' && attr.name === name)
-		).toMatchObject({
-			value: {
-				type: 'ExpressionTag',
-				expression: { type: 'MemberExpression', object: { name: 'image' }, property: { name } }
-			}
+		const attribute = images[0].attributes.find(
+			(attr) => attr.type === 'Attribute' && attr.name === name
+		);
+		expect(attribute).toMatchObject({
+			value: { type: 'ExpressionTag', expression: { type: 'ArrowFunctionExpression' } }
 		});
+		const handler = source.slice(
+			(attribute as AST.Attribute).start,
+			(attribute as AST.Attribute).end
+		);
+		expect(handler.replace(/\s+/g, ' ')).toBe(
+			`${name}={(event) => image.${name}(event.currentTarget.getAttribute('src'))}`
+		);
 	}
 });
