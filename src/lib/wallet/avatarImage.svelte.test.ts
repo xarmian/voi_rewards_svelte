@@ -21,7 +21,7 @@ it('resets for a new src and ignores old handlers after the new image loads', ()
 	image.onload();
 	expect(image.show).toBe(true);
 	src = 'https://host/b.png';
-	expect(image.src).toBe(src);
+	expect(image.src).toBe('https://host/b.png');
 	expect(image.show).toBe(false);
 	oldLoad();
 	expect(image.show).toBe(false);

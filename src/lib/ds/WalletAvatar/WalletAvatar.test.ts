@@ -59,12 +59,10 @@ it('uses only an img for the avatar and wires the module load and error handlers
 		expect(
 			images[0].attributes.find((attr) => attr.type === 'Attribute' && attr.name === name)
 		).toMatchObject({
-			value: [
-				{
-					type: 'ExpressionTag',
-					expression: { type: 'MemberExpression', object: { name: 'image' }, property: { name } }
-				}
-			]
+			value: {
+				type: 'ExpressionTag',
+				expression: { type: 'MemberExpression', object: { name: 'image' }, property: { name } }
+			}
 		});
 	}
 });

@@ -188,6 +188,6 @@ it('wires wallet identity once to walletId and renders its avatar and name with 
 	expect(source.slice(avatars[0].start, avatars[0].end)).toContain('src={identity.avatar}');
 	expect(source.slice(avatars[0].start, avatars[0].end)).toContain('gradient={avatar}');
 	expect(source.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1]).toMatch(
-		/walletId\s*\?\s*identity.name\s*\?\?\s*shortAddr\(walletId\)\s*:\s*'Check a wallet'/
+		/walletId\s*\?\s*\(?identity.name\s*\?\?\s*shortAddr\(walletId\)\)?\s*:\s*'Check a wallet'/
 	);
 });
