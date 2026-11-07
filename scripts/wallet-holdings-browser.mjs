@@ -89,9 +89,11 @@ try {
 		optimizeDeps: { include: ['svelte', 'svelte/store', 'flowbite-svelte', 'algosdk', 'ulujs'] }
 	});
 	await server.listen();
+	if (!process.env.HOLDINGS_CHROMIUM) {
+		throw new Error('Set HOLDINGS_CHROMIUM to the path of a Chromium or headless-shell binary');
+	}
 	browser = spawn(
-		process.env.HOLDINGS_CHROMIUM ||
-			'/home/dave/.cache/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell',
+		process.env.HOLDINGS_CHROMIUM,
 		[
 			'--no-sandbox',
 			'--disable-dev-shm-usage',
@@ -333,9 +335,17 @@ try {
 		'PASS one-way expansion retains the same pending Claim controller through sorting, detail toggles and wallet changes'
 	);
 	assert.equal(errors.length, 0, JSON.stringify(errors));
-	await mkdir('/tmp/task-152-browser', { recursive: true });
-	const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
-	await writeFile('/tmp/task-152-browser/holdings.png', Buffer.from(shot.data, 'base64'));
+	if (process.env.HOLDINGS_SHOT_DIR) {
+		await mkdir(process.env.HOLDINGS_SHOT_DIR, { recursive: true });
+		const shot = await send('Page.captureScreenshot', {
+			format: 'png',
+			captureBeyondViewport: true
+		});
+		await writeFile(
+			resolve(process.env.HOLDINGS_SHOT_DIR, 'holdings.png'),
+			Buffer.from(shot.data, 'base64')
+		);
+	}
 	console.log('PASS real claim error remains visible; no external requests permitted');
 } finally {
 	ws?.close();
