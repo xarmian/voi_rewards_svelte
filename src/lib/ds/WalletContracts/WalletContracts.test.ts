@@ -5,9 +5,9 @@ import { canSignFor } from '$lib/chain/signerGate';
 import { expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
 import WalletContracts from './WalletContracts.svelte';
-import { contractFixture } from '../../wallet/contracts.fixtures';
 import { sortRows } from '../DataTable/sort';
 import type { WalletContract } from '../../wallet/summary';
+import { contractFixture } from '../../wallet/contracts.fixtures';
 
 vi.mock('$lib/component/WithdrawModal.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/component/RegisterVoteKey.svelte', () => ({ default: () => {} }));
@@ -462,4 +462,19 @@ it('small positive withdrawable and scheduled amounts do not round to zero', () 
 	}).body.replace(/<!--[\s\S]*?-->/g, '');
 	expect(html).toContain('&lt;0.01 VOI withdrawable now');
 	expect(html).toContain('+&lt;0.01 VOI');
+});
+
+it('does not show a withdrawable total while the contract list is unavailable', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts: [contractFixture(1)],
+			current: null,
+			pageAddress: 'OWNER',
+			selected: null,
+			state: 'stale',
+			contractSet: 'unavailable'
+		}
+	}).body;
+	expect(html).toContain('Withdrawable balance unavailable');
+	expect(html).not.toContain('VOI withdrawable now');
 });

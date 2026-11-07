@@ -67,7 +67,9 @@
 	}
 	const hasActions = $derived(contracts.some((row) => rowCanAct(row)));
 	const unavailable = $derived(contracts.filter((row) => !row.details).length);
-	const available = $derived(summarizeContracts(contracts).available);
+	const available = $derived(
+		contractSet === 'ready' ? summarizeContracts(contracts).available : null
+	);
 	let sort = $state<SortState>();
 	let openContextGeneration = 0;
 	$effect.pre(() => {

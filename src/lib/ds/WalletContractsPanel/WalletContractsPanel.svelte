@@ -13,7 +13,7 @@
 	import LineChart from '../charts/LineChart.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import WalletContracts from '../WalletContracts/WalletContracts.svelte';
-	import { compact } from '../format';
+	import { comma, compact } from '../format';
 	let {
 		contracts,
 		current,
@@ -57,7 +57,7 @@
 				? 'Schedule starts'
 				: timeline.events
 						.filter((e) => e.date.slice(0, 7) === month.date.slice(0, 7))
-						.map((e) => `${e.date} #${e.contractId}: ${e.amount} VOI`)
+						.map((e) => `${e.date} #${e.contractId}: ${comma(e.amount, 2)} VOI`)
 						.join('; '),
 			month.amount,
 			month.cumulative

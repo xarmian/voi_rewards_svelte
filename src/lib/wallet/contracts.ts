@@ -98,7 +98,7 @@ export function summarizeContracts(contracts: ContractRow[]) {
 export type VestingEvent = { contractId: number; date: string; amount: number };
 export type VestingMonth = { date: string; amount: number; cumulative: number };
 
-function projectSchedule(details: ContractDetails, now: number): VestingEvent[] | null {
+function projectSchedule(details: ContractDetails): VestingEvent[] | null {
 	const total = Number(details.totalAmount);
 	if (
 		!nonnegative(total) ||
@@ -123,7 +123,6 @@ function projectSchedule(details: ContractDetails, now: number): VestingEvent[] 
 		!nonnegative(amount) ||
 		amount === 0 ||
 		!Number.isFinite(first) ||
-		first! <= now ||
 		remaining < amount ||
 		Math.abs(amount - total / details.distributionCount) > tolerance
 	)
@@ -149,14 +148,16 @@ export function buildVestingTimeline(contracts: ContractRow[], now = Date.now())
 	const events: VestingEvent[] = [];
 	const unavailable: number[] = [];
 	for (const contract of contracts) {
-		const schedule = contract.details ? projectSchedule(contract.details, now) : null;
+		const schedule = contract.details ? projectSchedule(contract.details) : null;
 		if (schedule === null) unavailable.push(contract.contractId);
 		else events.push(...schedule);
 	}
 	events.sort((a, b) => a.date.localeCompare(b.date) || a.contractId - b.contractId);
 	const months: VestingMonth[] = [];
 	if (!unavailable.length && events.length) {
-		months.push({ date: new Date(now).toISOString(), amount: 0, cumulative: 0 });
+		// A clock that has passed the first loaded release still shows the loaded schedule.
+		const start = Math.min(now, Date.parse(events[0].date));
+		months.push({ date: new Date(start).toISOString(), amount: 0, cumulative: 0 });
 		const grouped = new Map<string, number>();
 		for (const event of events) {
 			const month = event.date.slice(0, 7);

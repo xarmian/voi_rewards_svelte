@@ -178,3 +178,15 @@ it('bounds a list read at fifteen seconds', async () => {
 	await vi.advanceTimersByTimeAsync(15000);
 	expect(await pending).toMatchObject({ contractSet: 'unavailable' });
 });
+
+it('keeps the loaded schedule when the clock passes the first release', () => {
+	const row = contractFixture(1);
+	const later = Date.parse('2027-01-02T06:00:00Z');
+	const timeline = buildVestingTimeline([row], later);
+	expect(timeline.complete).toBe(true);
+	expect(timeline.unavailable).toEqual([]);
+	expect(timeline.events).toHaveLength(4);
+	expect(Date.parse(timeline.months[0].date)).toBeLessThanOrEqual(
+		Date.parse(timeline.events[0].date)
+	);
+});
