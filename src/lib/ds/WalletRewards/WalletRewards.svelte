@@ -246,7 +246,7 @@
 	</div>
 {/snippet}
 
-<div class="min-w-0 space-y-5">
+<div class="min-w-0 space-y-5 [overflow-wrap:anywhere]">
 	<Card title="Rewards by epoch">
 		{#snippet actions()}<Button variant="soft" onclick={() => refresh()}>Refresh rewards</Button
 			>{/snippet}
