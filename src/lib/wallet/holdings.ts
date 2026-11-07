@@ -10,6 +10,9 @@ import { resolveEnvoiToken } from '$lib/utils/envoi';
 export type HoldingsAccount = Part<AccountSnapshot> | { status: 'loading' };
 export type HoldingsSplit = {
 	pageAddress: string;
+	/** Owner used to load this snapshot; compared as well as the page on invalidation. */
+	ownerAddress?: string;
+	ownerLookup?: 'ok' | 'unavailable';
 	owner: { address: string; balance: number } | null;
 	contracts: { address: string; balance: number; details: { lockedBalance: number } | null }[];
 	contractSet: 'ready' | 'unavailable';
@@ -190,6 +193,9 @@ export function deriveHoldingsDisplay({
 			: [];
 	const nativeReady =
 		split?.pageAddress === pageAddress &&
+		split.ownerLookup !== 'unavailable' &&
+		(split.ownerAddress === undefined ||
+			split.ownerAddress === (parentWalletAddress || pageAddress)) &&
 		split.contractSet === 'ready' &&
 		(!parentWalletAddress || contracts.some((c) => c.address === pageAddress)) &&
 		contracts.every(

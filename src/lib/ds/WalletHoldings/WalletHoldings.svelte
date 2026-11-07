@@ -263,6 +263,11 @@
 				{holdingsAmount(display.total)} VOI · {display.usd === null
 					? 'USD unavailable'
 					: `≈ ${usd(display.usd)}`}
+			</p>{:else if account.status === 'loaded' && split?.ownerLookup === 'unavailable'}<p
+				class="mt-4 text-h2"
+				aria-label="Holdings total"
+			>
+				Unavailable
 			</p>{/if}
 		{#if display.composition}<div
 				role="img"

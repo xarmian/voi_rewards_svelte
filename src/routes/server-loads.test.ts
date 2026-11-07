@@ -279,19 +279,20 @@ describe('TASK-32 wallet loads', () => {
 		const depends = vi.fn();
 		const fetcher = vi.fn<typeof fetch>();
 		expect(await load({ params: { id: address }, depends, url, fetch: fetcher } as never)).toEqual({
-			parentWalletId: 'OWNER'
+			parentWalletId: 'OWNER',
+			ownerLookup: 'ok'
 		});
 		expect(mocks.lockvest).toHaveBeenCalledWith(address);
 		expect(depends).toHaveBeenCalledWith('wallet:id');
 	});
 
-	it('returns null and logs when lockvest fails', async () => {
+	it('keeps the page loadable with explicitly unknown ownership and logs when lockvest fails', async () => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
 		const error = new Error('lookup failed');
 		mocks.lockvest.mockRejectedValue(error);
 		expect(
 			await load({ params: { id: address }, depends: vi.fn(), url, fetch: vi.fn() } as never)
-		).toEqual({ parentWalletId: null });
+		).toEqual({ parentWalletId: null, ownerLookup: 'unavailable' });
 		expect(console.error).toHaveBeenCalledWith('Lockvest lookup failed:', error);
 	});
 
@@ -299,7 +300,7 @@ describe('TASK-32 wallet loads', () => {
 		const { load } = await import('./(site)/wallet/[...id]/+page.server');
 		expect(
 			await load({ params: { id: '' }, depends: vi.fn(), url, fetch: vi.fn() } as never)
-		).toEqual({ parentWalletId: null });
+		).toEqual({ parentWalletId: null, ownerLookup: 'ok' });
 		expect(mocks.lockvest).not.toHaveBeenCalled();
 	});
 

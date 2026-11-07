@@ -76,7 +76,8 @@ describe('wallet shell hash integration', () => {
 		const html = render(Page, {
 			props: { data: { walletId: 'OWNER', parentWalletId: null } }
 		}).body;
-		expect(html).toContain(`Legacy ${content} content`);
+		if (content === 'lockvest') expect(html).toContain('Scheduled unlocks');
+		else expect(html).toContain(`Legacy ${content} content`);
 		expect(html).toMatch(new RegExp(`href="#${expected}"[^>]*aria-current="page"`));
 		if (hash === '#consensus') expect(html).toMatch(/<details[^>]* open/);
 	});
@@ -190,4 +191,14 @@ it('wires wallet identity once to walletId and renders its avatar and name with 
 	expect(source.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1]).toMatch(
 		/walletId\s*\?\s*\(?identity.name\s*\?\?\s*shortAddr\(walletId\)\)?\s*:\s*'Check a wallet'/
 	);
+});
+
+it('contracts uses an independent full panel and removes only the replaced wallet import', () => {
+	url.hash = '#contracts';
+	const html = render(Page, { props: { data: { walletId: 'OWNER', parentWalletId: null } } }).body;
+	expect(html).toContain('Scheduled unlocks');
+	expect(html).not.toContain('Legacy lockvest content');
+	const source = readFileSync('src/routes/(site)/wallet/[...id]/+page.svelte', 'utf8');
+	expect(source).toContain('WalletContractsPanel');
+	expect(source).not.toContain('import LockVestComponent');
 });

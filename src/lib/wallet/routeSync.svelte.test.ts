@@ -64,23 +64,24 @@ it('syncs once per wallet route change and loads the current parent', () => {
 	expect(load).toHaveBeenCalledExactlyOnceWith(A.address);
 	parentWalletId = 'OWNER';
 	flushSync();
-	// The original effect tracks walletId only; parent-only changes do not initialize.
-	expect(load).toHaveBeenCalledTimes(1);
+	// Ownership invalidation reloads the source without selecting an account again.
+	expect(load).toHaveBeenCalledTimes(2);
+	expect(selectWallet).toHaveBeenCalledTimes(1);
 	walletId = B.address;
 	flushSync();
 	expect(selectWallet).toHaveBeenCalledTimes(2);
 	expect(selectWallet).toHaveBeenLastCalledWith(expect.objectContaining({ address: B.address }));
 	expect(get(selectedWallet)?.address).toBe(B.address);
-	expect(load.mock.calls).toEqual([[A.address], ['OWNER']]);
+	expect(load.mock.calls).toEqual([[A.address], ['OWNER'], ['OWNER']]);
 	walletId = '';
 	flushSync();
-	expect(load).toHaveBeenCalledTimes(2);
+	expect(load).toHaveBeenCalledTimes(3);
 	parentWalletId = null;
 	walletId = 'UNCONNECTED';
 	flushSync();
 	expect(get(selectedWallet)?.address).toBe(B.address);
 	expect(selectWallet).toHaveBeenCalledTimes(2);
-	expect(load).toHaveBeenCalledTimes(3);
+	expect(load).toHaveBeenCalledTimes(4);
 	expect(load).toHaveBeenLastCalledWith('UNCONNECTED');
 });
 

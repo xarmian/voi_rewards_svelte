@@ -38,7 +38,10 @@ export type WalletSnapshot = {
 
 // These display details intentionally use LockVestComponent's existing reads and calculations.
 // The existing modals receive the same ContractDetails shape and microVOI units.
-async function readContract(account: WalletAccount, force: boolean): Promise<ContractDetails> {
+export async function readContract(
+	account: WalletAccount,
+	force: boolean
+): Promise<ContractDetails> {
 	// Get the application info using algodClient
 	const appInfo = await algodClient.getApplicationByID(account.contractId).do();
 	const accountInfo = await requireAccountInfo(account.address, { force });
@@ -169,7 +172,7 @@ async function readContract(account: WalletAccount, force: boolean): Promise<Con
 	};
 }
 
-async function bounded<T>(request: Promise<T>): Promise<T> {
+export async function bounded<T>(request: Promise<T>): Promise<T> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
 		return await Promise.race([

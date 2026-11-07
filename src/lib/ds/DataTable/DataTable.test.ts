@@ -231,3 +231,15 @@ describe('DataTable SSR', () => {
 		assert.ok(contentText(body).includes('as of'));
 	});
 });
+
+test('a per-row action predicate omits the unavailable row trigger while retaining table cells and default behavior', () => {
+	const rowActions = createRawSnippet<[Row]>(() => ({
+		render: () => '<button type="button" role="menuitem">Copy</button>'
+	}));
+	const body = html({ rowActions, rowHasActions: (row: Row) => row.name === 'Alpha' });
+	assert.equal((body.match(/aria-haspopup="menu"/g) ?? []).length, 1);
+	assert.ok(contentText(body).includes('Actions for Alpha'));
+	assert.ok(!contentText(body).includes('Actions for Beta'));
+	assert.ok(contentText(body).includes('Beta'));
+	assert.equal((html({ rowActions }).match(/aria-haspopup="menu"/g) ?? []).length, 2);
+});

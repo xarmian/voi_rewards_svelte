@@ -176,3 +176,51 @@ it('excludes a contract-route owner from liquid holdings', () => {
 	expect(result.holdings.other).toBe(4000);
 	expect(result.holdings.total).toBe(10000);
 });
+
+it('unknown route ownership withholds the locked/liquid split and total even with successful account and token reads', () => {
+	const summary = summarizeWallet({
+		owner,
+		contracts: [],
+		current: null,
+		history: [],
+		state: 'ready',
+		now: Date.now(),
+		ownerLookup: 'unavailable',
+		tokens: { state: 'ready', lp: 0, other: 0, lpCount: 0, tokenCount: 0 }
+	});
+	expect(summary.contractsReady).toBe(false);
+	expect(summary.holdings.state).toBe('error');
+	expect(summary.holdings.liquidKnown).toBe(false);
+	expect(summary.holdings.total).toBeNull();
+});
+
+it('unknown ownership renders unavailable native split in Overview', async () => {
+	const { render } = await import('svelte/server');
+	const { default: Overview } = await import('$lib/ds/WalletOverview/WalletOverview.svelte');
+	const summary = summarizeWallet({
+		owner,
+		contracts: [],
+		current: null,
+		history: [],
+		state: 'ready',
+		now: Date.now(),
+		ownerLookup: 'unavailable',
+		tokens: { state: 'ready', lp: 0, other: 0, lpCount: 0, tokenCount: 0 }
+	});
+	const html = render(Overview, {
+		props: {
+			summary,
+			contracts: [],
+			current: null,
+			pageAddress: 'OWNER',
+			selected: null,
+			now: Date.now()
+		}
+	}).body;
+	const text = html
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ');
+	expect(text).toContain('Locked balance unavailable');
+	expect(text).toMatch(/Liquid: Unavailable/);
+});

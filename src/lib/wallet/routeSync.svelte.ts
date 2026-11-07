@@ -32,9 +32,24 @@ export function createWalletRouteSync(
 		}
 	}
 
-	// TASK-109 / TASK-165: only route changes initialize; asynchronous reads of selection and
+	// Only page changes initialize selection; owner changes reload data. Asynchronous reads of selection and
 	// connected wallets must not turn connect/restore notifications into route synchronization.
+	let previousPage: string | undefined;
 	$effect.pre(() => {
-		if (browser && walletId()) untrack(() => initializeWallet());
+		const page = walletId();
+		const owner = parentWalletId();
+		if (!browser) return;
+		if (!page) {
+			previousPage = undefined;
+			return;
+		}
+		if (previousPage === page)
+			untrack(() => {
+				void updateAccountInfo(owner || page);
+			});
+		else {
+			previousPage = page;
+			untrack(() => initializeWallet());
+		}
 	});
 }
