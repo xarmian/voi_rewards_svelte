@@ -30,7 +30,8 @@ export function signingHarness(component: string, name: string, captured = 'X') 
 		signerMatchesAccount,
 		wrongSignerMessage,
 		capturePageSigner,
-		captureSigner: () => Object.freeze({ address: context.$selectedWallet.address, walletId: 'pera' }),
+		captureSigner: () =>
+			Object.freeze({ address: context.$selectedWallet.address, walletId: 'pera' }),
 		accountAddress: 'Y',
 		pageAddress: 'Y',
 		walletAddress: 'Y',
@@ -55,12 +56,27 @@ export function signingHarness(component: string, name: string, captured = 'X') 
 		claimingError: null,
 		claimError: null,
 		bulkClaimError: null,
-		claimableTokensSummary: [],
+		claimableTokensSummary: [
+			{ token: { type: 'arc200', id: '1' }, approvals: [{ owner: 'OWNER', amount: '1' }] }
+		],
 		bridgeStatus: 'idle',
 		isVoiToAlgorand: true,
 		destinationAddress: 'DEST',
 		destinationNetwork: 'algorand',
 		amount: '1',
+		recipients: [{ address: 'DEST', amount: '1' }],
+		decimalToBaseUnits: () => 1n,
+		withinBalance: () => true,
+		isARC200Token: () => false,
+		abi: { custom: {} },
+		algodIndexer: {},
+		loadClaimBuilder: async () => ({
+			arc200: class {
+				constructor() {
+					io();
+				}
+			}
+		}),
 		selectedToken: { symbol: 'VOI', decimals: 6, algorandAssetId: '0', voiAssetId: '0' },
 		feeAmount: 0,
 		destinationAmount: 1,
@@ -100,15 +116,22 @@ export function signingHarness(component: string, name: string, captured = 'X') 
 	});
 	const names = component === 'RegisterVoteKey' ? ['signerOrError', name] : [name];
 	runInContext(
-		ts.transpileModule(handlerSource(component, names).replace("await import('ulujs')", 'await loadClaimBuilder()'), {
-			compilerOptions: { target: ts.ScriptTarget.ES2022 }
-		}).outputText,
+		ts.transpileModule(
+			handlerSource(component, names).replace("await import('ulujs')", 'await loadClaimBuilder()'),
+			{
+				compilerOptions: { target: ts.ScriptTarget.ES2022 }
+			}
+		).outputText,
 		context
 	);
 	return {
 		context,
 		io,
 		capturePageSigner,
-		run: () => runInContext(`${name}({transactionId: 'approval', spender: 'SPENDER', owner: 'OWNER', amount: '1'})`, context)
+		run: () =>
+			runInContext(
+				`${name}({transactionId: 'approval', spender: 'SPENDER', owner: 'OWNER', amount: '1'})`,
+				context
+			)
 	};
 }

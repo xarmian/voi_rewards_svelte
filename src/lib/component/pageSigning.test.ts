@@ -21,10 +21,12 @@ test.each(paths)(
 	'%s %s refuses a captured account different from its own page before construction',
 	async (component, name, errorKey) => {
 		const h = signingHarness(component, name);
-		await h.run();
+		await h.run().catch((error: unknown) => {
+			if (!h.io.mock.calls.length) throw error;
+		});
+		expect(h.io).not.toHaveBeenCalled();
 		expect(h.context[errorKey]).toBe(refusal);
 		expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
-		expect(h.io).not.toHaveBeenCalled();
 	}
 );
 
@@ -35,10 +37,12 @@ test.each(paths)(
 		h.capturePageSigner.mockImplementation(() => {
 			throw new Error(refusal);
 		});
-		await h.run();
+		await h.run().catch((error: unknown) => {
+			if (!h.io.mock.calls.length) throw error;
+		});
+		expect(h.io).not.toHaveBeenCalled();
 		expect(h.context[errorKey]).toBe(refusal);
 		expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
-		expect(h.io).not.toHaveBeenCalled();
 	}
 );
 
@@ -53,10 +57,12 @@ test.each(paths)(
 			h.context.contract.owner = 'X';
 			return Object.freeze({ address: 'X', walletId: 'pera' });
 		});
-		await h.run();
+		await h.run().catch((error: unknown) => {
+			if (!h.io.mock.calls.length) throw error;
+		});
+		expect(h.io).not.toHaveBeenCalled();
 		expect(h.context[errorKey]).toBe(refusal);
 		expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
-		expect(h.io).not.toHaveBeenCalled();
 	}
 );
 
@@ -79,57 +85,132 @@ test('withdraw refuses a row whose owner is not the page', async () => {
 	expect(h.io).not.toHaveBeenCalled();
 });
 
-
-test.each(paths)('%s %s signs with the page pair while another account was last used', async (component, name) => {
- const h = signingHarness(component, name, 'Y');
- const c = h.context;
- c.$selectedWallet = {address: 'X', app: 'defly'};
- const txn = {sender: 'Y', txID: () => 'tx'};
- const sign = vi.fn(async () => { throw new Error('Mock signing complete'); });
- c.signTransactions = sign;
- c.signAndSendTransactions = sign;
- c.algodClient = {getTransactionParams: () => ({do: async () => ({})})};
- c.algosdk = {...c.algosdk, decodeUnsignedTransaction: () => txn, assignGroupID: (txns: unknown) => txns};
- c.BRIDGE_ADDRESS = 'BRIDGE';
- c.TextEncoder = TextEncoder;
- c.buildPayment = vi.fn((args: {from: string}) => {expect(args.from).toBe('Y'); return txn;});
- c.buildAssetTransfer = vi.fn((args: {from: string}) => {expect(args.from).toBe('Y'); return txn;});
- c.buildWalletKeyregTxn = vi.fn((args: {sender: string}) => {expect(args.sender).toBe('Y'); return txn;});
- c.sendWalletKeyreg = async (_txn: unknown, deps: {signAndSend: (groups: unknown) => Promise<unknown>}) => deps.signAndSend([[txn]]);
- c.recipients = [{address: 'DEST', amount: '1'}];
- c.decimalToBaseUnits = () => 1n;
- c.withinBalance = () => true;
- c.isARC200Token = () => false;
- c.isNativeToken = () => true;
- c.MAX_TXN_PER_GROUP = 16;
- c.MAX_GROUPS_PER_SIGNING = 16;
- c.buildVOITransaction = vi.fn((_token: unknown, sender: string) => {expect(sender).toBe('Y'); return txn;});
- c.canOfferWithdraw = () => true;
- c.VOIToMicroVOI = () => 1000000;
- c.sendDeps = {};
- c.sendWithdrawal = async (_args: unknown, deps: {sign: (groups: unknown) => Promise<unknown>}) => deps.sign([[txn]]);
- c.votingKey = c.selectionKey = c.stateProofKey = '';
- c.firstRound = 1; c.lastRound = 2; c.keyDilution = 1;
- c.payIncentiveFee = false;
- c.incentiveKeyregFee = () => 1000n;
- c.abi = {custom: {}};
- c.CONTRACT = vi.fn(function (...args: unknown[]) {
-  expect(args[4]).toEqual(expect.objectContaining({addr: 'Y'}));
-  return {participate: async () => ({obj: {}}), withdraw: async () => ({obj: {}}), custom: async () => ({txns: ['one', 'two']}), setFee: vi.fn(), setEnableGroupResourceSharing: vi.fn(), setExtraTxns: vi.fn()};
- });
- c.arc200Approve = async (_id: unknown, _spender: unknown, _amount: unknown, sender: string, callback: (txns: unknown[]) => Promise<unknown>) => {expect(sender).toBe('Y'); return callback([txn]);};
- c.arc200RevokeApproval = async (_id: unknown, _spender: unknown, sender: string, callback: (txns: unknown[]) => Promise<unknown>) => {expect(sender).toBe('Y'); return callback([txn]);};
- c.arc200TransferFrom = async (_id: unknown, _from: unknown, to: string, _amount: unknown, sender: string, callback: (txns: unknown[]) => Promise<unknown>) => {expect(to).toBe('Y'); expect(sender).toBe('Y'); return callback([txn]);};
- c.claimableTokensSummary = [{token: c.token, approvals: c.approvals}];
- c.algodIndexer = {};
- c.loadClaimBuilder = async () => ({arc200: class {
-  constructor(_id: unknown, _algod: unknown, _indexer: unknown, opts: {acc: {addr: string}}) {expect(opts.acc.addr).toBe('Y');}
-  async arc200_transferFrom(_from: unknown, to: string) {expect(to).toBe('Y'); return {success: true, txns: ['one']};}
- }});
- await h.run();
- expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
- expect(sign).toHaveBeenCalledOnce();
- const [groups, signer] = sign.mock.calls[0] as unknown as [unknown, unknown];
- expect(Array.isArray(groups)).toBe(true);
- expect(signer).toEqual({address: 'Y', walletId: 'pera'});
-});
+test.each(paths)(
+	'%s %s signs with the page pair while another account was last used',
+	async (component, name) => {
+		const h = signingHarness(component, name, 'Y');
+		const c = h.context;
+		c.$selectedWallet = { address: 'X', app: 'defly' };
+		const txn = { sender: 'Y', txID: () => 'tx' };
+		const sign = vi.fn(async () => {
+			throw new Error('Mock signing complete');
+		});
+		c.signTransactions = sign;
+		c.signAndSendTransactions = sign;
+		c.algodClient = { getTransactionParams: () => ({ do: async () => ({}) }) };
+		c.algosdk = {
+			...c.algosdk,
+			decodeUnsignedTransaction: () => txn,
+			assignGroupID: (txns: unknown) => txns
+		};
+		c.BRIDGE_ADDRESS = 'BRIDGE';
+		c.TextEncoder = TextEncoder;
+		c.buildPayment = vi.fn((args: { from: string }) => {
+			expect(args.from).toBe('Y');
+			return txn;
+		});
+		c.buildAssetTransfer = vi.fn((args: { from: string }) => {
+			expect(args.from).toBe('Y');
+			return txn;
+		});
+		c.buildWalletKeyregTxn = vi.fn((args: { sender: string }) => {
+			expect(args.sender).toBe('Y');
+			return txn;
+		});
+		c.sendWalletKeyreg = async (
+			_txn: unknown,
+			deps: { signAndSend: (groups: unknown) => Promise<unknown> }
+		) => deps.signAndSend([[txn]]);
+		c.recipients = [{ address: 'DEST', amount: '1' }];
+		c.decimalToBaseUnits = () => 1n;
+		c.withinBalance = () => true;
+		c.isARC200Token = () => false;
+		c.isNativeToken = () => true;
+		c.MAX_TXN_PER_GROUP = 16;
+		c.MAX_GROUPS_PER_SIGNING = 16;
+		c.buildVOITransaction = vi.fn((_token: unknown, sender: string) => {
+			expect(sender).toBe('Y');
+			return txn;
+		});
+		c.canOfferWithdraw = () => true;
+		c.VOIToMicroVOI = () => 1000000;
+		c.sendDeps = {};
+		c.sendWithdrawal = async (
+			_args: unknown,
+			deps: { sign: (groups: unknown) => Promise<unknown> }
+		) => deps.sign([[txn]]);
+		c.votingKey = c.selectionKey = c.stateProofKey = '';
+		c.firstRound = 1;
+		c.lastRound = 2;
+		c.keyDilution = 1;
+		c.payIncentiveFee = false;
+		c.incentiveKeyregFee = () => 1000n;
+		c.abi = { custom: {} };
+		c.CONTRACT = vi.fn(function (...args: unknown[]) {
+			expect(args[4]).toEqual(expect.objectContaining({ addr: 'Y' }));
+			return {
+				participate: async () => ({ obj: {} }),
+				withdraw: async () => ({ obj: {} }),
+				custom: async () => ({ txns: ['one', 'two'] }),
+				setFee: vi.fn(),
+				setEnableGroupResourceSharing: vi.fn(),
+				setExtraTxns: vi.fn()
+			};
+		});
+		c.arc200Approve = async (
+			_id: unknown,
+			_spender: unknown,
+			_amount: unknown,
+			sender: string,
+			callback: (txns: unknown[]) => Promise<unknown>
+		) => {
+			expect(sender).toBe('Y');
+			return callback([txn]);
+		};
+		c.arc200RevokeApproval = async (
+			_id: unknown,
+			_spender: unknown,
+			sender: string,
+			callback: (txns: unknown[]) => Promise<unknown>
+		) => {
+			expect(sender).toBe('Y');
+			return callback([txn]);
+		};
+		c.arc200TransferFrom = async (
+			_id: unknown,
+			_from: unknown,
+			to: string,
+			_amount: unknown,
+			sender: string,
+			callback: (txns: unknown[]) => Promise<unknown>
+		) => {
+			expect(to).toBe('Y');
+			expect(sender).toBe('Y');
+			return callback([txn]);
+		};
+		c.claimableTokensSummary = [{ token: c.token, approvals: c.approvals }];
+		c.algodIndexer = {};
+		c.loadClaimBuilder = async () => ({
+			arc200: class {
+				constructor(
+					_id: unknown,
+					_algod: unknown,
+					_indexer: unknown,
+					opts: { acc: { addr: string } }
+				) {
+					expect(opts.acc.addr).toBe('Y');
+				}
+				async arc200_transferFrom(_from: unknown, to: string) {
+					expect(to).toBe('Y');
+					return { success: true, txns: ['one'] };
+				}
+			}
+		});
+		await h.run();
+		expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
+		expect(sign).toHaveBeenCalledOnce();
+		const [groups, signer] = sign.mock.calls[0] as unknown as [unknown, unknown];
+		expect(Array.isArray(groups)).toBe(true);
+		expect(signer).toEqual({ address: 'Y', walletId: 'pera' });
+	}
+);

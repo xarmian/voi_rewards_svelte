@@ -4,7 +4,7 @@ import { get } from 'svelte/store';
 
 const environment = vi.hoisted(() => ({ browser: true }));
 vi.mock('$app/environment', () => environment);
-vi.mock('$app/navigation', () => ({goto: vi.fn()}));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 import { goto } from '$app/navigation';
 vi.hoisted(() => {
 	const values = new Map<string, string>();
@@ -117,7 +117,7 @@ it('follows a page signer arriving through connect without reload or navigation'
 	flushSync();
 	expect(get(selectedWallet)?.address).toBe(A.address);
 	expect(load).toHaveBeenCalledOnce();
- expect(goto).not.toHaveBeenCalled();
+	expect(goto).not.toHaveBeenCalled();
 });
 
 it('keeps a pinned selection on route changes and still loads the route', () => {

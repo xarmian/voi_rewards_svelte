@@ -34,6 +34,10 @@ import Register from '$lib/component/RegisterVoteKey.svelte';
 import Fungible from '$lib/component/FungibleToken.svelte';
 import Claimable from '$lib/component/ClaimableTokenCard.svelte';
 import Picker from '$lib/component/WalletPickerWordsFixture.svelte';
+import Rewards from '$lib/ds/WalletRewards/WalletRewards.svelte';
+import Contracts from '$lib/ds/WalletContracts/WalletContracts.svelte';
+import { contractFixture } from '$lib/wallet/contracts.fixtures';
+import { pageAccountState } from '$lib/chain/signerGate';
 import Calculator from '$lib/component/CalculatorComponent.svelte';
 import { tokens } from '$lib/ds/WalletHoldings/fixtures';
 
@@ -80,6 +84,22 @@ test('all wallet surfaces use account and read-only wording', () => {
 				'contract',
 				render(Page, { props: { data: { walletId: 'C', parentWalletId: 'Y' } } }).body
 			);
+			add('rewards', render(Rewards, { props: { pageAddress: 'Y' } }).body);
+			for (const mode of ['overview', 'full'] as const) {
+				add(
+					`contracts-${mode}`,
+					render(Contracts, {
+						props: {
+							contracts: [contractFixture(1, { owner: 'Y' })],
+							current: null,
+							pageAddress: 'Y',
+							accountState: pageAccountState('Y', entries),
+							state: 'ready',
+							mode
+						}
+					}).body
+				);
+			}
 			add('holdings', render(Portfolio, { props: { walletAddress: 'Y' } }).body);
 			add(
 				'consensus',
@@ -157,6 +177,9 @@ test('all wallet surfaces use account and read-only wording', () => {
 				'search',
 				'contract',
 				'holdings',
+				'rewards',
+				'contracts-overview',
+				'contracts-full',
 				'consensus',
 				'send',
 				'bridge',
@@ -172,11 +195,16 @@ test('all wallet surfaces use account and read-only wording', () => {
 			].sort()
 		);
 		const text = audit.join('\n');
-		expect(text.replaceAll('Quick Select', 'Quick amount')).not.toMatch(/\b(?:selected|select|re-select)\b/i);
+		for (const surface of audit) {
+			expect(
+				surface.startsWith('calculator:')
+					? surface.replaceAll('Quick Select', 'Quick amount')
+					: surface
+			).not.toMatch(/\b(?:selected|select|re-select)\b/i);
+		}
 		if (process.env.WALLET_WORDS_AUDIT) writeFileSync(process.env.WALLET_WORDS_AUDIT, text + '\n');
 	} finally {
 		vi.clearAllTimers();
 		vi.useRealTimers();
 	}
 });
-

@@ -32,9 +32,7 @@ test.each(['PortfolioComponent', 'OptOutModal'])(
 	(component) => {
 		const text = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
 		// The stores can lag the rune store by a tick, so a guard can pass and the capture still refuse.
-		const capture = text.indexOf(
-			'signer = capturePageSigner(target);'
-		);
+		const capture = text.indexOf('signer = capturePageSigner(target);');
 		expect(capture).toBeGreaterThan(-1);
 		expect(text.slice(capture - 40, capture)).toMatch(/try \{\s*$/);
 		const catchBody = text.slice(capture, text.indexOf('return;', capture));
