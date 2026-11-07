@@ -130,7 +130,7 @@ it.each(['Offline', 'Online'])(
 				contracts: data.contracts,
 				current: data.current,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: { state: 'yours', signingEntry: { address: 'OWNER', app: 'kibisis' } },
 				now: Date.now(),
 				onrefresh: () => {}
 			}
@@ -238,7 +238,7 @@ it.each(['app 404', 'app timeout'])(
 				current: data.current,
 				historyState: data.historyState,
 				pageAddress: 'OWNER',
-				selected: null,
+				accountState: { state: 'read-only' },
 				now: Date.now(),
 				onrefresh: () => {}
 			}

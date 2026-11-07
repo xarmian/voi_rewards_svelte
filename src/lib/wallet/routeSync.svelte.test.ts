@@ -4,6 +4,8 @@ import { get } from 'svelte/store';
 
 const environment = vi.hoisted(() => ({ browser: true }));
 vi.mock('$app/environment', () => environment);
+vi.mock('$app/navigation', () => ({goto: vi.fn()}));
+import { goto } from '$app/navigation';
 vi.hoisted(() => {
 	const values = new Map<string, string>();
 	Object.defineProperty(globalThis, 'localStorage', {
@@ -21,7 +23,7 @@ vi.mock('$lib/chain/wallet.svelte', async (importOriginal) => {
 	return { ...actual, selectWallet: vi.fn(actual.selectWallet) };
 });
 import { walletStore } from 'avm-wallet-svelte';
-import { connectedWallets, selectedWallet, selectWallet } from '$lib/chain/wallet.svelte';
+import { selectedWallet, selectWallet, captureSigner } from '$lib/chain/wallet.svelte';
 import { pinnedFlows } from '$lib/chain/flowAccount';
 import { createWalletRouteSync } from './routeSync.svelte';
 
@@ -32,7 +34,6 @@ const A = {
 	isWatch: false
 };
 const B = { ...A, address: 'B'.repeat(58) };
-const C = { ...A, address: 'C'.repeat(58) };
 let dispose: (() => void) | undefined;
 afterEach(() => {
 	dispose?.();
@@ -85,52 +86,38 @@ it('syncs once per wallet route change and loads the current parent', () => {
 	expect(load).toHaveBeenLastCalledWith('UNCONNECTED');
 });
 
-it('does not resync or reload on restore/connect notifications and preserves a user selection', () => {
-	walletStore.addAccounts([A, B]);
-	walletStore.selectAccount(B);
-	let walletId = $state(A.address);
-	const load = vi.fn<(address: string) => Promise<void>>(async () => {});
-	const connectedNotifications = vi.fn();
-	const selectionNotifications = vi.fn();
-	const stopConnected = connectedWallets.subscribe(connectedNotifications);
-	const stopSelected = selectedWallet.subscribe(selectionNotifications);
-	try {
-		dispose = $effect.root(() => {
-			createWalletRouteSync(
-				() => walletId,
-				() => null,
-				load
-			);
-		});
-		flushSync();
-		walletId = B.address;
-		flushSync();
-		expect.soft(selectWallet).toHaveBeenCalledTimes(2);
-		expect.soft(load).toHaveBeenCalledTimes(2);
-		// The picker selects A while the displayed route is still B.
-		walletStore.selectAccount(A);
-		flushSync();
-		expect.soft(get(selectedWallet)?.address).toBe(A.address);
-		expect.soft(selectWallet).toHaveBeenCalledTimes(2);
-		expect.soft(load).toHaveBeenCalledTimes(2);
-		connectedNotifications.mockClear();
-		selectionNotifications.mockClear();
-		// Restore/connect publishes both a new account and updated selected-account metadata.
-		walletStore.addAccounts([C]);
-		walletStore.updateAccountName(A.address, 'Restored account');
-		flushSync();
-		expect.soft(connectedNotifications).toHaveBeenCalled();
-		expect.soft(selectionNotifications).toHaveBeenCalled();
-		expect.soft(get(connectedWallets).map((account) => account.address)).toContain(C.address);
-		expect
-			.soft(get(selectedWallet))
-			.toMatchObject({ address: A.address, name: 'Restored account' });
-		expect.soft(selectWallet).toHaveBeenCalledTimes(2);
-		expect.soft(load).toHaveBeenCalledTimes(2);
-	} finally {
-		stopConnected();
-		stopSelected();
-	}
+it('follows a page signer arriving through connect without reload or navigation', () => {
+	walletStore.addAccounts([A]);
+	walletStore.selectAccount(A);
+	const load = vi.fn(async () => {});
+	dispose = $effect.root(() =>
+		createWalletRouteSync(
+			() => B.address,
+			() => null,
+			load
+		)
+	);
+	flushSync();
+	expect(selectWallet).not.toHaveBeenCalled();
+	walletStore.addAccounts([{ ...B, walletId: 'watch', isWatch: true }]);
+	flushSync();
+	expect(selectWallet).not.toHaveBeenCalled();
+	expect(get(selectedWallet)?.address).toBe(A.address);
+	walletStore.addAccounts([B]);
+	flushSync();
+	expect(selectWallet).toHaveBeenCalledExactlyOnceWith(
+		expect.objectContaining({ address: B.address, walletId: B.walletId })
+	);
+	expect(load).toHaveBeenCalledOnce();
+	walletStore.selectAccount(A);
+	flushSync();
+	expect(selectWallet).toHaveBeenCalledTimes(1);
+	expect(get(selectedWallet)?.address).toBe(A.address);
+	walletStore.removeAccount(B.walletId, B.address);
+	flushSync();
+	expect(get(selectedWallet)?.address).toBe(A.address);
+	expect(load).toHaveBeenCalledOnce();
+ expect(goto).not.toHaveBeenCalled();
 });
 
 it('keeps a pinned selection on route changes and still loads the route', () => {
@@ -151,8 +138,10 @@ it('keeps a pinned selection on route changes and still loads the route', () => 
 	expect(load).toHaveBeenCalledExactlyOnceWith(A.address);
 	pinnedFlows.set(0);
 	flushSync();
-	expect(get(selectedWallet)?.address).toBe(B.address);
-	expect(selectWallet).not.toHaveBeenCalled();
+	expect(get(selectedWallet)?.address).toBe(A.address);
+	expect(selectWallet).toHaveBeenCalledExactlyOnceWith(
+		expect.objectContaining({ address: A.address })
+	);
 	expect(load).toHaveBeenCalledTimes(1);
 });
 
@@ -170,4 +159,26 @@ it('does not select or load outside the browser', () => {
 	flushSync();
 	expect(selectWallet).not.toHaveBeenCalled();
 	expect(load).not.toHaveBeenCalled();
+});
+
+it('page membership hands the exact signing pair to vanity and leaves Watch pages alone', () => {
+	walletStore.addAccounts([A, { ...B, walletId: 'watch', isWatch: true }, B]);
+	walletStore.selectAccount(A);
+	let address = $state(B.address);
+	dispose = $effect.root(() =>
+		createWalletRouteSync(
+			() => address,
+			() => null,
+			vi.fn(async () => {})
+		)
+	);
+	flushSync();
+	expect(captureSigner()).toEqual({ address: B.address, walletId: B.walletId });
+	address = 'WATCH';
+	walletStore.addAccounts([{ ...A, address: 'WATCH', walletId: 'watch', isWatch: true }]);
+	flushSync();
+	expect(captureSigner()).toEqual({ address: B.address, walletId: B.walletId });
+	address = '';
+	flushSync();
+	expect(captureSigner()).toEqual({ address: B.address, walletId: B.walletId });
 });

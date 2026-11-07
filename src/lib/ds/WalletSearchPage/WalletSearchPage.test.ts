@@ -57,3 +57,26 @@ it('missing or inaccessible storage leaves usable search and an explicit recents
 	}
 	expect(source).toContain('No recent wallets yet. Search an address or try an example.');
 });
+it('Your accounts lists signing entries once per address, taking the signing name', async () => {
+	const source = readFileSync(new URL('./WalletSearchPage.svelte', import.meta.url), 'utf8');
+	const fn = source.match(/function signingAccounts\([^]*?\n\t\}/)?.[0];
+	expect(fn).toBeDefined();
+	const { pageAccountState } = await import('$lib/chain/signerGate');
+	const entries = [
+		{ address: 'Y', app: 'Watch', name: 'Watch name' },
+		{ address: 'Y', app: 'pera', name: 'Alice' },
+		{ address: 'Y', app: 'defly', name: 'Other name' },
+		{ address: 'W', app: 'Watch' },
+		{ address: 'X', app: 'defly', name: 'Bob' },
+		{ address: 'BLANK', app: '' }
+	];
+	const result = runInNewContext(
+		ts.transpile(`${fn}; signingAccounts(entries)`, { target: ts.ScriptTarget.ES2022 }),
+		{ entries, pageAccountState }
+	);
+	expect(result).toEqual([entries[1], entries[4]]);
+	expect(source).toContain('<Card title="Your accounts">');
+	expect(source.indexOf('<Card title="Your accounts">')).toBeLessThan(
+		source.indexOf('<Card title="Recent wallets">')
+	);
+});

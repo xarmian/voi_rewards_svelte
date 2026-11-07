@@ -45,6 +45,8 @@ function selectedWalletGlobals() {
 	return {
 		accountAddress: address,
 		$selectedWallet: { address },
+		canSignTransactions: true,
+		capturePageSigner: () => ({ address, walletId: 'pera' }),
 		captureSigner: () => ({ address, walletId: 'pera' }),
 		flow: createFlowPin()
 	};
@@ -61,6 +63,8 @@ async function retryHarness(pinned: string, selected: string) {
 		algosdk,
 		accountAddress: pinned,
 		$selectedWallet: { address: selected },
+		canSignTransactions: true,
+		capturePageSigner: () => ({ address: selected, walletId: 'pera' }),
 		captureSigner: () => ({ address: selected, walletId: 'pera' }),
 		flow,
 		selectedToken: { decimals: 6, symbol: 'VOI' },
@@ -76,19 +80,19 @@ async function retryHarness(pinned: string, selected: string) {
 	return { run, flow };
 }
 
-test('a retry after a failed send refuses a different selected account and names the pinned one', async () => {
+test('a retry after a failed send refuses an injected signer different from the pinned page', async () => {
 	const pinned = algosdk.generateAccount().addr.toString();
 	const other = algosdk.generateAccount().addr.toString();
 	const { run, flow } = await retryHarness(pinned, other);
 	await run('handleSend()');
-	expect(run('error')).toBe(`Select account ${pinned} in a signing wallet to continue.`);
+	expect(run('error')).toBe(wrongSignerMessage());
 	expect(run('isSending')).toBe(false);
 	// The refusal leaves the pin where it was: the form still belongs to the submitted account.
 	expect(flow.address).toBe(pinned);
 	flow.dispose();
 });
 
-test('a retry after a failed send with the pinned account selected again goes on to validate', async () => {
+test('a retry after a failed send with the pinned page signer still connected goes on to validate', async () => {
 	const pinned = algosdk.generateAccount().addr.toString();
 	const { run, flow } = await retryHarness(pinned, pinned);
 	await run('handleSend()');
@@ -232,6 +236,8 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 					signerMatchesAccount,
 					wrongSignerMessage,
 					$selectedWallet: { address: selected },
+					canSignTransactions: true,
+					capturePageSigner: () => ({ address: selected, walletId: 'pera' }),
 					captureSigner: () => ({ address: selected, walletId: 'pera' }),
 					buildPayment: payment,
 					buildAssetTransfer: asset,
@@ -265,7 +271,7 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 			);
 			await run('handleSend()');
 			if (selected !== accountAddress) {
-				expect(run('error')).toBe(wrongSignerMessage(accountAddress));
+				expect(run('error')).toBe(wrongSignerMessage());
 				for (const call of [
 					payment,
 					asset,

@@ -13,7 +13,7 @@ test('withdraw signs separately and uses the recorded send flow and wait estimat
 		/sign:\s*\(groups\) => signTransactions\(groups, signer\)/
 	);
 	expect(source, 'A missing wallet must be rejected before building').toMatch(
-		/Connect a wallet to withdraw[\s\S]*new CONTRACT\(/
+		/if \(!canSignTransactions \|\| pageAddress !== contract.owner\)[\s\S]*new CONTRACT\(/
 	);
 });
 
@@ -85,7 +85,7 @@ test('the amount input and Withdraw button use the synchronous registry guard', 
 			new RegExp(`disabled=\\{[^}]*!${guard}`)
 		);
 	expect(source, 'The form must be hidden when a withdrawal cannot be offered').toContain(
-		`{#if ${guard}}`
+		`{#if canSignTransactions && pageAddress === contract.owner && ${guard}}`
 	);
 });
 

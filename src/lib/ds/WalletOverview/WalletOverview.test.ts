@@ -1,3 +1,4 @@
+import { pageAccountState } from '$lib/chain/signerGate';
 import { expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import WalletOverview from './WalletOverview.svelte';
@@ -13,7 +14,14 @@ it('server-renders the complete Overview skeleton without claiming zero balances
 		now: 0
 	});
 	const html = render(WalletOverview, {
-		props: { summary, contracts: [], current: null, pageAddress: 'OWNER', selected: null, now: 0 }
+		props: {
+			summary,
+			contracts: [],
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now: 0
+		}
 	}).body;
 	for (const title of [
 		'Node health',
@@ -32,7 +40,7 @@ it('server-renders the complete Overview skeleton without claiming zero balances
 it.each([
 	['OWNER', true],
 	['OTHER', false]
-])('overview row menu for selected %s requires page ownership', (address, visible) => {
+])('overview row menu for connected account %s requires page ownership', (address, visible) => {
 	const contracts = [
 		{
 			address: 'ESCROW',
@@ -65,7 +73,7 @@ it.each([
 			contracts,
 			current: null,
 			pageAddress: 'OWNER',
-			selected: { address, app: 'kibisis' },
+			accountState: pageAccountState('OWNER', [{ address, app: 'kibisis' }]),
 			now: 0
 		}
 	}).body;
@@ -92,7 +100,14 @@ it('keeps the owner liquid balance visible while contract holdings are unavailab
 		now: 0
 	});
 	const html = render(WalletOverview, {
-		props: { summary, contracts: [], current: null, pageAddress: 'OWNER', selected: null, now: 0 }
+		props: {
+			summary,
+			contracts: [],
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now: 0
+		}
 	}).body;
 	const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
 	expect(text).toContain('Liquid: 1,234 VOI');
@@ -117,7 +132,7 @@ it('does not print a liquid balance on a contract route while holdings are unava
 			contracts: [],
 			current: null,
 			pageAddress: 'CONTRACT',
-			selected: null,
+			accountState: { state: 'read-only' },
 			now: 0
 		}
 	}).body;

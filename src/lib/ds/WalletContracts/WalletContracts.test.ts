@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
-import { canSignFor } from '$lib/chain/signerGate';
+import { pageAccountState } from '$lib/chain/signerGate';
 import { expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
 import WalletContracts from './WalletContracts.svelte';
@@ -34,7 +34,13 @@ const contracts = [
 
 it('TASK-164: every displayed contract address is a read-only wallet link', () => {
 	const html = render(WalletContracts, {
-		props: { contracts, current: null, pageAddress: 'OWNER', selected: null, state: 'ready' }
+		props: {
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'ready'
+		}
 	}).body.replace(/<!--[\s\S]*?-->/g, '');
 	expect(html).toMatch(/<a\b[^>]*href="\/wallet\/ESCROW"/);
 	const source = readFileSync(new URL('./WalletContracts.svelte', import.meta.url), 'utf8');
@@ -44,13 +50,19 @@ it.each([
 	['watch-only', { address: 'OWNER', app: 'Watch' }, 'OWNER', false],
 	['connected owner', { address: 'OWNER', app: 'kibisis' }, 'OWNER', true],
 	['different page', { address: 'OWNER', app: 'kibisis' }, 'OTHER', false],
-	['contract page with owner selected', { address: 'OWNER', app: 'kibisis' }, 'ESCROW', false],
-	['different selection', { address: 'OTHER', app: 'kibisis' }, 'OWNER', false]
+	['contract page with owner connected', { address: 'OWNER', app: 'kibisis' }, 'ESCROW', false],
+	['different connected account', { address: 'OTHER', app: 'kibisis' }, 'OWNER', false]
 ] as const)(
 	'%s: row menu visibility follows both ownership and page address',
 	(_, selected, pageAddress, allowed) => {
 		const html = render(WalletContracts, {
-			props: { contracts, current: null, pageAddress, selected, state: 'ready' }
+			props: {
+				contracts,
+				current: null,
+				pageAddress,
+				accountState: pageAccountState(pageAddress, selected ? [selected] : []),
+				state: 'ready'
+			}
 		}).body.replace(/<!--[\s\S]*?-->/g, '');
 		expect(html.includes('aria-haspopup="menu"')).toBe(allowed);
 	}
@@ -84,7 +96,7 @@ it('mixed ownership keeps the authorized row menu and suppresses the foreign row
 			contracts: mixed,
 			current: null,
 			pageAddress: 'OWNER',
-			selected: { address: 'OWNER', app: 'kibisis' },
+			accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 			state: 'ready'
 		}
 	}).body.replace(/<!--[\s\S]*?-->/g, '');
@@ -101,7 +113,7 @@ it.each(['loading', 'error', 'missing details'] as const)(
 					condition === 'missing details' ? [{ ...contracts[0], details: null }] : contracts,
 				current: null,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 				state: condition === 'missing details' ? 'ready' : condition
 			}
 		}).body.replace(/<!--[\s\S]*?-->/g, '');
@@ -125,7 +137,7 @@ function harness() {
 	const pending = Promise.withResolvers<{ default: () => void }>();
 	const context = {
 		contracts: [contractFixture(), contractFixture(2)],
-		selected: { address: 'OWNER', app: 'kibisis' },
+		accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 		pageAddress: 'OWNER',
 		dataState: 'ready',
 		contractSet: 'ready',
@@ -134,10 +146,10 @@ function harness() {
 				this.dataState !== 'loading' &&
 				this.dataState !== 'error' &&
 				this.contracts.length > 0 &&
-				this.selected.address === this.pageAddress
+				this.accountState.state === 'yours'
 			);
 		},
-		canSignFor,
+		pageAccountState,
 		loadModal: vi.fn(() => pending.promise),
 		WithdrawModal: null,
 		RegisterVoteKey: null,
@@ -168,7 +180,7 @@ it.each(['overview', 'full'] as const)(
 				contracts: [contractFixture(), { ...contractFixture(2), details: null }],
 				current: null,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 				state: 'ready',
 				mode,
 				onrefresh: vi.fn()
@@ -225,11 +237,11 @@ it.each(['withdraw', 'key'] as const)(
 			const row = context.contracts[0];
 			const opening = handlers.open(row, action);
 			expect(context.loadModal, change).toHaveBeenCalledOnce();
-			if (change === 'selection') context.selected = { address: 'OTHER', app: 'kibisis' };
+			if (change === 'selection') context.accountState = pageAccountState('OWNER', []);
 			if (change === 'page') context.pageAddress = 'OTHER';
 			if (change === 'both') {
 				context.pageAddress = 'OTHER';
-				context.selected = { address: 'OTHER', app: 'kibisis' };
+				context.accountState = pageAccountState('OWNER', []);
 			}
 			if (change === 'removed') context.contracts = [context.contracts[1]];
 			if (change === 'replaced details')
@@ -305,7 +317,7 @@ it('full mode shows every row initially closed with native disclosure and sort b
 			contracts: rows,
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			state: 'ready',
 			mode: 'full'
 		}
@@ -378,7 +390,7 @@ it.each([
 			contracts: [contractFixture()],
 			current: null,
 			pageAddress,
-			selected,
+			accountState: pageAccountState(pageAddress, selected ? [selected] : []),
 			state,
 			mode: 'full'
 		}
@@ -395,7 +407,7 @@ it.each(['overview', 'full'] as const)(
 				contracts: [contractFixture()],
 				current: null,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 				state: 'stale',
 				contractSet: 'unavailable',
 				mode
@@ -440,7 +452,7 @@ it('invalid schedule dates stay unavailable without aborting the contract rows',
 				contracts: [contractFixture(1, { nextVestingDate: new Date(NaN) })],
 				current: null,
 				pageAddress: 'OWNER',
-				selected: null,
+				accountState: { state: 'read-only' },
 				state: 'ready',
 				mode: 'full'
 			}
@@ -455,7 +467,7 @@ it('small positive withdrawable and scheduled amounts do not round to zero', () 
 			contracts: [contractFixture(1, { availableForWithdrawal: 1, nextVestingAmount: 1 })],
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			state: 'ready',
 			mode: 'full'
 		}
@@ -470,7 +482,7 @@ it('does not show a withdrawable total while the contract list is unavailable', 
 			contracts: [contractFixture(1)],
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			state: 'stale',
 			contractSet: 'unavailable'
 		}

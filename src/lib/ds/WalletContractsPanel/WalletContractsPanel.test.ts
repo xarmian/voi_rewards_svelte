@@ -6,7 +6,7 @@ import type { WalletContract } from '$lib/wallet/summary';
 const props = {
 	current: null,
 	pageAddress: 'OWNER',
-	selected: null,
+	accountState: { state: 'read-only' as const },
 	state: 'ready' as const,
 	now: scheduleNow,
 	onrefresh: vi.fn()

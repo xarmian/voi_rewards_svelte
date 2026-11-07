@@ -103,19 +103,12 @@ test('WithdrawModal only clears the record of the withdrawal it was waiting on',
 });
 
 test('WithdrawModal keys every withdrawal read by the wallet captured at submit', () => {
-	const live = source
-		.split('\n')
-		.filter((line) => line.includes('$selectedWallet') && !line.includes('import '));
-	expect(live.map((line) => line.trim())).toEqual([
-		'$: activeWallet = flowWallet ?? $selectedWallet?.address;',
-		// The submit-time guard. Nothing reads the live selection after it: the signer is captured
-		// right below, and sendWithdrawal signs as it, so a picker move cannot change who signs.
-		'if (!$selectedWallet?.address) {'
-	]);
+	expect(source).not.toContain('$selectedWallet');
+	expect(source).toContain('$: activeWallet = flowWallet ?? pageAddress;');
 	const withdraw = source.slice(source.indexOf('async function handleWithdraw()'));
 	const body = withdraw.slice(0, withdraw.indexOf('\n\t}\n'));
-	expect(body.indexOf('captureSigner()')).toBeGreaterThan(0);
-	expect(body.indexOf('captureSigner()')).toBeLessThan(body.indexOf('await '));
+	expect(body.indexOf('capturePageSigner(target)')).toBeGreaterThan(0);
+	expect(body.indexOf('capturePageSigner(target)')).toBeLessThan(body.indexOf('await '));
 	expect(body).toContain('const wallet = signer.address;');
 	expect(source).not.toContain('currentWallet');
 	expect(source).toMatch(/let flowWallet: string \| undefined;/);
@@ -182,6 +175,9 @@ test('withdraw requires the contract owner before building or signing', async ()
 		);
 		const context = createContext({
 			$selectedWallet: { address: selected },
+			pageAddress: 'Z',
+			canSignTransactions: true,
+			capturePageSigner: () => ({ address: selected }),
 			captureSigner: () => ({ address: selected }),
 			signerMatchesAccount,
 			wrongSignerMessage,
@@ -205,7 +201,7 @@ test('withdraw requires the contract owner before building or signing', async ()
 		runInContext(ts.transpileModule(handler!, {}).outputText, context);
 		await runInContext('handleWithdraw()', context);
 		if (selected !== 'Z') {
-			expect(context.error).toBe(wrongSignerMessage('Z'));
+			expect(context.error).toBe(wrongSignerMessage());
 			for (const call of [
 				CONTRACT,
 				withdraw,

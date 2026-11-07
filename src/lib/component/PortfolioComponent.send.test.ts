@@ -35,6 +35,6 @@ test('an account refresh cannot unmount Send VOI or change its token balance', (
 
 test('the Send button remains disabled until the account is loaded', () => {
 	expect(source, 'Block opening the modal while balance is unavailable').toMatch(
-		/on:click=\{openSendVoiModal\}[^]*?disabled=\{!canSignTransactions \|\| accountPart\.status !== 'loaded'\}/
+		/on:click=\{openSendVoiModal\}[^]*?disabled=\{accountPart\.status !== 'loaded'\}/
 	);
 });

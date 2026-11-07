@@ -1,4 +1,4 @@
-import { test } from 'vitest';
+import { expect, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { navCurrent, navItems } from './nav';
 
@@ -42,4 +42,21 @@ test('navigation destinations and labels', () => {
 		{ key: 'node', label: 'Run a node', href: '/how_to_node' },
 		{ key: 'ecosystem', label: 'Ecosystem', href: '/directory' }
 	]);
+});
+
+test('My staking uses a connected signing pair and falls back to the first signer', async () => {
+	const nav = await import('./nav');
+	expect(nav).toHaveProperty('myStakingHref');
+	const x = { address: 'X', walletId: 'pera', app: 'pera' };
+	const y = { address: 'Y', walletId: 'defly', app: 'defly' };
+	const watch = { address: 'W', walletId: 'watch', app: 'Watch' };
+	for (const [entries, selected, href] of [
+		[[], null, '/wallet'],
+		[[watch], watch, '/wallet'],
+		[[x, y], y, '/wallet/Y'],
+		[[watch, x], watch, '/wallet/X'],
+		[[x], { ...x, walletId: 'defly' }, '/wallet/X'],
+		[[x], y, '/wallet/X']
+	] as const)
+		expect(nav.myStakingHref(entries, selected)).toBe(href);
 });

@@ -14,7 +14,12 @@ const base = summarizeWallet({
 const summary = (patch: Partial<WalletSummary>): WalletSummary => ({ ...base, ...patch });
 const html = (value: WalletSummary) =>
 	render(Headline, {
-		props: { account: { name: 'Shelly', addr: 'OWNER' }, summary: value, onretry: () => {} }
+		props: {
+			yours: true,
+			account: { name: 'Shelly', addr: 'OWNER' },
+			summary: value,
+			onretry: () => {}
+		}
 	}).body.replace(/<!--[\s\S]*?-->/g, '');
 const text = (value: WalletSummary) =>
 	html(value)

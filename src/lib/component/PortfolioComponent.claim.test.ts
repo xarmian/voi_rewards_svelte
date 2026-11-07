@@ -32,7 +32,9 @@ test.each(['PortfolioComponent', 'OptOutModal'])(
 	(component) => {
 		const text = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
 		// The stores can lag the rune store by a tick, so a guard can pass and the capture still refuse.
-		const capture = text.indexOf('signer = captureSigner();');
+		const capture = text.indexOf(
+			'signer = capturePageSigner(target);'
+		);
 		expect(capture).toBeGreaterThan(-1);
 		expect(text.slice(capture - 40, capture)).toMatch(/try \{\s*$/);
 		const catchBody = text.slice(capture, text.indexOf('return;', capture));
@@ -58,29 +60,28 @@ test.each(['FungibleToken', 'ClaimableTokenCard', 'RegisterVoteKey', 'OptOutModa
 	}
 );
 
-test('bulk claim captures its signer before any await and refuses another selection', () => {
+test('bulk claim captures its signer before any await and refuses a page without signing membership', () => {
 	const start = source.indexOf('async function bulkClaimAllTokens()');
 	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
-	const capture = fn.indexOf('captureSigner()');
+	const capture = fn.indexOf('capturePageSigner(target)');
 	expect(capture).toBeGreaterThan(0);
 	expect(capture).toBeLessThan(fn.indexOf('await '));
-	// The account on screen must be the one that is selected, in a wallet that can sign.
+	// The page must be connected in a signing wallet.
 	const guard = fn.slice(0, capture);
-	expect(guard).toContain('selected?.address !== walletAddress');
-	expect(guard).toContain("selected.app === 'Watch'");
+	expect(guard).toContain("pageAccountState(walletAddress, $connectedWallets).state === 'yours'");
 	expect(fn).toMatch(/const claimAccount = signer\.address;/);
 });
 
 test('bulk claim refuses a signer that is not the account the page claims for, before building', () => {
 	// The readable store can lag the rune store by a tick, so the guard can pass for account A while
-	// captureSigner returns B. The claims are built for A's approvals from claimAccount: a signer that
+	// capturePageSigner returns B. The claims are built for A's approvals from claimAccount: a signer that
 	// is not A must stop the run before any transaction is built, or the sender would follow the
 	// signer instead of the account the user confirmed.
 	const start = source.indexOf('async function bulkClaimAllTokens()');
 	const fn = source.slice(start, source.indexOf('\n\t}\n', start));
-	const capture = fn.indexOf('captureSigner()');
+	const capture = fn.indexOf('capturePageSigner(target)');
 	// The whole statement, so a neutralised condition (`false && …`) does not satisfy it.
-	const statement = /\n\t\tif \(signer\.address !== walletAddress\) \{\n/.exec(fn);
+	const statement = /\n\t\tif \(!signerMatchesAccount\(signer, target\)\) \{\n/.exec(fn);
 	expect(statement).not.toBeNull();
 	const check = statement?.index ?? -1;
 	const marker = fn.indexOf('const claimAccount = signer.address;');
@@ -88,7 +89,7 @@ test('bulk claim refuses a signer that is not the account the page claims for, b
 	expect(marker).toBeGreaterThan(check);
 	expect(check).toBeLessThan(fn.indexOf('await '));
 	const refusal = fn.slice(check, fn.indexOf('return;', check));
-	expect(refusal).toContain('bulkClaimError = `Select account ${walletAddress}');
+	expect(refusal).toContain('bulkClaimError = wrongSignerMessage()');
 });
 
 test('bulk claim builds its transactions from the captured account, not the live route address', () => {
@@ -123,6 +124,8 @@ test.each(['Y', undefined])(
 				signerMatchesAccount,
 				wrongSignerMessage,
 				$selectedWallet: { address: selected, app: 'Pera' },
+				canSignTransactions: true,
+				capturePageSigner: () => ({ address: selected }),
 				captureSigner: () => ({ address: selected }),
 				buildAssetTransfer,
 				buildPayment,
@@ -139,7 +142,7 @@ test.each(['Y', undefined])(
 			runInContext(ts.transpileModule(handler!, {}).outputText, context);
 			await runInContext('handleOptOut()', context);
 			if (selected !== accountAddress) {
-				expect(context.optOutError).toBe(wrongSignerMessage(accountAddress));
+				expect(context.optOutError).toBe(wrongSignerMessage());
 				for (const call of [
 					buildAssetTransfer,
 					buildPayment,
@@ -163,18 +166,12 @@ test.each(['Y', undefined])(
 );
 
 test.each(['OptOutModal', 'SendTokenModal'])(
-	'%s displays and disables a mismatched signing account',
+	'%s labels the page signer without a selection banner',
 	(component) => {
 		const text = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
-		expect(text).toMatch(/^\texport let accountAddress: string \| undefined = undefined;$/m);
-		expect(text).toContain('Signing account: {$selectedWallet?.address}');
-		expect(text).toMatch(
-			/\{#if \$selectedWallet\?\.address !== accountAddress\}\s*<[^>]*role="alert"[^>]*>\s*\{wrongSignerMessage\(accountAddress\)\}/
-		);
-		const button = text.match(/<Button\b[^>]*on:click=\{handle(?:OptOut|Send)\}[^>]*>/)?.[0];
-		expect(button).toMatch(
-			/disabled=\{[^}]*\|\|\s*\$selectedWallet\?\.address !== accountAddress\}/
-		);
+		expect(text).toContain('Signing account:');
+		expect(text).not.toContain('selectedWallet');
+		expect(text).toContain('{#if canSignTransactions}<Button');
 	}
 );
 

@@ -19,18 +19,16 @@ test('pins the captured sender before any asynchronous work', () => {
 
 test('reacts to pin changes and holds the tracker on A after selection switches to B', async () => {
 	const reaction = trackerReaction();
-	expect(reaction).toContain(
-		'syncTracker(open, flow.current(accountAddress ?? $selectedWallet?.address))'
-	);
+	expect(reaction).toContain('syncTracker(open, flow.current(accountAddress))');
 	const { createFlowPin } = await import('../chain/flowAccount');
 	const flow = createFlowPin();
 	const syncTracker = vi.fn();
 	const context = createContext({
-		accountAddress: undefined,
 		flow,
 		syncTracker,
 		pinTick: 0,
 		open: true,
+		accountAddress: 'A',
 		$selectedWallet: { address: 'A' }
 	});
 	const run = () => runInContext(ts.transpileModule(reaction, {}).outputText, context);
@@ -38,6 +36,7 @@ test('reacts to pin changes and holds the tracker on A after selection switches 
 	flow.pin('A');
 	context.pinTick++;
 	context.$selectedWallet.address = 'B';
+	context.accountAddress = 'B';
 	run();
 	expect(syncTracker).toHaveBeenLastCalledWith(true, 'A');
 	flow.release();
@@ -49,9 +48,7 @@ test('reacts to pin changes and holds the tracker on A after selection switches 
 test('keeps balance reads with the flow account and ignores selection changes while pinned', () => {
 	expect(source).toContain('!flow.pinned');
 	expect(source).toMatch(/requireAccountInfo\(address, \{ force: true \}\)/);
-	expect(source).toContain(
-		'const address = flow.current(accountAddress ?? $selectedWallet?.address)'
-	);
+	expect(source).toContain('const address = flow.current(accountAddress)');
 });
 
 test('releases on idle/reset and external close, retaining the account through pending results', () => {
