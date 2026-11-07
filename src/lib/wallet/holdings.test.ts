@@ -159,11 +159,11 @@ it('discards old address and same-address request generations before publishing 
 	late.resolve(result);
 	await expect(y).rejects.toThrow(/superseded/i);
 });
-it('bounds a service read at 15 seconds and refuses malformed populations', async () => {
+it('bounds a service read at 60 seconds and refuses malformed populations', async () => {
 	vi.useFakeTimers();
 	const load = createHoldingsTokenLoader(() => new Promise(() => {}));
-	const pending = expect(load('Y', 0)).rejects.toThrow(/15|timed out/i);
-	await vi.advanceTimersByTimeAsync(15000);
+	const pending = expect(load('Y', 0)).rejects.toThrow(/60|timed out/i);
+	await vi.advanceTimersByTimeAsync(60000);
 	await pending;
 	const malformed = createHoldingsTokenLoader(vi.fn().mockResolvedValue({}));
 	await expect(malformed('Y', 0)).rejects.toThrow(/invalid/i);
@@ -215,4 +215,56 @@ it.each([
 		}
 	});
 	expect(ready.parts.find((part) => part.label === 'Liquid')?.value).toBe(0);
+});
+
+it('a contract page needs its own discovered contract before showing a native split', () => {
+	for (const contracts of [
+		[],
+		[{ address: 'OTHER', balance: 4, details: { lockedBalance: 3000000 } }]
+	]) {
+		const display = deriveHoldingsDisplay({
+			pageAddress: 'CHILD',
+			parentWalletAddress: 'PARENT',
+			account,
+			tokens: [],
+			split: { ...split, pageAddress: 'CHILD', contracts }
+		});
+		expect(display.parts.find((p) => p.label === 'Locked')?.value).toBeNull();
+		expect(display.parts.find((p) => p.label === 'Liquid')?.value).toBeNull();
+		expect(display.total).toBeNull();
+		expect(display.composition).toBeNull();
+	}
+});
+
+it.each([{ balance: NaN }, { decimals: 256 }, { id: 123 as unknown as string }])(
+	'invalid token fields keep the original population and mark only the bad row unavailable (%j)',
+	async (invalid) => {
+		const tokens = [token(), token({ ...invalid, name: 'Invalid token', id: invalid.id ?? 'bad' })];
+		const load = createHoldingsTokenLoader(vi.fn().mockResolvedValue({ tokens, partial: false }));
+		const result = await load('Y', 1);
+		expect(result.tokens).toBe(tokens);
+		expect(result.partial).toBe(true);
+		const display = deriveHoldingsDisplay({ pageAddress: 'Y', account, split, ...result });
+		expect(display.rows.tokens).toHaveLength(2);
+		expect(display.rows.tokens[0].token).toBe(tokens[0]);
+		expect(display.rows.tokens[1].quantity).toBeNull();
+		expect(display.rows.tokens[1].valueLabel).toBe('Unavailable');
+		expect(display.total).toBeNull();
+		expect(display.composition).toBeNull();
+	}
+);
+
+it('a token read completing after 20 seconds still publishes', async () => {
+	vi.useFakeTimers();
+	const result = { tokens: [token()], partial: false };
+	const load = createHoldingsTokenLoader(
+		() => new Promise((resolve) => setTimeout(() => resolve(result), 20000))
+	);
+	const pending = load('Y', 1);
+	const published = pending.then(
+		(value) => ({ value }),
+		(error) => ({ error })
+	);
+	await vi.advanceTimersByTimeAsync(20000);
+	expect(await published).toEqual({ value: result });
 });

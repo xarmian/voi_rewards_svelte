@@ -27,6 +27,23 @@ const nonnegative = (n: unknown): n is number =>
 	typeof n === 'number' && Number.isFinite(n) && n >= 0;
 const decimalsKnown = (n: unknown): n is number =>
 	Number.isInteger(n) && Number(n) >= 0 && Number(n) <= 255;
+const validToken = (token: FungibleTokenType) =>
+	!!token &&
+	typeof token.id === 'string' &&
+	nonnegative(token.balance) &&
+	Number.isInteger(token.balance) &&
+	decimalsKnown(token.decimals);
+
+export function holdingsClaimKey(
+	items: { token: { id: string } }[],
+	index: number,
+	address: string | undefined
+) {
+	const id = items[index].token.id;
+	const occurrence = items.slice(0, index).filter((item) => item.token.id === id).length;
+	return `${address}:${id}${occurrence ? ':' + occurrence : ''}`;
+}
+
 export const holdingsAmount = (n: number | null) =>
 	n === null ? 'Unavailable' : n > 0 && n < 0.01 ? '<0.01' : compact(n, 2);
 
@@ -39,6 +56,7 @@ export function holdingsExactQuantity(
 		!decimalsKnown(token.decimals)
 	)
 		return 'Unavailable';
+	if (!Number.isSafeInteger(token.balance)) return `≈ ${token.balance / 10 ** token.decimals}`;
 	const units = BigInt(token.balance).toString();
 	if (token.decimals === 0) return units;
 	const digits = units.padStart(token.decimals + 1, '0');
@@ -52,8 +70,14 @@ export function deriveHoldingsRows(
 	{
 		pageAddress = '',
 		showDust = false,
-		partial = false
-	}: { pageAddress?: string; showDust?: boolean; partial?: boolean } = {}
+		partial = false,
+		remembered = new Set<string>()
+	}: {
+		pageAddress?: string;
+		showDust?: boolean;
+		partial?: boolean;
+		remembered?: ReadonlySet<string>;
+	} = {}
 ) {
 	const seen = new Set<string>();
 	const all: HoldingsRow[] = [];
@@ -61,21 +85,22 @@ export function deriveHoldingsRows(
 		const key = `${pageAddress}:${token.type ?? 'vsa'}:${token.id}${token.poolInfo ? ':' + (token.poolInfo.provider ?? 'unknown') : ''}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
-		const quantity =
-			nonnegative(token.balance) && decimalsKnown(token.decimals)
-				? token.balance / 10 ** token.decimals
-				: null;
+		const valid = validToken(token);
+		const quantity = valid ? token.balance / 10 ** token.decimals : null;
 		// The service uses zero as its unavailable valuation placeholder. Positive raw balances cannot prove $0.
 		const value =
-			nonnegative(token.value) && (token.value > 0 || token.balance === 0) ? token.value : null;
+			valid && nonnegative(token.value) && (token.value > 0 || token.balance === 0)
+				? token.value
+				: null;
 		const usd =
-			nonnegative(token.usdValue) && (token.usdValue > 0 || token.balance === 0)
+			valid && nonnegative(token.usdValue) && (token.usdValue > 0 || token.balance === 0)
 				? token.usdValue
 				: null;
 		let underlying: HoldingsRow['underlying'] = null;
 		const pool = token.poolInfo;
 		if (
 			pool &&
+			valid &&
 			!partial &&
 			nonnegative(token.balance) &&
 			nonnegative(pool.totalSupply) &&
@@ -113,6 +138,8 @@ export function deriveHoldingsRows(
 			(row) =>
 				!row.token.poolInfo &&
 				(showDust ||
+					remembered.has(row.key) ||
+					row.quantity === null ||
 					(row.value === null && row.token.balance > 0) ||
 					(row.value ?? 0) > 0.1 ||
 					(row.token.approvals?.length ?? 0) > 0 ||
@@ -124,15 +151,18 @@ export function deriveHoldingsRows(
 
 export function deriveHoldingsDisplay({
 	pageAddress,
+	parentWalletAddress = null,
 	account,
 	tokens,
 	partial = false,
 	tokenState = 'ready',
 	split,
 	price = null,
-	showDust = false
+	showDust = false,
+	remembered = new Set<string>()
 }: {
 	pageAddress: string;
+	parentWalletAddress?: string | null;
 	account: HoldingsAccount;
 	tokens: FungibleTokenType[];
 	partial?: boolean;
@@ -140,8 +170,9 @@ export function deriveHoldingsDisplay({
 	split?: HoldingsSplit;
 	price?: number | null;
 	showDust?: boolean;
+	remembered?: ReadonlySet<string>;
 }) {
-	const rows = deriveHoldingsRows(tokens, { pageAddress, showDust, partial });
+	const rows = deriveHoldingsRows(tokens, { pageAddress, showDust, partial, remembered });
 	const pageLiquid = account.status === 'loaded' ? account.value.balance / 1e6 : null;
 	const contracts =
 		split?.pageAddress === pageAddress
@@ -150,6 +181,7 @@ export function deriveHoldingsDisplay({
 	const nativeReady =
 		split?.pageAddress === pageAddress &&
 		split.contractSet === 'ready' &&
+		(!parentWalletAddress || contracts.some((c) => c.address === pageAddress)) &&
 		contracts.every(
 			(c) => c.details && nonnegative(c.balance) && nonnegative(c.details.lockedBalance)
 		);
@@ -199,13 +231,16 @@ export function deriveHoldingsDisplay({
 	};
 }
 
-async function bounded<T>(read: Promise<T>, label: string): Promise<T> {
+async function bounded<T>(read: Promise<T>, label: string, timeout = 15000): Promise<T> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
 		return await Promise.race([
 			read,
 			new Promise<never>((_, reject) => {
-				timer = setTimeout(() => reject(new Error(`${label} timed out after 15 seconds`)), 15000);
+				timer = setTimeout(
+					() => reject(new Error(`${label} timed out after ${timeout / 1000} seconds`)),
+					timeout
+				);
 			})
 		]);
 	} finally {
@@ -222,18 +257,11 @@ export async function loadHoldingsTokens(
 	fetchTokens: FetchTokens = fetchFungibleTokens
 ): Promise<TokenResult> {
 	if (!browser || !address) throw new Error('A browser wallet address is required');
-	const result = await bounded(fetchTokens(address, price), 'Token balances');
+	const result = await bounded(fetchTokens(address, price), 'Token balances', 60000);
 	if (!isCurrent()) throw new Error('Holdings request superseded');
-	if (
-		!result ||
-		!Array.isArray(result.tokens) ||
-		typeof result.partial !== 'boolean' ||
-		result.tokens.some(
-			(t) => !t || typeof t.id !== 'string' || !nonnegative(t.balance) || !decimalsKnown(t.decimals)
-		)
-	)
+	if (!result || !Array.isArray(result.tokens) || typeof result.partial !== 'boolean')
 		throw new Error('Invalid token population');
-	return result;
+	return result.tokens.every(validToken) ? result : { ...result, partial: true };
 }
 
 /** One loader per controller, so a late read cannot overwrite a newer address or refresh. No SSR stores. */
