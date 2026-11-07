@@ -118,6 +118,50 @@ it('incomplete tokens, contract population, or account never yields a complete t
 	).toBeNull();
 	expect(deriveHoldingsDisplay({ pageAddress: 'Z', account, tokens: [], split }).total).toBeNull();
 });
+const lpToken = (props: Partial<FungibleTokenType> = {}) =>
+	token({ id: 'lp', value: 5, poolInfo: { provider: 'humble' }, ...props });
+const parts = (display: ReturnType<typeof deriveHoldingsDisplay>) =>
+	Object.fromEntries(display.parts.map((part) => [part.label, part]));
+it('an unpriced regular token leaves the LP figure known and gives Tokens and other a labelled known subtotal', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'Y',
+		account,
+		tokens: [lpToken(), token({ id: 'a', value: 7 }), token({ id: 'b', value: 0 })],
+		split
+	});
+	expect(parts(display).LP.value).toBe(5);
+	expect(parts(display)['Tokens and other']).toMatchObject({
+		value: 7,
+		note: 'Known subtotal; 1 token has no price'
+	});
+	expect(display.total).toBeNull();
+	expect(display.composition).toBeNull();
+});
+it('an unpriced LP position makes the LP figure unavailable without hiding the priced tokens', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'Y',
+		account,
+		tokens: [lpToken({ value: 0 }), token({ id: 'a', value: 7 })],
+		split
+	});
+	expect(parts(display).LP.value).toBeNull();
+	expect(parts(display)['Tokens and other'].value).toBe(7);
+	expect(parts(display)['Tokens and other'].note).toBeUndefined();
+});
+it('an incomplete token source leaves LP and Tokens and other unavailable, with no subtotal', () => {
+	for (const overrides of [{ partial: true }, { tokenState: 'error' as const }]) {
+		const display = deriveHoldingsDisplay({
+			pageAddress: 'Y',
+			account,
+			tokens: [lpToken(), token({ id: 'a', value: 7 }), token({ id: 'b', value: 0 })],
+			split,
+			...overrides
+		});
+		expect(parts(display).LP.value).toBeNull();
+		expect(parts(display)['Tokens and other'].value).toBeNull();
+		expect(parts(display)['Tokens and other'].note).toBeUndefined();
+	}
+});
 it('frozen tokens and approval objects survive derivation untouched and by identity', () => {
 	const original = token({
 		poolInfo: {

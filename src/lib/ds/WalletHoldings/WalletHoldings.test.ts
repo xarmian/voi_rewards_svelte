@@ -547,3 +547,45 @@ it('unknown ownership displays unavailable native parts and total', () => {
 	expect(text).toMatch(/Liquid Unavailable/);
 	expect(html).toMatch(/aria-label="Holdings total"[^>]*>\s*Unavailable/);
 });
+it('an unpriced token shows a labelled known subtotal and LP stays known in the split', () => {
+	const lp = {
+		...token,
+		id: 'lp',
+		name: 'LP',
+		symbol: 'LP',
+		value: 5,
+		poolInfo: { provider: 'humble' }
+	};
+	const priced = { ...token, id: 'a', name: 'Priced', value: 7 };
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [lp, priced, token],
+			tokenState: 'ready',
+			split: {
+				pageAddress: 'Y',
+				owner: { address: 'Y', balance: 0 },
+				contracts: [],
+				contractSet: 'ready'
+			}
+		}
+	}).body;
+	const split = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
+	const text = split.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+	expect(text).toMatch(/LP\s*5 VOI/);
+	expect(text).toMatch(/Tokens and other\s*7 VOI/);
+	expect(text).toContain('Known subtotal; 1 token has no price');
+	expect(html).not.toContain('Holdings total');
+});
+it('an unknown quantity reads Unavailable without a token symbol', () => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [{ ...token, balance: Number.NaN }],
+			tokenState: 'ready'
+		}
+	}).body;
+	expect(html).not.toMatch(/Unavailable\s+TOK/);
+});
