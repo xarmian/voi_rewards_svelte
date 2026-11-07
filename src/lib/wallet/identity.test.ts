@@ -68,6 +68,41 @@ it.each([
 	});
 });
 
+it.each([
+	'https://evilvoirewards.com/x.png',
+	'https://xvoirewards.com/x.png',
+	'https://voirewards.com.evil.example/x.png',
+	'https://voirewards.co/x.png'
+])('keeps %s, which is a different host from the site', (avatarUrl) => {
+	expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: avatarUrl } }]).avatar).toBe(
+		avatarUrl
+	);
+});
+
+it.each([
+	'https://preview.example.test/x.png',
+	'https://PREVIEW.example.test/x.png',
+	'https://preview.example.test./x.png'
+])('refuses %s, the host of the page being viewed', (avatarUrl) => {
+	vi.stubGlobal('location', { hostname: 'preview.example.test' });
+	try {
+		expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: avatarUrl } }]).avatar).toBe(
+			null
+		);
+	} finally {
+		vi.unstubAllGlobals();
+	}
+});
+
+it('keeps an avatar on another host while a page host is set', () => {
+	vi.stubGlobal('location', { hostname: 'preview.example.test' });
+	try {
+		expect(parseWalletIdentity('A', [named]).avatar).toBe(avatar);
+	} finally {
+		vi.unstubAllGlobals();
+	}
+});
+
 it('accepts a 2048-character https avatar', () => {
 	const url = 'https://host.example/' + 'x'.repeat(2027);
 	expect(url).toHaveLength(2048);
@@ -129,6 +164,19 @@ it.each([
 		ADDRESS.slice(0, 29) + '_' + ADDRESS.slice(29) + '.voi'
 	],
 	['an address split by a dot, then .voi', ADDRESS.slice(0, 29) + '.' + ADDRESS.slice(29) + '.voi'],
+	// Lower case, so only the 56-character cap refuses these.
+	[
+		'a lower-case address split by a hyphen, then .voi',
+		ADDRESS.toLowerCase().slice(0, 29) + '-' + ADDRESS.toLowerCase().slice(29) + '.voi'
+	],
+	[
+		'a lower-case address with a zero for an o, then .voi',
+		ADDRESS.toLowerCase().replace('o', '0') + '.voi'
+	],
+	[
+		'a lower-case address split by a dot, then .voi',
+		ADDRESS.toLowerCase().slice(0, 29) + '.' + ADDRESS.toLowerCase().slice(29) + '.voi'
+	],
 	['upper case', 'Shelly.voi'],
 	['an upper-case VOI label', 'shelly.VOI'],
 	['a capital I standing in for l', 'sheIIy.voi'],
