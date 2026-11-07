@@ -1,31 +1,32 @@
-<script context="module" lang="ts">
-	let nextId = 0;
-</script>
-
 <script lang="ts">
-	import { createEventDispatcher, onMount, tick } from 'svelte';
+	import { createEventDispatcher, tick, untrack } from 'svelte';
 	import { leavesWidget, nextOptionIndex } from '$lib/a11y/keyboard';
 	import { slide } from 'svelte/transition';
-	import { Input, Badge } from 'flowbite-svelte';
+	import { Button, Chip } from '$lib/ds';
 	import type { UniqueToken } from '../../routes/api/tokens/+server';
 
 	const dispatch = createEventDispatcher<{
 		tokenSelect: UniqueToken;
 	}>();
 
-	export let selectedToken: UniqueToken | null = null;
-	export let allTokens: UniqueToken[] = [];
-	export let disabled = false;
+	let {
+		selectedToken = null,
+		allTokens = [],
+		disabled = false
+	}: {
+		selectedToken?: UniqueToken | null;
+		allTokens?: UniqueToken[];
+		disabled?: boolean;
+	} = $props();
 
-	let searchQuery = '';
-	let dropdownOpen = false;
+	let searchQuery = $state(
+		untrack(() => (selectedToken?.symbol === 'VOI' ? '' : (selectedToken?.symbol ?? '')))
+	);
+	let dropdownOpen = $state(false);
 	let root: HTMLDivElement;
 	let suppressOpen = false;
-	let uid: number | undefined;
-	$: listId = uid === undefined ? undefined : `token-results-${uid}`;
-	onMount(() => {
-		uid = ++nextId;
-	});
+	const uid = $props.id();
+	const listId = `${uid}-results`;
 
 	const inputEl = () => root?.querySelector('input');
 	const options = () => root.querySelectorAll<HTMLButtonElement>('[data-token-option]');
@@ -66,15 +67,17 @@
 	}
 
 	// Filter tokens based on search query
-	$: filteredTokens = searchQuery.trim()
-		? allTokens
-				.filter(
-					(token) =>
-						token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						token.id.toString().includes(searchQuery)
-				)
-				.slice(0, 20)
-		: allTokens.slice(0, 10); // Show first 10 tokens when no search
+	let filteredTokens = $derived(
+		searchQuery.trim()
+			? allTokens
+					.filter(
+						(token) =>
+							token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+							token.id.toString().includes(searchQuery)
+					)
+					.slice(0, 20)
+			: allTokens.slice(0, 10)
+	); // Show first 10 tokens when no search
 
 	// Keyboard picks (click detail 0) return focus to the input; pointer picks leave the input,
 	// as before, so a touch keyboard closes (TASK-39 r2).
@@ -117,76 +120,59 @@
 		resetToVOI(event);
 	}
 
-	// Get token type styling
-	function getTokenTypeColor(type: string): string {
-		switch (type?.toUpperCase()) {
-			case 'ARC200':
-				return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-			case 'ASA':
-				return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-			case 'VOI':
-				return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
-			default:
-				return 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300';
-		}
-	}
-
 	// Update search query when selected token changes (but don't interfere with user typing)
-	$: if (selectedToken && !dropdownOpen) {
-		searchQuery = selectedToken.symbol === 'VOI' ? '' : selectedToken.symbol;
-	}
+	$effect(() => {
+		if (selectedToken && !dropdownOpen) {
+			searchQuery = selectedToken.symbol === 'VOI' ? '' : selectedToken.symbol;
+		}
+	});
 </script>
 
 <div
 	class="relative w-full"
 	bind:this={root}
-	on:focusout={(event) => {
+	onfocusout={(event) => {
 		if (leavesWidget(root, event.relatedTarget)) dropdownOpen = false;
 	}}
 >
-	<!-- Search Input -->
-	<div class="relative">
-		<Input
+	<label for={uid} class="mb-1 block text-label text-ink">Search tokens</label>
+	<div class="flex flex-wrap items-center gap-2">
+		<input
+			id={uid}
+			type="text"
 			bind:value={searchQuery}
-			on:focus={handleFocus}
-			on:click={() => (dropdownOpen = true)}
-			on:input={() => (dropdownOpen = true)}
-			on:keydown={handleInputKeydown}
+			onfocus={handleFocus}
+			onclick={() => (dropdownOpen = true)}
+			oninput={() => (dropdownOpen = true)}
+			onkeydown={handleInputKeydown}
 			aria-label="Search tokens"
 			aria-controls={dropdownOpen && !disabled ? listId : undefined}
 			placeholder="Search tokens (e.g., USDC, ALGO, 12345)"
 			{disabled}
-			class="pr-20"
+			class="min-h-10 w-full min-w-0 flex-1 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink placeholder:text-ink-muted [@media(pointer:coarse)]:min-h-11"
 		/>
-
-		<!-- Right side icons -->
-		<div class="absolute inset-y-0 right-0 flex items-center pr-3 gap-2">
-			{#if searchQuery}
-				<button
-					type="button"
-					on:click={clearSearch}
-					class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-					title="Clear search"
-					aria-label="Clear search"
-				>
-					<i class="fas fa-times text-sm" aria-hidden="true"></i>
-				</button>
-			{/if}
-
-			{#if selectedToken && selectedToken.symbol !== 'VOI'}
-				<button
-					type="button"
-					on:click={resetToVOI}
-					class="text-gray-400 hover:text-red-500 transition-colors"
-					title="Reset to VOI"
-					aria-label="Reset to VOI"
-				>
-					<i class="fas fa-undo text-sm" aria-hidden="true"></i>
-				</button>
-			{/if}
-
-			<i class="fas fa-search text-gray-400" aria-hidden="true"></i>
-		</div>
+		{#if searchQuery}
+			<Button
+				variant="ghost"
+				size="sm"
+				onclick={clearSearch}
+				title="Clear search"
+				aria-label="Clear search"
+			>
+				<i class="fas fa-times" aria-hidden="true"></i>
+			</Button>
+		{/if}
+		{#if selectedToken && selectedToken.symbol !== 'VOI'}
+			<Button
+				variant="ghost"
+				size="sm"
+				onclick={resetToVOI}
+				title="Reset to VOI"
+				aria-label="Reset to VOI"
+			>
+				<i class="fas fa-undo" aria-hidden="true"></i>
+			</Button>
+		{/if}
 	</div>
 
 	<!-- Dropdown -->
@@ -195,17 +181,13 @@
 			id={listId}
 			role="group"
 			aria-label="Token results"
-			class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+			class="absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-ds-md border border-edge bg-surface text-ink shadow-card"
 			transition:slide={{ duration: 200, axis: 'y' }}
 		>
 			{#if filteredTokens.length > 0}
 				<!-- Header -->
-				<div
-					class="px-4 py-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50"
-				>
-					<div
-						class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider"
-					>
+				<div class="border-b border-edge bg-surface-2 px-4 py-2">
+					<div class="text-label text-ink-muted">
 						{searchQuery ? `Search Results (${filteredTokens.length})` : 'Popular Tokens'}
 					</div>
 				</div>
@@ -214,37 +196,37 @@
 				{#each filteredTokens as token, index}
 					<button
 						type="button"
-						class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus transition-all duration-200 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:shadow-sm hover:scale-[1.01]"
+						class="min-h-10 w-full border-b border-line px-4 py-3 text-left text-ink last:border-b-0 hover:bg-surface-2 [@media(pointer:coarse)]:min-h-11"
 						data-token-option
-						on:mousedown|preventDefault
-						on:keydown={(event) => handleOptionKeydown(event, index)}
-						on:click={(event) => selectToken(token, event)}
+						onmousedown={(event) => event.preventDefault()}
+						onkeydown={(event) => handleOptionKeydown(event, index)}
+						onclick={(event) => selectToken(token, event)}
 					>
 						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-3">
+							<div class="flex min-w-0 items-center gap-3">
 								<!-- Token Icon -->
 								<div
-									class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-purple-400 to-blue-500"
+									class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-ds-md bg-accent-soft text-accent"
 								>
 									{#if token.imageUrl}
 										<img
 											src={token.imageUrl}
 											alt={token.symbol}
 											class="w-full h-full object-cover"
-											on:error={(e) => {
-												// Fallback to gradient with symbol if image fails to load
+											onerror={(e) => {
+												// Fallback to symbol if image fails to load
 												e.target.style.display = 'none';
 												e.target.nextElementSibling.style.display = 'flex';
 											}}
 										/>
 										<div
-											class="w-full h-full items-center justify-center text-white text-sm font-bold hidden"
+											class="hidden h-full w-full items-center justify-center text-sm font-bold text-accent"
 										>
 											{token.symbol.slice(0, 2)}
 										</div>
 									{:else}
 										<div
-											class="w-full h-full flex items-center justify-center text-white text-sm font-bold"
+											class="flex h-full w-full items-center justify-center text-sm font-bold text-accent"
 										>
 											{token.symbol.slice(0, 2)}
 										</div>
@@ -252,11 +234,11 @@
 								</div>
 
 								<!-- Token Info -->
-								<div class="text-left">
-									<div class="font-medium text-gray-900 dark:text-white">
+								<div class="min-w-0 break-words text-left">
+									<div class="font-medium text-ink">
 										{token.symbol}
 									</div>
-									<div class="text-xs text-gray-500 dark:text-gray-400">
+									<div class="text-micro text-ink-muted">
 										ID: {token.id} • {token.decimals} decimals
 									</div>
 								</div>
@@ -264,10 +246,8 @@
 
 							<!-- Right side info -->
 							<div class="flex flex-col items-end gap-1">
-								<Badge class="text-xs px-2 py-0.5 {getTokenTypeColor(token.type)}">
-									{token.type}
-								</Badge>
-								<span class="text-xs text-gray-500 dark:text-gray-400">
+								<Chip tone="neutral" label={token.type} />
+								<span class="text-micro text-ink-muted">
 									{token.poolCount} pools
 								</span>
 							</div>
@@ -276,15 +256,15 @@
 				{/each}
 			{:else if searchQuery}
 				<!-- No Results -->
-				<div class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-					<i class="fas fa-search text-3xl mb-3 text-gray-300 dark:text-gray-600"></i>
+				<div class="px-4 py-8 text-center text-ink-muted">
+					<i class="fas fa-search mb-3 text-3xl text-ink-muted"></i>
 					<p class="font-medium">No tokens found</p>
 					<p class="text-sm mt-1">Try searching with a different symbol or token ID</p>
 				</div>
 			{:else}
 				<!-- Loading or Empty State -->
-				<div class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-					<i class="fas fa-coins text-3xl mb-3 text-gray-300 dark:text-gray-600"></i>
+				<div class="px-4 py-8 text-center text-ink-muted">
+					<i class="fas fa-coins mb-3 text-3xl text-ink-muted"></i>
 					<p class="font-medium">No tokens available</p>
 					<p class="text-sm mt-1">Try refreshing the page</p>
 				</div>
