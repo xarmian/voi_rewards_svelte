@@ -72,7 +72,7 @@ it('uses only an img for the avatar and wires the module load and error handlers
 			(attribute as AST.Attribute).end
 		);
 		expect(handler.replace(/\s+/g, ' ')).toBe(
-			`${name}={(event) => image.${name}(Number(event.currentTarget.dataset.generation))}`
+			`${name}={(event) => image.${name}(Number(event.currentTarget.getAttribute('data-generation') ?? NaN))}`
 		);
 	}
 });

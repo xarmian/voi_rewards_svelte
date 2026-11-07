@@ -20,8 +20,10 @@
 				data-generation={image.generation}
 				class="absolute inset-0 h-full w-full object-cover"
 				class:opacity-0={!image.show}
-				onload={(event) => image.onload(Number(event.currentTarget.dataset.generation))}
-				onerror={(event) => image.onerror(Number(event.currentTarget.dataset.generation))}
+				onload={(event) =>
+					image.onload(Number(event.currentTarget.getAttribute('data-generation') ?? NaN))}
+				onerror={(event) =>
+					image.onerror(Number(event.currentTarget.getAttribute('data-generation') ?? NaN))}
 			/>
 		{/if}
 	{/key}
