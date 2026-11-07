@@ -222,6 +222,9 @@
 			contractsLoadedAddress = requestedAddress;
 			contractsLoadedOwner = requestedOwner;
 			console.error('Error updating contracts:', error);
+			// Retained rows stay visible, but a failed refresh leaves their source unknown: no actions.
+			if (contractsSnapshot)
+				contractsSnapshot = { ...contractsSnapshot, contractSet: 'unavailable' };
 			contractsLoadState = contractsSnapshot ? 'stale' : 'error';
 			contractsRefreshFailed = contractsSnapshot !== null;
 		}
@@ -252,7 +255,12 @@
 	function refresh() {
 		if (!browser || !walletId) return;
 		if (ownerLookup === 'unavailable') return invalidate('wallet:id');
-		if (tabs.current === 'contracts') return updateContracts(true);
+		// Overview data is reloaded too, so a completed withdrawal is not shown stale there.
+		if (tabs.current === 'contracts')
+			return Promise.all([
+				updateContracts(true),
+				updateAccountInfo(parentWalletId || walletId, true)
+			]);
 		return updateAccountInfo(parentWalletId || walletId, true);
 	}
 </script>

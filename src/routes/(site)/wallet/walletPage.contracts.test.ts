@@ -56,7 +56,8 @@ it('failed refresh keeps the last good contracts only for the same page and owne
 	await load();
 	context.loadContracts.mockRejectedValue(new Error('failed'));
 	await load(true);
-	expect(context.contractsSnapshot).toBe(good);
+	expect(context.contractsSnapshot).toEqual({ ...good, contractSet: 'unavailable' });
+	expect(context.contractsSnapshot.contracts).toBe(good.contracts);
 	expect(context.contractsLoadState).toBe('stale');
 	expect(context.contractsRefreshFailed).toBe(true);
 	context.walletId = 'OTHER';
@@ -113,7 +114,7 @@ it('refresh retries the server ownership source before treating the route as an 
 	expect(context.updateAccountInfo).toHaveBeenCalledExactlyOnceWith('PAGE', true);
 });
 
-it('the page refresh updates visible contract rows without requesting Overview data', async () => {
+it('the page refresh updates the visible contract rows and also reloads the Overview data, so a withdrawal is not shown stale there', async () => {
 	const context = {
 		browser: true,
 		walletId: 'PAGE',
@@ -121,12 +122,12 @@ it('the page refresh updates visible contract rows without requesting Overview d
 		ownerLookup: 'ok',
 		tabs: { current: 'contracts' },
 		invalidate: vi.fn(),
-		updateAccountInfo: vi.fn(),
+		updateAccountInfo: vi.fn().mockResolvedValue(undefined),
 		updateContracts: vi.fn().mockResolvedValue(undefined)
 	};
 	const refresh = runInNewContext(`${code('refresh')}; refresh`, context);
 	await refresh();
 	expect(context.updateContracts).toHaveBeenCalledExactlyOnceWith(true);
-	expect(context.updateAccountInfo).not.toHaveBeenCalled();
+	expect(context.updateAccountInfo).toHaveBeenCalledExactlyOnceWith('PAGE', true);
 	expect(context.invalidate).not.toHaveBeenCalled();
 });
