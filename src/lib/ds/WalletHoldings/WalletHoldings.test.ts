@@ -336,12 +336,13 @@ it.each([
 	expect(exact).toBe(`${expected} TOK`);
 });
 
-it('claim cards keep their token identity throughout the list', () => {
+it('claim cards keep their wallet and token identity throughout the list', () => {
 	const loops = [
 		...controller().matchAll(/\{#each claimableTokensSummary as claimableItem, index([^]*?)\}/g)
 	];
 	expect(loops).toHaveLength(1);
-	for (const loop of loops) expect(loop[1].trim()).toBe('(claimableItem.token.id)');
+	for (const loop of loops)
+		expect(loop[1].trim()).toBe("(walletAddress + ':' + claimableItem.token.id)");
 });
 
 it('composition exposes a named image and readable amounts', () => {

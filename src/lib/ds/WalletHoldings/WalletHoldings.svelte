@@ -246,6 +246,7 @@
 					: `≈ ${usd(display.usd)}`}
 			</p>{/if}
 		{#if display.composition}<div
+				role="img"
 				aria-label="Holdings composition"
 				class="my-4 flex h-3 gap-0.5 overflow-hidden rounded-full bg-grid"
 			>

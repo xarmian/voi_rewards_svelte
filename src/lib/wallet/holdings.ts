@@ -49,12 +49,16 @@ export function holdingsExactQuantity(
 /** Rows hold references to the service objects. Formatting/filtering must never change money inputs. */
 export function deriveHoldingsRows(
 	tokens: FungibleTokenType[],
-	{ showDust = false, partial = false }: { showDust?: boolean; partial?: boolean } = {}
+	{
+		pageAddress = '',
+		showDust = false,
+		partial = false
+	}: { pageAddress?: string; showDust?: boolean; partial?: boolean } = {}
 ) {
 	const seen = new Set<string>();
 	const all: HoldingsRow[] = [];
 	for (const token of tokens) {
-		const key = `${token.type ?? 'vsa'}:${token.id}${token.poolInfo ? ':' + (token.poolInfo.provider ?? 'unknown') : ''}`;
+		const key = `${pageAddress}:${token.type ?? 'vsa'}:${token.id}${token.poolInfo ? ':' + (token.poolInfo.provider ?? 'unknown') : ''}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
 		const quantity =
@@ -137,7 +141,7 @@ export function deriveHoldingsDisplay({
 	price?: number | null;
 	showDust?: boolean;
 }) {
-	const rows = deriveHoldingsRows(tokens, { showDust, partial });
+	const rows = deriveHoldingsRows(tokens, { pageAddress, showDust, partial });
 	const pageLiquid = account.status === 'loaded' ? account.value.balance / 1e6 : null;
 	const contracts =
 		split?.pageAddress === pageAddress

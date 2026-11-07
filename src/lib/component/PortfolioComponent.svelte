@@ -50,6 +50,7 @@
 	let nftGeneration = 0;
 	$: if (walletAddress !== sourceAddress) {
 		sourceAddress = walletAddress;
+		tokenLoadGeneration++;
 		tokensAsOf = undefined;
 		nftGeneration++;
 		nfts = undefined;
@@ -999,7 +1000,7 @@
 			</div>
 			<div hidden={!showClaimableSection}>
 				<div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each claimableTokensSummary as claimableItem, index (claimableItem.token.id)}
+					{#each claimableTokensSummary as claimableItem, index (walletAddress + ':' + claimableItem.token.id)}
 						<div class="min-w-0" hidden={index >= 6 && !isExpandingClaimableSection}>
 							<p class="mb-2 break-words text-sm">
 								{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
