@@ -44,7 +44,18 @@ try {
 					if (id === '\0fixture:env')
 						return `export const PUBLIC_SUPABASE_URL='https://supabase.example'; export const PUBLIC_SUPABASE_ANON_KEY='fixture'; export const PUBLIC_MIMIR_URL='https://mimir.example'; export const PUBLIC_MIMIR_ANON_KEY='fixture'; export const PUBLIC_WALLETCONNECT_PROJECT_ID='fixture';`;
 					if (id === '\0fixture:tokens')
-						return `import {tokens} from '/src/lib/ds/WalletHoldings/fixtures.ts'; export const fetchFungibleTokens = async () => ({tokens,partial:false});`;
+						return `import {tokens} from '/src/lib/ds/WalletHoldings/fixtures.ts';
+							const scenario = new URL(location.href).searchParams.get('case');
+							const asset = (id, value, balance=1000000) => ({...tokens[0],id,name:'Asset '+id,value,balance,approvals:[]});
+							globalThis.__tokenPopulation = scenario==='dust'
+								? [...Array.from({length:5},(_,i)=>asset('priced'+i,10-i)), ...Array.from({length:3},(_,i)=>asset('unknown'+i,0)), ...Array.from({length:5},(_,i)=>asset('zero'+i,0,0))]
+								: scenario==='keys' ? tokens.slice(0,3) : scenario==='amount' ? tokens.slice(0,9).map(t=>({...t,approvals:t.approvals.map(a=>({...a,amount:'4000'}))})) : tokens;
+							export const fetchFungibleTokens = async address => {
+								globalThis.__tokenReads=(globalThis.__tokenReads||0)+1;
+								if(address==='B') { if(scenario==='address-failure') throw new Error('Token read refused'); return {tokens:[],partial:false}; }
+								if(globalThis.__holdTokens) await new Promise((resolve,reject)=>{globalThis.__releaseTokens=resolve;globalThis.__rejectTokens=reject;});
+								return {tokens:globalThis.__tokenPopulation,partial:false};
+							};`;
 					if (id === '\0fixture:account')
 						return `export * from '/src/lib/portfolio/accountDetails.ts?fixture-real'; export const loadAccountDetails = async (address,deps,{onPart}) => {onPart('account',{status:'loaded',value:{balance:4000000,minBalance:100000,status:'Offline',pendingRewards:0,round:1}});onPart('createdAt',{status:'loaded',value:1});onPart('rewards',{status:'loaded',value:[]});}; export const totalRewardsMicroVoi = () => 0;`;
 					if (id === '\0fixture:price')
@@ -86,7 +97,20 @@ try {
 		},
 		define: { global: 'globalThis' },
 		server: { host: '127.0.0.1', port: 4182, strictPort: true },
-		optimizeDeps: { include: ['svelte', 'svelte/store', 'flowbite-svelte', 'algosdk', 'ulujs'] }
+		optimizeDeps: {
+			include: [
+				'svelte',
+				'svelte/store',
+				'flowbite-svelte',
+				'flowbite-svelte-icons',
+				'lodash-es',
+				'd3-scale',
+				'd3-shape',
+				'@supabase/supabase-js',
+				'algosdk',
+				'ulujs'
+			]
+		}
 	});
 	await server.listen();
 	if (!process.env.HOLDINGS_CHROMIUM) {
@@ -176,60 +200,195 @@ try {
 		deviceScaleFactor: 1,
 		mobile: false
 	});
-	await send('Page.navigate', { url: 'http://127.0.0.1:4182/__holdings' });
-	await wait(`document.querySelector('#ds-holdings-tokens')`);
-	await evaluate(
-		`window.visible = el => !!el && !!el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'; window.buttons = (root=document) => [...root.querySelectorAll('button')].filter(visible); window.clickText = text => { const b=buttons().find(b=>b.textContent.trim()===text); if(!b)throw new Error('Missing button '+text); b.click(); };`
-	);
-	await evaluate(`clickText('Show dust');`);
-	await wait(`buttons().some(b=>b.textContent.trim()==='Show 6 more tokens')`);
-	await evaluate(`clickText('Show 6 more tokens'); clickText('Show claimable tokens');`);
-	await evaluate(
-		`[...document.querySelectorAll('#ds-holdings-tokens button[aria-expanded="false"],#ds-holdings-lp button[aria-expanded="false"]')].forEach(b=>b.click())`
-	);
-	await wait(`buttons().some(b=>b.textContent.includes('More Details'))`);
-	await evaluate(
-		`buttons().filter(b=>b.textContent.trim()==='More Details').forEach(b=>b.click())`
-	);
-
-	assert.equal(nftReads, 0, 'Ownership must not load at tab mount');
-	await evaluate(`clickText('Show collectibles');`);
-	await wait(`document.body.textContent.includes('Loading NFT ownership')`);
-	assert.ok(pendingNft, 'First expansion starts ownership retrieval');
-	assert.equal(
-		await evaluate(`document.body.textContent.includes('0 NFTs')`),
-		false,
-		'No count before ownership succeeds'
-	);
-	await send('Fetch.fulfillRequest', {
-		requestId: pendingNft,
-		responseCode: 200,
-		responseHeaders: [
-			{ name: 'Content-Type', value: 'application/json' },
-			{ name: 'Access-Control-Allow-Origin', value: '*' }
-		],
-		body: Buffer.from(
-			JSON.stringify({ tokens: [{ contractId: 797609, tokenId: '7', metadata: 'broken' }] })
-		).toString('base64')
-	});
-	await wait(
-		`document.body.textContent.includes('1 NFTs') && document.body.textContent.includes('NFT #7') && document.body.textContent.includes('Some NFT metadata is unavailable')`
-	);
-	await evaluate(`clickText('Hide collectibles · 1 NFTs');`);
-	await evaluate(`clickText('Show collectibles · 1 NFTs');`);
-	assert.equal(nftReads, 1, 'Collapse and expand reuses retrieved ownership');
-	for (const theme of ['light', 'dark']) {
+	const open = async (scenario) => {
+		await send('Page.navigate', { url: 'http://127.0.0.1:4182/__holdings?case=' + scenario });
+		await wait(`document.querySelector('#ds-holdings-tokens [data-token-id]')`);
 		await evaluate(
-			`document.documentElement.dataset.theme=${JSON.stringify(theme)};document.documentElement.classList.toggle('dark',${theme === 'dark'});`
+			`window.visible = el => !!el && !!el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'; window.buttons = (root=document) => [...root.querySelectorAll('button')].filter(visible); window.clickText = text => { const b=buttons().find(b=>b.textContent.trim()===text); if(!b)throw new Error('Missing button '+text); b.click(); };`
 		);
-		for (const width of [320, 390, 768, 1024, 1440]) {
-			await send('Emulation.setDeviceMetricsOverride', {
-				width,
-				height: 900,
-				deviceScaleFactor: 1,
-				mobile: false
-			});
-			const result = await evaluate(`(() => {
+	};
+	const cases = process.env.HOLDINGS_CASE
+		? process.env.HOLDINGS_CASE.split(',')
+		: ['refresh', 'sort', 'dust', 'address-empty', 'address-failure', 'keys', 'amount', 'controls'];
+	for (const scenario of cases.filter((name) => name !== 'controls')) {
+		await open(scenario);
+		if (scenario === 'refresh' || scenario === 'sort') {
+			await evaluate(
+				`window.initialRows=[...document.querySelectorAll('#ds-holdings-tokens div[data-token-id]')].map(detail=>({detail,row:detail.closest('tr'),id:detail.dataset.tokenId}));window.pendingClaimCard=document.querySelector('[data-token-id="1"] .wallet-token-legacy');document.querySelector('button[aria-controls="'+pendingClaimCard.closest('tr').id+'"]').click();`
+			);
+			await evaluate(
+				`buttons(pendingClaimCard).find(b=>b.textContent.trim()==='More Details').click();`
+			);
+			await wait(`buttons(pendingClaimCard).some(b=>b.textContent.trim()==='Claim')`);
+			await evaluate(
+				`window.__holdClaim=true;[...pendingClaimCard.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
+			);
+			await wait(`pendingClaimCard.textContent.includes('Claiming...')`);
+			if (scenario === 'refresh') {
+				await evaluate(`window.__holdTokens=true;clickText('Refresh tokens');`);
+				await wait(`typeof window.__releaseTokens==='function'`);
+			} else {
+				await evaluate(`document.querySelectorAll('#ds-holdings-tokens thead button')[2].click();`);
+			}
+			assert.equal(
+				await evaluate(
+					`initialRows.every(({detail,row,id})=>row.isConnected && detail===document.querySelector('div[data-token-id="'+id+'"]') && row===detail.closest('tr'))`
+				),
+				true,
+				'Loaded token rows retain membership and node identity during ' + scenario
+			);
+			assert.equal(
+				await evaluate(
+					`pendingClaimCard.isConnected && pendingClaimCard===document.querySelector('[data-token-id="1"] .wallet-token-legacy') && pendingClaimCard.textContent.includes('Claiming...')`
+				),
+				true,
+				'Pending Claim retains its mounted money control during ' + scenario
+			);
+			if (scenario === 'refresh') {
+				await evaluate(`__rejectTokens(new Error('Refresh refused'));`);
+				await wait(
+					`document.body.textContent.includes('Refresh failed. Showing the last loaded token balances.')`
+				);
+				assert.equal(
+					await evaluate(
+						`initialRows.every(({row})=>row.isConnected) && pendingClaimCard.isConnected`
+					),
+					true,
+					'A failed same-wallet refresh keeps rows and pending Claim'
+				);
+			}
+		} else if (scenario === 'dust') {
+			await evaluate(
+				`window.unknownRows=[...document.querySelectorAll('div[data-token-id^="unknown"]')];clickText('Show dust');`
+			);
+			assert.equal(
+				await evaluate(
+					`unknownRows.length===3 && unknownRows.every(row=>row.isConnected && row===document.querySelector('[data-token-id="'+row.dataset.tokenId+'"]'))`
+				),
+				true,
+				'Show dust keeps all three unpriced row nodes mounted'
+			);
+			assert.equal(
+				await evaluate(
+					`document.querySelectorAll('#ds-holdings-tokens div[data-token-id]').length`
+				),
+				13,
+				'Show dust expands the full population'
+			);
+			assert.equal(
+				await evaluate(`buttons().some(b=>/Show \\d+ more tokens/.test(b.textContent))`),
+				false,
+				'Show dust removes the page limit permanently'
+			);
+		} else if (scenario.startsWith('address-')) {
+			await evaluate(
+				`clickText('Show claimable tokens');window.__holdTokens=true;clickText('Refresh tokens');`
+			);
+			await wait(`typeof window.__releaseTokens==='function'`);
+			assert.equal(
+				await evaluate(
+					`!!document.querySelector('.wallet-claim-legacy') && buttons().some(b=>b.textContent.trim()==='Claim All')`
+				),
+				true,
+				'Same-wallet refresh retains claimable approvals'
+			);
+			await evaluate(`__holdTokens=false;__releaseTokens();`);
+			await wait(`!buttons().find(b=>b.textContent.trim()==='Refresh tokens')?.disabled`);
+			await evaluate(`clickText('Switch page');`);
+			await wait(
+				scenario === 'address-failure'
+					? `document.body.textContent.includes('Token balances unavailable')`
+					: `document.body.textContent.includes('No tokens in this account')`
+			);
+			assert.equal(
+				await evaluate(
+					`[...document.querySelectorAll('h3')].some(h=>h.textContent.trim()==='Claimable tokens') || buttons().some(b=>/^(Claim|Claim All|Show claimable tokens|Hide claimable tokens)$/.test(b.textContent.trim())) || !!document.querySelector('.wallet-claim-legacy')`
+				),
+				false,
+				'An empty or failed new wallet has no Claimable section or claim controls'
+			);
+		} else if (scenario === 'keys') {
+			await evaluate(`clickText('Show claimable tokens');`);
+			await wait(`document.querySelectorAll('.wallet-claim-legacy').length===3`);
+			await evaluate(
+				`window.claimCards=[...document.querySelectorAll('.wallet-claim-legacy')];window.secondCard=claimCards[1];window.__holdClaim=true;[...secondCard.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
+			);
+			await wait(`secondCard.textContent.includes('Claiming...')`);
+			await evaluate(`__tokenPopulation=__tokenPopulation.slice(1);clickText('Refresh tokens');`);
+			await wait(`document.querySelectorAll('.wallet-claim-legacy').length===2`);
+			assert.equal(
+				await evaluate(
+					`secondCard.isConnected && secondCard===document.querySelectorAll('.wallet-claim-legacy')[0] && secondCard.textContent.includes('Asset 2') && !secondCard.textContent.includes('Asset 3') && secondCard.textContent.includes('Claiming...')`
+				),
+				true,
+				'Removing the first claim card preserves the pending second instance and its token prop'
+			);
+		} else if (scenario === 'amount') {
+			await evaluate(`clickText('Show claimable tokens');`);
+			await wait(`buttons().some(b=>b.textContent.trim()==='Show 3 More')`);
+			await evaluate(`clickText('Show 3 More');`);
+			assert.equal(
+				await evaluate(
+					`(() => {const amounts=[...document.querySelectorAll('.wallet-claim-legacy')].map(card=>card.previousElementSibling.textContent.trim()); return amounts.length===9 && amounts.every(text=>/^0\\.004\\s/.test(text) && !/^0\\.00\\s/.test(text));})()`
+				),
+				true,
+				'Both claim grids display 0.004 without rounding it to zero'
+			);
+		}
+		console.log('PASS', scenario);
+	}
+	if (!cases.includes('controls')) {
+		assert.equal(errors.length, 0, JSON.stringify(errors));
+	} else {
+		await open('controls');
+		await evaluate(`clickText('Show dust');`);
+		await evaluate(`clickText('Show claimable tokens');`);
+		await evaluate(
+			`[...document.querySelectorAll('#ds-holdings-tokens button[aria-expanded="false"],#ds-holdings-lp button[aria-expanded="false"]')].forEach(b=>b.click())`
+		);
+		await wait(`buttons().some(b=>b.textContent.includes('More Details'))`);
+		await evaluate(
+			`buttons().filter(b=>b.textContent.trim()==='More Details').forEach(b=>b.click())`
+		);
+
+		assert.equal(nftReads, 0, 'Ownership must not load at tab mount');
+		await evaluate(`clickText('Show collectibles');`);
+		await wait(`document.body.textContent.includes('Loading NFT ownership')`);
+		assert.ok(pendingNft, 'First expansion starts ownership retrieval');
+		assert.equal(
+			await evaluate(`document.body.textContent.includes('0 NFTs')`),
+			false,
+			'No count before ownership succeeds'
+		);
+		await send('Fetch.fulfillRequest', {
+			requestId: pendingNft,
+			responseCode: 200,
+			responseHeaders: [
+				{ name: 'Content-Type', value: 'application/json' },
+				{ name: 'Access-Control-Allow-Origin', value: '*' }
+			],
+			body: Buffer.from(
+				JSON.stringify({ tokens: [{ contractId: 797609, tokenId: '7', metadata: 'broken' }] })
+			).toString('base64')
+		});
+		await wait(
+			`document.body.textContent.includes('1 NFTs') && document.body.textContent.includes('NFT #7') && document.body.textContent.includes('Some NFT metadata is unavailable')`
+		);
+		await evaluate(`clickText('Hide collectibles · 1 NFTs');`);
+		await evaluate(`clickText('Show collectibles · 1 NFTs');`);
+		assert.equal(nftReads, 1, 'Collapse and expand reuses retrieved ownership');
+		for (const theme of ['light', 'dark']) {
+			await evaluate(
+				`document.documentElement.dataset.theme=${JSON.stringify(theme)};document.documentElement.classList.toggle('dark',${theme === 'dark'});`
+			);
+			for (const width of [320, 390, 768, 1024, 1440]) {
+				await send('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 900,
+					deviceScaleFactor: 1,
+					mobile: false
+				});
+				const result = await evaluate(`(() => {
 				const fail=message=>{throw new Error(message)};
 				const targetRules=[...document.styleSheets].flatMap(s=>{try{return [...s.cssRules]}catch{return []}}).filter(r=>r.selectorText?.includes('.wallet-') && r.style?.display==='none');
 				if(targetRules.length!==1)fail('Expected one explicit adapter hide rule, got '+targetRules.length);
@@ -268,85 +427,86 @@ try {
 				if(document.documentElement.scrollWidth>innerWidth)fail('Horizontal overflow '+document.documentElement.scrollWidth+' > '+innerWidth);
 				return {width:innerWidth,counts};
 			})()`);
-			console.log(
-				'PASS adapter controls, structural targets and layout',
-				theme,
-				width,
-				result.counts.length
-			);
+				console.log(
+					'PASS adapter controls, structural targets and layout',
+					theme,
+					width,
+					result.counts.length
+				);
+			}
 		}
-	}
-	// A synthetic signing rejection exercises the real ClaimableTokenCard error surface.
-	await evaluate(
-		`const card=document.querySelector('.wallet-claim-legacy'); [...card.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
-	);
-	await wait(
-		`document.querySelector('.wallet-claim-legacy').textContent.includes('Fixture signing refused')`
-	);
+		// A synthetic signing rejection exercises the real ClaimableTokenCard error surface.
+		await evaluate(
+			`const card=document.querySelector('.wallet-claim-legacy'); [...card.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
+		);
+		await wait(
+			`document.querySelector('.wallet-claim-legacy').textContent.includes('Fixture signing refused')`
+		);
 
-	// Expanded rows keep their real controllers while a transaction is pending.
-	// Hold only the transaction boundary; run the real FungibleToken claim handler and DataTable.
-	await evaluate(
-		`window.__holdClaim=true;window.pendingClaimCard=document.querySelector('[data-token-id="14"] .wallet-token-legacy');[...pendingClaimCard.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
-	);
-	await wait(`pendingClaimCard.textContent.includes('Claiming...')`);
-	const assertPendingController = async () => {
+		// Expanded rows keep their real controllers while a transaction is pending.
+		// Hold only the transaction boundary; run the real FungibleToken claim handler and DataTable.
+		await evaluate(
+			`window.__holdClaim=true;window.pendingClaimCard=document.querySelector('[data-token-id="14"] .wallet-token-legacy');[...pendingClaimCard.querySelectorAll('button')].find(b=>b.textContent.trim()==='Claim').click();`
+		);
+		await wait(`pendingClaimCard.textContent.includes('Claiming...')`);
+		const assertPendingController = async () => {
+			assert.equal(
+				await evaluate(
+					`pendingClaimCard.isConnected && pendingClaimCard === document.querySelector('[data-token-id="14"] .wallet-token-legacy')`
+				),
+				true,
+				'Expanded token 14 retains the same connected controller while Claim is pending'
+			);
+		};
 		assert.equal(
 			await evaluate(
-				`pendingClaimCard.isConnected && pendingClaimCard === document.querySelector('[data-token-id="14"] .wallet-token-legacy')`
+				`buttons().concat([...document.querySelectorAll('a')]).some(el => /^(Show fewer|Show less|Hide dust|Collapse)$/i.test(el.textContent.trim()))`
 			),
-			true,
-			'Expanded token 14 retains the same connected controller while Claim is pending'
+			false,
+			'Expanded holdings expose no list collapse control'
 		);
-	};
-	assert.equal(
-		await evaluate(
-			`buttons().concat([...document.querySelectorAll('a')]).some(el => /^(Show fewer|Show less|Hide dust|Collapse)$/i.test(el.textContent.trim()))`
-		),
-		false,
-		'Expanded holdings expose no list collapse control'
-	);
-	await assertPendingController();
-	// Sort both ways, close/reopen the detail, and change the selected wallet.
-	for (const column of ['Token', 'Quantity', 'VOI equivalent', '≈USD']) {
-		for (let direction = 0; direction < 2; direction++) {
+		await assertPendingController();
+		// Sort both ways, close/reopen the detail, and change the selected wallet.
+		for (const column of ['Token', 'Quantity', 'VOI equivalent', '≈USD']) {
+			for (let direction = 0; direction < 2; direction++) {
+				await evaluate(
+					`document.querySelector('#ds-holdings-tokens th').closest('thead').querySelectorAll('button')[${['Token', 'Quantity', 'VOI equivalent', '≈USD'].indexOf(column)}].click()`
+				);
+				await assertPendingController();
+			}
+		}
+		for (let n = 0; n < 2; n++) {
 			await evaluate(
-				`document.querySelector('#ds-holdings-tokens th').closest('thead').querySelectorAll('button')[${['Token', 'Quantity', 'VOI equivalent', '≈USD'].indexOf(column)}].click()`
+				`document.querySelector('button[aria-controls="'+pendingClaimCard.closest('tr').id+'"]').click()`
 			);
 			await assertPendingController();
 		}
-	}
-	for (let n = 0; n < 2; n++) {
-		await evaluate(
-			`document.querySelector('button[aria-controls="'+pendingClaimCard.closest('tr').id+'"]').click()`
+		for (let n = 0; n < 2; n++) {
+			await evaluate(`clickText('Toggle signing')`);
+			await assertPendingController();
+		}
+		assert.equal(
+			await evaluate(`pendingClaimCard.isConnected`),
+			true,
+			'Pending approval Claim remains mounted after the available controls are exercised'
 		);
-		await assertPendingController();
-	}
-	for (let n = 0; n < 2; n++) {
-		await evaluate(`clickText('Toggle signing')`);
-		await assertPendingController();
-	}
-	assert.equal(
-		await evaluate(`pendingClaimCard.isConnected`),
-		true,
-		'Pending approval Claim remains mounted after the available controls are exercised'
-	);
-	console.log(
-		'PASS one-way expansion retains the same pending Claim controller through sorting, detail toggles and wallet changes'
-	);
-	assert.equal(errors.length, 0, JSON.stringify(errors));
-	if (process.env.HOLDINGS_SHOT_DIR) {
-		await mkdir(process.env.HOLDINGS_SHOT_DIR, { recursive: true });
-		const shot = await send('Page.captureScreenshot', {
-			format: 'png',
-			captureBeyondViewport: true
-		});
-		await writeFile(
-			resolve(process.env.HOLDINGS_SHOT_DIR, 'holdings.png'),
-			Buffer.from(shot.data, 'base64')
+		console.log(
+			'PASS one-way expansion retains the same pending Claim controller through sorting, detail toggles and wallet changes'
 		);
+		assert.equal(errors.length, 0, JSON.stringify(errors));
+		if (process.env.HOLDINGS_SHOT_DIR) {
+			await mkdir(process.env.HOLDINGS_SHOT_DIR, { recursive: true });
+			const shot = await send('Page.captureScreenshot', {
+				format: 'png',
+				captureBeyondViewport: true
+			});
+			await writeFile(
+				resolve(process.env.HOLDINGS_SHOT_DIR, 'holdings.png'),
+				Buffer.from(shot.data, 'base64')
+			);
+		}
+		console.log('PASS real claim error remains visible; no external requests permitted');
 	}
-	console.log('PASS real claim error remains visible; no external requests permitted');
 } finally {
 	ws?.close();
 	browser?.kill();
