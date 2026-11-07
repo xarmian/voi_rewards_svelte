@@ -29,22 +29,38 @@ const token = {
 const controller = () =>
 	readFileSync(new URL('../../component/PortfolioComponent.svelte', import.meta.url), 'utf8');
 
-it('D4 renders partial nonzero assets as Unavailable and withholds the total and composition bar', () => {
+it('partial nonzero asset value cells read Unavailable and withhold the total and composition bar', () => {
 	const html = render(WalletHoldings, {
 		props: { pageAddress: 'Y', account, tokens: [token], partial: true, tokenState: 'ready' }
 	}).body;
-	expect(html).toContain('Unknown asset');
-	expect(html).toContain('Unavailable');
+	const row = html.match(/<tr[^>]*>[^]*?Unknown asset[^]*?<\/tr>/)?.[0];
+	expect(row).toBeDefined();
+	const cells = [...row!.matchAll(/<td\b[^>]*>([^]*?)<\/td>/g)];
+	const valueCell = cells[2][1].replace(/<[^>]*>/g, '').trim();
+	expect(valueCell).toBe('Unavailable');
+	expect(valueCell).not.toMatch(/^0(?:\.0+)?(?: VOI)?$/);
 	expect(html).toContain('Some pool or approval details are unavailable');
 	expect(html).not.toContain('Holdings total');
 	expect(html).not.toContain('Holdings composition');
 });
 it('confirmed native zero is ready, token failure is unavailable, and NFTs do not start or display a count at mount', () => {
 	const html = render(WalletHoldings, {
-		props: { pageAddress: 'Y', account, tokens: [], tokenState: 'error', tokenError: 'offline' }
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [],
+			tokenState: 'error',
+			tokenError: 'offline',
+			split: {
+				pageAddress: 'Y',
+				owner: { address: 'Y', balance: 0 },
+				contracts: [],
+				contractSet: 'ready'
+			}
+		}
 	}).body;
-	expect(html).toContain('0');
-	expect(html).toContain('VOI');
+	expect(html).toMatch(/Page VOI balance<[^]*?>0<[^]*?VOI/);
+	expect(html).toMatch(/Liquid[^]*?<dd[^>]*>[^]*?0 VOI[^]*?<\/dd>/);
 	expect(html).toContain('Token balances unavailable');
 	expect(html).toContain('Show collectibles');
 	expect(html).not.toContain('0 NFTs');
@@ -151,6 +167,36 @@ it('controller delegates presentation using full raw population and the original
 	expect(source.slice(source.indexOf('<!-- Send VOI Modal -->'))).toBe(
 		original.slice(original.indexOf('<!-- Send VOI Modal -->'))
 	);
+	const script = (text: string) => text.split('</script>')[0];
+	const emptySummary = '\t\t} else {\n\t\t\tclaimableTokensSummary = [];\n\t\t}';
+	expect(script(source)).toContain(emptySummary);
+	// Strip only the explicit read additions before comparing the complete original controller.
+	const restored = script(source)
+		.replace(/\t\/\* eslint-disable[^\n]+\n/, '')
+		.replace(
+			"import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';",
+			"import PortfolioSectionNFT from './PortfolioSectionNFT.svelte';"
+		)
+		.replace(
+			/\n\timport \{\n\t\tcreateHoldingsTokenLoader,[^]*?from '\$lib\/wallet\/holdings';/,
+			''
+		)
+		.replace("\n\timport type { NFTToken } from '$lib/types/assets';", '')
+		.replace(
+			'\n\timport { arc200TransferFrom }',
+			"\n\timport { fetchFungibleTokens } from '$lib/services/accounts';\n\timport { arc200TransferFrom }"
+		)
+		.replace(/\n\t\/\/ Read-only Holdings sources;[^]*?(?=\n\tlet accountPart:)/, '')
+		.replace(/\n\t+const tokenGeneration = \+\+tokenLoadGeneration;/g, '')
+		.replace(/\n\t+tokensAsOf = new Date\(\)\.toISOString\(\);/g, '')
+		.replaceAll(
+			'holdingsTokenLoader(requestedWallet, lastTokenPrice)',
+			'fetchFungibleTokens(requestedWallet, lastTokenPrice)'
+		)
+		.replaceAll(' || tokenGeneration !== tokenLoadGeneration', '')
+		.replaceAll(' && tokenGeneration === tokenLoadGeneration', '')
+		.replace(emptySummary, '\t\t}');
+	expect(restored.replace(/\s+/g, ' ').trim()).toBe(script(original).replace(/\s+/g, ' ').trim());
 	const normalized = (text: string) => text.replace(/\s+/g, ' ');
 	for (const component of ['FungibleToken', 'ClaimableTokenCard']) {
 		const mount = new RegExp(`<${component}\\s+[\\s\\S]*?/>`);
@@ -223,6 +269,10 @@ it('top ten and dust never narrow the actual Claim All builder population', asyn
 	);
 	runInContext('claimableTokensSummary = calculateClaimableTokensSummary()', context);
 	expect(context.claimableTokensSummary).toHaveLength(15); // fourteen regular tokens and one LP with an approval
+	expect(
+		new Set(context.claimableTokensSummary.map((item: { token: { id: string } }) => item.token.id))
+			.size
+	).toBe(context.claimableTokensSummary.length);
 	await runInContext('bulkClaimAllTokens()', context);
 	expect(built).toHaveLength(15);
 	expect(built).toContain(14);
@@ -238,7 +288,6 @@ it('NFT ownership begins only on expansion, publishes count before metadata, and
 	const owned = [{ contractId: '797609', tokenId: '7', name: 'NFT #7', imageUrl: '' }];
 	const context = createContext({
 		walletAddress: 'Y',
-		nftAddress: 'Y',
 		nftGeneration: 0,
 		nfts: undefined,
 		nftState: 'idle',
@@ -265,4 +314,34 @@ it('NFT ownership begins only on expansion, publishes count before metadata, and
 	expect(context.nftPartial).toBe(true);
 	await runInContext('readWalletNfts()', context);
 	expect(context.loadWalletNfts).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+	[700, 6, '0.0007'],
+	[7, 7, '0.0000007'],
+	[Number.MAX_SAFE_INTEGER, 6, '9007199254.740991']
+])('exact quantity preserves %s base units with %s decimals', (balance, decimals, expected) => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'Y',
+			account,
+			tokens: [{ ...token, balance, decimals }],
+			tokenState: 'ready'
+		}
+	}).body;
+	const exact = html
+		.match(/Exact quantity<\/dt>\s*<dd>([^]*?)<\/dd>/)?.[1]
+		.replace(/<[^>]*>/g, '')
+		.trim();
+	expect(exact).toBe(`${expected} TOK`);
+});
+
+it('claim cards keep their token identity in both grids', () => {
+	const loops = [
+		...controller().matchAll(
+			/\{#each claimableTokensSummary\.slice\([^]*? as claimableItem([^]*?)\}/g
+		)
+	];
+	expect(loops).toHaveLength(2);
+	for (const loop of loops) expect(loop[1].trim()).toBe('(claimableItem.token.id)');
 });

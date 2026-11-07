@@ -20,7 +20,6 @@ export type HoldingsRow = {
 	value: number | null;
 	valueLabel: string;
 	usd: number | null;
-	canOptOut: boolean;
 	underlying: { symbol: string; amount: number }[] | null;
 };
 
@@ -30,6 +29,22 @@ const decimalsKnown = (n: unknown): n is number =>
 	Number.isInteger(n) && Number(n) >= 0 && Number(n) <= 255;
 export const holdingsAmount = (n: number | null) =>
 	n === null ? 'Unavailable' : n > 0 && n < 0.01 ? '<0.01' : compact(n, 2);
+
+export function holdingsExactQuantity(
+	token: Pick<FungibleTokenType, 'balance' | 'decimals'>
+): string {
+	if (
+		!nonnegative(token.balance) ||
+		!Number.isInteger(token.balance) ||
+		!decimalsKnown(token.decimals)
+	)
+		return 'Unavailable';
+	const units = BigInt(token.balance).toString();
+	if (token.decimals === 0) return units;
+	const digits = units.padStart(token.decimals + 1, '0');
+	const fraction = digits.slice(-token.decimals).replace(/0+$/, '');
+	return digits.slice(0, -token.decimals) + (fraction ? `.${fraction}` : '');
+}
 
 /** Rows hold references to the service objects. Formatting/filtering must never change money inputs. */
 export function deriveHoldingsRows(
@@ -85,7 +100,6 @@ export function deriveHoldingsRows(
 			value,
 			valueLabel: value === null ? 'Unavailable' : `${holdingsAmount(value)} VOI`,
 			usd,
-			canOptOut: token.balance === 0 && token.type !== 'arc200',
 			underlying
 		});
 	}
@@ -139,7 +153,11 @@ export function deriveHoldingsDisplay({
 		? contracts.reduce((sum, c) => sum + Math.min(c.balance, c.details!.lockedBalance / 1e6), 0)
 		: null;
 	const unlocked = nativeReady ? contracts.reduce((sum, c) => sum + c.balance, 0) - locked! : null;
-	const liquid = nativeReady && contracts.some((c) => c.address === pageAddress) ? 0 : pageLiquid;
+	const liquid = nativeReady
+		? contracts.some((c) => c.address === pageAddress)
+			? 0
+			: pageLiquid
+		: null;
 	const valuesReady =
 		!partial &&
 		(tokenState === 'ready' || tokenState === 'empty') &&

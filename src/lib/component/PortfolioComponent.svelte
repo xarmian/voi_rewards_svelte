@@ -662,6 +662,8 @@
 	$: {
 		if (fungibleTokens.length > 0) {
 			claimableTokensSummary = calculateClaimableTokensSummary();
+		} else {
+			claimableTokensSummary = [];
 		}
 	}
 
@@ -955,6 +957,15 @@
 	/>
 {/snippet}
 
+{#snippet claimAmount(amount: number, decimals: number)}
+	{@const precision = Math.min(decimals, 6)}
+	{#if amount > 0 && amount < 10 ** -precision}
+		&lt;{(10 ** -precision).toFixed(precision)}
+	{:else}
+		{amount.toLocaleString('en-US', { maximumFractionDigits: precision })}
+	{/if}
+{/snippet}
+
 {#snippet claims()}
 	{#if bulkClaimError}<p role="alert" class="break-all text-danger">{bulkClaimError}</p>{/if}
 	{#if claimableTokensSummary.length > 0}
@@ -988,10 +999,10 @@
 			</div>
 			{#if showClaimableSection}
 				<div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each claimableTokensSummary.slice(0, 6) as claimableItem}
+					{#each claimableTokensSummary.slice(0, 6) as claimableItem (claimableItem.token.id)}
 						<div class="min-w-0">
 							<p class="mb-2 break-words text-sm">
-								{formatNumber(claimableItem.totalAmount, 2)}
+								{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
 								{claimableItem.token.symbol} · {claimableItem.totalValue > 0
 									? formatNumber(claimableItem.totalValue, 2) + ' VOI equivalent'
 									: 'Value unavailable'}
@@ -1021,10 +1032,10 @@
 					>
 					{#if isExpandingClaimableSection}
 						<div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-							{#each claimableTokensSummary.slice(6) as claimableItem}
+							{#each claimableTokensSummary.slice(6) as claimableItem (claimableItem.token.id)}
 								<div class="min-w-0">
 									<p class="mb-2 break-words text-sm">
-										{formatNumber(claimableItem.totalAmount, 2)}
+										{@render claimAmount(claimableItem.totalAmount, claimableItem.token.decimals)}
 										{claimableItem.token.symbol} · {claimableItem.totalValue > 0
 											? formatNumber(claimableItem.totalValue, 2) + ' VOI equivalent'
 											: 'Value unavailable'}
@@ -1060,13 +1071,7 @@
 	pageAddress={walletAddress ?? ''}
 	account={accountPart}
 	tokens={fungibleTokens}
-	tokenState={tokensError
-		? tokensAsOf
-			? 'stale'
-			: 'error'
-		: isLoadingTokens || !tokensAsOf
-			? 'loading'
-			: 'ready'}
+	tokenState={tokensError ? (tokensAsOf ? 'stale' : 'error') : !tokensAsOf ? 'loading' : 'ready'}
 	tokenError={tokensError}
 	partial={tokensPartial}
 	asOf={tokensAsOf}

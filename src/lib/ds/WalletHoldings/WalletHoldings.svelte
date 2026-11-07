@@ -4,6 +4,7 @@
 	import {
 		deriveHoldingsDisplay,
 		holdingsAmount,
+		holdingsExactQuantity,
 		type HoldingsAccount,
 		type HoldingsRow,
 		type HoldingsSplit
@@ -139,8 +140,16 @@
 	// Own the initial slice so DataTable never offers its reversible list expansion.
 	const tokenRows = $derived.by(() => {
 		const column = columns.find((column) => column.key === tokenSort.key)!;
-		const sorted = sortRows(display.rows.tokens, column, tokenSort.dir);
-		return tokensExpanded ? sorted : sorted.slice(0, 10);
+		const defaultOrder = sortRows(
+			display.rows.tokens,
+			columns.find((column) => column.key === 'value')!,
+			'desc'
+		);
+		return sortRows(
+			tokensExpanded ? defaultOrder : defaultOrder.slice(0, 10),
+			column,
+			tokenSort.dir
+		);
 	});
 	const tableState = $derived(tokenState);
 </script>
@@ -148,7 +157,7 @@
 {#snippet identity(row: HoldingsRow)}<span class="break-words" title={row.token.name}
 		>{row.token.name}</span
 	>{/snippet}
-{#snippet quantity(row: HoldingsRow)}<span title={String(row.quantity)}
+{#snippet quantity(row: HoldingsRow)}<span title={holdingsExactQuantity(row.token)}
 		>{holdingsAmount(row.quantity)} {row.token.symbol}</span
 	>{/snippet}
 {#snippet value(row: HoldingsRow)}<span
@@ -164,7 +173,7 @@
 		<dl class="grid min-w-0 grid-cols-1 gap-2 text-sm md:grid-cols-2">
 			<div>
 				<dt class="text-ink-muted">Exact quantity</dt>
-				<dd>{row.quantity === null ? 'Unavailable' : String(row.quantity)} {row.token.symbol}</dd>
+				<dd>{holdingsExactQuantity(row.token)} {row.token.symbol}</dd>
 			</div>
 			<div>
 				<dt class="text-ink-muted">Token ID</dt>
@@ -204,7 +213,7 @@
 			>Refresh tokens</Button
 		>
 		{#if !showDust}
-			<Button variant="soft" onclick={() => (showDust = true)}>Show dust</Button>
+			<Button variant="soft" onclick={() => (showDust = tokensExpanded = true)}>Show dust</Button>
 		{/if}
 	</div>
 {/snippet}

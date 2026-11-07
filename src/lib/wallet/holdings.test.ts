@@ -82,18 +82,7 @@ it('dust keeps unknown positive balances and both directions of approval; zero i
 	expect(deriveHoldingsRows(raw).tokens.map((r) => r.token.id)).toEqual(['unknown', 'in', 'out']);
 	expect(deriveHoldingsRows(raw, { showDust: true }).tokens).toHaveLength(5);
 });
-it('raw zero, never rounded zero, determines Opt-out reachability without changing money objects', () => {
-	const raw = [
-		token({ balance: 1, value: 0 }),
-		token({ id: 'zero', balance: 0, value: 0 }),
-		token({ id: 'arc', type: 'arc200', balance: 0, value: 0 })
-	];
-	const rows = deriveHoldingsRows(raw, { showDust: true }).tokens;
-	expect(rows.map((r) => r.canOptOut)).toEqual([false, true, false]);
-	expect(rows[0].token).toBe(raw[0]);
-	expect(rows[0].token.balance).toBe(1);
-});
-it('D4: partial zero-valued nonzero balance is Unavailable, with no total or composition', () => {
+it('partial zero-valued nonzero balance is Unavailable, with no total or composition', () => {
 	const display = deriveHoldingsDisplay({
 		pageAddress: 'Y',
 		account,
@@ -196,4 +185,34 @@ it('ownership survives malformed metadata and independently failed collection/en
 	expect(enriched.tokens).toHaveLength(1);
 	expect(enriched.tokens[0].tokenId).toBe('7');
 	expect(enriched.partial).toBe(true);
+});
+
+it.each([
+	{ ...split, pageAddress: 'C', contracts: [{ address: 'C', balance: 4, details: null }] },
+	{
+		...split,
+		pageAddress: 'C',
+		contractSet: 'unavailable' as const,
+		contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3000000 } }]
+	},
+	undefined
+])('contract liquid stays unavailable until its native split is ready (%j)', (pendingSplit) => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'C',
+		account,
+		tokens: [],
+		split: pendingSplit
+	});
+	expect(display.parts.find((part) => part.label === 'Liquid')?.value).toBeNull();
+	const ready = deriveHoldingsDisplay({
+		pageAddress: 'C',
+		account,
+		tokens: [],
+		split: {
+			...split,
+			pageAddress: 'C',
+			contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3000000 } }]
+		}
+	});
+	expect(ready.parts.find((part) => part.label === 'Liquid')?.value).toBe(0);
 });
