@@ -23,6 +23,7 @@ it('server renders exactly one hidden decorative image without sending a referre
 	expect(images[0]).toContain('referrerpolicy="no-referrer"');
 	expect(images[0]).toContain('alt=""');
 	expect(images[0]).toContain('decoding="async"');
+	expect(images[0]).toMatch(/data-generation="\d+"/);
 	expect(images[0]).toContain('opacity-0');
 	expect(images[0]).toContain('object-cover');
 	expect(images[0]).not.toContain('crossorigin');
@@ -71,7 +72,7 @@ it('uses only an img for the avatar and wires the module load and error handlers
 			(attribute as AST.Attribute).end
 		);
 		expect(handler.replace(/\s+/g, ' ')).toBe(
-			`${name}={(event) => image.${name}(event.currentTarget.getAttribute('src'))}`
+			`${name}={(event) => image.${name}(Number(event.currentTarget.dataset.generation))}`
 		);
 	}
 });

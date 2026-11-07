@@ -4,6 +4,7 @@ import { fetchWalletIdentity, parseWalletIdentity } from './identity';
 const avatar = 'https://cdn.example/avatar.png';
 const named = { address: 'A', name: ' shelly.of.voi ', metadata: { avatar } };
 const empty = { name: null, avatar: null };
+const ADDRESS = 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ';
 afterEach(() => vi.useRealTimers());
 
 it('chooses the named result for the requested address among several results', () => {
@@ -46,7 +47,15 @@ it.each([
 	['host without a dot', 'https://intranet/x.png'],
 	['localhost', 'https://localhost/x.png'],
 	['.local host', 'https://printer.local/x.png'],
-	['explicit port', 'https://host.example:8443/x.png']
+	['explicit port', 'https://host.example:8443/x.png'],
+	// WHATWG keeps a trailing dot in the hostname, so a suffix check on `.local` or `localhost` misses it.
+	['trailing dot on a local host', 'https://printer.local./a.png'],
+	['trailing dot on localhost', 'https://localhost./x.png'],
+	['trailing dot on a public-looking host', 'https://cdn.example./x.png'],
+	['percent-encoded trailing dot', 'https://foo.local%2e/x.png'],
+	['ideographic full stop', 'https://foo.local\u3002/x.png'],
+	['leading dot', 'https://.cdn.example/x.png'],
+	['empty label', 'https://cdn..example/x.png']
 ])('rejects %s avatars while keeping the name', (_, value) => {
 	expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: value } }])).toEqual({
 		name: 'shelly.of.voi',
@@ -80,13 +89,42 @@ it.each([
 		'a name that looks like an address',
 		'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ'
 	],
-	['a lower-case address look-alike', 'g3msa75ozejtccenojdldjk7ud7e2k5dnc7fvhcnov7e3i4dtxtowduifq']
+	['a lower-case address look-alike', 'g3msa75ozejtccenojdldjk7ud7e2k5dnc7fvhcnov7e3i4dtxtowduifq'],
+	["the hero's own short-address shape", 'G3MSA7\u2026UIFQ'],
+	['the short-address shape with three dots', 'G3MS...UIFQ'],
+	['an address with a zero for an O', ADDRESS.replace('O', '0')],
+	['an address with a one for an I', ADDRESS.replace('I', '1')],
+	['an address with a Cyrillic A', '\u0410' + ADDRESS.slice(1)],
+	[
+		'an address in fullwidth characters',
+		[...ADDRESS].map((c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0)).join('')
+	],
+	['an address with a combining mark', ADDRESS + '\u0301'],
+	['an address with a check mark', ADDRESS + '\u2713'],
+	['an address split by a no-break space', ADDRESS.slice(0, 29) + '\u00a0' + ADDRESS.slice(29)],
+	['an address split by an ideographic space', ADDRESS.slice(0, 29) + '\u3000' + ADDRESS.slice(29)],
+	['a long name with no dot', 'a'.repeat(33)],
+	['a combining grapheme joiner', 'sh\u034felly.voi'],
+	['a variation selector', 'a\ufe0fb.voi'],
+	['a hangul filler', 'a\u3164b.voi'],
+	['a braille blank', 'a\u2800b.voi'],
+	['a space inside the name', 'shelly of.voi'],
+	['an ellipsis inside the name', 'shelly\u2026.voi'],
+	['a Cyrillic letter among Latin ones', 'sh\u0435lly.of.voi'],
+	['a Greek letter among Latin ones', 'sh\u03b5lly.voi']
 ])('shows no name and no avatar for %s (the record is not trusted)', (_, name) => {
 	expect(parseWalletIdentity('A', [{ ...named, name }])).toEqual(empty);
 });
 
-it('keeps an ordinary unicode name', () => {
-	expect(parseWalletIdentity('A', [{ ...named, name: 'café.voi' }]).name).toBe('café.voi');
+it.each([
+	'café.voi',
+	'shelly.of.voi',
+	'name-1_x.voi',
+	'привет.voi',
+	'a'.repeat(32),
+	'a'.repeat(60) + '.voi'
+])('keeps the ordinary name %s', (name) => {
+	expect(parseWalletIdentity('A', [{ ...named, name }]).name).toBe(name);
 });
 
 it.each([[], [{ address: 'A' }], [{ ...named, address: 'B' }], [{ ...named, name: '   ' }]])(
