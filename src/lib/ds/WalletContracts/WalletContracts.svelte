@@ -2,7 +2,7 @@
 	import type { ContractDetails } from '$lib/types';
 	import type { WalletEpoch } from '$lib/wallet/summary';
 	import { summarizeContracts, type ContractRow } from '$lib/wallet/contracts';
-	import { canSignFor, type SelectedAccount } from '$lib/chain/signerGate';
+	import { type PageAccountState } from '$lib/chain/signerGate';
 	import type { Column } from '../DataTable';
 	import type { DataState } from '../types';
 	import Card from '../Card/Card.svelte';
@@ -18,7 +18,7 @@
 		contracts,
 		current,
 		pageAddress,
-		selected,
+		accountState,
 		state: dataState = 'loading',
 		asOf,
 		onrefresh,
@@ -30,7 +30,7 @@
 		contracts: ContractRow[];
 		current: WalletEpoch | null;
 		pageAddress: string;
-		selected: SelectedAccount;
+		accountState: PageAccountState<{ address: string; app: string; walletId?: string }>;
 		state?: DataState;
 		asOf?: string;
 		onrefresh?: () => Promise<void> | void;
@@ -55,14 +55,15 @@
 		dataState !== 'loading' &&
 			dataState !== 'error' &&
 			contracts.length > 0 &&
-			selected?.address === pageAddress
+			accountState.state === 'yours'
 	);
 	function rowCanAct(row: ContractRow) {
 		return (
 			canAct &&
 			contractSet === 'ready' &&
 			row.details !== null &&
-			canSignFor(selected, row.details.owner)
+			accountState.state === 'yours' &&
+			row.details.owner === pageAddress
 		);
 	}
 	const hasActions = $derived(contracts.some((row) => rowCanAct(row)));
@@ -74,7 +75,7 @@
 	let openContextGeneration = 0;
 	$effect.pre(() => {
 		void contracts;
-		void selected;
+		void accountState;
 		void pageAddress;
 		void dataState;
 		void contractSet;
@@ -96,7 +97,7 @@
 		const generation = openContextGeneration;
 		const population = contracts;
 		const address = pageAddress;
-		const selection = selected;
+		const membership = accountState;
 		actionError = '';
 		try {
 			if (action === 'withdraw')
@@ -106,13 +107,13 @@
 			if (
 				!rowCanAct(row) ||
 				generation !== openContextGeneration ||
-				selected !== selection ||
+				accountState !== membership ||
 				pageAddress !== address ||
 				contracts !== population ||
 				!contracts.includes(row) ||
 				row.details !== details ||
-				!canSignFor(selected, details.owner) ||
-				selected?.address !== pageAddress
+				details.owner !== pageAddress ||
+				accountState.state !== 'yours'
 			)
 				return;
 			selectedContract = details;
@@ -399,6 +400,7 @@
 
 {#if selectedContract && showWithdrawModal && WithdrawModal}
 	<WithdrawModal
+		{pageAddress}
 		contract={selectedContract}
 		bind:show={showWithdrawModal}
 		onSuccess={handleWithdrawSuccess}
@@ -406,6 +408,7 @@
 {/if}
 {#if selectedContract && showRegisterVoteKey && RegisterVoteKey}
 	<RegisterVoteKey
+		{pageAddress}
 		walletAddress={selectedContract.contractAddress}
 		parentWalletAddress={selectedContract.owner}
 		contractId={selectedContract.contractId}

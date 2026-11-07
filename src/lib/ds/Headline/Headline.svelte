@@ -3,10 +3,12 @@
 	import { compact, pct, shortAddr } from '../format';
 	import Button from '../Button/Button.svelte';
 	let {
+		yours = false,
 		account,
 		summary,
 		onretry
 	}: {
+		yours?: boolean;
 		account: { name?: string; addr: string };
 		summary: WalletSummary;
 		onretry?: () => void;
@@ -30,8 +32,8 @@
 	> of expected).
 {/snippet}
 {#snippet idle()}
-	{name} has <strong>{compact(summary.idleBalance, 1)} VOI</strong> in contracts that aren't staking:
-	register a key to earn.
+	{name} has <strong>{compact(summary.idleBalance, 1)} VOI</strong> in contracts that aren't staking{#if yours}:
+		register a key to earn.{:else}. These contracts are not staking.{/if}
 {/snippet}
 
 <p
@@ -61,7 +63,7 @@
 			>{summary.keyDays! <= 0
 				? 'has expired'
 				: `expires in ${Math.ceil(summary.keyDays!)} days`}</strong
-		>: renew it to keep earning.
+		>{#if yours}: renew it to keep earning.{:else}. This account’s participation key needs renewal.{/if}
 		{#if earning}{@render earnings()}{/if}
 	{:else if earning}
 		{@render earnings()}

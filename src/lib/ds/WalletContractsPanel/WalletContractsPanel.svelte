@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SelectedAccount } from '$lib/chain/signerGate';
+	import type { PageAccountState } from '$lib/chain/signerGate';
 	import type { WalletEpoch } from '$lib/wallet/summary';
 	import {
 		buildVestingTimeline,
@@ -19,7 +19,7 @@
 		contracts,
 		current,
 		pageAddress,
-		selected,
+		accountState,
 		state = 'loading',
 		contractSet = 'ready',
 		asOf,
@@ -29,7 +29,7 @@
 		contracts: ContractRow[];
 		current: WalletEpoch | null;
 		pageAddress: string;
-		selected: SelectedAccount;
+		accountState: PageAccountState<{ address: string; app: string; walletId?: string }>;
 		state?: DataState;
 		contractSet?: 'ready' | 'unavailable';
 		asOf?: string;
@@ -147,7 +147,7 @@
 			{contracts}
 			{current}
 			{pageAddress}
-			{selected}
+			{accountState}
 			state={failed && state !== 'stale' ? 'error' : state}
 			{contractSet}
 			{asOf}
