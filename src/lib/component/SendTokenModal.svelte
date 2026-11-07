@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import {
 		applyRecipientLookup,
@@ -14,8 +18,8 @@
 	import { Modal, Button, Input, Label } from 'flowbite-svelte';
 	import {
 		signTransactions,
-		selectedWallet,
-		captureSigner,
+		connectedWallets,
+		capturePageSigner,
 		type TransactionSigner
 	} from '$lib/chain/wallet.svelte';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
@@ -126,12 +130,12 @@
 	// Fetch VOI balance only on initial modal open
 	$: {
 		void pinTick;
-		const address = flow.current(accountAddress ?? $selectedWallet?.address);
+		const address = flow.current(accountAddress);
 		if (open && address && isInitialLoad && !flow.pinned) {
 			isInitialLoad = false;
 			requireAccountInfo(address, { force: true })
 				.then((info) => {
-					if (address !== flow.current(accountAddress ?? $selectedWallet?.address)) return;
+					if (address !== flow.current(accountAddress)) return;
 					nativeVoiToken = {
 						...nativeVoiToken,
 						balance: Number(info.amount),
@@ -224,7 +228,7 @@
 	let keepOpenButton: HTMLButtonElement | undefined;
 	$: {
 		void pinTick;
-		syncTracker(open, flow.current(accountAddress ?? $selectedWallet?.address));
+		syncTracker(open, flow.current(accountAddress));
 	}
 	$: if (flow.pinned && (!open || (txState === 'idle' && !showResults && !isSending))) {
 		flow.release();
@@ -667,28 +671,30 @@
 
 	async function handleSend() {
 		if (isSending) return;
-		if (!$selectedWallet?.address) {
-			error = 'Please connect your wallet first';
+		if (!canSignTransactions) {
+			error = wrongSignerMessage();
 			return;
 		}
+
 		const token = selectedToken;
 		// The account the user confirmed; every batch signs as it.
+		const target = accountAddress;
 		let signer: TransactionSigner;
 		try {
-			signer = captureSigner();
+			signer = capturePageSigner(target);
 		} catch (captureError) {
 			error = captureError instanceof Error ? captureError.message : String(captureError);
 			return;
 		}
-		if (!signerMatchesAccount(signer, accountAddress)) {
-			error = wrongSignerMessage(accountAddress);
+		if (!signerMatchesAccount(signer, target)) {
+			error = wrongSignerMessage();
 			return;
 		}
 		// After a failed send the pin keeps this form (tracker, token, balance checks) on that account
 		// while its error shows, so a send for a different selection would sign as one account and be
 		// validated against another's funds. Only the pinned account can retry; closing starts over.
 		if (flow.pinned && flow.address !== signer.address) {
-			error = `Select account ${flow.address} in a signing wallet to continue.`;
+			error = wrongSignerMessage();
 			return;
 		}
 		const sender = signer.address;
@@ -1109,6 +1115,9 @@
 		noteForAll = '';
 		showNoteMenu = false;
 	}
+
+	$: accountState = pageAccountState(accountAddress, $connectedWallets);
+	$: canSignTransactions = accountState.state === 'yours';
 </script>
 
 <Modal
@@ -1590,16 +1599,8 @@
 						</div>
 					{/if}
 					<p class="text-sm text-gray-500 dark:text-gray-400">
-						Signing account: {$selectedWallet?.address}
+						Signing account: {flow.address ?? accountAddress}
 					</p>
-					{#if $selectedWallet?.address !== accountAddress}
-						<div
-							role="alert"
-							class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg"
-						>
-							{wrongSignerMessage(accountAddress)}
-						</div>
-					{/if}
 
 					<div
 						class="flex flex-col sm:flex-row gap-3 items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700"
@@ -1622,85 +1623,83 @@
 							<Button color="alternative" class="flex-1 sm:flex-none" on:click={requestClose}
 								>Cancel</Button
 							>
-							<Button
-								color="blue"
-								class="flex-1 sm:flex-none"
-								on:click={handleSend}
-								disabled={!canSubmit ||
-									txState !== 'idle' ||
-									$selectedWallet?.address !== accountAddress}
-							>
-								{#if txState === 'building'}
-									<svg
-										class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											class="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									Building Txns...
-								{:else if txState === 'awaiting'}
-									<svg
-										class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											class="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									Awaiting Signature {#if totalTxnGroups > 1}(Batch {currentTxnGroup + 1} of {totalTxnGroups}){/if}
-								{:else if txState === 'sending'}
-									<svg
-										class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											class="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									Sending {#if totalTxnGroups > 1}(Batch {currentTxnGroup + 1} of {totalTxnGroups}){/if}
-								{:else}
-									<i class="fas fa-paper-plane mr-2"></i>
-									Send
-								{/if}
-							</Button>
+							{#if canSignTransactions}<Button
+									color="blue"
+									class="flex-1 sm:flex-none"
+									on:click={handleSend}
+									disabled={!canSubmit || txState !== 'idle'}
+								>
+									{#if txState === 'building'}
+										<svg
+											class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												class="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="4"
+											></circle>
+											<path
+												class="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											></path>
+										</svg>
+										Building Txns...
+									{:else if txState === 'awaiting'}
+										<svg
+											class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												class="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="4"
+											></circle>
+											<path
+												class="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											></path>
+										</svg>
+										Awaiting Signature {#if totalTxnGroups > 1}(Batch {currentTxnGroup + 1} of {totalTxnGroups}){/if}
+									{:else if txState === 'sending'}
+										<svg
+											class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												class="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="4"
+											></circle>
+											<path
+												class="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											></path>
+										</svg>
+										Sending {#if totalTxnGroups > 1}(Batch {currentTxnGroup + 1} of {totalTxnGroups}){/if}
+									{:else}
+										<i class="fas fa-paper-plane mr-2"></i>
+										Send
+									{/if}
+								</Button>{/if}
 						</div>
 					</div>
 				</div>
