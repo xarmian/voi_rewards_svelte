@@ -503,6 +503,9 @@ it('a split retains its loaded address when the route changes', () => {
 		createContext({
 			walletId: 'B',
 			loadedAddress: 'A',
+			loadedOwner: 'A',
+			ownerLookup: 'ok',
+			knownContractSet: 'ready',
 			snapshot: { contractSet: 'ready' },
 			viewOwner: { address: 'A', balance: 4 },
 			viewContracts: []
@@ -515,4 +518,32 @@ it('a split retains its loaded address when the route changes', () => {
 		expect(html.match(new RegExp(label + '[^]*?<dd[^>]*>([^]*?)</dd>'))?.[1]).toContain(
 			'Unavailable'
 		);
+});
+
+it('unknown ownership displays unavailable native parts and total', () => {
+	const html = render(WalletHoldings, {
+		props: {
+			pageAddress: 'C',
+			account: {
+				status: 'loaded',
+				value: { balance: 12e6, minBalance: 100000, status: 'Offline', round: 1, pendingRewards: 0 }
+			},
+			tokens: [],
+			tokenState: 'ready',
+			split: {
+				pageAddress: 'C',
+				owner: { address: 'C', balance: 12 },
+				contracts: [],
+				contractSet: 'ready',
+				ownerLookup: 'unavailable'
+			}
+		}
+	}).body;
+	const text = html
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ');
+	expect(text).toMatch(/Locked Unavailable/);
+	expect(text).toMatch(/Liquid Unavailable/);
+	expect(html).toMatch(/aria-label="Holdings total"[^>]*>\s*Unavailable/);
 });

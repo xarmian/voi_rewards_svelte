@@ -321,3 +321,34 @@ it('typed token ids keep their keys when malformed neighbours disappear', () => 
 	)!;
 	expect(withNeighbour.key).toBe(deriveHoldingsRows([valid]).all[0].key);
 });
+
+it('unknown ownership prevents an empty contract population from establishing Locked zero or Liquid', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'Y',
+		account,
+		tokens: [],
+		split: { ...split, ownerLookup: 'unavailable' }
+	});
+	expect(display.parts[0].value).toBeNull();
+	expect(display.parts[3].value).toBeNull();
+	expect(display.total).toBeNull();
+	expect(display.composition).toBeNull();
+});
+it('an owner change for the same page cannot reuse the previous owner split', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'C',
+		parentWalletAddress: 'NEW',
+		account,
+		tokens: [],
+		split: {
+			...split,
+			pageAddress: 'C',
+			ownerAddress: 'OLD',
+			owner: null,
+			contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3e6 } }]
+		}
+	});
+	expect(display.parts[0].value).toBeNull();
+	expect(display.parts[3].value).toBeNull();
+	expect(display.total).toBeNull();
+});

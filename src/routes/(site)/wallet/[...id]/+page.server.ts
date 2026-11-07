@@ -8,6 +8,7 @@ export const load = (async ({ params, depends, url, fetch }) => {
 	depends('wallet:id');
 
 	let parentWalletId: string | null = null;
+	let ownerLookup: 'ok' | 'unavailable' = 'ok';
 	if (params.id) {
 		const [first, ...segments] = params.id.split('/');
 		const rest = segments.join('/');
@@ -28,8 +29,9 @@ export const load = (async ({ params, depends, url, fetch }) => {
 			parentWalletId = contract?.global_owner ?? null;
 		} catch (error) {
 			console.error('Lockvest lookup failed:', error);
+			ownerLookup = 'unavailable';
 		}
 	}
 
-	return { parentWalletId };
+	return { parentWalletId, ownerLookup };
 }) satisfies PageServerLoad;

@@ -87,6 +87,7 @@ export function summarizeWallet({
 	now,
 	tokens,
 	contractSet = 'ready',
+	ownerLookup = 'ok',
 	price = null
 }: {
 	owner: WalletAccount | null;
@@ -98,6 +99,7 @@ export function summarizeWallet({
 	tokens?: TokenValues;
 	price?: number | null;
 	contractSet?: 'ready' | 'unavailable';
+	ownerLookup?: 'ok' | 'unavailable';
 }): WalletSummary {
 	// A contract route can be supplied as the primary account too: never count it twice.
 	const accounts = [
@@ -189,6 +191,7 @@ export function summarizeWallet({
 	const incompleteHealth =
 		online.some((account) => account.voteLastValid === null) || votes.length !== online.length;
 	const contractsReady =
+		ownerLookup === 'ok' &&
 		contractSet === 'ready' &&
 		contracts.every((contract) => contract.details !== null && contract.details !== undefined);
 	const unlocks = new Map<string, { date: string; amount: number; count: number }>();
@@ -246,7 +249,7 @@ export function summarizeWallet({
 			state: state === 'loading' ? 'loading' : holdingsReady ? 'ready' : 'error',
 			locked,
 			liquid,
-			liquidKnown: owner !== null,
+			liquidKnown: owner !== null && ownerLookup === 'ok',
 			lp: tokens?.lp ?? 0,
 			other,
 			total,

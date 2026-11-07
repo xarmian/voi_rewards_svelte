@@ -20,6 +20,7 @@
 		StatusPill,
 		Tabs,
 		WalletOverview,
+		WalletContractsPanel,
 		WalletAvatar,
 		createHashTabs,
 		shortAddr,
@@ -31,19 +32,27 @@
 	import { createWalletIdentity } from '$lib/wallet/identity.svelte';
 	import { summarizeWallet } from '$lib/wallet/summary';
 	import { loadWallet, type LegacyAccount, type WalletSnapshot } from '$lib/wallet/load';
+	import { loadContracts, type ContractsSnapshot } from '$lib/wallet/contracts';
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
 	import ProposalsComponent from '$lib/component/ProposalsComponent.svelte';
 	import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
-	import LockVestComponent from '$lib/component/LockVestComponent.svelte';
 	import EpochComponent from '$lib/component/EpochComponent.svelte';
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
 
 	let {
 		data
-	}: { data: { walletId: string | null; parentWalletId: string | null; hash?: string } } = $props();
+	}: {
+		data: {
+			walletId: string | null;
+			parentWalletId: string | null;
+			ownerLookup?: 'ok' | 'unavailable';
+			hash?: string;
+		};
+	} = $props();
 	const walletId = $derived(data.walletId ?? '');
 	const identity = createWalletIdentity(() => walletId);
 	const parentWalletId = $derived(data.parentWalletId);
+	const ownerLookup = $derived(data.ownerLookup ?? 'ok');
 	let panel: HTMLDivElement | undefined = $state();
 	const tabs = createHashTabs({ ids: WALLET_TABS, panel: () => panel });
 	const sections = WALLET_TABS.map((id) => ({
@@ -64,10 +73,34 @@
 	});
 	let sequence = 0;
 	let loadedAddress = $state('');
-	const viewContracts = $derived(
-		snapshot?.contracts.filter((contract) => !parentWalletId || contract.address === walletId) ?? []
+	let loadedOwner = $state('');
+	const snapshotMatches = $derived(
+		loadedAddress === walletId && loadedOwner === (parentWalletId || walletId)
 	);
-	const viewOwner = $derived(parentWalletId ? null : (snapshot?.owner ?? null));
+	const knownContractSet = $derived(
+		ownerLookup === 'ok' && snapshotMatches
+			? (snapshot?.contractSet ?? 'unavailable')
+			: 'unavailable'
+	);
+	let contractsSnapshot = $state.raw<ContractsSnapshot | null>(null);
+	let contractsLoadState = $state<DataState>('loading');
+	let contractsRefreshFailed = $state(false);
+	let contractsLoadedAddress = $state('');
+	let contractsLoadedOwner = $state('');
+	let contractsSequence = 0;
+	const contractsMatch = $derived(
+		contractsLoadedAddress === walletId && contractsLoadedOwner === (parentWalletId || walletId)
+	);
+	const viewContracts = $derived(
+		snapshotMatches
+			? (snapshot?.contracts.filter(
+					(contract) => !parentWalletId || contract.address === walletId
+				) ?? [])
+			: []
+	);
+	const viewOwner = $derived(
+		parentWalletId || !snapshotMatches || ownerLookup !== 'ok' ? null : (snapshot?.owner ?? null)
+	);
 	const viewAccount = $derived(viewOwner ?? viewContracts[0] ?? null);
 	const dataState = $derived(
 		loadState === 'ready' && snapshot && now - Date.parse(snapshot.asOf) > 300000
@@ -78,7 +111,8 @@
 		summarizeWallet({
 			owner: viewOwner,
 			contracts: viewContracts,
-			contractSet: snapshot?.contractSet ?? 'unavailable',
+			contractSet: knownContractSet,
+			ownerLookup,
 			current: snapshot?.current ?? null,
 			history: snapshot?.history ?? [],
 			state: dataState,
@@ -111,7 +145,7 @@
 		if (!browser || !walletId) return;
 		const requestedAddress = walletId;
 		const request = ++sequence;
-		if (loadedAddress !== requestedAddress) {
+		if (loadedAddress !== requestedAddress || loadedOwner !== address) {
 			snapshot = null;
 			primaryAccountInfo = null;
 			childAccounts = [];
@@ -120,20 +154,86 @@
 		refreshFailed = false;
 		try {
 			const result = await loadWallet(address, requestedAddress, force);
-			if (request !== sequence) return;
+			if (
+				request !== sequence ||
+				walletId !== requestedAddress ||
+				(parentWalletId || walletId) !== address
+			)
+				return;
 			snapshot = result;
 			primaryAccountInfo = result.primary;
 			childAccounts = result.children;
 			loadedAddress = requestedAddress;
+			loadedOwner = address;
 			loadState = 'ready';
 			now = Date.now();
 		} catch (error) {
-			if (request !== sequence) return;
+			if (
+				request !== sequence ||
+				walletId !== requestedAddress ||
+				(parentWalletId || walletId) !== address
+			)
+				return;
 			console.error('Error updating account info:', error);
 			loadState = snapshot ? 'stale' : 'error';
 			refreshFailed = snapshot !== null;
 		}
 	};
+	async function updateContracts(force = false) {
+		if (!browser || !walletId) return;
+		const requestedAddress = walletId;
+		const requestedOwner = parentWalletId || walletId;
+		const request = ++contractsSequence;
+		if (contractsLoadedAddress !== requestedAddress || contractsLoadedOwner !== requestedOwner) {
+			contractsSnapshot = null;
+		}
+		contractsLoadState = 'loading';
+		contractsRefreshFailed = false;
+		try {
+			const result = await loadContracts(requestedOwner, requestedAddress, force);
+			if (
+				request !== contractsSequence ||
+				walletId !== requestedAddress ||
+				(parentWalletId || walletId) !== requestedOwner
+			)
+				return;
+			contractsLoadedAddress = requestedAddress;
+			contractsLoadedOwner = requestedOwner;
+			// A failed list remains unknown even when old rows are retained for display.
+			if (result.contractSet === 'unavailable') {
+				contractsSnapshot = contractsSnapshot
+					? { ...contractsSnapshot, contractSet: 'unavailable' }
+					: result;
+				contractsRefreshFailed = true;
+				contractsLoadState = contractsSnapshot.contracts.length > 0 ? 'stale' : 'error';
+				return;
+			}
+			contractsSnapshot = result;
+			contractsLoadedAddress = requestedAddress;
+			contractsLoadedOwner = requestedOwner;
+			contractsLoadState = 'ready';
+		} catch (error) {
+			if (
+				request !== contractsSequence ||
+				walletId !== requestedAddress ||
+				(parentWalletId || walletId) !== requestedOwner
+			)
+				return;
+			contractsLoadedAddress = requestedAddress;
+			contractsLoadedOwner = requestedOwner;
+			console.error('Error updating contracts:', error);
+			contractsLoadState = contractsSnapshot ? 'stale' : 'error';
+			contractsRefreshFailed = contractsSnapshot !== null;
+		}
+	}
+	$effect(() => {
+		void walletId;
+		void parentWalletId;
+		if (tabs.current === 'contracts')
+			untrack(() => {
+				void updateContracts();
+			});
+	});
 	createWalletRouteSync(
 		() => walletId,
 		() => parentWalletId,
@@ -147,6 +247,7 @@
 	});
 	onDestroy(() => {
 		sequence++;
+		contractsSequence++;
 	});
 	function refresh() {
 		if (browser && walletId) return updateAccountInfo(parentWalletId || walletId, true);
@@ -281,7 +382,9 @@
 									pageAddress: loadedAddress,
 									owner: viewOwner,
 									contracts: viewContracts,
-									contractSet: snapshot.contractSet
+									contractSet: knownContractSet,
+									ownerAddress: loadedOwner,
+									ownerLookup
 								}
 							: undefined}
 					/>
@@ -291,9 +394,24 @@
 					<EpochComponent walletAddress={walletId} /><ProposalsComponent {walletId} />
 				</div>
 			{:else if tabs.current === 'contracts'}
-				{#if snapshot?.contractSet === 'unavailable'}
-					<InlineAlert message="Lock contracts unavailable." onretry={refresh} />
-				{:else}<div class="legacy-panel"><LockVestComponent {childAccounts} /></div>{/if}
+				<WalletContractsPanel
+					contracts={contractsMatch ? (contractsSnapshot?.contracts ?? []) : []}
+					current={snapshotMatches ? (snapshot?.current ?? null) : null}
+					pageAddress={walletId}
+					selected={$selectedWallet}
+					state={contractsMatch ? contractsLoadState : 'loading'}
+					contractSet={ownerLookup === 'ok' ? contractsSnapshot?.contractSet : 'unavailable'}
+					asOf={contractsSnapshot?.asOf}
+					{now}
+					onrefresh={() => updateContracts(true)}
+				/>
+				{#if contractsRefreshFailed && contractsLoadState === 'stale'}<div class="mt-3">
+						<InlineAlert
+							tone="warn"
+							message="Refresh failed; showing the last loaded contracts."
+							onretry={() => updateContracts(true)}
+						/>
+					</div>{/if}
 			{:else if tabs.current === 'calculator'}
 				<Card title="Calculator"
 					><div class="legacy-panel">
