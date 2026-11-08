@@ -107,7 +107,6 @@ test('all wallet surfaces use account and read-only wording', () => {
 			add('holdings', render(Portfolio, { props: { walletAddress: 'Y' } }).body);
 			add(
 				'consensus',
-				'contract-consensus',
 				render(Node, { props: { walletId: 'Y', parentWalletId: null, contractId: null } }).body
 			);
 			add(
