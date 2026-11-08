@@ -14,6 +14,7 @@ it.each([
 	const view = analyticsPageView(new URL(href));
 	expect(view.page_path).toBe(path);
 	expect(view.page_location).toBe(`https://voirewards.com${path}`);
+	expect(view.page_title).toBe('Wallet');
 	expect(JSON.stringify(view)).not.toContain(ADDRESS);
 });
 
@@ -28,6 +29,12 @@ it('leaves other pages as they are, query string included', () => {
 it('does not treat a path that merely starts with wallet as a wallet page', () => {
 	const view = analyticsPageView(new URL('https://voirewards.com/walletish'));
 	expect(view.page_path).toBe('/walletish');
+});
+
+it('the layout loads GA per navigation and sets the redacted location on the tag', () => {
+	const source = readFileSync(new URL('../routes/+layout.svelte', import.meta.url), 'utf8');
+	expect(source).toContain('if (loadAnalytics(nav.to.url.pathname)) sendPageView(');
+	expect(source).toContain("gtag('set', view)");
 });
 
 it('the layout turns off the automatic page view and sends the redacted one', () => {

@@ -29,26 +29,9 @@
 	let { supabase, session } = data;
 	$: ({ supabase, session } = data);
 
-	// Page views are sent by hand so that wallet routes never put an address in the URL we report.
-	function sendPageView(url: URL, from?: URL) {
-		const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
-		if (typeof gtag !== 'function') return;
-		gtag('event', 'page_view', {
-			...analyticsPageView(url),
-			...(from ? { page_referrer: analyticsPageView(from).page_location } : {})
-		});
-	}
-
-	afterNavigate((nav) => {
-		if (nav.type === 'enter' || !nav.to) return;
-		sendPageView(nav.to.url, nav.from?.url);
-	});
-
-	onMount(() => {
-		initTheme();
-		// Conditionally inject Google Analytics except on /discover and /vanity
+	// Google Analytics is not loaded on /discover and /vanity. Returns whether it is loaded for this path.
+	function loadAnalytics(pathname: string): boolean {
 		try {
-			const pathname = $page.url.pathname;
 			const isDiscover = pathname.startsWith('/discover');
 			const isVanity = pathname === '/vanity' || pathname.startsWith('/vanity/');
 			if (typeof window !== 'undefined' && !isDiscover && !isVanity) {
@@ -65,9 +48,33 @@
 					inline.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NDX21XVC4G', {send_page_view: false});`;
 					document.head.appendChild(inline);
 				}
-				sendPageView($page.url);
+				return true;
 			}
 		} catch {}
+		return false;
+	}
+
+	// Page views are sent by hand so that wallet routes never put an address in what we report. The
+	// location is also set on the tag so that any page view it sends itself starts from the redacted one.
+	function sendPageView(url: URL, from?: URL) {
+		const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
+		if (typeof gtag !== 'function') return;
+		const view = analyticsPageView(url);
+		gtag('set', view);
+		gtag('event', 'page_view', {
+			...view,
+			...(from ? { page_referrer: analyticsPageView(from).page_location } : {})
+		});
+	}
+
+	afterNavigate((nav) => {
+		if (nav.type === 'enter' || !nav.to) return;
+		if (loadAnalytics(nav.to.url.pathname)) sendPageView(nav.to.url, nav.from?.url);
+	});
+
+	onMount(() => {
+		initTheme();
+		if (loadAnalytics($page.url.pathname)) sendPageView($page.url);
 		const {
 			data: { subscription }
 		} = supabase.auth.onAuthStateChange((event, _session) => {
