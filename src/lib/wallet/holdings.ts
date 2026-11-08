@@ -14,7 +14,11 @@ export type HoldingsSplit = {
 	ownerAddress?: string;
 	ownerLookup?: 'ok' | 'unavailable';
 	owner: { address: string; balance: number } | null;
-	contracts: { address: string; balance: number; details: { lockedBalance: number } | null }[];
+	contracts: {
+		address: string;
+		balance: number;
+		details: { lockedBalance: number; availableForWithdrawal: number } | null;
+	}[];
 	contractSet: 'ready' | 'unavailable';
 };
 type Withdrawable = { value: number | null; usd: number | null };
@@ -212,10 +216,12 @@ export function deriveHoldingsDisplay({
 			(c) => c.details && nonnegative(c.balance) && nonnegative(c.details.lockedBalance)
 		);
 	const inContracts = nativeReady ? contracts.reduce((sum, c) => sum + c.balance, 0) : null;
-	const locked = nativeReady
-		? contracts.reduce((sum, c) => sum + Math.min(c.balance, c.details!.lockedBalance / 1e6), 0)
-		: null;
-	const withdrawable = inContracts !== null && locked !== null ? inContracts - locked : null;
+	// The contract loader's own figure: it also subtracts the minimum balance, so it is never
+	// the plain difference between balance and locked.
+	const withdrawable =
+		nativeReady && contracts.every((c) => nonnegative(c.details!.availableForWithdrawal))
+			? contracts.reduce((sum, c) => sum + c.details!.availableForWithdrawal / 1e6, 0)
+			: null;
 	const liquid = nativeReady
 		? contracts.some((c) => c.address === pageAddress)
 			? 0

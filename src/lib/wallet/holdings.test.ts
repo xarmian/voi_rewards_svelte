@@ -238,7 +238,9 @@ it.each([
 		...split,
 		pageAddress: 'C',
 		contractSet: 'unavailable' as const,
-		contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3000000 } }]
+		contracts: [
+			{ address: 'C', balance: 4, details: { lockedBalance: 3000000, availableForWithdrawal: 0 } }
+		]
 	},
 	undefined
 ])('contract liquid stays unavailable until its native split is ready (%j)', (pendingSplit) => {
@@ -256,7 +258,9 @@ it.each([
 		split: {
 			...split,
 			pageAddress: 'C',
-			contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3000000 } }]
+			contracts: [
+				{ address: 'C', balance: 4, details: { lockedBalance: 3000000, availableForWithdrawal: 0 } }
+			]
 		}
 	});
 	expect(ready.parts.find((part) => part.label === 'Liquid')?.value).toBe(0);
@@ -265,7 +269,13 @@ it.each([
 it('a contract page needs its own discovered contract before showing a native split', () => {
 	for (const contracts of [
 		[],
-		[{ address: 'OTHER', balance: 4, details: { lockedBalance: 3000000 } }]
+		[
+			{
+				address: 'OTHER',
+				balance: 4,
+				details: { lockedBalance: 3000000, availableForWithdrawal: 0 }
+			}
+		]
 	]) {
 		const display = deriveHoldingsDisplay({
 			pageAddress: 'CHILD',
@@ -389,7 +399,9 @@ it('an owner change for the same page cannot reuse the previous owner split', ()
 			pageAddress: 'C',
 			ownerAddress: 'OLD',
 			owner: null,
-			contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3e6 } }]
+			contracts: [
+				{ address: 'C', balance: 4, details: { lockedBalance: 3e6, availableForWithdrawal: 0 } }
+			]
 		}
 	});
 	expect(display.parts[0].value).toBeNull();
@@ -408,15 +420,19 @@ it('the summary lines add up to the total, each with a USD value from the same p
 		split: {
 			...split,
 			contracts: [
-				{ address: 'C1', balance: 10, details: { lockedBalance: 6e6 } },
-				{ address: 'C2', balance: 2, details: { lockedBalance: 2e6 } }
+				{
+					address: 'C1',
+					balance: 10,
+					details: { lockedBalance: 6e6, availableForWithdrawal: 3.5e6 }
+				},
+				{ address: 'C2', balance: 2, details: { lockedBalance: 2e6, availableForWithdrawal: 0 } }
 			]
 		}
 	});
 	expect(lines(display)).toEqual(['Liquid', 'In contracts', 'LP', 'Tokens']);
 	expect(parts(display).Liquid.value).toBe(4);
 	expect(parts(display)['In contracts'].value).toBe(12);
-	expect(parts(display)['In contracts'].withdrawable).toEqual({ value: 4, usd: 2 });
+	expect(parts(display)['In contracts'].withdrawable).toEqual({ value: 3.5, usd: 1.75 });
 	expect(parts(display).LP.value).toBe(5);
 	expect(parts(display).Tokens.value).toBe(7);
 	expect(display.total).toBe(28);
@@ -429,10 +445,19 @@ it('without a price every USD figure is unavailable, never zero', () => {
 		pageAddress: 'Y',
 		account,
 		tokens: [],
-		split: { ...split, contracts: [{ address: 'C1', balance: 3, details: { lockedBalance: 1e6 } }] }
+		split: {
+			...split,
+			contracts: [
+				{
+					address: 'C1',
+					balance: 3,
+					details: { lockedBalance: 1e6, availableForWithdrawal: 1.5e6 }
+				}
+			]
+		}
 	});
 	expect(display.parts.map((p) => p.usd)).toEqual([null, null, null, null]);
-	expect(parts(display)['In contracts'].withdrawable).toEqual({ value: 2, usd: null });
+	expect(parts(display)['In contracts'].withdrawable).toEqual({ value: 1.5, usd: null });
 	expect(display.usd).toBeNull();
 });
 it('contract figures stay unavailable while the native split is not ready', () => {
