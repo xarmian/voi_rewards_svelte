@@ -13,7 +13,6 @@
 	import type { Column, SortState } from '../DataTable/types';
 	import { sortRows } from '../DataTable/sort';
 	import Card from '../Card/Card.svelte';
-	import StatTile from '../StatTile/StatTile.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
 	import DataTable from '../DataTable/DataTable.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
@@ -167,6 +166,8 @@
 		});
 	});
 	const tableState = $derived(tokenState);
+	const usdLabel = (value: number | null) =>
+		value === null ? 'USD unavailable' : `≈ ${usd(value)}`;
 </script>
 
 {#snippet identity(row: HoldingsRow)}<span
@@ -248,12 +249,6 @@
 				message="VOI balance unavailable"
 				onretry={onretryAccount}
 			/>{/if}
-		<StatTile
-			label="Page VOI balance"
-			value={holdingsAmount(display.pageLiquid)}
-			unit={display.pageLiquid === null ? undefined : 'VOI'}
-			state={account.status === 'loading' ? 'loading' : 'ready'}
-		/>
 		{#if account.status === 'loaded'}<p class="mt-3 text-sm text-ink-muted">
 				Minimum balance: {account.value.minBalance / 1e6} VOI.
 			</p>{/if}
@@ -290,15 +285,18 @@
 					<dd class="text-h2" title={part.value === null ? undefined : `${part.value} VOI`}>
 						{holdingsAmount(part.value)}{part.value === null ? '' : ' VOI'}
 					</dd>
+					<p class="text-label text-ink-muted">{usdLabel(part.usd)}</p>
+					{#if part.withdrawable}<p class="text-label text-ink-muted">
+							Withdrawable now: {holdingsAmount(part.withdrawable.value)}{part.withdrawable
+								.value === null
+								? ''
+								: ' VOI'} · {usdLabel(part.withdrawable.usd)}
+						</p>{/if}
 					{#if part.note}<p class="text-label text-ink-muted">{part.note}</p>{/if}
 				</div>{/each}
 		</dl>
-		{#if display.parts[0].value === null}<p class="mt-3 text-sm text-ink-muted">
-				Locked balance unavailable.
-			</p>{/if}
 		<p class="mt-3 text-sm text-ink-muted">
-			{scopeLabel}. Tokens and liquidity positions belong only to the page address. Tokens and other
-			includes unlocked VOI in contracts.
+			{scopeLabel}. Tokens and liquidity positions belong only to the page address.
 		</p>
 	</Card>
 	<Card title="Tokens" span={{ lg: 12, md: 2 }} actions={tokenControls}>

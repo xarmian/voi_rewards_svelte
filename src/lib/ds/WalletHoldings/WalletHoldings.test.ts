@@ -60,7 +60,7 @@ it('confirmed native zero is ready, token failure is unavailable, and NFTs do no
 			}
 		}
 	}).body;
-	expect(html).toMatch(/Page VOI balance<[^]*?>0<[^]*?VOI/);
+	expect(html).not.toContain('Page VOI balance');
 	expect(html).toMatch(/Liquid[^]*?<dd[^>]*>[^]*?0 VOI[^]*?<\/dd>/);
 	expect(html).toContain('Token balances unavailable');
 	expect(html).toContain('Show collectibles');
@@ -294,7 +294,7 @@ it('composition exposes a named image and readable amounts', () => {
 	}).body;
 	const bar = html.match(/<div[^>]*aria-label="Holdings composition"[^>]*>/)?.[0];
 	expect(bar).toContain('role="img"');
-	for (const label of ['Locked', 'LP', 'Tokens and other', 'Liquid']) {
+	for (const label of ['Liquid', 'In contracts', 'Withdrawable now', 'LP', 'Tokens']) {
 		expect(html).toContain(label);
 	}
 	expect(html).toMatch(/<dd[^>]*>[^]*?0 VOI[^]*?<\/dd>/);
@@ -387,7 +387,7 @@ it('an unavailable page balance has no currency unit', () => {
 			tokenState: 'ready'
 		}
 	}).body;
-	const tile = html.match(/Page VOI balance[^]*?<\/p>/)?.[0];
+	const tile = html.match(/Liquid[^]*?<\/dd>/)?.[0];
 	expect(tile).toContain('Unavailable');
 	expect(tile?.slice(tile.indexOf('Unavailable'))).not.toContain('VOI');
 });
@@ -445,7 +445,7 @@ it('a split retains its loaded address when the route changes', () => {
 	const html = render(WalletHoldings, {
 		props: { pageAddress: 'B', account, tokens: [], tokenState: 'ready', split }
 	}).body;
-	for (const label of ['Locked', 'Liquid'])
+	for (const label of ['In contracts', 'Liquid'])
 		expect(html.match(new RegExp(label + '[^]*?<dd[^>]*>([^]*?)</dd>'))?.[1]).toContain(
 			'Unavailable'
 		);
@@ -474,7 +474,7 @@ it('unknown ownership displays unavailable native parts and total', () => {
 		.replace(/<!--[\s\S]*?-->/g, '')
 		.replace(/<[^>]+>/g, ' ')
 		.replace(/\s+/g, ' ');
-	expect(text).toMatch(/Locked Unavailable/);
+	expect(text).toMatch(/In contracts Unavailable/);
 	expect(text).toMatch(/Liquid Unavailable/);
 	expect(html).toMatch(/aria-label="Holdings total"[^>]*>\s*Unavailable/);
 });
@@ -505,7 +505,7 @@ it('an unpriced token shows a labelled known subtotal and LP stays known in the 
 	const split = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
 	const text = split.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
 	expect(text).toMatch(/LP\s*5 VOI/);
-	expect(text).toMatch(/Tokens and other\s*7 VOI/);
+	expect(text).toMatch(/Tokens\s*7 VOI/);
 	expect(text).toContain('Known subtotal; 1 token has no price');
 	expect(html).not.toContain('Holdings total');
 });

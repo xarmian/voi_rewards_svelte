@@ -122,7 +122,7 @@ const lpToken = (props: Partial<FungibleTokenType> = {}) =>
 	token({ id: 'lp', value: 5, poolInfo: { provider: 'humble' }, ...props });
 const parts = (display: ReturnType<typeof deriveHoldingsDisplay>) =>
 	Object.fromEntries(display.parts.map((part) => [part.label, part]));
-it('an unpriced regular token leaves the LP figure known and gives Tokens and other a labelled known subtotal', () => {
+it('an unpriced regular token leaves the LP figure known and gives Tokens a labelled known subtotal', () => {
 	const display = deriveHoldingsDisplay({
 		pageAddress: 'Y',
 		account,
@@ -130,7 +130,7 @@ it('an unpriced regular token leaves the LP figure known and gives Tokens and ot
 		split
 	});
 	expect(parts(display).LP.value).toBe(5);
-	expect(parts(display)['Tokens and other']).toMatchObject({
+	expect(parts(display)['Tokens']).toMatchObject({
 		value: 7,
 		note: 'Known subtotal; 1 token has no price'
 	});
@@ -145,10 +145,10 @@ it('an unpriced LP position makes the LP figure unavailable without hiding the p
 		split
 	});
 	expect(parts(display).LP.value).toBeNull();
-	expect(parts(display)['Tokens and other'].value).toBe(7);
-	expect(parts(display)['Tokens and other'].note).toBeUndefined();
+	expect(parts(display)['Tokens'].value).toBe(7);
+	expect(parts(display)['Tokens'].note).toBeUndefined();
 });
-it('an incomplete token source leaves LP and Tokens and other unavailable, with no subtotal', () => {
+it('an incomplete token source leaves LP and Tokens unavailable, with no subtotal', () => {
 	for (const overrides of [{ partial: true }, { tokenState: 'error' as const }]) {
 		const display = deriveHoldingsDisplay({
 			pageAddress: 'Y',
@@ -158,8 +158,8 @@ it('an incomplete token source leaves LP and Tokens and other unavailable, with 
 			...overrides
 		});
 		expect(parts(display).LP.value).toBeNull();
-		expect(parts(display)['Tokens and other'].value).toBeNull();
-		expect(parts(display)['Tokens and other'].note).toBeUndefined();
+		expect(parts(display)['Tokens'].value).toBeNull();
+		expect(parts(display)['Tokens'].note).toBeUndefined();
 	}
 });
 it('frozen tokens and approval objects survive derivation untouched and by identity', () => {
@@ -238,7 +238,9 @@ it.each([
 		...split,
 		pageAddress: 'C',
 		contractSet: 'unavailable' as const,
-		contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3000000 } }]
+		contracts: [
+			{ address: 'C', balance: 4, details: { lockedBalance: 3000000, availableForWithdrawal: 0 } }
+		]
 	},
 	undefined
 ])('contract liquid stays unavailable until its native split is ready (%j)', (pendingSplit) => {
@@ -256,7 +258,9 @@ it.each([
 		split: {
 			...split,
 			pageAddress: 'C',
-			contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3000000 } }]
+			contracts: [
+				{ address: 'C', balance: 4, details: { lockedBalance: 3000000, availableForWithdrawal: 0 } }
+			]
 		}
 	});
 	expect(ready.parts.find((part) => part.label === 'Liquid')?.value).toBe(0);
@@ -265,7 +269,13 @@ it.each([
 it('a contract page needs its own discovered contract before showing a native split', () => {
 	for (const contracts of [
 		[],
-		[{ address: 'OTHER', balance: 4, details: { lockedBalance: 3000000 } }]
+		[
+			{
+				address: 'OTHER',
+				balance: 4,
+				details: { lockedBalance: 3000000, availableForWithdrawal: 0 }
+			}
+		]
 	]) {
 		const display = deriveHoldingsDisplay({
 			pageAddress: 'CHILD',
@@ -274,7 +284,7 @@ it('a contract page needs its own discovered contract before showing a native sp
 			tokens: [],
 			split: { ...split, pageAddress: 'CHILD', contracts }
 		});
-		expect(display.parts.find((p) => p.label === 'Locked')?.value).toBeNull();
+		expect(display.parts.find((p) => p.label === 'In contracts')?.value).toBeNull();
 		expect(display.parts.find((p) => p.label === 'Liquid')?.value).toBeNull();
 		expect(display.total).toBeNull();
 		expect(display.composition).toBeNull();
@@ -366,7 +376,7 @@ it('typed token ids keep their keys when malformed neighbours disappear', () => 
 	expect(withNeighbour.key).toBe(deriveHoldingsRows([valid]).all[0].key);
 });
 
-it('unknown ownership prevents an empty contract population from establishing Locked zero or Liquid', () => {
+it('unknown ownership prevents an empty contract population from establishing In contracts zero or Liquid', () => {
 	const display = deriveHoldingsDisplay({
 		pageAddress: 'Y',
 		account,
@@ -374,7 +384,7 @@ it('unknown ownership prevents an empty contract population from establishing Lo
 		split: { ...split, ownerLookup: 'unavailable' }
 	});
 	expect(display.parts[0].value).toBeNull();
-	expect(display.parts[3].value).toBeNull();
+	expect(display.parts[1].value).toBeNull();
 	expect(display.total).toBeNull();
 	expect(display.composition).toBeNull();
 });
@@ -389,10 +399,78 @@ it('an owner change for the same page cannot reuse the previous owner split', ()
 			pageAddress: 'C',
 			ownerAddress: 'OLD',
 			owner: null,
-			contracts: [{ address: 'C', balance: 4, details: { lockedBalance: 3e6 } }]
+			contracts: [
+				{ address: 'C', balance: 4, details: { lockedBalance: 3e6, availableForWithdrawal: 0 } }
+			]
 		}
 	});
 	expect(display.parts[0].value).toBeNull();
-	expect(display.parts[3].value).toBeNull();
+	expect(display.parts[1].value).toBeNull();
 	expect(display.total).toBeNull();
+});
+
+const lines = (display: ReturnType<typeof deriveHoldingsDisplay>) =>
+	display.parts.map((p) => p.label);
+it('the summary lines add up to the total, each with a USD value from the same price', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'Y',
+		account,
+		tokens: [lpToken(), token({ id: 'a', value: 7 })],
+		price: 0.5,
+		split: {
+			...split,
+			contracts: [
+				{
+					address: 'C1',
+					balance: 10,
+					details: { lockedBalance: 6e6, availableForWithdrawal: 3.5e6 }
+				},
+				{ address: 'C2', balance: 2, details: { lockedBalance: 2e6, availableForWithdrawal: 0 } }
+			]
+		}
+	});
+	expect(lines(display)).toEqual(['Liquid', 'In contracts', 'LP', 'Tokens']);
+	expect(parts(display).Liquid.value).toBe(4);
+	expect(parts(display)['In contracts'].value).toBe(12);
+	expect(parts(display)['In contracts'].withdrawable).toEqual({ value: 3.5, usd: 1.75 });
+	expect(parts(display).LP.value).toBe(5);
+	expect(parts(display).Tokens.value).toBe(7);
+	expect(display.total).toBe(28);
+	expect(display.parts.reduce((sum, p) => sum + p.value!, 0)).toBe(display.total);
+	expect(display.parts.map((p) => p.usd)).toEqual([2, 6, 2.5, 3.5]);
+	expect(display.usd).toBe(14);
+});
+it('without a price every USD figure is unavailable, never zero', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'Y',
+		account,
+		tokens: [],
+		split: {
+			...split,
+			contracts: [
+				{
+					address: 'C1',
+					balance: 3,
+					details: { lockedBalance: 1e6, availableForWithdrawal: 1.5e6 }
+				}
+			]
+		}
+	});
+	expect(display.parts.map((p) => p.usd)).toEqual([null, null, null, null]);
+	expect(parts(display)['In contracts'].withdrawable).toEqual({ value: 1.5, usd: null });
+	expect(display.usd).toBeNull();
+});
+it('contract figures stay unavailable while the native split is not ready', () => {
+	const display = deriveHoldingsDisplay({
+		pageAddress: 'Y',
+		account,
+		tokens: [],
+		split: undefined,
+		price: 1
+	});
+	expect(parts(display)['In contracts']).toMatchObject({
+		value: null,
+		usd: null,
+		withdrawable: { value: null, usd: null }
+	});
 });
