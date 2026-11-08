@@ -17,6 +17,16 @@ export type HoldingsSplit = {
 	contracts: { address: string; balance: number; details: { lockedBalance: number } | null }[];
 	contractSet: 'ready' | 'unavailable';
 };
+type Withdrawable = { value: number | null; usd: number | null };
+type SummaryLine = {
+	label: string;
+	value: number | null;
+	usd: number | null;
+	color: string;
+	note?: string;
+	/** Of the "In contracts" line: the unlocked VOI that can be withdrawn now. */
+	withdrawable?: Withdrawable;
+};
 export type HoldingsRow = {
 	key: string;
 	token: FungibleTokenType;
@@ -201,10 +211,11 @@ export function deriveHoldingsDisplay({
 		contracts.every(
 			(c) => c.details && nonnegative(c.balance) && nonnegative(c.details.lockedBalance)
 		);
+	const inContracts = nativeReady ? contracts.reduce((sum, c) => sum + c.balance, 0) : null;
 	const locked = nativeReady
 		? contracts.reduce((sum, c) => sum + Math.min(c.balance, c.details!.lockedBalance / 1e6), 0)
 		: null;
-	const unlocked = nativeReady ? contracts.reduce((sum, c) => sum + c.balance, 0) - locked! : null;
+	const withdrawable = inContracts !== null && locked !== null ? inContracts - locked : null;
 	const liquid = nativeReady
 		? contracts.some((c) => c.address === pageAddress)
 			? 0
@@ -220,37 +231,44 @@ export function deriveHoldingsDisplay({
 	const regular = rows.all.filter((r) => !r.token.poolInfo);
 	const unpriced = regular.filter((r) => !valued(r)).length;
 	const known = regular.filter(valued).reduce((sum, r) => sum + r.value!, 0);
-	const other = sourceReady && unlocked !== null && unpriced === 0 ? unlocked + known : null;
+	const tokensValue = sourceReady && unpriced === 0 ? known : null;
 	// Some regular tokens have no price: the known part is shown, labelled, and never as a total.
-	const otherSubtotal = sourceReady && unlocked !== null && unpriced > 0 ? unlocked + known : null;
+	const tokensSubtotal = sourceReady && unpriced > 0 ? known : null;
 	const total =
 		nativeReady &&
 		valuesReady &&
 		liquid !== null &&
-		locked !== null &&
+		inContracts !== null &&
 		lp !== null &&
-		other !== null
-			? liquid + locked + lp + other
+		tokensValue !== null
+			? liquid + inContracts + lp + tokensValue
 			: null;
-	const parts: { label: string; value: number | null; color: string; note?: string }[] = [
-		{ label: 'Locked', value: locked, color: 'bg-accent-fill' },
-		{ label: 'LP', value: lp, color: 'bg-hi' },
-		otherSubtotal !== null
-			? {
-					label: 'Tokens and other',
-					value: otherSubtotal,
-					color: 'bg-series-3',
+	const usdOf = (value: number | null) =>
+		value !== null && price !== null && price > 0 ? value * price : null;
+	const line = (
+		label: string,
+		value: number | null,
+		color: string,
+		extra: { note?: string; withdrawable?: Withdrawable } = {}
+	): SummaryLine => ({ label, value, usd: usdOf(value), color, ...extra });
+	// The lines add up to the total: liquid + in contracts + LP + tokens.
+	const parts: SummaryLine[] = [
+		line('Liquid', liquid, 'bg-ink-muted'),
+		line('In contracts', inContracts, 'bg-accent-fill', {
+			withdrawable: { value: withdrawable, usd: usdOf(withdrawable) }
+		}),
+		line('LP', lp, 'bg-hi'),
+		tokensSubtotal !== null
+			? line('Tokens', tokensSubtotal, 'bg-series-3', {
 					note: `Known subtotal; ${unpriced} ${unpriced === 1 ? 'token has' : 'tokens have'} no price`
-				}
-			: { label: 'Tokens and other', value: other, color: 'bg-series-3' },
-		{ label: 'Liquid', value: liquid, color: 'bg-ink-muted' }
+				})
+			: line('Tokens', tokensValue, 'bg-series-3')
 	];
 	return {
 		rows,
-		pageLiquid,
 		parts,
 		total,
-		usd: total !== null && price !== null && price > 0 ? total * price : null,
+		usd: usdOf(total),
 		composition: total !== null ? parts : null
 	};
 }
