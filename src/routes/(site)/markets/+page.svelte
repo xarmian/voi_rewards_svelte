@@ -661,9 +661,11 @@
 	}
 
 	// Watch for token selection changes and fetch chart data
-	$: if (browser && selectedToken && selectedToken.id !== 0) {
+	// A selected pair shows its own chart, so Quote and resolution changes must not
+	// request the hidden token chart; Back re-runs this with the current settings.
+	$: if (browser && selectedToken && !selectedMarket && selectedToken.id !== 0) {
 		fetchTokenChartData(selectedToken.id, chartSettings.resolution, currentQuoteCurrency);
-	} else if (browser && selectedToken && selectedToken.id === 0) {
+	} else if (browser && selectedToken && !selectedMarket && selectedToken.id === 0) {
 		// For VOI, fetch OHLCV from VOI/aUSDC pool
 		fetchVOIChartData(chartSettings.resolution, currentQuoteCurrency);
 	}

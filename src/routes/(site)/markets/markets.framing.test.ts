@@ -75,6 +75,17 @@ it('lets only the newest token or VOI chart request publish, and passes the pair
 	expect(source).toContain('selectedQuote={chartView.selectedQuote}');
 });
 
+it('does not request the hidden token chart when Quote or resolution changes with a pair selected', () => {
+	const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+	const watcher =
+		page.match(
+			/\n\t\$: if \(browser && selectedToken && [^\n]*id !== 0\) \{[\s\S]*?\n\t\}\n/
+		)?.[0] ?? '';
+	expect(watcher).toContain('fetchTokenChartData(');
+	expect(watcher).toContain('fetchVOIChartData(');
+	expect(watcher).toContain('!selectedMarket');
+});
+
 it('makes the quote control act on a selected pair instead of the hidden token chart', () => {
 	const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 	const panel = readFileSync(new URL('./ChartPanel.svelte', import.meta.url), 'utf8');

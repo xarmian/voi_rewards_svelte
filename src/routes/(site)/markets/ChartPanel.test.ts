@@ -120,6 +120,26 @@ it.each(['Failed to load market OHLCV (503)', 'No chart data available.'])(
 		expect(body).not.toContain('Price fixture');
 	}
 );
+it('names the quote a non-VOI token chart shows, so the heading and the plotted series agree', () => {
+	const token = { id: 7, symbol: 'ABC', decimals: 6 } as ComponentProps<
+		typeof ChartPanel
+	>['selectedToken'];
+	const data = [{ time: 1, open: 1, high: 2, low: 0, close: 2, volume: 1 }];
+	const heading = (body: string) => body.replace(/<!--[\s\S]*?-->/g, '');
+	const usd = heading(panel({ showTokenChart: true, selectedToken: token, tokenChartData: data }));
+	expect(usd).toMatch(/ABC\/USD\b/);
+	expect(usd).not.toContain('ABC/VOI');
+	const voi = heading(
+		panel({
+			showTokenChart: true,
+			selectedToken: token,
+			tokenChartData: data,
+			currentQuoteCurrency: 'VOI'
+		})
+	);
+	expect(voi).toMatch(/ABC\/VOI\b/);
+	expect(voi).not.toContain('ABC/USD');
+});
 it('retains the OHLCV chart during a refetch and after a refetch error', () => {
 	for (const state of [{ tokenChartLoading: true }, { tokenChartError: 'Offline' }]) {
 		const body = panel({
