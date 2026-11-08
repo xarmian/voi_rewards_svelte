@@ -11,19 +11,28 @@ it.each([
 	[`https://voirewards.com/wallet/nick.voi`, '/wallet/:address'],
 	[`https://voirewards.com/wallet?q=${ADDRESS}`, '/wallet']
 ])('wallet URL %s is reported as %s with no address anywhere', (href, path) => {
-	const view = analyticsPageView(new URL(href));
+	const view = analyticsPageView(new URL(href), 'nick.voi | Voi Wallet');
 	expect(view.page_path).toBe(path);
 	expect(view.page_location).toBe(`https://voirewards.com${path}`);
 	expect(view.page_title).toBe('Wallet');
+	expect(JSON.stringify(view)).not.toContain('nick.voi');
 	expect(JSON.stringify(view)).not.toContain(ADDRESS);
 });
 
 it('leaves other pages as they are, query string included', () => {
-	const view = analyticsPageView(new URL('https://voirewards.com/markets?quote=usd'));
+	const view = analyticsPageView(new URL('https://voirewards.com/markets?quote=usd'), 'Markets');
 	expect(view).toEqual({
 		page_location: 'https://voirewards.com/markets?quote=usd',
-		page_path: '/markets?quote=usd'
+		page_path: '/markets?quote=usd',
+		page_title: 'Markets'
 	});
+});
+
+it('a page after a wallet page reports its own title, not the wallet one', () => {
+	const wallet = analyticsPageView(new URL(`https://voirewards.com/wallet/${ADDRESS}`), 'x');
+	const next = analyticsPageView(new URL('https://voirewards.com/faq'), 'FAQ');
+	expect(wallet.page_title).toBe('Wallet');
+	expect(next.page_title).toBe('FAQ');
 });
 
 it('does not treat a path that merely starts with wallet as a wallet page', () => {
@@ -40,5 +49,5 @@ it('the layout loads GA per navigation and sets the redacted location on the tag
 it('the layout turns off the automatic page view and sends the redacted one', () => {
 	const source = readFileSync(new URL('../routes/+layout.svelte', import.meta.url), 'utf8');
 	expect(source).toContain("gtag('config', 'G-NDX21XVC4G', {send_page_view: false})");
-	expect(source).toContain('analyticsPageView(url)');
+	expect(source).toContain('analyticsPageView(url, document.title)');
 });

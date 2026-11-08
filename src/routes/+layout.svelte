@@ -59,7 +59,7 @@
 	function sendPageView(url: URL, from?: URL) {
 		const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
 		if (typeof gtag !== 'function') return;
-		const view = analyticsPageView(url);
+		const view = analyticsPageView(url, document.title);
 		gtag('set', view);
 		gtag('event', 'page_view', {
 			...view,
