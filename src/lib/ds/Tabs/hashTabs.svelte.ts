@@ -41,7 +41,8 @@ export function createHashTabs({
 			}
 			if (user) {
 				await tick();
-				if (alive && version === revision) panel?.()?.focus();
+				// Focus for keyboard and screen-reader users, but never scroll the page to the panel.
+				if (alive && version === revision) panel?.()?.focus({ preventScroll: true });
 			}
 		}
 		const onHashChange = () => {
