@@ -91,7 +91,7 @@
 									baseTokenId: selectedToken.id,
 									quoteTokenId: 390001, // wVOI
 									baseSymbol: selectedToken.symbol,
-									quoteSymbol: 'VOI',
+									quoteSymbol: currentQuoteCurrency === 'USD' ? 'USD' : 'VOI',
 									baseDecimals: selectedToken.decimals,
 									quoteDecimals: 6,
 									poolId: undefined
