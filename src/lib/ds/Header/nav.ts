@@ -1,3 +1,4 @@
+import { pageAccountState } from '$lib/chain/signerGate';
 export type NavKey = 'home' | 'staking' | 'network' | 'node' | 'ecosystem';
 export const navItems: { key: NavKey; label: string; href: string }[] = [
 	{ key: 'home', label: 'Home', href: '/' },
@@ -16,4 +17,22 @@ export function navCurrent(pathname: string): NavKey | null {
 	if (path === '/directory' || path.startsWith('/directory/') || path === '/markets')
 		return 'ecosystem';
 	return null;
+}
+
+type NavAccount = { address: string; app: string; walletId: string };
+export function myStakingHref(
+	connected: readonly NavAccount[],
+	selected: NavAccount | null
+): string {
+	const pair =
+		selected &&
+		connected.find(
+			(entry) => entry.address === selected.address && entry.walletId === selected.walletId
+		);
+	const current = pair && pageAccountState(pair.address, [pair]);
+	if (current && current.state === 'yours') return `/wallet/${pair.address}`;
+	const first = connected.find(
+		(entry) => pageAccountState(entry.address, [entry]).state === 'yours'
+	);
+	return first ? `/wallet/${first.address}` : '/wallet';
 }

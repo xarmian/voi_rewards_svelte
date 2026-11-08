@@ -1,10 +1,19 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { connectedWallets, selectedWallet } from '$lib/chain/wallet.svelte';
+	let mounted = $state(false);
+	onMount(() => {
+		mounted = true;
+	});
+	const stakingHref = $derived(
+		mounted ? myStakingHref($connectedWallets, $selectedWallet) : '/wallet'
+	);
 	import { goto } from '$app/navigation';
 	import SearchBox from '../SearchBox/SearchBox.svelte';
 	import ThemeToggle from '../ThemeToggle/ThemeToggle.svelte';
 	import FreshnessBadge from './FreshnessBadge.svelte';
 	import MobileMenu from './MobileMenu.svelte';
-	import { navItems, type NavKey } from './nav';
+	import { navItems, myStakingHref, type NavKey } from './nav';
 	let {
 		variant,
 		current,
@@ -35,7 +44,7 @@
 				{#each navItems as item (item.key)}
 					<li>
 						<a
-							href={item.href}
+							href={item.key === 'staking' ? stakingHref : item.href}
 							aria-current={current === item.key ? 'page' : undefined}
 							class="block rounded-full px-2 py-2 transition-colors duration-fast ease-out-soft {current ===
 							item.key
@@ -76,6 +85,7 @@
 </header>
 <MobileMenu
 	bind:this={menu}
+	{stakingHref}
 	{current}
 	onsubmit={search}
 	onopenchange={(value) => {

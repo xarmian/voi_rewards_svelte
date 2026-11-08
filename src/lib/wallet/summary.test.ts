@@ -213,7 +213,7 @@ it('unknown ownership renders unavailable native split in Overview', async () =>
 			contracts: [],
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			now: Date.now()
 		}
 	}).body;

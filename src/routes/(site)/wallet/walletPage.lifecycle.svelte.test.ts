@@ -4,7 +4,7 @@ import ts from 'typescript';
 import { afterEach, expect, it, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { get } from 'svelte/store';
-import { pickNavigation, selectionFromRoute } from '$lib/utils/walletSelection';
+import { pickNavigation } from '$lib/utils/walletSelection';
 
 vi.hoisted(() => {
 	const values = new Map<string, string>();
@@ -121,13 +121,14 @@ it('one picker lifecycle restores without replacing a user pick and keeps its su
 		);
 		const select = runInNewContext(`${code(selector, 'handleSelect')}; handleSelect`, {
 			walletStore,
+			accountMode: 'navigation',
 			onAccountPicked: picked,
 			onClose: undefined
 		});
 		select(A);
 		flushSync();
 		expect(goto).toHaveBeenCalledWith(`/wallet/${A.address}`, { invalidateAll: true });
-		expect(selected.at(-1)).toBe(A.address);
+		expect(selected.at(-1)).toBe(B.address);
 		const C = { ...A, address: 'C'.repeat(58) };
 		walletStore.addAccounts([C]);
 		flushSync();
@@ -137,21 +138,6 @@ it('one picker lifecycle restores without replacing a user pick and keeps its su
 		stopSelected();
 	}
 });
-it('pins the existing exception: an unpinned connected route replaces a different selection', () => {
-	const connected = [A, B].map((a) => ({ ...a, app: a.walletId }));
-	expect(
-		selectionFromRoute({
-			routeAddress: A.address,
-			connected,
-			selected: connected[1],
-			pinned: false
-		})
-	).toEqual(connected[0]);
-	expect(
-		selectionFromRoute({ routeAddress: A.address, connected, selected: connected[1], pinned: true })
-	).toBeNull();
-});
-
 it('search navigation leaves a connected selection and pin count unchanged', () => {
 	walletStore.addAccounts([A]);
 	walletStore.selectAccount(A);
@@ -162,4 +148,71 @@ it('search navigation leaves a connected selection and pin count unchanged', () 
 	flushSync();
 	expect(goto).toHaveBeenCalledWith(`/wallet/${B.address}`, { invalidateAll: true });
 	expect(get(selectedWallet)?.address).toBe(A.address);
+});
+
+it('explicit picks and Add completion navigate, while passive updates and removal keep the URL', async () => {
+	const goto = vi.fn();
+	let pins = 0;
+	const context = {
+		walletId: 'CONTRACT',
+		parentWalletId: A.address,
+		pinnedFlows: {
+			subscribe(run: (n: number) => void) {
+				run(pins);
+				return () => {};
+			}
+		},
+		get,
+		goto,
+		pickNavigation
+	};
+	const picked = runInNewContext(
+		`${code(page, 'handleAccountPicked')}; handleAccountPicked`,
+		context
+	);
+	const select = runInNewContext(`${code(selector, 'handleSelect')}; handleSelect`, {
+		walletStore,
+		accountMode: 'navigation',
+		onAccountPicked: picked,
+		onClose: undefined
+	});
+	walletStore.addAccounts([A, B]);
+	flushSync();
+	expect(goto).not.toHaveBeenCalled();
+	select(A);
+	expect(goto).toHaveBeenCalledExactlyOnceWith(`/wallet/${A.address}`, { invalidateAll: true });
+	goto.mockClear();
+	context.walletId = A.address;
+	select(A);
+	expect(goto).not.toHaveBeenCalled();
+	walletStore.selectAccount(B);
+	walletStore.removeAccount(A.walletId, A.address);
+	flushSync();
+	expect(goto).not.toHaveBeenCalled();
+	pins = 1;
+	select(B);
+	expect(goto).not.toHaveBeenCalled();
+	pins = 0;
+	const add = readFileSync(
+		'node_modules/avm-wallet-svelte/dist/components/AddAccountView.svelte',
+		'utf8'
+	);
+	const connect = runInNewContext(`${code(add, 'handleConnect')}; handleConnect`, {
+		connectingWallet: null,
+		walletErrors: {},
+		registry: { getAdapter: () => ({ connect: async () => [A, B] }) },
+		providerStore: { genesisId: 'fixture' },
+		walletStore,
+		accountMode: 'navigation',
+		autoSignIn: false,
+		onAccountPicked: picked,
+		onClose: undefined,
+		console
+	});
+	await connect({ id: 'kibisis', name: 'Fixture', isWatchOnly: false });
+	// The current page pick is a no-op, even for deliberate Add.
+	expect(goto).not.toHaveBeenCalled();
+	context.walletId = 'CONTRACT';
+	await connect({ id: 'kibisis', name: 'Fixture', isWatchOnly: false });
+	expect(goto).toHaveBeenCalledExactlyOnceWith(`/wallet/${A.address}`, { invalidateAll: true });
 });

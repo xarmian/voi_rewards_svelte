@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { WalletSummary, WalletContract, WalletEpoch } from '$lib/wallet/summary';
-	import type { SelectedAccount } from '$lib/chain/signerGate';
+	import type { PageAccountState } from '$lib/chain/signerGate';
 	import type { DataState } from '../types';
 	import Card from '../Card/Card.svelte';
 	import HealthRing from '../HealthRing/HealthRing.svelte';
@@ -21,7 +21,7 @@
 		historyState = 'loading',
 		price = null,
 		pageAddress,
-		selected,
+		accountState,
 		asOf,
 		now,
 		onrefresh
@@ -32,7 +32,7 @@
 		historyState?: DataState;
 		price?: number | null;
 		pageAddress: string;
-		selected: SelectedAccount;
+		accountState: PageAccountState<{ address: string; app: string; walletId?: string }>;
 		asOf?: string;
 		now: number;
 		onrefresh?: () => Promise<void> | void;
@@ -133,7 +133,7 @@
 						<HealthItem
 							tone={summary.idleCount ? 'warn' : 'ok'}
 							title={`${comma(summary.idleCount)} contracts not staking`}
-							detail={`${compact(summary.idleBalance, 1)} VOI idle`}
+							detail={`${compact(summary.idleBalance, 1)} VOI idle${summary.idleCount && accountState.state === 'yours' ? ' · register a key in Contracts to earn' : ''}`}
 						/>
 					</ul>
 				{/if}
@@ -327,7 +327,7 @@
 			{contracts}
 			{current}
 			{pageAddress}
-			{selected}
+			{accountState}
 			state={loading ? 'loading' : stakingUnavailable ? 'error' : summary.state}
 			{asOf}
 			{onrefresh}

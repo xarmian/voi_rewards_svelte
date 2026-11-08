@@ -20,9 +20,12 @@ describe('wallet page selection wiring (TASK-132)', () => {
 		expect(handler.slice(0, handler.indexOf('\n\t}\n'))).toMatch(/pickNavigation\s*\(/);
 	});
 
-	test('the pick handler checks the live pin count and parent address', () => {
+	test('the pick handler checks the live pin count and page address', () => {
 		expect(source.match(/pinned:\s*get\(pinnedFlows\)\s*>\s*0/g)?.length).toBe(1);
-		expect(source).toMatch(/parentAddress:\s*parentWalletId/);
+		expect(source).not.toContain('parentAddress:');
+		expect(source).not.toContain('selectedWallet');
+		expect(source).toContain('accountMode="navigation"');
+		expect(source).not.toMatch(/connectedWallets\.subscribe/);
 	});
 
 	test('a modal destroyed mid-flow releases its pin from the count', () => {

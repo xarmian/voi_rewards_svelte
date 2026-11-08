@@ -1,12 +1,16 @@
 <script lang="ts">
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { Modal } from 'flowbite-svelte';
 	import { createEventDispatcher, onDestroy, tick } from 'svelte';
 	import {
-		selectedWallet,
-		signTransactions,
 		connectedWallets,
-		captureSigner,
+		signTransactions,
+		capturePageSigner,
 		type TransactionSigner
 	} from '$lib/chain/wallet.svelte';
 	import QRCode from 'qrcode';
@@ -81,11 +85,14 @@
 
 	export let show = false;
 	export let tokenKey: keyof typeof BRIDGE_TOKENS = 'VOI';
-	export let canSignTransactions = false;
+	export let accountAddress: string;
 
 	$: selectedToken = BRIDGE_TOKENS[tokenKey];
 
 	const dispatch = createEventDispatcher();
+	$: accountState = pageAccountState(accountAddress, $connectedWallets);
+	$: canSignTransactions = accountState.state === 'yours';
+
 	let selectedDirection: 'voi-to-algorand' | 'algorand-to-voi' = 'voi-to-algorand';
 	let algorandDestination: DestinationState = { ...emptyDestination };
 	let voiDestination: DestinationState = { ...emptyDestination };
@@ -125,12 +132,12 @@
 	let pinTick = 0;
 	$: {
 		void pinTick;
-		syncTracker(show, flow.current($selectedWallet?.address));
+		syncTracker(show, flow.current(accountAddress));
 	}
 	$: if (flow.pinned && (!show || bridgeStatus === 'idle')) {
 		flow.release();
 		pinTick++;
-		const address = flow.current($selectedWallet?.address);
+		const address = flow.current(accountAddress);
 		if (show && address) void fetchVoiBalance(address);
 	}
 	$: closeNeedsConfirm =
@@ -250,15 +257,13 @@
 
 	const BRIDGE_ADDRESS = 'ARAMIDFJYV2TOFB5MRNZJIXBSAVZCVAUDAPFGKR5PNX4MTILGAZABBTXQQ';
 
-	const unsub = selectedWallet.subscribe((wallet) => {
-		if (flow.pinned) return;
-		const address = flow.current(wallet?.address);
-		if (address) {
-			fetchVoiBalance(address);
-		} else {
-			voiBalance = null;
+	$: {
+		if (!flow.pinned) {
+			const address = flow.current(accountAddress);
+			if (address) fetchVoiBalance(address);
+			else voiBalance = null;
 		}
-	});
+	}
 
 	// Subscribe to connectedWallets store and maintain unique addresses
 	const unsubConnectedWallets = connectedWallets.subscribe((wallets) => {
@@ -271,7 +276,6 @@
 		pendingController?.abort();
 		tracker?.stop();
 		flow.dispose();
-		unsub();
 		unsubConnectedWallets();
 		if (searchTimeout) {
 			clearTimeout(searchTimeout);
@@ -398,21 +402,28 @@
 
 	async function handleSubmit() {
 		if (bridgeStatus !== 'idle' || !algosdk.isValidAddress(destinationAddress)) return;
+		if (!canSignTransactions) {
+			bridgeError = wrongSignerMessage();
+			return;
+		}
 		if (isVoiToAlgorand) {
 			// The account the user confirmed, taken before any await; it signs whatever the picker does.
-			let signer: TransactionSigner | undefined;
-			let noSignerMessage = 'No wallet connected';
+			const target = accountAddress;
+			let signer: TransactionSigner;
 			try {
-				signer = captureSigner();
+				signer = capturePageSigner(target);
 			} catch (captureError) {
-				if ($selectedWallet && captureError instanceof Error)
-					noSignerMessage = captureError.message;
+				bridgeError = captureError instanceof Error ? captureError.message : wrongSignerMessage();
+				return;
 			}
-			const sender = signer?.address;
-			if (sender) {
-				flow.pin(sender);
-				pinTick++;
+			if (!signerMatchesAccount(signer, target)) {
+				bridgeError = wrongSignerMessage();
+				return;
 			}
+			const sender = signer.address;
+			flow.pin(sender);
+			pinTick++;
+
 			const senderTracker = tracker;
 			const destination = destinationAddress;
 			const enteredAmount = amount;
@@ -437,7 +448,7 @@
 				bridgeError = null;
 
 				if (!signer || !sender || !senderTracker) {
-					throw new Error(noSignerMessage);
+					throw new Error(wrongSignerMessage());
 				}
 
 				// Get suggested params for the transaction
@@ -810,7 +821,7 @@
 		isLoadingBalance = true;
 		try {
 			const accountInfo = await requireAccountInfo(address, { force: true });
-			if (address !== flow.current($selectedWallet?.address)) return;
+			if (address !== flow.current(accountAddress)) return;
 			if (selectedToken.voiAssetId === '0') {
 				// For VOI token
 				voiBalance = Number(accountInfo.amount) / 1e6;
@@ -822,11 +833,11 @@
 				voiBalance = asset ? Number(asset.amount) / 1e6 : 0;
 			}
 		} catch (error) {
-			if (address !== flow.current($selectedWallet?.address)) return;
+			if (address !== flow.current(accountAddress)) return;
 			console.error('Error fetching balance:', error);
 			voiBalance = null;
 		} finally {
-			if (address === flow.current($selectedWallet?.address)) isLoadingBalance = false;
+			if (address === flow.current(accountAddress)) isLoadingBalance = false;
 		}
 	}
 
@@ -1225,18 +1236,6 @@
 			document.removeEventListener('click', handleTokenSelectorClickOutside);
 		};
 	});
-
-	// Update the selectedDirection reactive declaration to default to algorand-to-voi when canSignTransactions is false,
-	// but never under a bridge that is already in flight: the switch clears the destination fields.
-	$: {
-		if (
-			!canSignTransactions &&
-			selectedDirection === 'voi-to-algorand' &&
-			bridgeStatus === 'idle'
-		) {
-			selectedDirection = 'algorand-to-voi';
-		}
-	}
 </script>
 
 <svelte:window on:keydown={handleCloseKeydown} />
@@ -1343,7 +1342,7 @@
 													showSourceSearchResults = false;
 													sourceSearchResults = [];
 													algorandSourceBalance = null;
-													const address = flow.current($selectedWallet?.address);
+													const address = flow.current(accountAddress);
 													if (address) fetchVoiBalance(address);
 												}}
 											>
@@ -1426,720 +1425,716 @@
 							{/each}
 						</section>
 					{/if}
-					<!-- Bridge Direction Selection -->
-					<div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
-						<div class="relative w-full md:w-1/2 group">
-							<button
-								class={`w-full p-3 md:p-4 border-2 rounded-lg transition-all duration-200 ${
-									selectedDirection === 'voi-to-algorand'
-										? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
-										: 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
-								} ${!canSignTransactions ? 'opacity-50 cursor-not-allowed' : ''}`}
-								on:click={() => {
-									if (canSignTransactions) {
-										selectedDirection = 'voi-to-algorand';
-									}
-								}}
-								aria-describedby="voi-to-algo-tooltip"
-							>
-								<div class="flex flex-col items-center space-y-2 md:space-y-3">
-									<div class="font-medium text-base md:text-lg">
-										<span class="text-emerald-600 dark:text-emerald-400 font-semibold"
-											>VOI Network</span
-										>
-										<span class="mx-2">→</span>
-										<span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
-									</div>
-									<div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-										<span class="mr-1">Receive</span>
-										<span class="font-medium text-blue-600 dark:text-blue-400"
-											>{selectedToken.bridgedSymbol}</span
-										>
-										<span class="ml-1">on Algorand</span>
-									</div>
-								</div>
-							</button>
-							{#if !canSignTransactions}
-								<div
-									id="voi-to-algo-tooltip"
-									class="absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 px-3 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg shadow-sm dark:bg-gray-700 -bottom-12 left-1/2 transform -translate-x-1/2 w-max"
-									role="tooltip"
+					{#if canSignTransactions}
+						<!-- Bridge Direction Selection -->
+						<div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
+							<div class="relative w-full md:w-1/2 group">
+								<button
+									class={`w-full p-3 md:p-4 border-2 rounded-lg transition-all duration-200 ${
+										selectedDirection === 'voi-to-algorand'
+											? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
+											: 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+									} ${!canSignTransactions ? 'opacity-50 cursor-not-allowed' : ''}`}
+									on:click={() => {
+										if (canSignTransactions) {
+											selectedDirection = 'voi-to-algorand';
+										}
+									}}
 								>
-									Please connect a VOI Network wallet<br />to enable this option
-									<div
-										class="absolute bottom-full left-1/2 transform -translate-x-1/2 border-8 border-transparent border-b-gray-900 dark:border-b-gray-700"
-									></div>
-								</div>
-							{/if}
-						</div>
-
-						<div class="relative w-full md:w-1/2 group">
-							<button
-								class={`w-full p-3 md:p-4 border-2 rounded-lg transition-all duration-200 ${
-									selectedDirection === 'algorand-to-voi'
-										? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
-										: 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
-								}`}
-								on:click={() => (selectedDirection = 'algorand-to-voi')}
-							>
-								<div class="flex flex-col items-center space-y-3">
-									<div class="font-medium text-lg">
-										<span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
-										<span class="mx-2">→</span>
-										<span class="text-emerald-600 dark:text-emerald-400 font-semibold"
-											>VOI Network</span
-										>
-									</div>
-									<div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-										<span class="mr-1">Receive</span>
-										<span class="font-medium text-emerald-600 dark:text-emerald-400"
-											>{selectedToken.symbol}</span
-										>
-										<span class="ml-1">on VOI Network</span>
-									</div>
-								</div>
-							</button>
-						</div>
-					</div>
-
-					<!-- Source Address (only for Algorand to VOI) -->
-					{#if !isVoiToAlgorand}
-						<div class="space-y-2">
-							<div class="flex items-center space-x-2">
-								<label
-									for="sourceAddress"
-									class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-								>
-									Source <span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span
-									> Address
-								</label>
-								<span class="text-xs text-gray-500 dark:text-gray-400">(Optional)</span>
-							</div>
-							<div class="relative">
-								<div class="relative">
-									<input
-										type="text"
-										bind:value={algorandSourceAddress}
-										on:input={(e) => handleSourceInput(e.currentTarget.value)}
-										on:keydown={handleSourceKeydown}
-										class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-										placeholder="Enter address or search NFDomains..."
-										class:border-green-500={isValidSourceAddress}
-										class:border-red-500={algorandSourceAddress && !isValidSourceAddress}
-									/>
-									{#if algorandSourceAddress}
-										<button
-											type="button"
-											class="absolute inset-y-0 right-0 pr-3 flex items-center"
-											aria-label="Clear input"
-											on:click={() => {
-												algorandSourceAddress = '';
-												algorandSourceResolvedName = null;
-												isValidSourceAddress = false;
-												showSourceSearchResults = false;
-												algorandSourceBalance = null;
-											}}
-										>
-											<svg
-												class="w-4 h-4 text-gray-500 hover:text-gray-700"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
+									<div class="flex flex-col items-center space-y-2 md:space-y-3">
+										<div class="font-medium text-base md:text-lg">
+											<span class="text-emerald-600 dark:text-emerald-400 font-semibold"
+												>VOI Network</span
 											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-									{/if}
-								</div>
-
-								{#if showSourceSearchResults && sourceSearchResults.length > 0}
-									<div
-										class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
-									>
-										<ul class="max-h-60 overflow-auto py-1">
-											{#each sourceSearchResults as result, i}
-												<li>
-													<button
-														class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
-														class:bg-gray-100={i === selectedSourceSearchIndex}
-														class:dark:bg-gray-700={i === selectedSourceSearchIndex}
-														on:click={() => selectSourceSearchResult(result)}
-													>
-														<div
-															class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-														>
-															{#if 'owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)}
-																<img
-																	src={getAvatarUrl(result)}
-																	alt="Avatar"
-																	class="w-full h-full object-cover"
-																	on:error={(e) => {
-																		const target = e.currentTarget as HTMLImageElement;
-																		target.style.display = 'none';
-																		(target.nextElementSibling as HTMLDivElement).style.display =
-																			'flex';
-																	}}
-																/>
-															{:else}
-																<div
-																	class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
-																>
-																	{getInitials(result.name)}
-																</div>
-															{/if}
-														</div>
-														<div class="min-w-0 flex-1">
-															<div class="font-medium text-gray-900 dark:text-white truncate">
-																{result.name}
-															</div>
-															<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-																{typeof result === 'object' && 'owner' in result
-																	? result.owner
-																	: result.address}
-															</div>
-														</div>
-													</button>
-												</li>
-											{/each}
-										</ul>
-									</div>
-								{/if}
-
-								{#if algorandSourceResolvedName}
-									<div class="mt-2 flex items-center space-x-2">
-										<div
-											class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-										>
-											{#if algorandSourceResolvedName.avatar}
-												<img
-													src={algorandSourceResolvedName.avatar}
-													alt="Avatar"
-													class="w-full h-full object-cover"
-													on:error={(e) => {
-														const target = e.currentTarget as HTMLImageElement;
-														target.style.display = 'none';
-														(target.nextElementSibling as HTMLDivElement).style.display = 'flex';
-													}}
-												/>
-											{:else}
-												<div
-													class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium"
-												>
-													{getInitials(algorandSourceResolvedName.name)}
-												</div>
-											{/if}
+											<span class="mx-2">→</span>
+											<span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
 										</div>
-										<p class="text-sm text-gray-500 dark:text-gray-400">
-											{algorandSourceResolvedName.name}
-										</p>
-									</div>
-								{/if}
-
-								{#if isValidSourceAddress}
-									<div class="mt-2">
-										{#if isLoadingAlgorandBalance}
-											<p class="text-sm text-gray-500 dark:text-gray-400">
-												Loading aVOI balance...
-											</p>
-										{:else if algorandSourceBalance !== null}
-											<button
-												class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-												on:click={() => (amount = algorandSourceBalance?.toString() || '')}
+										<div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+											<span class="mr-1">Receive</span>
+											<span class="font-medium text-blue-600 dark:text-blue-400"
+												>{selectedToken.bridgedSymbol}</span
 											>
-												Available balance: {algorandSourceBalance.toFixed(6)}
-												{isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
+											<span class="ml-1">on Algorand</span>
+										</div>
+									</div>
+								</button>
+							</div>
+
+							<div class="relative w-full md:w-1/2 group">
+								<button
+									class={`w-full p-3 md:p-4 border-2 rounded-lg transition-all duration-200 ${
+										selectedDirection === 'algorand-to-voi'
+											? 'border-blue-500 bg-blue-50/80 dark:bg-blue-900/30 shadow-lg'
+											: 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+									}`}
+									on:click={() => (selectedDirection = 'algorand-to-voi')}
+								>
+									<div class="flex flex-col items-center space-y-3">
+										<div class="font-medium text-lg">
+											<span class="text-blue-600 dark:text-blue-400 font-semibold">Algorand</span>
+											<span class="mx-2">→</span>
+											<span class="text-emerald-600 dark:text-emerald-400 font-semibold"
+												>VOI Network</span
+											>
+										</div>
+										<div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+											<span class="mr-1">Receive</span>
+											<span class="font-medium text-emerald-600 dark:text-emerald-400"
+												>{selectedToken.symbol}</span
+											>
+											<span class="ml-1">on VOI Network</span>
+										</div>
+									</div>
+								</button>
+							</div>
+						</div>
+
+						<!-- Source Address (only for Algorand to VOI) -->
+						{#if !isVoiToAlgorand}
+							<div class="space-y-2">
+								<div class="flex items-center space-x-2">
+									<label
+										for="sourceAddress"
+										class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+									>
+										Source <span class="text-blue-600 dark:text-blue-400 font-semibold"
+											>Algorand</span
+										> Address
+									</label>
+									<span class="text-xs text-gray-500 dark:text-gray-400">(Optional)</span>
+								</div>
+								<div class="relative">
+									<div class="relative">
+										<input
+											type="text"
+											bind:value={algorandSourceAddress}
+											on:input={(e) => handleSourceInput(e.currentTarget.value)}
+											on:keydown={handleSourceKeydown}
+											class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+											placeholder="Enter address or search NFDomains..."
+											class:border-green-500={isValidSourceAddress}
+											class:border-red-500={algorandSourceAddress && !isValidSourceAddress}
+										/>
+										{#if algorandSourceAddress}
+											<button
+												type="button"
+												class="absolute inset-y-0 right-0 pr-3 flex items-center"
+												aria-label="Clear input"
+												on:click={() => {
+													algorandSourceAddress = '';
+													algorandSourceResolvedName = null;
+													isValidSourceAddress = false;
+													showSourceSearchResults = false;
+													algorandSourceBalance = null;
+												}}
+											>
+												<svg
+													class="w-4 h-4 text-gray-500 hover:text-gray-700"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
 											</button>
 										{/if}
 									</div>
-								{/if}
-							</div>
-						</div>
-					{/if}
 
-					<!-- Destination Address -->
-					<div class="space-y-2">
-						<label
-							for="destinationAddress"
-							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-						>
-							Destination <span
-								class={`${isVoiToAlgorand ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'} font-semibold`}
-							>
-								{isVoiToAlgorand ? 'Algorand' : 'VOI Network'}
-							</span> Address
-						</label>
-						{#if isVoiToAlgorand}
-							<div class="relative">
-								<div class="relative">
-									<input
-										type="text"
-										bind:value={algorandDestination.text}
-										bind:this={searchInputRef}
-										on:input={(e) => handleInput(e.currentTarget.value)}
-										on:keydown={handleKeydown}
-										on:focus={() => {
-											if (!algorandDestination.text) {
-												showConnectedWallets = true;
-												showSearchResults = false;
-											}
-										}}
-										class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-										placeholder={`Enter address or search ${isVoiToAlgorand ? 'NFDomains' : 'Envoi names'}...`}
-										class:border-green-500={isValidDestination}
-										class:border-red-500={Boolean(algorandDestination.error)}
-										style:padding-left={pickedName(algorandDestination) ? '2.75rem' : undefined}
-									/>
-									{#if pickedName(algorandDestination)}
-										<span
-											class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
+									{#if showSourceSearchResults && sourceSearchResults.length > 0}
+										<div
+											class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
 										>
-											<NameAvatar
-												name={algorandDestination.name ?? ''}
-												avatar={resolvedName?.avatar}
-											/>
-										</span>
+											<ul class="max-h-60 overflow-auto py-1">
+												{#each sourceSearchResults as result, i}
+													<li>
+														<button
+															class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
+															class:bg-gray-100={i === selectedSourceSearchIndex}
+															class:dark:bg-gray-700={i === selectedSourceSearchIndex}
+															on:click={() => selectSourceSearchResult(result)}
+														>
+															<div
+																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+															>
+																{#if 'owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)}
+																	<img
+																		src={getAvatarUrl(result)}
+																		alt="Avatar"
+																		class="w-full h-full object-cover"
+																		on:error={(e) => {
+																			const target = e.currentTarget as HTMLImageElement;
+																			target.style.display = 'none';
+																			(target.nextElementSibling as HTMLDivElement).style.display =
+																				'flex';
+																		}}
+																	/>
+																{:else}
+																	<div
+																		class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
+																	>
+																		{getInitials(result.name)}
+																	</div>
+																{/if}
+															</div>
+															<div class="min-w-0 flex-1">
+																<div class="font-medium text-gray-900 dark:text-white truncate">
+																	{result.name}
+																</div>
+																<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
+																	{typeof result === 'object' && 'owner' in result
+																		? result.owner
+																		: result.address}
+																</div>
+															</div>
+														</button>
+													</li>
+												{/each}
+											</ul>
+										</div>
 									{/if}
-									{#if algorandDestination.text}
-										<button
-											type="button"
-											class="absolute inset-y-0 right-0 pr-3 flex items-center"
-											aria-label="Clear input"
-											on:click={() => {
-												void handleInput('');
-											}}
-										>
-											<svg
-												class="w-4 h-4 text-gray-500 hover:text-gray-700"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
+
+									{#if algorandSourceResolvedName}
+										<div class="mt-2 flex items-center space-x-2">
+											<div
+												class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
+												{#if algorandSourceResolvedName.avatar}
+													<img
+														src={algorandSourceResolvedName.avatar}
+														alt="Avatar"
+														class="w-full h-full object-cover"
+														on:error={(e) => {
+															const target = e.currentTarget as HTMLImageElement;
+															target.style.display = 'none';
+															(target.nextElementSibling as HTMLDivElement).style.display = 'flex';
+														}}
+													/>
+												{:else}
+													<div
+														class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium"
+													>
+														{getInitials(algorandSourceResolvedName.name)}
+													</div>
+												{/if}
+											</div>
+											<p class="text-sm text-gray-500 dark:text-gray-400">
+												{algorandSourceResolvedName.name}
+											</p>
+										</div>
+									{/if}
+
+									{#if isValidSourceAddress}
+										<div class="mt-2">
+											{#if isLoadingAlgorandBalance}
+												<p class="text-sm text-gray-500 dark:text-gray-400">
+													Loading aVOI balance...
+												</p>
+											{:else if algorandSourceBalance !== null}
+												<button
+													class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+													on:click={() => (amount = algorandSourceBalance?.toString() || '')}
+												>
+													Available balance: {algorandSourceBalance.toFixed(6)}
+													{isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
+												</button>
+											{/if}
+										</div>
 									{/if}
 								</div>
+							</div>
+						{/if}
 
-								{#if showSearchResults && searchResults.length > 0}
-									<div
-										bind:this={searchDropdownRef}
-										class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
-									>
-										<ul class="max-h-60 overflow-auto py-1">
-											{#each searchResults as result, i}
-												<li>
-													<button
-														class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
-														class:bg-gray-100={i === selectedSearchIndex}
-														class:dark:bg-gray-700={i === selectedSearchIndex}
-														on:click={() => selectSearchResult(result)}
-													>
-														<div
-															class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-														>
-															{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
-																<img
-																	src={'owner' in result ? getAvatarUrl(result) : result.avatar}
-																	alt="Avatar"
-																	class="w-full h-full object-cover"
-																	on:error={(e) => {
-																		const target = e.currentTarget as HTMLImageElement;
-																		target.style.display = 'none';
-																		(target.nextElementSibling as HTMLDivElement).style.display =
-																			'flex';
-																	}}
-																/>
-															{:else}
-																<div
-																	class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
-																>
-																	{getInitials('owner' in result ? result.name : result.name)}
-																</div>
-															{/if}
-														</div>
-														<div class="min-w-0 flex-1">
-															<div class="font-medium text-gray-900 dark:text-white truncate">
-																{result.name}
-															</div>
-															<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-																{'owner' in result
-																	? (nfdReceiveAddress(result) ?? '')
-																	: result.address}
-															</div>
-														</div>
-													</button>
-												</li>
-											{/each}
-										</ul>
-									</div>
-								{/if}
-
-								{#if pickedName(algorandDestination) && algorandDestination.address}
-									<ResolvedAddress address={algorandDestination.address} />
-								{/if}
-								{#if algorandDestination.error}
-									<p class="text-sm text-red-600 dark:text-red-400" role="alert">
-										{algorandDestination.error}
-									</p>
-								{/if}
-
-								{#if resolvedName && !pickedName(algorandDestination)}
-									<div class="mt-2 flex items-center gap-2">
-										<NameAvatar name={resolvedName.name} avatar={resolvedName.avatar} />
-										<p class="text-sm text-gray-500 dark:text-gray-400">
-											{resolvedName.name}
-										</p>
-									</div>
-								{/if}
-								{#if isVoiToAlgorand && isValidDestination}
-									<div class="mb-4">
-										{#if isCheckingOptIn}
-											<p class="text-sm text-gray-500 dark:text-gray-400">
-												Checking if address is opted into {selectedToken.bridgedSymbol}...
-											</p>
-										{:else if !isOptedIn}
-											<div
-												class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4"
+						<!-- Destination Address -->
+						<div class="space-y-2">
+							<label
+								for="destinationAddress"
+								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+							>
+								Destination <span
+									class={`${isVoiToAlgorand ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'} font-semibold`}
+								>
+									{isVoiToAlgorand ? 'Algorand' : 'VOI Network'}
+								</span> Address
+							</label>
+							{#if isVoiToAlgorand}
+								<div class="relative">
+									<div class="relative">
+										<input
+											type="text"
+											bind:value={algorandDestination.text}
+											bind:this={searchInputRef}
+											on:input={(e) => handleInput(e.currentTarget.value)}
+											on:keydown={handleKeydown}
+											on:focus={() => {
+												if (!algorandDestination.text) {
+													showConnectedWallets = true;
+													showSearchResults = false;
+												}
+											}}
+											class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+											placeholder={`Enter address or search ${isVoiToAlgorand ? 'NFDomains' : 'Envoi names'}...`}
+											class:border-green-500={isValidDestination}
+											class:border-red-500={Boolean(algorandDestination.error)}
+											style:padding-left={pickedName(algorandDestination) ? '2.75rem' : undefined}
+										/>
+										{#if pickedName(algorandDestination)}
+											<span
+												class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
 											>
-												<p class="text-sm text-yellow-700 dark:text-yellow-200 mb-2">
-													This address has not opted into {selectedToken.bridgedSymbol}. The
-													recipient must opt in to asset {selectedToken.algorandAssetId} before receiving
-													tokens.
-												</p>
-												<div class="flex space-x-2">
-													<button
-														on:click={generateOptInQrCode}
-														class="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 focus:ring-4 focus:ring-yellow-300"
-													>
-														Generate Opt-in QR Code
-													</button>
-													<button
-														on:click={() => checkOptIn(destinationAddress)}
-														class="px-4 py-2 text-sm font-medium text-yellow-600 bg-yellow-100 rounded-lg hover:bg-yellow-200 focus:ring-4 focus:ring-yellow-300"
-													>
-														Check Again
-													</button>
-												</div>
-											</div>
-										{:else}
-											<p class="text-sm text-green-600 dark:text-green-400">
-												✓ Address is opted into {selectedToken.bridgedSymbol}
-											</p>
+												<NameAvatar
+													name={algorandDestination.name ?? ''}
+													avatar={resolvedName?.avatar}
+												/>
+											</span>
+										{/if}
+										{#if algorandDestination.text}
+											<button
+												type="button"
+												class="absolute inset-y-0 right-0 pr-3 flex items-center"
+												aria-label="Clear input"
+												on:click={() => {
+													void handleInput('');
+												}}
+											>
+												<svg
+													class="w-4 h-4 text-gray-500 hover:text-gray-700"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
 										{/if}
 									</div>
-								{/if}
-							</div>
-						{:else}
-							<div class="relative">
-								<div class="relative">
-									<input
-										type="text"
-										bind:value={voiDestination.text}
-										bind:this={searchInputRef}
-										on:input={(e) => handleInput(e.currentTarget.value)}
-										on:keydown={handleKeydown}
-										on:focus={() => {
-											if (!voiDestination.text) {
-												showConnectedWallets = true;
-												showSearchResults = false;
-											}
-										}}
-										class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-										placeholder="Enter address or search Envoi names..."
-										class:border-green-500={isValidDestination}
-										class:border-red-500={Boolean(voiDestination.error)}
-										style:padding-left={pickedName(voiDestination) ? '2.75rem' : undefined}
-									/>
-									{#if pickedName(voiDestination)}
-										<span
-											class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
+
+									{#if showSearchResults && searchResults.length > 0}
+										<div
+											bind:this={searchDropdownRef}
+											class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
 										>
-											<NameAvatar name={voiDestination.name ?? ''} avatar={resolvedName?.avatar} />
-										</span>
+											<ul class="max-h-60 overflow-auto py-1">
+												{#each searchResults as result, i}
+													<li>
+														<button
+															class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
+															class:bg-gray-100={i === selectedSearchIndex}
+															class:dark:bg-gray-700={i === selectedSearchIndex}
+															on:click={() => selectSearchResult(result)}
+														>
+															<div
+																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+															>
+																{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
+																	<img
+																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
+																		alt="Avatar"
+																		class="w-full h-full object-cover"
+																		on:error={(e) => {
+																			const target = e.currentTarget as HTMLImageElement;
+																			target.style.display = 'none';
+																			(target.nextElementSibling as HTMLDivElement).style.display =
+																				'flex';
+																		}}
+																	/>
+																{:else}
+																	<div
+																		class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
+																	>
+																		{getInitials('owner' in result ? result.name : result.name)}
+																	</div>
+																{/if}
+															</div>
+															<div class="min-w-0 flex-1">
+																<div class="font-medium text-gray-900 dark:text-white truncate">
+																	{result.name}
+																</div>
+																<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
+																	{'owner' in result
+																		? (nfdReceiveAddress(result) ?? '')
+																		: result.address}
+																</div>
+															</div>
+														</button>
+													</li>
+												{/each}
+											</ul>
+										</div>
 									{/if}
-									{#if voiDestination.text}
-										<button
-											type="button"
-											class="absolute inset-y-0 right-0 pr-3 flex items-center"
-											aria-label="Clear input"
-											on:click={() => {
-												void handleInput('');
-												showConnectedWallets = true;
-											}}
-										>
-											<svg
-												class="w-4 h-4 text-gray-500 hover:text-gray-700"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
+
+									{#if pickedName(algorandDestination) && algorandDestination.address}
+										<ResolvedAddress address={algorandDestination.address} />
+									{/if}
+									{#if algorandDestination.error}
+										<p class="text-sm text-red-600 dark:text-red-400" role="alert">
+											{algorandDestination.error}
+										</p>
+									{/if}
+
+									{#if resolvedName && !pickedName(algorandDestination)}
+										<div class="mt-2 flex items-center gap-2">
+											<NameAvatar name={resolvedName.name} avatar={resolvedName.avatar} />
+											<p class="text-sm text-gray-500 dark:text-gray-400">
+												{resolvedName.name}
+											</p>
+										</div>
+									{/if}
+									{#if isVoiToAlgorand && isValidDestination}
+										<div class="mb-4">
+											{#if isCheckingOptIn}
+												<p class="text-sm text-gray-500 dark:text-gray-400">
+													Checking if address is opted into {selectedToken.bridgedSymbol}...
+												</p>
+											{:else if !isOptedIn}
+												<div
+													class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4"
+												>
+													<p class="text-sm text-yellow-700 dark:text-yellow-200 mb-2">
+														This address has not opted into {selectedToken.bridgedSymbol}. The
+														recipient must opt in to asset {selectedToken.algorandAssetId} before receiving
+														tokens.
+													</p>
+													<div class="flex space-x-2">
+														<button
+															on:click={generateOptInQrCode}
+															class="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 focus:ring-4 focus:ring-yellow-300"
+														>
+															Generate Opt-in QR Code
+														</button>
+														<button
+															on:click={() => checkOptIn(destinationAddress)}
+															class="px-4 py-2 text-sm font-medium text-yellow-600 bg-yellow-100 rounded-lg hover:bg-yellow-200 focus:ring-4 focus:ring-yellow-300"
+														>
+															Check Again
+														</button>
+													</div>
+												</div>
+											{:else}
+												<p class="text-sm text-green-600 dark:text-green-400">
+													✓ Address is opted into {selectedToken.bridgedSymbol}
+												</p>
+											{/if}
+										</div>
 									{/if}
 								</div>
+							{:else}
+								<div class="relative">
+									<div class="relative">
+										<input
+											type="text"
+											bind:value={voiDestination.text}
+											bind:this={searchInputRef}
+											on:input={(e) => handleInput(e.currentTarget.value)}
+											on:keydown={handleKeydown}
+											on:focus={() => {
+												if (!voiDestination.text) {
+													showConnectedWallets = true;
+													showSearchResults = false;
+												}
+											}}
+											class="w-full px-3 py-2 md:py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+											placeholder="Enter address or search Envoi names..."
+											class:border-green-500={isValidDestination}
+											class:border-red-500={Boolean(voiDestination.error)}
+											style:padding-left={pickedName(voiDestination) ? '2.75rem' : undefined}
+										/>
+										{#if pickedName(voiDestination)}
+											<span
+												class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
+											>
+												<NameAvatar
+													name={voiDestination.name ?? ''}
+													avatar={resolvedName?.avatar}
+												/>
+											</span>
+										{/if}
+										{#if voiDestination.text}
+											<button
+												type="button"
+												class="absolute inset-y-0 right-0 pr-3 flex items-center"
+												aria-label="Clear input"
+												on:click={() => {
+													void handleInput('');
+													showConnectedWallets = true;
+												}}
+											>
+												<svg
+													class="w-4 h-4 text-gray-500 hover:text-gray-700"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
+										{/if}
+									</div>
 
-								{#if showConnectedWallets && uniqueConnectedWallets.length > 0 && !voiDestination.text}
-									<div
-										bind:this={searchDropdownRef}
-										class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
-									>
-										<ul class="max-h-48 overflow-auto py-1">
-											{#each uniqueConnectedWallets as address, i}
-												<li>
-													<button
-														class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
-														on:click={() => {
-															void handleInput(address);
-															showConnectedWallets = false;
-														}}
-													>
-														<div
-															class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900"
+									{#if showConnectedWallets && uniqueConnectedWallets.length > 0 && !voiDestination.text}
+										<div
+											bind:this={searchDropdownRef}
+											class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
+										>
+											<ul class="max-h-48 overflow-auto py-1">
+												{#each uniqueConnectedWallets as address, i}
+													<li>
+														<button
+															class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
+															on:click={() => {
+																void handleInput(address);
+																showConnectedWallets = false;
+															}}
 														>
-															<svg
-																class="w-4 h-4 text-emerald-600 dark:text-emerald-400"
-																fill="none"
-																stroke="currentColor"
-																viewBox="0 0 24 24"
+															<div
+																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900"
 															>
-																<path
-																	stroke-linecap="round"
-																	stroke-linejoin="round"
-																	stroke-width="2"
-																	d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-																/>
-															</svg>
-														</div>
-														<div class="min-w-0 flex-1">
-															<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-																{address}
-															</div>
-														</div>
-													</button>
-												</li>
-											{/each}
-										</ul>
-									</div>
-								{/if}
-
-								{#if showSearchResults && searchResults.length > 0}
-									<div
-										bind:this={searchDropdownRef}
-										class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
-									>
-										<ul class="max-h-60 overflow-auto py-1">
-											{#each searchResults as result, i}
-												<li>
-													<button
-														class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
-														class:bg-gray-100={i === selectedSearchIndex}
-														class:dark:bg-gray-700={i === selectedSearchIndex}
-														on:click={() => selectSearchResult(result)}
-													>
-														<div
-															class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-														>
-															{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
-																<img
-																	src={'owner' in result ? getAvatarUrl(result) : result.avatar}
-																	alt="Avatar"
-																	class="w-full h-full object-cover"
-																	on:error={(e) => {
-																		const target = e.currentTarget as HTMLImageElement;
-																		target.style.display = 'none';
-																		(target.nextElementSibling as HTMLDivElement).style.display =
-																			'flex';
-																	}}
-																/>
-															{:else}
-																<div
-																	class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
+																<svg
+																	class="w-4 h-4 text-emerald-600 dark:text-emerald-400"
+																	fill="none"
+																	stroke="currentColor"
+																	viewBox="0 0 24 24"
 																>
-																	{getInitials('owner' in result ? result.name : result.name)}
+																	<path
+																		stroke-linecap="round"
+																		stroke-linejoin="round"
+																		stroke-width="2"
+																		d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+																	/>
+																</svg>
+															</div>
+															<div class="min-w-0 flex-1">
+																<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
+																	{address}
 																</div>
-															{/if}
-														</div>
-														<div class="min-w-0 flex-1">
-															<div class="font-medium text-gray-900 dark:text-white truncate">
-																{result.name}
 															</div>
-															<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-																{'owner' in result
-																	? (nfdReceiveAddress(result) ?? '')
-																	: result.address}
+														</button>
+													</li>
+												{/each}
+											</ul>
+										</div>
+									{/if}
+
+									{#if showSearchResults && searchResults.length > 0}
+										<div
+											bind:this={searchDropdownRef}
+											class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
+										>
+											<ul class="max-h-60 overflow-auto py-1">
+												{#each searchResults as result, i}
+													<li>
+														<button
+															class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
+															class:bg-gray-100={i === selectedSearchIndex}
+															class:dark:bg-gray-700={i === selectedSearchIndex}
+															on:click={() => selectSearchResult(result)}
+														>
+															<div
+																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+															>
+																{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
+																	<img
+																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
+																		alt="Avatar"
+																		class="w-full h-full object-cover"
+																		on:error={(e) => {
+																			const target = e.currentTarget as HTMLImageElement;
+																			target.style.display = 'none';
+																			(target.nextElementSibling as HTMLDivElement).style.display =
+																				'flex';
+																		}}
+																	/>
+																{:else}
+																	<div
+																		class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
+																	>
+																		{getInitials('owner' in result ? result.name : result.name)}
+																	</div>
+																{/if}
 															</div>
-														</div>
-													</button>
-												</li>
-											{/each}
-										</ul>
-									</div>
-								{/if}
+															<div class="min-w-0 flex-1">
+																<div class="font-medium text-gray-900 dark:text-white truncate">
+																	{result.name}
+																</div>
+																<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
+																	{'owner' in result
+																		? (nfdReceiveAddress(result) ?? '')
+																		: result.address}
+																</div>
+															</div>
+														</button>
+													</li>
+												{/each}
+											</ul>
+										</div>
+									{/if}
 
-								{#if pickedName(voiDestination) && voiDestination.address}
-									<ResolvedAddress address={voiDestination.address} />
-								{/if}
-								{#if voiDestination.error}
-									<p class="text-sm text-red-600 dark:text-red-400" role="alert">
-										{voiDestination.error}
-									</p>
-								{/if}
-
-								{#if resolvedName && !pickedName(voiDestination)}
-									<div class="mt-2 flex items-center gap-2">
-										<NameAvatar name={resolvedName.name} avatar={resolvedName.avatar} />
-										<p class="text-sm text-gray-500 dark:text-gray-400">
-											{resolvedName.name}
+									{#if pickedName(voiDestination) && voiDestination.address}
+										<ResolvedAddress address={voiDestination.address} />
+									{/if}
+									{#if voiDestination.error}
+										<p class="text-sm text-red-600 dark:text-red-400" role="alert">
+											{voiDestination.error}
 										</p>
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</div>
+									{/if}
 
-					<!-- Amount Input -->
-					<div class="space-y-2">
-						<label for="amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-							Amount <span
-								class={isVoiToAlgorand
-									? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-									: 'text-blue-600 dark:text-blue-400 font-semibold'}
-							>
-								({isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol})
-							</span>
-						</label>
-						{#if isVoiToAlgorand}
-							<div class="mb-2">
-								{#if isLoadingBalance}
-									<p class="text-sm text-gray-500 dark:text-gray-400">Loading balance...</p>
-								{:else if voiBalance !== null}
-									<p class="text-sm text-gray-500 dark:text-gray-400">
-										Available balance: {voiBalance.toFixed(6)}
-										{isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
-									</p>
-								{/if}
-							</div>
-						{/if}
-						<input
-							type="number"
-							bind:value={amount}
-							min="0"
-							step="0.000001"
-							class="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-							placeholder="Enter amount"
-						/>
-						<div class="space-y-1">
-							<p class="text-sm text-gray-500 dark:text-gray-400">
-								Bridge fee: {displayFeeAmount.toFixed(6)}
-								{isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol} (0.1%)
-							</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">
-								You will receive: {displayDestinationAmount.toFixed(6)}
-								{isVoiToAlgorand ? selectedToken.bridgedSymbol : selectedToken.symbol}
-							</p>
-							{#if destinationAddress}
-								<div class="text-sm text-gray-500 dark:text-gray-400">
-									To:
-									<span class="font-mono break-all" data-testid="bridge-to-address"
-										>{destinationAddress}</span
-									>
+									{#if resolvedName && !pickedName(voiDestination)}
+										<div class="mt-2 flex items-center gap-2">
+											<NameAvatar name={resolvedName.name} avatar={resolvedName.avatar} />
+											<p class="text-sm text-gray-500 dark:text-gray-400">
+												{resolvedName.name}
+											</p>
+										</div>
+									{/if}
 								</div>
 							{/if}
 						</div>
-					</div>
-					{#if !isVoiToAlgorand}
-						<div class="text-center">
-							<p class="text-sm text-gray-500 dark:text-gray-400">
-								You will scan the generated QR code or open the link with your Algorand wallet
-							</p>
-						</div>
-					{/if}
 
-					<!-- QR Code Modal -->
-					<Modal bind:open={showQrCode} size="sm" autoclose={false}>
-						<div class="p-3 md:p-4">
-							<div class="flex justify-between items-center mb-3 md:mb-4">
-								<h3 class="text-lg md:text-xl font-medium text-gray-900 dark:text-white">
-									Scan QR Code
-								</h3>
-							</div>
-
-							<div class="flex flex-col items-center space-y-3 md:space-y-4">
-								<img src={qrCodeDataUrl} alt="Bridge QR Code" class="w-56 h-56 md:w-64 md:h-64" />
-								<div class="flex flex-col items-center gap-2">
-									<p class="text-sm text-gray-600 dark:text-gray-400">
-										Scan this QR code with Pera Wallet or Defly Wallet
-									</p>
-									{#if isMonitoringAlgorand}
-										<p class="text-sm text-blue-600 dark:text-blue-400 animate-pulse">
-											Monitoring for transaction on Algorand{monitoringDots}
+						<!-- Amount Input -->
+						<div class="space-y-2">
+							<label
+								for="amount"
+								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+							>
+								Amount <span
+									class={isVoiToAlgorand
+										? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+										: 'text-blue-600 dark:text-blue-400 font-semibold'}
+								>
+									({isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol})
+								</span>
+							</label>
+							{#if isVoiToAlgorand}
+								<div class="mb-2">
+									{#if isLoadingBalance}
+										<p class="text-sm text-gray-500 dark:text-gray-400">Loading balance...</p>
+									{:else if voiBalance !== null}
+										<p class="text-sm text-gray-500 dark:text-gray-400">
+											Available balance: {voiBalance.toFixed(6)}
+											{isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol}
 										</p>
 									{/if}
-									{#if monitorState === 'unavailable'}
-										<p class="text-sm text-gray-600 dark:text-gray-400" role="status">
-											Can't check Algorand right now. We will keep trying.
-										</p>
-										<button
-											type="button"
-											class="text-sm text-blue-600 dark:text-blue-400 underline"
-											on:click={() => monitorAlgorandTransactions()}>Retry</button
+								</div>
+							{/if}
+							<input
+								type="number"
+								bind:value={amount}
+								min="0"
+								step="0.000001"
+								class="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+								placeholder="Enter amount"
+							/>
+							<div class="space-y-1">
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									Bridge fee: {displayFeeAmount.toFixed(6)}
+									{isVoiToAlgorand ? selectedToken.symbol : selectedToken.bridgedSymbol} (0.1%)
+								</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									You will receive: {displayDestinationAmount.toFixed(6)}
+									{isVoiToAlgorand ? selectedToken.bridgedSymbol : selectedToken.symbol}
+								</p>
+								{#if destinationAddress}
+									<div class="text-sm text-gray-500 dark:text-gray-400">
+										To:
+										<span class="font-mono break-all" data-testid="bridge-to-address"
+											>{destinationAddress}</span
 										>
-									{/if}
-									<a
-										href={peraWalletUrl}
-										class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
-									>
-										Open in Pera or Defly Wallet
-									</a>
-								</div>
+									</div>
+								{/if}
 							</div>
 						</div>
-					</Modal>
-
-					<!-- Opt-in QR Code Modal -->
-					<Modal
-						bind:open={showOptInQrCode}
-						size="sm"
-						autoclose={false}
-						on:close={handleOptInQrCodeClose}
-					>
-						<div class="p-4">
-							<div class="flex justify-between items-center mb-4">
-								<h3 class="text-xl font-medium text-gray-900 dark:text-white">Opt-in to aVOI</h3>
+						{#if !isVoiToAlgorand}
+							<div class="text-center">
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									You will scan the generated QR code or open the link with your Algorand wallet
+								</p>
 							</div>
+						{/if}
 
-							<div class="flex flex-col items-center space-y-4">
-								<img src={optInQrCodeDataUrl} alt="Opt-in QR Code" class="w-64 h-64" />
-								<div class="flex flex-col items-center gap-2">
-									<p class="text-sm text-gray-600 dark:text-gray-400">
-										Scan this QR code with Pera Wallet or Defly Wallet to opt into aVOI
-									</p>
-									<a
-										href={`perawallet://?amount=0&asset=${selectedToken.algorandAssetId}`}
-										class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
-									>
-										Open in Pera or Defly Wallet
-									</a>
+						<!-- QR Code Modal -->
+						<Modal bind:open={showQrCode} size="sm" autoclose={false}>
+							<div class="p-3 md:p-4">
+								<div class="flex justify-between items-center mb-3 md:mb-4">
+									<h3 class="text-lg md:text-xl font-medium text-gray-900 dark:text-white">
+										Scan QR Code
+									</h3>
+								</div>
+
+								<div class="flex flex-col items-center space-y-3 md:space-y-4">
+									<img src={qrCodeDataUrl} alt="Bridge QR Code" class="w-56 h-56 md:w-64 md:h-64" />
+									<div class="flex flex-col items-center gap-2">
+										<p class="text-sm text-gray-600 dark:text-gray-400">
+											Scan this QR code with Pera Wallet or Defly Wallet
+										</p>
+										{#if isMonitoringAlgorand}
+											<p class="text-sm text-blue-600 dark:text-blue-400 animate-pulse">
+												Monitoring for transaction on Algorand{monitoringDots}
+											</p>
+										{/if}
+										{#if monitorState === 'unavailable'}
+											<p class="text-sm text-gray-600 dark:text-gray-400" role="status">
+												Can't check Algorand right now. We will keep trying.
+											</p>
+											<button
+												type="button"
+												class="text-sm text-blue-600 dark:text-blue-400 underline"
+												on:click={() => monitorAlgorandTransactions()}>Retry</button
+											>
+										{/if}
+										<a
+											href={peraWalletUrl}
+											class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
+										>
+											Open in Pera or Defly Wallet
+										</a>
+									</div>
 								</div>
 							</div>
-						</div>
-					</Modal>
+						</Modal>
+
+						<!-- Opt-in QR Code Modal -->
+						<Modal
+							bind:open={showOptInQrCode}
+							size="sm"
+							autoclose={false}
+							on:close={handleOptInQrCodeClose}
+						>
+							<div class="p-4">
+								<div class="flex justify-between items-center mb-4">
+									<h3 class="text-xl font-medium text-gray-900 dark:text-white">Opt-in to aVOI</h3>
+								</div>
+
+								<div class="flex flex-col items-center space-y-4">
+									<img src={optInQrCodeDataUrl} alt="Opt-in QR Code" class="w-64 h-64" />
+									<div class="flex flex-col items-center gap-2">
+										<p class="text-sm text-gray-600 dark:text-gray-400">
+											Scan this QR code with Pera Wallet or Defly Wallet to opt into aVOI
+										</p>
+										<a
+											href={`perawallet://?amount=0&asset=${selectedToken.algorandAssetId}`}
+											class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
+										>
+											Open in Pera or Defly Wallet
+										</a>
+									</div>
+								</div>
+							</div>
+						</Modal>
+					{/if}
 				</div>
 			{:else}
 				<div class="space-y-6">
@@ -2319,14 +2314,14 @@
 					>
 						Cancel
 					</button>
-					<button
-						on:click={handleSubmit}
-						disabled={submitButtonDisabled}
-						title={submitButtonTooltip}
-						class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
-					>
-						{isVoiToAlgorand ? 'Bridge to Algorand' : 'Generate QR Code'}
-					</button>
+					{#if canSignTransactions}<button
+							on:click={handleSubmit}
+							disabled={submitButtonDisabled}
+							title={submitButtonTooltip}
+							class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							{isVoiToAlgorand ? 'Bridge to Algorand' : 'Generate QR Code'}
+						</button>{/if}
 				</div>
 			{:else}
 				<div class="flex justify-end space-x-3 md:space-x-4">

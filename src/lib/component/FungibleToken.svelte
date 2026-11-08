@@ -1,4 +1,9 @@
 <script lang="ts">
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import type { FungibleTokenType, LPToken, TokenApproval } from '$lib/types/assets';
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { getProcessedIcon, iconUrl, isIconMissing, markIconMissing } from '$lib/utils/tokenIcons';
@@ -9,14 +14,13 @@
 	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { calculateUserPoolAmounts, calculateUserPoolShare } from '$lib/tokens/lpStats';
 	import { algodClient } from '$lib/utils/algod';
-	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
+	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
 
 	const dispatch = createEventDispatcher();
 
 	export let token: FungibleTokenType | LPToken;
-	export let canSignTransactions = false;
 	export let walletId: string | undefined;
 	export let fungibleTokens: FungibleTokenType[];
 	// TASK-108: the VOI price has not loaded yet, so a null usdValue is pending, not unavailable.
@@ -193,13 +197,19 @@
 	$: displayValue = token.value || 0;
 
 	async function claimTokens(approval: TokenApproval) {
-		if (!canSignTransactions || !walletId || !$selectedWallet?.address) {
+		if (!(pageAccountState(walletId, $connectedWallets).state === 'yours') || !walletId) {
+			claimingError = wrongSignerMessage();
 			return;
 		}
 
 		try {
 			// The account the user confirmed, taken before any await.
-			const signer = captureSigner();
+			const target = walletId;
+			const signer = capturePageSigner(target);
+			if (!signerMatchesAccount(signer, target)) {
+				claimingError = wrongSignerMessage();
+				return;
+			}
 			claimingApproval = approval.transactionId;
 			claimingError = null;
 			claimSuccess = false;
@@ -259,7 +269,7 @@
 
 	// Function to handle opening the manage approvals modal
 	function openManageApprovalsModal() {
-		if (canSignTransactions && isArc200Token(token)) {
+		if (pageAccountState(walletId, $connectedWallets).state === 'yours' && isArc200Token(token)) {
 			showManageApprovalsModal = true;
 		}
 	}
@@ -272,7 +282,7 @@
 </script>
 
 <div bind:this={cardElement} class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 md:p-4 relative">
-	{#if canSignTransactions && token.balance === 0 && token.type !== 'arc200'}
+	{#if pageAccountState(walletId, $connectedWallets).state === 'yours' && token.balance === 0 && token.type !== 'arc200'}
 		<button
 			class="absolute top-7 right-3 p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
 			on:click={() => (showOptOutModal = true)}
@@ -503,7 +513,7 @@
 												View Transaction
 											</a>
 
-											{#if canSignTransactions}
+											{#if pageAccountState(walletId, $connectedWallets).state === 'yours'}
 												<button
 													on:click={() => claimTokens(approval)}
 													class="px-2 py-1 text-xs font-medium text-white {claimSuccess &&
@@ -565,17 +575,14 @@
 										? `(${token.outgoingApprovals.filter((approval) => approval.amount !== '0').length})`
 										: ''}
 								</p>
-								<button
-									on:click={openManageApprovalsModal}
-									class="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition-colors"
-									disabled={!canSignTransactions}
-									title={canSignTransactions
-										? 'Manage token approvals'
-										: 'Connect wallet to manage approvals'}
-								>
-									<i class="fas fa-cog mr-1"></i>
-									Manage
-								</button>
+								{#if pageAccountState(walletId, $connectedWallets).state === 'yours'}<button
+										on:click={openManageApprovalsModal}
+										class="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition-colors"
+										title="Manage token approvals"
+									>
+										<i class="fas fa-cog mr-1"></i>
+										Manage
+									</button>{/if}
 							</div>
 							<div class="space-y-2 max-h-40 overflow-y-auto">
 								{#each token.outgoingApprovals.filter((approval) => approval.amount !== '0') as approval}
@@ -678,7 +685,7 @@
 												View Transaction
 											</a>
 
-											{#if canSignTransactions}
+											{#if pageAccountState(walletId, $connectedWallets).state === 'yours'}
 												<button
 													on:click={() => claimTokens(approval)}
 													class="px-2 py-1 text-xs font-medium text-white {claimSuccess &&
@@ -777,15 +784,19 @@
 					<span class="text-purple-500 group-hover:text-purple-600">Trade</span>
 				</a>
 			{/if}
-			{#if !isLPToken(token)}
+			{#if pageAccountState(walletId, $connectedWallets).state === 'yours' && !isLPToken(token)}
 				<span class="text-gray-400">|</span>
 				<button
-					class="flex flex-col items-center group {canSignTransactions
+					class="flex flex-col items-center group {pageAccountState(walletId, $connectedWallets)
+						.state === 'yours'
 						? ''
 						: 'opacity-50 cursor-not-allowed'}"
-					on:click={() => (canSignTransactions ? (showSendModal = true) : null)}
+					on:click={() =>
+						pageAccountState(walletId, $connectedWallets).state === 'yours'
+							? (showSendModal = true)
+							: null}
 					aria-label="Send token"
-					title={canSignTransactions ? 'Send token' : 'Connect wallet to send token'}
+					title="Send token"
 				>
 					<i class="fa-solid fa-paper-plane text-blue-500 group-hover:text-blue-600"></i>
 					<span class="text-blue-500 group-hover:text-blue-600">Send</span>
@@ -795,14 +806,16 @@
 				{#if isArc200Token(token)}
 					<span class="text-gray-400">|</span>
 					<button
-						class="flex flex-col items-center group {canSignTransactions
+						class="flex flex-col items-center group {pageAccountState(walletId, $connectedWallets)
+							.state === 'yours'
 							? ''
 							: 'opacity-50 cursor-not-allowed'}"
-						on:click={() => (canSignTransactions ? openManageApprovalsModal() : null)}
+						on:click={() =>
+							pageAccountState(walletId, $connectedWallets).state === 'yours'
+								? openManageApprovalsModal()
+								: null}
 						aria-label="Manage approvals"
-						title={canSignTransactions
-							? 'Manage token approvals'
-							: 'Connect wallet to manage approvals'}
+						title="Manage token approvals"
 					>
 						<i class="fa-solid fa-shield-alt text-blue-500 group-hover:text-blue-600"></i>
 						<span class="text-blue-500 group-hover:text-blue-600">Approvals</span>

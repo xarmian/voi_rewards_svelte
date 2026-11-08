@@ -1,43 +1,37 @@
 import { readFileSync } from 'node:fs';
-import { createContext, runInContext } from 'node:vm';
-import ts from 'typescript';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+import { signingHarness } from './pageSigningHarness';
 
 const source = readFileSync(new URL('./ManageApprovalsModal.svelte', import.meta.url), 'utf8');
-const expression = source.match(/\$:\s*canSignTransactions\s*=([^;]+);/)?.[1] ?? '';
-
-test.each([
-	[true, null],
-	[false, 'revoke-id']
-])(
-	'keeps signing capability during approve=%s revoke=%s after a selection switch',
-	(isApproving, isRevoking) => {
-		const context = createContext({
-			signingPinned: true,
-			isApproving,
-			isRevoking,
-			walletId: 'A',
-			$selectedWallet: { address: 'B', app: 'Watch' }
-		});
-		expect(runInContext(ts.transpileModule(`Boolean(${expression})`, {}).outputText, context)).toBe(
-			true
-		);
-		context.isApproving = false;
-		context.isRevoking = null;
-		expect(runInContext(ts.transpileModule(`Boolean(${expression})`, {}).outputText, context)).toBe(
-			false
-		);
-	}
-);
-
-test.each(['handleCreateApproval', 'handleRevokeApproval'])(
-	'%s captures capability at click and clears it after send',
-	(name) => {
-		const body = source.match(new RegExp(`async function ${name}\\([^]*?\\n\\t}`))?.[0] ?? '';
-		expect(body.indexOf('signingPinned = canSignTransactions')).toBeGreaterThanOrEqual(0);
-		expect(body.indexOf('signingPinned = canSignTransactions')).toBeLessThan(
-			body.indexOf('await ')
-		);
-		expect(body).toMatch(/finally\s*\{[^}]*signingPinned = false/);
-	}
-);
+test('an approval already in flight signs with its captured pair after a pick and a route change', async () => {
+	const h = signingHarness('ManageApprovalsModal', 'handleCreateApproval', 'Y');
+	let finish!: () => void;
+	const pending = new Promise<void>((resolve) => {
+		finish = resolve;
+	});
+	const sign = vi.fn().mockResolvedValue([[1]]);
+	const approve = vi.fn(async (_id, _spender, _amount, _sender, callback) => {
+		await pending;
+		await callback(['transaction']);
+		return { success: true, txId: 'tx' };
+	});
+	h.context.arc200Approve = approve;
+	h.context.signTransactions = sign;
+	const attempt = h.run();
+	expect(approve).toHaveBeenCalledOnce();
+	h.context.walletId = 'Z';
+	h.context.$selectedWallet = { address: 'Z', app: 'defly' };
+	h.context.canSignTransactions = false;
+	h.capturePageSigner.mockReturnValue(Object.freeze({ address: 'Z', walletId: 'pera' }));
+	finish();
+	await attempt;
+	expect(sign).toHaveBeenCalledExactlyOnceWith([['transaction']], {
+		address: 'Y',
+		walletId: 'pera'
+	});
+	expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
+	expect(h.context.approvalSuccess).toBe(true);
+});
+test('progress never grants permission for another approval', () => {
+	expect(source).not.toContain('signingPinned');
+});

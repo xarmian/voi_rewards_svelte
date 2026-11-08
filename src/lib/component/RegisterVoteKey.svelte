@@ -1,10 +1,15 @@
 <script lang="ts">
-	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import { fade } from 'svelte/transition';
 	import Modal from './ui/Modal.svelte';
 	import {
 		signAndSendTransactions,
-		captureSigner,
+		connectedWallets,
+		capturePageSigner,
 		type TransactionSigner
 	} from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
@@ -29,7 +34,10 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 
 	const dispatch = createEventDispatcher();
+	$: accountState = pageAccountState(pageAddress, $connectedWallets);
+	$: canSignTransactions = accountState.state === 'yours';
 
+	export let pageAddress: string;
 	export let walletAddress: string;
 	export let parentWalletAddress: string | null;
 	export let contractId: number | null;
@@ -176,9 +184,19 @@
 	// The account the user confirmed, taken before any await. A failure shows in the error area.
 	function signerOrError(): TransactionSigner | null {
 		try {
-			return captureSigner();
+			if (!canSignTransactions || pageAddress !== (parentWalletAddress ?? walletAddress)) {
+				error = wrongSignerMessage();
+				return null;
+			}
+			const target = pageAddress;
+			const signer = capturePageSigner(target);
+			if (!signerMatchesAccount(signer, target)) {
+				error = wrongSignerMessage();
+				return null;
+			}
+			return signer;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'No account is selected.';
+			error = err instanceof Error ? err.message : wrongSignerMessage();
 			transactionStatus = 'idle';
 			return null;
 		}
@@ -194,7 +212,7 @@
 			return;
 		}
 		if (!signerMatchesAccount(signer, parentWalletAddress)) {
-			error = wrongSignerMessage(parentWalletAddress);
+			error = wrongSignerMessage();
 			return;
 		}
 
@@ -373,7 +391,7 @@
 			return;
 		}
 		if (!signerMatchesAccount(signer, parentWalletAddress)) {
-			error = wrongSignerMessage(parentWalletAddress);
+			error = wrongSignerMessage();
 			return;
 		}
 
@@ -531,7 +549,7 @@
 		<div class="space-y-6">
 			<div class="border-t border-gray-200 dark:border-gray-700 pt-6">
 				<h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">
-					Need help generating keys? Select your node type:
+					Need help generating keys? Choose your node type:
 				</h3>
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 					{#each Object.entries(nodeInstructions) as [type, info]}
@@ -727,8 +745,8 @@
 				</label>
 				<p id="incentive-fee-help" class="mt-1 ml-7 text-xs text-gray-600 dark:text-gray-400">
 					{#if isStakingContract}
-						Not available for staking contracts: the contract always registers keys with the
-						normal 0.001 VOI fee.
+						Not available for staking contracts: the contract always registers keys with the normal
+						0.001 VOI fee.
 					{:else}
 						The fee is paid once, at key registration, and is not refundable. Off means the normal
 						0.001 VOI fee.
@@ -814,36 +832,36 @@
 						<span>Cancel</span>
 					{/if}
 				</button>
-				<button
-					on:click={handleSubmit}
-					class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-					disabled={transactionStatus !== 'idle' ||
-						!firstRound ||
-						!lastRound ||
-						!keyDilution ||
-						!selectionKey ||
-						!votingKey ||
-						!stateProofKey}
-				>
-					<i class="fas fa-check"></i>
-					<span>Register Key</span>
-				</button>
-				{#if isOnline}
-					<button
-						on:click={() => {
-							if (parentWalletAddress === null) {
-								goOfflineWalletVoteKey();
-							} else {
-								goOfflineStakingContractVoteKey();
-							}
-						}}
-						class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-						disabled={transactionStatus !== 'idle' && transactionStatus !== 'success'}
+				{#if canSignTransactions && pageAddress === (parentWalletAddress ?? walletAddress)}<button
+						on:click={handleSubmit}
+						class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={transactionStatus !== 'idle' ||
+							!firstRound ||
+							!lastRound ||
+							!keyDilution ||
+							!selectionKey ||
+							!votingKey ||
+							!stateProofKey}
 					>
-						<i class="fas fa-power-off"></i>
-						<span>Go Offline</span>
+						<i class="fas fa-check"></i>
+						<span>Register Key</span>
 					</button>
-				{/if}
+					{#if isOnline}
+						<button
+							on:click={() => {
+								if (parentWalletAddress === null) {
+									goOfflineWalletVoteKey();
+								} else {
+									goOfflineStakingContractVoteKey();
+								}
+							}}
+							class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+							disabled={transactionStatus !== 'idle' && transactionStatus !== 'success'}
+						>
+							<i class="fas fa-power-off"></i>
+							<span>Go Offline</span>
+						</button>
+					{/if}{/if}
 			</div>
 		</div>
 	</div>

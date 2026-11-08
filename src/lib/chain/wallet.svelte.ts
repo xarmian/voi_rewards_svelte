@@ -9,8 +9,9 @@
 //   a flow believe the picker moved.
 // - `selectWallet` is the only writer of the selection, and it selects an exact (address, wallet)
 //   pair, never the first address match.
-// - `captureSigner` snapshots the account at the moment the user confirms; signing never reads the
-//   live selection afterwards.
+// - `captureSigner` snapshots selection for vanity; `capturePageSigner` captures page membership.
+//   Both freeze the exact pair for one confirmed attempt.
+import { pageAccountState, wrongSignerMessage } from './signerGate';
 import { readable } from 'svelte/store';
 import { walletStore } from 'avm-wallet-svelte';
 import type { ConnectedAccount, TransactionSigner } from 'avm-wallet-svelte';
@@ -93,5 +94,13 @@ export function captureSigner(): TransactionSigner {
 	const account = walletStore.selectedAccount;
 	if (!account) throw new Error('No account is selected.');
 	if (account.isWatch) throw new Error('A watch-only account cannot sign.');
+	return Object.freeze({ address: account.address, walletId: account.walletId });
+}
+
+/** Capture the first connected signing pair for the explicit page account. */
+export function capturePageSigner(pageAddress: string | null | undefined): TransactionSigner {
+	const state = pageAccountState(pageAddress, walletStore.accounts.map(toWallet));
+	if (state.state !== 'yours') throw new Error(wrongSignerMessage());
+	const account = state.signingEntry;
 	return Object.freeze({ address: account.address, walletId: account.walletId });
 }

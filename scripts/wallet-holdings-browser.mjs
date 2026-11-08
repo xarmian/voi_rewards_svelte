@@ -78,7 +78,7 @@ try {
 					if (id === '\0fixture:$app/stores')
 						return `import {writable} from 'svelte/store'; export const page = writable({url:new URL('http://localhost/wallet/Y')});`;
 					if (id === '\0fixture:$lib/chain/wallet.svelte')
-						return `import {writable} from 'svelte/store'; export const selectedWallet = writable({address:'Y',app:'fixture'}); export const connectedWallets = writable([]); export const wallets = writable([]); export const captureSigner = () => ({address:'Y'}); export const signTransactions = async () => {throw new Error('Fixture signing refused')}; export const signAndSendTransactions = signTransactions;`;
+						return `import {writable} from 'svelte/store'; export const selectedWallet = writable({address:'Y',app:'fixture'}); export const connectedWallets = writable([{address:'Y',app:'fixture',walletId:'kibisis'}]); export const wallets = writable([]); export const capturePageSigner = () => ({address:'Y'}); export const signTransactions = async () => {throw new Error('Fixture signing refused')}; export const signAndSendTransactions = signTransactions;`;
 				},
 				configureServer(vite) {
 					vite.middlewares.use('/__holdings', async (_req, res) => {
