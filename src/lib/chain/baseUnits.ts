@@ -19,3 +19,14 @@ export function sumBaseUnits(values: string[], decimals: number): bigint {
 		0n
 	);
 }
+
+/**
+ * The balance in base units. A token carries its exact integer string (`balanceRaw`) because the
+ * `balance` number rounds above 2^53; a missing or malformed string falls back to the number.
+ */
+export function exactBalance(token: { balance: number; balanceRaw?: string }): bigint {
+	if (token.balanceRaw !== undefined && /^\d+$/.test(token.balanceRaw)) {
+		return BigInt(token.balanceRaw);
+	}
+	return BigInt(Math.floor(token.balance));
+}

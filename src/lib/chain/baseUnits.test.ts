@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decimalToBaseUnits, sumBaseUnits } from './baseUnits';
+import { decimalToBaseUnits, exactBalance, sumBaseUnits } from './baseUnits';
 
 describe('sumBaseUnits', () => {
 	it('sums exactly where floating point drifts', () => {
@@ -52,5 +52,25 @@ describe('decimalToBaseUnits', () => {
 
 	it.each([-1, 1.5, NaN, Infinity])('rejects invalid decimals %s', (decimals) => {
 		expect(() => decimalToBaseUnits('1', decimals)).toThrow(/^Invalid amount/);
+	});
+});
+
+describe('exactBalance', () => {
+	it('prefers the exact base-unit string over the rounded number', () => {
+		// Number('9007199254740995') rounds up to 9007199254740996.
+		expect(exactBalance({ balance: 9007199254740996, balanceRaw: '9007199254740995' })).toBe(
+			9007199254740995n
+		);
+	});
+
+	it('falls back to the number when no exact string was carried', () => {
+		expect(exactBalance({ balance: 2000000 })).toBe(2000000n);
+		expect(exactBalance({ balance: 12.9 })).toBe(12n);
+	});
+
+	it('ignores a malformed exact string', () => {
+		expect(exactBalance({ balance: 5, balanceRaw: '-1' })).toBe(5n);
+		expect(exactBalance({ balance: 5, balanceRaw: '1e3' })).toBe(5n);
+		expect(exactBalance({ balance: 5, balanceRaw: '' })).toBe(5n);
 	});
 });
