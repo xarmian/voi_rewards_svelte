@@ -14,7 +14,6 @@
 		Button,
 		Card,
 		CopyButton,
-		Headline,
 		InlineAlert,
 		WalletSearchPage,
 		WalletRewards,
@@ -361,7 +360,6 @@
 								: 'Read-only'}
 					/>
 				</div>
-				<Headline {yours} account={{ addr: walletId }} {summary} onretry={refresh} />
 				{#if !yours}
 					<p class="text-label text-on-hero-muted">
 						{accountState.state === 'watch-only'
