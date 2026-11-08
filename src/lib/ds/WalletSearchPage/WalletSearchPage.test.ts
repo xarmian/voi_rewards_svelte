@@ -54,7 +54,7 @@ it('missing or inaccessible storage leaves usable search and an explicit recents
 		expect(context.recent).toEqual([]);
 		expect(context.recentReady).toBe(true);
 	}
-	expect(source).toContain('No recent wallets yet. Search an address or try an example.');
+	expect(source).toContain('No recent wallets yet. Search an address or an enVoi name.');
 });
 it('Your accounts lists signing entries once per address, taking the signing name', async () => {
 	const source = readFileSync(new URL('./WalletSearchPage.svelte', import.meta.url), 'utf8');

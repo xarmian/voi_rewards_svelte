@@ -84,7 +84,7 @@
 							</li>{/each}
 					</ul>
 				{:else}<p class="text-label text-ink-muted">
-						No recent wallets yet. Search an address or try an example.
+						No recent wallets yet. Search an address or an enVoi name.
 					</p>{/if}
 			</Card>
 		</div>
