@@ -47,10 +47,6 @@
 				buttonLabel="Check"
 				{resolver}
 				{onsubmit}
-				examples={[
-					{ label: 'shelly.of.voi', href: '/wallet/shelly.of.voi' },
-					{ label: 'xarmian.voi', href: '/wallet/xarmian.voi' }
-				]}
 			/>
 		</div>
 	</section>

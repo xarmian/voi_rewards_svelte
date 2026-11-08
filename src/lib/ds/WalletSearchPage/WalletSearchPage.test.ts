@@ -6,7 +6,7 @@ import ts from 'typescript';
 import WalletSearchPage from './WalletSearchPage.svelte';
 import SearchBox from '../SearchBox/SearchBox.svelte';
 import { createResolver } from '../SearchBox/resolve';
-it('SSR always contains the hero, explanation, form and examples without accessing storage', () => {
+it('SSR always contains the hero, explanation and form without accessing storage', () => {
 	const resolver = {
 		...createResolver(),
 		recents: vi.fn(() => {
@@ -18,11 +18,10 @@ it('SSR always contains the hero, explanation, form and examples without accessi
 		'Check a wallet',
 		'Rewards, contracts and holdings for any address.',
 		'Recent wallets',
-		'/wallet/shelly.of.voi',
-		'/wallet/xarmian.voi',
 		'wallet-search-hero-input'
 	])
 		expect(html).toContain(text);
+	expect(html).not.toContain('Try');
 	expect(resolver.recents).not.toHaveBeenCalled();
 	const header = render(SearchBox, {
 		props: { variant: 'compact', id: 'ds-search-header', onsubmit: vi.fn() }
