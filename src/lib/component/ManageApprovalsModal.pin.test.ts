@@ -22,12 +22,14 @@ test('an approval already in flight signs with its captured pair after a pick an
 	h.context.walletId = 'Z';
 	h.context.$selectedWallet = { address: 'Z', app: 'defly' };
 	h.context.canSignTransactions = false;
+	h.capturePageSigner.mockReturnValue(Object.freeze({ address: 'Z', walletId: 'pera' }));
 	finish();
 	await attempt;
 	expect(sign).toHaveBeenCalledExactlyOnceWith([['transaction']], {
 		address: 'Y',
 		walletId: 'pera'
 	});
+	expect(h.capturePageSigner).toHaveBeenCalledExactlyOnceWith('Y');
 	expect(h.context.approvalSuccess).toBe(true);
 });
 test('progress never grants permission for another approval', () => {

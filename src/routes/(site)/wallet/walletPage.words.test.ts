@@ -100,9 +100,14 @@ test('all wallet surfaces use account and read-only wording', () => {
 					}).body
 				);
 			}
+			add(
+				'contract-consensus',
+				render(Node, { props: { walletId: 'C', parentWalletId: 'Y', contractId: 1 } }).body
+			);
 			add('holdings', render(Portfolio, { props: { walletAddress: 'Y' } }).body);
 			add(
 				'consensus',
+				'contract-consensus',
 				render(Node, { props: { walletId: 'Y', parentWalletId: null, contractId: null } }).body
 			);
 			add(
@@ -181,6 +186,7 @@ test('all wallet surfaces use account and read-only wording', () => {
 				'contracts-overview',
 				'contracts-full',
 				'consensus',
+				'contract-consensus',
 				'send',
 				'bridge',
 				'withdraw',

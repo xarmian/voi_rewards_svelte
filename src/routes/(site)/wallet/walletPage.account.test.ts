@@ -17,6 +17,7 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidate: vi.fn() }));
 vi.mock('avm-wallet-svelte', () => ({ Web3Wallet: () => {} }));
 import { connectedWallets, selectedWallet } from '$lib/chain/wallet.svelte';
 import Page from './[...id]/+page.svelte';
+import Node from '$lib/component/NodeComponent.svelte';
 const connected = connectedWallets as ReturnType<typeof writable>;
 test.each([
 	[[], 'Read-only', 'Read-only. Connect a wallet to act on your own accounts.'],
@@ -57,3 +58,68 @@ test('bare wallet renders search even while another account is connected', () =>
 		expect(html).not.toContain('Wallet sections');
 	}
 });
+
+test.each([
+	[
+		'own account with a different account last used',
+		'OWNER',
+		null,
+		[
+			{ address: 'OWNER', app: 'pera', walletId: 'pera' },
+			{ address: 'X', app: 'pera', walletId: 'pera' }
+		],
+		{ address: 'X', app: 'pera', walletId: 'pera' },
+		true
+	],
+	[
+		'contract with its signing owner last used',
+		'CONTRACT',
+		'OWNER',
+		[{ address: 'OWNER', app: 'pera', walletId: 'pera' }],
+		{ address: 'OWNER', app: 'pera', walletId: 'pera' },
+		false
+	],
+	[
+		'foreign account',
+		'FOREIGN',
+		null,
+		[{ address: 'OWNER', app: 'pera', walletId: 'pera' }],
+		{ address: 'OWNER', app: 'pera', walletId: 'pera' },
+		false
+	],
+	[
+		'watch-only account',
+		'OWNER',
+		null,
+		[{ address: 'OWNER', app: 'Watch', walletId: 'watch' }],
+		{ address: 'OWNER', app: 'Watch', walletId: 'watch' },
+		false
+	]
+] as const)(
+	'Consensus key controls follow page membership for %s',
+	(_label, walletId, parentWalletId, accounts, lastUsed, allowed) => {
+		const previousAccounts = get(connectedWallets);
+		const previousSelection = get(selectedWallet);
+		const selection = selectedWallet as ReturnType<typeof writable>;
+		try {
+			connected.set(accounts);
+			selection.set(lastUsed);
+			const html = render(Node, {
+				props: { walletId, parentWalletId, contractId: parentWalletId ? 1 : null }
+			}).body.replace(/<!--[\s\S]*?-->/g, '');
+			const keyButtons = [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)]
+				.map((match) =>
+					match[1]
+						.replace(/<[^>]+>/g, ' ')
+						.replace(/\s+/g, ' ')
+						.trim()
+				)
+				.filter((label) => /^(Register|Update) Participation Key$/i.test(label));
+			expect(keyButtons).toHaveLength(allowed ? 1 : 0);
+			expect(html.includes('Participation details for this account are read-only.')).toBe(!allowed);
+		} finally {
+			connected.set(previousAccounts);
+			selection.set(previousSelection);
+		}
+	}
+);
