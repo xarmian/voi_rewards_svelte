@@ -83,7 +83,8 @@ it('does not request the hidden token chart when Quote or resolution changes wit
 		)?.[0] ?? '';
 	expect(watcher).toContain('fetchTokenChartData(');
 	expect(watcher).toContain('fetchVOIChartData(');
-	expect(watcher).toContain('!selectedMarket');
+	// Both the token and the VOI branch carry the guard.
+	expect(watcher.match(/browser && selectedToken && !selectedMarket && /g)).toHaveLength(2);
 });
 
 it('makes the quote control act on a selected pair instead of the hidden token chart', () => {
