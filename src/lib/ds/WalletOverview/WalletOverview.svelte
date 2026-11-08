@@ -133,7 +133,7 @@
 						<HealthItem
 							tone={summary.idleCount ? 'warn' : 'ok'}
 							title={`${comma(summary.idleCount)} contracts not staking`}
-							detail={`${compact(summary.idleBalance, 1)} VOI idle`}
+							detail={`${compact(summary.idleBalance, 1)} VOI idle${summary.idleCount && accountState.state === 'yours' ? ' · register a key in Contracts to earn' : ''}`}
 						/>
 					</ul>
 				{/if}

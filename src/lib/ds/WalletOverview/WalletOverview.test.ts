@@ -80,6 +80,55 @@ it.each([
 	expect(html.includes('aria-haspopup="menu"')).toBe(visible);
 });
 
+it.each([
+	['yours', true],
+	['read-only', false]
+])('idle contract hint renders only when the page account is %s', (state, hint) => {
+	const contracts = [
+		{
+			address: 'ESCROW',
+			contractId: 1,
+			balance: 5,
+			isParticipating: false,
+			round: 0,
+			voteLastValid: null,
+			lastVoteAt: null,
+			lastBlock: null,
+			details: {
+				owner: 'OWNER',
+				availableForWithdrawal: 0,
+				lockedBalance: 0,
+				nextVestingDate: null
+			}
+		}
+	] as import('../../wallet/summary').WalletContract[];
+	const summary = summarizeWallet({
+		owner: null,
+		contracts,
+		current: null,
+		history: [],
+		state: 'ready',
+		now: 0
+	});
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState:
+				state === 'yours'
+					? pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }])
+					: { state: 'read-only' },
+			now: 0
+		}
+	}).body;
+	const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+	expect(text).toContain('1 contracts not staking');
+	expect(text).toContain('VOI idle');
+	expect(text.includes('register a key in Contracts to earn')).toBe(hint);
+});
+
 it('keeps the owner liquid balance visible while contract holdings are unavailable', () => {
 	const summary = summarizeWallet({
 		owner: {
