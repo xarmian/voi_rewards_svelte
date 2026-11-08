@@ -9,7 +9,8 @@
 	import { dev } from '$app/environment';
 	// import { inject } from '@vercel/analytics';
 	// inject({ mode: dev ? 'development' : 'production' });
-	import { invalidate } from '$app/navigation';
+	import { afterNavigate, invalidate } from '$app/navigation';
+	import { analyticsPageView } from '$lib/analytics';
 	import { onMount } from 'svelte';
 	import { initTheme } from '$lib/theme.svelte';
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
@@ -27,6 +28,21 @@
 
 	let { supabase, session } = data;
 	$: ({ supabase, session } = data);
+
+	// Page views are sent by hand so that wallet routes never put an address in the URL we report.
+	function sendPageView(url: URL, from?: URL) {
+		const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
+		if (typeof gtag !== 'function') return;
+		gtag('event', 'page_view', {
+			...analyticsPageView(url),
+			...(from ? { page_referrer: analyticsPageView(from).page_location } : {})
+		});
+	}
+
+	afterNavigate((nav) => {
+		if (nav.type === 'enter' || !nav.to) return;
+		sendPageView(nav.to.url, nav.from?.url);
+	});
 
 	onMount(() => {
 		initTheme();
@@ -46,9 +62,10 @@
 				if (!document.getElementById('ga-inline')) {
 					const inline = document.createElement('script');
 					inline.id = 'ga-inline';
-					inline.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NDX21XVC4G');`;
+					inline.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NDX21XVC4G', {send_page_view: false});`;
 					document.head.appendChild(inline);
 				}
+				sendPageView($page.url);
 			}
 		} catch {}
 		const {
