@@ -12,6 +12,18 @@
 		fetchTokenChartData as loadTokenChartData,
 		fetchVOIChartData as loadVOIChartData
 	} from '$lib/markets/chartData';
+	import {
+		resetChartSelection,
+		pickMarket,
+		selectionForToken,
+		visibleChart,
+		applyChartResult,
+		refreshChart,
+		applyPairResult,
+		createRequestGate,
+		convertsPairToUsd,
+		type ChartMarket
+	} from '$lib/markets/chartSelection';
 	import { InlineAlert, Tabs } from '$lib/ds';
 	import { onMount } from 'svelte';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
@@ -449,6 +461,7 @@
 
 	let selectedPeriod: '24h' | '7d' = '24h';
 	let priceHistory = data.priceHistory;
+	let tokenPriceHistory = priceHistory;
 
 	async function handlePeriodChange(period: '24h' | '7d') {
 		selectedPeriod = period;
@@ -458,49 +471,95 @@
 		priceHistory = await response.json();
 	}
 
-	let selectedTradingPairId: number | null = null;
-	let selectedMarket: { exchange: string; pair: string; trading_pair_id: number } | null = null;
+	// Read through a function: at the top level of a reactive block TypeScript narrows selectedToken.
+	const currentTokenId = (): number | null => selectedToken?.id ?? null;
+	let pairChart = resetChartSelection(currentTokenId());
+	let pairRequest = 0;
+	$: {
+		const next = selectionForToken(pairChart, currentTokenId());
+		if (next !== pairChart) {
+			pairChart = next;
+			priceHistory = tokenPriceHistory;
+		}
+	}
+	$: chartView = visibleChart(pairChart, {
+		data: tokenChartData,
+		volumes: tokenChartVolumes,
+		loading: tokenChartLoading,
+		error: tokenChartError,
+		show: showTokenChart
+	});
+	$: selectedTradingPairId = chartView.selectedTradingPairId;
+	$: selectedMarket = chartView.selectedMarket;
+
+	function handleChartBack() {
+		pairRequest++;
+		priceHistory = tokenPriceHistory;
+		pairChart = resetChartSelection(selectedToken?.id ?? null);
+	}
 
 	// Click market row: load pool chart normalized to USD when possible
-	async function handleMarketRowClick(market: any) {
-		selectedTradingPairId = market.trading_pair_id;
-		selectedMarket = {
-			exchange: market.exchange,
-			pair: market.pair,
-			trading_pair_id: market.trading_pair_id
-		};
+	async function handleMarketRowClick(market: ChartMarket) {
+		if (!pairChart.market) tokenPriceHistory = priceHistory;
+		pairChart = pickMarket(pairChart, market);
+		await fetchPairChartData(market, chartSettings.resolution);
+	}
+
+	async function fetchPairChartData(
+		market: ChartMarket,
+		resolution: Resolution,
+		quote: 'VOI' | 'USD' = currentQuoteCurrency
+	) {
+		const request = ++pairRequest;
+		const tokenId = selectedToken?.id ?? null;
+		pairChart = { ...pairChart, loading: true, error: '' };
+		const isCurrent = () =>
+			request === pairRequest && pairChart.market === market && tokenId === selectedToken?.id;
 
 		// Prefer OHLCV so we can normalize to USD when quote is VOI
 		const baseId = market.base_token_id;
 		const quoteId = market.quote_token_id;
 		try {
 			const res = await fetch(
-				`/api/ohlcv?baseTokenId=${baseId}&quoteTokenId=${quoteId}&resolution=${chartSettings.resolution}&limit=500`
+				`/api/ohlcv?baseTokenId=${baseId}&quoteTokenId=${quoteId}&resolution=${resolution}&limit=500`
 			);
 			if (!res.ok) throw new Error(`Failed to load market OHLCV (${res.status})`);
 			const json = await res.json();
 			let candles = json?.candles || [];
-			const quoteSym = (market.pair.split('/')[1] || '').toUpperCase();
+			let converted = false;
 			// If quote is VOI or WVOI, convert to USD using VOI reference series (with caching)
-			if (candles.length && (quoteSym === 'VOI' || quoteSym === 'WVOI')) {
+			if (candles.length && convertsPairToUsd(market.pair, quote)) {
 				try {
 					const refJson = await getVoiUsdReferenceData();
 					if (refJson) {
-						candles = convertVoiQuotedCandlesToUsd(candles, refJson);
+						const convertedCandles = convertVoiQuotedCandlesToUsd(candles, refJson);
+						// An unusable reference returns the same array: only a real conversion changes the label.
+						converted = convertedCandles !== candles;
+						candles = convertedCandles;
 					}
 				} catch (e) {
 					console.warn('USD normalization failed; showing VOI quote');
 				}
 			}
 			// Map to line data for PriceChart
-			priceHistory = (candles || []).map((c: any) => ({ time: c.time, value: c.close }));
+			if (isCurrent()) {
+				priceHistory = (candles || []).map((c: any) => ({ time: c.time, value: c.close }));
+				pairChart = applyPairResult(pairChart, candles, converted);
+			}
 		} catch (e) {
 			console.warn('Failed to load market OHLCV:', e);
+			if (isCurrent()) {
+				pairChart = {
+					...pairChart,
+					...applyChartResult(pairChart, {
+						error: e instanceof Error ? e.message : 'Failed to load chart data'
+					})
+				};
+			}
 		}
 	}
 
 	// Unified Chart State (using selectedPool instead of selectedTokenPair)
-	let unifiedChartData: OHLCVData[] = [];
 	let unifiedVolumeData: VolumeData[] = [];
 	let chartTokenPair: TokenPair | null = null;
 	let chartLoading = false;
@@ -532,6 +591,30 @@
 		chartSettingsInitToken = selectedToken.symbol;
 	}
 
+	function receiveTokenChartResult(result: {
+		data?: OHLCVData[];
+		volumes?: VolumeData[];
+		error: string;
+	}) {
+		const next = applyChartResult(
+			{
+				data: tokenChartData,
+				volumes: tokenChartVolumes,
+				loading: tokenChartLoading,
+				error: tokenChartError,
+				show: showTokenChart
+			},
+			result
+		);
+		tokenChartData = next.data;
+		tokenChartVolumes = next.volumes;
+		tokenChartError = next.error;
+		showTokenChart = next.show;
+	}
+
+	// Token and VOI chart requests share one gate: only the newest may publish.
+	const tokenGate = createRequestGate();
+
 	// Fetch chart data for selected token paired with VOI or USD
 	async function fetchTokenChartData(
 		tokenId: number,
@@ -540,6 +623,7 @@
 	) {
 		if (!tokenId || tokenId === 0) return; // Skip for native VOI
 
+		const request = tokenGate.begin();
 		tokenChartLoading = true;
 		tokenChartError = '';
 
@@ -551,17 +635,10 @@
 				resolution,
 				quoteCurrency
 			);
-			if (!result) return;
-			if (result.data) {
-				tokenChartData = result.data;
-				tokenChartVolumes = result.volumes;
-				showTokenChart = true;
-			} else {
-				tokenChartError = result.error;
-				showTokenChart = false;
-			}
+			if (!result || !tokenGate.isCurrent(request)) return;
+			receiveTokenChartResult(result);
 		} finally {
-			tokenChartLoading = false;
+			if (tokenGate.isCurrent(request)) tokenChartLoading = false;
 		}
 	}
 
@@ -570,21 +647,16 @@
 		resolution: Resolution = '1h',
 		quoteCurrency: 'VOI' | 'USD' = 'USD'
 	) {
+		const request = tokenGate.begin();
 		tokenChartLoading = true;
 		tokenChartError = '';
 
 		try {
 			const result = await loadVOIChartData(fetch, resolution, quoteCurrency);
-			if (result.data) {
-				tokenChartData = result.data;
-				tokenChartVolumes = result.volumes;
-				showTokenChart = true;
-			} else {
-				tokenChartError = result.error;
-				showTokenChart = false;
-			}
+			if (!tokenGate.isCurrent(request)) return;
+			receiveTokenChartResult(result);
 		} finally {
-			tokenChartLoading = false;
+			if (tokenGate.isCurrent(request)) tokenChartLoading = false;
 		}
 	}
 
@@ -599,6 +671,10 @@
 	// Handle chart resolution changes
 	async function handleChartResolutionChange(resolution: Resolution) {
 		chartSettings = { ...chartSettings, resolution };
+		if (selectedMarket) {
+			await fetchPairChartData(selectedMarket, resolution);
+			return;
+		}
 		if (selectedToken) {
 			if (selectedToken.id === 0) {
 				await fetchVOIChartData(resolution, currentQuoteCurrency);
@@ -700,7 +776,6 @@
 
 				// Apply final results if latest
 				if (seq === fetchSeq) {
-					unifiedChartData = localCandles;
 					unifiedVolumeData = localVolumes;
 					chartTokenPair = localChartPair;
 				}
@@ -770,7 +845,6 @@
 				}
 
 				if (seq === fetchSeq) {
-					unifiedChartData = localCandles;
 					unifiedVolumeData = localVolumes;
 					chartTokenPair = localChartPair;
 				}
@@ -780,7 +854,6 @@
 		} catch (error) {
 			console.error('Error fetching chart data:', error);
 			chartError = error instanceof Error ? error.message : 'Failed to load chart data';
-			unifiedChartData = [];
 			unifiedVolumeData = [];
 		} finally {
 			if (seq === fetchSeq) {
@@ -801,16 +874,20 @@
 
 	// Token pair selection now handled via handlePoolSelect
 
-	// A plain refetch: candles are rebuilt server-side every 5 minutes (TASK-17).
-	function handleUnifiedRefresh(
+	function handleChartRefresh(
 		event: CustomEvent<{ tokenPair: TokenPair; resolution: Resolution }>
 	) {
-		const { resolution } = event.detail;
-		if (shouldUseVOIData(selectedToken?.symbol || 'VOI')) {
-			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution, selectedTradingPairId);
-		} else {
-			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', resolution);
-		}
+		return refreshChart(
+			pairChart,
+			selectedToken?.id ?? null,
+			event.detail.resolution,
+			currentQuoteCurrency,
+			{
+				pair: fetchPairChartData,
+				voi: fetchVOIChartData,
+				token: fetchTokenChartData
+			}
+		);
 	}
 
 	function handleUnifiedResolutionChange(event: CustomEvent<Resolution>) {
@@ -898,19 +975,23 @@
 
 		<section class="grid grid-cols-1 gap-bento">
 			<ChartPanel
-				{showTokenChart}
+				showTokenChart={chartView.show}
 				{selectedToken}
-				{tokenChartLoading}
-				{tokenChartError}
-				{tokenChartData}
-				{tokenChartVolumes}
+				tokenChartLoading={chartView.loading}
+				tokenChartError={chartView.error}
+				tokenChartData={chartView.data}
+				tokenChartVolumes={chartView.volumes}
 				bind:currentQuoteCurrency
 				{chartSettings}
 				{handleChartResolutionChange}
 				{handleChartTypeChange}
 				{fetchVOIChartData}
 				{fetchTokenChartData}
-				on:refreshData
+				{fetchPairChartData}
+				on:refreshData={handleChartRefresh}
+				{selectedMarket}
+				selectedQuote={chartView.selectedQuote}
+				onBack={handleChartBack}
 			>
 				<PriceChart
 					data={priceHistory}

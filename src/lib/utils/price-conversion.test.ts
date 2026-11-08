@@ -112,3 +112,13 @@ test('candle MAD forwards k to all four fields and preserves time and volume', (
 		candles.map(({ time, volume }) => ({ time, open: 11, high: 13, low: 9, close: 12, volume }))
 	);
 });
+
+test('returns the same candle array when the reference has no usable point, and a new array when it converts', () => {
+	const candles = [{ time: 10, open: 1, high: 2, low: 1, close: 2, volume: 3 }];
+	const invalid = [{ time: 'not a time', value: Number.NaN }];
+	assert.equal(convertVoiQuotedCandlesToUsd(candles, invalid as never), candles);
+	assert.equal(convertVoiQuotedCandlesToUsd(candles, []), candles);
+	const converted = convertVoiQuotedCandlesToUsd(candles, [{ time: 0, value: 0.5 }] as never);
+	assert.notEqual(converted, candles);
+	assert.equal(converted[0].close, 1);
+});
