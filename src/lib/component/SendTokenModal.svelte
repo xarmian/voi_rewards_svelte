@@ -26,7 +26,7 @@
 	import algosdk from 'algosdk';
 	import { onDestroy, tick } from 'svelte';
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
-	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
+	import { decimalToBaseUnits, exactBalance, sumBaseUnits } from '$lib/chain/baseUnits';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
 	import {
@@ -101,6 +101,7 @@
 				symbol: 'VOI';
 				decimals: number;
 				balance: number;
+				balanceRaw?: string;
 				name: string;
 				id?: undefined;
 		  };
@@ -121,6 +122,7 @@
 		symbol: 'VOI',
 		decimals: 6,
 		balance: isNativeToken(token) ? token.balance : 0,
+		balanceRaw: isNativeToken(token) ? token.balanceRaw : undefined,
 		verified: true,
 		imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
 		value: isNativeToken(token) ? token.balance / 1e6 : 0,
@@ -139,13 +141,15 @@
 					nativeVoiToken = {
 						...nativeVoiToken,
 						balance: Number(info.amount),
+						balanceRaw: String(info.amount),
 						value: Number(info.amount) / 1e6
 					};
 					// If the selected token is native VOI, update it too
 					if (isNativeToken(selectedToken)) {
 						selectedToken = {
 							...selectedToken,
-							balance: Number(info.amount)
+							balance: Number(info.amount),
+							balanceRaw: String(info.amount)
 						};
 					}
 					// Force Svelte reactivity for available tokens
@@ -347,7 +351,7 @@
 				rows.map((r) => r.amount),
 				token.decimals
 			);
-			return total > 0n && total <= BigInt(Math.floor(token.balance));
+			return total > 0n && total <= exactBalance(token);
 		} catch {
 			return false;
 		}
@@ -1097,6 +1101,7 @@
 				symbol: 'VOI',
 				decimals: 6,
 				balance: nativeVoiToken.balance,
+				balanceRaw: nativeVoiToken.balanceRaw,
 				name: 'Voi'
 			};
 		} else {

@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { expect, test, vi } from 'vitest';
 import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
-import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
+import { decimalToBaseUnits, exactBalance, sumBaseUnits } from '$lib/chain/baseUnits';
 import { createFlowPin } from '$lib/chain/flowAccount';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
@@ -23,6 +23,7 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 		.join('\n');
 	const context = createContext({
 		signerMatchesAccount,
+		exactBalance,
 		wrongSignerMessage,
 		buildPayment,
 		buildAssetTransfer,
@@ -164,6 +165,47 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 	await run('handleSend()');
 	expect(run('error')).toBe('Total exceeds your available VOI balance');
 	expect(run('isSending')).toBe(false);
+});
+
+test('checks the exact base-unit balance when the number rounded it up past the true value', async () => {
+	// True balance 9007199254740995 base units; Number() rounds it up to 9007199254740996.
+	const run = componentFunctions(['handleSend', 'withinBalance'], {
+		decimalToBaseUnits,
+		sumBaseUnits,
+		exactBalance,
+		algosdk,
+		...selectedWalletGlobals(),
+		selectedToken: {
+			decimals: 6,
+			symbol: 'TEST',
+			balance: 9007199254740996,
+			balanceRaw: '9007199254740995'
+		},
+		tracker: {},
+		recipients: [
+			{
+				address: algosdk.generateAccount().addr.toString(),
+				amount: '9007199254.740996'
+			}
+		],
+		isSending: false,
+		error: null
+	});
+	await run('handleSend()');
+	expect(run('error')).toBe('Total exceeds your available TEST balance');
+});
+
+test('accepts a send of the exact balance when the number rounded it down', () => {
+	// True balance 9007199254740993 base units; Number() rounds it down to 9007199254740992.
+	const run = componentFunctions(['withinBalance'], {
+		decimalToBaseUnits,
+		sumBaseUnits,
+		exactBalance
+	});
+	const token = { decimals: 6, balance: 9007199254740992, balanceRaw: '9007199254740993' };
+	expect(run(`withinBalance([{ amount: '9007199254.740993' }], ${JSON.stringify(token)})`)).toBe(
+		true
+	);
 });
 
 const suggestedParams = {
