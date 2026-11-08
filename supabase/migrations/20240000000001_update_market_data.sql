@@ -1,4 +1,8 @@
--- Update the get_latest_market_data function to include trading_pair_id
+-- Update the get_latest_market_data function to include trading_pair_id.
+-- Adding an output column changes the return type, which CREATE OR REPLACE
+-- rejects for an existing function, so drop it first.
+drop function if exists get_latest_market_data();
+
 create or replace function get_latest_market_data()
 returns table (
     exchange_name text,
