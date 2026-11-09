@@ -72,7 +72,14 @@ describe('usd', () => {
 		assert.equal(usd(0.004213), '$0.004213');
 		assert.equal(usd(0.00421337), '$0.004213');
 		assert.equal(usd(0.005), '$0.005');
+		assert.equal(usd(0.000001), '$0.000001');
+		assert.equal(usd(5e-7), '$0.000001');
 	});
+	for (const amount of [4e-7, 1e-9]) {
+		test(`positive ${amount} that rounds to zero has a less-than guard`, () => {
+			assert.equal(usd(amount), '<$0.000001');
+		});
+	}
 	test('negatives', () => {
 		assert.equal(usd(-12.3), '-$12.30');
 		assert.equal(usd(-0.004213), '-$0.004213');

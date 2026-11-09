@@ -62,6 +62,7 @@ export function usd(n: Num): string {
 	if (!isNum(n)) return MISSING;
 	const abs = Math.abs(n);
 	const body = abs !== 0 && abs < 0.01 ? fmt(2, 6).format(abs) : fmt(2, 2).format(abs);
+	if (n > 0 && body === '0.00') return '<$0.000001';
 	// Negative values that round to zero would otherwise read "-$0.00".
 	return (n < 0 && body !== '0.00' ? '-$' : '$') + body;
 }

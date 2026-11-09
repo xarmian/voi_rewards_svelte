@@ -67,6 +67,18 @@ it('confirmed native zero is ready, token failure is unavailable, and NFTs do no
 	expect(html).not.toContain('0 NFTs');
 	expect(html).not.toContain('No liquidity positions');
 });
+it.each([1, 10, 11])(
+	'token caption explains sorting only when %s tokens exceed the shown rows',
+	(count) => {
+		const html = render(WalletHoldings, {
+			props: { pageAddress: 'Y', account, tokens: population.slice(0, count), tokenState: 'ready' }
+		}).body;
+		expect(html.match(/<caption[^>]*>([^]*?)<\/caption>/)?.[1]).toBe(
+			'Page address token holdings' +
+				(count > 10 ? '. Until all tokens are shown, sorting reorders only the rows shown.' : '')
+		);
+	}
+);
 it('expansion only adds rows and permanently removes the page limit', async () => {
 	const source = readFileSync(new URL('./WalletHoldings.svelte', import.meta.url), 'utf8');
 	const script = source.split('</script>')[0].replace('<script lang="ts">', '');
@@ -139,6 +151,9 @@ it('expansion only adds rows and permanently removes the page limit', async () =
 	const expandedHtml = render(expandedContext.exports.default, {
 		props: { pageAddress: 'Y', account, tokens: population, tokenState: 'ready' }
 	}).body;
+	expect(expandedHtml.match(/<caption[^>]*>([^]*?)<\/caption>/)?.[1]).toBe(
+		'Page address token holdings'
+	);
 	expect(expandedHtml).toContain('data-token-id="14"');
 	expect(expandedHtml).toContain('data-token-id="zero"');
 	expect(expandedHtml).not.toMatch(

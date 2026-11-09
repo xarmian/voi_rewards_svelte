@@ -319,7 +319,9 @@
 				rows={tokenRows}
 				rowKey={(r) => r.key}
 				rowName={(r) => r.token.name}
-				caption="Page address token holdings"
+				caption={!tokensExpanded && display.rows.tokens.length > tokenRows.length
+					? 'Page address token holdings. Until all tokens are shown, sorting reorders only the rows shown.'
+					: 'Page address token holdings'}
 				id="ds-holdings-tokens"
 				density="compact"
 				bind:sort={tokenSort}
