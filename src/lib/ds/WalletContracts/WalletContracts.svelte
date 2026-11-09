@@ -131,9 +131,12 @@
 		if (generation === withdrawOpenGeneration) selectedContract = null;
 	}
 	async function handleVoteKeySuccess(forceRefresh = false) {
+		// The modal stays open so the person sees its confirmation; closing it clears the selection.
 		if (forceRefresh) await onrefresh?.();
-		selectedContract = null;
-		showRegisterVoteKey = false;
+	}
+	function handleVoteKeyVisibility(show: boolean) {
+		showRegisterVoteKey = show;
+		if (!show) selectedContract = null;
 	}
 	const overviewColumns: Column<ContractRow>[] = [
 		{ key: 'contract', header: 'Contract', priority: 1, cell: addressCell },
@@ -413,7 +416,7 @@
 		parentWalletAddress={selectedContract.owner}
 		contractId={selectedContract.contractId}
 		isOnline={selectedContract.isParticipating}
-		bind:showModal={showRegisterVoteKey}
+		bind:showModal={() => showRegisterVoteKey, handleVoteKeyVisibility}
 		onSuccess={handleVoteKeySuccess}
 	/>
 {/if}
