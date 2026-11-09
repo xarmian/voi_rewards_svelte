@@ -32,6 +32,52 @@ const contracts = [
 	}
 ] as WalletContract[];
 
+it('full mode keeps retained contract rows visible and busy during a refresh', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'loading',
+			mode: 'full'
+		}
+	}).body;
+	expect(html).toContain('href="/wallet/ESCROW"');
+	expect(html).toContain('aria-busy="true"');
+	expect(html).not.toContain('data-contract-skeleton');
+});
+it('full mode keeps seven skeleton bars for an initially empty loading list', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts: [],
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'loading',
+			mode: 'full'
+		}
+	}).body;
+	expect(html.match(/data-contract-skeleton/g)).toHaveLength(7);
+});
+it('overview loading keeps the DataTable placeholders instead of retained contract rows', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'loading',
+			mode: 'overview'
+		}
+	}).body;
+	expect(html).toContain('Loading withdrawable balance…');
+	expect(html).toContain('aria-busy="true"');
+	expect(html.match(/<tr aria-hidden="true"/g)).toHaveLength(5);
+	expect(html).not.toContain('href="/wallet/ESCROW"');
+	expect(html).not.toContain('data-contract-skeleton');
+});
+
 it('TASK-164: every displayed contract address is a read-only wallet link', () => {
 	const html = render(WalletContracts, {
 		props: {
@@ -156,6 +202,8 @@ function harness() {
 		selectedContract: null,
 		showWithdrawModal: false,
 		showRegisterVoteKey: false,
+		pendingAction: null as 'withdraw' | 'key' | null,
+		pendingOpens: 0,
 		withdrawOpenGeneration: 0,
 		openContextGeneration: 0,
 		actionError: '',
@@ -175,6 +223,44 @@ function harness() {
 	);
 	return { context, handlers, resolve: () => pending.resolve({ default: () => {} }) };
 }
+it.each([
+	['withdraw', 'key'],
+	['key', 'withdraw']
+] as const)('a pending %s import blocks the %s opener', async (first, second) => {
+	const { context, handlers, resolve } = harness();
+	const row = context.contracts[0];
+	const opening = handlers.open(row, first);
+	const competing = handlers.open(row, second);
+	resolve();
+	await Promise.all([opening, competing]);
+	expect(context.showWithdrawModal).toBe(first === 'withdraw');
+	expect(context.showRegisterVoteKey).toBe(first === 'key');
+	expect(context.pendingAction).toBeNull();
+});
+it('a rejected import releases the pending action so the other opener can work', async () => {
+	const { context, handlers, resolve } = harness();
+	context.loadModal.mockRejectedValueOnce(new Error('Import failed'));
+	await handlers.open(context.contracts[0], 'withdraw');
+	expect(context.pendingAction).toBeNull();
+	expect(context.actionError).toBe('Unable to open this action. Please try again.');
+	const opening = handlers.open(context.contracts[0], 'key');
+	const pendingAction = context.pendingAction;
+	resolve();
+	await opening;
+	expect(pendingAction).toBe('key');
+	expect(context.showWithdrawModal).toBe(false);
+	expect(context.showRegisterVoteKey).toBe(true);
+	expect(context.pendingAction).toBeNull();
+});
+it('detail buttons disable the action opposite to the pending opener', () => {
+	const detail = source.slice(source.indexOf('{#snippet detail('), source.indexOf('<Card title='));
+	expect(detail).toMatch(
+		/<Button\s+variant="primary"\s+disabled=\{pendingAction !== null && pendingAction !== 'withdraw'\}/
+	);
+	expect(detail).toMatch(
+		/<Button\s+variant="soft"\s+disabled=\{pendingAction !== null && pendingAction !== 'key'\}/
+	);
+});
 it.each(['overview', 'full'] as const)(
 	'%s retains healthy row actions and the unreadable row, without an empty menu, and offers Refresh',
 	(mode) => {

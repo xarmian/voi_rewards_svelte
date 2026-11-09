@@ -53,7 +53,7 @@
 			'Cumulative scheduled VOI'
 		],
 		rows: timeline.months.map((month, index) => [
-			month.date,
+			index === 0 ? `Start ${month.date}` : month.date,
 			index === 0
 				? 'Schedule starts'
 				: timeline.events

@@ -50,6 +50,7 @@
 	const hiddenBalance = $derived(
 		sorted.slice(limit).reduce((total, contract) => total + (contract.balance ?? 0), 0)
 	);
+	const refreshing = $derived(mode === 'full' && dataState === 'loading' && contracts.length > 0);
 	// Page authorization is separate from the readable, authorized population of each row.
 	const canAct = $derived(
 		dataState !== 'loading' &&
@@ -84,6 +85,8 @@
 	let selectedContract: ContractDetails | null = $state.raw(null);
 	let showWithdrawModal = $state(false);
 	let showRegisterVoteKey = $state(false);
+	let pendingAction = $state<'withdraw' | 'key' | null>(null);
+	let pendingOpens = 0;
 	let withdrawOpenGeneration = 0;
 	let actionError = $state('');
 	let WithdrawModal: typeof import('$lib/component/WithdrawModal.svelte').default | null =
@@ -93,6 +96,9 @@
 
 	async function open(row: ContractRow, action: 'withdraw' | 'key') {
 		if (!rowCanAct(row) || !row.details) return;
+		if (pendingAction !== null && pendingAction !== action) return;
+		pendingAction = action;
+		pendingOpens++;
 		const details = row.details;
 		const generation = openContextGeneration;
 		const population = contracts;
@@ -123,6 +129,9 @@
 			} else showRegisterVoteKey = true;
 		} catch {
 			actionError = 'Unable to open this action. Please try again.';
+		} finally {
+			pendingOpens--;
+			if (pendingOpens === 0) pendingAction = null;
 		}
 	}
 	async function handleWithdrawSuccess(forceRefresh = false) {
@@ -342,8 +351,15 @@
 			</div>
 		</dl>
 		{#if rowCanAct(row)}<div class="flex flex-wrap gap-2">
-				<Button variant="primary" onclick={() => open(row, 'withdraw')}>Withdraw</Button>
-				<Button variant="soft" onclick={() => open(row, 'key')}
+				<Button
+					variant="primary"
+					disabled={pendingAction !== null && pendingAction !== 'withdraw'}
+					onclick={() => open(row, 'withdraw')}>Withdraw</Button
+				>
+				<Button
+					variant="soft"
+					disabled={pendingAction !== null && pendingAction !== 'key'}
+					onclick={() => open(row, 'key')}
 					>{row.isParticipating ? 'Update' : 'Register'} participation key</Button
 				>
 			</div>{/if}
@@ -366,7 +382,7 @@
 			<Button variant="soft" size="sm" onclick={onrefresh}>Refresh</Button>
 		</div>
 	{/if}
-	{#if mode === 'full' && dataState === 'loading'}
+	{#if mode === 'full' && dataState === 'loading' && contracts.length === 0}
 		<div aria-busy="true" class="space-y-2">
 			<span class="sr-only">Loading lock contracts…</span>
 			{#each [0, 1, 2, 3, 4, 5, 6] as index (index)}<div
@@ -376,27 +392,29 @@
 				></div>{/each}
 		</div>
 	{:else}
-		<DataTable
-			{columns}
-			rows={sorted}
-			rowKey={(row) => String(row.contractId)}
-			rowName={(row) => `contract #${row.contractId}`}
-			caption="Lock contracts: balances in VOI"
-			captionHidden
-			density="compact"
-			state={dataState}
-			{asOf}
-			onretry={onrefresh}
-			limit={mode === 'full' ? undefined : limit}
-			bind:sort
-			detail={mode === 'full' ? detail : undefined}
-			moreLabel={(hidden) =>
-				`Show ${hidden} more not-staking contracts (${compact(hiddenBalance, 1)} VOI)`}
-			rowActions={mode === 'overview' && hasActions ? actions : undefined}
-			rowHasActions={rowCanAct}
-			expandable={mode === 'full' || !hasActions}
-			emptyText="No lock contracts for this account."
-		/>
+		<div aria-busy={refreshing ? 'true' : undefined}>
+			<DataTable
+				{columns}
+				rows={sorted}
+				rowKey={(row) => String(row.contractId)}
+				rowName={(row) => `contract #${row.contractId}`}
+				caption="Lock contracts: balances in VOI"
+				captionHidden
+				density="compact"
+				state={refreshing ? 'ready' : dataState}
+				{asOf}
+				onretry={onrefresh}
+				limit={mode === 'full' ? undefined : limit}
+				bind:sort
+				detail={mode === 'full' ? detail : undefined}
+				moreLabel={(hidden) =>
+					`Show ${hidden} more not-staking contracts (${compact(hiddenBalance, 1)} VOI)`}
+				rowActions={mode === 'overview' && hasActions ? actions : undefined}
+				rowHasActions={rowCanAct}
+				expandable={mode === 'full' || !hasActions}
+				emptyText="No lock contracts for this account."
+			/>
+		</div>
 	{/if}
 	{#if actionError}<InlineAlert message={actionError} />{/if}
 </Card>
