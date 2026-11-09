@@ -13,6 +13,9 @@ export const load = (async ({ params, depends, url, fetch }) => {
 		const [first, ...segments] = params.id.split('/');
 		const rest = segments.join('/');
 		if (!isValidAddress(first)) {
+			if (/^[A-Z2-7]{58}$/.test(first)) {
+				error(404, `No wallet found for "${first}"`);
+			}
 			const result = await resolveWalletName(first, fetch);
 			if (result.kind === 'address') {
 				redirect(307, '/wallet/' + result.address + (rest ? '/' + rest : '') + url.search);
