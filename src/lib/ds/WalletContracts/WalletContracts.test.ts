@@ -166,8 +166,11 @@ function harness() {
 	)
 		? functionCode('rowCanAct')
 		: '';
+	const hasVisibility = ast.statements.some(
+		(node) => ts.isFunctionDeclaration(node) && node.name?.text === 'handleVoteKeyVisibility'
+	);
 	const handlers = runInNewContext(
-		`${optionalRowGate}; ${functionCode('open')}; ${functionCode('handleWithdrawSuccess')}; ({open, handleWithdrawSuccess})`,
+		`${optionalRowGate}; ${functionCode('open')}; ${functionCode('handleWithdrawSuccess')}; ${functionCode('handleVoteKeySuccess')}; ${hasVisibility ? functionCode('handleVoteKeyVisibility') : ''}; ({open, handleWithdrawSuccess, handleVoteKeySuccess, handleVoteKeyVisibility: ${hasVisibility ? 'handleVoteKeyVisibility' : 'undefined'}})`,
 		context
 	);
 	return { context, handlers, resolve: () => pending.resolve({ default: () => {} }) };
@@ -305,6 +308,31 @@ it('an old withdrawal success cannot clear a newly opened withdrawal after refre
 	refresh.resolve();
 	await success;
 	expect(context.selectedContract).toBe(raw);
+});
+it('a successful key registration refreshes the list and keeps the modal open for its confirmation', async () => {
+	const { context, handlers, resolve } = harness();
+	const opening = handlers.open(context.contracts[0], 'key');
+	resolve();
+	await opening;
+	const raw = context.contracts[0].details;
+	await handlers.handleVoteKeySuccess(true);
+	expect(context.onrefresh).toHaveBeenCalledOnce();
+	expect(context.showRegisterVoteKey).toBe(true);
+	expect(context.selectedContract).toBe(raw);
+});
+it('closing the key modal clears the selected contract, and keeping it open does not', async () => {
+	const { context, handlers, resolve } = harness();
+	const opening = handlers.open(context.contracts[0], 'key');
+	resolve();
+	await opening;
+	const raw = context.contracts[0].details;
+	handlers.handleVoteKeyVisibility(true);
+	expect(context.showRegisterVoteKey).toBe(true);
+	expect(context.selectedContract).toBe(raw);
+	handlers.handleVoteKeyVisibility(false);
+	expect(context.showRegisterVoteKey).toBe(false);
+	expect(context.selectedContract).toBeNull();
+	expect(source).toMatch(/bind:showModal=\{\(\) => showRegisterVoteKey, handleVoteKeyVisibility\}/);
 });
 it('full mode shows every row initially closed with native disclosure and sort buttons, unavailable details, and no overflow wrapper', () => {
 	const rows = Array.from({ length: 16 }, (_, n) => ({
