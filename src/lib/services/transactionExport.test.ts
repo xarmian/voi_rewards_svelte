@@ -720,3 +720,14 @@ describe('metadata request lifecycle', () => {
 		expect(readAsset).toHaveBeenCalledTimes(2);
 	});
 });
+
+it('captures loaded staking contracts for the CSV without extra reads', async () => {
+	const stakingContracts = new Map([['B', '9007199254740993']]);
+	const { run, deps } = setup([page('ROOT')], { stakingContracts });
+	stakingContracts.set('B', '99');
+	const result = await run.start();
+	expect(result.stakingContracts).toEqual(new Map([['B', '9007199254740993']]));
+	expect(deps.bootstrap).toHaveBeenCalledTimes(1);
+	expect(deps.readPage).toHaveBeenCalledTimes(1);
+	expect(deps.readAsset).not.toHaveBeenCalled();
+});

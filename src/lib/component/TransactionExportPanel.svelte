@@ -8,6 +8,7 @@
 		type ActivityType,
 		type ExportOptions
 	} from '$lib/wallet/transactionExport';
+	import { buildStakingContractMap, type StakingContract } from '$lib/wallet/stakingContracts';
 	import { exportFilename, serializeCsv } from '$lib/wallet/transactionCsv';
 	import {
 		createExportRun,
@@ -22,11 +23,15 @@
 		pageAddress,
 		suggestions,
 		suggestionsAvailable,
+		stakingContracts,
+		stakingContractsAvailable,
 		onclose
 	}: {
 		pageAddress: string;
 		suggestions: { address: string; label?: string }[];
 		suggestionsAvailable: boolean;
+		stakingContracts: StakingContract[];
+		stakingContractsAvailable: boolean;
 		onclose: () => void;
 	} = $props();
 	const today = () => new Date().toISOString().slice(0, 10);
@@ -161,6 +166,7 @@
 		run = createExportRun(options, {
 			...createIndexerReader(),
 			rewardSenders: new Set(REWARDS_ADDRESSES),
+			stakingContracts: buildStakingContractMap(stakingContracts, stakingContractsAvailable),
 			onProgress: (value) => {
 				if (generation === current) pendingProgress = value;
 			}
@@ -312,9 +318,17 @@
 				<p id="export-types-help" class="text-sm text-ink-muted">
 					Payments and asset transfers include inner transactions. Zero-amount asset transfers and
 					close-outs are included. Known reward payouts are native VOI only, classified by sender;
-					estimated rewards are excluded. Staking labels are unavailable. Type filters do not reduce
-					scanning time.
+					estimated rewards are excluded. The Staking contract column marks transfers to and from
+					the staking contracts this wallet owns now, as this site knows them. Contracts it owned
+					earlier are not marked unless you add their address. Type filters do not reduce scanning
+					time.
 				</p>
+				{#if !stakingContractsAvailable}
+					<InlineAlert
+						tone="warn"
+						message="Staking contracts couldn't be loaded, so the Staking contract column will be empty."
+					/>
+				{/if}
 				{#if errors.types}<p id="export-types-error" role="alert">{errors.types}</p>{/if}
 			</fieldset>
 			<fieldset disabled={locked} class="w-full min-w-0 max-w-full space-y-3">

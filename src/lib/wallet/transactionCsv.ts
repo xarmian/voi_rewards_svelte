@@ -29,7 +29,8 @@ const columns = [
 	'Asset ID',
 	'Asset unit',
 	'Asset name',
-	'Asset decimals'
+	'Asset decimals',
+	'Staking contract'
 ];
 export function protectText(value: string): string {
 	let first = '';
@@ -53,6 +54,7 @@ function numeric(value: bigint, decimals = 0): string {
 	return formatUnits(value, decimals);
 }
 interface Context {
+	stakingContracts: ReadonlyMap<string, string>;
 	assets: ReadonlyMap<bigint, AssetMetadata>;
 	snapshotRound: bigint;
 	status: ExportStatus;
@@ -75,6 +77,14 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 				typeof metadata.name !== 'string')
 		)
 			throw new Error(`Asset ${row.assetId} metadata is missing or invalid.`);
+		const stakingIds = [
+			...new Set(
+				[row.from, row.to].flatMap((address) => {
+					const id = context.stakingContracts.get(address);
+					return id === undefined ? [] : [BigInt(id)];
+				})
+			)
+		].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 		return [
 			protectText(new Date(row.timestamp * 1000).toISOString()),
 			protectText(row.account),
@@ -97,7 +107,8 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 			row.assetId === null ? '' : numeric(row.assetId),
 			protectText(metadata?.unitName ?? 'VOI'),
 			protectText(metadata?.name ?? 'VOI (native)'),
-			String(metadata?.decimals ?? 6)
+			String(metadata?.decimals ?? 6),
+			stakingIds.map((id) => numeric(id)).join(' ')
 		];
 	});
 	return [columns, ...records].map((record) => record.map(csvCell).join(',') + '\r\n').join('');

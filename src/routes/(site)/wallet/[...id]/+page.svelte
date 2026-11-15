@@ -36,6 +36,7 @@
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
 	import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
+	import { buildStakingContractMap } from '$lib/wallet/stakingContracts';
 	import TransactionExportPanel from '$lib/component/TransactionExportPanel.svelte';
 
 	let {
@@ -118,6 +119,19 @@
 			).values()
 		];
 	});
+	const exportStakingContracts = $derived(
+		[
+			...buildStakingContractMap([
+				...viewContracts,
+				...(contractsMatch ? (contractsSnapshot?.contracts ?? []) : [])
+			])
+		].map(([address, contractId]) => ({ address, contractId }))
+	);
+	const stakingContractsAvailable = $derived(
+		ownerLookup === 'ok' &&
+			(knownContractSet === 'ready' ||
+				(contractsMatch && contractsSnapshot?.contractSet === 'ready'))
+	);
 	const exportSuggestionsAvailable = $derived(
 		ownerLookup === 'ok' &&
 			(!!parentWalletId ||
@@ -548,6 +562,8 @@
 						pageAddress={walletId}
 						suggestions={exportSuggestions}
 						suggestionsAvailable={exportSuggestionsAvailable}
+						stakingContracts={exportStakingContracts}
+						{stakingContractsAvailable}
 						onclose={closeExport}
 					/>
 				{/if}
