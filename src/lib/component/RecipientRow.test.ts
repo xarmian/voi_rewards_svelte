@@ -17,3 +17,45 @@ test('RecipientRow still renders the amount from recipient.amount and writes it 
 	expect(source).toMatch(/value=\{\s*recipient\.amount\s*\}/);
 	expect(source).toMatch(/on:input=\{\s*handleAmountChange\s*\}/);
 });
+
+test('Max visibility compares exact base units and fills the original max string', async () => {
+	const { createContext, runInContext } = await import('node:vm');
+	const { decimalToBaseUnits } = await import('../chain/baseUnits');
+	const ts = await import('typescript');
+	const fn = source.match(/\tfunction isBelowMax\([\s\S]*?\n\t\}/)?.[0] || '';
+	const condition = source.match(
+		/\{#if ([^\n]+)\}\s*<button\s*type="button"\s*class="hidden sm:absolute/
+	)?.[1];
+	expect(condition).toBeDefined();
+	const maxAmount = '1.152921504606846976';
+	const context = createContext({
+		decimalToBaseUnits,
+		maxAmount,
+		decimals: 18,
+		recipient: { amount: '' },
+		index: 0,
+		onAmountChange: (_: number, amount: string) => {
+			expect(amount).toBe(maxAmount);
+		}
+	});
+	runInContext(
+		ts.transpileModule(fn, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText,
+		context
+	);
+	for (const [amount, visible] of [
+		['', true],
+		['bad', true],
+		['1.152921504606846975', true],
+		[maxAmount, false],
+		['1.152921504606846977', false]
+	] as const) {
+		context.recipient.amount = amount;
+		expect(runInContext(condition!, context), amount).toBe(visible);
+	}
+	const fill = source.match(
+		/on:click=\{\(\) => \{\s*(recipient.amount = maxAmount[\s\S]*?)\}\}/
+	)?.[1];
+	expect(fill).toBeDefined();
+	runInContext(fill!, context);
+	expect(context.recipient.amount).toBe(maxAmount);
+});

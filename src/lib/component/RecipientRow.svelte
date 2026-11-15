@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { decimalToBaseUnits } from '$lib/chain/baseUnits';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import {
 		loadRecipientInfo,
@@ -29,7 +30,8 @@
 				name: string;
 				id?: undefined;
 		  };
-	export let maxAmount: number;
+	export let maxAmount: string;
+	export let decimals: number;
 	export let onRemove: (index: number) => void;
 	export let onAmountChange: (index: number, amount: string) => void;
 	export let onNoteChange: (index: number, note: string) => void;
@@ -52,6 +54,14 @@
 	let noteButtonRef: HTMLElement;
 	// Reference to the note input element
 	let noteInputRef: HTMLInputElement;
+
+	function isBelowMax(amount: string, max: string, decimals: number): boolean {
+		try {
+			return decimalToBaseUnits(amount, decimals) < decimalToBaseUnits(max, decimals);
+		} catch {
+			return true;
+		}
+	}
 
 	// Helper functions
 	function enforceDecimals(value: string | number, decimals: number): string {
@@ -391,13 +401,13 @@
 							placeholder={`${selectedToken.symbol}`}
 							on:input={handleAmountChange}
 						/>
-						{#if !recipient.amount || Number(recipient.amount) < maxAmount}
+						{#if isBelowMax(recipient.amount, maxAmount, decimals)}
 							<button
 								type="button"
 								class="hidden sm:absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded"
 								on:click={() => {
-									recipient.amount = maxAmount.toString();
-									onAmountChange(index, maxAmount.toString());
+									recipient.amount = maxAmount;
+									onAmountChange(index, maxAmount);
 								}}
 							>
 								MAX

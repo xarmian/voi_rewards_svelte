@@ -1,4 +1,6 @@
 import algosdk from 'algosdk';
+import { decimalToBaseUnits } from '$lib/chain/baseUnits';
+import { baseUnitsToDecimal } from '$lib/chain/sendAmounts';
 import type { Recipient } from '$lib/types/recipients';
 
 export const zeroAddress = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
@@ -36,37 +38,35 @@ export function filterHolders<T extends HolderBalance>(
 
 export type HolderDistributionType = 'equal' | 'proportional' | 'per-holder';
 
-// Who is paid and how much, from the holders that passed filterHolders. Moved unchanged from the
-// import modal so the step between the holder list and the sent transactions can be pinned.
+// Who is paid and how much, from the holders that passed filterHolders.
 export function buildHolderRecipients(
 	validHolders: HolderBalance[],
 	distributionType: HolderDistributionType,
 	amountValue: string
 ): Recipient[] {
-	// Calculate total tokens for proportional distribution if needed
-	let totalTokenAmount = 0;
+	let totalBalance = 0n;
+	let poolUnits = 0n;
 
 	if (distributionType === 'proportional') {
-		// Sum all balances for proportional distribution
-		totalTokenAmount = validHolders.reduce((sum: number, holder) => {
-			const balance = Number(holder.balance) / Math.pow(10, holder.decimals);
-			return sum + balance;
-		}, 0);
+		totalBalance = validHolders.reduce((sum, holder) => sum + BigInt(holder.balance ?? '0'), 0n);
+		try {
+			poolUnits = decimalToBaseUnits(amountValue, 8);
+		} catch {
+			// Leave amounts blank when the pool is not a valid decimal.
+		}
 	}
 
 	const recipients: Recipient[] = [];
 
 	validHolders.forEach((holder) => {
 		let amount = '';
-		const holderBalance = Number(holder.balance) / Math.pow(10, holder.decimals);
 
 		if (distributionType !== 'equal') {
 			if (distributionType === 'per-holder') {
 				amount = String(amountValue);
-			} else if (distributionType === 'proportional' && totalTokenAmount > 0) {
-				// Calculate proportional amount based on holder's percentage of total
-				const percentage = holderBalance / totalTokenAmount;
-				amount = (Number(amountValue) * percentage).toFixed(8);
+			} else if (distributionType === 'proportional' && totalBalance > 0n) {
+				const share = (poolUnits * BigInt(holder.balance ?? '0')) / totalBalance;
+				amount = share === 0n ? '' : baseUnitsToDecimal(share, 8);
 			}
 		} else {
 			// Equal distribution (amount will be calculated by the recipient table)

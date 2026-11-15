@@ -12,7 +12,7 @@ const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url),
 
 // Vitest uses Node without a DOM renderer. Exercise the actual component functions in isolation.
 function componentFunctions(names: string[], globals: Record<string, unknown>) {
-	const script = names
+	const script = [...new Set([...names, 'getExactBalance'])]
 		.map((name) => {
 			const match = source.match(
 				new RegExp(`\\t(?:async )?function ${name}\\([\\s\\S]*?\\n\\t\\}`)
@@ -339,4 +339,196 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 			flow.dispose();
 		}
 	}
+});
+
+// Read the actual reactive assignments as well as event handlers, so display and send agree.
+async function amountHarness(
+	amounts: string[],
+	decimals: number,
+	balance: number,
+	balanceRaw?: string
+) {
+	const helpers = await import('../chain/sendAmounts');
+	const names = [
+		'enforceDecimals',
+		'withinBalance',
+		'setAmountForAllRecipients',
+		'distributeAmount',
+		'getExactBalance',
+		'formatMaxAmount',
+		'displayTotal'
+	];
+	const run = componentFunctions(
+		names.filter((name) => source.includes(`function ${name}(`)),
+		{
+			...helpers,
+			decimalToBaseUnits,
+			exactBalance,
+			sumBaseUnits,
+			selectedToken: { decimals, balance, balanceRaw },
+			recipients: amounts.map((amount) => ({ amount })),
+			amountToDistribute: '',
+			showAmountMenu: true
+		}
+	);
+	const update = () => {
+		for (const name of [
+			'balanceUnits',
+			'maxAmountString',
+			'maxAmount',
+			'totalAmount',
+			'isValidAmount',
+			'evenShare',
+			'distributionFitsBalance',
+			'canSplitEvenly',
+			'canMaxEach',
+			'totalRequiredForMax'
+		]) {
+			const assignment = source.match(new RegExp(`\\$:\\s*${name} =\\s*[\\s\\S]*?;`));
+			if (assignment) run(assignment[0].replace('$:', ''));
+		}
+	};
+	update();
+	return { run, update };
+}
+
+test('Max at 2 ** 60 base units equals the held balance and passes the send gate', async () => {
+	const { run } = await amountHarness([''], 18, 2 ** 60);
+	expect(String(run('maxAmount'))).toBe('1.152921504606846976');
+	run('recipients[0].amount = String(maxAmount)');
+	expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
+});
+
+test('even split refuses sub-base-unit shares and never fills exponent strings', async () => {
+	const { run, update } = await amountHarness(['', '', ''], 7, 100);
+	run('amountToDistribute = "0.0000001"');
+	update();
+	expect(run('canSplitEvenly')).toBe(false);
+	run('distributeAmount("even")');
+	expect(run('recipients.map(r => r.amount)')).toEqual(['', '', '']);
+	run('amountToDistribute = "0.0000003"');
+	update();
+	expect(run('canSplitEvenly')).toBe(true);
+	run('distributeAmount("even")');
+	expect(run('recipients.map(r => r.amount)')).toEqual(Array(3).fill('0.0000001'));
+});
+
+test('totals are exact and invalid rows display an em dash', async () => {
+	const { run, update } = await amountHarness(['0.1', '0.2'], 18, 2 ** 60);
+	expect(run('totalAmount')).toBe('0.3');
+	run('recipients[1].amount = "1e3"');
+	update();
+	expect(run('totalAmount')).toBe('—');
+});
+
+test('distribution input writes truncated decimals back even when the stored amount is unchanged', () => {
+	const input = { value: '0.1234567' };
+	const run = componentFunctions(['handleDistributeInput', 'enforceDecimals'], {
+		input,
+		selectedToken: { decimals: 6 },
+		amountToDistribute: '0.123456'
+	});
+	run('handleDistributeInput(input)');
+	expect(run('amountToDistribute')).toBe('0.123456');
+	expect(input.value).toBe('0.123456');
+});
+
+test('distribution checks and required total use the same balance as send', async () => {
+	const { run, update } = await amountHarness(['', '', ''], 18, 2 ** 60);
+	run('amountToDistribute = "0.1"');
+	update();
+	expect(run('canMaxEach')).toBe(true);
+	expect(run('totalRequiredForMax')).toBe('0.3');
+	run('amountToDistribute = "1.152921504606847"');
+	update();
+	expect(run('canSplitEvenly')).toBe(false);
+	expect(run('canMaxEach')).toBe(false);
+	run('amountToDistribute = "1.152921504606846976"');
+	update();
+	expect(run('canSplitEvenly')).toBe(true);
+});
+
+test('duplicate recipients combine through exact amount arithmetic', async () => {
+	const helpers = await import('../chain/sendAmounts');
+	const run = componentFunctions(['combineRecipients', 'enforceDecimals'], {
+		...helpers,
+		decimalToBaseUnits,
+		selectedToken: { decimals: 18 },
+		recipients: [
+			{ address: 'ADDR', amount: '0.1' },
+			{ address: 'ADDR', amount: '0.2' }
+		],
+		syncLookupBanner: () => {}
+	});
+	run('combineRecipients("sum")');
+	expect(run('recipients.map(r => r.amount)')).toEqual(['0.3']);
+});
+
+test('confirmed total uses sent token precision, confirmed groups only, and invalid fallback', async () => {
+	const helpers = await import('../chain/sendAmounts');
+	const run = componentFunctions(['displayTotal', 'enforceDecimals'], {
+		...helpers,
+		sumBaseUnits,
+		groupOutcomes: [{ status: 'confirmed' }, { status: 'pending' }, { status: 'confirmed' }],
+		recipientsByGroup: [
+			[{ amount: '0.1' }],
+			[{ amount: '99' }],
+			[{ amount: '0.200000000000000001' }]
+		],
+		sentToken: { decimals: 18 },
+		selectedToken: { decimals: 6 }
+	});
+	const assignment = source.match(/\$:\s*confirmedTotal =\s*[\s\S]*?;/)![0].replace('$:', '');
+	run(assignment);
+	expect(run('confirmedTotal')).toBe('0.300000000000000001');
+	run('recipientsByGroup[2][0].amount = "bad"');
+	run(assignment);
+	expect(run('confirmedTotal')).toBe('—');
+	run('recipientsByGroup[2][0].amount = "0.2000009"; sentToken = null');
+	run(assignment);
+	expect(run('confirmedTotal')).toBe('0.3');
+});
+
+test.each([
+	['1.', 6],
+	['12', 0]
+] as const)('distribution input %j at %i decimals is not written back', (value, decimals) => {
+	const setter = vi.fn();
+	const input = {
+		get value() {
+			return value;
+		},
+		set value(next: string) {
+			setter(next);
+		}
+	};
+	const run = componentFunctions(['handleDistributeInput', 'enforceDecimals'], {
+		input,
+		selectedToken: { decimals },
+		amountToDistribute: ''
+	});
+	run('handleDistributeInput(input)');
+	expect(input.value).toBe(value);
+	expect(setter).not.toHaveBeenCalled();
+});
+
+test.each([NaN, Infinity, -1])(
+	'invalid balance %s becomes zero without breaking Max',
+	async (balance) => {
+		const { run } = await amountHarness([''], 6, balance);
+		expect(run('balanceUnits')).toBe(0n);
+		expect(run('maxAmountString')).toBe('0');
+	}
+);
+
+test('Max reads the exact balance string when the token carries one', async () => {
+	// The number can only hold 9007199254740992; the raw string is the true balance.
+	const { run } = await amountHarness([''], 0, 2 ** 53, '9007199254740993');
+	expect(run('balanceUnits')).toBe(9007199254740993n);
+	expect(run('maxAmountString')).toBe('9007199254740993');
+});
+
+test('non-integer token decimals do not break Max', async () => {
+	const { run } = await amountHarness([''], 1.5, 5);
+	expect(run('maxAmountString')).toBe('0');
 });
