@@ -84,9 +84,9 @@ describe('ARC-200 proportional holder amounts', () => {
 		},
 		{
 			name: 'handles balances above the safe integer limit exactly',
-			pool: '1',
-			balances: ['9007199254740993', '9007199254740993'],
-			expected: ['0.5', '0.5']
+			pool: '90071992547409.94',
+			balances: ['9007199254740993', '1'],
+			expected: ['90071992547409.93', '0.01']
 		},
 		{
 			name: 'leaves amounts blank when the total balance is zero',
