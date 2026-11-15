@@ -92,6 +92,74 @@ it('server-renders the complete Overview skeleton without claiming zero balances
 	expect(html).not.toContain('0 VOI');
 });
 
+it('renders chart, Holdings, Lock contracts, and Next unlocks in DOM order', () => {
+	const summary = summarizeWallet({
+		owner: null,
+		contracts: [],
+		current: null,
+		history: [],
+		state: 'loading',
+		now: 0
+	});
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts: [],
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now: 0
+		}
+	}).body;
+	const chart = html.indexOf('Blocks vs expected');
+	const holdings = html.indexOf('Holdings');
+	const contracts = html.indexOf('Lock contracts');
+	const unlocks = html.indexOf('Next unlocks');
+	expect(chart).toBeGreaterThanOrEqual(0);
+	expect(chart).toBeLessThan(holdings);
+	expect(holdings).toBeLessThan(contracts);
+	expect(contracts).toBeLessThan(unlocks);
+});
+
+it.each([
+	[1, '1 contract not staking'],
+	[2, '2 contracts not staking']
+])('uses the correct idle contract plural for %i idle contracts', (idleCount, title) => {
+	const contracts: WalletContract[] = Array.from({ length: idleCount }, (_, i) => ({
+		address: `IDLE${i}`,
+		contractId: i + 1,
+		balance: 5000,
+		minBalance: 0.1,
+		isParticipating: false,
+		round: 0,
+		voteLastValid: null,
+		lastVoteAt: null,
+		lastBlock: null,
+		details: null
+	}));
+	const summary = summarizeWallet({
+		owner: null,
+		contracts,
+		current: null,
+		history: [],
+		state: 'ready',
+		now: 0
+	});
+	expect(summary.idleCount).toBe(idleCount);
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now: 0
+		}
+	}).body;
+	expect(html).toContain(title);
+	expect(html).not.toContain('1 contracts not staking');
+});
+
 it.each([
 	['OWNER', true],
 	['OTHER', false]
@@ -179,7 +247,7 @@ it.each([
 		}
 	}).body;
 	const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
-	expect(text).toContain('1 contracts not staking');
+	expect(text).toContain('1 contract not staking');
 	expect(text).toContain('VOI idle');
 	expect(text.includes('register a key in Contracts to earn')).toBe(hint);
 });

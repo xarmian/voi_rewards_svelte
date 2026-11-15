@@ -132,7 +132,7 @@
 						/>
 						<HealthItem
 							tone={summary.idleCount ? 'warn' : 'ok'}
-							title={`${comma(summary.idleCount)} contracts not staking`}
+							title={`${comma(summary.idleCount)} ${summary.idleCount === 1 ? 'contract' : 'contracts'} not staking`}
 							detail={`${compact(summary.idleBalance, 1)} VOI idle${summary.idleCount && accountState.state === 'yours' ? ' · register a key in Contracts to earn' : ''}${summary.emptyContracts > 0 ? ` · ${comma(summary.emptyContracts)} empty ${summary.emptyContracts === 1 ? 'contract' : 'contracts'} not shown` : ''}`}
 						/>
 					</ul>
@@ -276,63 +276,6 @@
 			{#snippet children(ctx)}<BarsVsExpected {ctx} {bars} />{/snippet}
 		</ChartFrame>
 	</div>
-	<Card title="Next unlocks" span={{ lg: 4 }}>
-		{#if loading}{@render skeleton('next unlocks')}
-		{:else if failed || !summary.contractsReady}<InlineAlert
-				message="Unlock schedules unavailable."
-				onretry={failed || stakingUnavailable ? onrefresh : undefined}
-			/>
-		{:else}
-			{#if summary.unlocks.length}
-				<ol class="space-y-3">
-					{#each summary.unlocks as unlock (unlock.date)}
-						<li
-							class="flex flex-wrap items-center justify-between gap-2 rounded-ds-sm border border-line bg-surface-2 p-3"
-						>
-							<div>
-								<time class="font-bold" datetime={unlock.date}>{date(unlock.date)}</time>
-								<p class="text-label text-ink-muted">
-									{unlock.count}
-									{unlock.count === 1 ? 'contract' : 'contracts'}
-								</p>
-							</div>
-							<strong class="text-accent">+{compact(unlock.amount, 1)} VOI</strong>
-						</li>
-					{/each}
-				</ol>
-			{:else}<p class="text-sm text-ink-muted">No upcoming unlocks.</p>{/if}
-			<div class="mt-4 space-y-3">
-				{#each summary.lockedByYear as year (year.year)}
-					<div>
-						<dl class="flex flex-wrap justify-between gap-2 text-label">
-							<dt>Locked · vesting-start year {year.year}</dt>
-							<dd>{compact(year.amount)} VOI</dd>
-						</dl>
-						<div aria-hidden="true" class="mt-1 h-2 rounded-full bg-grid">
-							<div
-								class="h-full rounded-full bg-bar"
-								style:width={`${(year.amount / maxYear) * 100}%`}
-							></div>
-						</div>
-					</div>
-				{/each}
-			</div>
-			<p class="mt-4 text-label">
-				Withdrawable now: <strong>{compact(summary.withdrawable, 1)} VOI</strong>
-			</p>
-		{/if}
-	</Card>
-	<div class="min-w-0 lg:col-span-8">
-		<WalletContracts
-			{contracts}
-			{current}
-			{pageAddress}
-			{accountState}
-			state={loading ? 'loading' : stakingUnavailable ? 'error' : summary.state}
-			{asOf}
-			{onrefresh}
-		/>
-	</div>
 	<Card title="Holdings" span={{ lg: 4 }}>
 		{#if loading}{@render skeleton('holdings')}
 		{:else if failed || holdings.state === 'error'}<InlineAlert
@@ -378,5 +321,62 @@
 		{/if}
 		<a href="#holdings" class="mt-4 inline-block font-bold text-accent underline">View holdings →</a
 		>
+	</Card>
+	<div class="min-w-0 lg:col-span-8">
+		<WalletContracts
+			{contracts}
+			{current}
+			{pageAddress}
+			{accountState}
+			state={loading ? 'loading' : stakingUnavailable ? 'error' : summary.state}
+			{asOf}
+			{onrefresh}
+		/>
+	</div>
+	<Card title="Next unlocks" span={{ lg: 4 }}>
+		{#if loading}{@render skeleton('next unlocks')}
+		{:else if failed || !summary.contractsReady}<InlineAlert
+				message="Unlock schedules unavailable."
+				onretry={failed || stakingUnavailable ? onrefresh : undefined}
+			/>
+		{:else}
+			{#if summary.unlocks.length}
+				<ol class="space-y-3">
+					{#each summary.unlocks as unlock (unlock.date)}
+						<li
+							class="flex flex-wrap items-center justify-between gap-2 rounded-ds-sm border border-line bg-surface-2 p-3"
+						>
+							<div>
+								<time class="font-bold" datetime={unlock.date}>{date(unlock.date)}</time>
+								<p class="text-label text-ink-muted">
+									{unlock.count}
+									{unlock.count === 1 ? 'contract' : 'contracts'}
+								</p>
+							</div>
+							<strong class="text-accent">+{compact(unlock.amount, 1)} VOI</strong>
+						</li>
+					{/each}
+				</ol>
+			{:else}<p class="text-sm text-ink-muted">No upcoming unlocks.</p>{/if}
+			<div class="mt-4 space-y-3">
+				{#each summary.lockedByYear as year (year.year)}
+					<div>
+						<dl class="flex flex-wrap justify-between gap-2 text-label">
+							<dt>Locked · vesting-start year {year.year}</dt>
+							<dd>{compact(year.amount)} VOI</dd>
+						</dl>
+						<div aria-hidden="true" class="mt-1 h-2 rounded-full bg-grid">
+							<div
+								class="h-full rounded-full bg-bar"
+								style:width={`${(year.amount / maxYear) * 100}%`}
+							></div>
+						</div>
+					</div>
+				{/each}
+			</div>
+			<p class="mt-4 text-label">
+				Withdrawable now: <strong>{compact(summary.withdrawable, 1)} VOI</strong>
+			</p>
+		{/if}
 	</Card>
 </div>
