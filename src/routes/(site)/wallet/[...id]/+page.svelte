@@ -521,25 +521,27 @@
 							<time datetime={snapshot.asOf}>{new Date(snapshot.asOf).toUTCString()}</time
 							>{:else}Wallet data loads in your browser.{/if}
 					</p>
-					<Button
-						id="voi-activity-export-entry"
-						variant="soft"
-						size="sm"
-						aria-expanded={exportOpen}
-						aria-controls="voi-activity-export"
-						onclick={() => {
-							if (exportOpen) closeExport();
-							else exportAddress = walletId;
-						}}>Export VOI activity</Button
-					>
-					<Button
-						variant="soft"
-						size="sm"
-						onclick={refresh}
-						disabled={tabs.current === 'contracts'
-							? contractsLoadState === 'loading'
-							: loadState === 'loading'}>Refresh wallet data</Button
-					>
+					<div class="flex flex-wrap gap-2">
+						<Button
+							id="voi-activity-export-entry"
+							variant="soft"
+							size="sm"
+							aria-expanded={exportOpen}
+							aria-controls="voi-activity-export"
+							onclick={() => {
+								if (exportOpen) closeExport();
+								else exportAddress = walletId;
+							}}>Export VOI activity</Button
+						>
+						<Button
+							variant="soft"
+							size="sm"
+							onclick={refresh}
+							disabled={tabs.current === 'contracts'
+								? contractsLoadState === 'loading'
+								: loadState === 'loading'}>Refresh wallet data</Button
+						>
+					</div>
 				</div>
 				{#if exportOpen}
 					<TransactionExportPanel
