@@ -81,7 +81,7 @@ export function validateMimirParams(
 		? {
 				p_user: parseAddress,
 				p_limit: mimirSchemas.get_arc200_transfers.p_limit,
-				p_offset: mimirSchemas.get_arc200_transfers.p_offset,
+				p_offset: (value: string) => parseInteger(value, 0, 0),
 				p_min_round: (value: string) => parseInteger(value, 1),
 				p_max_round: (value: string) => parseInteger(value, 1)
 			}

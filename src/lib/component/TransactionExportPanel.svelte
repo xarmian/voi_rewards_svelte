@@ -80,6 +80,7 @@
 	let objectUrl: string | undefined;
 	let revokeTimer: ReturnType<typeof setTimeout> | undefined;
 	const locked = $derived(busy || result !== null);
+	const arcRequested = $derived(assetMode === 'all' && types.includes('asset-transfer'));
 	const range = $derived(
 		frozen?.allDates
 			? 'All indexed dates (UTC)'
@@ -383,7 +384,9 @@
 					omits an offset.
 				</p>
 			</div>
-			<InlineAlert tone="warn" message={ARC200_SOURCE_WARNING} />
+			{#if arcRequested && !result}
+				<InlineAlert tone="warn" message={ARC200_SOURCE_WARNING} />
+			{/if}
 			<div aria-busy={busy} class="space-y-3">
 				<p aria-live="polite" aria-atomic="true" class="sr-only">{liveStatus}</p>
 				{#if busy || !result}<p>{statusText}</p>{/if}

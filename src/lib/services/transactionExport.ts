@@ -489,7 +489,10 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 		}
 		controller.signal.throwIfAborted();
 	}
-	async function request<T>(read: (signal: AbortSignal) => Promise<T>): Promise<T> {
+	async function request<T>(
+		read: (signal: AbortSignal) => Promise<T>,
+		{ retrySyntaxError = true } = {}
+	): Promise<T> {
 		// A deadline can win the race before the transport acknowledges its abort.
 		if (pendingRead) {
 			const signal = controller.signal;
@@ -546,7 +549,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				const transient =
 					!(
 						error instanceof SchemaError ||
-						error instanceof SyntaxError ||
+						(!retrySyntaxError && error instanceof SyntaxError) ||
 						error instanceof DeadlineError
 					) &&
 					(httpStatus === undefined || httpStatus === 429 || httpStatus >= 500);
@@ -716,7 +719,9 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 					const address = options.addresses[arcAccountIndex];
 					const query = { address, minRound: windowLower, maxRound: upperRound };
 					progress();
-					const raw = await request((signal) => deps.readArc200Page(query, signal));
+					const raw = await request((signal) => deps.readArc200Page(query, signal), {
+						retrySyntaxError: false
+					});
 					const page = schema(() => normalizeArc200Page(raw, query, isValidAddress));
 					dataResponses++;
 					arc200Scanned += page.length;
@@ -747,7 +752,9 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 						resolvingAssetId = id;
 						progress();
 						try {
-							const raw = await request((signal) => deps.readArc200Metadata(id, signal));
+							const raw = await request((signal) => deps.readArc200Metadata(id, signal), {
+								retrySyntaxError: false
+							});
 							controller.signal.throwIfAborted();
 							arc200Assets.set(
 								id,
