@@ -531,7 +531,7 @@
 							onclick={() => {
 								if (exportOpen) closeExport();
 								else exportAddress = walletId;
-							}}>Export VOI activity</Button
+							}}>Export wallet activity</Button
 						>
 						<Button
 							variant="soft"
