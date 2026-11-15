@@ -840,19 +840,6 @@
 			} else {
 				// Handle non-ARC200 tokens (native VOI and VSA)
 				const suggestedParams = await algodClient.getTransactionParams().do();
-				if (isNativeToken(token)) {
-					const minFee = BigInt(suggestedParams.minFee ?? MIN_TXN_FEE);
-					const fee = suggestedParams.flatFee ? BigInt(suggestedParams.fee ?? 0) : MIN_TXN_FEE;
-					const feePerTxn = fee > minFee ? fee : minFee;
-					const payments = sendRecipients.filter((r) => r.address && r.amount);
-					const total = sumBaseUnits(
-						payments.map((r) => r.amount),
-						token.decimals
-					);
-					if (total > getSpendableBalance(token, payments.length, feePerTxn)) {
-						throw new Error('Total plus network fees exceeds your available VOI balance');
-					}
-				}
 				let currentGroup: algosdk.Transaction[] = [];
 				let currentRecipients: Recipient[] = [];
 
@@ -898,6 +885,25 @@
 				if (currentGroup.length > 0) {
 					transactionGroups.push(algosdk.assignGroupID(currentGroup));
 					recipientsByGroup.push(currentRecipients);
+				}
+			}
+
+			if (isNativeToken(token)) {
+				const info = await requireAccountInfo(sender, { force: true });
+				if (controller.signal.aborted) return;
+				const available = spendableNative(
+					BigInt(String(info.amount)),
+					BigInt(String(info.minBalance)),
+					0n,
+					0
+				);
+				const total = sumBaseUnits(
+					sendRecipients.map((r) => r.amount),
+					token.decimals
+				);
+				const fees = transactionGroups.flat().reduce((sum, txn) => sum + BigInt(txn.fee), 0n);
+				if (total + fees > available) {
+					throw new Error('Total plus network fees exceeds your available VOI balance');
 				}
 			}
 
@@ -1145,7 +1151,12 @@
 	function syncTokenProp(nextToken: SendToken) {
 		if (isSending) return;
 		const previousKey = tokenKey(selectedToken);
-		selectedToken = nextToken;
+		selectedToken = isNativeToken(nextToken)
+			? {
+					...nextToken,
+					minBalanceRaw: nextToken.minBalanceRaw ?? nativeVoiToken.minBalanceRaw
+				}
+			: nextToken;
 		if (tokenKey(selectedToken) !== previousKey) void recheckRecipients();
 	}
 

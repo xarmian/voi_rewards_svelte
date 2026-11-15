@@ -8,6 +8,7 @@ import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate'
 import { decimalToBaseUnits, exactBalance, sumBaseUnits } from '$lib/chain/baseUnits';
 import * as sendAmounts from '$lib/chain/sendAmounts';
 import { createFlowPin } from '$lib/chain/flowAccount';
+import { tokenKey } from '$lib/chain/recipientInfo';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
 
@@ -288,6 +289,7 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 					buildCombinedPayment: combined,
 					signTransactions,
 					sendGroups,
+					requireAccountInfo: vi.fn().mockResolvedValue({ amount: 2000000n, minBalance: 100000n }),
 					algosdk,
 					decimalToBaseUnits,
 					sumBaseUnits,
@@ -552,6 +554,30 @@ test('native Max and the send gate reserve the minimum balance and one fee', asy
 	expect(run('withinBalance(recipients, selectedToken)')).toBe(false);
 });
 
+test('native Max reserves the minimum balance for an account with opt-ins', async () => {
+	const { run } = await amountHarness([''], 6, 5_000_000, '5000000', true, '400000');
+	expect(run('maxAmount')).toBe('4.599');
+	run('recipients[0].amount = maxAmount');
+	expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
+	run('recipients[0].amount = "4.599001"');
+	expect(run('withinBalance(recipients, selectedToken)')).toBe(false);
+});
+
+test.each(['syncTokenProp', 'handleTokenChange'])(
+	'%s preserves the known native minimum balance',
+	(handler) => {
+		const run = componentFunctions([handler], {
+			tokenKey,
+			isSending: false,
+			selectedToken: { type: 'vsa', id: '1' },
+			nativeVoiToken: { balance: 5000000, balanceRaw: '5000000', minBalanceRaw: '400000' },
+			recheckRecipients: vi.fn()
+		});
+		run(`${handler}({ type: 'native', decimals: 6, balance: 5000000 })`);
+		expect(run('selectedToken.minBalanceRaw')).toBe('400000');
+	}
+);
+
 test('native Max and distribution limits update with the number of rows', async () => {
 	const { run, update } = await amountHarness([''], 6, 5_000_000, '5000000', true, '100000');
 	run('recipients.push({ amount: "" }, { amount: "" }); amountToDistribute = "4.898"');
@@ -584,73 +610,155 @@ test('non-native Max keeps the full token balance', async () => {
 	expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
 });
 
+function nativeSendHarness(
+	amount: string,
+	params = suggestedParams,
+	requireAccountInfo = vi.fn().mockResolvedValue({ amount: 5000000n, minBalance: 100000n })
+) {
+	const payment = vi.fn(buildPayment);
+	const signTransactions = vi.fn().mockResolvedValue([new Uint8Array([1])]);
+	const sendGroups = vi.fn().mockResolvedValue(undefined);
+	const wallet = selectedWalletGlobals();
+	const run = componentFunctions(['handleSend', 'withinBalance', 'buildVOITransaction'], {
+		...wallet,
+		Error,
+		requireAccountInfo,
+		algosdk,
+		decimalToBaseUnits,
+		sumBaseUnits,
+		buildPayment: payment,
+		signTransactions,
+		sendGroups,
+		algodClient: {
+			getTransactionParams: () => ({
+				do: async () => ({ ...params })
+			})
+		},
+		selectedToken: {
+			type: 'native',
+			decimals: 6,
+			symbol: 'VOI',
+			balance: 5_000_000,
+			balanceRaw: '5000000',
+			minBalanceRaw: '100000'
+		},
+		recipients: [{ address: wallet.accountAddress, amount }],
+		tracker: {},
+		isSending: false,
+		txState: 'idle',
+		error: null,
+		pinTick: 0,
+		pendingController: undefined,
+		AbortController,
+		isARC200Token: () => false,
+		MAX_TXN_PER_GROUP: 16,
+		MAX_GROUPS_PER_SIGNING: 16,
+		sendDeps: {},
+		createOutcomeHandler: vi.fn(),
+		recordOutcome: vi.fn()
+	});
+	return { run, payment, signTransactions, sendGroups, wallet, requireAccountInfo };
+}
+
 test.each([
 	[true, 5000, 1000, '4.899', false],
 	[true, 5000, 1000, '4.895', true],
 	[true, 1000, 1000, '4.899', true],
 	[false, 0, 5000, '4.899', false],
-	[false, 0, 1000, '4.899', true]
+	[false, 0, 1000, '4.899', true],
+	[false, 10, 1000, '4.899', false],
+	[false, 10, 1000, '4.89', true]
 ] as const)(
 	'native send with flatFee %s, fee %s, minFee %s and amount %s succeeds: %s',
 	async (flatFee, fee, minFee, amount, succeeds) => {
-		const payment = vi.fn(buildPayment);
-		const signTransactions = vi.fn().mockResolvedValue([new Uint8Array([1])]);
-		const sendGroups = vi.fn().mockResolvedValue(undefined);
-		const wallet = selectedWalletGlobals();
-		const run = componentFunctions(['handleSend', 'withinBalance', 'buildVOITransaction'], {
-			...wallet,
-			algosdk,
-			decimalToBaseUnits,
-			sumBaseUnits,
-			buildPayment: payment,
-			signTransactions,
-			sendGroups,
-			algodClient: {
-				getTransactionParams: () => ({
-					do: async () => ({ ...suggestedParams, flatFee, fee, minFee })
-				})
-			},
-			selectedToken: {
-				type: 'native',
-				decimals: 6,
-				symbol: 'VOI',
-				balance: 5_000_000,
-				balanceRaw: '5000000',
-				minBalanceRaw: '100000'
-			},
-			recipients: [{ address: wallet.accountAddress, amount }],
-			tracker: {},
-			isSending: false,
-			txState: 'idle',
-			error: null,
-			pinTick: 0,
-			pendingController: undefined,
-			AbortController,
-			isARC200Token: () => false,
-			MAX_TXN_PER_GROUP: 16,
-			MAX_GROUPS_PER_SIGNING: 16,
-			sendDeps: {},
-			createOutcomeHandler: vi.fn(),
-			recordOutcome: vi.fn()
-		});
+		const { run, payment, signTransactions, sendGroups, wallet, requireAccountInfo } =
+			nativeSendHarness(amount, { ...suggestedParams, flatFee, fee, minFee });
 		expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
 		await run('handleSend()');
 		expect(run('isSending')).toBe(false);
 		expect(run('txState')).toBe('idle');
 		if (succeeds) {
 			expect(run('error')).toBeNull();
-			expect(payment).toHaveBeenCalledExactlyOnceWith(
-				expect.objectContaining({ amount: decimalToBaseUnits(amount, 6) })
-			);
 			expect(signTransactions).toHaveBeenCalledOnce();
 			expect(sendGroups).toHaveBeenCalledOnce();
 			expect(run('showResults')).toBe(true);
 		} else {
 			expect(run('error')).toBe('Total plus network fees exceeds your available VOI balance');
-			expect(payment).not.toHaveBeenCalled();
 			expect(signTransactions).not.toHaveBeenCalled();
 			expect(sendGroups).not.toHaveBeenCalled();
 		}
+		expect(requireAccountInfo).toHaveBeenCalledExactlyOnceWith(wallet.accountAddress, {
+			force: true
+		});
+		expect(payment).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ amount: decimalToBaseUnits(amount, 6) })
+		);
 		wallet.flow.dispose();
 	}
 );
+
+test.each([
+	[5000000n, 400000n, '4.899', false],
+	[5000000n, 400000n, '4.5', true],
+	[4900000n, 100000n, '4.899', false]
+] as const)(
+	'native send rechecks current balance %s and minimum %s for amount %s: %s',
+	async (amount, minBalance, sendAmount, succeeds) => {
+		const requireAccountInfo = vi.fn().mockResolvedValue({ amount, minBalance });
+		const { run, signTransactions, sendGroups, wallet } = nativeSendHarness(
+			sendAmount,
+			suggestedParams,
+			requireAccountInfo
+		);
+		expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
+		await run('handleSend()');
+		expect(run('isSending')).toBe(false);
+		expect(run('txState')).toBe('idle');
+		if (succeeds) {
+			expect(run('error')).toBeNull();
+			expect(signTransactions).toHaveBeenCalledOnce();
+			expect(sendGroups).toHaveBeenCalledOnce();
+		} else {
+			expect(run('error')).toBe('Total plus network fees exceeds your available VOI balance');
+			expect(signTransactions).not.toHaveBeenCalled();
+			expect(sendGroups).not.toHaveBeenCalled();
+		}
+		expect(requireAccountInfo).toHaveBeenCalledExactlyOnceWith(wallet.accountAddress, {
+			force: true
+		});
+		wallet.flow.dispose();
+	}
+);
+
+test('native send stops when fresh account info cannot be fetched', async () => {
+	const requireAccountInfo = vi.fn().mockRejectedValue(new Error('Account lookup failed'));
+	const { run, signTransactions, sendGroups, wallet } = nativeSendHarness(
+		'4.5',
+		suggestedParams,
+		requireAccountInfo
+	);
+	await run('handleSend()');
+	expect(run('error')).toBe('Account lookup failed');
+	expect(signTransactions).not.toHaveBeenCalled();
+	expect(sendGroups).not.toHaveBeenCalled();
+	expect(run('isSending')).toBe(false);
+	expect(run('txState')).toBe('idle');
+	wallet.flow.dispose();
+});
+
+test('native send includes built fees from every transaction group before signing', async () => {
+	const { run, payment, signTransactions, sendGroups, wallet } = nativeSendHarness('0.285', {
+		...suggestedParams,
+		fee: 5000
+	});
+	run('recipients = Array.from({ length: 17 }, () => ({ ...recipients[0] }))');
+	expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
+	await run('handleSend()');
+	expect(payment).toHaveBeenCalledTimes(17);
+	expect(run('error')).toBe('Total plus network fees exceeds your available VOI balance');
+	expect(signTransactions).not.toHaveBeenCalled();
+	expect(sendGroups).not.toHaveBeenCalled();
+	expect(run('isSending')).toBe(false);
+	expect(run('txState')).toBe('idle');
+	wallet.flow.dispose();
+});

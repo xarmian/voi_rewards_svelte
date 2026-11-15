@@ -1,4 +1,5 @@
 import { expect, test, vi } from 'vitest';
+import { spendableNative } from '$lib/chain/sendAmounts';
 import { signingHarness } from './pageSigningHarness';
 const refusal = "This page's account isn't connected in a signing wallet. Nothing was signed.";
 const paths = [
@@ -91,7 +92,7 @@ test.each(paths)(
 		const h = signingHarness(component, name, 'Y');
 		const c = h.context;
 		c.$selectedWallet = { address: 'X', app: 'defly' };
-		const txn = { sender: 'Y', txID: () => 'tx' };
+		const txn = { sender: 'Y', fee: 1000n, txID: () => 'tx' };
 		const sign = vi.fn(async () => {
 			throw new Error('Mock signing complete');
 		});
@@ -127,6 +128,8 @@ test.each(paths)(
 		c.MIN_TXN_FEE = 1000n;
 		c.sumBaseUnits = () => 1n;
 		c.getSpendableBalance = () => 1n;
+		c.spendableNative = spendableNative;
+		c.requireAccountInfo = vi.fn().mockResolvedValue({ amount: 5000000n, minBalance: 100000n });
 		c.isARC200Token = () => false;
 		c.isNativeToken = () => true;
 		c.MAX_TXN_PER_GROUP = 16;
