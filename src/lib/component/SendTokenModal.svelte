@@ -34,7 +34,10 @@
 		isDecimalAmount,
 		splitEvenly,
 		fitsBalance,
-		multiplyDecimal
+		multiplyDecimal,
+		spendableNative,
+		MIN_TXN_FEE,
+		BASE_MIN_BALANCE
 	} from '$lib/chain/sendAmounts';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
@@ -111,6 +114,7 @@
 				decimals: number;
 				balance: number;
 				balanceRaw?: string;
+				minBalanceRaw?: string;
 				name: string;
 				id?: undefined;
 		  };
@@ -125,13 +129,15 @@
 	let notice: string | null = null;
 
 	// Create the native VOI token object with proper initialization
-	let nativeVoiToken: FungibleTokenType = {
+	let nativeVoiToken: FungibleTokenType & { minBalanceRaw?: string } = {
 		id: '0',
 		name: 'Voi',
 		symbol: 'VOI',
 		decimals: 6,
 		balance: isNativeToken(token) ? token.balance : 0,
 		balanceRaw: isNativeToken(token) ? token.balanceRaw : undefined,
+		minBalanceRaw:
+			isNativeToken(token) && 'minBalanceRaw' in token ? token.minBalanceRaw : undefined,
 		verified: true,
 		imageUrl: `https://asset-verification.nautilus.sh/icons/0.png`,
 		value: isNativeToken(token) ? token.balance / 1e6 : 0,
@@ -151,6 +157,7 @@
 						...nativeVoiToken,
 						balance: Number(info.amount),
 						balanceRaw: String(info.amount),
+						minBalanceRaw: String(info.minBalance),
 						value: Number(info.amount) / 1e6
 					};
 					// If the selected token is native VOI, update it too
@@ -158,7 +165,8 @@
 						selectedToken = {
 							...selectedToken,
 							balance: Number(info.amount),
-							balanceRaw: String(info.amount)
+							balanceRaw: String(info.amount),
+							minBalanceRaw: String(info.minBalance)
 						};
 					}
 					// Force Svelte reactivity for available tokens
@@ -192,6 +200,18 @@
 			return 0n;
 		}
 	}
+	function getSpendableBalance(
+		token: SendToken,
+		txnCount: number,
+		feePerTxn = MIN_TXN_FEE
+	): bigint {
+		const balance = getExactBalance(token);
+		if (!isNativeToken(token)) return balance;
+		const raw = 'minBalanceRaw' in token ? token.minBalanceRaw : undefined;
+		const minBalance =
+			typeof raw === 'string' && /^\d+$/.test(raw) ? BigInt(raw) : BASE_MIN_BALANCE;
+		return spendableNative(balance, minBalance, feePerTxn, Math.max(1, txnCount));
+	}
 	function formatMaxAmount(balance: bigint, decimals: number): string {
 		try {
 			return baseUnitsToDecimal(balance, decimals);
@@ -199,8 +219,8 @@
 			return '0';
 		}
 	}
-	$: balanceUnits = getExactBalance(selectedToken);
-	$: maxAmountString = formatMaxAmount(balanceUnits, selectedToken.decimals);
+	$: spendableUnits = getSpendableBalance(selectedToken, recipients.length);
+	$: maxAmountString = formatMaxAmount(spendableUnits, selectedToken.decimals);
 	$: maxAmount = maxAmountString;
 
 	let recipients: Recipient[] = [
@@ -376,7 +396,7 @@
 				rows.map((r) => r.amount),
 				token.decimals
 			);
-			return total > 0n && total <= getExactBalance(token);
+			return total > 0n && total <= getSpendableBalance(token, rows.length);
 		} catch {
 			return false;
 		}
@@ -404,7 +424,7 @@
 		amountToDistribute,
 		1,
 		selectedToken.decimals,
-		balanceUnits
+		spendableUnits
 	);
 	$: splitError = getSplitError(distributionFitsBalance, evenShare, recipients.length);
 	$: canSplitEvenly = evenShare !== null && distributionFitsBalance;
@@ -412,7 +432,7 @@
 		amountToDistribute,
 		recipients.length,
 		selectedToken.decimals,
-		balanceUnits
+		spendableUnits
 	);
 	$: totalRequiredForMax =
 		multiplyDecimal(amountToDistribute, recipients.length, selectedToken.decimals) ?? '0';
@@ -764,7 +784,9 @@
 			return;
 		}
 		if (!withinBalance(recipients, token)) {
-			error = `Total exceeds your available ${token.symbol} balance`;
+			error = isNativeToken(token)
+				? 'Total plus network fees exceeds your available VOI balance'
+				: `Total exceeds your available ${token.symbol} balance`;
 			return;
 		}
 
@@ -818,6 +840,22 @@
 			} else {
 				// Handle non-ARC200 tokens (native VOI and VSA)
 				const suggestedParams = await algodClient.getTransactionParams().do();
+				if (isNativeToken(token)) {
+					const minFee = BigInt(suggestedParams.minFee ?? MIN_TXN_FEE);
+					const fee = suggestedParams.flatFee ? BigInt(suggestedParams.fee ?? 0) : MIN_TXN_FEE;
+					const feePerTxn = fee > minFee ? fee : minFee;
+					const payments = sendRecipients.filter((r) => r.address && r.amount);
+					const total = sumBaseUnits(
+						payments.map((r) => r.amount),
+						token.decimals
+					);
+					if (total > getSpendableBalance(token, payments.length, feePerTxn)) {
+						error = 'Total plus network fees exceeds your available VOI balance';
+						isSending = false;
+						txState = 'idle';
+						return;
+					}
+				}
 				let currentGroup: algosdk.Transaction[] = [];
 				let currentRecipients: Recipient[] = [];
 
@@ -1134,6 +1172,7 @@
 				decimals: 6,
 				balance: nativeVoiToken.balance,
 				balanceRaw: nativeVoiToken.balanceRaw,
+				minBalanceRaw: nativeVoiToken.minBalanceRaw,
 				name: 'Voi'
 			};
 		} else {

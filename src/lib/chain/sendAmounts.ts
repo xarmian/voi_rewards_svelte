@@ -1,5 +1,29 @@
 import { decimalAmountPattern, decimalToBaseUnits } from './baseUnits';
 
+export const MIN_TXN_FEE = 1000n; // Network minimum fee per transaction, base units.
+export const BASE_MIN_BALANCE = 100000n; // Protocol minimum balance of a plain account, base units.
+
+/** Base units a native sender can spend across `txnCount` payments: balance minus the account's
+ * minimum balance minus one fee per payment, floored at zero. */
+export function spendableNative(
+	balance: bigint,
+	minBalance: bigint,
+	feePerTxn: bigint,
+	txnCount: number
+): bigint {
+	if (
+		!Number.isInteger(txnCount) ||
+		txnCount < 0 ||
+		balance < 0n ||
+		minBalance < 0n ||
+		feePerTxn < 0n
+	) {
+		return 0n;
+	}
+	const spendable = balance - minBalance - feePerTxn * BigInt(txnCount);
+	return spendable > 0n ? spendable : 0n;
+}
+
 /** Format non-negative base units without rounding or exponent notation. */
 export function baseUnitsToDecimal(units: bigint, decimals: number): string {
 	if (!Number.isInteger(decimals) || decimals < 0) {

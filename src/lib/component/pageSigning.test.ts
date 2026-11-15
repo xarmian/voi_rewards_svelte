@@ -124,6 +124,9 @@ test.each(paths)(
 		c.recipients = [{ address: 'DEST', amount: '1' }];
 		c.decimalToBaseUnits = () => 1n;
 		c.withinBalance = () => true;
+		c.MIN_TXN_FEE = 1000n;
+		c.sumBaseUnits = () => 1n;
+		c.getSpendableBalance = () => 1n;
 		c.isARC200Token = () => false;
 		c.isNativeToken = () => true;
 		c.MAX_TXN_PER_GROUP = 16;
