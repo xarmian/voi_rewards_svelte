@@ -1,3 +1,15 @@
+import {
+	ARC200_MAX_ROUND_WINDOW,
+	ARC200_SOURCE_WARNING,
+	ARC200_CAP_WARNING,
+	assertArc200Bound,
+	normalizeArc200Page,
+	normalizeArc200Metadata,
+	selectArc200Window,
+	mapArc200Transfer,
+	type Arc200Metadata,
+	type Arc200Query
+} from '$lib/wallet/arc200Export';
 import { isValidAddress, ALGORAND_ZERO_ADDRESS_STRING, parseJSON, IntDecoding } from 'algosdk';
 import { algodIndexer } from '$lib/utils/algod';
 import {
@@ -233,10 +245,10 @@ export function createIndexerReader(
 		async readPage(query: ExportQuery, signal: AbortSignal): Promise<ExportPage> {
 			let request = client
 				.searchForTransactions()
-				.address(query.address)
 				.excludeCloseTo(false)
 				.maxRound(query.maxRound)
 				.limit(query.limit);
+			if (query.address !== undefined) request = request.address(query.address);
 			if (query.afterTime) request = request.afterTime(query.afterTime);
 			if (query.beforeTime) request = request.beforeTime(query.beforeTime);
 			if (query.nextToken) request = request.nextToken(query.nextToken);
@@ -264,6 +276,14 @@ function validatePage(value: unknown): ExportPage {
 	return { transactions: page.transactions, nextToken: page.nextToken as string | undefined };
 }
 export interface ExportResult {
+	arc200Assets: ReadonlyMap<bigint, Arc200Metadata>;
+	warnings: readonly string[];
+	arc200Scanned: number;
+	dataResponses: number;
+	sourceScans: { indexer: readonly string[]; arc200: readonly string[] };
+	boundary?:
+		| { source: 'indexer'; address: string; nextToken?: string }
+		| { source: 'arc200'; address: string; upperRound: bigint };
 	stakingContracts: ReadonlyMap<string, string>;
 	assets: ReadonlyMap<bigint, AssetMetadata>;
 	rows: readonly ExportRow[];
@@ -274,12 +294,14 @@ export interface ExportResult {
 	scanned: number;
 	completedAddresses: string[];
 	unfinishedAddresses: string[];
-	cursor?: string;
 	canRetry: boolean;
 	oldestTimestamp?: number;
 	newestTimestamp?: number;
 }
 export interface ExportProgress {
+	phase: 'indexer' | 'arc200';
+	arc200Scanned: number;
+	dataResponses: number;
 	assetsResolved: number;
 	resolvingAssetId?: bigint;
 	account: number;
@@ -290,6 +312,8 @@ export interface ExportProgress {
 	retrySeconds?: number;
 }
 export interface ExportDependencies {
+	readArc200Page(query: Arc200Query, signal: AbortSignal): Promise<unknown>;
+	readArc200Metadata(id: bigint, signal: AbortSignal): Promise<unknown>;
 	stakingContracts?: ReadonlyMap<string, string>;
 	readAsset(id: bigint, signal: AbortSignal): Promise<unknown>;
 	maxAssets?: number;
@@ -347,6 +371,16 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	const maxRows = deps.maxRows ?? 100000;
 	const maxAssets = deps.maxAssets ?? 200;
 	const assets = new Map<bigint, AssetMetadata>();
+	const arc200Assets = new Map<bigint, Arc200Metadata>();
+	const arcRequested = options.assets.mode === 'all' && options.types.includes('asset-transfer');
+	let phase: 'indexer' | 'arc200' = 'indexer';
+	let arcAccountIndex = 0,
+		arc200Scanned = 0,
+		occurrence = 0,
+		dataResponses = 0;
+	let lowerRound: bigint | null | undefined;
+	let upperRound: bigint | undefined;
+	let windowLower: bigint | undefined;
 	let resolvingAssetId: bigint | undefined;
 	let rows: ExportRow[] = [];
 	const roots = new Map<string, string>();
@@ -370,9 +404,15 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	function progress(retrySeconds?: number) {
 		if (!disposed && !cancelled)
 			deps.onProgress?.({
-				assetsResolved: assets.size,
+				assetsResolved: assets.size + arc200Assets.size,
+				phase,
+				arc200Scanned,
+				dataResponses,
 				resolvingAssetId,
-				account: Math.min(accountIndex + 1, accounts.size),
+				account: Math.min(
+					(phase === 'indexer' ? accountIndex : arcAccountIndex) + 1,
+					accounts.size
+				),
 				accounts: accounts.size,
 				pages,
 				scanned,
@@ -381,18 +421,58 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			});
 	}
 	function result(): ExportResult {
+		const indexer = options.addresses.slice(0, accountIndex);
+		const arc200 = options.addresses.slice(0, arcAccountIndex);
+		const completedAddresses = indexer.filter(
+			(address) => !arcRequested || arc200.includes(address)
+		);
+		const rawIds = [
+			...new Set(
+				rows.flatMap((row) =>
+					row.assetKind === 'arc200' && arc200Assets.get(row.assetId!)?.decimals === null
+						? [row.assetId!]
+						: []
+				)
+			)
+		].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+		const warnings = arcRequested ? [ARC200_SOURCE_WARNING] : [];
+		if (rawIds.length)
+			warnings.push(
+				`ARC-200 amounts exported as raw units for contract IDs: ${rawIds.join(', ')}. Indexed decimals are unavailable.`
+			);
 		return {
+			arc200Assets: new Map(arc200Assets),
+			warnings,
+			arc200Scanned,
+			dataResponses,
+			sourceScans: { indexer, arc200 },
+			boundary:
+				phase === 'indexer'
+					? accountIndex < options.addresses.length
+						? { source: 'indexer', address: options.addresses[accountIndex], nextToken: cursor }
+						: undefined
+					: arcAccountIndex < options.addresses.length
+						? {
+								source: 'arc200',
+								address: options.addresses[arcAccountIndex],
+								upperRound: upperRound ?? snapshotRound
+							}
+						: undefined,
 			assets: new Map(assets),
 			stakingContracts: new Map(stakingContracts),
 			rows: [...rows].sort(compareRows),
 			snapshotRound,
 			status,
-			reason,
+			reason:
+				status === 'partial-cap' && arcRequested && phase === 'arc200'
+					? `${reason} ${ARC200_CAP_WARNING}`
+					: reason,
 			pages,
 			scanned,
-			completedAddresses: options.addresses.slice(0, accountIndex),
-			unfinishedAddresses: options.addresses.slice(accountIndex),
-			cursor,
+			completedAddresses,
+			unfinishedAddresses: options.addresses.filter(
+				(address) => !completedAddresses.includes(address)
+			),
 			canRetry: retryEligible && !disposed && !cancelled,
 			oldestTimestamp,
 			newestTimestamp
@@ -441,7 +521,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			const interrupted = new Promise<never>((_resolve, reject) => {
 				rejectAbort = reject;
 				timer = setTimeout(() => {
-					const error = new DeadlineError('The indexer page exceeded the 30-second deadline.');
+					const error = new DeadlineError('The data request exceeded the 30-second deadline.');
 					requestController.abort(error);
 					reject(error);
 				}, 30000);
@@ -464,7 +544,11 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				controller.signal.throwIfAborted();
 				const { status: httpStatus, retryAfter } = httpDetails(error);
 				const transient =
-					!(error instanceof SchemaError || error instanceof DeadlineError) &&
+					!(
+						error instanceof SchemaError ||
+						error instanceof SyntaxError ||
+						error instanceof DeadlineError
+					) &&
 					(httpStatus === undefined || httpStatus === 429 || httpStatus >= 500);
 				if (!transient || attempt >= 3) throw error;
 				let delay = 1000 * 2 ** attempt;
@@ -484,6 +568,19 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			}
 		}
 	}
+	function schema<T>(normalize: () => T): T {
+		try {
+			return normalize();
+		} catch (error) {
+			throw new SchemaError(error instanceof Error ? error.message : 'Invalid ARC-200 response.');
+		}
+	}
+	function atCap(): boolean {
+		if (dataResponses < maxPages && rows.length < maxRows) return false;
+		status = 'partial-cap';
+		reason = 'Export cap reached; narrow the dates or select fewer accounts.';
+		return true;
+	}
 	async function execute(): Promise<ExportResult> {
 		retryEligible = false;
 		try {
@@ -494,7 +591,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				);
 			while (accountIndex < options.addresses.length) {
 				controller.signal.throwIfAborted();
-				if (pages >= maxPages || rows.length >= maxRows) {
+				if (dataResponses >= maxPages || rows.length >= maxRows) {
 					status = 'partial-cap';
 					reason = 'Export cap reached; narrow the dates or select fewer accounts.';
 					return result();
@@ -523,6 +620,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 						...mapTransaction(root, accounts, rewards).filter((row) => matchesFilters(row, options))
 					);
 				}
+				dataResponses++;
 				if (rows.length + stagedRows.length > maxRows) {
 					status = 'partial-cap';
 					reason =
@@ -532,7 +630,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				const needed = new Set(
 					stagedRows.flatMap((row) => (row.assetId === null ? [] : [row.assetId]))
 				);
-				if (new Set([...assets.keys(), ...needed]).size > maxAssets) {
+				if (new Set([...assets.keys(), ...needed]).size + arc200Assets.size > maxAssets) {
 					status = 'partial-cap';
 					reason = 'Asset limit reached; select one asset or narrow the dates.';
 					return result();
@@ -569,8 +667,119 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				}
 				progress();
 			}
-			status = 'complete-indexed';
-			reason = '';
+			if (arcRequested) {
+				phase = 'arc200';
+				schema(() => assertArc200Bound(snapshotRound));
+				if (lowerRound === undefined) {
+					if (options.allDates) lowerRound = 1n;
+					else {
+						if (atCap()) return result();
+						// algorand/indexer 748ac4048cf8893c4faf0c1d3b31bcbe67b0165d,
+						// idb/postgres/postgres.go:501-516,589-598,724-729: without an address,
+						// txn_participation is not joined and ORDER BY t.round, t.intra is ascending.
+						// afterTime selects rounds at or after the first round with realtime > T.
+						const page = validatePage(
+							await request((signal) =>
+								deps.readPage(
+									{
+										afterTime: new Date(options.startTime! * 1000).toISOString(),
+										limit: 1,
+										maxRound: snapshotRound
+									},
+									signal
+								)
+							)
+						);
+						if (page.transactions.length > 1)
+							throw new SchemaError('Invalid date lower-bound response.');
+						const first = page.transactions[0];
+						if (first === undefined) lowerRound = null;
+						else {
+							const round = positive(object(first).confirmedRound);
+							if (round > snapshotRound)
+								throw new SchemaError('Date lower bound exceeds the snapshot.');
+							lowerRound = round > 1000n ? round - 1000n : 1n;
+						}
+						dataResponses++;
+						pages++;
+					}
+				}
+				if (lowerRound === null) arcAccountIndex = options.addresses.length;
+				while (arcAccountIndex < options.addresses.length && lowerRound !== null) {
+					controller.signal.throwIfAborted();
+					upperRound ??= snapshotRound;
+					if (windowLower === undefined) {
+						const candidate = upperRound - BigInt(ARC200_MAX_ROUND_WINDOW - 1);
+						windowLower = candidate > lowerRound ? candidate : lowerRound;
+					}
+					if (atCap()) return result();
+					const address = options.addresses[arcAccountIndex];
+					const query = { address, minRound: windowLower, maxRound: upperRound };
+					progress();
+					const raw = await request((signal) => deps.readArc200Page(query, signal));
+					const page = schema(() => normalizeArc200Page(raw, query, isValidAddress));
+					dataResponses++;
+					arc200Scanned += page.length;
+					const window = selectArc200Window(page, upperRound);
+					if (window.kind === 'cap') {
+						status = 'partial-cap';
+						reason = `ARC-200 round ${window.round} fills the 100-record window; this round and older ARC-200 history for this account were not included.`;
+						return result();
+					}
+					const stagedRows = window.accepted
+						.map((transfer, i) => mapArc200Transfer(transfer, address, occurrence + i))
+						.filter((row) => matchesFilters(row, options));
+					if (rows.length + stagedRows.length > maxRows) {
+						status = 'partial-cap';
+						reason =
+							'The next page exceeds the row cap; none of that page was retained. Narrow the dates.';
+						return result();
+					}
+					const needed = [...new Set(stagedRows.map((row) => row.assetId!))].filter(
+						(id) => !arc200Assets.has(id)
+					);
+					if (assets.size + arc200Assets.size + needed.length > maxAssets) {
+						status = 'partial-cap';
+						reason = 'Asset/token definition limit reached; none of this page was retained.';
+						return result();
+					}
+					for (const id of needed) {
+						resolvingAssetId = id;
+						progress();
+						try {
+							const raw = await request((signal) => deps.readArc200Metadata(id, signal));
+							controller.signal.throwIfAborted();
+							arc200Assets.set(
+								id,
+								schema(() => normalizeArc200Metadata(raw, id))
+							);
+						} finally {
+							resolvingAssetId = undefined;
+							progress();
+						}
+					}
+					controller.signal.throwIfAborted();
+					rows.push(...stagedRows);
+					for (const row of stagedRows) {
+						oldestTimestamp = Math.min(oldestTimestamp ?? row.timestamp, row.timestamp);
+						newestTimestamp = Math.max(newestTimestamp ?? row.timestamp, row.timestamp);
+					}
+					pages++;
+					occurrence += window.accepted.length;
+					if (window.kind === 'next') upperRound = window.upperRound;
+					else {
+						upperRound = windowLower - 1n;
+						windowLower = undefined;
+						if (upperRound < lowerRound) {
+							arcAccountIndex++;
+							upperRound = undefined;
+						}
+					}
+					progress();
+				}
+			}
+			status = arcRequested ? 'partial-source' : 'complete-indexed';
+			reason = arcRequested ? 'ARC-200 history completeness is unverified.' : '';
 		} catch (error) {
 			if (cancelled || disposed) {
 				status = 'partial-cancelled';
@@ -624,6 +833,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			rows = [];
 			roots.clear();
 			assets.clear();
+			arc200Assets.clear();
 			cursors.clear();
 		}
 	};

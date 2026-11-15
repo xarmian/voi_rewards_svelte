@@ -534,9 +534,7 @@ describe('asset page commits and metadata demand', () => {
 			input
 		);
 		expect((await run.start()).status).toBe(
-			input.assets?.mode === 'all' || (!input.assets && !input.types)
-				? 'partial-source'
-				: 'complete-indexed'
+			!input.assets && !input.types ? 'partial-source' : 'complete-indexed'
 		);
 		expect(deps.readAsset).not.toHaveBeenCalled();
 	});
@@ -893,12 +891,15 @@ describe('bounded ARC-200 export phase', () => {
 		'clamps the padded lower bound to round 1 for first round %s',
 		async (first) => {
 			const { run, deps } = arcSetup(
-				{ readPage: async (q) => ({ transactions: q.address ? [] : [{ confirmedRound: first }] }) },
+				{
+					bootstrap: async () => 2000n,
+					readPage: async (q) => ({ transactions: q.address ? [] : [{ confirmedRound: first }] })
+				},
 				{ allDates: false, from: '2024-01-01', through: '2024-01-01' }
 			);
 			expect((await run.start()).status).toBe('partial-source');
 			expect(deps.readArc200Page).toHaveBeenCalledWith(
-				{ address: A, minRound: 1n, maxRound: 100n },
+				{ address: A, minRound: 1n, maxRound: 2000n },
 				expect.any(AbortSignal)
 			);
 		}

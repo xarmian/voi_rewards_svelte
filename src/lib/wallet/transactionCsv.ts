@@ -1,3 +1,4 @@
+import type { Arc200Metadata } from './arc200Export';
 import {
 	compareRows,
 	formatUnits,
@@ -54,6 +55,7 @@ function numeric(value: bigint, decimals = 0): string {
 	return formatUnits(value, decimals);
 }
 interface Context {
+	arc200Assets: ReadonlyMap<bigint, Arc200Metadata>;
 	stakingContracts: ReadonlyMap<string, string>;
 	assets: ReadonlyMap<bigint, AssetMetadata>;
 	snapshotRound: bigint;
@@ -62,7 +64,11 @@ interface Context {
 export function serializeCsv(rows: readonly ExportRow[], context: Context): string {
 	const snapshotRound = numeric(context.snapshotRound);
 	const records = [...rows].sort(compareRows).map((row) => {
-		const metadata = row.assetId === null ? undefined : context.assets.get(row.assetId);
+		const arc = row.assetKind === 'arc200';
+		const metadata =
+			row.assetId === null
+				? undefined
+				: (arc ? context.arc200Assets : context.assets).get(row.assetId);
 		if (
 			row.assetId !== null &&
 			(typeof row.assetId !== 'bigint' ||
@@ -70,9 +76,11 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 				row.assetId > 18446744073709551615n ||
 				!metadata ||
 				metadata.id !== row.assetId ||
-				!Number.isInteger(metadata.decimals) ||
-				metadata.decimals < 0 ||
-				metadata.decimals > 19 ||
+				(!(arc && metadata.decimals === null) &&
+					(typeof metadata.decimals !== 'number' ||
+						!Number.isInteger(metadata.decimals) ||
+						metadata.decimals < 0 ||
+						metadata.decimals > (arc ? 255 : 19))) ||
 				typeof metadata.unitName !== 'string' ||
 				typeof metadata.name !== 'string')
 		)
@@ -95,8 +103,14 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 			protectText(row.direction),
 			protectText(row.from),
 			protectText(row.to),
-			metadata ? 'ASA/VSA' : 'VOI',
-			numeric(row.amount, metadata?.decimals ?? 6),
+			arc
+				? metadata?.decimals === null
+					? 'ARC-200 (raw units)'
+					: 'ARC-200'
+				: metadata
+					? 'ASA/VSA'
+					: 'VOI',
+			numeric(row.amount, metadata?.decimals ?? (arc ? 0 : 6)),
 			numeric(row.fee, 6),
 			numeric(row.round),
 			protectText(row.group),
@@ -107,7 +121,7 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 			row.assetId === null ? '' : numeric(row.assetId),
 			protectText(metadata?.unitName ?? 'VOI'),
 			protectText(metadata?.name ?? 'VOI (native)'),
-			String(metadata?.decimals ?? 6),
+			arc && metadata?.decimals === null ? '' : String(metadata?.decimals ?? 6),
 			stakingIds.map((id) => numeric(id)).join(' ')
 		];
 	});

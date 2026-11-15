@@ -27,9 +27,11 @@ it('preserves HTTP status and headers for scheduler backoff', async () => {
 	const reader = createArc200Reader(
 		vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status: 429, headers }))
 	);
-	await expect(reader.readArc200Metadata(1n, new AbortController().signal)).rejects.toMatchObject({
-		response: { status: 429, headers }
+	const failure = reader.readArc200Metadata(1n, new AbortController().signal);
+	await expect(failure).rejects.toMatchObject({
+		response: { status: 429, headers: expect.any(Headers) }
 	});
+	await failure.catch((error) => expect(error.response.headers.get('Retry-After')).toBe('3'));
 });
 it.each([{ error: 'failure' }, {}, { data: null }])(
 	'rejects invalid proxy envelope %j',
