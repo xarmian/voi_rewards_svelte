@@ -8,6 +8,7 @@
 		type ActivityType,
 		type ExportOptions
 	} from '$lib/wallet/transactionExport';
+	import { buildStakingContractMap, type StakingContract } from '$lib/wallet/stakingContracts';
 	import { exportFilename, serializeCsv } from '$lib/wallet/transactionCsv';
 	import {
 		createExportRun,
@@ -22,11 +23,15 @@
 		pageAddress,
 		suggestions,
 		suggestionsAvailable,
+		stakingContracts,
+		stakingContractsAvailable,
 		onclose
 	}: {
 		pageAddress: string;
 		suggestions: { address: string; label?: string }[];
 		suggestionsAvailable: boolean;
+		stakingContracts: StakingContract[];
+		stakingContractsAvailable: boolean;
 		onclose: () => void;
 	} = $props();
 	const today = () => new Date().toISOString().slice(0, 10);
@@ -161,6 +166,7 @@
 		run = createExportRun(options, {
 			...createIndexerReader(),
 			rewardSenders: new Set(REWARDS_ADDRESSES),
+			stakingContracts: buildStakingContractMap(stakingContracts, stakingContractsAvailable),
 			onProgress: (value) => {
 				if (generation === current) pendingProgress = value;
 			}

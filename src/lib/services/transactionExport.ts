@@ -264,6 +264,7 @@ function validatePage(value: unknown): ExportPage {
 	return { transactions: page.transactions, nextToken: page.nextToken as string | undefined };
 }
 export interface ExportResult {
+	stakingContracts: ReadonlyMap<string, string>;
 	assets: ReadonlyMap<bigint, AssetMetadata>;
 	rows: readonly ExportRow[];
 	snapshotRound: bigint;
@@ -289,6 +290,7 @@ export interface ExportProgress {
 	retrySeconds?: number;
 }
 export interface ExportDependencies {
+	stakingContracts?: ReadonlyMap<string, string>;
 	readAsset(id: bigint, signal: AbortSignal): Promise<unknown>;
 	maxAssets?: number;
 	bootstrap(address: string, signal: AbortSignal): Promise<bigint>;
@@ -338,6 +340,7 @@ function httpDetails(error: unknown): { status?: number; retryAfter?: string } {
 export function createExportRun(options: ExportOptions, deps: ExportDependencies): ExportRun {
 	const accounts = new Set(options.addresses);
 	const rewards = new Set(deps.rewardSenders);
+	const stakingContracts = new Map(deps.stakingContracts);
 	const now = deps.now ?? Date.now;
 	const pause = deps.sleep ?? sleep;
 	const maxPages = deps.maxPages ?? 200;
@@ -380,6 +383,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	function result(): ExportResult {
 		return {
 			assets: new Map(assets),
+			stakingContracts: new Map(stakingContracts),
 			rows: [...rows].sort(compareRows),
 			snapshotRound,
 			status,
