@@ -39,7 +39,8 @@ function setup(
 	input: Partial<ExportInput> = {}
 ) {
 	let clock = 0;
-	const readPage = vi.fn(async () => {
+	const readPage = vi.fn(async (query: ExportQuery) => {
+		if (!query.address) return { transactions: [] };
 		const page = pages.shift();
 		if (page instanceof Error) throw page;
 		if (!page) throw new Error('Unexpected read');
@@ -48,6 +49,8 @@ function setup(
 	const deps: ExportDependencies = {
 		bootstrap: vi.fn(async () => 100n),
 		readPage,
+		readArc200Page: vi.fn(async () => []),
+		readArc200Metadata: vi.fn(async (id) => arcMetadata(id)),
 		readAsset: vi.fn(async (id) => metadata(id)),
 		rewardSenders: new Set(),
 		now: () => clock,
@@ -159,7 +162,7 @@ describe('bounded sequential scans', () => {
 		expect(await run.start()).toMatchObject({
 			status: 'partial-error',
 			pages: 1,
-			cursor: 'next',
+			boundary: { source: 'indexer', address: 'A', nextToken: 'next' },
 			canRetry: true
 		});
 		const result = await run.retry();
@@ -193,7 +196,7 @@ describe('bounded sequential scans', () => {
 			status: 'partial-cap',
 			pages: 1,
 			unfinishedAddresses: ['A'],
-			cursor: 'next'
+			boundary: { source: 'indexer', address: 'A', nextToken: 'next' }
 		});
 	});
 	it('retains none of a page exceeding the row cap and completes at an exact terminal row limit', async () => {
@@ -233,6 +236,13 @@ describe('bounded sequential scans', () => {
 });
 
 describe('retry, pacing and cancellation', () => {
+	it('retries a malformed indexer page and completes with its rows', async () => {
+		const { run, readPage } = setup([new SyntaxError('Unexpected token <'), page('recovered')]);
+		const result = await run.start();
+		expect(result.status).toBe('complete-indexed');
+		expect(result.rows.map((row) => row.txId)).toEqual(['recovered', 'recovered']);
+		expect(readPage).toHaveBeenCalledTimes(2);
+	});
 	it('spaces bootstrap and page starts by at least 500ms and respects Retry-After', async () => {
 		let now = 0;
 		const starts: number[] = [];
@@ -510,7 +520,7 @@ describe('asset page commits and metadata demand', () => {
 			{ transactions: [tx, assetTx('SECOND', 2n)] }
 		]);
 		const result = await run.start();
-		expect(result).toMatchObject({ status: 'complete-indexed', pages: 3, scanned: 4 });
+		expect(result).toMatchObject({ status: 'partial-source', pages: 5, scanned: 4 });
 		expect(result.rows).toHaveLength(9);
 		expect(result.assets.size).toBe(2);
 		expect(deps.readAsset).toHaveBeenCalledTimes(2);
@@ -530,7 +540,9 @@ describe('asset page commits and metadata demand', () => {
 			{},
 			input
 		);
-		expect((await run.start()).status).toBe('complete-indexed');
+		expect((await run.start()).status).toBe(
+			!input.assets && !input.types ? 'partial-source' : 'complete-indexed'
+		);
 		expect(deps.readAsset).not.toHaveBeenCalled();
 	});
 	it('rejects conflicting asset bodies for the same root', async () => {
@@ -563,7 +575,7 @@ describe('asset page commits and metadata demand', () => {
 			status: 'partial-error',
 			pages: 1,
 			scanned: 1,
-			cursor: 'next',
+			boundary: { source: 'indexer', address: A, nextToken: 'next' },
 			canRetry: true,
 			reason: 'Asset 3 metadata unavailable; this page was not included. Amounts were not guessed.'
 		});
@@ -579,7 +591,7 @@ describe('asset page commits and metadata demand', () => {
 			})
 		);
 		const complete = await run.retry();
-		expect(complete).toMatchObject({ status: 'complete-indexed', pages: 3, scanned: 3 });
+		expect(complete).toMatchObject({ status: 'partial-source', pages: 4, scanned: 3 });
 		expect(complete.rows).toHaveLength(6);
 		expect(readAsset.mock.calls.map(([id]) => id)).toEqual([1n, 2n, 3n, 3n]);
 		expect(
@@ -599,7 +611,7 @@ describe('asset page commits and metadata demand', () => {
 			status: 'partial-cap',
 			pages: 1,
 			scanned: 1,
-			cursor: 'next',
+			boundary: { source: 'indexer', address: A, nextToken: 'next' },
 			reason: 'Asset limit reached; select one asset or narrow the dates.'
 		});
 		expect(deps.readAsset).toHaveBeenCalledTimes(1);
@@ -647,7 +659,7 @@ describe('metadata request lifecycle', () => {
 			},
 			{ addresses: [A] }
 		);
-		expect((await run.start()).status).toBe('complete-indexed');
+		expect((await run.start()).status).toBe('partial-source');
 		expect(starts).toEqual([0, 500, 1000, 4000]);
 	});
 	it.each(['cancel', 'dispose'] as const)(
@@ -715,7 +727,7 @@ describe('metadata request lifecycle', () => {
 		resolve(metadata(1n));
 		await vi.advanceTimersByTimeAsync(0);
 		const result = await retried;
-		expect(result).toMatchObject({ status: 'complete-indexed', pages: 1 });
+		expect(result).toMatchObject({ status: 'partial-source', pages: 2 });
 		expect(result.assets.size).toBe(1);
 		expect(readAsset).toHaveBeenCalledTimes(2);
 	});
@@ -730,4 +742,482 @@ it('captures loaded staking contracts for the CSV without extra reads', async ()
 	expect(deps.bootstrap).toHaveBeenCalledTimes(1);
 	expect(deps.readPage).toHaveBeenCalledTimes(1);
 	expect(deps.readAsset).not.toHaveBeenCalled();
+});
+
+const arcRecord = (changes: Record<string, unknown> = {}) => ({
+	contractid: '1',
+	from: A,
+	to: B,
+	amount: '9007199254740993',
+	round: 100,
+	timestamp: 1704067200,
+	transactionid: null,
+	note: null,
+	...changes
+});
+const arcMetadata = (id: bigint, decimals: number | null = 18) => ({
+	tokens: [{ contractId: id.toString(), decimals, symbol: 'TOKEN', name: 'Token' }]
+});
+function arcSetup(changes: Partial<ExportDependencies> = {}, input: Partial<ExportInput> = {}) {
+	return setup(
+		[],
+		{
+			readPage: vi.fn(async () => ({ transactions: [] })),
+			readArc200Page: vi.fn(async () => []),
+			readArc200Metadata: vi.fn(async (id) => arcMetadata(id)),
+			...changes
+		},
+		{ ...assetInput, addresses: [A], ...input }
+	);
+}
+describe('bounded ARC-200 export phase', () => {
+	it('pins both sources and all accounts once, keeps counterpart effects and never claims completeness after late insertion', async () => {
+		const readArc200Page = vi.fn(async () => [arcRecord(), arcRecord()]);
+		const { run, deps } = arcSetup({ readArc200Page }, { addresses: [A, B, A] });
+		const result = await run.start();
+		expect(result).toMatchObject({
+			status: 'partial-source',
+			snapshotRound: 100n,
+			pages: 4,
+			arc200Scanned: 4,
+			completedAddresses: [A, B],
+			unfinishedAddresses: [],
+			sourceScans: { indexer: [A, B], arc200: [A, B] }
+		});
+		expect(result.warnings.join(' ')).toMatch(/source may omit transfer logs/);
+		expect(result.rows.map((r) => [r.account, r.direction])).toEqual([
+			[A, 'out'],
+			[A, 'out'],
+			[B, 'in'],
+			[B, 'in']
+		]);
+		expect(deps.bootstrap).toHaveBeenCalledTimes(1);
+		expect(readArc200Page.mock.calls).toHaveLength(2);
+		for (const [query] of readArc200Page.mock.calls as unknown as [
+			{ maxRound: bigint; minRound: bigint }
+		][])
+			expect(query).toMatchObject({ maxRound: 100n, minRound: 1n });
+		expect(deps.readArc200Metadata).toHaveBeenCalledTimes(1);
+		run.dispose();
+		expect((await run.start()).arc200Assets.size).toBe(0);
+		expect(result.arc200Assets.size).toBe(1);
+		const next = arcSetup({ readArc200Page: async () => [arcRecord({ round: 99 })] });
+		expect((await next.run.start()).status).toBe('partial-source');
+		expect(next.deps.readArc200Metadata).toHaveBeenCalledTimes(1);
+	});
+	it('rejects a post-snapshot record atomically without automatic schema retries', async () => {
+		const readArc200Page = vi.fn(async () => [arcRecord(), arcRecord({ round: 101 })]);
+		const { run } = arcSetup({ readArc200Page });
+		expect(await run.start()).toMatchObject({
+			status: 'partial-error',
+			rows: [],
+			sourceScans: { indexer: [A], arc200: [] },
+			unfinishedAddresses: [A]
+		});
+		expect(readArc200Page).toHaveBeenCalledTimes(1);
+	});
+	it('retries an inclusive uncommitted boundary exactly once and withholds its partial oldest round', async () => {
+		const first = [...Array(99).fill(arcRecord({ round: 100 })), arcRecord({ round: 99 })];
+		const readArc200Page = vi
+			.fn()
+			.mockResolvedValueOnce(first)
+			.mockRejectedValueOnce(httpError(400))
+			.mockResolvedValueOnce([arcRecord({ round: 99 }), arcRecord({ round: 99 })]);
+		const { run, deps } = arcSetup({ readArc200Page });
+		expect(await run.start()).toMatchObject({
+			status: 'partial-error',
+			rows: expect.any(Array),
+			boundary: { source: 'arc200', address: A, upperRound: 99n },
+			canRetry: true
+		});
+		const result = await run.retry();
+		expect(result.status).toBe('partial-source');
+		expect(result.rows).toHaveLength(101);
+		expect(result.rows.filter((r) => r.round === 99n)).toHaveLength(2);
+		expect(readArc200Page.mock.calls.map(([q]) => [q.minRound, q.maxRound])).toEqual([
+			[1n, 100n],
+			[1n, 99n],
+			[1n, 99n]
+		]);
+		expect(deps.bootstrap).toHaveBeenCalledTimes(1);
+		expect(deps.readArc200Metadata).toHaveBeenCalledTimes(1);
+	});
+	it('counts empty windows and steps through the last lower bound with All indexed dates', async () => {
+		const { run, deps } = arcSetup({ bootstrap: async () => 2000001n });
+		expect(await run.start()).toMatchObject({
+			status: 'partial-source',
+			pages: 4,
+			rows: [],
+			completedAddresses: [A]
+		});
+		expect(
+			vi.mocked(deps.readArc200Page).mock.calls.map(([q]) => [q.minRound, q.maxRound])
+		).toEqual([
+			[1000002n, 2000001n],
+			[2n, 1000001n],
+			[1n, 1n]
+		]);
+		expect(deps.readPage).toHaveBeenCalledTimes(1);
+	});
+	it('stops empty windows at the shared 200-response cap', async () => {
+		const { run, deps } = arcSetup({ bootstrap: async () => 500000000n });
+		const result = await run.start();
+		expect(result).toMatchObject({
+			status: 'partial-cap',
+			pages: 200,
+			rows: [],
+			unfinishedAddresses: [A]
+		});
+		expect(deps.readArc200Page).toHaveBeenCalledTimes(199);
+		expect(result.reason).toContain(
+			'ARC-200 history is scanned in windows of up to 1,000,000 rounds; long date ranges or many accounts may reach the cap.'
+		);
+	});
+	it('derives one shared padded lower bound from the first returned round and stops there', async () => {
+		const readPage = vi.fn(async (q: ExportQuery) => ({
+			transactions: q.address ? [] : [raw('FIRST', { confirmedRound: 1501000n })]
+		}));
+		const { run, deps } = arcSetup(
+			{ bootstrap: async () => 3000000n, readPage },
+			{ allDates: false, from: '2024-01-01', through: '2024-01-02', addresses: [A, B] }
+		);
+		expect(await run.start()).toMatchObject({ status: 'partial-source', pages: 7 });
+		expect(readPage.mock.calls.filter(([q]) => !q.address).map(([q]) => q)).toEqual([
+			{ afterTime: '2024-01-01T00:00:00.000Z', limit: 1, maxRound: 3000000n }
+		]);
+		expect(
+			vi.mocked(deps.readArc200Page).mock.calls.map(([q]) => [q.minRound, q.maxRound])
+		).toEqual([
+			[2000001n, 3000000n],
+			[1500000n, 2000000n],
+			[2000001n, 3000000n],
+			[1500000n, 2000000n]
+		]);
+	});
+	it.each([1n, 999n])(
+		'clamps the padded lower bound to round 1 for first round %s',
+		async (first) => {
+			const { run, deps } = arcSetup(
+				{
+					bootstrap: async () => 2000n,
+					readPage: async (q) => ({ transactions: q.address ? [] : [{ confirmedRound: first }] })
+				},
+				{ allDates: false, from: '2024-01-01', through: '2024-01-01' }
+			);
+			expect((await run.start()).status).toBe('partial-source');
+			expect(deps.readArc200Page).toHaveBeenCalledWith(
+				{ address: A, minRound: 1n, maxRound: 2000n },
+				expect.any(AbortSignal)
+			);
+		}
+	);
+	it('skips ARC for every account when the single lower-bound search is empty', async () => {
+		const { run, deps } = arcSetup(
+			{},
+			{ allDates: false, from: '2024-01-01', through: '2024-01-01', addresses: [A, B] }
+		);
+		expect(await run.start()).toMatchObject({
+			status: 'partial-source',
+			pages: 3,
+			completedAddresses: [A, B],
+			rows: []
+		});
+		expect(deps.readPage).toHaveBeenCalledTimes(3);
+		expect(deps.readArc200Page).not.toHaveBeenCalled();
+	});
+	it('counts the lower-bound request against the shared cap before starting ARC', async () => {
+		const { run, deps } = arcSetup(
+			{
+				maxPages: 2,
+				readPage: async (q) => ({ transactions: q.address ? [] : [{ confirmedRound: 1n }] })
+			},
+			{ allDates: false, from: '2024-01-01', through: '2024-01-01' }
+		);
+		expect(await run.start()).toMatchObject({ status: 'partial-cap', pages: 2 });
+		expect(deps.readArc200Page).not.toHaveBeenCalled();
+	});
+	it('keeps a full-page boundary within the same window lower bound', async () => {
+		const readArc200Page = vi
+			.fn()
+			.mockResolvedValueOnce([
+				...Array(99).fill(arcRecord({ round: 2000000 })),
+				arcRecord({ round: 1500000 })
+			])
+			.mockResolvedValue([]);
+		const { run } = arcSetup({ bootstrap: async () => 2000000n, readArc200Page });
+		expect((await run.start()).status).toBe('partial-source');
+		expect(readArc200Page.mock.calls.map(([q]) => [q.minRound, q.maxRound])).toEqual([
+			[1000001n, 2000000n],
+			[1000001n, 1500000n],
+			[1n, 1000000n]
+		]);
+	});
+	it('stops on a dense round with none of the round retained and no metadata lookups', async () => {
+		const { run, deps } = arcSetup({
+			readArc200Page: vi.fn(async () => Array(100).fill(arcRecord()))
+		});
+		expect(await run.start()).toMatchObject({
+			status: 'partial-cap',
+			dataResponses: 2,
+			rows: [],
+			canRetry: false,
+			reason: expect.stringContaining('round 100 fills the 100-record window')
+		});
+		expect(deps.readArc200Metadata).not.toHaveBeenCalled();
+	});
+	it.each([
+		{ assets: { mode: 'native' } },
+		{ assets: { mode: 'asset', id: '1' } },
+		{ types: ['fee'] }
+	] satisfies Partial<ExportInput>[])(
+		'does not request ARC outside its scope %j',
+		async (input) => {
+			const { run, deps } = arcSetup({}, input);
+			expect((await run.start()).status).toBe('complete-indexed');
+			expect(deps.readArc200Page).not.toHaveBeenCalled();
+		}
+	);
+	it('uses separate ASA/ARC caches, caches unknown scales, and only resolves filtered contracts', async () => {
+		const { run, deps } = arcSetup(
+			{
+				readPage: async (q) => ({
+					transactions: q.address ? [assetTx()] : [{ confirmedRound: 1n }]
+				}),
+				readArc200Page: async () => [
+					arcRecord(),
+					arcRecord(),
+					arcRecord({ contractid: '2', timestamp: 1703980800 })
+				],
+				readArc200Metadata: vi.fn(async (id) => arcMetadata(id, null))
+			},
+			{ allDates: false, from: '2024-01-01', through: '2024-01-01' }
+		);
+		const result = await run.start();
+		expect(result.status).toBe('partial-source');
+		expect(result.assets.size).toBe(1);
+		expect(result.arc200Assets.size).toBe(1);
+		expect(deps.readAsset).toHaveBeenCalledTimes(1);
+		expect(deps.readArc200Metadata).toHaveBeenCalledTimes(1);
+		expect(result.arc200Assets.get(1n)?.decimals).toBeNull();
+		expect(result.warnings.join(' ')).toMatch(/raw units.*1/);
+	});
+	it.each(['rows', 'metadata'] as const)(
+		'preflights the shared %s cap without partial ARC page commit',
+		async (cap) => {
+			const { run, deps } = arcSetup({
+				readPage: async () => ({ transactions: [assetTx()] }),
+				readArc200Page: async () => [arcRecord(), arcRecord({ contractid: '2' })],
+				...(cap === 'rows' ? { maxRows: 3 } : { maxAssets: 2 })
+			});
+			const result = await run.start();
+			expect(result.status).toBe('partial-cap');
+			expect(result.rows).toHaveLength(2);
+			expect(result.rows.some((r) => r.assetKind === 'arc200')).toBe(false);
+			expect(deps.readArc200Metadata).not.toHaveBeenCalled();
+		}
+	);
+	it('does not start ARC if the native phase stops early', async () => {
+		const { run, deps } = arcSetup({
+			readPage: async () => ({ transactions: [], nextToken: 'next' }),
+			maxPages: 1
+		});
+		expect(await run.start()).toMatchObject({
+			status: 'partial-cap',
+			sourceScans: { indexer: [], arc200: [] }
+		});
+		expect(deps.readArc200Page).not.toHaveBeenCalled();
+	});
+	it('supports sparse full pages until the shared response cap without conventional offsets', async () => {
+		const { run, deps } = arcSetup({
+			bootstrap: async () => 100000n,
+			readArc200Page: vi.fn(async (q) =>
+				Array.from({ length: 100 }, (_, i) => arcRecord({ round: Number(q.maxRound) - i }))
+			),
+			maxRows: 30000
+		});
+		expect(await run.start()).toMatchObject({ status: 'partial-cap', pages: 200 });
+		expect(deps.readArc200Page).toHaveBeenCalledTimes(199);
+		for (const [q] of vi.mocked(deps.readArc200Page).mock.calls)
+			expect(q).not.toHaveProperty('offset');
+	});
+});
+
+describe('ARC request lifecycle', () => {
+	it('fails a malformed ARC-200 page without retrying', async () => {
+		const readArc200Page = vi.fn().mockRejectedValue(new SyntaxError('Unexpected token <'));
+		const { run } = arcSetup({ readArc200Page });
+		expect(await run.start()).toMatchObject({ status: 'partial-error', rows: [] });
+		expect(readArc200Page).toHaveBeenCalledTimes(1);
+	});
+	it('shares 500ms spacing and Retry-After between sources and metadata', async () => {
+		let clock = 0;
+		const starts: number[] = [];
+		const readArc200Page = vi.fn(async () => {
+			starts.push(clock);
+			if (readArc200Page.mock.calls.length === 1) throw httpError(429, '3');
+			return [arcRecord()];
+		});
+		const { run } = arcSetup({
+			now: () => clock,
+			sleep: async (ms) => {
+				clock += ms;
+			},
+			bootstrap: async () => {
+				starts.push(clock);
+				return 100n;
+			},
+			readPage: async () => {
+				starts.push(clock);
+				return { transactions: [] };
+			},
+			readArc200Page,
+			readArc200Metadata: async (id) => {
+				starts.push(clock);
+				return arcMetadata(id);
+			}
+		});
+		expect((await run.start()).status).toBe('partial-source');
+		expect(starts).toEqual([0, 500, 1000, 4000, 4500]);
+	});
+	it('backs off 1/2/4 seconds for metadata failures and manually retries its staged page', async () => {
+		let clock = 0;
+		const readArc200Metadata = vi
+			.fn()
+			.mockRejectedValueOnce(httpError(503))
+			.mockRejectedValueOnce(httpError(503))
+			.mockRejectedValueOnce(httpError(503))
+			.mockRejectedValueOnce(httpError(503))
+			.mockResolvedValue(arcMetadata(1n));
+		const { run, deps } = arcSetup({
+			now: () => clock,
+			sleep: async (ms) => {
+				clock += ms;
+			},
+			readArc200Page: vi.fn(async () => [arcRecord()]),
+			readArc200Metadata
+		});
+		expect(await run.start()).toMatchObject({
+			status: 'partial-error',
+			rows: [],
+			boundary: { source: 'arc200', address: A, upperRound: 100n }
+		});
+		expect(clock).toBe(8500);
+		expect(readArc200Metadata).toHaveBeenCalledTimes(4);
+		expect((await run.retry()).rows).toHaveLength(1);
+		expect(deps.readArc200Page).toHaveBeenCalledTimes(2);
+	});
+	it.each(['page', 'metadata', 'boundary'] as const)(
+		'cancels during ARC %s and ignores late completion',
+		async (phase) => {
+			let resolve!: (value: unknown) => void;
+			let signal!: AbortSignal;
+			const pendingRead = (_q: unknown, s: AbortSignal) => {
+				signal = s;
+				return new Promise<unknown>((r) => {
+					resolve = r;
+				});
+			};
+			const readArc200Page = vi.fn(async (q, s) =>
+				phase === 'page' || (phase === 'boundary' && q.maxRound === 99n)
+					? pendingRead(q, s)
+					: phase === 'boundary'
+						? [...Array(99).fill(arcRecord()), arcRecord({ round: 99 })]
+						: [arcRecord()]
+			);
+			const { run } = arcSetup({
+				readArc200Page,
+				...(phase === 'metadata' ? { readArc200Metadata: pendingRead } : {})
+			});
+			const pending = run.start();
+			await vi.waitFor(() => expect(resolve).toBeDefined());
+			run.cancel();
+			const result = await pending;
+			expect(result.status).toBe('partial-cancelled');
+			expect(result.rows).toHaveLength(phase === 'boundary' ? 99 : 0);
+			expect(signal.aborted).toBe(true);
+			resolve(phase === 'metadata' ? arcMetadata(1n) : [arcRecord()]);
+			await Promise.resolve();
+			expect((await run.retry()).rows).toHaveLength(result.rows.length);
+		}
+	);
+	it('cancels during ARC backoff without another request', async () => {
+		let backoff!: () => void;
+		const { run, deps } = arcSetup({
+			readArc200Page: vi.fn(async () => {
+				throw httpError(503);
+			}),
+			sleep: async (ms, signal) => {
+				if (ms === 1000)
+					await new Promise<void>((resolve, reject) => {
+						backoff = resolve;
+						signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+					});
+			}
+		});
+		const pending = run.start();
+		await vi.waitFor(() => expect(backoff).toBeDefined());
+		run.cancel();
+		expect((await pending).status).toBe('partial-cancelled');
+		expect(deps.readArc200Page).toHaveBeenCalledTimes(1);
+	});
+	it('times out ARC metadata and waits for transport settlement before boundary retry', async () => {
+		vi.useFakeTimers();
+		let resolve!: (value: unknown) => void;
+		let signal!: AbortSignal;
+		const readArc200Metadata = vi.fn(async (_id, s) => {
+			signal = s;
+			if (readArc200Metadata.mock.calls.length === 1)
+				return new Promise((r) => {
+					resolve = r;
+				});
+			return arcMetadata(1n);
+		});
+		const { run, deps } = arcSetup({
+			readArc200Page: vi.fn(async () => [arcRecord()]),
+			readArc200Metadata
+		});
+		const pending = run.start();
+		await vi.advanceTimersByTimeAsync(30000);
+		expect(await pending).toMatchObject({
+			status: 'partial-error',
+			rows: [],
+			arc200Assets: new Map(),
+			canRetry: true
+		});
+		expect(signal.aborted).toBe(true);
+		const retried = run.retry();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(deps.readArc200Page).toHaveBeenCalledTimes(1);
+		resolve(arcMetadata(1n));
+		await vi.advanceTimersByTimeAsync(0);
+		expect((await retried).rows).toHaveLength(1);
+		expect(readArc200Metadata).toHaveBeenCalledTimes(2);
+	});
+});
+
+it('uses the same SDK reader without an address for the date lower-bound search', async () => {
+	const builder = {
+		excludeCloseTo: vi.fn().mockReturnThis(),
+		address: vi.fn().mockReturnThis(),
+		limit: vi.fn().mockReturnThis(),
+		maxRound: vi.fn().mockReturnThis(),
+		afterTime: vi.fn().mockReturnThis(),
+		beforeTime: vi.fn().mockReturnThis(),
+		nextToken: vi.fn().mockReturnThis(),
+		do: vi.fn(async () => ({ transactions: [{ confirmedRound: 2000n }] }))
+	};
+	const reader = createIndexerReader({
+		searchForTransactions: () => builder,
+		lookupAssetByID: vi.fn()
+	});
+	const signal = new AbortController().signal;
+	await reader.readPage(
+		{ afterTime: '2024-01-01T00:00:00.000Z', limit: 1, maxRound: 3000n },
+		signal
+	);
+	expect(builder.address).not.toHaveBeenCalled();
+	expect(builder.afterTime).toHaveBeenCalledWith('2024-01-01T00:00:00.000Z');
+	expect(builder.limit).toHaveBeenCalledWith(1);
+	expect(builder.maxRound).toHaveBeenCalledWith(3000n);
+	expect(builder.do).toHaveBeenCalledWith(undefined, { signal });
 });

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { createArc200Reader } from '$lib/services/arc200Export';
+	import { ARC200_SOURCE_WARNING, ARC200_CAP_WARNING } from '$lib/wallet/arc200Export';
 	import { Button, Card, InlineAlert, StatusPill } from '$lib/ds';
 	import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import {
@@ -78,6 +80,7 @@
 	let objectUrl: string | undefined;
 	let revokeTimer: ReturnType<typeof setTimeout> | undefined;
 	const locked = $derived(busy || result !== null);
+	const arcRequested = $derived(assetMode === 'all' && types.includes('asset-transfer'));
 	const range = $derived(
 		frozen?.allDates
 			? 'All indexed dates (UTC)'
@@ -89,13 +92,13 @@
 		frozen?.assets.mode === 'asset'
 			? `Asset ${frozen.assets.id} (ASA/VSA)`
 			: frozen?.assets.mode === 'all'
-				? 'VOI and all assets'
+				? 'VOI and all assets (ASA/VSA + ARC-200)'
 				: 'VOI only'
 	);
 	const statusText = $derived(
 		busy
 			? progress
-				? `${progress.resolvingAssetId !== undefined ? `Resolving asset ${progress.resolvingAssetId} · ${progress.assetsResolved} asset definitions loaded · ` : ''}Account ${progress.account} of ${progress.accounts} · ${progress.pages} pages · ${progress.scanned} transactions scanned · ${progress.rows} rows${progress.retrySeconds ? ` · Retrying in ${progress.retrySeconds} seconds` : ''}`
+				? `${progress.phase === 'arc200' ? 'ARC-200' : 'Native and ASA/VSA'} · ${progress.resolvingAssetId !== undefined ? `Resolving ${progress.phase === 'arc200' ? 'ARC-200 contract' : 'asset'} ${progress.resolvingAssetId} · ${progress.assetsResolved} asset/token definitions loaded · ` : ''}Account ${progress.account} of ${progress.accounts} · ${progress.dataResponses} data pages · ${progress.scanned + progress.arc200Scanned} records scanned · ${progress.rows} rows${progress.retrySeconds ? ` · Retrying in ${progress.retrySeconds} seconds` : ''}`
 				: 'Capturing the indexed round…'
 			: result
 				? `${result.rows.length} rows · ${scope} · ${result.status === 'complete-indexed' ? 'Complete through the captured indexed round' : result.reason}`
@@ -165,6 +168,7 @@
 		const current = generation;
 		run = createExportRun(options, {
 			...createIndexerReader(),
+			...createArc200Reader(),
 			rewardSenders: new Set(REWARDS_ADDRESSES),
 			stakingContracts: buildStakingContractMap(stakingContracts, stakingContractsAvailable),
 			onProgress: (value) => {
@@ -225,12 +229,12 @@
 					Export wallet activity
 				</h2>
 				<p>
-					Export native VOI and ASA/VSA transfer activity for the selected assets. ARC-200 tokens
-					aren't included. LP positions and valuations aren't included.
+					Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts. All assets
+					includes ARC-200. LP positions and valuations are excluded.
 				</p>
 				<p class="text-sm text-ink-muted">
-					Up to 200 pages, 100,000 rows or 200 asset definitions per export; narrow the dates or
-					select one asset if capped. Dates and timestamps are UTC.
+					Up to 200 data pages, 100,000 rows or 200 asset/token definitions. ARC-200 scanning stops
+					if a round fills a 100-record window. Dates are UTC. {ARC200_CAP_WARNING}
 				</p>
 			</div>
 			<fieldset
@@ -320,8 +324,8 @@
 					close-outs are included. Known reward payouts are native VOI only, classified by sender;
 					estimated rewards are excluded. The Staking contract column marks transfers to and from
 					the staking contracts this wallet owns now, as this site knows them. Contracts it owned
-					earlier are not marked unless you add their address. Type filters do not reduce scanning
-					time.
+					earlier are not marked unless you add their address. ARC-200 transfer records use Asset
+					transfers. Type/date filters may not reduce ARC-200 scanning time.
 				</p>
 				{#if !stakingContractsAvailable}
 					<InlineAlert
@@ -340,7 +344,7 @@
 					class="block w-full min-w-0 max-w-full rounded-ds-sm border border-edge bg-surface p-2 text-ink focus-visible:ring-2 focus-visible:ring-focus"
 				>
 					<option value="native">VOI only</option>
-					<option value="all">VOI and all assets</option>
+					<option value="all">VOI and all assets (ASA/VSA + ARC-200)</option>
 					<option value="asset">One asset (ASA/VSA)</option>
 				</select>
 				{#if assetMode === 'asset'}
@@ -380,6 +384,9 @@
 					omits an offset.
 				</p>
 			</div>
+			{#if arcRequested && !result}
+				<InlineAlert tone="warn" message={ARC200_SOURCE_WARNING} />
+			{/if}
 			<div aria-busy={busy} class="space-y-3">
 				<p aria-live="polite" aria-atomic="true" class="sr-only">{liveStatus}</p>
 				{#if busy || !result}<p>{statusText}</p>{/if}
@@ -394,30 +401,42 @@
 							tone={result.status === 'partial-error' ? 'danger' : 'warn'}
 							message={result.reason}
 						/>{/if}
+					{#each result.warnings as warning}<InlineAlert tone="warn" message={warning} />{/each}
+					{#if result.status === 'partial-source' && !result.rows.length}<p>
+							No matching rows returned; ARC-200 history completeness is unverified.
+						</p>{/if}
 					{#if result.status === 'complete-indexed' && !result.rows.length}<p>
 							No matching indexed activity for these options.
 						</p>{/if}
 					<p>
 						{result.rows.length} rows · {scope} · {range} · {frozen.addresses.length} selected
 						{frozen.addresses.length === 1 ? 'address' : 'addresses'} · {result.snapshotRound > 0n
-							? `indexed through round ${result.snapshotRound.toString()}`
+							? `Snapshot upper bound: round ${result.snapshotRound.toString()}`
 							: 'Snapshot round not captured'}
 					</p>
-					<p>{result.pages} committed pages · {result.scanned} transactions scanned</p>
+					<p>
+						{result.dataResponses} data pages · {result.scanned + result.arc200Scanned} records scanned
+					</p>
 					{#if result.oldestTimestamp !== undefined && result.newestTimestamp !== undefined}<p>
 							Included timestamps: {new Date(result.oldestTimestamp * 1000).toISOString()} to {new Date(
 								result.newestTimestamp * 1000
 							).toISOString()}. A partial export is not necessarily a contiguous date range across
 							accounts.
 						</p>{/if}
-					<p>Completed addresses: {result.completedAddresses.join(', ') || 'None'}</p>
+					<p>Accounts scanned: {result.completedAddresses.join(', ') || 'None'}</p>
+					<p>
+						Native and ASA/VSA accounts scanned: {result.sourceScans.indexer.length} · ARC-200 accounts
+						scanned: {result.sourceScans.arc200.length}
+					</p>
 					{#if result.unfinishedAddresses.length}<p>
 							Unfinished addresses: {result.unfinishedAddresses.join(', ')}
 						</p>
 						<p>
-							Current account boundary: {result.cursor
-								? `after cursor ${result.cursor}`
-								: 'before the first page'}.
+							Current account boundary: {result.boundary?.source === 'arc200'
+								? `ARC-200 at or before round ${result.boundary.upperRound}`
+								: result.boundary?.nextToken
+									? `Native and ASA/VSA after cursor ${result.boundary.nextToken}`
+									: 'before the first page'}.
 						</p>{/if}
 				{/if}
 			</div>

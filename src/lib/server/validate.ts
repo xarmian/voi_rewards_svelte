@@ -1,3 +1,6 @@
+import { ARC200_MAX_ROUND_WINDOW } from '$lib/wallet/arc200Export';
+export { ARC200_MAX_ROUND_WINDOW };
+
 function isIntegerString(value: string): boolean {
 	return value.length > 0 && !/\D/.test(value);
 }
@@ -38,6 +41,11 @@ type ParamParser = (value: string) => RpcParam | null;
 
 const mimirSchemas: Record<string, Record<string, ParamParser>> = {
 	get_online_account_count: {},
+	get_arc200_tokens: {
+		contractId: (value) => (parseInteger(value, 1) === null ? null : value),
+		limit: (value) => parseInteger(value, 1, 1),
+		'next-token': (value) => parseInteger(value, 0, 0)
+	},
 	get_tx_counts: {
 		p_period: (value) => (value === 'day' || value === 'week' ? value : null),
 		p_n: (value) => parseInteger(value, 1, 60)
@@ -68,7 +76,16 @@ export function validateMimirParams(
 			error: `Invalid action. Allowed actions are: ${Object.keys(mimirSchemas).join(', ')}`
 		};
 	}
-	const schema = mimirSchemas[action];
+	const userOnly = action === 'get_arc200_transfers' && !searchParams.has('p_contractid');
+	const schema = userOnly
+		? {
+				p_user: parseAddress,
+				p_limit: mimirSchemas.get_arc200_transfers.p_limit,
+				p_offset: (value: string) => parseInteger(value, 0, 0),
+				p_min_round: (value: string) => parseInteger(value, 1),
+				p_max_round: (value: string) => parseInteger(value, 1)
+			}
+		: mimirSchemas[action];
 	for (const key of searchParams.keys()) {
 		if (key !== 'action' && !Object.keys(schema).includes(key)) {
 			return { error: `Unknown parameter: ${key}` };
@@ -83,6 +100,12 @@ export function validateMimirParams(
 		if (parsed === null) return { error: `Invalid parameter: ${key}` };
 		params[key] = parsed;
 	}
+	if (
+		userOnly &&
+		(Number(params.p_min_round) > Number(params.p_max_round) ||
+			Number(params.p_max_round) - Number(params.p_min_round) > ARC200_MAX_ROUND_WINDOW)
+	)
+		return { error: 'Invalid ARC-200 round window' };
 	return { action, params };
 }
 

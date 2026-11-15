@@ -1,6 +1,7 @@
 export type ActivityType = 'payment' | 'reward-payout' | 'asset-transfer' | 'close-out' | 'fee';
 export type ExportStatus =
 	| 'complete-indexed'
+	| 'partial-source'
 	| 'partial-cap'
 	| 'partial-cancelled'
 	| 'partial-error';
@@ -28,7 +29,7 @@ export interface ExportOptions extends Omit<ExportInput, 'assets'> {
 	endTime?: number;
 }
 export interface ExportQuery {
-	address: string;
+	address?: string;
 	maxRound: bigint;
 	limit: number;
 	nextToken?: string;
@@ -60,6 +61,8 @@ export interface NormalizedTransaction extends TransactionNode {
 	group: string;
 }
 export interface ExportRow {
+	assetKind: 'native' | 'asa' | 'arc200';
+	arc200Occurrence?: number;
 	assetId: bigint | null;
 	timestamp: number;
 	account: string;
@@ -191,6 +194,7 @@ export function mapTransaction(
 	function visit(node: TransactionNode, innerPath: string, parentApp?: bigint) {
 		const applicationId = node.type === 'appl' ? node.applicationId : parentApp;
 		const base = {
+			assetKind: 'native' as const,
 			assetId: null,
 			timestamp: root.timestamp,
 			txId: root.id,
@@ -223,6 +227,7 @@ export function mapTransaction(
 								: 'payment';
 				rows.push({
 					...base,
+					assetKind: assetId === null ? 'native' : 'asa',
 					assetId,
 					from,
 					account,
@@ -272,8 +277,9 @@ export function matchesFilters(row: ExportRow, options: ExportOptions): boolean 
 	return (
 		options.types.includes(row.type) &&
 		(options.assets.mode === 'asset'
-			? row.assetId === options.assets.id || row.type === 'fee'
-			: options.assets.mode === 'all' || row.assetId === null) &&
+			? (row.assetKind === 'asa' && row.assetId === options.assets.id) ||
+				(row.assetKind === 'native' && row.type === 'fee')
+			: options.assets.mode === 'all' || row.assetKind === 'native') &&
 		(options.allDates || (row.timestamp >= options.startTime! && row.timestamp < options.endTime!))
 	);
 }
@@ -282,6 +288,11 @@ function lexical(a: string, b: string): number {
 }
 export function compareRows(a: ExportRow, b: ExportRow): number {
 	if (a.round !== b.round) return a.round < b.round ? -1 : 1;
+	const aArc = a.assetKind === 'arc200';
+	const bArc = b.assetKind === 'arc200';
+	if (aArc !== bArc) return aArc ? 1 : -1;
+	if (aArc && bArc)
+		return lexical(a.account, b.account) || b.arc200Occurrence! - a.arc200Occurrence!;
 	const offset =
 		Number(a.offset === undefined) - Number(b.offset === undefined) ||
 		(a.offset ?? 0) - (b.offset ?? 0);

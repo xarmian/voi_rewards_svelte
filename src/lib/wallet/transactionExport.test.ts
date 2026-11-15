@@ -334,3 +334,38 @@ describe('asset options and combined filters', () => {
 		expect(matchesFilters({ ...rows[0], timestamp: root.timestamp + 86400 }, specific)).toBe(false);
 	});
 });
+
+describe('ARC-200 namespaces and ordering', () => {
+	it('includes ARC only in all assets and preserves exact type/date boundaries', () => {
+		const asa = { ...map(assetRoot())[0], assetId: 1n, assetKind: 'asa' as const };
+		const arc = { ...asa, assetKind: 'arc200' as const, arc200Occurrence: 0 };
+		expect(matchesFilters(arc, options({ assets: { mode: 'asset', id: '1' } }))).toBe(false);
+		expect(matchesFilters(asa, options({ assets: { mode: 'asset', id: '1' } }))).toBe(true);
+		expect(matchesFilters(arc, options())).toBe(false);
+		expect(matchesFilters(arc, options({ assets: { mode: 'all' } }))).toBe(true);
+		expect(matchesFilters(arc, options({ assets: { mode: 'all' }, types: ['fee'] }))).toBe(false);
+		expect(
+			[-1, 0, 86399, 86400].map((delta) =>
+				matchesFilters(
+					{ ...arc, timestamp: root.timestamp + delta },
+					options({ assets: { mode: 'all' } })
+				)
+			)
+		).toEqual([false, true, true, false]);
+	});
+	it('orders sources before offsets and keeps mixed triples transitive', () => {
+		const native = map()[0];
+		const rows = [
+			{ ...native, assetKind: 'arc200' as const, account: 'B', arc200Occurrence: 3, txId: 'A' },
+			{ ...native, assetKind: 'arc200' as const, account: 'A', arc200Occurrence: 1, txId: 'Z' },
+			{ ...native, assetKind: 'arc200' as const, account: 'A', arc200Occurrence: 2, txId: 'ZZ' },
+			{ ...native, offset: undefined, txId: 'Z' },
+			{ ...native, offset: 1, txId: 'A' }
+		];
+		const sorted = [...rows].sort(compareRows);
+		expect(sorted).toEqual([rows[4], rows[3], rows[2], rows[1], rows[0]]);
+		for (let a = 0; a < sorted.length; a++)
+			for (let b = a + 1; b < sorted.length; b++)
+				expect(compareRows(sorted[a], sorted[b])).toBeLessThan(0);
+	});
+});
