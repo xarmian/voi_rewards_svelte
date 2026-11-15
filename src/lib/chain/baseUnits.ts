@@ -1,10 +1,12 @@
+export const decimalAmountPattern = /^(?:\d+(?:\.\d*)?|\.\d+)$/;
+
 export function decimalToBaseUnits(value: string, decimals: number): bigint {
 	if (!Number.isInteger(decimals) || decimals < 0) {
 		throw new Error('Invalid amount: decimals must be a non-negative integer');
 	}
 
 	const trimmed = value.trim();
-	if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)) {
+	if (!decimalAmountPattern.test(trimmed)) {
 		throw new Error('Invalid amount: expected a decimal string');
 	}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isDecimalAmount, multiplyDecimal } from '$lib/chain/sendAmounts';
 	import { Modal, Button, Select, Input, Label } from 'flowbite-svelte';
 	import type { Recipient } from '$lib/types/recipients';
 	import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
@@ -375,7 +376,7 @@
 			if (i === addressColumnIndex) continue;
 			const hasNumericValue = parsedData.some((row) => {
 				const value = row.cells[i];
-				return value && !isNaN(Number(value));
+				return value && isDecimalAmount(value);
 			});
 			if (hasNumericValue) {
 				amountColumnIndex = i;
@@ -402,7 +403,7 @@
 			const hasStringValue = parsedData.some((row, index) => {
 				if (index === 0) return false; // Skip potential header row
 				const value = row.cells[i];
-				return value && typeof value === 'string' && value.length > 0 && isNaN(Number(value));
+				return value && typeof value === 'string' && value.length > 0 && !isDecimalAmount(value);
 			});
 
 			if (hasStringValue) {
@@ -523,7 +524,8 @@
 				if (!row || !row.cells[addressColumnIndex]) continue;
 
 				const addressOrName = row.cells[addressColumnIndex];
-				const amount = amountColumnIndex >= 0 ? row.cells[amountColumnIndex] || '' : '';
+				const amountCell = amountColumnIndex >= 0 ? row.cells[amountColumnIndex] || '' : '';
+				const amount = isDecimalAmount(amountCell) ? amountCell : '';
 				const note = noteColumnIndex >= 0 ? row.cells[noteColumnIndex] || '' : '';
 
 				// Skip invalid rows
@@ -827,18 +829,12 @@
 			return;
 		}
 
-		if (
-			arc200DistributionType === 'per-holder' &&
-			(!amountValue || isNaN(Number(amountValue)) || Number(amountValue) <= 0)
-		) {
+		if (arc200DistributionType === 'per-holder' && !isDecimalAmount(amountValue)) {
 			error = 'Please enter a valid amount';
 			return;
 		}
 
-		if (
-			arc200DistributionType === 'proportional' &&
-			(!amountValue || isNaN(Number(amountValue)) || Number(amountValue) <= 0)
-		) {
+		if (arc200DistributionType === 'proportional' && !isDecimalAmount(amountValue)) {
 			error = 'Please enter a valid total amount for the pool';
 			return;
 		}
@@ -923,6 +919,10 @@
 		}
 	}
 
+	function fractionDigits(value: string): number {
+		return value.trim().split('.')[1]?.length ?? 0;
+	}
+
 	async function handleNFTCollectionImport() {
 		if (!collectionId) {
 			error = 'Please enter a collection ID';
@@ -939,10 +939,7 @@
 			return;
 		}
 
-		if (
-			amountType !== 'none' &&
-			(!amountValue || isNaN(Number(amountValue)) || Number(amountValue) <= 0)
-		) {
+		if (amountType !== 'none' && !isDecimalAmount(amountValue)) {
 			error = 'Please enter a valid amount';
 			return;
 		}
@@ -1004,7 +1001,7 @@
 					if (amountType === 'per-holder') {
 						amount = String(amountValue);
 					} else if (amountType === 'per-nft') {
-						amount = (Number(amountValue) * count).toString();
+						amount = multiplyDecimal(amountValue, count, fractionDigits(amountValue)) ?? '';
 					} else if (amountType === 'total-pool') {
 						amount = (amountPerNFT * count).toFixed(8);
 					}
@@ -1371,7 +1368,8 @@
 												: amountType === 'per-nft'
 													? 'Amount per NFT'
 													: 'Total amount to distribute'}
-											bind:value={amountValue}
+											value={amountValue}
+											on:input={(event) => (amountValue = (event.target as HTMLInputElement).value)}
 										/>
 										<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 											{#if amountType === 'per-holder'}
@@ -1555,7 +1553,8 @@
 											placeholder={arc200DistributionType === 'per-holder'
 												? 'Amount per holder'
 												: 'Total amount to distribute'}
-											bind:value={amountValue}
+											value={amountValue}
+											on:input={(event) => (amountValue = (event.target as HTMLInputElement).value)}
 										/>
 									</div>
 								{/if}

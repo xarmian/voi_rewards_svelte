@@ -12,7 +12,7 @@ const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url),
 
 // Vitest uses Node without a DOM renderer. Exercise the actual component functions in isolation.
 function componentFunctions(names: string[], globals: Record<string, unknown>) {
-	const script = names
+	const script = [...new Set([...names, 'getExactBalance'])]
 		.map((name) => {
 			const match = source.match(
 				new RegExp(`\\t(?:async )?function ${name}\\([\\s\\S]*?\\n\\t\\}`)
@@ -295,7 +295,7 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 
 // Read the actual reactive assignments as well as event handlers, so display and send agree.
 async function amountHarness(amounts: string[], decimals: number, balance: number) {
-	const helpers = await import('../chain/sendAmounts').catch(() => ({}));
+	const helpers = await import('../chain/sendAmounts');
 	const names = [
 		'enforceDecimals',
 		'withinBalance',
@@ -329,7 +329,7 @@ async function amountHarness(amounts: string[], decimals: number, balance: numbe
 			'canMaxEach',
 			'totalRequiredForMax'
 		]) {
-			const assignment = source.match(new RegExp(`\\$:\\s*${name} = [\\s\\S]*?;`));
+			const assignment = source.match(new RegExp(`\\$:\\s*${name} =\\s*[\\s\\S]*?;`));
 			if (assignment) run(assignment[0].replace('$:', ''));
 		}
 	};

@@ -23,6 +23,13 @@
 	import { onDestroy, tick } from 'svelte';
 	import { sendGroups, retryRecipients } from '$lib/chain/groupSend';
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
+	import {
+		baseUnitsToDecimal,
+		isDecimalAmount,
+		splitEvenly,
+		fitsBalance,
+		multiplyDecimal
+	} from '$lib/chain/sendAmounts';
 	import { type Outcome, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { createSendDeps, createTrackingDeps } from '$lib/chain/trackingDeps';
 	import {
@@ -166,13 +173,13 @@
 		syncTokenProp(token);
 	}
 
-	// Update maxAmount when selected token changes
-	$: maxAmount = Number(
-		enforceDecimals(
-			selectedToken.balance / Math.pow(10, selectedToken.decimals),
-			selectedToken.decimals
-		)
-	);
+	// Use the same balance conversion for all displays and the send gate.
+	function getExactBalance(token: SendToken): bigint {
+		return BigInt(Math.floor(token.balance));
+	}
+	$: exactBalance = getExactBalance(selectedToken);
+	$: maxAmountString = baseUnitsToDecimal(exactBalance, selectedToken.decimals);
+	$: maxAmount = maxAmountString;
 
 	let recipients: Recipient[] = [
 		{ address: null, amount: '', note: '', info: null, isLoading: false, isValid: false }
@@ -328,12 +335,20 @@
 		return truncatedFraction ? `${whole}.${truncatedFraction}` : whole;
 	}
 
-	$: totalAmount = Number(
-		enforceDecimals(
-			recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
-			selectedToken.decimals
-		)
-	);
+	function displayTotal(rows: Recipient[], decimals: number): string {
+		try {
+			return baseUnitsToDecimal(
+				sumBaseUnits(
+					rows.map((r) => r.amount),
+					decimals
+				),
+				decimals
+			);
+		} catch {
+			return '—';
+		}
+	}
+	$: totalAmount = displayTotal(recipients, selectedToken.decimals);
 	$: isValidTotalAmount = withinBalance(recipients, selectedToken);
 
 	// The exact base-unit total must be positive and not exceed the balance; floats drift.
@@ -343,7 +358,7 @@
 				rows.map((r) => r.amount),
 				token.decimals
 			);
-			return total > 0n && total <= BigInt(Math.floor(token.balance));
+			return total > 0n && total <= getExactBalance(token);
 		} catch {
 			return false;
 		}
@@ -365,10 +380,23 @@
 		isValidTotalAmount &&
 		!isSending;
 
-	$: isValidAmount = amountToDistribute && Number(amountToDistribute) > 0;
-	$: canSplitEvenly = isValidAmount && Number(amountToDistribute) <= maxAmount;
-	$: canMaxEach = isValidAmount && Number(amountToDistribute) * recipients.length <= maxAmount;
-	$: totalRequiredForMax = isValidAmount ? Number(amountToDistribute) * recipients.length : 0;
+	$: isValidAmount = isDecimalAmount(amountToDistribute);
+	$: evenShare = splitEvenly(amountToDistribute, recipients.length, selectedToken.decimals);
+	$: distributionFitsBalance = fitsBalance(
+		amountToDistribute,
+		1,
+		selectedToken.decimals,
+		exactBalance
+	);
+	$: canSplitEvenly = evenShare !== null && distributionFitsBalance;
+	$: canMaxEach = fitsBalance(
+		amountToDistribute,
+		recipients.length,
+		selectedToken.decimals,
+		exactBalance
+	);
+	$: totalRequiredForMax =
+		multiplyDecimal(amountToDistribute, recipients.length, selectedToken.decimals) ?? '0';
 
 	function addRecipient() {
 		recipients = [
@@ -986,9 +1014,13 @@
 		if (type === 'even' && !canSplitEvenly) return;
 		if (type === 'max' && !canMaxEach) return;
 
-		const amount = Number(amountToDistribute);
 		if (type === 'even') {
-			const splitAmount = enforceDecimals(amount / recipients.length, selectedToken.decimals);
+			const splitAmount = splitEvenly(
+				amountToDistribute,
+				recipients.length,
+				selectedToken.decimals
+			);
+			if (splitAmount === null) return;
 			setAmountForAllRecipients(splitAmount);
 		} else {
 			setAmountForAllRecipients(enforceDecimals(amountToDistribute, selectedToken.decimals));
@@ -1232,7 +1264,7 @@
 							class="h-8 sm:h-12 rounded-full bg-transparent"
 						/>
 					{/if}
-					<span>Available: {maxAmount.toLocaleString()} {selectedToken.symbol}</span>
+					<span>Available: {maxAmountString} {selectedToken.symbol}</span>
 				</div>
 			</div>
 		</div>
@@ -1370,7 +1402,7 @@
 												<Label class="mb-2 text-sm">Amount to distribute:</Label>
 												<Input
 													type="number"
-													bind:value={amountToDistribute}
+													value={amountToDistribute}
 													min="0"
 													max={maxAmount}
 													step={`${1 / Math.pow(10, selectedToken.decimals)}`}
@@ -1384,7 +1416,7 @@
 														);
 													}}
 												/>
-												{#if amountToDistribute && Number(amountToDistribute) > maxAmount}
+												{#if isValidAmount && !distributionFitsBalance}
 													<p class="mt-1 text-xs text-red-500 dark:text-red-400">
 														Amount exceeds your balance
 													</p>
@@ -1409,9 +1441,7 @@
 															? 'text-gray-500'
 															: 'text-gray-400 dark:text-gray-600'}"
 													>
-														{amountToDistribute && Number(amountToDistribute) > 0
-															? (Number(amountToDistribute) / recipients.length).toFixed(6)
-															: '0'} each
+														{evenShare ?? '0'} each
 													</span>
 												</button>
 												<button
@@ -1440,7 +1470,7 @@
 														{/if}
 													</span>
 												</button>
-												{#if amountToDistribute && Number(amountToDistribute) > 0}
+												{#if isValidAmount}
 													{#if !canMaxEach && !canSplitEvenly}
 														<p class="text-xs text-red-500 dark:text-red-400">
 															Insufficient balance for either distribution method
@@ -1527,6 +1557,7 @@
 										isLastRecipient={recipients.length === 1}
 										{selectedToken}
 										{maxAmount}
+										decimals={selectedToken.decimals}
 										onRemove={removeRecipient}
 										onAmountChange={handleRecipientAmountChange}
 										onNoteChange={handleRecipientNoteChange}
