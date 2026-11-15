@@ -71,6 +71,20 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it('loads the algod minimum balance in VOI', async () => {
+	const data = await loadWallet('OWNER', 'OWNER');
+	expect(data.owner.minBalance).toBe(0.1);
+});
+
+it.each([undefined, null, NaN, Infinity])(
+	'leaves a missing or non-finite minimum balance (%s) unknown',
+	async (minBalance) => {
+		mocks.account.mockResolvedValue({ amount: 1e9, status: 'Online', minBalance });
+		const data = await loadWallet('OWNER', 'OWNER');
+		expect(data.owner.minBalance).toBeNull();
+	}
+);
+
 it('uses the live epoch rows for the current figure and keeps 12 complete epochs separately', async () => {
 	const data = await loadWallet('OWNER', 'OWNER');
 	expect(data.current.epoch).toBe(104);
