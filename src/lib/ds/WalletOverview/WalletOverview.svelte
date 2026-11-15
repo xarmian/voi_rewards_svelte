@@ -105,7 +105,7 @@
 			<div class="flex flex-wrap items-center gap-5">
 				<HealthRing
 					value={summary.onlineContracts}
-					total={summary.contractCount}
+					total={summary.healthContractCount}
 					tone={summary.healthTone}
 					state={loading ? 'loading' : 'ready'}
 				/>
@@ -133,7 +133,7 @@
 						<HealthItem
 							tone={summary.idleCount ? 'warn' : 'ok'}
 							title={`${comma(summary.idleCount)} contracts not staking`}
-							detail={`${compact(summary.idleBalance, 1)} VOI idle${summary.idleCount && accountState.state === 'yours' ? ' · register a key in Contracts to earn' : ''}`}
+							detail={`${compact(summary.idleBalance, 1)} VOI idle${summary.idleCount && accountState.state === 'yours' ? ' · register a key in Contracts to earn' : ''}${summary.emptyContracts > 0 ? ` · ${comma(summary.emptyContracts)} empty ${summary.emptyContracts === 1 ? 'contract' : 'contracts'} not shown` : ''}`}
 						/>
 					</ul>
 				{/if}

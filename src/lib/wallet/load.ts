@@ -301,6 +301,7 @@ export async function loadWallet(
 			address,
 			contractId,
 			balance,
+			minBalance: account.minBalance == null ? null : finite(Number(account.minBalance) / 1e6),
 			isParticipating: account.status === 'Online',
 			round: supply!['current-round'],
 			voteLastValid: account.participation
