@@ -4,7 +4,14 @@ import Panel from './TransactionExportPanel.svelte';
 
 it('shows labelled asset choices and transfer disclosure before Start with native scope selected', () => {
 	const { body } = render(Panel, {
-		props: { pageAddress: 'A', suggestions: [], suggestionsAvailable: false, onclose: () => {} }
+		props: {
+			pageAddress: 'A',
+			suggestions: [],
+			suggestionsAvailable: false,
+			stakingContracts: [],
+			stakingContractsAvailable: false,
+			onclose: () => {}
+		}
 	});
 	const html = body.replace(/\s+/g, ' ');
 	expect(html).toContain('Export wallet activity');
@@ -25,6 +32,32 @@ it('shows labelled asset choices and transfer disclosure before Start with nativ
 		expect(html.indexOf(copy)).toBeLessThan(html.indexOf('Start export'));
 	}
 	expect(html).not.toContain('NFTs are not included');
-	expect(html).toContain('Staking labels are unavailable.');
+	expect(html).not.toContain('Staking labels are unavailable.');
 	expect(html).toContain('estimated rewards are excluded.');
 });
+
+it.each([true, false])(
+	'discloses staking coverage with availability %s',
+	(stakingContractsAvailable) => {
+		const { body } = render(Panel, {
+			props: {
+				pageAddress: 'A',
+				suggestions: [],
+				suggestionsAvailable: true,
+				stakingContracts: [{ address: 'CONTRACT', contractId: 12 }],
+				stakingContractsAvailable,
+				onclose: () => {}
+			}
+		});
+		const html = body.replace(/\s+/g, ' ');
+		expect(html).toContain(
+			'The Staking contract column marks transfers to and from the staking contracts this wallet owns now, as this site knows them. Contracts it owned earlier are not marked unless you add their address.'
+		);
+		expect(html).not.toContain('Staking labels are unavailable.');
+		expect(html).toContain('id="export-types-help"');
+		expect(html).toContain('aria-describedby="export-types-help"');
+		const warning =
+			"Staking contracts couldn't be loaded, so the Staking contract column will be empty.";
+		expect(html.includes(warning)).toBe(!stakingContractsAvailable);
+	}
+);

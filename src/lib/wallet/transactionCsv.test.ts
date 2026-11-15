@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import { csvCell, protectText, serializeCsv, exportFilename } from './transactionCsv';
-import { normalizeOptions, type ExportRow } from './transactionExport';
+import { mapTransaction, normalizeOptions, type ExportRow } from './transactionExport';
 
 const header =
-	'"Timestamp (UTC)","Account","Tx ID","Inner path","Transaction type","Type","Direction","From","To","Asset","Amount","Fee (VOI)","Round","Group ID","Application ID","Note","Snapshot round","Export status","Asset ID","Asset unit","Asset name","Asset decimals"\r\n';
+	'"Timestamp (UTC)","Account","Tx ID","Inner path","Transaction type","Type","Direction","From","To","Asset","Amount","Fee (VOI)","Round","Group ID","Application ID","Note","Snapshot round","Export status","Asset ID","Asset unit","Asset name","Asset decimals","Staking contract"\r\n';
 const row: ExportRow = {
 	assetId: null,
 	timestamp: 0,
@@ -24,6 +24,7 @@ const row: ExportRow = {
 };
 const context = {
 	assets: new Map(),
+	stakingContracts: new Map<string, string>(),
 	snapshotRound: 9007199254740999n,
 	status: 'complete-indexed' as const
 };
@@ -31,7 +32,7 @@ const context = {
 it('writes exact RFC 4180 bytes with one header, quoted cells and final CRLF', () => {
 	expect(serializeCsv([row], context)).toBe(
 		header +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","payment","in","A","B","VOI","9007199254.740993","0","9007199254740993","","","Hi,""世界""\r\nnext","9007199254740999","complete-indexed","","VOI","VOI (native)","6"\r\n'
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","payment","in","A","B","VOI","9007199254.740993","0","9007199254740993","","","Hi,""世界""\r\nnext","9007199254740999","complete-indexed","","VOI","VOI (native)","6",""\r\n'
 	);
 	expect(serializeCsv([], context)).toBe(header);
 	expect(csvCell('a,"b"')).toBe('"a,""b"""');
@@ -119,13 +120,13 @@ it('writes a literal mixed-asset golden with exact scales and native fees', () =
 	);
 	expect(csv).toBe(
 		header +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","90071992.54740993","0","9007199254740993","","","","9007199254740999","complete-indexed","9007199254740995","EIGHT","Eight","8"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","9007199254740993","0","9007199254740993","","","","9007199254740999","complete-indexed","2","","","0"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","123.45","0","9007199254740993","","","","9007199254740999","complete-indexed","3","FOUR","Four","4"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","0.0000000000000000001","0","9007199254740993","","","","9007199254740999","complete-indexed","4","NINETEEN","Nineteen","19"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","9007199254740993","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6"\r\n'
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","90071992.54740993","0","9007199254740993","","","","9007199254740999","complete-indexed","9007199254740995","EIGHT","Eight","8",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","9007199254740993","0","9007199254740993","","","","9007199254740999","complete-indexed","2","","","0",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","123.45","0","9007199254740993","","","","9007199254740999","complete-indexed","3","FOUR","Four","4",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","0.0000000000000000001","0","9007199254740993","","","","9007199254740999","complete-indexed","4","NINETEEN","Nineteen","19",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","9007199254740993","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6",""\r\n'
 	);
-	expect(csv.split('\r\n')[0].split(',')).toHaveLength(22);
+	expect(csv.split('\r\n')[0].split(',')).toHaveLength(23);
 	expect(csv).not.toMatch(/\d[eE][+-]\d/);
 });
 it.each([
@@ -148,3 +149,118 @@ it.each(['=1', ' \u0001-cmd', '\tvalue', ' @x,"quoted"\r\nnext'])(
 		expect(csv).toContain([csvCell("'" + value), csvCell("'" + value), '"0"'].join(','));
 	}
 );
+
+const contracts = new Map([
+	['CONTRACT', '9007199254740993'],
+	['SECOND', '12'],
+	['SAME_ID', '12']
+]);
+function stakingCell(exportRow: ExportRow, stakingContracts = contracts) {
+	const csv = serializeCsv([{ ...exportRow, note: '' }], { ...context, stakingContracts });
+	return csv.split('\r\n')[1].split(',').at(-1);
+}
+it.each([
+	['outgoing', 'B', 'CONTRACT', 'out', '9007199254740993'],
+	['incoming', 'CONTRACT', 'B', 'in', '9007199254740993'],
+	['unknown application', 'B', 'UNKNOWN_APP', 'out', ''],
+	['two contracts', 'CONTRACT', 'SECOND', 'out', '12 9007199254740993'],
+	['reverse endpoints', 'SECOND', 'CONTRACT', 'in', '12 9007199254740993'],
+	['same contract', 'CONTRACT', 'CONTRACT', 'self', '9007199254740993'],
+	['same ID', 'SECOND', 'SAME_ID', 'out', '12']
+] as const)(
+	'marks %s payments using only the row endpoints',
+	(_, from, to, direction, expected) => {
+		expect(stakingCell({ ...row, from, to, direction })).toBe('"' + expected + '"');
+	}
+);
+it('marks inner payments and preserves reward payout precedence', () => {
+	const rows = mapTransaction(
+		{
+			id: 'APP',
+			round: 1n,
+			timestamp: 0,
+			group: '',
+			type: 'appl',
+			sender: 'B',
+			fee: 0n,
+			note: '',
+			applicationId: 99n,
+			inner: [
+				{
+					type: 'pay',
+					sender: 'CONTRACT',
+					fee: 0n,
+					note: '',
+					inner: [],
+					payment: { receiver: 'B', amount: 1n, closeAmount: 0n }
+				}
+			]
+		},
+		new Set(['B']),
+		new Set(['CONTRACT'])
+	);
+	expect(rows).toHaveLength(1);
+	expect(rows[0]).toMatchObject({ innerPath: '0', from: 'CONTRACT', type: 'reward-payout' });
+	expect(stakingCell(rows[0])).toBe('"9007199254740993"');
+});
+it('marks asset transfers, close-outs and fees using their own serialized endpoints', () => {
+	const rows = mapTransaction(
+		{
+			id: 'ASSET',
+			round: 1n,
+			timestamp: 0,
+			group: '',
+			type: 'axfer',
+			sender: 'SECOND',
+			fee: 1n,
+			note: '',
+			inner: [],
+			assetTransfer: {
+				assetId: 1n,
+				sender: 'B',
+				receiver: 'UNKNOWN_APP',
+				amount: 2n,
+				closeAmount: 3n,
+				closeTo: 'CONTRACT'
+			}
+		},
+		new Set(['B', 'SECOND']),
+		new Set()
+	);
+	const csv = serializeCsv(rows, {
+		...context,
+		stakingContracts: contracts,
+		assets: new Map([[1n, { id: 1n, decimals: 0, unitName: '', name: '' }]])
+	});
+	expect(rows.map(({ type, from, to }) => [type, from, to])).toEqual([
+		['asset-transfer', 'B', 'UNKNOWN_APP'],
+		['close-out', 'B', 'CONTRACT'],
+		['fee', 'SECOND', '']
+	]);
+	expect(
+		csv
+			.trimEnd()
+			.split('\r\n')
+			.slice(1)
+			.map((line) => line.split(',').at(-1))
+	).toEqual(['""', '"9007199254740993"', '"12"']);
+	expect(stakingCell({ ...row, type: 'asset-transfer', from: 'CONTRACT' })).toBe(
+		'"9007199254740993"'
+	);
+});
+it('keeps all 23 columns and empty staking cells when contracts are unavailable', () => {
+	const rows = (['payment', 'reward-payout', 'asset-transfer', 'close-out', 'fee'] as const).map(
+		(type) => ({ ...row, type, from: 'CONTRACT', note: '' })
+	);
+	const lines = serializeCsv(rows, context).trimEnd().split('\r\n');
+	expect(lines[0].split(',')).toHaveLength(23);
+	expect(lines[0].split(',').at(-1)).toBe('"Staking contract"');
+	for (const line of lines.slice(1)) {
+		expect(line.split(',')).toHaveLength(23);
+		expect(line.split(',').at(-1)).toBe('""');
+	}
+});
+it('quotes staking IDs as plain decimal digits without spreadsheet formula prefixes', () => {
+	expect(stakingCell({ ...row, from: 'CONTRACT' })).toMatch(/^"[0-9]+"$/);
+	expect(stakingCell({ ...row, from: 'UNKNOWN_APP' })).toBe('""');
+});
