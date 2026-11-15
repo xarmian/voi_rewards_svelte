@@ -2,7 +2,62 @@ import { pageAccountState } from '$lib/chain/signerGate';
 import { expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import WalletOverview from './WalletOverview.svelte';
-import { summarizeWallet } from '../../wallet/summary';
+import { summarizeWallet, type WalletContract } from '../../wallet/summary';
+
+it.each([0, 1, 2])('leaves %i empty contracts out of the health ring', (emptyCount) => {
+	const online: WalletContract = {
+		address: 'ONLINE',
+		contractId: 1,
+		balance: 5,
+		minBalance: 0.1,
+		isParticipating: true,
+		round: 100,
+		voteLastValid: 10000000,
+		lastVoteAt: '2026-10-25T00:00:00Z',
+		lastBlock: 99,
+		details: null
+	};
+	const contracts = [
+		online,
+		...Array.from({ length: emptyCount }, (_, i) => ({
+			...online,
+			address: `EMPTY${i}`,
+			contractId: i + 2,
+			balance: 0.2,
+			minBalance: 0.2,
+			isParticipating: false,
+			voteLastValid: null
+		}))
+	];
+	const now = Date.parse('2026-10-25T00:00:00Z');
+	const summary = summarizeWallet({
+		owner: null,
+		contracts,
+		current: null,
+		history: [],
+		state: 'ready',
+		now
+	});
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now
+		}
+	}).body;
+	const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+	expect.soft(html).toContain('aria-label="1 of 1 contracts online"');
+	if (emptyCount > 0) {
+		expect(text).toContain(
+			`0 VOI idle · ${emptyCount} empty ${emptyCount === 1 ? 'contract' : 'contracts'} not shown`
+		);
+	} else {
+		expect(text).not.toContain('not shown');
+	}
+});
 
 it('server-renders the complete Overview skeleton without claiming zero balances', () => {
 	const summary = summarizeWallet({

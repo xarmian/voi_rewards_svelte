@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeWallet, type WalletAccount, type WalletEpoch } from './summary';
+import { isEmptyContract, summarizeWallet, type WalletAccount, type WalletEpoch } from './summary';
 
 const owner: WalletAccount = {
 	address: 'OWNER',
@@ -39,7 +39,44 @@ const summarize = (contracts: WalletAccount[], current = epoch, primary = owner)
 		now: Date.parse('2026-10-25T00:00:00Z')
 	});
 
+describe('isEmptyContract', () => {
+	it.each([
+		{ balance: 0.1, minBalance: 0.1, isParticipating: false, empty: true },
+		{ balance: 0.101, minBalance: 0.1, isParticipating: false, empty: true },
+		{ balance: 0.101001, minBalance: 0.1, isParticipating: false, empty: false },
+		{ balance: 0.25, minBalance: 0.2485, isParticipating: false, empty: false },
+		{ balance: 0.249, minBalance: 0.2485, isParticipating: false, empty: true },
+		{ balance: 0.1, minBalance: 0.1, isParticipating: true, empty: false },
+		{ balance: 0.1, minBalance: undefined, isParticipating: false, empty: true },
+		{ balance: 5, minBalance: undefined, isParticipating: false, empty: false },
+		{ balance: 0.1, minBalance: null, isParticipating: false, empty: true },
+		{ balance: 0.1, minBalance: NaN, isParticipating: false, empty: true },
+		{ balance: 5, minBalance: Infinity, isParticipating: false, empty: false }
+	])(
+		'balance $balance, minimum $minBalance, participating $isParticipating: empty $empty',
+		({ empty, ...account }) => {
+			expect(isEmptyContract({ ...owner, ...account })).toBe(empty);
+		}
+	);
+});
+
 describe('owner and contracts roll-up', () => {
+	it('excludes empty contracts from health while retaining funded idle contracts', () => {
+		const funded = online('FUNDED');
+		const empty = { ...owner, address: 'EMPTY', contractId: 2, balance: 0.2, minBalance: 0.2 };
+		const idle = { ...owner, address: 'IDLE', contractId: 3, balance: 0.2, minBalance: 0.1 };
+		const primary = { ...online('OWNER'), contractId: 0 };
+		const result = summarize([funded, empty, idle], epoch, primary);
+		expect(result.emptyContracts).toBe(1);
+		expect(result.healthContractCount).toBe(2);
+		expect(result.contractCount).toBe(3);
+		expect(result.idleCount).toBe(1);
+		expect(result.idleBalance).toBe(0.2);
+		expect(result.healthTone).toBe('warn');
+		const healthy = summarize([funded, empty], epoch, primary);
+		expect(healthy.healthTone).toBe('ok');
+		expect(healthy.emptyContracts).toBe(1);
+	});
 	it('offline owner with 16 contracts counts only the three online balances as current stake', () => {
 		const contracts = Array.from({ length: 16 }, (_, i) => ({
 			...online(`C${i}`),
@@ -103,8 +140,10 @@ describe('owner and contracts roll-up', () => {
 });
 
 it('drained contracts do not count as idle or warn an otherwise healthy owner', () => {
-	const drained = { ...owner, address: 'DRAINED', balance: 0.1 };
+	const drained = { ...owner, address: 'DRAINED', balance: 0.249, minBalance: 0.2485 };
 	const result = summarize([drained], epoch, online('OWNER'));
+	expect(result.emptyContracts).toBe(1);
+	expect(result.healthContractCount).toBe(0);
 	expect(result.idleCount).toBe(0);
 	expect(result.idleBalance).toBe(0);
 	expect(result.healthTone).toBe('ok');

@@ -2,13 +2,16 @@ import type { DataState, Tone } from '$lib/ds/types';
 import type { ContractDetails } from '$lib/types';
 import { vestingStartTime } from './vesting';
 
-export const IDLE_CONTRACT_MIN_BALANCE = 0.1;
+export const BASE_MIN_BALANCE_VOI = 0.1;
+export const MIN_FEE_MICROVOI = 1000;
 
 /** Display amounts are VOI. ContractDetails retains the existing modal's microVOI units. */
 export type WalletAccount = {
 	address: string;
 	contractId: number;
 	balance: number;
+	/** Account minimum balance in VOI, from algod min-balance. */
+	minBalance?: number | null;
 	isParticipating: boolean;
 	round: number;
 	voteLastValid: number | null;
@@ -17,6 +20,18 @@ export type WalletAccount = {
 	lastBlockAt?: string | null;
 	details?: ContractDetails | null;
 };
+
+export function isEmptyContract(account: WalletAccount): boolean {
+	const minBalance =
+		typeof account.minBalance === 'number' && Number.isFinite(account.minBalance)
+			? account.minBalance
+			: BASE_MIN_BALANCE_VOI;
+	return (
+		account.isParticipating === false &&
+		Math.round(account.balance * 1e6) - Math.round(minBalance * 1e6) <= MIN_FEE_MICROVOI
+	);
+}
+
 export type WalletContract = WalletAccount & { details: ContractDetails | null };
 export type WalletEpoch = {
 	epoch: number;
@@ -54,6 +69,8 @@ export type WalletSummary = {
 	state: DataState;
 	ownerLookup?: 'ok' | 'unavailable';
 	contractCount: number;
+	emptyContracts: number;
+	healthContractCount: number;
 	onlineContracts: number;
 	onlineAccounts: number;
 	stakedOnline: number;
@@ -108,9 +125,8 @@ export function summarizeWallet({
 	];
 	const online = accounts.filter((account) => account.isParticipating);
 	const stakedOnline = online.reduce((total, account) => total + account.balance, 0);
-	const idle = contracts.filter(
-		(account) => !account.isParticipating && account.balance > IDLE_CONTRACT_MIN_BALANCE
-	);
+	const idle = contracts.filter((account) => !account.isParticipating && !isEmptyContract(account));
+	const emptyContracts = contracts.filter(isEmptyContract).length;
 	const keyDays = accounts
 		.filter((account) => account.voteLastValid !== null && Number.isFinite(account.voteLastValid))
 		.map((account) => ((account.voteLastValid! - account.round) * 2.8) / 86400);
@@ -261,6 +277,8 @@ export function summarizeWallet({
 		},
 		state,
 		contractCount: contracts.length,
+		emptyContracts,
+		healthContractCount: contracts.length - emptyContracts,
 		onlineContracts: contracts.filter((account) => account.isParticipating).length,
 		onlineAccounts: online.length,
 		stakedOnline,
