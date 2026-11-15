@@ -321,7 +321,7 @@
 			</div>
 			<div aria-busy={busy} class="space-y-3">
 				<p aria-live="polite" aria-atomic="true" class="sr-only">{liveStatus}</p>
-				<p>{statusText}</p>
+				{#if busy || !result}<p>{statusText}</p>{/if}
 				{#if result && frozen}
 					<StatusPill
 						tone={result.status === 'complete-indexed' ? 'ok' : 'warn'}
