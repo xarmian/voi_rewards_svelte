@@ -43,8 +43,12 @@ describe('isEmptyContract', () => {
 	it.each([
 		{ balance: 0.1, minBalance: 0.1, isParticipating: false, empty: true },
 		{ balance: 0.101, minBalance: 0.1, isParticipating: false, empty: true },
-		{ balance: 0.101001, minBalance: 0.1, isParticipating: false, empty: false },
-		{ balance: 0.25, minBalance: 0.2485, isParticipating: false, empty: false },
+		{ balance: 0.102, minBalance: 0.1, isParticipating: false, empty: true },
+		{ balance: 0.5, minBalance: 0.1, isParticipating: false, empty: true },
+		{ balance: 1.099999, minBalance: 0.1, isParticipating: false, empty: true },
+		{ balance: 1.1, minBalance: 0.1, isParticipating: false, empty: false },
+		{ balance: 1.2485, minBalance: 0.2485, isParticipating: false, empty: false },
+		{ balance: 1.248499, minBalance: 0.2485, isParticipating: false, empty: true },
 		{ balance: 0.249, minBalance: 0.2485, isParticipating: false, empty: true },
 		{ balance: 0.1, minBalance: 0.1, isParticipating: true, empty: false },
 		{ balance: 0.1, minBalance: undefined, isParticipating: false, empty: true },
@@ -64,14 +68,14 @@ describe('owner and contracts roll-up', () => {
 	it('excludes empty contracts from health while retaining funded idle contracts', () => {
 		const funded = online('FUNDED');
 		const empty = { ...owner, address: 'EMPTY', contractId: 2, balance: 0.2, minBalance: 0.2 };
-		const idle = { ...owner, address: 'IDLE', contractId: 3, balance: 0.2, minBalance: 0.1 };
+		const idle = { ...owner, address: 'IDLE', contractId: 3, balance: 1.1, minBalance: 0.1 };
 		const primary = { ...online('OWNER'), contractId: 0 };
 		const result = summarize([funded, empty, idle], epoch, primary);
 		expect(result.emptyContracts).toBe(1);
 		expect(result.healthContractCount).toBe(2);
 		expect(result.contractCount).toBe(3);
 		expect(result.idleCount).toBe(1);
-		expect(result.idleBalance).toBe(0.2);
+		expect(result.idleBalance).toBe(1.1);
 		expect(result.healthTone).toBe('warn');
 		const healthy = summarize([funded, empty], epoch, primary);
 		expect(healthy.healthTone).toBe('ok');

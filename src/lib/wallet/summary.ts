@@ -3,7 +3,12 @@ import type { ContractDetails } from '$lib/types';
 import { vestingStartTime } from './vesting';
 
 export const BASE_MIN_BALANCE_VOI = 0.1;
-export const MIN_FEE_MICROVOI = 1000;
+/**
+ * Stake above the minimum balance below which an offline contract counts as empty. Under 1 VOI
+ * an account's share of online stake is so small it would not expect a block, so registering a
+ * key could not earn anything: it is not a staking contract left idle.
+ */
+export const MIN_STAKE_MICROVOI = 1_000_000;
 
 /** Display amounts are VOI. ContractDetails retains the existing modal's microVOI units. */
 export type WalletAccount = {
@@ -28,7 +33,7 @@ export function isEmptyContract(account: WalletAccount): boolean {
 			: BASE_MIN_BALANCE_VOI;
 	return (
 		account.isParticipating === false &&
-		Math.round(account.balance * 1e6) - Math.round(minBalance * 1e6) <= MIN_FEE_MICROVOI
+		Math.round(account.balance * 1e6) - Math.round(minBalance * 1e6) < MIN_STAKE_MICROVOI
 	);
 }
 
