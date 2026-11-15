@@ -269,14 +269,12 @@
 	<button
 		type="button"
 		role="menuitem"
-		class="block w-full rounded-ds-xs px-3 py-2 text-start hover:bg-surface-2"
 		onclick={() => (tableStatus = `Copy address selected for ${proposerName(row)} (illustrative).`)}
 		>Copy address</button
 	>
 	<button
 		type="button"
 		role="menuitem"
-		class="block w-full rounded-ds-xs px-3 py-2 text-start hover:bg-surface-2"
 		onclick={() =>
 			(tableStatus = `Edit nickname selected for ${proposerName(row)} (illustrative).`)}
 		>Edit nickname</button

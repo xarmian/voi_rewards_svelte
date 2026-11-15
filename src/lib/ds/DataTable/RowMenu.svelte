@@ -11,7 +11,7 @@
 		name: string;
 		trigger: HTMLButtonElement;
 		onclose: (restoreFocus: boolean) => void;
-		/** Native buttons with role="menuitem"; this menu owns their keyboard navigation. */
+		/** Pass bare native buttons with role="menuitem"; this menu owns their styling and keyboard navigation. */
 		children: Snippet;
 	} = $props();
 	function menu(node: HTMLDivElement) {
@@ -85,7 +85,7 @@
 	role="menu"
 	aria-label="Actions for {name}"
 	use:menu
-	class="absolute right-0 top-full z-10 w-44 max-w-[80vw] rounded-ds-sm border border-line bg-surface p-1 text-start text-sm text-ink shadow-pop"
+	class="absolute right-0 top-full z-10 w-44 max-w-[80vw] rounded-ds-sm border border-line bg-surface p-1 text-start text-sm text-ink shadow-pop [&_[role=menuitem]]:block [&_[role=menuitem]]:w-full [&_[role=menuitem]]:rounded-ds-xs [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:py-2 [&_[role=menuitem]]:text-start [&_[role=menuitem]:hover]:bg-surface-2 [&_[role=menuitem]:focus-visible]:bg-surface-2 [&_[role=menuitem]:disabled]:opacity-50 [&_[role=menuitem]:disabled]:cursor-not-allowed [&_[role=menuitem]:disabled:hover]:bg-transparent"
 >
 	{@render children()}
 </div>
