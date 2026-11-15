@@ -36,6 +36,7 @@
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
 	import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
+	import TransactionExportPanel from '$lib/component/TransactionExportPanel.svelte';
 
 	let {
 		data
@@ -96,6 +97,41 @@
 				) ?? [])
 			: []
 	);
+	let exportAddress = $state('');
+	const exportOpen = $derived(exportAddress === walletId && !!walletId);
+	const exportSuggestions = $derived.by(() => {
+		if (parentWalletId) return [{ address: parentWalletId, label: 'Owner address' }];
+		if (ownerLookup !== 'ok') return [];
+		const contracts = [
+			...viewContracts,
+			...(contractsMatch ? (contractsSnapshot?.contracts ?? []) : [])
+		];
+		return [
+			...new Map(
+				contracts.map((contract) => [
+					contract.address,
+					{
+						address: contract.address,
+						label: `Contract ${contract.contractId}`
+					}
+				])
+			).values()
+		];
+	});
+	const exportSuggestionsAvailable = $derived(
+		ownerLookup === 'ok' &&
+			(!!parentWalletId ||
+				knownContractSet === 'ready' ||
+				(contractsMatch && contractsSnapshot?.contractSet === 'ready'))
+	);
+	$effect(() => {
+		void walletId;
+		exportAddress = '';
+	});
+	function closeExport() {
+		exportAddress = '';
+		document.getElementById('voi-activity-export-entry')?.focus();
+	}
 	const viewOwner = $derived(
 		parentWalletId || !snapshotMatches || ownerLookup !== 'ok' ? null : (snapshot?.owner ?? null)
 	);
@@ -486,6 +522,17 @@
 							>{:else}Wallet data loads in your browser.{/if}
 					</p>
 					<Button
+						id="voi-activity-export-entry"
+						variant="soft"
+						size="sm"
+						aria-expanded={exportOpen}
+						aria-controls="voi-activity-export"
+						onclick={() => {
+							if (exportOpen) closeExport();
+							else exportAddress = walletId;
+						}}>Export VOI activity</Button
+					>
+					<Button
 						variant="soft"
 						size="sm"
 						onclick={refresh}
@@ -494,6 +541,14 @@
 							: loadState === 'loading'}>Refresh wallet data</Button
 					>
 				</div>
+				{#if exportOpen}
+					<TransactionExportPanel
+						pageAddress={walletId}
+						suggestions={exportSuggestions}
+						suggestionsAvailable={exportSuggestionsAvailable}
+						onclose={closeExport}
+					/>
+				{/if}
 				{#if dataState === 'stale'}<div class="mt-3">
 						<InlineAlert
 							tone="warn"
