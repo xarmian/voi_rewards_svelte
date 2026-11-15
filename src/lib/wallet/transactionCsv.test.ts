@@ -80,7 +80,7 @@ it('shows the native-only disclosure before Start', async () => {
 	const { body } = render(Panel, {
 		props: { pageAddress: 'A', suggestions: [], suggestionsAvailable: false, onclose: () => {} }
 	});
-	expect(body).toContain(
+	expect(body.replace(/\s+/g, ' ')).toContain(
 		'This export covers native VOI only. Tokens (ASA/VSA and ARC-200), LP positions and NFTs are not included.'
 	);
 	expect(body).toContain('Start export');

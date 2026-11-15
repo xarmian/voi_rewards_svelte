@@ -291,20 +291,36 @@ describe('retry, pacing and cancellation', () => {
 		await Promise.resolve();
 		expect((await run.retry()).rows).toHaveLength(0);
 	});
-	it('enforces a 30-second deadline and discards late results', async () => {
+	it('enforces the deadline and waits for the old transport before retrying the same boundary', async () => {
 		vi.useFakeTimers();
 		let signal!: AbortSignal;
-		const { run } = setup([], {
-			readPage: async (_q, s) => {
-				signal = s;
-				return new Promise(() => {});
-			}
+		let resolve!: (page: ExportPage) => void;
+		const readPage = vi.fn(async (_query: ExportQuery, requestSignal: AbortSignal) => {
+			signal = requestSignal;
+			if (readPage.mock.calls.length === 1)
+				return new Promise<ExportPage>((r) => {
+					resolve = r;
+				});
+			return page('retry');
 		});
+		const { run } = setup([], { readPage });
 		const pending = run.start();
-		await vi.advanceTimersByTimeAsync(0);
 		await vi.advanceTimersByTimeAsync(30000);
-		const result = await pending;
-		expect(result).toMatchObject({ status: 'partial-error', pages: 0, rows: [] });
+		expect(await pending).toMatchObject({
+			status: 'partial-error',
+			pages: 0,
+			rows: [],
+			canRetry: true
+		});
 		expect(signal.aborted).toBe(true);
+		const retried = run.retry();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(readPage).toHaveBeenCalledTimes(1);
+		resolve(page('late'));
+		await vi.advanceTimersByTimeAsync(0);
+		const result = await retried;
+		expect(result).toMatchObject({ status: 'complete-indexed', pages: 1 });
+		expect(result.rows.map((row) => row.txId)).toEqual(['retry', 'retry']);
+		expect(readPage.mock.calls.map(([query]) => query.nextToken)).toEqual([undefined, undefined]);
 	});
 });
