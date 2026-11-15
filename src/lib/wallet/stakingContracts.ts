@@ -2,6 +2,7 @@ export interface StakingContract {
 	address: string;
 	contractId: number | string | bigint;
 }
+const MAX_APPLICATION_ID = 2n ** 64n - 1n;
 export function buildStakingContractMap(
 	contracts: readonly StakingContract[],
 	available = true
@@ -15,7 +16,7 @@ export function buildStakingContractMap(
 		)
 			continue;
 		const id = BigInt(contractId);
-		if (id < 0n) continue;
+		if (id < 1n || id > MAX_APPLICATION_ID) continue;
 		result.set(address, id.toString());
 	}
 	return result;
