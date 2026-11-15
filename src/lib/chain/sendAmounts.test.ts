@@ -3,7 +3,9 @@ import { decimalToBaseUnits } from './baseUnits';
 import {
 	baseUnitsToDecimal,
 	isDecimalAmount,
-	isDecimalNumber,
+	isNumericCell,
+	combineAmounts,
+	getSplitError,
 	splitEvenly,
 	fitsBalance,
 	multiplyDecimal
@@ -47,9 +49,15 @@ test.each([
 	['0', true],
 	['0.00', true],
 	[' 0.00 ', true],
-	['1e3', false]
-] as const)('decimal grammar classifies %j as %s', (value, expected) => {
-	expect(isDecimalNumber(value)).toBe(expected);
+	['-1', true],
+	['1e-7', true],
+	['1.2345678901234568e+23', true],
+	['abc', false],
+	['1,000', false],
+	[' ', false],
+	['Infinity', false]
+] as const)('numeric detection classifies %j as %s', (value, expected) => {
+	expect(isNumericCell(value)).toBe(expected);
 });
 
 test('splits in whole base units, dropping only the remainder', () => {
@@ -81,4 +89,26 @@ test('multiplies without drift or exponent notation', () => {
 	for (const factor of [-1, 0.5, NaN, Infinity]) expect(multiplyDecimal('1', factor, 6)).toBeNull();
 	for (const value of ['bad', '1e3', '-1', '']) expect(multiplyDecimal(value, 3, 6)).toBeNull();
 	expect(multiplyDecimal('1', 3, -1)).toBeNull();
+});
+
+test.each([
+	['0.1', '0.2', 'sum', 18, '0.3'],
+	['0.0000001', '0.0000001', 'sum', 18, '0.0000002'],
+	['1.000000000000000001', '1.000000000000000002', 'max', 18, '1.000000000000000002'],
+	['1.000000000000000001', '1.000000000000000002', 'min', 18, '1.000000000000000001'],
+	['', '1', 'sum', 6, '1'],
+	['bad', '1', 'sum', 6, '1'],
+	['bad', '1', 'min', 6, ''],
+	['0', '', 'max', 6, '']
+] as const)('combines %j and %j with %s exactly', (a, b, method, decimals, expected) => {
+	expect(combineAmounts(a, b, method, decimals)).toBe(expected);
+});
+
+test('split error distinguishes sub-unit shares from insufficient balance', () => {
+	expect(getSplitError(true, splitEvenly('0.000001', 3, 6), 3)).toBe(
+		'Amount is too small to split across 3 recipients'
+	);
+	expect(getSplitError(false, null, 3)).toBe('Insufficient balance for either distribution method');
+	expect(getSplitError(false, '1', 3)).toBe('Insufficient balance for either distribution method');
+	expect(getSplitError(true, '1', 3)).toBeNull();
 });

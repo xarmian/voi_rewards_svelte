@@ -302,6 +302,7 @@ async function amountHarness(amounts: string[], decimals: number, balance: numbe
 		'setAmountForAllRecipients',
 		'distributeAmount',
 		'getExactBalance',
+		'formatMaxAmount',
 		'displayTotal'
 	];
 	const run = componentFunctions(
@@ -391,4 +392,82 @@ test('distribution checks and required total use the same balance as send', asyn
 	run('amountToDistribute = "1.152921504606846976"');
 	update();
 	expect(run('canSplitEvenly')).toBe(true);
+});
+
+test('duplicate recipients combine through exact amount arithmetic', async () => {
+	const helpers = await import('../chain/sendAmounts');
+	const run = componentFunctions(['combineRecipients', 'enforceDecimals'], {
+		...helpers,
+		decimalToBaseUnits,
+		selectedToken: { decimals: 18 },
+		recipients: [
+			{ address: 'ADDR', amount: '0.1' },
+			{ address: 'ADDR', amount: '0.2' }
+		],
+		syncLookupBanner: () => {}
+	});
+	run('combineRecipients("sum")');
+	expect(run('recipients.map(r => r.amount)')).toEqual(['0.3']);
+});
+
+test('confirmed total uses sent token precision, confirmed groups only, and invalid fallback', async () => {
+	const helpers = await import('../chain/sendAmounts');
+	const run = componentFunctions(['displayTotal', 'enforceDecimals'], {
+		...helpers,
+		sumBaseUnits,
+		groupOutcomes: [{ status: 'confirmed' }, { status: 'pending' }, { status: 'confirmed' }],
+		recipientsByGroup: [
+			[{ amount: '0.1' }],
+			[{ amount: '99' }],
+			[{ amount: '0.200000000000000001' }]
+		],
+		sentToken: { decimals: 18 },
+		selectedToken: { decimals: 6 }
+	});
+	const assignment = source.match(/\$:\s*confirmedTotal =\s*[\s\S]*?;/)![0].replace('$:', '');
+	run(assignment);
+	expect(run('confirmedTotal')).toBe('0.300000000000000001');
+	run('recipientsByGroup[2][0].amount = "bad"');
+	run(assignment);
+	expect(run('confirmedTotal')).toBe('—');
+	run('recipientsByGroup[2][0].amount = "0.2000009"; sentToken = null');
+	run(assignment);
+	expect(run('confirmedTotal')).toBe('0.3');
+});
+
+test.each([
+	['1.', 6],
+	['12', 0]
+] as const)('distribution input %j at %i decimals is not written back', (value, decimals) => {
+	const setter = vi.fn();
+	const input = {
+		get value() {
+			return value;
+		},
+		set value(next: string) {
+			setter(next);
+		}
+	};
+	const run = componentFunctions(['handleDistributeInput', 'enforceDecimals'], {
+		input,
+		selectedToken: { decimals },
+		amountToDistribute: ''
+	});
+	run('handleDistributeInput(input)');
+	expect(input.value).toBe(value);
+	expect(setter).not.toHaveBeenCalled();
+});
+
+test.each([NaN, Infinity, -1])(
+	'invalid balance %s becomes zero without breaking Max',
+	async (balance) => {
+		const { run } = await amountHarness([''], 6, balance);
+		expect(run('exactBalance')).toBe(0n);
+		expect(run('maxAmountString')).toBe('0');
+	}
+);
+
+test('non-integer token decimals do not break Max', async () => {
+	const { run } = await amountHarness([''], 1.5, 5);
+	expect(run('maxAmountString')).toBe('0');
 });

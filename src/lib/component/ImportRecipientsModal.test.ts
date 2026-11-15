@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
+import algosdk from 'algosdk';
+import { decimalToBaseUnits, sumBaseUnits } from '../chain/baseUnits';
 
 const source = readFileSync(new URL('./ImportRecipientsModal.svelte', import.meta.url), 'utf8');
 // The ARC-200 holder step that builds recipient amounts lives in this module, beside the filters.
@@ -37,7 +39,7 @@ async function importFunctions(names: string[], globals: Record<string, unknown>
 				source.match(new RegExp(`\\t(?:async )?function ${name}\\([\\s\\S]*?\\n\\t\\}`))?.[0] || ''
 		)
 		.join('\n');
-	const context = createContext({ ...helpers, ...globals });
+	const context = createContext({ ...helpers, decimalToBaseUnits, ...globals });
 	runInContext(
 		ts.transpileModule(script, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText,
 		context
@@ -120,15 +122,15 @@ test('amount inputs preserve typed strings for validation and multiplication', (
 	expect(source).not.toContain('bind:value={amountValue}');
 });
 
-test('column detection distinguishes positive decimal amounts from other text', async () => {
+test('column detection accepts finite numeric syntax independently of validation', async () => {
 	const run = await importFunctions(['autoDetectColumns'], {
 		parsedData: [{ cells: ['ADDRESS', '1e3', '0.5'] }, { cells: ['ADDRESS', '0x10', '.5'] }],
 		columnCount: 3,
 		algosdk: { isValidAddress: (value: string) => value === 'ADDRESS' }
 	});
 	run('autoDetectColumns()');
-	expect(run('amountColumnIndex')).toBe(2);
-	expect(run('noteColumnIndex')).toBe(1);
+	expect(run('amountColumnIndex')).toBe(1);
+	expect(run('noteColumnIndex')).toBe(-1);
 });
 
 test('headerless CSV detects zero amounts and preserves the real notes on import', async () => {
@@ -156,14 +158,14 @@ test('headerless CSV detects zero amounts and preserves the real notes on import
 	]);
 });
 
-test('column detection does not treat exponent notation as an amount column', async () => {
+test('column detection treats exponent notation as an amount column', async () => {
 	const run = await importFunctions(['autoDetectColumns'], {
 		parsedData: [{ cells: ['ADDR', '1e3', 'foo'] }, { cells: ['ADDR', '1e3', 'bar'] }],
 		columnCount: 3,
 		algosdk: { isValidAddress: (value: string) => value === 'ADDR' }
 	});
 	run('autoDetectColumns()');
-	expect(run('amountColumnIndex')).toBe(-1);
+	expect(run('amountColumnIndex')).toBe(1);
 });
 
 test('note detection skips zero numeric cells outside the amount column', async () => {
@@ -175,4 +177,79 @@ test('note detection skips zero numeric cells outside the amount column', async 
 	run('autoDetectColumns()');
 	expect(run('amountColumnIndex')).toBe(1);
 	expect(run('noteColumnIndex')).toBe(3);
+});
+
+test.each([
+	['2', ['A', 'B', 'B'], ['0.66666666', '1.33333332']],
+	['1', ['A', 'B', 'C'], ['0.33333333', '0.33333333', '0.33333333']]
+])(
+	'total NFT pool %s floors each NFT share before multiplying holder counts',
+	async (amountValue, owners, expected) => {
+		let imported: { amount: string }[] = [];
+		const run = await importFunctions(['handleNFTCollectionImport'], {
+			amountValue,
+			amountType: 'total-pool',
+			collectionId: '1',
+			roundNumber: '',
+			zeroAddress: 'ZERO',
+			URL,
+			fetch: async () => ({
+				ok: true,
+				json: async () => ({ tokens: (owners as string[]).map((owner) => ({ owner })) })
+			}),
+			onConfirm: (rows: typeof imported) => {
+				imported = rows;
+			},
+			handleClose: () => {},
+			error: null
+		});
+		await run('handleNFTCollectionImport()');
+		expect(imported.map((r) => r.amount)).toEqual(expected);
+		expect(
+			sumBaseUnits(
+				imported.map((r) => r.amount),
+				8
+			)
+		).toBeLessThanOrEqual(decimalToBaseUnits(amountValue as string, 8));
+	}
+);
+
+test('headerless negative amount column preserves notes and imports blank amounts', async () => {
+	let imported: { amount: string; note: string }[] = [];
+	const run = await importFunctions(['parseContentData', 'autoDetectColumns', 'handleConfirm'], {
+		parsedData: [],
+		columnCount: 3,
+		algosdk: { isValidAddress: (value: string) => value === 'ADDR' },
+		isValidAddressContent: (value: string) => value === 'ADDR',
+		selectedRows: new Set([0, 1]),
+		onConfirm: (rows: typeof imported) => {
+			imported = rows;
+		},
+		handleClose: () => {},
+		error: null
+	});
+	run('parsedData = parseContentData("ADDR,-1,fee refund\\nADDR,-1,fee refund")');
+	run('autoDetectColumns()');
+	expect(run('amountColumnIndex')).toBe(1);
+	expect(run('noteColumnIndex')).toBe(2);
+	await run('handleConfirm()');
+	expect(imported.map(({ amount, note }) => ({ amount, note }))).toEqual([
+		{ amount: '', note: 'fee refund' },
+		{ amount: '', note: 'fee refund' }
+	]);
+});
+
+test('JSON numeric exponent amount is detected as the amount column', async () => {
+	const address = algosdk.generateAccount().addr.toString();
+	const run = await importFunctions(['parseContentData', 'autoDetectColumns'], {
+		parsedData: [],
+		columnCount: 3,
+		algosdk,
+		isValidAddressContent: algosdk.isValidAddress,
+		content: JSON.stringify([{ address, amount: 1e-7, note: 'x' }])
+	});
+	run('parsedData = parseContentData(content)');
+	run('autoDetectColumns()');
+	expect(run('amountColumnIndex')).toBe(1);
+	expect(run('noteColumnIndex')).not.toBe(1);
 });
