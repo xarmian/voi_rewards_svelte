@@ -1,10 +1,11 @@
-import { isValidAddress } from 'algosdk';
+import { isValidAddress, ALGORAND_ZERO_ADDRESS_STRING, parseJSON, IntDecoding } from 'algosdk';
 import { algodIndexer } from '$lib/utils/algod';
 import {
 	buildQuery,
 	compareRows,
 	mapTransaction,
 	matchesFilters,
+	type AssetMetadata,
 	type ExportOptions,
 	type ExportQuery,
 	type ExportRow,
@@ -17,6 +18,13 @@ export { isValidAddress };
 class SchemaError extends Error {}
 class CursorError extends SchemaError {}
 class DeadlineError extends Error {}
+class AssetMetadataError extends Error {
+	constructor(id: bigint) {
+		super(
+			`Asset ${id} metadata unavailable; this page was not included. Amounts were not guessed.`
+		);
+	}
+}
 function object(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== 'object' || Array.isArray(value))
 		throw new SchemaError('Invalid indexed transaction structure.');
@@ -36,6 +44,19 @@ function text(value: unknown): string {
 	if (typeof value !== 'string' || !value)
 		throw new SchemaError('Missing indexed transaction identity or address.');
 	return value;
+}
+function assetId(value: unknown): bigint {
+	const id = positive(value);
+	if (id > 18446744073709551615n) throw new SchemaError('Invalid uint64 asset ID.');
+	return id;
+}
+function address(value: unknown): string {
+	const result = text(value);
+	if (!isValidAddress(result)) throw new SchemaError('Invalid indexed asset address.');
+	return result;
+}
+function optionalAddress(value: unknown): string | undefined {
+	return value === undefined || value === ALGORAND_ZERO_ADDRESS_STRING ? undefined : address(value);
 }
 function safeNumber(value: unknown): number {
 	if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
@@ -91,6 +112,22 @@ function normalizeNode(value: unknown, ancestors: Set<unknown>): TransactionNode
 			closeTo
 		};
 	}
+	if (type === 'axfer') {
+		const asset = object(tx.assetTransferTransaction);
+		const closeAmount = exact(asset.closeAmount === undefined ? 0n : asset.closeAmount);
+		const closeTo = optionalAddress(asset.closeTo);
+		if (closeAmount > 0n && !closeTo)
+			throw new SchemaError('Positive close amount has no recipient.');
+		result.sender = address(tx.sender);
+		result.assetTransfer = {
+			assetId: assetId(asset.assetId),
+			sender: optionalAddress(asset.sender),
+			receiver: address(asset.receiver),
+			amount: exact(asset.amount),
+			closeAmount,
+			closeTo
+		};
+	}
 	if (type === 'appl') {
 		const app = object(tx.applicationTransaction);
 		const id = exact(app.applicationId);
@@ -121,11 +158,50 @@ export function normalizeTransaction(value: unknown): NormalizedTransaction {
 		group: tx.group === undefined ? '' : base64(bytes(tx.group))
 	};
 }
+function assetText(params: Record<string, unknown>, key: string): string {
+	const plain = params[key];
+	const encoded = params[`${key}-b64`];
+	if (plain !== undefined && typeof plain !== 'string')
+		throw new SchemaError('Invalid indexed asset text.');
+	let data: Uint8Array | undefined;
+	if (encoded !== undefined) {
+		if (typeof encoded !== 'string') throw new SchemaError('Invalid indexed asset text bytes.');
+		try {
+			const binary = atob(encoded);
+			if (btoa(binary) !== encoded) throw new Error('Noncanonical base64.');
+			data = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+		} catch {
+			throw new SchemaError('Invalid indexed asset text bytes.');
+		}
+	}
+	if (typeof plain === 'string') return plain;
+	if (!data) return '';
+	try {
+		return new TextDecoder('utf-8', { fatal: true }).decode(data);
+	} catch {
+		return `base64:${encoded}`;
+	}
+}
+export function normalizeAssetResponse(value: unknown, expectedId: bigint): AssetMetadata {
+	const asset = object(object(value).asset);
+	if (typeof asset.index !== 'bigint' || assetId(asset.index) !== expectedId)
+		throw new SchemaError('Indexed asset ID does not match the request.');
+	const params = object(asset.params);
+	if (typeof params.decimals !== 'bigint' || params.decimals < 0n || params.decimals > 19n)
+		throw new SchemaError('Missing or invalid indexed asset decimals.');
+	return Object.freeze({
+		id: asset.index,
+		decimals: Number(params.decimals),
+		unitName: assetText(params, 'unit-name'),
+		name: assetText(params, 'name')
+	});
+}
 export interface ExportPage {
 	transactions: unknown[];
 	nextToken?: string;
 }
 interface SearchBuilder {
+	excludeCloseTo(value: boolean): SearchBuilder;
 	address(value: string): SearchBuilder;
 	limit(value: number): SearchBuilder;
 	maxRound(value: bigint): SearchBuilder;
@@ -134,8 +210,18 @@ interface SearchBuilder {
 	nextToken(value: string): SearchBuilder;
 	do(headers?: Record<string, string>, customOptions?: Record<string, unknown>): Promise<unknown>;
 }
+interface AssetLookup {
+	includeAll(value: boolean): AssetLookup;
+	doRaw(
+		headers?: Record<string, string>,
+		customOptions?: Record<string, unknown>
+	): Promise<Uint8Array>;
+}
 export function createIndexerReader(
-	client: { searchForTransactions(): SearchBuilder } = algodIndexer
+	client: {
+		searchForTransactions(): SearchBuilder;
+		lookupAssetByID(id: bigint): AssetLookup;
+	} = algodIndexer
 ) {
 	return {
 		async bootstrap(address: string, signal: AbortSignal): Promise<bigint> {
@@ -148,6 +234,7 @@ export function createIndexerReader(
 			let request = client
 				.searchForTransactions()
 				.address(query.address)
+				.excludeCloseTo(false)
 				.maxRound(query.maxRound)
 				.limit(query.limit);
 			if (query.afterTime) request = request.afterTime(query.afterTime);
@@ -155,6 +242,16 @@ export function createIndexerReader(
 			if (query.nextToken) request = request.nextToken(query.nextToken);
 			const response = object(await request.do(undefined, { signal }));
 			return validatePage(response);
+		},
+		async readAsset(id: bigint, signal: AbortSignal): Promise<unknown> {
+			const raw = await client.lookupAssetByID(id).includeAll(true).doRaw(undefined, { signal });
+			try {
+				return parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(raw), {
+					intDecoding: IntDecoding.BIGINT
+				});
+			} catch {
+				throw new SchemaError('Invalid indexed asset response.');
+			}
 		}
 	};
 }
@@ -167,6 +264,7 @@ function validatePage(value: unknown): ExportPage {
 	return { transactions: page.transactions, nextToken: page.nextToken as string | undefined };
 }
 export interface ExportResult {
+	assets: ReadonlyMap<bigint, AssetMetadata>;
 	rows: readonly ExportRow[];
 	snapshotRound: bigint;
 	status: ExportStatus;
@@ -181,6 +279,8 @@ export interface ExportResult {
 	newestTimestamp?: number;
 }
 export interface ExportProgress {
+	assetsResolved: number;
+	resolvingAssetId?: bigint;
 	account: number;
 	accounts: number;
 	pages: number;
@@ -189,6 +289,8 @@ export interface ExportProgress {
 	retrySeconds?: number;
 }
 export interface ExportDependencies {
+	readAsset(id: bigint, signal: AbortSignal): Promise<unknown>;
+	maxAssets?: number;
 	bootstrap(address: string, signal: AbortSignal): Promise<bigint>;
 	readPage(query: ExportQuery, signal: AbortSignal): Promise<ExportPage>;
 	rewardSenders: ReadonlySet<string>;
@@ -240,6 +342,9 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	const pause = deps.sleep ?? sleep;
 	const maxPages = deps.maxPages ?? 200;
 	const maxRows = deps.maxRows ?? 100000;
+	const maxAssets = deps.maxAssets ?? 200;
+	const assets = new Map<bigint, AssetMetadata>();
+	let resolvingAssetId: bigint | undefined;
 	let rows: ExportRow[] = [];
 	const roots = new Map<string, string>();
 	const cursors = new Set<string>();
@@ -262,6 +367,8 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	function progress(retrySeconds?: number) {
 		if (!disposed && !cancelled)
 			deps.onProgress?.({
+				assetsResolved: assets.size,
+				resolvingAssetId,
 				account: Math.min(accountIndex + 1, accounts.size),
 				accounts: accounts.size,
 				pages,
@@ -272,6 +379,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	}
 	function result(): ExportResult {
 		return {
+			assets: new Map(assets),
 			rows: [...rows].sort(compareRows),
 			snapshotRound,
 			status,
@@ -417,6 +525,29 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 						'The next page exceeds the row cap; none of that page was retained. Narrow the dates.';
 					return result();
 				}
+				const needed = new Set(
+					stagedRows.flatMap((row) => (row.assetId === null ? [] : [row.assetId]))
+				);
+				if (new Set([...assets.keys(), ...needed]).size > maxAssets) {
+					status = 'partial-cap';
+					reason = 'Asset limit reached; select one asset or narrow the dates.';
+					return result();
+				}
+				for (const id of needed) {
+					if (assets.has(id)) continue;
+					resolvingAssetId = id;
+					progress();
+					try {
+						const raw = await request((signal) => deps.readAsset(id, signal));
+						controller.signal.throwIfAborted();
+						assets.set(id, normalizeAssetResponse(raw, id));
+					} catch {
+						throw new AssetMetadataError(id);
+					} finally {
+						resolvingAssetId = undefined;
+						progress();
+					}
+				}
 				controller.signal.throwIfAborted();
 				for (const [id, fingerprint] of stagedRoots) roots.set(id, fingerprint);
 				rows.push(...stagedRows);
@@ -488,6 +619,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			cancel();
 			rows = [];
 			roots.clear();
+			assets.clear();
 			cursors.clear();
 		}
 	};

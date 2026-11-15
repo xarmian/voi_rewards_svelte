@@ -1,6 +1,7 @@
 import {
 	compareRows,
 	formatUnits,
+	type AssetMetadata,
 	type ExportOptions,
 	type ExportRow,
 	type ExportStatus
@@ -24,7 +25,11 @@ const columns = [
 	'Application ID',
 	'Note',
 	'Snapshot round',
-	'Export status'
+	'Export status',
+	'Asset ID',
+	'Asset unit',
+	'Asset name',
+	'Asset decimals'
 ];
 export function protectText(value: string): string {
 	let first = '';
@@ -48,14 +53,29 @@ function numeric(value: bigint, decimals = 0): string {
 	return formatUnits(value, decimals);
 }
 interface Context {
+	assets: ReadonlyMap<bigint, AssetMetadata>;
 	snapshotRound: bigint;
 	status: ExportStatus;
 }
 export function serializeCsv(rows: readonly ExportRow[], context: Context): string {
 	const snapshotRound = numeric(context.snapshotRound);
-	const records = [...rows]
-		.sort(compareRows)
-		.map((row) => [
+	const records = [...rows].sort(compareRows).map((row) => {
+		const metadata = row.assetId === null ? undefined : context.assets.get(row.assetId);
+		if (
+			row.assetId !== null &&
+			(typeof row.assetId !== 'bigint' ||
+				row.assetId < 1n ||
+				row.assetId > 18446744073709551615n ||
+				!metadata ||
+				metadata.id !== row.assetId ||
+				!Number.isInteger(metadata.decimals) ||
+				metadata.decimals < 0 ||
+				metadata.decimals > 19 ||
+				typeof metadata.unitName !== 'string' ||
+				typeof metadata.name !== 'string')
+		)
+			throw new Error(`Asset ${row.assetId} metadata is missing or invalid.`);
+		return [
 			protectText(new Date(row.timestamp * 1000).toISOString()),
 			protectText(row.account),
 			protectText(row.txId),
@@ -65,16 +85,21 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 			protectText(row.direction),
 			protectText(row.from),
 			protectText(row.to),
-			'VOI',
-			numeric(row.amount, 6),
+			metadata ? 'ASA/VSA' : 'VOI',
+			numeric(row.amount, metadata?.decimals ?? 6),
 			numeric(row.fee, 6),
 			numeric(row.round),
 			protectText(row.group),
 			row.applicationId === undefined ? '' : numeric(row.applicationId),
 			protectText(row.note),
 			snapshotRound,
-			context.status
-		]);
+			context.status,
+			row.assetId === null ? '' : numeric(row.assetId),
+			protectText(metadata?.unitName ?? 'VOI'),
+			protectText(metadata?.name ?? 'VOI (native)'),
+			String(metadata?.decimals ?? 6)
+		];
+	});
 	return [columns, ...records].map((record) => record.map(csvCell).join(',') + '\r\n').join('');
 }
 export function exportFilename(
@@ -87,5 +112,11 @@ export function exportFilename(
 		!/^(all-dates|\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2})$/.test(range)
 	)
 		throw new Error('Invalid filename parameters.');
-	return `voi-native-only-activity-${context.pageAddress.slice(0, 8)}-${range}-${options.addresses.length}accounts-r${numeric(context.snapshotRound)}${context.status === 'complete-indexed' ? '' : '-partial'}.csv`;
+	const prefix =
+		options.assets.mode === 'asset'
+			? `voi-asset-${numeric(options.assets.id)}-activity`
+			: options.assets.mode === 'all'
+				? 'voi-all-assets-activity'
+				: 'voi-native-only-activity';
+	return `${prefix}-${context.pageAddress.slice(0, 8)}-${range}-${options.addresses.length}accounts-r${numeric(context.snapshotRound)}${context.status === 'complete-indexed' ? '' : '-partial'}.csv`;
 }

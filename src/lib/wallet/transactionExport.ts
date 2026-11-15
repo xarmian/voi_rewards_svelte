@@ -1,10 +1,19 @@
-export type ActivityType = 'payment' | 'reward-payout' | 'close-out' | 'fee';
+export type ActivityType = 'payment' | 'reward-payout' | 'asset-transfer' | 'close-out' | 'fee';
 export type ExportStatus =
 	| 'complete-indexed'
 	| 'partial-cap'
 	| 'partial-cancelled'
 	| 'partial-error';
+export type AssetSelectionInput = { mode: 'native' | 'all' } | { mode: 'asset'; id: string };
+export type AssetSelection = { mode: 'native' | 'all' } | { mode: 'asset'; id: bigint };
+export interface AssetMetadata {
+	readonly id: bigint;
+	readonly decimals: number;
+	readonly unitName: string;
+	readonly name: string;
+}
 export interface ExportInput {
+	assets: AssetSelectionInput;
 	pageAddress: string;
 	addresses: readonly string[];
 	types: readonly ActivityType[];
@@ -12,7 +21,8 @@ export interface ExportInput {
 	from?: string;
 	through?: string;
 }
-export interface ExportOptions extends ExportInput {
+export interface ExportOptions extends Omit<ExportInput, 'assets'> {
+	assets: AssetSelection;
 	allDates: boolean;
 	startTime?: number;
 	endTime?: number;
@@ -32,6 +42,14 @@ export interface TransactionNode {
 	note: string;
 	applicationId?: bigint;
 	payment?: { receiver: string; amount: bigint; closeAmount: bigint; closeTo?: string };
+	assetTransfer?: {
+		assetId: bigint;
+		sender?: string;
+		receiver: string;
+		amount: bigint;
+		closeAmount: bigint;
+		closeTo?: string;
+	};
 	inner: TransactionNode[];
 }
 export interface NormalizedTransaction extends TransactionNode {
@@ -42,6 +60,7 @@ export interface NormalizedTransaction extends TransactionNode {
 	group: string;
 }
 export interface ExportRow {
+	assetId: bigint | null;
 	timestamp: number;
 	account: string;
 	txId: string;
@@ -62,13 +81,19 @@ export interface ExportRow {
 }
 export class OptionsError extends Error {
 	constructor(
-		public field: 'dates' | 'accounts' | 'types',
+		public field: 'dates' | 'accounts' | 'types' | 'assets',
 		message: string
 	) {
 		super(message);
 	}
 }
-const activityTypes: readonly ActivityType[] = ['payment', 'reward-payout', 'close-out', 'fee'];
+const activityTypes: readonly ActivityType[] = [
+	'payment',
+	'reward-payout',
+	'asset-transfer',
+	'close-out',
+	'fee'
+];
 function dateTime(date: string | undefined): number {
 	if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
 		throw new OptionsError('dates', 'Enter both dates as YYYY-MM-DD.');
@@ -96,7 +121,17 @@ export function normalizeOptions(
 	const types = [...new Set(input.types)];
 	if (!types.length || types.some((t) => !activityTypes.includes(t)))
 		throw new OptionsError('types', 'Select at least one activity type.');
+	let assets: AssetSelection;
+	if (input.assets.mode === 'asset') {
+		const id = input.assets.id.trim();
+		if (!/^\d+$/.test(id) || BigInt(id) < 1n || BigInt(id) > 18446744073709551615n)
+			throw new OptionsError('assets', 'Enter an asset ID from 1 to 18446744073709551615.');
+		assets = { mode: 'asset', id: BigInt(id) };
+	} else {
+		assets = { mode: input.assets.mode };
+	}
 	const base = {
+		assets: Object.freeze(assets),
 		pageAddress: input.pageAddress,
 		addresses: Object.freeze(addresses),
 		types: Object.freeze(types),
@@ -156,6 +191,7 @@ export function mapTransaction(
 	function visit(node: TransactionNode, innerPath: string, parentApp?: bigint) {
 		const applicationId = node.type === 'appl' ? node.applicationId : parentApp;
 		const base = {
+			assetId: null,
 			timestamp: root.timestamp,
 			txId: root.id,
 			innerPath,
@@ -167,25 +203,52 @@ export function mapTransaction(
 			applicationId,
 			note: node.note
 		};
-		function payment(to: string, amount: bigint, effect: 'amount' | 'close') {
-			for (const account of new Set([node.sender, to])) {
+		function transfer(
+			from: string,
+			to: string,
+			amount: bigint,
+			effect: 'amount' | 'close',
+			assetId: bigint | null = null
+		) {
+			for (const account of new Set([from, to])) {
 				if (!accounts.has(account)) continue;
-				const direction = node.sender === to ? 'self' : account === node.sender ? 'out' : 'in';
+				const direction = from === to ? 'self' : account === from ? 'out' : 'in';
 				const type =
 					effect === 'close'
 						? 'close-out'
-						: direction === 'in' && rewardSenders.has(node.sender)
-							? 'reward-payout'
-							: 'payment';
-				rows.push({ ...base, account, effect, type, direction, to, amount, fee: 0n });
+						: assetId !== null
+							? 'asset-transfer'
+							: direction === 'in' && rewardSenders.has(from)
+								? 'reward-payout'
+								: 'payment';
+				rows.push({
+					...base,
+					assetId,
+					from,
+					account,
+					effect,
+					type,
+					direction,
+					to,
+					amount,
+					fee: 0n
+				});
 			}
 		}
 		if (node.type === 'pay' && node.payment) {
-			payment(node.payment.receiver, node.payment.amount, 'amount');
+			transfer(node.sender, node.payment.receiver, node.payment.amount, 'amount');
 			if (node.payment.closeAmount > 0n) {
 				if (!node.payment.closeTo) throw new Error('Positive close amount requires a recipient.');
-				payment(node.payment.closeTo, node.payment.closeAmount, 'close');
+				transfer(node.sender, node.payment.closeTo, node.payment.closeAmount, 'close');
 			}
+		}
+		if (node.type === 'axfer' && node.assetTransfer) {
+			const asset = node.assetTransfer;
+			const from = asset.sender ?? node.sender;
+			transfer(from, asset.receiver, asset.amount, 'amount', asset.assetId);
+			if (asset.closeAmount > 0n && !asset.closeTo)
+				throw new Error('Positive close amount requires a recipient.');
+			if (asset.closeTo) transfer(from, asset.closeTo, asset.closeAmount, 'close', asset.assetId);
 		}
 		if (node.fee > 0n && accounts.has(node.sender))
 			rows.push({
@@ -208,6 +271,9 @@ export function mapTransaction(
 export function matchesFilters(row: ExportRow, options: ExportOptions): boolean {
 	return (
 		options.types.includes(row.type) &&
+		(options.assets.mode === 'asset'
+			? row.assetId === options.assets.id || row.type === 'fee'
+			: options.assets.mode === 'all' || row.assetId === null) &&
 		(options.allDates || (row.timestamp >= options.startTime! && row.timestamp < options.endTime!))
 	);
 }
