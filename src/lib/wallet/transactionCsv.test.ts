@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import { csvCell, protectText, serializeCsv, exportFilename } from './transactionCsv';
 import { normalizeOptions, type ExportRow } from './transactionExport';
+import Panel from '../component/TransactionExportPanel.svelte';
 
 const header =
 	'"Timestamp (UTC)","Account","Tx ID","Inner path","Transaction type","Type","Direction","From","To","Asset","Amount","Fee (VOI)","Round","Group ID","Application ID","Note","Snapshot round","Export status"\r\n';
@@ -75,8 +76,7 @@ it('marks native-only scope, page identity, range, accounts, round and every par
 	}
 	expect(exportFilename(options, filenameContext)).toMatch(/^voi-native-only-activity-/);
 });
-it('shows the native-only disclosure before Start', async () => {
-	const { default: Panel } = await import('../component/TransactionExportPanel.svelte');
+it('shows the native-only disclosure before Start', () => {
 	const { body } = render(Panel, {
 		props: { pageAddress: 'A', suggestions: [], suggestionsAvailable: false, onclose: () => {} }
 	});
