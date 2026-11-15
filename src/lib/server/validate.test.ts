@@ -71,3 +71,21 @@ it('accepts exactly one positive token ID and fixed pagination', () => {
 	])
 		expect(validate(invalid)).toHaveProperty('error');
 });
+
+it('refuses a nonzero offset for user-only transfers', () => {
+	expect(
+		validate(base.replace('p_offset=0', 'p_offset=1') + '&p_min_round=1&p_max_round=100')
+	).toEqual({ error: 'Invalid parameter: p_offset' });
+});
+it('accepts offset zero for user-only transfers', () => {
+	expect(validate(base + '&p_min_round=1&p_max_round=100')).toEqual({
+		action: 'get_arc200_transfers',
+		params: { p_user: A, p_limit: 100, p_offset: 0, p_min_round: 1, p_max_round: 100 }
+	});
+});
+it('still accepts offset 100 for contract and user transfers', () => {
+	expect(validate(base.replace('p_offset=0', 'p_offset=100') + '&p_contractid=7')).toEqual({
+		action: 'get_arc200_transfers',
+		params: { p_contractid: 7, p_user: A, p_limit: 100, p_offset: 100 }
+	});
+});

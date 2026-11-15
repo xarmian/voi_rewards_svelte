@@ -236,6 +236,13 @@ describe('bounded sequential scans', () => {
 });
 
 describe('retry, pacing and cancellation', () => {
+	it('retries a malformed indexer page and completes with its rows', async () => {
+		const { run, readPage } = setup([new SyntaxError('Unexpected token <'), page('recovered')]);
+		const result = await run.start();
+		expect(result.status).toBe('complete-indexed');
+		expect(result.rows.map((row) => row.txId)).toEqual(['recovered', 'recovered']);
+		expect(readPage).toHaveBeenCalledTimes(2);
+	});
 	it('spaces bootstrap and page starts by at least 500ms and respects Retry-After', async () => {
 		let now = 0;
 		const starts: number[] = [];
@@ -1036,6 +1043,12 @@ describe('bounded ARC-200 export phase', () => {
 });
 
 describe('ARC request lifecycle', () => {
+	it('fails a malformed ARC-200 page without retrying', async () => {
+		const readArc200Page = vi.fn().mockRejectedValue(new SyntaxError('Unexpected token <'));
+		const { run } = arcSetup({ readArc200Page });
+		expect(await run.start()).toMatchObject({ status: 'partial-error', rows: [] });
+		expect(readArc200Page).toHaveBeenCalledTimes(1);
+	});
 	it('shares 500ms spacing and Retry-After between sources and metadata', async () => {
 		let clock = 0;
 		const starts: number[] = [];
