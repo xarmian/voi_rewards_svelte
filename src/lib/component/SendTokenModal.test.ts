@@ -292,3 +292,95 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 		}
 	}
 });
+
+// Read the actual reactive assignments as well as event handlers, so display and send agree.
+async function amountHarness(amounts: string[], decimals: number, balance: number) {
+	const helpers = await import('../chain/sendAmounts').catch(() => ({}));
+	const names = [
+		'enforceDecimals',
+		'withinBalance',
+		'setAmountForAllRecipients',
+		'distributeAmount',
+		'getExactBalance',
+		'displayTotal'
+	];
+	const run = componentFunctions(
+		names.filter((name) => source.includes(`function ${name}(`)),
+		{
+			...helpers,
+			decimalToBaseUnits,
+			sumBaseUnits,
+			selectedToken: { decimals, balance },
+			recipients: amounts.map((amount) => ({ amount })),
+			amountToDistribute: '',
+			showAmountMenu: true
+		}
+	);
+	const update = () => {
+		for (const name of [
+			'exactBalance',
+			'maxAmountString',
+			'maxAmount',
+			'totalAmount',
+			'isValidAmount',
+			'evenShare',
+			'distributionFitsBalance',
+			'canSplitEvenly',
+			'canMaxEach',
+			'totalRequiredForMax'
+		]) {
+			const assignment = source.match(new RegExp(`\\$:\\s*${name} = [\\s\\S]*?;`));
+			if (assignment) run(assignment[0].replace('$:', ''));
+		}
+	};
+	update();
+	return { run, update };
+}
+
+test('Max at 2 ** 60 base units equals the held balance and passes the send gate', async () => {
+	const { run } = await amountHarness([''], 18, 2 ** 60);
+	expect(String(run('maxAmount'))).toBe('1.152921504606846976');
+	run('recipients[0].amount = String(maxAmount)');
+	expect(run('withinBalance(recipients, selectedToken)')).toBe(true);
+});
+
+test('even split refuses sub-base-unit shares and never fills exponent strings', async () => {
+	const { run, update } = await amountHarness(['', '', ''], 7, 100);
+	run('amountToDistribute = "0.0000001"');
+	update();
+	expect(run('canSplitEvenly')).toBe(false);
+	run('distributeAmount("even")');
+	expect(run('recipients.map(r => r.amount)')).toEqual(['', '', '']);
+	run('amountToDistribute = "0.0000003"');
+	update();
+	expect(run('canSplitEvenly')).toBe(true);
+	run('distributeAmount("even")');
+	expect(run('recipients.map(r => r.amount)')).toEqual(Array(3).fill('0.0000001'));
+});
+
+test('totals are exact and invalid rows display an em dash', async () => {
+	const { run, update } = await amountHarness(['0.1', '0.2'], 18, 2 ** 60);
+	expect(run('totalAmount')).toBe('0.3');
+	run('recipients[1].amount = "1e3"');
+	update();
+	expect(run('totalAmount')).toBe('—');
+});
+
+test('distribution input preserves the original decimal string', () => {
+	expect(source).not.toContain('bind:value={amountToDistribute}');
+});
+
+test('distribution checks and required total use the same balance as send', async () => {
+	const { run, update } = await amountHarness(['', '', ''], 18, 2 ** 60);
+	run('amountToDistribute = "0.1"');
+	update();
+	expect(run('canMaxEach')).toBe(true);
+	expect(run('totalRequiredForMax')).toBe('0.3');
+	run('amountToDistribute = "1.152921504606847"');
+	update();
+	expect(run('canSplitEvenly')).toBe(false);
+	expect(run('canMaxEach')).toBe(false);
+	run('amountToDistribute = "1.152921504606846976"');
+	update();
+	expect(run('canSplitEvenly')).toBe(true);
+});
