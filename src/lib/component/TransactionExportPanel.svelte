@@ -311,9 +311,9 @@
 					>{/each}
 				<p id="export-types-help" class="text-sm text-ink-muted">
 					Payments and asset transfers include inner transactions. Zero-amount asset transfers and
-					close-outs are included. Known reward payouts apply to native VOI only. Type filters do
-					not reduce scanning time. Staking labels are unavailable. Known reward payouts are
-					classified by sender; estimated rewards are excluded.
+					close-outs are included. Known reward payouts are native VOI only, classified by sender;
+					estimated rewards are excluded. Staking labels are unavailable. Type filters do not reduce
+					scanning time.
 				</p>
 				{#if errors.types}<p id="export-types-error" role="alert">{errors.types}</p>{/if}
 			</fieldset>
