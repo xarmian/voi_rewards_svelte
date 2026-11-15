@@ -25,6 +25,8 @@
 	import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 	import {
 		baseUnitsToDecimal,
+		combineAmounts,
+		getSplitError,
 		isDecimalAmount,
 		splitEvenly,
 		fitsBalance,
@@ -175,10 +177,19 @@
 
 	// Use the same balance conversion for all displays and the send gate.
 	function getExactBalance(token: SendToken): bigint {
-		return BigInt(Math.floor(token.balance));
+		return Number.isFinite(token.balance) && token.balance >= 0
+			? BigInt(Math.floor(token.balance))
+			: 0n;
+	}
+	function formatMaxAmount(balance: bigint, decimals: number): string {
+		try {
+			return baseUnitsToDecimal(balance, decimals);
+		} catch {
+			return '0';
+		}
 	}
 	$: exactBalance = getExactBalance(selectedToken);
-	$: maxAmountString = baseUnitsToDecimal(exactBalance, selectedToken.decimals);
+	$: maxAmountString = formatMaxAmount(exactBalance, selectedToken.decimals);
 	$: maxAmount = maxAmountString;
 
 	let recipients: Recipient[] = [
@@ -202,21 +213,11 @@
 	const sendDeps = createSendDeps(algodClient);
 	const trackingDeps = createTrackingDeps(algodClient, algodIndexer);
 	$: retryList = retryRecipients(groupOutcomes, recipientsByGroup);
-	$: confirmedTotal = Number(
-		enforceDecimals(
-			groupOutcomes.reduce(
-				(sum, outcome, index) =>
-					outcome?.status === 'confirmed'
-						? sum +
-							recipientsByGroup[index].reduce(
-								(total, recipient) => total + Number(recipient.amount),
-								0
-							)
-						: sum,
-				0
-			),
-			(sentToken ?? selectedToken).decimals
-		)
+	$: confirmedTotal = displayTotal(
+		groupOutcomes.flatMap((outcome, index) =>
+			outcome?.status === 'confirmed' ? recipientsByGroup[index] : []
+		),
+		(sentToken ?? selectedToken).decimals
 	);
 	$: statusCounts = {
 		confirmed: groupOutcomes.filter((o) => o?.status === 'confirmed').length,
@@ -337,7 +338,7 @@
 
 	function handleDistributeInput(input: HTMLInputElement) {
 		const trimmed = enforceDecimals(input.value, selectedToken.decimals);
-		if (input.value !== trimmed) input.value = trimmed;
+		if ((input.value.split('.')[1]?.length ?? 0) > selectedToken.decimals) input.value = trimmed;
 		amountToDistribute = trimmed;
 	}
 
@@ -394,6 +395,7 @@
 		selectedToken.decimals,
 		exactBalance
 	);
+	$: splitError = getSplitError(distributionFitsBalance, evenShare, recipients.length);
 	$: canSplitEvenly = evenShare !== null && distributionFitsBalance;
 	$: canMaxEach = fitsBalance(
 		amountToDistribute,
@@ -975,23 +977,12 @@
 
 			const existing = acc.find((r) => r.address === curr.address);
 			if (existing) {
-				const currentAmount = Number(curr.amount) || 0;
-				const existingAmount = Number(existing.amount) || 0;
-
-				let newAmount: number;
-				switch (method) {
-					case 'sum':
-						newAmount = existingAmount + currentAmount;
-						break;
-					case 'max':
-						newAmount = Math.max(existingAmount, currentAmount);
-						break;
-					case 'min':
-						newAmount = Math.min(existingAmount, currentAmount);
-						break;
-				}
-
-				existing.amount = newAmount > 0 ? enforceDecimals(newAmount, selectedToken.decimals) : '';
+				existing.amount = combineAmounts(
+					existing.amount,
+					curr.amount,
+					method,
+					selectedToken.decimals
+				);
 				return acc;
 			}
 
@@ -1443,6 +1434,9 @@
 															: 'text-gray-400 dark:text-gray-600'}"
 													>
 														{evenShare ?? '0'} each
+														{#if isValidAmount && distributionFitsBalance && splitError}
+															<span class="block text-xs text-red-500">{splitError}</span>
+														{/if}
 													</span>
 												</button>
 												<button
@@ -1472,9 +1466,9 @@
 													</span>
 												</button>
 												{#if isValidAmount}
-													{#if !canMaxEach && !canSplitEvenly}
+													{#if !distributionFitsBalance}
 														<p class="text-xs text-red-500 dark:text-red-400">
-															Insufficient balance for either distribution method
+															{splitError}
 														</p>
 													{/if}
 												{/if}

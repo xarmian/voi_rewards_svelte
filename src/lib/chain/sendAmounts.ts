@@ -13,9 +13,46 @@ export function baseUnitsToDecimal(units: bigint, decimals: number): string {
 	return fraction ? `${whole}.${fraction}` : whole;
 }
 
-/** Check decimal syntax, including zero, for imported column detection. */
-export function isDecimalNumber(value: string): boolean {
-	return decimalAmountPattern.test(value.trim());
+/** Classify imported columns independently of amount validation. */
+export function isNumericCell(value: string): boolean {
+	return value.trim() !== '' && Number.isFinite(Number(value));
+}
+
+/** Combine duplicate amounts in base units; blank or invalid rows count as zero. */
+export function combineAmounts(
+	a: string,
+	b: string,
+	method: 'sum' | 'max' | 'min',
+	decimals: number
+): string {
+	const units = [a, b].map((value) => {
+		try {
+			return decimalToBaseUnits(value, decimals);
+		} catch {
+			return 0n;
+		}
+	});
+	const [left, right] = units;
+	const result =
+		method === 'sum'
+			? left + right
+			: method === 'max'
+				? left > right
+					? left
+					: right
+				: left < right
+					? left
+					: right;
+	return result === 0n ? '' : baseUnitsToDecimal(result, decimals);
+}
+
+export function getSplitError(
+	distributionFitsBalance: boolean,
+	evenShare: string | null,
+	count: number
+): string | null {
+	if (!distributionFitsBalance) return 'Insufficient balance for either distribution method';
+	return evenShare === null ? `Amount is too small to split across ${count} recipients` : null;
 }
 
 /** Check positivity in the typed decimal, before any token-precision truncation. */

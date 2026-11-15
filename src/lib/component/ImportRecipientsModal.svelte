@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { isDecimalAmount, isDecimalNumber, multiplyDecimal } from '$lib/chain/sendAmounts';
+	import {
+		isDecimalAmount,
+		isNumericCell,
+		multiplyDecimal,
+		baseUnitsToDecimal
+	} from '$lib/chain/sendAmounts';
+	import { decimalToBaseUnits } from '$lib/chain/baseUnits';
 	import { Modal, Button, Select, Input, Label } from 'flowbite-svelte';
 	import type { Recipient } from '$lib/types/recipients';
 	import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
@@ -376,7 +382,7 @@
 			if (i === addressColumnIndex) continue;
 			const hasNumericValue = parsedData.some((row) => {
 				const value = row.cells[i];
-				return value && isDecimalNumber(value);
+				return value && isNumericCell(value);
 			});
 			if (hasNumericValue) {
 				amountColumnIndex = i;
@@ -403,7 +409,7 @@
 			const hasStringValue = parsedData.some((row, index) => {
 				if (index === 0) return false; // Skip potential header row
 				const value = row.cells[i];
-				return value && typeof value === 'string' && value.length > 0 && !isDecimalNumber(value);
+				return value && typeof value === 'string' && value.length > 0 && !isNumericCell(value);
 			});
 
 			if (hasStringValue) {
@@ -979,7 +985,7 @@
 
 			// Calculate total NFTs for total-pool distribution if needed
 			let totalNFTCount = 0;
-			let amountPerNFT = 0;
+			let amountPerNFT = 0n;
 
 			if (amountType === 'total-pool') {
 				// Count total NFTs (excluding burned and zero address)
@@ -987,7 +993,7 @@
 
 				// Calculate amount per NFT
 				if (totalNFTCount > 0) {
-					amountPerNFT = Number(amountValue) / totalNFTCount;
+					amountPerNFT = decimalToBaseUnits(amountValue, 8) / BigInt(totalNFTCount);
 				}
 			}
 
@@ -1003,7 +1009,7 @@
 					} else if (amountType === 'per-nft') {
 						amount = multiplyDecimal(amountValue, count, fractionDigits(amountValue)) ?? '';
 					} else if (amountType === 'total-pool') {
-						amount = (amountPerNFT * count).toFixed(8);
+						amount = baseUnitsToDecimal(amountPerNFT * BigInt(count), 8);
 					}
 				}
 
