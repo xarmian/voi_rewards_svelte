@@ -5,6 +5,7 @@ import { mapTransaction, normalizeOptions, type ExportRow } from './transactionE
 const header =
 	'"Timestamp (UTC)","Account","Tx ID","Inner path","Transaction type","Type","Direction","From","To","Asset","Amount","Fee (VOI)","Round","Group ID","Application ID","Note","Snapshot round","Export status","Asset ID","Asset unit","Asset name","Asset decimals","Staking contract"\r\n';
 const row: ExportRow = {
+	assetKind: 'native',
 	assetId: null,
 	timestamp: 0,
 	account: 'B',
@@ -23,6 +24,7 @@ const row: ExportRow = {
 	note: 'Hi,"世界"\r\nnext'
 };
 const context = {
+	arc200Assets: new Map(),
 	assets: new Map(),
 	stakingContracts: new Map<string, string>(),
 	snapshotRound: 9007199254740999n,
@@ -74,7 +76,12 @@ it('marks native-only scope, page identity, range, accounts, round and every par
 	expect(exportFilename(options, filenameContext)).toBe(
 		'voi-native-only-activity-ABCDEFGH-2024-01-01_to_2024-12-31-1accounts-r9007199254740999.csv'
 	);
-	for (const status of ['partial-cap', 'partial-error', 'partial-cancelled'] as const) {
+	for (const status of [
+		'partial-cap',
+		'partial-error',
+		'partial-cancelled',
+		'partial-source'
+	] as const) {
 		expect(exportFilename({ ...options, allDates: true }, { ...filenameContext, status })).toBe(
 			'voi-native-only-activity-ABCDEFGH-all-dates-1accounts-r9007199254740999-partial.csv'
 		);
@@ -107,7 +114,13 @@ it('writes a literal mixed-asset golden with exact scales and native fees', () =
 		[3n, { id: 3n, decimals: 4, unitName: 'FOUR', name: 'Four' }],
 		[4n, { id: 4n, decimals: 19, unitName: 'NINETEEN', name: 'Nineteen' }]
 	]);
-	const assetRow = { ...row, transactionType: 'axfer', type: 'asset-transfer' as const, note: '' };
+	const assetRow = {
+		...row,
+		assetKind: 'asa' as const,
+		transactionType: 'axfer',
+		type: 'asset-transfer' as const,
+		note: ''
+	};
 	const csv = serializeCsv(
 		[
 			{ ...assetRow, assetId: 9007199254740995n },
@@ -135,7 +148,7 @@ it.each([
 	{ id: 1n, decimals: 20, unitName: '', name: '' }
 ])('refuses missing or invalid asset metadata %s', (metadata) => {
 	expect(() =>
-		serializeCsv([{ ...row, assetId: 1n }], {
+		serializeCsv([{ ...row, assetKind: 'asa', assetId: 1n }], {
 			...context,
 			assets: metadata ? new Map([[1n, metadata]]) : new Map()
 		})
@@ -145,7 +158,10 @@ it.each(['=1', ' \u0001-cmd', '\tvalue', ' @x,"quoted"\r\nnext'])(
 	'protects indexed asset text %j',
 	(value) => {
 		const assets = new Map([[1n, { id: 1n, decimals: 0, unitName: value, name: value }]]);
-		const csv = serializeCsv([{ ...row, assetId: 1n, note: '' }], { ...context, assets });
+		const csv = serializeCsv([{ ...row, assetKind: 'asa', assetId: 1n, note: '' }], {
+			...context,
+			assets
+		});
 		expect(csv).toContain([csvCell("'" + value), csvCell("'" + value), '"0"'].join(','));
 	}
 );
@@ -263,4 +279,52 @@ it('keeps all 23 columns and empty staking cells when contracts are unavailable'
 it('quotes staking IDs as plain decimal digits without spreadsheet formula prefixes', () => {
 	expect(stakingCell({ ...row, from: 'CONTRACT' })).toMatch(/^"[0-9]+"$/);
 	expect(stakingCell({ ...row, from: 'UNKNOWN_APP' })).toBe('""');
+});
+
+it('writes a literal ARC golden with raw units, duplicate records, independent native fees and staking endpoints', () => {
+	const arc: ExportRow = {
+		...row,
+		assetKind: 'arc200',
+		assetId: 1n,
+		applicationId: 1n,
+		transactionType: 'appl',
+		type: 'asset-transfer',
+		txId: '',
+		note: '=1',
+		round: 1n,
+		arc200Occurrence: 0
+	};
+	const arc200Assets = new Map([
+		[1n, { id: 1n, decimals: 0, unitName: '=UNIT', name: 'Token' }],
+		[2n, { id: 2n, decimals: 18, unitName: '', name: '' }],
+		[3n, { id: 3n, decimals: null, unitName: '', name: '' }]
+	]);
+	const csv = serializeCsv(
+		[
+			arc,
+			{ ...arc, arc200Occurrence: 1 },
+			{ ...arc, assetId: 2n, applicationId: 2n, arc200Occurrence: 2 },
+			{ ...arc, assetId: 3n, applicationId: 3n, arc200Occurrence: 3 },
+			{
+				...row,
+				round: 1n,
+				type: 'fee',
+				effect: 'fee',
+				direction: 'fee',
+				amount: 0n,
+				fee: 1000n,
+				note: ''
+			}
+		],
+		{ ...context, arc200Assets, status: 'partial-source', stakingContracts: new Map([['A', '12']]) }
+	);
+	expect(csv).toBe(
+		header +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","1","","","","9007199254740999","partial-source","","VOI","VOI (native)","6","12"\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200 (raw units)","9007199254740993","0","1","","3","\'=1","9007199254740999","partial-source","3","","","","12"\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","0.009007199254740993","0","1","","2","\'=1","9007199254740999","partial-source","2","","","18","12"\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12"\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12"\r\n'
+	);
+	expect(csv.split('\r\n')[0].split(',')).toHaveLength(23);
 });
