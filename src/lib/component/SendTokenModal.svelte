@@ -120,8 +120,8 @@
 		  };
 	export let onTokenSent: () => void;
 
-	type SendToken = typeof token;
-	let selectedToken = token;
+	type SendToken = typeof token & { minBalanceRaw?: string };
+	let selectedToken: SendToken = token;
 	let sentToken: SendToken | null = null;
 	let missingIconIds = new Set<string>();
 	$: selectedIconId = isNativeToken(selectedToken) ? '0' : String(selectedToken.id ?? '');
