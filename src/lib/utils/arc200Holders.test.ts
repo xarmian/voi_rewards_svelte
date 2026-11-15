@@ -1,5 +1,6 @@
 import algosdk from 'algosdk';
 import { describe, expect, it } from 'vitest';
+import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
 import baseline from './arc200Holders.baseline.json';
 import {
 	buildHolderRecipients,
@@ -36,11 +37,22 @@ describe('ARC-200 holder filtering matches the algosdk 2 baseline', () => {
 	// Who is paid and how much: the step between the holder list and the transactions that are sent.
 	const distributions = Object.keys(baseline.recipients) as HolderDistributionType[];
 	it.each(distributions.flatMap((d) => Object.keys(baseline.filtered).map((m) => [d, m] as const)))(
-		'builds the same recipients and amounts for %s at minimum %s',
+		'preserves recipients with exact proportional amounts for %s at minimum %s',
 		(distribution, minimum) => {
 			const holders = filterHolders(balances, contractId, Number(minimum));
 			const recipients = buildHolderRecipients(holders, distribution, baseline.amountValue);
-			expect(recipients).toEqual(baseline.recipients[distribution][minimum as '0' | '1.5']);
+			const expected = baseline.recipients[distribution][minimum as '0' | '1.5'];
+			// Preserve the historical fixture, but replace its float-based proportional amounts.
+			const proportionalAmounts =
+				minimum === '0' ? ['4', '16', '80', '', ''] : ['16.66666666', '83.33333333'];
+			expect(recipients).toEqual(
+				distribution === 'proportional'
+					? expected.map((recipient, index) => ({
+							...recipient,
+							amount: proportionalAmounts[index]
+						}))
+					: expected
+			);
 		}
 	);
 
@@ -53,5 +65,56 @@ describe('ARC-200 holder filtering matches the algosdk 2 baseline', () => {
 			const result = filterHolders(balances, contractId, minimum);
 			expect(result.some((balance) => excluded.has(balance.accountId))).toBe(false);
 		}
+	});
+});
+
+describe('ARC-200 proportional holder amounts', () => {
+	it.each([
+		{
+			name: 'floors thirds without exceeding the pool',
+			pool: '2',
+			balances: ['5', '5', '5'],
+			expected: ['0.66666666', '0.66666666', '0.66666666']
+		},
+		{
+			name: 'splits unequal balances proportionally',
+			pool: '1',
+			balances: ['1', '3'],
+			expected: ['0.25', '0.75']
+		},
+		{
+			name: 'handles balances above the safe integer limit exactly',
+			pool: '1',
+			balances: ['9007199254740993', '9007199254740993'],
+			expected: ['0.5', '0.5']
+		},
+		{
+			name: 'leaves amounts blank when the total balance is zero',
+			pool: '1',
+			balances: ['0', '0'],
+			expected: ['', '']
+		},
+		{
+			name: 'leaves a floored zero share blank',
+			pool: '0.00000002',
+			balances: ['1', '3'],
+			expected: ['', '0.00000001']
+		}
+	])('$name', ({ pool, balances, expected }) => {
+		const holders = balances.map((balance, index) => ({
+			accountId: `holder-${index}`,
+			balance,
+			decimals: 6
+		}));
+		const amounts = buildHolderRecipients(holders, 'proportional', pool).map((row) => row.amount);
+		expect.soft(amounts).toEqual(expected);
+		expect(sumBaseUnits(amounts, 8)).toBeLessThanOrEqual(decimalToBaseUnits(pool, 8));
+	});
+
+	it.each(['', 'invalid', '1e3', '-1'])('leaves amounts blank for invalid pool %j', (pool) => {
+		const holders = [{ accountId: 'holder', balance: '1', decimals: 6 }];
+		expect(buildHolderRecipients(holders, 'proportional', pool).map((row) => row.amount)).toEqual([
+			''
+		]);
 	});
 });
