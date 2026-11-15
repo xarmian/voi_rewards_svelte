@@ -850,10 +850,7 @@
 						token.decimals
 					);
 					if (total > getSpendableBalance(token, payments.length, feePerTxn)) {
-						error = 'Total plus network fees exceeds your available VOI balance';
-						isSending = false;
-						txState = 'idle';
-						return;
+						throw new Error('Total plus network fees exceeds your available VOI balance');
 					}
 				}
 				let currentGroup: algosdk.Transaction[] = [];
