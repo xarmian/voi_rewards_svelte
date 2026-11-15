@@ -366,8 +366,16 @@ test('totals are exact and invalid rows display an em dash', async () => {
 	expect(run('totalAmount')).toBe('—');
 });
 
-test('distribution input preserves the original decimal string', () => {
-	expect(source).not.toContain('bind:value={amountToDistribute}');
+test('distribution input writes truncated decimals back even when the stored amount is unchanged', () => {
+	const input = { value: '0.1234567' };
+	const run = componentFunctions(['handleDistributeInput', 'enforceDecimals'], {
+		input,
+		selectedToken: { decimals: 6 },
+		amountToDistribute: '0.123456'
+	});
+	run('handleDistributeInput(input)');
+	expect(run('amountToDistribute')).toBe('0.123456');
+	expect(input.value).toBe('0.123456');
 });
 
 test('distribution checks and required total use the same balance as send', async () => {

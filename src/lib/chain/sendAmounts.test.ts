@@ -3,6 +3,7 @@ import { decimalToBaseUnits } from './baseUnits';
 import {
 	baseUnitsToDecimal,
 	isDecimalAmount,
+	isDecimalNumber,
 	splitEvenly,
 	fitsBalance,
 	multiplyDecimal
@@ -40,6 +41,15 @@ test.each(['1e3', '0x10', '1,000', '', '  ', '-1', '0', '0.0'])(
 );
 test.each(['1', '0.5', '.5', '5.', ' 0.000000000000000001 '])('accepts decimal %j', (value) => {
 	expect(isDecimalAmount(value)).toBe(true);
+});
+
+test.each([
+	['0', true],
+	['0.00', true],
+	[' 0.00 ', true],
+	['1e3', false]
+] as const)('decimal grammar classifies %j as %s', (value, expected) => {
+	expect(isDecimalNumber(value)).toBe(expected);
 });
 
 test('splits in whole base units, dropping only the remainder', () => {

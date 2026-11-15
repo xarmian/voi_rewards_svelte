@@ -45,7 +45,7 @@ async function importFunctions(names: string[], globals: Record<string, unknown>
 	return (code: string) => runInContext(code, context);
 }
 
-test.each(['1e3', '0x10', '1,000', '-1', ' '])(
+test.each(['1e3', '0x10', '1,000', '-1', ' ', '0', '0.00'])(
 	'import rejects %j with existing error messages',
 	async (amountValue) => {
 		for (const distribution of ['per-holder', 'proportional', 'per-nft']) {
@@ -129,4 +129,50 @@ test('column detection distinguishes positive decimal amounts from other text', 
 	run('autoDetectColumns()');
 	expect(run('amountColumnIndex')).toBe(2);
 	expect(run('noteColumnIndex')).toBe(1);
+});
+
+test('headerless CSV detects zero amounts and preserves the real notes on import', async () => {
+	let imported: { amount: string; note: string }[] = [];
+	const run = await importFunctions(['parseContentData', 'autoDetectColumns', 'handleConfirm'], {
+		parsedData: [],
+		columnCount: 3,
+		algosdk: { isValidAddress: (value: string) => value === 'ADDR' },
+		isValidAddressContent: (value: string) => value === 'ADDR',
+		selectedRows: new Set([0, 1]),
+		onConfirm: (rows: typeof imported) => {
+			imported = rows;
+		},
+		handleClose: () => {},
+		error: null
+	});
+	run('parsedData = parseContentData("ADDR,0,foo\\nADDR,0,bar")');
+	run('autoDetectColumns()');
+	expect(run('amountColumnIndex')).toBe(1);
+	expect(run('noteColumnIndex')).toBe(2);
+	await run('handleConfirm()');
+	expect(imported.map(({ amount, note }) => ({ amount, note }))).toEqual([
+		{ amount: '', note: 'foo' },
+		{ amount: '', note: 'bar' }
+	]);
+});
+
+test('column detection does not treat exponent notation as an amount column', async () => {
+	const run = await importFunctions(['autoDetectColumns'], {
+		parsedData: [{ cells: ['ADDR', '1e3', 'foo'] }, { cells: ['ADDR', '1e3', 'bar'] }],
+		columnCount: 3,
+		algosdk: { isValidAddress: (value: string) => value === 'ADDR' }
+	});
+	run('autoDetectColumns()');
+	expect(run('amountColumnIndex')).toBe(-1);
+});
+
+test('note detection skips zero numeric cells outside the amount column', async () => {
+	const run = await importFunctions(['autoDetectColumns'], {
+		parsedData: [{ cells: ['ADDR', '1', '0', 'foo'] }, { cells: ['ADDR', '1', '0.00', 'bar'] }],
+		columnCount: 4,
+		algosdk: { isValidAddress: (value: string) => value === 'ADDR' }
+	});
+	run('autoDetectColumns()');
+	expect(run('amountColumnIndex')).toBe(1);
+	expect(run('noteColumnIndex')).toBe(3);
 });
