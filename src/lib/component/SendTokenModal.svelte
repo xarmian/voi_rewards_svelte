@@ -335,6 +335,12 @@
 		return truncatedFraction ? `${whole}.${truncatedFraction}` : whole;
 	}
 
+	function handleDistributeInput(input: HTMLInputElement) {
+		const trimmed = enforceDecimals(input.value, selectedToken.decimals);
+		if (input.value !== trimmed) input.value = trimmed;
+		amountToDistribute = trimmed;
+	}
+
 	function displayTotal(rows: Recipient[], decimals: number): string {
 		try {
 			return baseUnitsToDecimal(
@@ -1408,13 +1414,8 @@
 													step={`${1 / Math.pow(10, selectedToken.decimals)}`}
 													placeholder={`Amount in ${selectedToken.symbol}`}
 													size="sm"
-													on:input={(e: Event) => {
-														const input = e.target as HTMLInputElement;
-														amountToDistribute = enforceDecimals(
-															input.value,
-															selectedToken.decimals
-														);
-													}}
+													on:input={(e: Event) =>
+														handleDistributeInput(e.target as HTMLInputElement)}
 												/>
 												{#if isValidAmount && !distributionFitsBalance}
 													<p class="mt-1 text-xs text-red-500 dark:text-red-400">

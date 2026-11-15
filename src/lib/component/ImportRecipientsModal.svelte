@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isDecimalAmount, multiplyDecimal } from '$lib/chain/sendAmounts';
+	import { isDecimalAmount, isDecimalNumber, multiplyDecimal } from '$lib/chain/sendAmounts';
 	import { Modal, Button, Select, Input, Label } from 'flowbite-svelte';
 	import type { Recipient } from '$lib/types/recipients';
 	import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
@@ -376,7 +376,7 @@
 			if (i === addressColumnIndex) continue;
 			const hasNumericValue = parsedData.some((row) => {
 				const value = row.cells[i];
-				return value && isDecimalAmount(value);
+				return value && isDecimalNumber(value);
 			});
 			if (hasNumericValue) {
 				amountColumnIndex = i;
@@ -403,7 +403,7 @@
 			const hasStringValue = parsedData.some((row, index) => {
 				if (index === 0) return false; // Skip potential header row
 				const value = row.cells[i];
-				return value && typeof value === 'string' && value.length > 0 && !isDecimalAmount(value);
+				return value && typeof value === 'string' && value.length > 0 && !isDecimalNumber(value);
 			});
 
 			if (hasStringValue) {

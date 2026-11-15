@@ -13,6 +13,11 @@ export function baseUnitsToDecimal(units: bigint, decimals: number): string {
 	return fraction ? `${whole}.${fraction}` : whole;
 }
 
+/** Check decimal syntax, including zero, for imported column detection. */
+export function isDecimalNumber(value: string): boolean {
+	return decimalAmountPattern.test(value.trim());
+}
+
 /** Check positivity in the typed decimal, before any token-precision truncation. */
 export function isDecimalAmount(value: string): boolean {
 	const trimmed = value.trim();
