@@ -51,7 +51,7 @@
 		/** Required with limit; receives the number of rows hidden when collapsed. */
 		moreLabel?: (hidden: number) => string;
 		lessLabel?: string;
-		/** Render native <button type="button" role="menuitem"> items. */
+		/** Render bare native <button type="button" role="menuitem"> items; the menu owns their styling. */
 		rowActions?: Snippet<[T]>;
 		/** Omit the action trigger for rows without actions. Other rows retain the shared column. */
 		rowHasActions?: (row: T) => boolean;
