@@ -11,12 +11,13 @@ import {
 } from './transactionExport';
 
 const input: ExportInput = {
+	assets: { mode: 'native' },
 	pageAddress: 'A',
 	addresses: ['A'],
 	allDates: false,
 	from: '2024-02-29',
 	through: '2024-02-29',
-	types: ['payment', 'reward-payout', 'close-out', 'fee']
+	types: ['payment', 'reward-payout', 'asset-transfer', 'close-out', 'fee']
 };
 const options = (changes: Partial<ExportInput> = {}) =>
 	normalizeOptions({ ...input, ...changes }, '2024-12-31', (a) => /^[A-Z]+$/.test(a));
@@ -171,5 +172,165 @@ describe('exact units and export options', () => {
 			maxRound: 99n,
 			limit: 500
 		});
+	});
+});
+
+const assetRoot = (changes: Partial<NormalizedTransaction> = {}): NormalizedTransaction => ({
+	...root,
+	type: 'axfer',
+	payment: undefined,
+	fee: 1000n,
+	assetTransfer: { assetId: 9007199254740995n, receiver: 'B', amount: 5n, closeAmount: 0n },
+	...changes
+});
+describe('asset effects', () => {
+	it('maps both selected participants, keeps native fees separate and never classifies assets as rewards', () => {
+		expect(
+			map(assetRoot()).map((r) => [r.account, r.type, r.direction, r.assetId, r.amount, r.fee])
+		).toEqual([
+			['A', 'asset-transfer', 'out', 9007199254740995n, 5n, 0n],
+			['B', 'asset-transfer', 'in', 9007199254740995n, 5n, 0n],
+			['A', 'fee', 'fee', null, 0n, 1000n]
+		]);
+	});
+	it('retains exactly one zero self effect', () => {
+		const tx = assetRoot({
+			fee: 0n,
+			assetTransfer: { assetId: 1n, receiver: 'A', amount: 0n, closeAmount: 0n }
+		});
+		expect(map(tx)).toEqual([
+			expect.objectContaining({
+				account: 'A',
+				direction: 'self',
+				type: 'asset-transfer',
+				amount: 0n
+			})
+		]);
+	});
+	it('debits the clawback target while charging only the authority and includes the authority when it is a recipient', () => {
+		const tx = assetRoot({
+			sender: 'K',
+			assetTransfer: { assetId: 1n, sender: 'A', receiver: 'B', amount: 5n, closeAmount: 0n }
+		});
+		expect(
+			map(tx, ['A', 'B', 'K']).map((r) => [r.account, r.from, r.to, r.type, r.direction])
+		).toEqual([
+			['A', 'A', 'B', 'asset-transfer', 'out'],
+			['B', 'A', 'B', 'asset-transfer', 'in'],
+			['K', 'K', '', 'fee', 'fee']
+		]);
+		expect(
+			map({ ...tx, assetTransfer: { ...tx.assetTransfer!, receiver: 'K' } }, ['K']).map(
+				(r) => r.type
+			)
+		).toEqual(['asset-transfer', 'fee']);
+	});
+	it.each([
+		[5n, 7n, 'C'],
+		[0n, 0n, 'C'],
+		[5n, 7n, 'B']
+	] as const)('keeps amount %s and close %s to %s independent', (amount, closeAmount, closeTo) => {
+		const rows = map(
+			assetRoot({ assetTransfer: { assetId: 1n, receiver: 'B', amount, closeAmount, closeTo } })
+		);
+		expect(rows.map((r) => [r.account, r.effect, r.to, r.amount])).toEqual([
+			['A', 'amount', 'B', amount],
+			['B', 'amount', 'B', amount],
+			['A', 'close', closeTo, closeAmount],
+			[closeTo, 'close', closeTo, closeAmount],
+			['A', 'fee', '', 0n]
+		]);
+		expect(rows.filter((r) => r.effect === 'close').every((r) => r.type === 'close-out')).toBe(
+			true
+		);
+	});
+	it('rejects positive close without a recipient', () => {
+		expect(() =>
+			map(assetRoot({ assetTransfer: { assetId: 1n, receiver: 'B', amount: 0n, closeAmount: 1n } }))
+		).toThrow(/recipient/);
+	});
+	it('visits nested assets and native siblings under unrelated parents with root identity and nearest application', () => {
+		const tx = {
+			...root,
+			type: 'appl',
+			sender: 'X',
+			fee: 0n,
+			applicationId: 10n,
+			inner: [
+				{
+					...root,
+					type: 'appl',
+					sender: 'X',
+					fee: 0n,
+					applicationId: 20n,
+					inner: [assetRoot({ note: 'asset note', inner: [assetRoot({ fee: 7n })] })]
+				},
+				{ ...root, fee: 0n, payment: { receiver: 'B', amount: 2n, closeAmount: 0n } }
+			]
+		};
+		const rows = map(tx, ['A']).sort(compareRows);
+		expect(rows.map((r) => [r.innerPath, r.type, r.applicationId, r.fee])).toEqual([
+			['0.0', 'asset-transfer', 20n, 0n],
+			['0.0', 'fee', 20n, 1000n],
+			['0.0.0', 'asset-transfer', 20n, 0n],
+			['0.0.0', 'fee', 20n, 7n],
+			['1', 'payment', 10n, 0n]
+		]);
+		expect(rows[0]).toMatchObject({
+			txId: 'ROOT',
+			timestamp: root.timestamp,
+			round: root.round,
+			group: root.group,
+			note: 'asset note'
+		});
+	});
+});
+describe('asset options and combined filters', () => {
+	it.each(['native', 'all'] as const)('retains and freezes %s scope', (mode) => {
+		const result = options({ assets: { mode } });
+		expect(result.assets).toEqual({ mode });
+		expect(Object.isFrozen(result.assets)).toBe(true);
+	});
+	it.each([' 0009007199254740995 ', '18446744073709551615'])(
+		'canonicalizes exact asset ID %s',
+		(id) => {
+			expect(options({ assets: { mode: 'asset', id } }).assets).toEqual({
+				mode: 'asset',
+				id: BigInt(id.trim())
+			});
+		}
+	);
+	it.each(['', '0', '-1', '1.1', '1e3', '18446744073709551616', '+1', '1 2'])(
+		'rejects asset ID %j',
+		(id) => {
+			expect(() => options({ assets: { mode: 'asset', id } })).toThrow(
+				'Enter an asset ID from 1 to 18446744073709551615.'
+			);
+		}
+	);
+	it('combines date, type and asset matching while retaining all selected-account fees for one asset', () => {
+		const rows = [
+			...map(assetRoot()),
+			...map(root),
+			...map(
+				assetRoot({ assetTransfer: { assetId: 2n, receiver: 'B', amount: 8n, closeAmount: 0n } })
+			)
+		];
+		const native = options();
+		const all = options({ assets: { mode: 'all' } });
+		const specific = options({ assets: { mode: 'asset', id: '9007199254740995' } });
+		expect(rows.filter((r) => matchesFilters(r, native))).toHaveLength(7);
+		expect(rows.filter((r) => matchesFilters(r, all))).toHaveLength(11);
+		expect(rows.filter((r) => matchesFilters(r, specific)).map((r) => r.type)).toEqual([
+			'asset-transfer',
+			'asset-transfer',
+			'fee',
+			'fee',
+			'fee'
+		]);
+		expect(
+			rows.filter((r) => matchesFilters(r, { ...specific, types: ['asset-transfer'] }))
+		).toHaveLength(2);
+		expect(matchesFilters({ ...rows[0], timestamp: root.timestamp + 86400 }, specific)).toBe(false);
 	});
 });
