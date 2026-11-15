@@ -8,7 +8,8 @@ import {
 	getSplitError,
 	splitEvenly,
 	fitsBalance,
-	multiplyDecimal
+	multiplyDecimal,
+	spendableNative
 } from './sendAmounts';
 
 test.each([
@@ -112,3 +113,27 @@ test('split error distinguishes sub-unit shares from insufficient balance', () =
 	expect(getSplitError(false, '1', 3)).toBe('Insufficient balance for either distribution method');
 	expect(getSplitError(true, '1', 3)).toBeNull();
 });
+
+test.each([
+	[5_000_000n, 100_000n, 1000n, 1, 4_899_000n],
+	[5_000_000n, 100_000n, 1000n, 3, 4_897_000n],
+	[101_000n, 100_000n, 1000n, 1, 0n],
+	[99_999n, 100_000n, 1000n, 1, 0n],
+	[5_000_000n, 100_000n, 1000n, 0, 4_900_000n],
+	[2n ** 60n, 100_000n, 1000n, 3, 2n ** 60n - 103_000n],
+	[-1n, 100_000n, 1000n, 1, 0n],
+	[5_000_000n, -1n, 1000n, 1, 0n],
+	[5_000_000n, 100_000n, -1n, 1, 0n]
+] as const)(
+	'native spendable for %s minus %s and %s per %s payments is %s',
+	(balance, min, fee, count, expected) => {
+		expect(spendableNative(balance, min, fee, count)).toBe(expected);
+	}
+);
+
+test.each([-1, 1.5, NaN, Infinity])(
+	'native spendable rejects invalid transaction count %s',
+	(count) => {
+		expect(spendableNative(5_000_000n, 100_000n, 1000n, count)).toBe(0n);
+	}
+);
