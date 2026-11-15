@@ -1,29 +1,36 @@
-import { readFileSync } from 'node:fs';
-import { expect, test } from 'vitest';
-
-const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
-
-test('signing availability reacts to both the selection and the page account', () => {
-	expect(source).toMatch(
-		/^\t\$: canSignTransactions = canSignFor\(\$selectedWallet, walletAddress\);$/m
-	);
+import { expect, test, vi } from 'vitest';
+import { render } from 'svelte/server';
+import { writable } from 'svelte/store';
+vi.mock('$lib/chain/wallet.svelte', async () => {
+	const { writable } = await import('svelte/store');
+	return {
+		connectedWallets: writable([]),
+		selectedWallet: writable({ address: 'X', app: 'pera' }),
+		signTransactions: vi.fn(),
+		capturePageSigner: vi.fn()
+	};
 });
-
-test('portfolio initialization does not assign signing availability', () => {
-	const block = source.match(
-		/lastInitializedWallet = walletAddress;[\s\S]*?initializePortfolio\(\);/
-	);
-	expect(block).not.toBeNull();
-	expect(block?.[0]).not.toMatch(/canSignTransactions\s*=/);
-});
-
-// The send form is opened for the account the page shows. Its balance is fetched once when it opens,
-// so a page that moves to another account (back button, a link) must not keep the form open over
-// the new account.
-test('a change of page account closes the send form', () => {
-	const block = source.match(
-		/lastInitializedWallet = walletAddress;[\s\S]*?initializePortfolio\(\);/
-	);
-	expect(block).not.toBeNull();
-	expect(block?.[0]).toMatch(/^\t\t\tshowSendVoiModal = false;$/m);
+vi.mock('$lib/mimir', () => ({ mimirClient: {} }));
+vi.mock('$lib/supabase', () => ({ supabasePublicClient: {} }));
+vi.mock('$lib/utils/algod', () => ({ algodClient: {}, algodIndexer: {} }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+import { connectedWallets } from '$lib/chain/wallet.svelte';
+import Portfolio from './PortfolioComponent.svelte';
+const entries = connectedWallets as ReturnType<typeof writable>;
+test.each([[[]], [[{ address: 'X', app: 'pera' }]], [[{ address: 'Y', app: 'Watch' }]]])(
+	'read-only holdings omit native signing controls for %j',
+	(accounts) => {
+		entries.set(accounts);
+		const html = render(Portfolio, { props: { walletAddress: 'Y' } }).body;
+		expect(html).not.toContain('Send VOI');
+		expect(html).not.toContain('Bridge VOI');
+		expect(html).not.toContain('Connect wallet to');
+		expect(html).toContain('History');
+	}
+);
+test('the page signer sees native actions independently of the last used account', () => {
+	entries.set([{ address: 'Y', app: 'pera' }]);
+	const html = render(Portfolio, { props: { walletAddress: 'Y' } }).body;
+	expect(html).toContain('Bridge VOI');
+	expect(html).toContain('Balance unavailable');
 });

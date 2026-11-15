@@ -212,3 +212,20 @@ it.each([
 	const body = panel({ sortedMarketData: [row({ price_change_percentage_24h: change })] });
 	expect(body).toContain(`class="${color}">${label}</span>`);
 });
+
+it('presses exactly the visible chart source and clears it on Back', async () => {
+	const { pickMarket, resetChartSelection, visibleChart } = await import(
+		'$lib/markets/chartSelection'
+	);
+	const market = { ...row(), base_token_id: 0, quote_token_id: 2 };
+	const token = { data: [], volumes: [], loading: false, error: '', show: true };
+	const selected = pickMarket(resetChartSelection(0), market);
+	const view = visibleChart(selected, token);
+	expect(panel({ selectedTradingPairId: view.selectedTradingPairId })).toMatch(
+		/aria-label="Show VOI\/USDC chart"[^>]*aria-pressed="true"/
+	);
+	const back = visibleChart(resetChartSelection(selected.tokenId), token);
+	expect(panel({ selectedTradingPairId: back.selectedTradingPairId })).toMatch(
+		/aria-label="Show VOI\/USDC chart"[^>]*aria-pressed="false"/
+	);
+});

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Web3Wallet, type ConnectedAccount } from 'avm-wallet-svelte';
-	import { selectedWallet } from '$lib/chain/wallet.svelte';
+	import { connectedWallets } from '$lib/chain/wallet.svelte';
 	import { get } from 'svelte/store';
 	import { pinnedFlows } from '$lib/chain/flowAccount';
 	import { pickNavigation } from '$lib/utils/walletSelection';
-	import { canSignFor } from '$lib/chain/signerGate';
+	import { pageAccountState } from '$lib/chain/signerGate';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
 	import { goto, invalidate } from '$app/navigation';
@@ -14,7 +14,6 @@
 		Button,
 		Card,
 		CopyButton,
-		Headline,
 		InlineAlert,
 		WalletSearchPage,
 		WalletRewards,
@@ -37,6 +36,8 @@
 	import NodeComponent from '$lib/component/NodeComponent.svelte';
 	import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
+	import { buildStakingContractMap } from '$lib/wallet/stakingContracts';
+	import TransactionExportPanel from '$lib/component/TransactionExportPanel.svelte';
 
 	let {
 		data
@@ -97,6 +98,54 @@
 				) ?? [])
 			: []
 	);
+	let exportAddress = $state('');
+	const exportOpen = $derived(exportAddress === walletId && !!walletId);
+	const exportSuggestions = $derived.by(() => {
+		if (parentWalletId) return [{ address: parentWalletId, label: 'Owner address' }];
+		if (ownerLookup !== 'ok') return [];
+		const contracts = [
+			...viewContracts,
+			...(contractsMatch ? (contractsSnapshot?.contracts ?? []) : [])
+		];
+		return [
+			...new Map(
+				contracts.map((contract) => [
+					contract.address,
+					{
+						address: contract.address,
+						label: `Contract ${contract.contractId}`
+					}
+				])
+			).values()
+		];
+	});
+	const exportStakingContracts = $derived(
+		[
+			...buildStakingContractMap([
+				...viewContracts,
+				...(contractsMatch ? (contractsSnapshot?.contracts ?? []) : [])
+			])
+		].map(([address, contractId]) => ({ address, contractId }))
+	);
+	const stakingContractsAvailable = $derived(
+		ownerLookup === 'ok' &&
+			(knownContractSet === 'ready' ||
+				(contractsMatch && contractsSnapshot?.contractSet === 'ready'))
+	);
+	const exportSuggestionsAvailable = $derived(
+		ownerLookup === 'ok' &&
+			(!!parentWalletId ||
+				knownContractSet === 'ready' ||
+				(contractsMatch && contractsSnapshot?.contractSet === 'ready'))
+	);
+	$effect(() => {
+		void walletId;
+		exportAddress = '';
+	});
+	function closeExport() {
+		exportAddress = '';
+		document.getElementById('voi-activity-export-entry')?.focus();
+	}
 	const viewOwner = $derived(
 		parentWalletId || !snapshotMatches || ownerLookup !== 'ok' ? null : (snapshot?.owner ?? null)
 	);
@@ -120,7 +169,9 @@
 			price: snapshot?.price
 		})
 	);
-	const connected = $derived(canSignFor($selectedWallet, walletId));
+	const accountState = $derived(pageAccountState(walletId, $connectedWallets));
+	const yours = $derived(accountState.state === 'yours');
+	const ownerState = $derived(pageAccountState(parentWalletId, $connectedWallets));
 	const avatar = $derived.by(() => {
 		const hash = Array.from(walletId).reduce(
 			(value, char) => (value * 31 + char.charCodeAt(0)) >>> 0,
@@ -137,7 +188,6 @@
 		const target = pickNavigation({
 			pick,
 			routeAddress: walletId,
-			parentAddress: parentWalletId,
 			pinned: get(pinnedFlows) > 0
 		});
 		if (target) goto(target, { invalidateAll: true });
@@ -299,6 +349,8 @@
 					</div>{/if}
 				<div class="wallet-picker relative ml-auto max-w-full">
 					<Web3Wallet
+						accountMode="navigation"
+						currentAccount={accountState.state === 'yours' ? accountState.signingEntry : null}
 						enabledWallets={['walletconnect', 'kibisis', 'lute', 'biatec', 'voiwallet']}
 						{algodClient}
 						indexerClient={algodIndexer}
@@ -314,7 +366,22 @@
 						showSignInStatus={false}
 						displayMode="dropdown"
 						onAccountPicked={handleAccountPicked}
-					/>
+					>
+						{#snippet trigger({ toggle })}
+							<button
+								type="button"
+								onclick={toggle}
+								class="rounded-ds-sm bg-surface-2 px-4 py-2 text-ink"
+								aria-label={$connectedWallets.length ? 'Your accounts' : 'Connect wallet'}
+							>
+								{$connectedWallets.length
+									? accountState.state === 'yours'
+										? (accountState.signingEntry.name ?? shortAddr(walletId))
+										: 'Your accounts'
+									: 'Connect wallet'}
+							</button>
+						{/snippet}
+					</Web3Wallet>
 				</div>
 			</div>
 			{#if walletId}
@@ -335,16 +402,38 @@
 						/>{/if}
 					<StatusPill
 						onHero
-						tone={connected ? 'ok' : 'neutral'}
-						label={connected ? 'Connected' : 'Watch only'}
+						tone={yours ? 'ok' : 'neutral'}
+						label={yours
+							? 'Your account'
+							: accountState.state === 'watch-only'
+								? 'Watch only'
+								: 'Read-only'}
 					/>
 				</div>
-				<Headline account={{ addr: walletId }} {summary} onretry={refresh} />
-				{#if parentWalletId}<a
-						class="inline-block text-label text-on-hero-muted underline"
-						href={`/wallet/${parentWalletId}`}
-						>View owner {shortAddr(parentWalletId)} and all contracts →</a
-					>{/if}
+				{#if !yours}
+					<p class="text-label text-on-hero-muted">
+						{accountState.state === 'watch-only'
+							? 'Read-only. This account is connected for watching only.'
+							: $connectedWallets.length
+								? "Read-only. This isn't one of your connected accounts."
+								: 'Read-only. Connect a wallet to act on your own accounts.'}
+					</p>
+				{/if}
+				{#if parentWalletId}
+					{#if ownerState.state === 'yours'}
+						<p class="text-label text-on-hero-muted">
+							This contract belongs to your account <a
+								class="underline"
+								href={`/wallet/${parentWalletId}`}
+								>{ownerState.signingEntry.name ?? shortAddr(parentWalletId)}</a
+							>. Manage it from your account page.
+						</p>
+					{:else}<a
+							class="inline-block text-label text-on-hero-muted underline"
+							href={`/wallet/${parentWalletId}`}
+							>View owner {shortAddr(parentWalletId)} and all contracts →</a
+						>{/if}
+				{/if}
 			{/if}
 			{#if walletId}<Tabs
 					variant="nav"
@@ -363,106 +452,131 @@
 		class="container-page relative -mt-[60px] min-w-0 pb-8"
 		aria-label="Wallet section"
 	>
-		{#if walletId}
-			{#if tabs.current === 'overview'}
-				<WalletOverview
-					{summary}
-					contracts={viewContracts}
-					current={snapshot?.current ?? null}
-					historyState={snapshot?.historyState ?? 'loading'}
-					price={snapshot?.price ?? null}
-					pageAddress={walletId}
-					selected={$selectedWallet}
-					asOf={snapshot?.asOf}
-					{now}
-					onrefresh={refresh}
-				/>
-				<details
-					bind:open={showNode}
-					class="mt-bento rounded-card border border-line bg-surface p-card"
-				>
-					<summary class="cursor-pointer font-bold text-accent">Consensus details</summary>
-					{#if showNode}<div class="legacy-panel mt-4">
-							<NodeComponent
-								{walletId}
-								parentWalletId={parentWalletId ?? null}
-								contractId={childAccounts.find((account) => account.address === walletId)
-									?.contractId ?? null}
+		{#if walletId}{#key walletId}
+				{#if tabs.current === 'overview'}
+					<WalletOverview
+						{summary}
+						contracts={viewContracts}
+						current={snapshot?.current ?? null}
+						historyState={snapshot?.historyState ?? 'loading'}
+						price={snapshot?.price ?? null}
+						pageAddress={walletId}
+						{accountState}
+						asOf={snapshot?.asOf}
+						{now}
+						onrefresh={refresh}
+					/>
+					<details
+						bind:open={showNode}
+						class="mt-bento rounded-card border border-line bg-surface p-card"
+					>
+						<summary class="cursor-pointer font-bold text-accent">Consensus details</summary>
+						{#if showNode}<div class="legacy-panel mt-4">
+								<NodeComponent
+									{walletId}
+									parentWalletId={parentWalletId ?? null}
+									contractId={childAccounts.find((account) => account.address === walletId)
+										?.contractId ?? null}
+								/>
+							</div>{/if}
+					</details>
+				{:else if tabs.current === 'holdings'}
+					<div class="min-w-0">
+						<PortfolioComponent
+							walletAddress={walletId}
+							parentWalletAddress={parentWalletId ?? null}
+							holdingsSplit={snapshot
+								? {
+										pageAddress: loadedAddress,
+										owner: viewOwner,
+										contracts: viewContracts,
+										contractSet: knownContractSet,
+										ownerAddress: loadedOwner,
+										ownerLookup
+									}
+								: undefined}
+						/>
+					</div>
+				{:else if tabs.current === 'rewards'}
+					<WalletRewards pageAddress={walletId} />
+				{:else if tabs.current === 'contracts'}
+					<WalletContractsPanel
+						contracts={contractsMatch ? (contractsSnapshot?.contracts ?? []) : []}
+						current={snapshotMatches ? (snapshot?.current ?? null) : null}
+						pageAddress={walletId}
+						{accountState}
+						state={contractsMatch ? contractsLoadState : 'loading'}
+						contractSet={ownerLookup === 'ok' ? contractsSnapshot?.contractSet : 'unavailable'}
+						asOf={contractsSnapshot?.asOf}
+						{now}
+						onrefresh={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
+					/>
+					{#if contractsRefreshFailed && contractsLoadState === 'stale'}<div class="mt-3">
+							<InlineAlert
+								tone="warn"
+								message="Refresh failed; showing the last loaded contracts."
+								onretry={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
 							/>
 						</div>{/if}
-				</details>
-			{:else if tabs.current === 'holdings'}
-				<div class="min-w-0">
-					<PortfolioComponent
-						walletAddress={walletId}
-						parentWalletAddress={parentWalletId ?? null}
-						holdingsSplit={snapshot
-							? {
-									pageAddress: loadedAddress,
-									owner: viewOwner,
-									contracts: viewContracts,
-									contractSet: knownContractSet,
-									ownerAddress: loadedOwner,
-									ownerLookup
-								}
-							: undefined}
-					/>
+				{:else if tabs.current === 'calculator'}
+					<Card title="Calculator"
+						><CalculatorComponent
+							walletAddress={walletId}
+							{childAccounts}
+							{primaryAccountInfo}
+						/></Card
+					>
+				{/if}
+				<div
+					class="mt-5 flex flex-wrap items-center justify-between gap-3 text-label text-ink-muted"
+				>
+					<p>
+						{#if snapshot}Block {comma(snapshot.owner.round)} · data as of
+							<time datetime={snapshot.asOf}>{new Date(snapshot.asOf).toUTCString()}</time
+							>{:else}Wallet data loads in your browser.{/if}
+					</p>
+					<div class="flex flex-wrap gap-2">
+						<Button
+							id="voi-activity-export-entry"
+							variant="soft"
+							size="sm"
+							aria-expanded={exportOpen}
+							aria-controls="voi-activity-export"
+							onclick={() => {
+								if (exportOpen) closeExport();
+								else exportAddress = walletId;
+							}}>Export wallet activity</Button
+						>
+						<Button
+							variant="soft"
+							size="sm"
+							onclick={refresh}
+							disabled={tabs.current === 'contracts'
+								? contractsLoadState === 'loading'
+								: loadState === 'loading'}>Refresh wallet data</Button
+						>
+					</div>
 				</div>
-			{:else if tabs.current === 'rewards'}
-				<WalletRewards pageAddress={walletId} />
-			{:else if tabs.current === 'contracts'}
-				<WalletContractsPanel
-					contracts={contractsMatch ? (contractsSnapshot?.contracts ?? []) : []}
-					current={snapshotMatches ? (snapshot?.current ?? null) : null}
-					pageAddress={walletId}
-					selected={$selectedWallet}
-					state={contractsMatch ? contractsLoadState : 'loading'}
-					contractSet={ownerLookup === 'ok' ? contractsSnapshot?.contractSet : 'unavailable'}
-					asOf={contractsSnapshot?.asOf}
-					{now}
-					onrefresh={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
-				/>
-				{#if contractsRefreshFailed && contractsLoadState === 'stale'}<div class="mt-3">
+				{#if exportOpen}
+					<TransactionExportPanel
+						pageAddress={walletId}
+						suggestions={exportSuggestions}
+						suggestionsAvailable={exportSuggestionsAvailable}
+						stakingContracts={exportStakingContracts}
+						{stakingContractsAvailable}
+						onclose={closeExport}
+					/>
+				{/if}
+				{#if dataState === 'stale'}<div class="mt-3">
 						<InlineAlert
 							tone="warn"
-							message="Refresh failed; showing the last loaded contracts."
-							onretry={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
+							message={refreshFailed
+								? 'Refresh failed; showing the last loaded wallet data.'
+								: 'Wallet data is more than five minutes old.'}
+							onretry={refresh}
 						/>
 					</div>{/if}
-			{:else if tabs.current === 'calculator'}
-				<Card title="Calculator"
-					><CalculatorComponent
-						walletAddress={walletId}
-						{childAccounts}
-						{primaryAccountInfo}
-					/></Card
-				>
-			{/if}
-			<div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-label text-ink-muted">
-				<p>
-					{#if snapshot}Block {comma(snapshot.owner.round)} · data as of
-						<time datetime={snapshot.asOf}>{new Date(snapshot.asOf).toUTCString()}</time
-						>{:else}Wallet data loads in your browser.{/if}
-				</p>
-				<Button
-					variant="soft"
-					size="sm"
-					onclick={refresh}
-					disabled={tabs.current === 'contracts'
-						? contractsLoadState === 'loading'
-						: loadState === 'loading'}>Refresh wallet data</Button
-				>
-			</div>
-			{#if dataState === 'stale'}<div class="mt-3">
-					<InlineAlert
-						tone="warn"
-						message={refreshFailed
-							? 'Refresh failed; showing the last loaded wallet data.'
-							: 'Wallet data is more than five minutes old.'}
-						onretry={refresh}
-					/>
-				</div>{/if}
-		{/if}
+			{/key}{/if}
 	</div>
 </div>
 

@@ -9,7 +9,8 @@
 	import { dev } from '$app/environment';
 	// import { inject } from '@vercel/analytics';
 	// inject({ mode: dev ? 'development' : 'production' });
-	import { invalidate } from '$app/navigation';
+	import { afterNavigate, invalidate } from '$app/navigation';
+	import { analyticsPageView } from '$lib/analytics';
 	import { onMount } from 'svelte';
 	import { initTheme } from '$lib/theme.svelte';
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
@@ -28,11 +29,9 @@
 	let { supabase, session } = data;
 	$: ({ supabase, session } = data);
 
-	onMount(() => {
-		initTheme();
-		// Conditionally inject Google Analytics except on /discover and /vanity
+	// Google Analytics is not loaded on /discover and /vanity. Returns whether it is loaded for this path.
+	function loadAnalytics(pathname: string): boolean {
 		try {
-			const pathname = $page.url.pathname;
 			const isDiscover = pathname.startsWith('/discover');
 			const isVanity = pathname === '/vanity' || pathname.startsWith('/vanity/');
 			if (typeof window !== 'undefined' && !isDiscover && !isVanity) {
@@ -46,11 +45,36 @@
 				if (!document.getElementById('ga-inline')) {
 					const inline = document.createElement('script');
 					inline.id = 'ga-inline';
-					inline.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NDX21XVC4G');`;
+					inline.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NDX21XVC4G', {send_page_view: false});`;
 					document.head.appendChild(inline);
 				}
+				return true;
 			}
 		} catch {}
+		return false;
+	}
+
+	// Page views are sent by hand so that wallet routes never put an address in what we report. The
+	// location is also set on the tag so that any page view it sends itself starts from the redacted one.
+	function sendPageView(url: URL, from?: URL) {
+		const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
+		if (typeof gtag !== 'function') return;
+		const view = analyticsPageView(url, document.title);
+		gtag('set', view);
+		gtag('event', 'page_view', {
+			...view,
+			...(from ? { page_referrer: analyticsPageView(from).page_location } : {})
+		});
+	}
+
+	afterNavigate((nav) => {
+		if (nav.type === 'enter' || !nav.to) return;
+		if (loadAnalytics(nav.to.url.pathname)) sendPageView(nav.to.url, nav.from?.url);
+	});
+
+	onMount(() => {
+		initTheme();
+		if (loadAnalytics($page.url.pathname)) sendPageView($page.url);
 		const {
 			data: { subscription }
 		} = supabase.auth.onAuthStateChange((event, _session) => {

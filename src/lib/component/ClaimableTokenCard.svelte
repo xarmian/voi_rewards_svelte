@@ -1,8 +1,13 @@
 <script lang="ts">
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
 	import { createEventDispatcher } from 'svelte';
 	import { arc200TransferFrom } from '$lib/utils/arc200';
-	import { signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
+	import { signTransactions, connectedWallets, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
 	import { algodClient } from '$lib/utils/algod';
 
@@ -12,7 +17,6 @@
 	export let approvals: TokenApproval[];
 	export let totalAmount: number;
 	export let totalValue: number;
-	export let canSignTransactions = false;
 	export let walletId: string | undefined;
 
 	let isClaiming = false;
@@ -41,7 +45,11 @@
 	}
 
 	async function handleClaim() {
-		if (!canSignTransactions || !walletId || isClaiming) return;
+		if (isClaiming) return;
+		if (!(pageAccountState(walletId, $connectedWallets).state === 'yours') || !walletId) {
+			claimError = wrongSignerMessage();
+			return;
+		}
 
 		isClaiming = true;
 		claimError = null;
@@ -49,7 +57,12 @@
 
 		try {
 			// The account the user confirmed, taken before any await and kept for every approval.
-			const signer = captureSigner();
+			const target = walletId;
+			const signer = capturePageSigner(target);
+			if (!signerMatchesAccount(signer, target)) {
+				claimError = wrongSignerMessage();
+				return;
+			}
 			// Only handle ARC-200 tokens for now
 			if (token.type === 'arc200') {
 				// Claim all approvals for this token
@@ -143,23 +156,23 @@
 			View Details
 		</button>
 
-		<button
-			on:click={handleClaim}
-			disabled={!canSignTransactions || isClaiming}
-			class="flex-1 px-3 py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 rounded-lg transition-colors flex items-center justify-center gap-1 disabled:cursor-not-allowed"
-			title="Claim all approvals for this token"
-		>
-			{#if isClaiming}
-				<div class="w-3 h-3 border-t-2 border-r-2 border-white rounded-full animate-spin"></div>
-				Claiming...
-			{:else if claimSuccess}
-				<i class="fas fa-check"></i>
-				Claimed
-			{:else}
-				<i class="fas fa-hand-holding-dollar"></i>
-				Claim
-			{/if}
-		</button>
+		{#if pageAccountState(walletId, $connectedWallets).state === 'yours'}<button
+				on:click={handleClaim}
+				disabled={isClaiming}
+				class="flex-1 px-3 py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 rounded-lg transition-colors flex items-center justify-center gap-1 disabled:cursor-not-allowed"
+				title="Claim all approvals for this token"
+			>
+				{#if isClaiming}
+					<div class="w-3 h-3 border-t-2 border-r-2 border-white rounded-full animate-spin"></div>
+					Claiming...
+				{:else if claimSuccess}
+					<i class="fas fa-check"></i>
+					Claimed
+				{:else}
+					<i class="fas fa-hand-holding-dollar"></i>
+					Claim
+				{/if}
+			</button>{/if}
 	</div>
 
 	{#if claimError}

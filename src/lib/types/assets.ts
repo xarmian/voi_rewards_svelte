@@ -3,6 +3,8 @@ export interface FungibleTokenType {
 	name: string;
 	symbol: string;
 	balance: number;
+	// Exact base-unit integer string; `balance` rounds above 2^53 (TASK-122)
+	balanceRaw?: string;
 	decimals: number;
 	verified: boolean;
 	imageUrl: string;

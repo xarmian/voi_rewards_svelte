@@ -69,6 +69,7 @@ test('picking an NFD makes the screen and bridge receiver agree', async () => {
 	const { nfdReceiveAddress } = await import('../utils/nfd');
 	const address = algosdk.encodeAddress(new Uint8Array(32));
 	const context = createContext({
+		canSignTransactions: true,
 		algorandDestination: { ...emptyDestination, text: 'typed query' },
 		voiDestination: emptyDestination,
 		isVoiToAlgorand: true,
@@ -94,6 +95,7 @@ test('does not show a QR generated for a destination edited while generation was
 	const pending = Promise.withResolvers<string>();
 	const address = algosdk.encodeAddress(new Uint8Array(32));
 	const context = createContext({
+		canSignTransactions: true,
 		bridgeStatus: 'idle',
 		isVoiToAlgorand: false,
 		destinationAddress: address,

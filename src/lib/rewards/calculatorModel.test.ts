@@ -18,6 +18,24 @@ const input: EstimateInput = {
 	costPercentage: 10
 };
 
+const irregularInput: EstimateInput = {
+	stake: 123456.789,
+	price: 0.003721,
+	onlineMoney: 1234567890000000,
+	rewardStake: 987654321000000,
+	epochRewards: Array.from({ length: 52 }, (_, i) => Math.round(3_000_000 * 0.97 ** i)),
+	nodeCost: 17.83,
+	isPercentageBased: false,
+	costPercentage: 13.7
+};
+
+const breakEvenCases = [
+	{ nodeCost: 5, price: 0.001, threshold: 101_000 },
+	{ nodeCost: 50, price: 0.001, threshold: 1_010_000 },
+	{ nodeCost: 604, price: 0.1, threshold: 122_100 },
+	{ nodeCost: 0, price: 0.01, threshold: 0 }
+];
+
 test('calculates hand-checkable rewards and compounds the yearly balance', () => {
 	const result = estimateRewards(input)!;
 	// share = 1000 / (100_000_000_000 / 1e6) = 0.01; weekly = 0.01 * 1000 = 10.
@@ -32,24 +50,22 @@ test('calculates hand-checkable rewards and compounds the yearly balance', () =>
 });
 
 test('preserves every output for an irregular descending epoch pool', () => {
-	const result = estimateRewards({
-		stake: 123456.789,
-		price: 0.003721,
-		onlineMoney: 1234567890000000,
-		rewardStake: 987654321000000,
-		epochRewards: Array.from({ length: 52 }, (_, i) => Math.round(3_000_000 * 0.97 ** i)),
-		nodeCost: 17.83,
-		isPercentageBased: false,
-		costPercentage: 13.7
-	})!;
-	// values from the pre-extraction implementation (same inputs)
+	const result = estimateRewards(irregularInput)!;
+	// Threshold uses the direct solve; all other values are from the pre-extraction implementation.
+	// First five pools sum to 14_126_597: 18.0083 / (0.003721 * 14_126_597 / 987654321)
+	// = 338361.1241473446 VOI, rounded up to 338400 instead of the search's 338500.
+	const exact =
+		(irregularInput.nodeCost * 1.01) /
+		((irregularInput.price * irregularInput.epochRewards.slice(0, 5).reduce((a, b) => a + b, 0)) /
+			(irregularInput.rewardStake / 1e6));
+	expect(Math.ceil(exact / 100) * 100).toBe(338400);
 	const expected: Estimate = {
 		expectedWeeklyBlocks: 21.6,
 		expectedMonthlyBlocks: 93.92914285714286,
 		expectedYearlyBlocks: 1127.057142857143,
 		apr: 15.794999999802561,
 		apy: 8.372165173820312,
-		profitabilityThreshold: 338500,
+		profitabilityThreshold: 338400,
 		breakEvenReached: true,
 		weeklyReward: 374.9999965828125,
 		weeklyRewardUSD: 1.3953749872846453,
@@ -67,9 +83,29 @@ test('preserves every output for an irregular descending epoch pool', () => {
 	};
 	expect(Object.keys(result).sort()).toEqual(Object.keys(expected).sort());
 	for (const key of Object.keys(expected) as (keyof Estimate)[]) {
-		if (key === 'breakEvenReached') expect(result[key], key).toBe(expected[key]);
-		else expect(result[key], key).toBeCloseTo(expected[key], 9);
+		expect(result[key], key).toBe(expected[key]);
 	}
+});
+
+test.each(breakEvenCases)(
+	'rounds the exact break-even up to $threshold VOI for cost $nodeCost and price $price',
+	({ nodeCost, price, threshold }) => {
+		expect(estimateRewards({ ...input, nodeCost, price })!.profitabilityThreshold).toBe(threshold);
+	}
+);
+
+test.each([
+	...breakEvenCases.map(({ nodeCost, price }) => ({ ...input, nodeCost, price })),
+	irregularInput,
+	input
+])('covers the closed-form cost within 100 VOI for cost $nodeCost and price $price', (fixture) => {
+	const monthlyPool = fixture.epochRewards.slice(0, 5).reduce((sum, reward) => sum + reward, 0);
+	const exact =
+		(fixture.nodeCost * 1.01) / ((fixture.price * monthlyPool) / (fixture.rewardStake / 1e6));
+	const threshold = estimateRewards(fixture)!.profitabilityThreshold;
+	expect(threshold).toBeGreaterThanOrEqual(exact - 1e-6);
+	expect(threshold - exact).toBeLessThan(100 + 1e-6);
+	expect(threshold % 100).toBe(0);
 });
 
 test.each([{ rewardStake: 0 }, { rewardStake: -1 }, { onlineMoney: 0 }])(
@@ -115,6 +151,7 @@ test.each([0, -1])('uses potential rates but zero rewards and balances for stake
 test('deducts percentage-based node cost from monthly rewards', () => {
 	const result = estimateRewards({ ...input, isPercentageBased: true, costPercentage: 10 })!;
 	expect(result.monthlyProfit).toBeCloseTo(result.monthlyRewardUSD * 0.9, 9);
+	expect(result.profitabilityThreshold).toBe(0);
 });
 
 test.each([{ nodeCost: 0 }, { isPercentageBased: true, costPercentage: 0 }])(
@@ -201,10 +238,11 @@ test('reports when a high node cost at a low price cannot break even within the 
 	expect(result.breakEvenReached).toBe(false);
 });
 
-test('reports a reached break-even without changing the normal pinned threshold', () => {
+test('reports a reached break-even at the directly solved normal threshold', () => {
 	const result = estimateRewards(input)!;
 	expect(result.breakEvenReached).toBe(true);
-	expect(result.profitabilityThreshold).toBe(20300);
+	// Direct solve: 10.1 / (0.05 * 0.01) = 20_200, replacing the search's 20_300.
+	expect(result.profitabilityThreshold).toBe(20200);
 });
 
 test.each([0.001, 0.01, 1000])('a 100 percent node cost cannot break even at price %s', (price) => {
@@ -215,6 +253,7 @@ test.each([0.001, 0.01, 1000])('a 100 percent node cost cannot break even at pri
 		costPercentage: 100
 	})!;
 	expect(result.breakEvenReached).toBe(false);
+	expect(result.profitabilityThreshold).toBe(BREAK_EVEN_SEARCH_LIMIT);
 });
 
 test('a percentage cost below the cutoff can break even', () => {
@@ -232,7 +271,7 @@ test.each([
 		(BREAK_EVEN_SEARCH_LIMIT / (input.rewardStake / 1e6)) * 1000 * 5 * input.price;
 	const nodeCost = (revenueAtLimit / 1.01) * factor;
 	const result = estimateRewards({ ...input, nodeCost })!;
-	// Both searches round to the limit, so the threshold alone cannot distinguish them.
+	// Both thresholds round to the limit, so the threshold alone cannot distinguish them.
 	expect(result.profitabilityThreshold).toBe(BREAK_EVEN_SEARCH_LIMIT);
 	expect(result.breakEvenReached).toBe(reached);
 });

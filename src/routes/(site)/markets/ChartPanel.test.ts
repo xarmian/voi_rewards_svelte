@@ -85,3 +85,89 @@ it('names the existing chart Card region in every state', () => {
 		expect(body).toMatch(/<h2\b[^>]*>Market chart(?:<!--[\s\S]*?-->)*<\/h2>/);
 	}
 });
+
+it('names the selected pair and offers Back only for a pair selection', () => {
+	const body = panel({
+		selectedMarket: {
+			trading_pair_id: 22,
+			pair: 'ABC/USDC',
+			exchange: 'Example',
+			base_token_id: 1,
+			quote_token_id: 2
+		}
+	});
+	expect(body).toMatch(/<h2\b[^>]*>[^<]*ABC\/USDC/);
+	expect(body).toContain('Back to VOI');
+	expect(panel()).not.toContain('Back to');
+});
+it.each(['Failed to load market OHLCV (503)', 'No chart data available.'])(
+	'keeps the selected pair message and Back in the card: %s',
+	(message) => {
+		const body = panel({
+			showTokenChart: true,
+			selectedMarket: {
+				trading_pair_id: 22,
+				pair: 'ABC/USDC',
+				exchange: 'Example',
+				base_token_id: 1,
+				quote_token_id: 2
+			},
+			tokenChartError: message
+		});
+		expect(body).toMatch(/role="alert"[^>]*>[\s\S]*?ABC|role="alert"/);
+		expect(body).toContain(message);
+		expect(body).toContain('Back to VOI');
+		expect(body).not.toContain('Price fixture');
+	}
+);
+it('names the quote a non-VOI token chart shows, so the heading and the plotted series agree', () => {
+	const token = { id: 7, symbol: 'ABC', decimals: 6 } as ComponentProps<
+		typeof ChartPanel
+	>['selectedToken'];
+	const data = [{ time: 1, open: 1, high: 2, low: 0, close: 2, volume: 1 }];
+	const heading = (body: string) => body.replace(/<!--[\s\S]*?-->/g, '');
+	const usd = heading(panel({ showTokenChart: true, selectedToken: token, tokenChartData: data }));
+	expect(usd).toMatch(/ABC\/USD\b/);
+	expect(usd).not.toContain('ABC/VOI');
+	const voi = heading(
+		panel({
+			showTokenChart: true,
+			selectedToken: token,
+			tokenChartData: data,
+			currentQuoteCurrency: 'VOI'
+		})
+	);
+	expect(voi).toMatch(/ABC\/VOI\b/);
+	expect(voi).not.toContain('ABC/USD');
+});
+it('retains the OHLCV chart during a refetch and after a refetch error', () => {
+	for (const state of [{ tokenChartLoading: true }, { tokenChartError: 'Offline' }]) {
+		const body = panel({
+			showTokenChart: true,
+			tokenChartData: [{ time: 1, open: 1, high: 2, low: 0, close: 2, volume: 1 }],
+			...state
+		});
+		expect(body).toContain('aria-label="Resolution"');
+		if ('tokenChartLoading' in state) expect(body).toContain('Loading chart data...');
+		else expect(body).toContain('Offline');
+	}
+});
+
+it.each([
+	['USD', 'Prices in USD'],
+	[null, 'Prices in VOI']
+])('names the quote of a selected VOI pair (%s) in the chart text', (selectedQuote, expected) => {
+	const body = panel({
+		showTokenChart: true,
+		tokenChartData: [{ time: 1, open: 1, high: 2, low: 0, close: 2, volume: 1 }],
+		selectedMarket: {
+			trading_pair_id: 22,
+			pair: 'ABC/VOI',
+			exchange: 'Example',
+			base_token_id: 1,
+			quote_token_id: 390001
+		},
+		selectedQuote
+	});
+	expect(body).toContain(expected);
+});

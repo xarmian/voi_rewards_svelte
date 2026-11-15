@@ -361,7 +361,7 @@ describe('TASK-32 wallet loads', () => {
 
 	it.each([
 		['URL', 'URL'],
-		['', 'SELECTED']
+		['', null]
 	])('merges server data with the wallet for param %s', async (id, expected) => {
 		const { load } = await import('./(site)/wallet/[...id]/+page');
 		selectedWallet.set({ address: 'SELECTED' } as never);

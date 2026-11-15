@@ -52,9 +52,13 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 			const signTransactions = vi.fn();
 			const signAndSendTransactions = vi.fn().mockResolvedValue(true);
 			const context = createContext({
+				canSignTransactions: true,
+				capturePageSigner: () => ({ address: selected }),
 				captureSigner: () => ({ address: selected }),
 				signerMatchesAccount,
 				wrongSignerMessage,
+				pageAddress: 'Z',
+				walletAddress: 'CONTRACT',
 				parentWalletAddress: 'Z',
 				contractId: 1,
 				error: null,
@@ -77,7 +81,7 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 			runInContext(ts.transpileModule(functions, {}).outputText, context);
 			await runInContext(`${name}()`, context);
 			if (selected !== 'Z') {
-				expect(context.error).toBe(wrongSignerMessage('Z'));
+				expect(context.error).toBe(wrongSignerMessage());
 				for (const call of [
 					CONTRACT,
 					participate,

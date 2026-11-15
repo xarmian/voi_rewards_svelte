@@ -3,11 +3,13 @@
 	import ThemeToggle from '../ThemeToggle/ThemeToggle.svelte';
 	import { navItems, type NavKey } from './nav';
 	let {
+		stakingHref = '/wallet',
 		current,
 		onopenchange,
 		onsubmit
 	}: {
 		current: NavKey | null;
+		stakingHref?: string;
 		onopenchange: (open: boolean) => void;
 		onsubmit: (address: string) => void;
 	} = $props();
@@ -53,7 +55,7 @@
 			{#each navItems as item (item.key)}
 				<li>
 					<a
-						href={item.href}
+						href={item.key === 'staking' ? stakingHref : item.href}
 						aria-current={current === item.key ? 'page' : undefined}
 						onclick={close}
 						class="block rounded-full px-4 py-3 text-body {current === item.key

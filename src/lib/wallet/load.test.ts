@@ -1,5 +1,4 @@
 import { render } from 'svelte/server';
-import Headline from '$lib/ds/Headline/Headline.svelte';
 import WalletOverview from '$lib/ds/WalletOverview/WalletOverview.svelte';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { epochRange } from '$lib/epochs';
@@ -72,6 +71,20 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it('loads the algod minimum balance in VOI', async () => {
+	const data = await loadWallet('OWNER', 'OWNER');
+	expect(data.owner.minBalance).toBe(0.1);
+});
+
+it.each([undefined, null, NaN, Infinity])(
+	'leaves a missing or non-finite minimum balance (%s) unknown',
+	async (minBalance) => {
+		mocks.account.mockResolvedValue({ amount: 1e9, status: 'Online', minBalance });
+		const data = await loadWallet('OWNER', 'OWNER');
+		expect(data.owner.minBalance).toBeNull();
+	}
+);
+
 it('uses the live epoch rows for the current figure and keeps 12 complete epochs separately', async () => {
 	const data = await loadWallet('OWNER', 'OWNER');
 	expect(data.current.epoch).toBe(104);
@@ -119,18 +132,13 @@ it.each(['Offline', 'Online'])(
 		expect(summary.state).toBe('ready');
 		expect(summary.contractsReady).toBe(false);
 		expect(summary.holdings.total).toBeNull();
-		const headline = render(Headline, {
-			props: { account: { addr: 'OWNER' }, summary, onretry: () => {} }
-		}).body;
-		expect(headline).not.toContain("isn't staking");
-		expect(headline).toContain('Retry');
 		const overview = render(WalletOverview, {
 			props: {
 				summary,
 				contracts: data.contracts,
 				current: data.current,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: { state: 'yours', signingEntry: { address: 'OWNER', app: 'kibisis' } },
 				now: Date.now(),
 				onrefresh: () => {}
 			}
@@ -228,9 +236,6 @@ it.each(['app 404', 'app timeout'])(
 			state: 'ready',
 			now: Date.parse('2026-10-25T00:00:00Z')
 		});
-		const headline = render(Headline, { props: { account: { addr: 'OWNER' }, summary } }).body;
-		expect(headline).toContain('earning');
-		expect(headline).not.toContain("couldn't load");
 		const overview = render(WalletOverview, {
 			props: {
 				summary,
@@ -238,7 +243,7 @@ it.each(['app 404', 'app timeout'])(
 				current: data.current,
 				historyState: data.historyState,
 				pageAddress: 'OWNER',
-				selected: null,
+				accountState: { state: 'read-only' },
 				now: Date.now(),
 				onrefresh: () => {}
 			}

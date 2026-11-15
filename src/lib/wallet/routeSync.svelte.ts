@@ -1,9 +1,9 @@
 import { browser } from '$app/environment';
 import { untrack } from 'svelte';
-import { fromStore, get } from 'svelte/store';
-import { connectedWallets, selectedWallet, selectWallet } from '$lib/chain/wallet.svelte';
+import { fromStore } from 'svelte/store';
+import { connectedWallets, selectWallet } from '$lib/chain/wallet.svelte';
 import { pinnedFlows } from '$lib/chain/flowAccount';
-import { selectionFromRoute } from '$lib/utils/walletSelection';
+import { pageAccountState } from '$lib/chain/signerGate';
 
 export function createWalletRouteSync(
 	walletId: () => string,
@@ -11,20 +11,19 @@ export function createWalletRouteSync(
 	updateAccountInfo: (address: string) => Promise<void>
 ) {
 	const connected = fromStore(connectedWallets);
-	const selected = fromStore(selectedWallet);
+	const pins = fromStore(pinnedFlows);
+	$effect(function followPageAccount() {
+		const state = pageAccountState(walletId(), connected.current);
+		const pinned = pins.current > 0;
+		if (browser && !pinned && state.state === 'yours') {
+			untrack(() => selectWallet(state.signingEntry));
+		}
+	});
 
 	async function initializeWallet() {
 		if (!browser || !walletId()) return;
 
 		try {
-			const next = selectionFromRoute({
-				routeAddress: walletId(),
-				connected: connected.current,
-				selected: selected.current,
-				pinned: get(pinnedFlows) > 0
-			});
-			if (next) selectWallet(next);
-
 			// Now load the wallet data
 			await updateAccountInfo(parentWalletId() || walletId());
 		} catch (error) {
@@ -32,8 +31,7 @@ export function createWalletRouteSync(
 		}
 	}
 
-	// Only page changes initialize selection; owner changes reload data. Asynchronous reads of selection and
-	// connected wallets must not turn connect/restore notifications into route synchronization.
+	// Data loads follow the route and owner independently of wallet connections.
 	let previousPage: string | undefined;
 	$effect.pre(() => {
 		const page = walletId();

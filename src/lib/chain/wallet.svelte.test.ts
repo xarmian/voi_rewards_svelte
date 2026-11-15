@@ -207,3 +207,33 @@ describe('wallet seam', () => {
 		});
 	});
 });
+
+describe('page signer capture', () => {
+	afterEach(() => walletStore.reset());
+	it.each([
+		['watch', 'pera'],
+		['pera', 'watch'],
+		['pera', 'defly'],
+		['defly', 'pera']
+	] as const)(
+		'freezes the first signing pair with providers %s then %s independently of selection',
+		async (first, second) => {
+			const seam = await import('./wallet.svelte');
+			walletStore.addAccounts([account(B, 'pera'), account(A, first), account(A, second)]);
+			walletStore.selectAccount(account(B, 'pera'));
+			expect(seam).toHaveProperty('capturePageSigner');
+			const signer = seam.capturePageSigner(A);
+			expect(signer).toEqual({ address: A, walletId: first === 'watch' ? second : first });
+			expect(Object.isFrozen(signer)).toBe(true);
+			walletStore.selectAccount(account(B, 'pera'));
+			expect(signer.address).toBe(A);
+		}
+	);
+	it('refuses absent and watch-only page accounts', async () => {
+		const seam = await import('./wallet.svelte');
+		walletStore.addAccounts([account(A, 'watch')]);
+		expect(seam).toHaveProperty('capturePageSigner');
+		for (const page of [A, B, '', undefined])
+			expect(() => seam.capturePageSigner(page)).toThrow('Nothing was signed.');
+	});
+});

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, test, vi } from 'vitest';
-import { canSignFor } from '$lib/chain/signerGate';
+import * as signerGate from '$lib/chain/signerGate';
 
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 
@@ -14,9 +14,10 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 		.replace(/export let /g, 'let ');
 	const error = vi.fn();
 	const context = createContext({
-		canSignFor,
-		createHoldingsTokenLoader: () => vi.fn(),
+		...signerGate,
 		$selectedWallet: undefined,
+		createHoldingsTokenLoader: () => vi.fn(),
+		$connectedWallets: [{ address: 'Y', app: 'pera' }],
 		$voiPrice: { price: 0 },
 		browser: false,
 		console: { error },
@@ -53,11 +54,11 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 }
 
 // Sending needs a known balance: the Send handler refuses to open until the account part has loaded.
-const loadedAccount = `accountPart = { status: 'loaded', value: { balance: 5_000_000, status: 'Online', minBalance: 100000, pendingRewards: 0, round: 1 } }`;
+const loadedAccount = `walletAddress = 'Y'; accountPart = { status: 'loaded', value: { balance: 5_000_000, status: 'Online', minBalance: 100000, pendingRewards: 0, round: 1 } }`;
 
 for (const [label, component, state, setup] of [
 	['Send', 'SendTokenModal', 'showSendVoiModal', loadedAccount],
-	['Bridge', 'BridgeModal', 'showBridgeModal', ''],
+	['Bridge', 'BridgeModal', 'showBridgeModal', "walletAddress = 'Y'; "],
 	['History', 'TokenTransfersModal', 'showVoiTransfersModal', '']
 ]) {
 	// Read the actual button binding so an unwired handler cannot make this pass.
@@ -113,5 +114,20 @@ for (const status of ['loading', 'unavailable']) {
 		);
 		await run(`(${handler})()`);
 		expect(run('showSendVoiModal'), 'a send needs a known balance').toBe(false);
+	});
+}
+
+for (const name of ['openSendVoiModal', 'openBridgeModal']) {
+	test(`${name} refuses an import that finishes after the page or signing entry changes`, async () => {
+		for (const change of ["walletAddress = 'Z'", '$connectedWallets = []']) {
+			const pending = Promise.withResolvers<{ default: object }>();
+			const { run } = componentScript(() => pending.promise);
+			run(loadedAccount);
+			const attempt = run(`${name}()`);
+			run(change);
+			pending.resolve({ default: {} });
+			await attempt;
+			expect(run(name === 'openSendVoiModal' ? 'showSendVoiModal' : 'showBridgeModal')).toBe(false);
+		}
 	});
 }

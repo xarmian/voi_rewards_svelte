@@ -1,5 +1,7 @@
 <!-- PriceChart.svelte -->
 <script lang="ts">
+	import { formatChartTick, tickTimestamp } from '$lib/markets/chartTicks';
+	import type { Time, Range } from 'lightweight-charts';
 	import { onThemeChange } from '$lib/theme.svelte';
 	import { onMount } from 'svelte';
 	import { chartTimestamp, describeLine } from '$lib/markets/chartDescription';
@@ -66,36 +68,16 @@
 		inspection = inspect(inspection, { pointer: index }, description.observations);
 	}
 
-	function formatTimeByPeriod(timestamp: number, period: '24h' | '7d'): string {
-		const date = new Date(timestamp * 1000);
-		const now = new Date();
-		const hoursDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-		if (period === '24h') {
-			// For 24h view, show HH:MM
-			return date.toLocaleTimeString(undefined, {
-				hour: '2-digit',
-				minute: '2-digit',
-				hour12: false
-			});
-		} else {
-			// For 7d view, show MMM DD HH:MM
-			if (hoursDiff < 24) {
-				return date.toLocaleTimeString(undefined, {
-					hour: '2-digit',
-					minute: '2-digit',
-					hour12: false
-				});
-			} else {
-				return date.toLocaleString(undefined, {
-					month: 'short',
-					day: '2-digit',
-					hour: '2-digit',
-					minute: '2-digit',
-					hour12: false
-				});
-			}
-		}
+	let visibleSeconds = 0;
+	function formatAxisTick(time: Time) {
+		return formatChartTick(time, visibleSeconds);
+	}
+	function updateTickRange(range: Range<Time> | null) {
+		const seconds = range ? tickTimestamp(range.to) - tickTimestamp(range.from) : 0;
+		const crossedDay = seconds > 86400 !== visibleSeconds > 86400;
+		visibleSeconds = seconds;
+		// Axis labels are cached by the chart, so invalidate them only when this rule changes.
+		if (crossedDay) chart?.applyOptions({ timeScale: { tickMarkFormatter: formatAxisTick } });
 	}
 
 	function updateChartTheme() {
@@ -123,7 +105,7 @@
 				...options.chart.timeScale,
 				timeVisible: true,
 				secondsVisible: false,
-				tickMarkFormatter: (time: number) => formatTimeByPeriod(time, selectedPeriod)
+				tickMarkFormatter: formatAxisTick
 			},
 			localization: {
 				timeFormatter: (time: number) => new Date(time * 1000).toLocaleString()
@@ -131,6 +113,8 @@
 			crosshair: { ...options.chart.crosshair, mode: 1 }
 		});
 		const instance = chart;
+		instance.timeScale().subscribeVisibleTimeRangeChange(updateTickRange);
+		lifecycle.add(() => instance.timeScale().unsubscribeVisibleTimeRangeChange(updateTickRange));
 		lifecycle.add(() => {
 			instance.remove();
 			chart = undefined;

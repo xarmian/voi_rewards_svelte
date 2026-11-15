@@ -6,7 +6,7 @@ import type { WalletContract } from '$lib/wallet/summary';
 const props = {
 	current: null,
 	pageAddress: 'OWNER',
-	selected: null,
+	accountState: { state: 'read-only' as const },
 	state: 'ready' as const,
 	now: scheduleNow,
 	onrefresh: vi.fn()
@@ -34,6 +34,15 @@ it('composes three aggregate tiles, one scheduled unlock chart and full disclosu
 	expect(words).toContain('8');
 	expect(html.match(/aria-roledescription="chart"/g)).toHaveLength(1);
 	expect(html).not.toContain('aria-haspopup="menu"');
+});
+it('labels the schedule start separately from the first release month end in the data table', () => {
+	const words = text(
+		render(WalletContractsPanel, {
+			props: { ...props, contracts: [contractFixture()] }
+		}).body
+	);
+	expect(words).toContain(`Start ${new Date(scheduleNow).toISOString()} Schedule starts`);
+	expect(words).toContain(' 2027-01-31T23:59:59.999Z 2027-01-02T00:00:00.000Z #1:');
 });
 it('partial amounts stay unavailable and schedules show an alert rather than fabricated releases', () => {
 	const html = render(WalletContractsPanel, {

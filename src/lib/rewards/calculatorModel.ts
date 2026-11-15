@@ -1,4 +1,6 @@
 export const BREAK_EVEN_SEARCH_LIMIT = 10_000_000;
+// In units of 100 VOI: absorbs floating-point noise so an exact multiple (101,000) is not rounded up to 101,100.
+const BREAK_EVEN_ROUNDING_EPSILON = 1e-9;
 
 export type EstimateInput = {
 	stake: number; // VOI to estimate
@@ -96,32 +98,33 @@ export function estimateRewards(input: EstimateInput): Estimate | null {
 	}
 	const apy = (simulatedBalance / calculationBalance - 1) * 100;
 
-	// Calculate profitability threshold regardless of total balance
-	let testAmount = 1000; // Start with 1000 VOI
+	// Calculate profitability threshold regardless of total balance.
+	// Monthly revenue and the cost target are both linear in the stake, so solve the break-even
+	// directly: revenue(a) - target(a) = gapAtZero + a * slope.
+	const atZero = breakEvenRevenue(0, input);
+	const atOne = breakEvenRevenue(1, input);
+	const gapAtZero = atZero.monthlyRevenueAtTest - atZero.targetRevenue;
+	// The per-VOI changes are taken separately so a constant fixed-cost target cancels exactly.
+	const slope =
+		atOne.monthlyRevenueAtTest -
+		atZero.monthlyRevenueAtTest -
+		(atOne.targetRevenue - atZero.targetRevenue);
+	const exactBreakEven = -gapAtZero / slope;
 
-	// Binary search for threshold
-	let min = 0;
-	let max = BREAK_EVEN_SEARCH_LIMIT;
-	let iterations = 0;
-	const maxIterations = 20; // Prevent infinite loops
-
-	while (min <= max && iterations < maxIterations) {
-		testAmount = Math.floor((min + max) / 2);
-		const { monthlyRevenueAtTest, targetRevenue } = breakEvenRevenue(testAmount, input);
-
-		if (Math.abs(monthlyRevenueAtTest - targetRevenue) < 0.01) {
-			break;
-		} else if (monthlyRevenueAtTest < targetRevenue) {
-			min = testAmount + 1;
-		} else {
-			max = testAmount - 1;
-		}
-
-		iterations++;
+	let profitabilityThreshold: number;
+	if (gapAtZero >= 0 && slope >= 0) {
+		// Any stake covers the cost (zero cost, or a percentage cost below the revenue it scales with).
+		profitabilityThreshold = 0;
+	} else if (gapAtZero < 0 && slope > 0 && Number.isFinite(exactBreakEven)) {
+		// Round up to the nearest 100 VOI, so the stake is never below the exact break-even.
+		profitabilityThreshold = Math.min(
+			BREAK_EVEN_SEARCH_LIMIT,
+			Math.ceil(exactBreakEven / 100 - BREAK_EVEN_ROUNDING_EPSILON) * 100
+		);
+	} else {
+		// The cost grows at least as fast as the revenue: no stake breaks even.
+		profitabilityThreshold = BREAK_EVEN_SEARCH_LIMIT;
 	}
-
-	// Round up to the nearest 100 VOI for a safety margin
-	const profitabilityThreshold = Math.ceil(testAmount / 100) * 100;
 	const limit = breakEvenRevenue(BREAK_EVEN_SEARCH_LIMIT, input);
 	const breakEvenReached = limit.monthlyRevenueAtTest >= limit.targetRevenue;
 

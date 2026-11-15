@@ -139,3 +139,24 @@ it('client navigation to another consensus route reopens a collapsed Node panel'
 		dispose();
 	}
 });
+
+it('focuses the panel after a user hash change without scrolling the page', async () => {
+	const focus = vi.fn();
+	const listeners: Record<string, () => void> = {};
+	const location = new URL('https://example.test/wallet/O#overview');
+	vi.stubGlobal('window', {
+		location,
+		addEventListener: (type: string, listener: () => void) => (listeners[type] = listener),
+		removeEventListener: vi.fn()
+	});
+	const dispose = $effect.root(() => {
+		createHashTabs({ ids: WALLET_TABS, panel: () => ({ focus }) as unknown as HTMLElement });
+		hooks.mounts.forEach((mount) => mount());
+	});
+	location.hash = '#holdings';
+	listeners.hashchange();
+	await new Promise((resolve) => setTimeout(resolve));
+	expect(focus).toHaveBeenCalledTimes(1);
+	expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+	dispose();
+});

@@ -1,12 +1,16 @@
 <script lang="ts">
-	import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import type { ContractDetails } from '$lib/types';
 	import { microVOIToVOI, VOIToMicroVOI } from '$lib/utils/format';
 	import { abi, CONTRACT } from 'ulujs';
 	import {
-		selectedWallet,
+		connectedWallets,
 		signTransactions,
-		captureSigner,
+		capturePageSigner,
 		type TransactionSigner
 	} from '$lib/chain/wallet.svelte';
 	import { onMount, onDestroy } from 'svelte';
@@ -23,6 +27,10 @@
 		getPendingWithdrawal,
 		pendingWithdrawalStorageKey
 	} from '$lib/chain/pendingWithdrawals';
+
+	export let pageAddress: string;
+	$: accountState = pageAccountState(pageAddress, $connectedWallets);
+	$: canSignTransactions = accountState.state === 'yours';
 
 	export let contract: ContractDetails;
 	export let show = false;
@@ -46,7 +54,7 @@
 	// The wallet captured when a withdrawal is submitted. Everything below reads this, never the live
 	// selection, so switching accounts mid-flow cannot move the hold to another wallet's key.
 	let flowWallet: string | undefined;
-	$: activeWallet = flowWallet ?? $selectedWallet?.address;
+	$: activeWallet = flowWallet ?? pageAddress;
 
 	const sendDeps = createSendDeps(algodClient);
 
@@ -232,20 +240,23 @@
 	}
 
 	async function handleWithdraw() {
-		if (!$selectedWallet?.address) {
-			error = 'Connect a wallet to withdraw';
+		if (!canSignTransactions || pageAddress !== contract.owner) {
+			error = wrongSignerMessage();
 			return;
 		}
+
 		// The account the user confirmed; it signs and keys the hold, wherever the picker goes.
+		const target = pageAddress;
+		const owner = contract.owner;
 		let signer: TransactionSigner;
 		try {
-			signer = captureSigner();
+			signer = capturePageSigner(target);
 		} catch (captureError) {
 			error = captureError instanceof Error ? captureError.message : String(captureError);
 			return;
 		}
-		if (!signerMatchesAccount(signer, contract.owner)) {
-			error = wrongSignerMessage(contract.owner);
+		if (!signerMatchesAccount(signer, target) || !signerMatchesAccount(signer, owner)) {
+			error = wrongSignerMessage();
 			return;
 		}
 		const wallet = signer.address;
@@ -505,7 +516,7 @@
 						</div>
 					</div>
 
-					{#if withdrawOffered}
+					{#if canSignTransactions && pageAddress === contract.owner && withdrawOffered}
 						<!-- Amount Input -->
 						<div class="space-y-2">
 							<label
@@ -563,7 +574,7 @@
 						? 'Close'
 						: 'Cancel'}
 				</button>
-				{#if withdrawOffered}
+				{#if canSignTransactions && pageAddress === contract.owner && withdrawOffered}
 					<button
 						type="button"
 						on:click={handleWithdraw}

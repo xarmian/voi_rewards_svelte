@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatChartTick, tickTimestamp } from '$lib/markets/chartTicks';
+	import type { Time, Range } from 'lightweight-charts';
 	import { onThemeChange } from '$lib/theme.svelte';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { chartTimestamp, describeOHLCV, displayedByTime } from '$lib/markets/chartDescription';
@@ -140,10 +142,7 @@
 		if (!chart) return;
 		chart.applyOptions({
 			timeScale: {
-				tickMarkFormatter: (time: any) => {
-					const ts = toUnixSeconds(time);
-					return formatTimeByResolution(ts, settings.resolution);
-				}
+				tickMarkFormatter: formatAxisTick
 			},
 			localization: {
 				timeFormatter: (time: any) => {
@@ -162,6 +161,18 @@
 		{ value: '4h', label: '4 hours' },
 		{ value: '1d', label: '1 day' }
 	];
+
+	let visibleSeconds = 0;
+	function formatAxisTick(time: Time) {
+		return formatChartTick(time, visibleSeconds);
+	}
+	function updateTickRange(range: Range<Time> | null) {
+		const seconds = range ? tickTimestamp(range.to) - tickTimestamp(range.from) : 0;
+		const crossedDay = seconds > 86400 !== visibleSeconds > 86400;
+		visibleSeconds = seconds;
+		// Axis labels are cached by the chart, so invalidate them only when this rule changes.
+		if (crossedDay) chart?.applyOptions({ timeScale: { tickMarkFormatter: formatAxisTick } });
+	}
 
 	function updateChartTheme() {
 		if (!chart || !chartContainer) return;
@@ -212,15 +223,14 @@
 				...options.chart.timeScale,
 				timeVisible: true,
 				secondsVisible: false,
-				tickMarkFormatter: (time: number) => {
-					const ts = typeof time === 'number' ? time : (time as unknown as number);
-					return formatTimeByResolution(ts, settings.resolution);
-				}
+				tickMarkFormatter: formatAxisTick
 			},
 			crosshair: { ...options.chart.crosshair, mode: 1 }
 		});
 
 		const instance = chart;
+		instance.timeScale().subscribeVisibleTimeRangeChange(updateTickRange);
+		lifecycle.add(() => instance.timeScale().unsubscribeVisibleTimeRangeChange(updateTickRange));
 		lifecycle.add(() => {
 			instance.remove();
 			chart = undefined;

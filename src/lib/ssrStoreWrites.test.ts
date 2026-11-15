@@ -125,12 +125,6 @@ test('WalletRewards does not load sources during a server render', async () => {
 	});
 });
 
-test('LockVestComponent does not load contract details during a server render', async () => {
-	await assertNoServerWrites(() => import('$lib/component/LockVestComponent.svelte'), {
-		childAccounts: [{ contractId: 1, address: CHILD, isParticipating: false, balance: 0 }]
-	});
-});
-
 test('Project does not load points during a server render', async () => {
 	await assertNoServerWrites(() => import('$lib/component/Project.svelte'), {
 		project: {

@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { expect, test, vi } from 'vitest';
 import { buildAssetTransfer, buildCombinedPayment, buildPayment } from '$lib/chain/txBuilders';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
-import { decimalToBaseUnits, sumBaseUnits } from '$lib/chain/baseUnits';
+import { decimalToBaseUnits, exactBalance, sumBaseUnits } from '$lib/chain/baseUnits';
 import { createFlowPin } from '$lib/chain/flowAccount';
 
 const source = readFileSync(new URL('./SendTokenModal.svelte', import.meta.url), 'utf8');
@@ -23,6 +23,7 @@ function componentFunctions(names: string[], globals: Record<string, unknown>) {
 		.join('\n');
 	const context = createContext({
 		signerMatchesAccount,
+		exactBalance,
 		wrongSignerMessage,
 		buildPayment,
 		buildAssetTransfer,
@@ -45,6 +46,8 @@ function selectedWalletGlobals() {
 	return {
 		accountAddress: address,
 		$selectedWallet: { address },
+		canSignTransactions: true,
+		capturePageSigner: () => ({ address, walletId: 'pera' }),
 		captureSigner: () => ({ address, walletId: 'pera' }),
 		flow: createFlowPin()
 	};
@@ -61,6 +64,8 @@ async function retryHarness(pinned: string, selected: string) {
 		algosdk,
 		accountAddress: pinned,
 		$selectedWallet: { address: selected },
+		canSignTransactions: true,
+		capturePageSigner: () => ({ address: selected, walletId: 'pera' }),
 		captureSigner: () => ({ address: selected, walletId: 'pera' }),
 		flow,
 		selectedToken: { decimals: 6, symbol: 'VOI' },
@@ -76,19 +81,19 @@ async function retryHarness(pinned: string, selected: string) {
 	return { run, flow };
 }
 
-test('a retry after a failed send refuses a different selected account and names the pinned one', async () => {
+test('a retry after a failed send refuses an injected signer different from the pinned page', async () => {
 	const pinned = algosdk.generateAccount().addr.toString();
 	const other = algosdk.generateAccount().addr.toString();
 	const { run, flow } = await retryHarness(pinned, other);
 	await run('handleSend()');
-	expect(run('error')).toBe(`Select account ${pinned} in a signing wallet to continue.`);
+	expect(run('error')).toBe(wrongSignerMessage());
 	expect(run('isSending')).toBe(false);
 	// The refusal leaves the pin where it was: the form still belongs to the submitted account.
 	expect(flow.address).toBe(pinned);
 	flow.dispose();
 });
 
-test('a retry after a failed send with the pinned account selected again goes on to validate', async () => {
+test('a retry after a failed send with the pinned page signer still connected goes on to validate', async () => {
 	const pinned = algosdk.generateAccount().addr.toString();
 	const { run, flow } = await retryHarness(pinned, pinned);
 	await run('handleSend()');
@@ -162,6 +167,47 @@ test('rejects a send whose exact base-unit total exceeds the balance even when f
 	expect(run('isSending')).toBe(false);
 });
 
+test('checks the exact base-unit balance when the number rounded it up past the true value', async () => {
+	// True balance 9007199254740995 base units; Number() rounds it up to 9007199254740996.
+	const run = componentFunctions(['handleSend', 'withinBalance'], {
+		decimalToBaseUnits,
+		sumBaseUnits,
+		exactBalance,
+		algosdk,
+		...selectedWalletGlobals(),
+		selectedToken: {
+			decimals: 6,
+			symbol: 'TEST',
+			balance: 9007199254740996,
+			balanceRaw: '9007199254740995'
+		},
+		tracker: {},
+		recipients: [
+			{
+				address: algosdk.generateAccount().addr.toString(),
+				amount: '9007199254.740996'
+			}
+		],
+		isSending: false,
+		error: null
+	});
+	await run('handleSend()');
+	expect(run('error')).toBe('Total exceeds your available TEST balance');
+});
+
+test('accepts a send of the exact balance when the number rounded it down', () => {
+	// True balance 9007199254740993 base units; Number() rounds it down to 9007199254740992.
+	const run = componentFunctions(['withinBalance'], {
+		decimalToBaseUnits,
+		sumBaseUnits,
+		exactBalance
+	});
+	const token = { decimals: 6, balance: 9007199254740992, balanceRaw: '9007199254740993' };
+	expect(run(`withinBalance([{ amount: '9007199254.740993' }], ${JSON.stringify(token)})`)).toBe(
+		true
+	);
+});
+
 const suggestedParams = {
 	fee: 1000,
 	minFee: 1000,
@@ -232,6 +278,8 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 					signerMatchesAccount,
 					wrongSignerMessage,
 					$selectedWallet: { address: selected },
+					canSignTransactions: true,
+					capturePageSigner: () => ({ address: selected, walletId: 'pera' }),
 					captureSigner: () => ({ address: selected, walletId: 'pera' }),
 					buildPayment: payment,
 					buildAssetTransfer: asset,
@@ -265,7 +313,7 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 			);
 			await run('handleSend()');
 			if (selected !== accountAddress) {
-				expect(run('error')).toBe(wrongSignerMessage(accountAddress));
+				expect(run('error')).toBe(wrongSignerMessage());
 				for (const call of [
 					payment,
 					asset,
@@ -294,7 +342,12 @@ test.each(['native', 'vsa'])('%s send stays with the page account', async (type)
 });
 
 // Read the actual reactive assignments as well as event handlers, so display and send agree.
-async function amountHarness(amounts: string[], decimals: number, balance: number) {
+async function amountHarness(
+	amounts: string[],
+	decimals: number,
+	balance: number,
+	balanceRaw?: string
+) {
 	const helpers = await import('../chain/sendAmounts');
 	const names = [
 		'enforceDecimals',
@@ -310,8 +363,9 @@ async function amountHarness(amounts: string[], decimals: number, balance: numbe
 		{
 			...helpers,
 			decimalToBaseUnits,
+			exactBalance,
 			sumBaseUnits,
-			selectedToken: { decimals, balance },
+			selectedToken: { decimals, balance, balanceRaw },
 			recipients: amounts.map((amount) => ({ amount })),
 			amountToDistribute: '',
 			showAmountMenu: true
@@ -319,7 +373,7 @@ async function amountHarness(amounts: string[], decimals: number, balance: numbe
 	);
 	const update = () => {
 		for (const name of [
-			'exactBalance',
+			'balanceUnits',
 			'maxAmountString',
 			'maxAmount',
 			'totalAmount',
@@ -462,10 +516,17 @@ test.each([NaN, Infinity, -1])(
 	'invalid balance %s becomes zero without breaking Max',
 	async (balance) => {
 		const { run } = await amountHarness([''], 6, balance);
-		expect(run('exactBalance')).toBe(0n);
+		expect(run('balanceUnits')).toBe(0n);
 		expect(run('maxAmountString')).toBe('0');
 	}
 );
+
+test('Max reads the exact balance string when the token carries one', async () => {
+	// The number can only hold 9007199254740992; the raw string is the true balance.
+	const { run } = await amountHarness([''], 0, 2 ** 53, '9007199254740993');
+	expect(run('balanceUnits')).toBe(9007199254740993n);
+	expect(run('maxAmountString')).toBe('9007199254740993');
+});
 
 test('non-integer token decimals do not break Max', async () => {
 	const { run } = await amountHarness([''], 1.5, 5);

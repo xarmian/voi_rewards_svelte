@@ -30,9 +30,9 @@ function fakeFetch(approvals: 'ok' | 'reject' | '500' = 'ok', balancesStatus = 2
 }
 
 function assertBalanceTokens(tokens: Awaited<ReturnType<typeof fetchFungibleTokens>>['tokens']) {
-	assert.deepEqual(tokens.map((token) => ({ id: token.id, balance: token.balance, type: token.type })), [
-		{ id: '123', balance: 2000000, type: 'arc200' },
-		{ id: '456', balance: 3000000, type: 'vsa' }
+	assert.deepEqual(tokens.map((token) => ({ id: token.id, balance: token.balance, balanceRaw: token.balanceRaw, type: token.type })), [
+		{ id: '123', balance: 2000000, balanceRaw: '2000000', type: 'arc200' },
+		{ id: '456', balance: 3000000, balanceRaw: '3000000', type: 'vsa' }
 	]);
 }
 

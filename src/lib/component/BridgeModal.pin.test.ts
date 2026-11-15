@@ -19,7 +19,7 @@ test('pins the captured sender before any asynchronous work', () => {
 
 test('reacts to pin changes and holds the tracker on A after selection switches to B', async () => {
 	const reaction = trackerReaction();
-	expect(reaction).toContain('syncTracker(show, flow.current($selectedWallet?.address))');
+	expect(reaction).toContain('syncTracker(show, flow.current(accountAddress))');
 	const { createFlowPin } = await import('../chain/flowAccount');
 	const flow = createFlowPin();
 	const syncTracker = vi.fn();
@@ -28,6 +28,7 @@ test('reacts to pin changes and holds the tracker on A after selection switches 
 		syncTracker,
 		pinTick: 0,
 		show: true,
+		accountAddress: 'A',
 		$selectedWallet: { address: 'A' }
 	});
 	const run = () => runInContext(ts.transpileModule(reaction, {}).outputText, context);
@@ -35,6 +36,7 @@ test('reacts to pin changes and holds the tracker on A after selection switches 
 	flow.pin('A');
 	context.pinTick++;
 	context.$selectedWallet.address = 'B';
+	context.accountAddress = 'B';
 	run();
 	expect(syncTracker).toHaveBeenLastCalledWith(true, 'A');
 	flow.release();
@@ -43,12 +45,10 @@ test('reacts to pin changes and holds the tracker on A after selection switches 
 	expect(syncTracker).toHaveBeenLastCalledWith(true, 'B');
 });
 
-test('keeps balance reads with the flow account and ignores selection changes while pinned', () => {
-	const subscription =
-		source.match(/selectedWallet\.subscribe\(\(wallet\) => \{([^]*?)\n\t\}\)/)?.[1] ?? '';
-	expect(subscription).toContain('if (flow.pinned) return');
-	expect(subscription).toContain('flow.current(wallet?.address)');
-	expect(fn('fetchVoiBalance')).toContain('flow.current($selectedWallet?.address)');
+test('balance reads use the page account and preserve captured tracker identity', () => {
+	expect(source).not.toContain('selectedWallet');
+	expect(fn('fetchVoiBalance')).toContain('flow.current(accountAddress)');
+	expect(source).toContain('if (!flow.pinned)');
 });
 
 test('releases on idle/reset and external close, retaining the account through pending results', () => {

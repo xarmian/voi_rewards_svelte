@@ -9,7 +9,8 @@
 	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
 	import { dataTable } from '../../stores/dataTable';
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
-	import { selectedWallet } from '$lib/chain/wallet.svelte';
+	import { connectedWallets } from '$lib/chain/wallet.svelte';
+	import { pageAccountState } from '$lib/chain/signerGate';
 
 	export let walletId: string;
 	export let parentWalletId: string | null;
@@ -75,7 +76,11 @@
 			// Get latest epoch data
 			const dates = await dataTable.fetchDateRanges();
 			if (requestId !== nodeRequestId) return;
-			if (!Array.isArray(dates) || dates.length === 0 || !Number.isFinite(dates[dates.length - 1]?.epoch)) {
+			if (
+				!Array.isArray(dates) ||
+				dates.length === 0 ||
+				!Number.isFinite(dates[dates.length - 1]?.epoch)
+			) {
 				consensusError = true;
 				return;
 			}
@@ -125,7 +130,6 @@
 			estimatedRewardsPerDay = calculateRewardsForPeriod(1 / 7); // 1/7 of a week
 			estimatedRewardsPerWeek = calculateRewardsForPeriod(1);
 			estimatedRewardsPerMonth = calculateRewardsForPeriod(30.44 / 7); // ~4.33 weeks
-
 		} catch (error) {
 			if (requestId !== nodeRequestId) return;
 			consensusError = true;
@@ -191,7 +195,7 @@
 
 <div class="flex items-center justify-between">
 	<h2 class="text-xl md:text-2xl font-bold mb-4">Consensus</h2>
-	{#if $selectedWallet?.app !== 'Watch' && $selectedWallet?.app !== '' && ($selectedWallet?.address === walletId || $selectedWallet?.address === parentWalletId)}
+	{#if pageAccountState(walletId, $connectedWallets).state === 'yours'}
 		<button
 			on:click={() => (showRegisterVoteKey = true)}
 			class="text-sm px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
@@ -201,9 +205,7 @@
 		</button>
 	{:else}
 		<p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-			To manage participation keys, connect {parentWalletId && parentWalletId !== walletId
-				? 'to the parent account'
-				: 'your wallet'} using the button in the top right.
+			Participation details for this account are read-only.
 		</p>
 	{/if}
 </div>
@@ -217,8 +219,8 @@
 					<div>Anticipated Proposals</div>
 					<InfoButton noAbsolute>
 						<p>
-							This is the calculated average block proposals and rewards for the selected account
-							based on account balance and the total online stake.
+							This is the calculated average block proposals and rewards for this account based on
+							account balance and the total online stake.
 						</p>
 					</InfoButton>
 				</span>
@@ -230,7 +232,11 @@
 			{:else if consensusError}
 				<div class="text-center text-gray-600 dark:text-gray-400 py-8" role="status">
 					Couldn't load consensus data.
-					<button type="button" class="ml-2 text-blue-600 dark:text-blue-400 hover:underline" on:click={() => fetchNodeData(true)}>Retry</button>
+					<button
+						type="button"
+						class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+						on:click={() => fetchNodeData(true)}>Retry</button
+					>
 				</div>
 			{:else if balance == 0 || Number(supply?.['online-money'] ?? 0) == 0}
 				<div class="flex justify-center items-center h-24">
@@ -319,9 +325,7 @@
 							class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700"
 						>
 							<span class="font-medium text-gray-600 dark:text-gray-400">Vote Key Expires:</span>
-							<span class="text-gray-800 dark:text-gray-200"
-								>{formatTime(voteKeySecondsLeft)}</span
-							>
+							<span class="text-gray-800 dark:text-gray-200">{formatTime(voteKeySecondsLeft)}</span>
 						</p>
 						<p
 							class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700"
@@ -369,8 +373,9 @@
 			<div class="p-6">
 				<div class="space-y-3">
 					<p class="text-gray-600 dark:text-gray-400">
-						NOTE: This account is not currently participating in consensus. Register a participation
-						key to begin participating.
+						This account is not currently participating in consensus.
+						{#if pageAccountState(walletId, $connectedWallets).state === 'yours'}Register a
+							participation key to begin participating.{/if}
 					</p>
 				</div>
 			</div>
@@ -379,6 +384,7 @@
 </div>
 {#if showRegisterVoteKey}
 	<RegisterVoteKey
+		pageAddress={walletId}
 		walletAddress={walletId}
 		parentWalletAddress={parentWalletId}
 		{contractId}

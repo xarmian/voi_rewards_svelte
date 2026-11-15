@@ -1,6 +1,10 @@
 <script lang="ts">
 	/* eslint-disable @typescript-eslint/no-unused-vars -- Retain the frozen legacy controller declarations while migrating its presentation. */
-	import { canSignFor } from '$lib/chain/signerGate';
+	import {
+		pageAccountState,
+		signerMatchesAccount,
+		wrongSignerMessage
+	} from '$lib/chain/signerGate';
 	import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import { loadAccountDetails, totalRewardsMicroVoi } from '$lib/portfolio/accountDetails';
 	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
@@ -26,7 +30,7 @@
 	import { config } from '$lib/config';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
-	import { selectedWallet, signTransactions, captureSigner } from '$lib/chain/wallet.svelte';
+	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -105,7 +109,6 @@
 	let currentEpochRewards: number = 0;
 	let rewardsHistory: any[] = [];
 	let asaDetails: any[] = [];
-	let canSignTransactions = false;
 	let totalValue: number = 0;
 	let totalUsdValue = 0;
 	// TASK-108: the totals are 0 until the first recomputeTotals and partial until the first token list lands,
@@ -204,10 +207,14 @@
 	}
 
 	async function openSendVoiModal() {
+		const page = walletAddress;
+		if (!(pageAccountState(walletAddress, $connectedWallets).state === 'yours')) return;
 		if (accountPart.status !== 'loaded') return;
 		sendVoiBalance = accountPart.value.balance;
 		try {
 			SendTokenModal ??= (await import('./SendTokenModal.svelte')).default;
+			if (walletAddress !== page || pageAccountState(page, $connectedWallets).state !== 'yours')
+				return;
 			showSendVoiModal = true;
 		} catch (error) {
 			console.error('Failed to load SendTokenModal:', error);
@@ -224,15 +231,17 @@
 	}
 
 	async function openBridgeModal() {
+		const page = walletAddress;
+		if (!(pageAccountState(walletAddress, $connectedWallets).state === 'yours')) return;
 		try {
 			BridgeModal ??= (await import('./BridgeModal.svelte')).default;
+			if (walletAddress !== page || pageAccountState(page, $connectedWallets).state !== 'yours')
+				return;
 			showBridgeModal = true;
 		} catch (error) {
 			console.error('Failed to load BridgeModal:', error);
 		}
 	}
-
-	$: canSignTransactions = canSignFor($selectedWallet, walletAddress);
 
 	$: {
 		// TASK-108: browser only. On the server the relative /api/voi-price fetch fails and its error stays in the
@@ -687,17 +696,17 @@
 
 	async function bulkClaimAllTokens() {
 		if (isBulkClaiming || !walletAddress) return;
-		const selected = $selectedWallet;
-		if (selected?.address !== walletAddress || !selected.app || selected.app === 'Watch') {
-			bulkClaimError = `Select account ${walletAddress} in a signing wallet to continue.`;
+		if (!(pageAccountState(walletAddress, $connectedWallets).state === 'yours')) {
+			bulkClaimError = wrongSignerMessage();
 			return;
 		}
 
 		// The account the user confirmed. Every batch signs as it, wherever the picker goes. The store
 		// above can lag the rune store by a tick, so the capture can still refuse: show it.
+		const target = walletAddress;
 		let signer: TransactionSigner;
 		try {
-			signer = captureSigner();
+			signer = capturePageSigner(target);
 		} catch (captureError) {
 			bulkClaimError = captureError instanceof Error ? captureError.message : String(captureError);
 			return;
@@ -705,8 +714,8 @@
 		// The claims below are built for the account this page shows, from its approvals. If the rune
 		// store moved while the readable one still showed it, the signer is another account: refuse,
 		// since a transfer built from the signer's address would not be the claim the user confirmed.
-		if (signer.address !== walletAddress) {
-			bulkClaimError = `Select account ${walletAddress} in a signing wallet to continue.`;
+		if (!signerMatchesAccount(signer, target)) {
+			bulkClaimError = wrongSignerMessage();
 			return;
 		}
 		const claimAccount = signer.address;
@@ -921,27 +930,23 @@
 </script>
 
 {#snippet nativeActions()}
-	<button
-		on:click={openSendVoiModal}
-		class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-600"
-		disabled={!canSignTransactions || accountPart.status !== 'loaded'}
-		title={accountPart.status !== 'loaded'
-			? 'Balance unavailable'
-			: !canSignTransactions
-				? 'Connect wallet to send tokens'
-				: 'Send VOI'}
-	>
-		<i class="fas fa-paper-plane"></i>
-		Send
-	</button>
-	<button
-		on:click={openBridgeModal}
-		class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-600"
-		title={!canSignTransactions ? 'Connect wallet to bridge tokens' : 'Bridge VOI'}
-	>
-		<i class="fas fa-bridge"></i>
-		Bridge
-	</button>
+	{#if pageAccountState(walletAddress, $connectedWallets).state === 'yours'}<button
+			on:click={openSendVoiModal}
+			class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-600"
+			disabled={accountPart.status !== 'loaded'}
+			title={accountPart.status !== 'loaded' ? 'Balance unavailable' : 'Send VOI'}
+		>
+			<i class="fas fa-paper-plane"></i>
+			Send
+		</button>{/if}
+	{#if pageAccountState(walletAddress, $connectedWallets).state === 'yours'}<button
+			on:click={openBridgeModal}
+			class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-600"
+			title="Bridge VOI"
+		>
+			<i class="fas fa-bridge"></i>
+			Bridge
+		</button>{/if}
 	<button
 		on:click={openVoiTransfersModal}
 		class="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
@@ -957,7 +962,6 @@
 		{token}
 		on:tokenOptedOut={initializePortfolio}
 		on:tokenSent={initializePortfolio}
-		{canSignTransactions}
 		walletId={walletAddress}
 		{fungibleTokens}
 		priceLoading={usdPending}
@@ -983,7 +987,7 @@
 		<div class="min-w-0 space-y-4 rounded-ds-sm border border-line bg-surface-2 p-3">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<h3 class="text-h2">Claimable tokens</h3>
-				{#if canSignTransactions && claimableTokensSummary.length > 0}
+				{#if pageAccountState(walletAddress, $connectedWallets).state === 'yours' && claimableTokensSummary.length > 0}
 					<button
 						on:click={bulkClaimAllTokens}
 						disabled={isBulkClaiming}
@@ -1024,7 +1028,6 @@
 									approvals={claimableItem.approvals}
 									totalAmount={claimableItem.totalAmount}
 									totalValue={claimableItem.totalValue}
-									{canSignTransactions}
 									walletId={walletAddress}
 									on:viewDetails={(event) => {
 										const { tokenId } = event.detail;
@@ -1144,8 +1147,8 @@
 {#if typeof walletAddress === 'string' && showBridgeModal}
 	<svelte:component
 		this={BridgeModal}
+		accountAddress={walletAddress}
 		bind:show={showBridgeModal}
 		tokenKey="VOI"
-		{canSignTransactions}
 	/>
 {/if}

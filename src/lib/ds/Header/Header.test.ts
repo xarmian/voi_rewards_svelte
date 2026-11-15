@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { render } from 'svelte/server';
@@ -69,4 +70,16 @@ test('Network is the selected main navigation item', () => {
 	const nav = html.match(/<nav aria-label="Main"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? '';
 	assert.match(nav, /<a[^>]*href="\/analytics"[^>]*aria-current="page"/);
 	assert.equal((nav.match(/aria-current="page"/g) ?? []).length, 1);
+});
+
+test('desktop and mobile staking links share the mounted destination and SSR stays on search', () => {
+	const source = readFileSync(new URL('./Header.svelte', import.meta.url), 'utf8');
+	const mobile = readFileSync(new URL('./MobileMenu.svelte', import.meta.url), 'utf8');
+	for (const html of [markup(), markup('home')]) {
+		assert.equal((html.match(/href="\/wallet"/g) ?? []).length, 2);
+	}
+	assert.match(source, /mounted\s*\?\s*myStakingHref/);
+	assert.ok(source.includes("item.key === 'staking' ? stakingHref : item.href"));
+	assert.ok(source.includes('{stakingHref}'));
+	assert.ok(mobile.includes("item.key === 'staking' ? stakingHref : item.href"));
 });

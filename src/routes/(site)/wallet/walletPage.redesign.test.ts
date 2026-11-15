@@ -19,10 +19,7 @@ vi.mock('$lib/component/NodeComponent.svelte', async () => {
 	const { default: Panel } = await import('./LegacyPanel.test.svelte');
 	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy consensus content' }) };
 });
-vi.mock('$lib/component/LockVestComponent.svelte', async () => {
-	const { default: Panel } = await import('./LegacyPanel.test.svelte');
-	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy lockvest content' }) };
-});
+
 vi.mock('$lib/component/PortfolioComponent.svelte', async () => {
 	const { default: Panel } = await import('./LegacyPanel.test.svelte');
 	return { default: (anchor: never) => Panel(anchor, { label: 'Legacy portfolio content' }) };

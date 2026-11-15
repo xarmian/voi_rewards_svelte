@@ -202,7 +202,7 @@
 		},
 		"src/lib/components/OHLCVChart.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 6,
+				"errors": 5,
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-vars": {
@@ -241,12 +241,6 @@
 			},
 			"no-unreachable": {
 				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/wallet/AccountInfo.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
 				"warnings": 0
 			}
 		},
@@ -378,7 +372,7 @@
 		},
 		"src/routes/(site)/markets/+page.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 4,
+				"errors": 3,
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-expressions": {
@@ -386,7 +380,7 @@
 				"warnings": 0
 			},
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 12,
+				"errors": 11,
 				"warnings": 0
 			}
 		},
@@ -606,7 +600,7 @@
 		},
 		"src/routes/(site)/markets/+page.svelte": {
 			"ts:2345": {
-				"errors": 2,
+				"errors": 1,
 				"warnings": 0
 			},
 			"ts:2739": {

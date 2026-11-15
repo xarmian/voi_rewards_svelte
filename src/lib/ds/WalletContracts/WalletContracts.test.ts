@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
-import { canSignFor } from '$lib/chain/signerGate';
+import { pageAccountState } from '$lib/chain/signerGate';
 import { expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
 import WalletContracts from './WalletContracts.svelte';
@@ -32,9 +32,61 @@ const contracts = [
 	}
 ] as WalletContract[];
 
+it('full mode keeps retained contract rows visible and busy during a refresh', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'loading',
+			mode: 'full'
+		}
+	}).body;
+	expect(html).toContain('href="/wallet/ESCROW"');
+	expect(html).toContain('aria-busy="true"');
+	expect(html).not.toContain('data-contract-skeleton');
+});
+it('full mode keeps seven skeleton bars for an initially empty loading list', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts: [],
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'loading',
+			mode: 'full'
+		}
+	}).body;
+	expect(html.match(/data-contract-skeleton/g)).toHaveLength(7);
+});
+it('overview loading keeps the DataTable placeholders instead of retained contract rows', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'loading',
+			mode: 'overview'
+		}
+	}).body;
+	expect(html).toContain('Loading withdrawable balance…');
+	expect(html).toContain('aria-busy="true"');
+	expect(html.match(/<tr aria-hidden="true"/g)).toHaveLength(5);
+	expect(html).not.toContain('href="/wallet/ESCROW"');
+	expect(html).not.toContain('data-contract-skeleton');
+});
+
 it('TASK-164: every displayed contract address is a read-only wallet link', () => {
 	const html = render(WalletContracts, {
-		props: { contracts, current: null, pageAddress: 'OWNER', selected: null, state: 'ready' }
+		props: {
+			contracts,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'ready'
+		}
 	}).body.replace(/<!--[\s\S]*?-->/g, '');
 	expect(html).toMatch(/<a\b[^>]*href="\/wallet\/ESCROW"/);
 	const source = readFileSync(new URL('./WalletContracts.svelte', import.meta.url), 'utf8');
@@ -44,13 +96,19 @@ it.each([
 	['watch-only', { address: 'OWNER', app: 'Watch' }, 'OWNER', false],
 	['connected owner', { address: 'OWNER', app: 'kibisis' }, 'OWNER', true],
 	['different page', { address: 'OWNER', app: 'kibisis' }, 'OTHER', false],
-	['contract page with owner selected', { address: 'OWNER', app: 'kibisis' }, 'ESCROW', false],
-	['different selection', { address: 'OTHER', app: 'kibisis' }, 'OWNER', false]
+	['contract page with owner connected', { address: 'OWNER', app: 'kibisis' }, 'ESCROW', false],
+	['different connected account', { address: 'OTHER', app: 'kibisis' }, 'OWNER', false]
 ] as const)(
 	'%s: row menu visibility follows both ownership and page address',
 	(_, selected, pageAddress, allowed) => {
 		const html = render(WalletContracts, {
-			props: { contracts, current: null, pageAddress, selected, state: 'ready' }
+			props: {
+				contracts,
+				current: null,
+				pageAddress,
+				accountState: pageAccountState(pageAddress, selected ? [selected] : []),
+				state: 'ready'
+			}
 		}).body.replace(/<!--[\s\S]*?-->/g, '');
 		expect(html.includes('aria-haspopup="menu"')).toBe(allowed);
 	}
@@ -84,7 +142,7 @@ it('mixed ownership keeps the authorized row menu and suppresses the foreign row
 			contracts: mixed,
 			current: null,
 			pageAddress: 'OWNER',
-			selected: { address: 'OWNER', app: 'kibisis' },
+			accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 			state: 'ready'
 		}
 	}).body.replace(/<!--[\s\S]*?-->/g, '');
@@ -101,7 +159,7 @@ it.each(['loading', 'error', 'missing details'] as const)(
 					condition === 'missing details' ? [{ ...contracts[0], details: null }] : contracts,
 				current: null,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 				state: condition === 'missing details' ? 'ready' : condition
 			}
 		}).body.replace(/<!--[\s\S]*?-->/g, '');
@@ -125,7 +183,7 @@ function harness() {
 	const pending = Promise.withResolvers<{ default: () => void }>();
 	const context = {
 		contracts: [contractFixture(), contractFixture(2)],
-		selected: { address: 'OWNER', app: 'kibisis' },
+		accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 		pageAddress: 'OWNER',
 		dataState: 'ready',
 		contractSet: 'ready',
@@ -134,16 +192,18 @@ function harness() {
 				this.dataState !== 'loading' &&
 				this.dataState !== 'error' &&
 				this.contracts.length > 0 &&
-				this.selected.address === this.pageAddress
+				this.accountState.state === 'yours'
 			);
 		},
-		canSignFor,
+		pageAccountState,
 		loadModal: vi.fn(() => pending.promise),
 		WithdrawModal: null,
 		RegisterVoteKey: null,
 		selectedContract: null,
 		showWithdrawModal: false,
 		showRegisterVoteKey: false,
+		pendingAction: null as 'withdraw' | 'key' | null,
+		pendingOpens: 0,
 		withdrawOpenGeneration: 0,
 		openContextGeneration: 0,
 		actionError: '',
@@ -154,12 +214,53 @@ function harness() {
 	)
 		? functionCode('rowCanAct')
 		: '';
+	const hasVisibility = ast.statements.some(
+		(node) => ts.isFunctionDeclaration(node) && node.name?.text === 'handleVoteKeyVisibility'
+	);
 	const handlers = runInNewContext(
-		`${optionalRowGate}; ${functionCode('open')}; ${functionCode('handleWithdrawSuccess')}; ({open, handleWithdrawSuccess})`,
+		`${optionalRowGate}; ${functionCode('open')}; ${functionCode('handleWithdrawSuccess')}; ${functionCode('handleVoteKeySuccess')}; ${hasVisibility ? functionCode('handleVoteKeyVisibility') : ''}; ({open, handleWithdrawSuccess, handleVoteKeySuccess, handleVoteKeyVisibility: ${hasVisibility ? 'handleVoteKeyVisibility' : 'undefined'}})`,
 		context
 	);
 	return { context, handlers, resolve: () => pending.resolve({ default: () => {} }) };
 }
+it.each([
+	['withdraw', 'key'],
+	['key', 'withdraw']
+] as const)('a pending %s import blocks the %s opener', async (first, second) => {
+	const { context, handlers, resolve } = harness();
+	const row = context.contracts[0];
+	const opening = handlers.open(row, first);
+	const competing = handlers.open(row, second);
+	resolve();
+	await Promise.all([opening, competing]);
+	expect(context.showWithdrawModal).toBe(first === 'withdraw');
+	expect(context.showRegisterVoteKey).toBe(first === 'key');
+	expect(context.pendingAction).toBeNull();
+});
+it('a rejected import releases the pending action so the other opener can work', async () => {
+	const { context, handlers, resolve } = harness();
+	context.loadModal.mockRejectedValueOnce(new Error('Import failed'));
+	await handlers.open(context.contracts[0], 'withdraw');
+	expect(context.pendingAction).toBeNull();
+	expect(context.actionError).toBe('Unable to open this action. Please try again.');
+	const opening = handlers.open(context.contracts[0], 'key');
+	const pendingAction = context.pendingAction;
+	resolve();
+	await opening;
+	expect(pendingAction).toBe('key');
+	expect(context.showWithdrawModal).toBe(false);
+	expect(context.showRegisterVoteKey).toBe(true);
+	expect(context.pendingAction).toBeNull();
+});
+it('detail buttons disable the action opposite to the pending opener', () => {
+	const detail = source.slice(source.indexOf('{#snippet detail('), source.indexOf('<Card title='));
+	expect(detail).toMatch(
+		/<Button\s+variant="primary"\s+disabled=\{pendingAction !== null && pendingAction !== 'withdraw'\}/
+	);
+	expect(detail).toMatch(
+		/<Button\s+variant="soft"\s+disabled=\{pendingAction !== null && pendingAction !== 'key'\}/
+	);
+});
 it.each(['overview', 'full'] as const)(
 	'%s retains healthy row actions and the unreadable row, without an empty menu, and offers Refresh',
 	(mode) => {
@@ -168,7 +269,7 @@ it.each(['overview', 'full'] as const)(
 				contracts: [contractFixture(), { ...contractFixture(2), details: null }],
 				current: null,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 				state: 'ready',
 				mode,
 				onrefresh: vi.fn()
@@ -225,11 +326,11 @@ it.each(['withdraw', 'key'] as const)(
 			const row = context.contracts[0];
 			const opening = handlers.open(row, action);
 			expect(context.loadModal, change).toHaveBeenCalledOnce();
-			if (change === 'selection') context.selected = { address: 'OTHER', app: 'kibisis' };
+			if (change === 'selection') context.accountState = pageAccountState('OWNER', []);
 			if (change === 'page') context.pageAddress = 'OTHER';
 			if (change === 'both') {
 				context.pageAddress = 'OTHER';
-				context.selected = { address: 'OTHER', app: 'kibisis' };
+				context.accountState = pageAccountState('OWNER', []);
 			}
 			if (change === 'removed') context.contracts = [context.contracts[1]];
 			if (change === 'replaced details')
@@ -294,6 +395,31 @@ it('an old withdrawal success cannot clear a newly opened withdrawal after refre
 	await success;
 	expect(context.selectedContract).toBe(raw);
 });
+it('a successful key registration refreshes the list and keeps the modal open for its confirmation', async () => {
+	const { context, handlers, resolve } = harness();
+	const opening = handlers.open(context.contracts[0], 'key');
+	resolve();
+	await opening;
+	const raw = context.contracts[0].details;
+	await handlers.handleVoteKeySuccess(true);
+	expect(context.onrefresh).toHaveBeenCalledOnce();
+	expect(context.showRegisterVoteKey).toBe(true);
+	expect(context.selectedContract).toBe(raw);
+});
+it('closing the key modal clears the selected contract, and keeping it open does not', async () => {
+	const { context, handlers, resolve } = harness();
+	const opening = handlers.open(context.contracts[0], 'key');
+	resolve();
+	await opening;
+	const raw = context.contracts[0].details;
+	handlers.handleVoteKeyVisibility(true);
+	expect(context.showRegisterVoteKey).toBe(true);
+	expect(context.selectedContract).toBe(raw);
+	handlers.handleVoteKeyVisibility(false);
+	expect(context.showRegisterVoteKey).toBe(false);
+	expect(context.selectedContract).toBeNull();
+	expect(source).toMatch(/bind:showModal=\{\(\) => showRegisterVoteKey, handleVoteKeyVisibility\}/);
+});
 it('full mode shows every row initially closed with native disclosure and sort buttons, unavailable details, and no overflow wrapper', () => {
 	const rows = Array.from({ length: 16 }, (_, n) => ({
 		...contractFixture(n + 1),
@@ -305,7 +431,7 @@ it('full mode shows every row initially closed with native disclosure and sort b
 			contracts: rows,
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			state: 'ready',
 			mode: 'full'
 		}
@@ -378,7 +504,7 @@ it.each([
 			contracts: [contractFixture()],
 			current: null,
 			pageAddress,
-			selected,
+			accountState: pageAccountState(pageAddress, selected ? [selected] : []),
 			state,
 			mode: 'full'
 		}
@@ -395,7 +521,7 @@ it.each(['overview', 'full'] as const)(
 				contracts: [contractFixture()],
 				current: null,
 				pageAddress: 'OWNER',
-				selected: { address: 'OWNER', app: 'kibisis' },
+				accountState: pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }]),
 				state: 'stale',
 				contractSet: 'unavailable',
 				mode
@@ -440,7 +566,7 @@ it('invalid schedule dates stay unavailable without aborting the contract rows',
 				contracts: [contractFixture(1, { nextVestingDate: new Date(NaN) })],
 				current: null,
 				pageAddress: 'OWNER',
-				selected: null,
+				accountState: { state: 'read-only' },
 				state: 'ready',
 				mode: 'full'
 			}
@@ -455,7 +581,7 @@ it('small positive withdrawable and scheduled amounts do not round to zero', () 
 			contracts: [contractFixture(1, { availableForWithdrawal: 1, nextVestingAmount: 1 })],
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			state: 'ready',
 			mode: 'full'
 		}
@@ -470,7 +596,7 @@ it('does not show a withdrawable total while the contract list is unavailable', 
 			contracts: [contractFixture(1)],
 			current: null,
 			pageAddress: 'OWNER',
-			selected: null,
+			accountState: { state: 'read-only' },
 			state: 'stale',
 			contractSet: 'unavailable'
 		}

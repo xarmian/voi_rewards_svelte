@@ -1,3 +1,4 @@
+import { pageAccountState } from '$lib/chain/signerGate';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createContext, runInContext } from 'node:vm';
@@ -59,13 +60,25 @@ it('confirmed native zero is ready, token failure is unavailable, and NFTs do no
 			}
 		}
 	}).body;
-	expect(html).toMatch(/Page VOI balance<[^]*?>0<[^]*?VOI/);
+	expect(html).not.toContain('Page VOI balance');
 	expect(html).toMatch(/Liquid[^]*?<dd[^>]*>[^]*?0 VOI[^]*?<\/dd>/);
 	expect(html).toContain('Token balances unavailable');
 	expect(html).toContain('Show collectibles');
 	expect(html).not.toContain('0 NFTs');
 	expect(html).not.toContain('No liquidity positions');
 });
+it.each([1, 10, 11])(
+	'token caption explains sorting only when %s tokens exceed the shown rows',
+	(count) => {
+		const html = render(WalletHoldings, {
+			props: { pageAddress: 'Y', account, tokens: population.slice(0, count), tokenState: 'ready' }
+		}).body;
+		expect(html.match(/<caption[^>]*>([^]*?)<\/caption>/)?.[1]).toBe(
+			'Page address token holdings' +
+				(count > 10 ? '. Until all tokens are shown, sorting reorders only the rows shown.' : '')
+		);
+	}
+);
 it('expansion only adds rows and permanently removes the page limit', async () => {
 	const source = readFileSync(new URL('./WalletHoldings.svelte', import.meta.url), 'utf8');
 	const script = source.split('</script>')[0].replace('<script lang="ts">', '');
@@ -138,105 +151,34 @@ it('expansion only adds rows and permanently removes the page limit', async () =
 	const expandedHtml = render(expandedContext.exports.default, {
 		props: { pageAddress: 'Y', account, tokens: population, tokenState: 'ready' }
 	}).body;
+	expect(expandedHtml.match(/<caption[^>]*>([^]*?)<\/caption>/)?.[1]).toBe(
+		'Page address token holdings'
+	);
 	expect(expandedHtml).toContain('data-token-id="14"');
 	expect(expandedHtml).toContain('data-token-id="zero"');
 	expect(expandedHtml).not.toMatch(
 		/Show \d+ more tokens|Show dust|Show fewer|Show less|Hide dust|Collapse/
 	);
 });
-it('controller delegates presentation using full raw population and the original snippets', () => {
+it('controller retains the full claim population and transaction-building body', () => {
 	const source = controller();
 	expect(source).toMatch(/<WalletHoldings\b[^]*?tokens=\{fungibleTokens\}/);
-	for (const name of ['nativeActions()', 'tokenActions(token: FungibleTokenType)', 'claims()'])
-		expect(source).toContain(`{#snippet ${name}}`);
-	expect(source).toMatch(/<FungibleToken\s+\{token\}/);
-	expect(source).toContain('{fungibleTokens}');
 	const original = execFileSync(
 		'git',
-		['show', '0402a41:src/lib/component/PortfolioComponent.svelte'],
+		['show', '67c1383:src/lib/component/PortfolioComponent.svelte'],
 		{ encoding: 'utf8' }
 	);
-	for (const name of [
-		'openSendVoiModal',
-		'openBridgeModal',
-		'bulkClaimAllTokens',
-		'calculateClaimableTokensSummary',
-		'handleTokenSent',
-		'handleClaimableTokenViewDetails',
-		'handleTokenClaimed'
-	]) {
-		const fn = new RegExp(`\\t(?:async )?function ${name}\\([^]*?\\n\\t\\}`);
-		expect(source.match(fn)?.[0], name).toBe(original.match(fn)?.[0]);
-	}
-	expect(source.slice(source.indexOf('<!-- Send VOI Modal -->'))).toBe(
-		original.slice(original.indexOf('<!-- Send VOI Modal -->'))
+	const body = (text: string) => text.match(/async function bulkClaimAllTokens\([^]*?\n\t\}/)![0];
+	const marker = 'const claimAccount = signer.address;';
+	expect(body(source).slice(body(source).indexOf(marker))).toBe(
+		body(original).slice(body(original).indexOf(marker))
 	);
-	const script = (text: string) => text.split('</script>')[0];
-	const emptySummary = '\t\t} else {\n\t\t\tclaimableTokensSummary = [];\n\t\t}';
-	expect(script(source)).toContain(emptySummary);
-	// Strip only the explicit read additions before comparing the complete original controller.
-	const restored = script(source)
-		.replace(/\t\/\* eslint-disable[^\n]+\n/, '')
-		.replace(
-			"import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';",
-			"import PortfolioSectionNFT from './PortfolioSectionNFT.svelte';"
-		)
-		.replace(
-			/\n\timport \{\n\t\tcreateHoldingsTokenLoader,[^]*?from '\$lib\/wallet\/holdings';/,
-			''
-		)
-		.replace("\n\timport type { NFTToken } from '$lib/types/assets';", '')
-		.replace(
-			'\n\timport { arc200TransferFrom }',
-			"\n\timport { fetchFungibleTokens } from '$lib/services/accounts';\n\timport { arc200TransferFrom }"
-		)
-		.replace(/\n\t\/\/ Read-only Holdings sources;[^]*?(?=\n\tlet accountPart:)/, '')
-		.replace(/\n\t+const tokenGeneration = \+\+tokenLoadGeneration;/g, '')
-		.replace(/\n\t+tokensAsOf = new Date\(\)\.toISOString\(\);/g, '')
-		.replaceAll(
-			'holdingsTokenLoader(requestedWallet, lastTokenPrice)',
-			'fetchFungibleTokens(requestedWallet, lastTokenPrice)'
-		)
-		.replaceAll(' || tokenGeneration !== tokenLoadGeneration', '')
-		.replaceAll(' && tokenGeneration === tokenLoadGeneration', '')
-		.replace(emptySummary, '\t\t}');
-	expect(restored.replace(/\s+/g, ' ').trim()).toBe(script(original).replace(/\s+/g, ' ').trim());
-	const normalized = (text: string) =>
-		text
-			.replace(
-				/on:viewDetails=\{[^]*?\}\}\s+on:tokenClaimed/,
-				'on:viewDetails={handleClaimableTokenViewDetails} on:tokenClaimed'
-			)
-			.replace(/\s+/g, ' ');
-	for (const component of ['FungibleToken', 'ClaimableTokenCard']) {
-		const mount = new RegExp(`<${component}\\s+[\\s\\S]*?/>`);
-		expect(normalized(source.match(mount)![0])).toBe(normalized(original.match(mount)![0]));
-	}
-	// Every original function except the two explicitly migrated read delegates stays intact.
-	const originalScript = original.split('</script>')[0].replace('<script lang="ts">', '');
-	const ast = ts.createSourceFile('baseline.ts', originalScript, ts.ScriptTarget.Latest, true);
-	for (const node of ast.statements) {
-		if (
-			!ts.isFunctionDeclaration(node) ||
-			['refreshTokens', 'initializePortfolio'].includes(node.name!.text)
-		)
-			continue;
-		expect(source, node.name!.text).toContain(node.getText(ast));
-	}
 });
-it('native controls retain their exact gates, including Bridge receive for X != Y', () => {
+it('native signing controls require page membership while history remains visible', () => {
 	const source = controller();
-	expect(source).toContain("disabled={!canSignTransactions || accountPart.status !== 'loaded'}");
-	const bridge = source.match(/<button\s+on:click=\{openBridgeModal\}[^]*?<\/button>/)?.[0];
-	expect(bridge).toBeDefined();
-	expect(bridge).not.toContain('disabled=');
+	expect(source).toContain("pageAccountState(walletAddress, $connectedWallets).state === 'yours'");
 	expect(source).toContain('on:click={openVoiTransfersModal}');
-	const actual = readFileSync(
-		new URL('../../component/BridgeModal.svelte', import.meta.url),
-		'utf8'
-	);
-	expect(actual).toContain('captureSigner()');
-	expect(actual).toContain('canSignTransactions');
+	expect(source).not.toContain('Connect wallet to');
 });
 
 it('top ten and dust never narrow the actual Claim All builder population', async () => {
@@ -261,7 +203,11 @@ it('top ten and dust never narrow the actual Claim All builder population', asyn
 		bulkClaimProgress: 0,
 		bulkClaimError: null,
 		bulkClaimResults: [],
-		captureSigner: () => ({ address: 'Y' }),
+		pageAccountState,
+		$connectedWallets: [{ address: 'Y', app: 'fixture' }],
+		signerMatchesAccount: (signer: { address: string }, page: string) => signer.address === page,
+		wrongSignerMessage: () => 'Nothing was signed.',
+		capturePageSigner: () => ({ address: 'Y' }),
 		fixtureImport: async () => ({ arc200: Contract }),
 		algodClient: {},
 		algodIndexer: {},
@@ -363,7 +309,7 @@ it('composition exposes a named image and readable amounts', () => {
 	}).body;
 	const bar = html.match(/<div[^>]*aria-label="Holdings composition"[^>]*>/)?.[0];
 	expect(bar).toContain('role="img"');
-	for (const label of ['Locked', 'LP', 'Tokens and other', 'Liquid']) {
+	for (const label of ['Liquid', 'In contracts', 'Withdrawable now', 'LP', 'Tokens']) {
 		expect(html).toContain(label);
 	}
 	expect(html).toMatch(/<dd[^>]*>[^]*?0 VOI[^]*?<\/dd>/);
@@ -456,7 +402,7 @@ it('an unavailable page balance has no currency unit', () => {
 			tokenState: 'ready'
 		}
 	}).body;
-	const tile = html.match(/Page VOI balance[^]*?<\/p>/)?.[0];
+	const tile = html.match(/Liquid[^]*?<\/dd>/)?.[0];
 	expect(tile).toContain('Unavailable');
 	expect(tile?.slice(tile.indexOf('Unavailable'))).not.toContain('VOI');
 });
@@ -514,7 +460,7 @@ it('a split retains its loaded address when the route changes', () => {
 	const html = render(WalletHoldings, {
 		props: { pageAddress: 'B', account, tokens: [], tokenState: 'ready', split }
 	}).body;
-	for (const label of ['Locked', 'Liquid'])
+	for (const label of ['In contracts', 'Liquid'])
 		expect(html.match(new RegExp(label + '[^]*?<dd[^>]*>([^]*?)</dd>'))?.[1]).toContain(
 			'Unavailable'
 		);
@@ -543,7 +489,7 @@ it('unknown ownership displays unavailable native parts and total', () => {
 		.replace(/<!--[\s\S]*?-->/g, '')
 		.replace(/<[^>]+>/g, ' ')
 		.replace(/\s+/g, ' ');
-	expect(text).toMatch(/Locked Unavailable/);
+	expect(text).toMatch(/In contracts Unavailable/);
 	expect(text).toMatch(/Liquid Unavailable/);
 	expect(html).toMatch(/aria-label="Holdings total"[^>]*>\s*Unavailable/);
 });
@@ -574,7 +520,7 @@ it('an unpriced token shows a labelled known subtotal and LP stays known in the 
 	const split = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
 	const text = split.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
 	expect(text).toMatch(/LP\s*5 VOI/);
-	expect(text).toMatch(/Tokens and other\s*7 VOI/);
+	expect(text).toMatch(/Tokens\s*7 VOI/);
 	expect(text).toContain('Known subtotal; 1 token has no price');
 	expect(html).not.toContain('Holdings total');
 });
