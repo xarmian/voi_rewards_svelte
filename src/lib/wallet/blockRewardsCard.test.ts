@@ -113,17 +113,28 @@ describe('morePagesAvailable', () => {
 
 describe('nextRewardStep', () => {
 	it('reveals loaded rows that are hidden', () => {
-		expect(nextRewardStep(30, 10, false)).toBe('reveal');
-		expect(nextRewardStep(30, 10, true)).toBe('reveal');
+		expect(nextRewardStep(30, 10, false, 'ready')).toBe('reveal');
+		expect(nextRewardStep(30, 10, true, 'ready')).toBe('reveal');
+	});
+	it('reveals loaded rows from a first page that is refreshing or failed to refresh', () => {
+		expect(nextRewardStep(100, 10, true, 'stale')).toBe('reveal');
 	});
 	it('fetches when every loaded row is shown and the last page was full', () => {
-		expect(nextRewardStep(100, 100, true)).toBe('fetch');
-		expect(nextRewardStep(100, 120, true)).toBe('fetch');
+		expect(nextRewardStep(100, 100, true, 'ready')).toBe('fetch');
+		expect(nextRewardStep(100, 120, true, 'ready')).toBe('fetch');
+	});
+	it('never fetches off a first page that is not settled', () => {
+		for (const state of ['stale', 'loading', 'error', 'empty'] as const)
+			expect(nextRewardStep(100, 100, true, state), state).toBeNull();
+	});
+	it('does nothing while the first page has no rows to show', () => {
+		expect(nextRewardStep(30, 10, true, 'loading')).toBeNull();
+		expect(nextRewardStep(30, 10, true, 'error')).toBeNull();
 	});
 	it('does nothing when every row is shown and no page remains', () => {
-		expect(nextRewardStep(10, 10, false)).toBeNull();
-		expect(nextRewardStep(4, 10, false)).toBeNull();
-		expect(nextRewardStep(0, 10, false)).toBeNull();
+		expect(nextRewardStep(10, 10, false, 'ready')).toBeNull();
+		expect(nextRewardStep(4, 10, false, 'ready')).toBeNull();
+		expect(nextRewardStep(0, 10, false, 'ready')).toBeNull();
 	});
 });
 

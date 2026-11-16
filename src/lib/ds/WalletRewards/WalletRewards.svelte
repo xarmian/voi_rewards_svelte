@@ -142,6 +142,7 @@
 	let pageResets = 0;
 	function resetPages(address: string) {
 		pageResets++;
+		announce = false;
 		pager.reset(address);
 		visibleCount = BLOCK_REWARD_ROWS_SHOWN;
 	}
@@ -385,30 +386,33 @@
 			recentRows.length,
 			visibleCount,
 			blockSources.recent.value !== undefined &&
-				morePagesAvailable(blockSources.recent.value, pages)
+				morePagesAvailable(blockSources.recent.value, pages),
+			blockSources.recent.state
 		)
 	);
-	// Only off a settled first page: paging from a page being refreshed could mix two reads.
-	let showMore = $derived(
-		blockSources.recent.state === 'ready' && pages.state !== 'error' && nextStep !== null
-	);
+	// Kept through a paging error, so focus stays on it and pressing it again retries.
+	let showMore = $derived(nextStep !== null);
 	let shownRecent = $derived(recentRows.slice(0, visibleCount));
+	/** Set by a press of Show more, so the live count speaks only when asked. */
+	let announce = $state(false);
 	async function showMoreRewards() {
 		if (pages.state === 'loading' || nextStep === null) return;
 		const address = pageAddress;
 		const resets = pageResets;
 		const before = shownRecent.length;
+		announce = true;
 		if (nextStep === 'fetch') {
 			await pager.more(recentRows);
 			// A refresh or address change during the fetch already reset the rows shown.
 			if (resets !== pageResets || address !== pageAddress || pages.state === 'error') return;
 		}
 		visibleCount = Math.min(before + BLOCK_REWARD_ROWS_STEP, recentRows.length);
-		const revealed = recentRows[before];
+		// The first new row, or the last row when an empty older page ended the history.
+		const target = recentRows[before] ?? shownRecent.at(-1);
 		await tick();
-		if (showMore || !revealed || address !== pageAddress) return;
+		if (showMore || !target || address !== pageAddress) return;
 		document
-			.querySelector<HTMLElement>(`[data-block-reward-tx="${CSS.escape(revealed.txid)}"]`)
+			.querySelector<HTMLElement>(`[data-block-reward-tx="${CSS.escape(target.txid)}"]`)
 			?.focus();
 	}
 	const fixableReasons = new Set(['suspended', 'not-opted-in', 'offline', 'keys-expired']);
@@ -785,11 +789,11 @@
 				/>
 				{#if pages.state === 'error'}<InlineAlert
 						tone="warn"
-						message="Older block rewards unavailable"
-						onretry={() => void showMoreRewards()}
+						message="Older block rewards unavailable. Show more block rewards tries again."
 					/>{/if}
 				<p class="sr-only" aria-live="polite">
-					{#if recentRows.length}Showing {shownRecent.length} of {recentRows.length} loaded block rewards{/if}
+					{#if announce && recentRows.length}Showing {shownRecent.length} of {recentRows.length} loaded
+						block rewards{/if}
 				</p>
 				{#if showMore}<Button
 						variant="soft"

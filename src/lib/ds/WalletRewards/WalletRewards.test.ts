@@ -375,8 +375,9 @@ describe('Block rewards card', () => {
 		expect(html).toMatch(SHOW_MORE);
 		expect(html.match(/Show more block rewards/g)?.length).toBe(1);
 		expect(html).not.toMatch(/See \d+ more block rewards|Load more/);
-		expect(html).toContain('Showing 10 of 100 loaded block rewards');
-		expect(html).toMatch(/aria-live="polite"[^>]*>(?:<!--[^>]*-->|\s)*Showing 10 of 100/);
+		// The live count speaks only after the user asks for more rows.
+		expect(html).not.toContain('Showing 10 of 100 loaded block rewards');
+		expect(html).toMatch(/<p class="sr-only" aria-live="polite">/);
 	});
 
 	it('offers the control for hidden rows even after a short page', () => {
@@ -393,16 +394,33 @@ describe('Block rewards card', () => {
 		}
 	});
 
-	it('offers no control while the first page is refreshing', () => {
+	it('still reveals loaded rows while the first page is refreshing or after it failed to refresh', () => {
 		const html = card(
-			drawBlock({ recent: { state: 'stale', value: rows(BLOCK_REWARD_PAGE_SIZE), asOf: 1 } })
+			drawBlock({
+				recent: {
+					state: 'stale',
+					value: rows(BLOCK_REWARD_PAGE_SIZE),
+					asOf: 1,
+					error: 'Request timed out after 15 seconds'
+				}
+			})
 		);
-		expect(html).not.toContain('Show more block rewards');
+		expect(shownRows(html)).toBe(10);
+		expect(html).toMatch(SHOW_MORE);
+	});
+
+	it('keeps the control through a paging error so pressing it again retries', () => {
+		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
+		const start = source.indexOf("{#if pages.state === 'error'}");
+		const alert = source.slice(start, source.indexOf('{/if}', start));
+		expect(alert).toContain('Older block rewards unavailable');
+		expect(alert).not.toMatch(/onretry=/);
+		expect(source).not.toMatch(/pages\.state !== 'error' &&/);
 	});
 
 	it('wires the control to one handler that never disables it', () => {
 		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
-		const button = source.slice(source.indexOf('Show more block rewards') - 600);
+		const button = source.slice(source.indexOf("'Show more block rewards'") - 600);
 		expect(button.slice(0, 600)).toMatch(/onclick=\{\(\) => void showMoreRewards\(\)\}/);
 		expect(button.slice(0, 600)).toMatch(/aria-busy=/);
 		expect(button.slice(0, 600)).not.toMatch(/disabled=/);

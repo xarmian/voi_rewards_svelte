@@ -112,14 +112,19 @@ export function morePagesAvailable(firstPage: BlockReward[], pages: BlockRewardP
 export const BLOCK_REWARD_ROWS_SHOWN = 10;
 export const BLOCK_REWARD_ROWS_STEP = 25;
 
-/** Reveal loaded rows that are hidden; otherwise fetch an older page when one may exist. */
+/**
+ * Reveal loaded rows that are hidden; otherwise fetch an older page when one may exist.
+ * Loaded rows can be revealed from a first page that is refreshing or failed to refresh,
+ * but an older page is fetched only off a settled first page, so two reads never mix.
+ */
 export function nextRewardStep(
 	loaded: number,
 	visible: number,
-	pageAvailable: boolean
+	pageAvailable: boolean,
+	firstPage: Source<unknown>['state']
 ): 'reveal' | 'fetch' | null {
-	if (loaded > visible) return 'reveal';
-	return pageAvailable ? 'fetch' : null;
+	if (loaded > visible) return firstPage === 'ready' || firstPage === 'stale' ? 'reveal' : null;
+	return pageAvailable && firstPage === 'ready' ? 'fetch' : null;
 }
 
 /** Older pages for one address; a reset drops any response still in flight. */
