@@ -90,7 +90,8 @@ describe('WalletBlockRewards', () => {
 	it('renders one Block rewards card with a refresh control', () => {
 		const html = draw();
 		expect(html.match(/<h2[^>]*>Block rewards(?:<!---->)?<\/h2>/g)?.length).toBe(1);
-		expect(html).toContain('lg:col-span-4');
+		expect(html).toContain('lg:col-span-12');
+		expect(html).toContain('md:col-span-2');
 		expect(html).toContain('Refresh block rewards');
 	});
 
@@ -212,7 +213,8 @@ describe('WalletBlockRewards', () => {
 	});
 
 	it('links to the rewards tab for details', () => {
-		expect(draw()).toMatch(/<a[^>]*href="#rewards"[^>]*>\s*Details\b[\s\S]*?<\/a>/);
+		const link = draw().match(/<a[^>]*href="#rewards"[^>]*>([\s\S]*?)<\/a>/);
+		expect(link?.[1].replace(/<[^>]+>/g, '')).toBe('Details on block rewards →');
 	});
 
 	it('uses no payout wording', () => {

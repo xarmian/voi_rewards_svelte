@@ -210,6 +210,6 @@
 			</p>{/if}
 	</div>
 	<a href="#rewards" class="mt-4 inline-block font-bold text-accent underline"
-		>Details<span class="sr-only"> on block rewards</span> →</a
+		>Details<span class="sr-only">{' on block rewards'}</span> →</a
 	>
 </Card>
