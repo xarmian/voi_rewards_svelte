@@ -1,0 +1,145 @@
+import { comma } from '$lib/ds/format';
+import type { BlockRewardFunding, BlockRewardStatus } from '$lib/rewards/blockRewardStatus';
+import {
+	BLOCK_REWARD_PAGE_SIZE,
+	loadBlockRewards,
+	type BlockReward,
+	type BlockRewardDay,
+	type NetworkBlockRewardDay
+} from './blockRewards';
+import { boundedRead, type Source } from './read';
+
+export type BlockRewardsState = {
+	status: Source<BlockRewardStatus & { balance: number }>;
+	funding: Source<{ funding: BlockRewardFunding; bonus: number | null }>;
+	daily: Source<BlockRewardDay[]>;
+	network: Source<NetworkBlockRewardDay[]>;
+	onlineStake: Source<number>;
+	lastRound: Source<number>;
+	recent: Source<BlockReward[]>;
+};
+
+export function createBlockRewardsState(): BlockRewardsState {
+	return {
+		status: { state: 'loading' },
+		funding: { state: 'loading' },
+		daily: { state: 'loading' },
+		network: { state: 'loading' },
+		onlineStake: { state: 'loading' },
+		lastRound: { state: 'loading' },
+		recent: { state: 'loading' }
+	};
+}
+
+/** Block time used when the recent network pace is unavailable. */
+export const FALLBACK_BLOCK_TIME = 2.8;
+
+type Total = { count: number; amount: number };
+
+const utcDate = (now: Date, offset = 0) =>
+	new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - offset * 86400000)
+		.toISOString()
+		.slice(0, 10);
+
+/** Today's UTC row, the seven UTC days through today, and every returned row. */
+export function historyTotals(
+	rows: BlockRewardDay[],
+	now: Date
+): { today: Total; week: Total; month: Total } {
+	const today = utcDate(now);
+	const weekStart = utcDate(now, 6);
+	const sum = (keep: (row: BlockRewardDay) => boolean) =>
+		rows
+			.filter(keep)
+			.reduce(
+				(total, row) => ({ count: total.count + row.count, amount: total.amount + row.amount }),
+				{
+					count: 0,
+					amount: 0
+				}
+			);
+	return {
+		today: sum((row) => row.day === today),
+		week: sum((row) => row.day >= weekStart && row.day <= today),
+		month: sum(() => true)
+	};
+}
+
+export function blockRewardCount(count: number): string {
+	return `${comma(count)} block reward${count === 1 ? '' : 's'}`;
+}
+
+/** Whole minutes of lag, at least one. */
+export function lagMinutes(lag: number, pace: { blockTime: number } | null): number {
+	return Math.max(1, Math.round((lag * (pace?.blockTime ?? FALLBACK_BLOCK_TIME)) / 60));
+}
+
+/** Rows in order, keeping the first row for each transaction id. */
+export function mergeBlockRewards(rows: BlockReward[], next: BlockReward[]): BlockReward[] {
+	const seen = new Set(rows.map((row) => row.txid));
+	return rows.concat(next.filter((row) => !seen.has(row.txid) && !!seen.add(row.txid)));
+}
+
+export type BlockRewardPages = {
+	/** Rows loaded after the first page. */
+	extra: BlockReward[];
+	/** Size of the most recent extra page, or null before any. */
+	lastPageSize: number | null;
+	state: 'idle' | 'loading' | 'error';
+	error?: string;
+};
+
+export const emptyBlockRewardPages = (): BlockRewardPages => ({
+	extra: [],
+	lastPageSize: null,
+	state: 'idle'
+});
+
+/** Whether the most recent page was full, so an older page may exist. */
+export function morePagesAvailable(firstPage: BlockReward[], pages: BlockRewardPages): boolean {
+	return (pages.lastPageSize ?? firstPage.length) === BLOCK_REWARD_PAGE_SIZE;
+}
+
+/** Older pages for one address; a reset drops any response still in flight. */
+export function createBlockRewardPager(publish: (pages: BlockRewardPages) => void) {
+	let generation = 0;
+	let address = '';
+	let pages = emptyBlockRewardPages();
+	const set = (next: BlockRewardPages) => publish((pages = next));
+	return {
+		reset(requested: string) {
+			generation++;
+			address = requested;
+			set(emptyBlockRewardPages());
+		},
+		async more(rows: BlockReward[]) {
+			const last = rows.at(-1);
+			if (!last || pages.state === 'loading') return;
+			const requestGeneration = generation;
+			set({ ...pages, state: 'loading', error: undefined });
+			try {
+				const page = await boundedRead(loadBlockRewards(address, last.round));
+				if (requestGeneration !== generation) return;
+				const known = new Set(rows.map((row) => row.txid));
+				set({
+					extra: mergeBlockRewards(
+						pages.extra,
+						page.filter((row) => !known.has(row.txid))
+					),
+					lastPageSize: page.length,
+					state: 'idle'
+				});
+			} catch (cause) {
+				if (requestGeneration !== generation) return;
+				set({
+					...pages,
+					state: 'error',
+					error: cause instanceof Error ? cause.message : String(cause)
+				});
+			}
+		},
+		dispose() {
+			generation++;
+		}
+	};
+}

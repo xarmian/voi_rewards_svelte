@@ -498,7 +498,7 @@
 						/>
 					</div>
 				{:else if tabs.current === 'rewards'}
-					<WalletRewards pageAddress={walletId} />
+					<WalletRewards pageAddress={walletId} isContract={!!parentWalletId} />
 				{:else if tabs.current === 'contracts'}
 					<WalletContractsPanel
 						contracts={contractsMatch ? (contractsSnapshot?.contracts ?? []) : []}

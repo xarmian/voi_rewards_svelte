@@ -8,8 +8,11 @@
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import BarsVsExpected from '../charts/BarsVsExpected.svelte';
 	import LineChart from '../charts/LineChart.svelte';
-	import { comma, compact, pct, shortAddr } from '../format';
+	import StatTile from '../StatTile/StatTile.svelte';
+	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
+	import { comma, compact, MISSING, pct, shortAddr } from '../format';
 	import type { Column } from '../DataTable/types';
+	import type { DataState } from '../types';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import { epochRange } from '$lib/epochs';
 	import { createReadSource } from '$lib/wallet/read';
@@ -29,7 +32,48 @@
 		type RewardRow,
 		type RewardsState
 	} from '$lib/wallet/rewards';
-	let { pageAddress, now }: { pageAddress: string; now?: Date } = $props();
+	import {
+		BLOCK_REWARD_LAG_ALERT_ROUNDS,
+		loadBlockRewardFunding,
+		loadBlockRewards,
+		loadBlockRewardsDaily,
+		loadBlockRewardStatus,
+		loadNetworkBlockRewardsDaily,
+		mimirLagRounds,
+		type BlockReward
+	} from '$lib/wallet/blockRewards';
+	import {
+		blockRewardCount,
+		createBlockRewardPager,
+		createBlockRewardsState,
+		emptyBlockRewardPages,
+		historyTotals,
+		lagMinutes,
+		mergeBlockRewards,
+		morePagesAvailable,
+		type BlockRewardsState
+	} from '$lib/wallet/blockRewardsCard';
+	import { readLastRound, readOnlineStake } from '$lib/rewards/blockRewardChain';
+	import {
+		FORECAST_ASSUMPTIONS,
+		FORECAST_PERIOD_SECONDS,
+		forecastBlockRewards,
+		networkPace
+	} from '$lib/rewards/blockRewardForecast';
+	import {
+		BLOCK_REWARD_LOOKBACK_NOTE,
+		BLOCK_REWARDS_UNKNOWN_TEXT
+	} from '$lib/rewards/blockRewardStatus';
+	import {
+		BLOCK_REWARD_MAX_MICROVOI,
+		BLOCK_REWARD_MIN_MICROVOI,
+		FEE_SHARE_PERCENT
+	} from '$lib/rewards/blockRewardConstants';
+	let {
+		pageAddress,
+		isContract = false,
+		now
+	}: { pageAddress: string; isContract?: boolean; now?: Date } = $props();
 	let clock = $state(new Date());
 	let at = $derived(now ?? clock);
 	let sources = $state(createRewardsState());
@@ -55,6 +99,59 @@
 		});
 		return () => {
 			for (const reader of Object.values(readers)) reader.dispose();
+		};
+	});
+	let blockSources = $state(createBlockRewardsState());
+	let pages = $state(emptyBlockRewardPages());
+	const pager = createBlockRewardPager((next) => (pages = next));
+	const blockReaders = {
+		status: createReadSource(
+			(address, force) => loadBlockRewardStatus(address, { isContract, force }),
+			(result) => (blockSources.status = result)
+		),
+		funding: createReadSource(
+			() => loadBlockRewardFunding(),
+			(result) => (blockSources.funding = result)
+		),
+		daily: createReadSource(
+			(address, force) => loadBlockRewardsDaily(address, 30, force),
+			(result) => (blockSources.daily = result)
+		),
+		network: createReadSource(
+			(_, force) => loadNetworkBlockRewardsDaily(30, force),
+			(result) => (blockSources.network = result)
+		),
+		onlineStake: createReadSource(
+			() => readOnlineStake(),
+			(result) => (blockSources.onlineStake = result)
+		),
+		lastRound: createReadSource(
+			() => readLastRound(),
+			(result) => (blockSources.lastRound = result)
+		),
+		recent: createReadSource(
+			(address, force) => loadBlockRewards(address, Number.MAX_SAFE_INTEGER, force),
+			(result) => (blockSources.recent = result)
+		)
+	};
+	function retryBlock(source: keyof BlockRewardsState) {
+		if (source === 'recent') pager.reset(pageAddress);
+		return blockReaders[source].load(pageAddress, true);
+	}
+	function refreshBlock(address = pageAddress) {
+		pager.reset(address);
+		for (const reader of Object.values(blockReaders)) void reader.load(address, true);
+	}
+	$effect(() => {
+		const address = pageAddress;
+		void isContract;
+		untrack(() => {
+			pager.reset(address);
+			for (const reader of Object.values(blockReaders)) void reader.load(address);
+		});
+		return () => {
+			pager.dispose();
+			for (const reader of Object.values(blockReaders)) reader.dispose();
 		};
 	});
 	onMount(() => {
@@ -175,8 +272,134 @@
 			cell: statusCell
 		}
 	]);
+	let blockStatus = $derived(blockSources.status.value);
+	let funding = $derived(blockSources.funding.value);
+	let fundingPaused = $derived(funding?.funding === 'paused');
+	let fundingUnknown = $derived(
+		blockSources.funding.state === 'error' || funding?.funding === 'unknown'
+	);
+	let pace = $derived(
+		blockSources.network.value ? networkPace(blockSources.network.value, at) : null
+	);
+	let lag = $derived(
+		blockSources.network.value && blockSources.lastRound.value !== undefined
+			? mimirLagRounds(blockSources.lastRound.value, blockSources.network.value)
+			: null
+	);
+	let totals = $derived(historyTotals(blockSources.daily.value ?? [], at));
+	let historyState: DataState = $derived(
+		blockSources.daily.state === 'empty' ? 'ready' : blockSources.daily.state
+	);
+	function forecastFor(seconds: number) {
+		const onlineStake = blockSources.onlineStake.value;
+		const round = blockSources.lastRound.value;
+		const bonus = funding?.bonus;
+		if (!blockStatus || onlineStake === undefined || round === undefined || bonus == null || !pace)
+			return null;
+		return forecastBlockRewards({
+			stake: blockStatus.balance,
+			onlineStake,
+			blockTime: pace.blockTime,
+			avgFees: pace.avgFees,
+			bonus,
+			round,
+			seconds,
+			eligible: blockStatus.registered
+		});
+	}
+	let dayForecast = $derived(forecastFor(FORECAST_PERIOD_SECONDS.day));
+	let weekForecast = $derived(forecastFor(FORECAST_PERIOD_SECONDS.week));
+	const forecastSources = ['status', 'funding', 'network', 'onlineStake', 'lastRound'] as const;
+	let notRegistered = $derived(blockStatus?.registered === false);
+	let forecastState: DataState = $derived(
+		notRegistered
+			? 'ready'
+			: forecastSources.some((key) => blockSources[key].state === 'loading')
+				? 'loading'
+				: dayForecast && weekForecast
+					? 'ready'
+					: 'error'
+	);
+	function retryForecast() {
+		for (const key of forecastSources) void retryBlock(key);
+	}
+	function chanceText(chance: number) {
+		const percent = chance * 100;
+		return percent > 99 ? '>99%' : pct(percent, percent < 1 ? 2 : 0);
+	}
+	function voiFigure(micro: number) {
+		const value = micro / 1e6;
+		return compact(value, value < 10 ? 2 : 0);
+	}
+	let expectedShare = $derived(
+		blockStatus &&
+			blockSources.onlineStake.value !== undefined &&
+			blockStatus.balance >= BLOCK_REWARD_MIN_MICROVOI &&
+			blockStatus.balance <= BLOCK_REWARD_MAX_MICROVOI
+			? blockStatus.balance / blockSources.onlineStake.value
+			: null
+	);
+	let networkBlocks = $derived(
+		new Map((blockSources.network.value ?? []).map((row) => [row.day, row.blocks]))
+	);
+	let blockDays = $derived(
+		[...(blockSources.daily.value ?? [])]
+			.sort((a, b) => a.day.localeCompare(b.day))
+			.map((row) => {
+				const blocks = networkBlocks.get(row.day);
+				return {
+					...row,
+					expected: expectedShare === null || blocks === undefined ? null : expectedShare * blocks
+				};
+			})
+	);
+	let blockChartData = $derived({
+		columns: ['UTC date', 'Block rewards', 'Expected at current balance', 'VOI'],
+		rows: blockDays.map((day) => [
+			day.day,
+			day.count,
+			day.expected === null ? 'Unavailable' : comma(day.expected, 2),
+			comma(day.amount / 1e6, 6)
+		]),
+		caption:
+			"Mimir indexed blocks; expected = current balance / current online stake × that day's network blocks."
+	});
+	let blockMax = $derived(
+		Math.max(1, ...blockDays.flatMap((day) => [day.count, day.expected ?? 0])) * 1.2
+	);
+	let recentRows = $derived(mergeBlockRewards(blockSources.recent.value ?? [], pages.extra));
+	let showMore = $derived(
+		blockSources.recent.value !== undefined && morePagesAvailable(blockSources.recent.value, pages)
+	);
+	const microVoi = (micro: number) => comma(micro / 1e6, 6);
+	let blockColumns: Column<BlockReward>[] = $derived([
+		{ key: 'time', header: 'UTC time', priority: 1, cell: timeCell },
+		{ key: 'round', header: 'Round', priority: 2, numeric: true, cell: roundCell },
+		{ key: 'amount', header: 'VOI', priority: 1, numeric: true, cell: amountCell },
+		{ key: 'bonus', header: 'Bonus', priority: 3, numeric: true, cell: bonusCell },
+		{ key: 'feeShare', header: 'Fee share', priority: 3, numeric: true, cell: feeShareCell },
+		{ key: 'note', header: 'Note', priority: 2, cell: noteCell },
+		{ key: 'txid', header: 'Transaction', priority: 1, cell: txCell }
+	]);
 </script>
 
+{#snippet timeCell(row: BlockReward)}{row.time.slice(0, 19).replace('T', ' ')}{/snippet}
+{#snippet roundCell(row: BlockReward)}{comma(row.round)}{/snippet}
+{#snippet amountCell(row: BlockReward)}{microVoi(row.amount)}{/snippet}
+{#snippet bonusCell(row: BlockReward)}{microVoi(row.bonus)}{/snippet}
+{#snippet feeShareCell(row: BlockReward)}{microVoi(
+		Math.floor((row.feesCollected * FEE_SHARE_PERCENT) / 100)
+	)}{/snippet}
+{#snippet noteCell(row: BlockReward)}{#if row.partial}Partial (fee sink low){:else}<span
+			class="text-ink-muted">—</span
+		>{/if}{/snippet}
+{#snippet txCell(row: BlockReward)}<a
+		class="break-all text-accent underline"
+		href={`https://block.voi.network/explorer/transaction/${encodeURIComponent(row.txid)}`}
+		target="_blank"
+		rel="noopener noreferrer"
+		title={row.txid}>{shortAddr(row.txid)}<span class="sr-only"> (opens in a new tab)</span></a
+	>{/snippet}
 {#snippet warning(source: keyof RewardsState, message: string)}
 	{#if sources[source].state === 'error' || sources[source].error}
 		<InlineAlert
@@ -380,4 +603,155 @@
 			</ChartFrame>
 		</div>
 	</div>
+	<Card title="Block rewards">
+		{#snippet actions()}<Button variant="soft" onclick={() => refreshBlock()}
+				>Refresh block rewards</Button
+			>{/snippet}
+		<div class="min-w-0 space-y-4">
+			<div class="space-y-2">
+				{#if blockStatus}
+					{#if blockStatus.registered}
+						<StatusPill tone="ok" label="Registered for block rewards" />
+					{:else}
+						<StatusPill tone="warn" label="Not registered for block rewards" />
+						<ul class="space-y-1 text-sm">
+							{#each blockStatus.reasons as reason (reason.code)}<li>
+									{reason.text}
+									{#if reason.code !== 'contract'}<a class="text-accent underline" href="#overview"
+											>Go online with the 2 VOI incentive fee</a
+										>{/if}
+								</li>{/each}
+						</ul>
+					{/if}
+					<p class="text-label text-ink-muted">{BLOCK_REWARD_LOOKBACK_NOTE}</p>
+				{:else if blockSources.status.state === 'error'}
+					<InlineAlert
+						message="Block reward registration status unavailable"
+						onretry={() => void retryBlock('status')}
+					/>
+				{:else}
+					<div aria-busy="true" class="h-7 w-56 max-w-full rounded-ds-xs bg-grid">
+						<span class="sr-only">Loading block reward registration status…</span>
+					</div>
+				{/if}
+			</div>
+			{#if fundingPaused}
+				<BlockRewardsPausedAlert />
+			{:else if fundingUnknown}
+				<InlineAlert
+					tone="warn"
+					message={BLOCK_REWARDS_UNKNOWN_TEXT}
+					onretry={() => void retryBlock('funding')}
+				/>
+			{/if}
+			{#if lag !== null && lag > BLOCK_REWARD_LAG_ALERT_ROUNDS}
+				{@const minutes = lagMinutes(lag, pace)}
+				<InlineAlert
+					tone="warn"
+					message={`Block reward history is about ${minutes} minute${minutes === 1 ? '' : 's'} behind the chain.`}
+				/>
+			{/if}
+			<div class="grid min-w-0 gap-3 sm:grid-cols-3">
+				{#each [{ label: 'Today (UTC)', total: totals.today }, { label: 'Last 7 days', total: totals.week }, { label: 'Last 30 days', total: totals.month }] as item (item.label)}
+					<StatTile
+						label={item.label}
+						value={amount(item.total.amount / 1e6)}
+						detail={blockRewardCount(item.total.count)}
+						state={historyState}
+						asOf={blockSources.daily.asOf}
+						onretry={() => void retryBlock('daily')}
+					/>
+				{/each}
+			</div>
+			<div class="space-y-2">
+				<div class="grid min-w-0 gap-3 sm:grid-cols-2">
+					<StatTile
+						label="Chance of a block reward · next 24 hours"
+						value={notRegistered
+							? 'Not registered'
+							: dayForecast
+								? chanceText(dayForecast.chance)
+								: MISSING}
+						state={forecastState}
+						onretry={retryForecast}
+					/>
+					<StatTile
+						label="Next 7 days"
+						value={notRegistered
+							? 'Not registered'
+							: weekForecast
+								? `${blockRewardCount(Math.round(weekForecast.expectedCount))} (${comma(weekForecast.range[0])}–${comma(weekForecast.range[1])}), ≈ ${voiFigure(weekForecast.expectedMicroVoi)} VOI`
+								: MISSING}
+						state={forecastState}
+						onretry={retryForecast}
+					/>
+				</div>
+				<p class="text-label text-ink-muted">
+					{FORECAST_ASSUMPTIONS}{fundingPaused ? ' Forecasts show rewards while funded.' : ''}
+				</p>
+			</div>
+			{#if blockSources.daily.state === 'empty'}<p class="text-label text-ink-muted">
+					No block rewards returned in the last 30 days
+				</p>{/if}
+			<ChartFrame
+				title="Daily block rewards · last 30 days"
+				headingLevel={3}
+				summary="Daily block rewards and expected block rewards at the current balance for this address, UTC"
+				data={blockChartData}
+				state={blockSources.daily.state}
+				onretry={() => void retryBlock('daily')}
+				asOf={blockSources.daily.asOf}
+				x={{ kind: 'band', values: blockDays.map((day) => day.day) }}
+				y={{ domain: [0, blockMax] }}
+				legend={blockDays.some((day) => day.expected !== null)
+					? [
+							{ label: 'Block rewards', swatch: 'fill' },
+							{ label: 'Expected at current balance', swatch: 'expected' },
+							{ label: 'Above expected', swatch: 'hi' }
+						]
+					: [{ label: 'Block rewards', swatch: 'fill' }]}
+				describe={(index) => blockChartData.rows[index].join(' · ')}
+				height={240}
+			>
+				{#snippet children(ctx)}<BarsVsExpected
+						{ctx}
+						bars={blockDays.map((day) => ({
+							x: day.day,
+							value: day.count,
+							expected: day.expected ?? NaN
+						}))}
+					/>{/snippet}
+			</ChartFrame>
+			<div class="min-w-0 space-y-3">
+				<h3 class="text-sm font-bold">Recent block rewards</h3>
+				<DataTable
+					columns={blockColumns}
+					rows={recentRows}
+					rowKey={(row) => row.txid}
+					rowName={(row) => `round ${row.round}`}
+					caption={`Recent block rewards for ${pageAddress}; amounts in VOI, newest first`}
+					captionHidden
+					id="wallet-block-rewards"
+					density="compact"
+					expandable
+					state={blockSources.recent.state}
+					asOf={blockSources.recent.asOf}
+					onretry={() => void retryBlock('recent')}
+					limit={10}
+					moreLabel={(hidden) => `See ${hidden} more block rewards`}
+					emptyText="No block rewards returned for this address"
+				/>
+				{#if pages.state === 'error'}<InlineAlert
+						tone="warn"
+						message="Older block rewards unavailable"
+						onretry={() => void pager.more(recentRows)}
+					/>{/if}
+				{#if showMore}<Button
+						variant="soft"
+						disabled={pages.state === 'loading'}
+						onclick={() => void pager.more(recentRows)}>Load more</Button
+					>{/if}
+			</div>
+		</div>
+	</Card>
 </div>
