@@ -4,6 +4,7 @@ import {
 	FORECAST_PERIOD_SECONDS,
 	forecastBlockRewards,
 	networkPace,
+	PACE_REQUEST_DAYS,
 	type ForecastInput
 } from './blockRewardForecast';
 
@@ -21,6 +22,12 @@ const forecast = (overrides: Partial<ForecastInput> = {}) =>
 	forecastBlockRewards({ ...base, ...overrides });
 
 describe('forecastBlockRewards', () => {
+	it('gives a zero chance over a zero-length period, even at the whole online stake', () => {
+		const result = forecast({ stake: 50_000_000e6, onlineStake: 50_000_000e6, seconds: 0 })!;
+		expect(result.chance).toBe(0);
+		expect(result.expectedCount).toBe(0);
+	});
+
 	it('matches the 30,000 VOI daily check', () => {
 		const result = forecast()!;
 		expect(result.expectedCount).toBeCloseTo(1.265, 3);
@@ -137,19 +144,34 @@ describe('networkPace', () => {
 		expect(pace.avgFees).toBeCloseTo(100, 9);
 	});
 
-	it('needs seven complete days', () => {
-		expect(
-			networkPace([...days(10, 6), { day: '2026-11-16', blocks: 5, feesCollected: 0 }], now)
-		).toBeNull();
-		expect(networkPace(days(9, 7), now)).not.toBeNull();
+	const today = { day: '2026-11-16', blocks: 5, feesCollected: 0 };
+
+	it('reads rows in any order', () => {
+		const rows = [today, ...days(9, 7)].reverse();
+		rows[0].blocks = 60_000;
+		const pace = networkPace(rows, now)!;
+		expect(pace.blockTime).toBeCloseTo((7 * 86400) / (8 * 30_000), 9);
+	});
+
+	it('needs each of the seven days before today exactly once', () => {
+		expect(networkPace([...days(10, 6), today], now)).toBeNull();
+		expect(networkPace([...days(10, 6), days(10, 1)[0], today], now)).toBeNull();
+		expect(networkPace([...days(8, 1), ...days(10, 6), today], now)).toBeNull();
+		expect(networkPace([...days(9, 7), today], now)).not.toBeNull();
+	});
+
+	it('is null until today has blocks, so a cut-short yesterday is not used', () => {
+		expect(networkPace(days(9, 7), now)).toBeNull();
+		expect(networkPace([...days(9, 7), { ...today, blocks: 0 }], now)).toBeNull();
+	});
+
+	it('requests enough days to include the seven complete ones and today', () => {
+		expect(PACE_REQUEST_DAYS).toBe(8);
 	});
 
 	it('is null without blocks', () => {
 		expect(
-			networkPace(
-				days(9, 7).map((row) => ({ ...row, blocks: 0 })),
-				now
-			)
+			networkPace([...days(9, 7).map((row) => ({ ...row, blocks: 0 })), today], now)
 		).toBeNull();
 	});
 });

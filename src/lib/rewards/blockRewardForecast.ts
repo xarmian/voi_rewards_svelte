@@ -103,24 +103,40 @@ export function forecastBlockRewards(input: ForecastInput): Forecast | null {
 	const rounds = seconds / blockTime;
 	const lambda = rounds * p;
 	return {
-		chance: 1 - Math.exp(rounds * Math.log1p(-p)),
+		chance: rounds === 0 ? 0 : 1 - Math.exp(rounds * Math.log1p(-p)),
 		expectedCount: lambda,
 		range: poissonRange(lambda),
 		expectedMicroVoi: p * rewardSum(bonus, avgFees, Math.floor(round), rounds)
 	};
 }
 
-/** Block time and average fees per block over the last seven complete UTC days. */
+/** Days to request so the seven complete days before today are all present, with today. */
+export const PACE_REQUEST_DAYS = PACE_DAYS + 1;
+
+/**
+ * Block time and average fees per block over the seven complete UTC days before today.
+ * Null unless each of those days appears exactly once and today already has blocks, which
+ * shows the indexed data has passed midnight, so yesterday is not cut short.
+ */
 export function networkPace(
 	days: PaceDay[],
 	now: Date
 ): { blockTime: number; avgFees: number } | null {
-	const today = now.toISOString().slice(0, 10);
-	const complete = days
-		.filter((row) => row.day < today)
-		.sort((a, b) => a.day.localeCompare(b.day))
-		.slice(-PACE_DAYS);
-	if (complete.length < PACE_DAYS) return null;
+	const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+	const date = (offset: number) =>
+		new Date(midnight - offset * 86400000).toISOString().slice(0, 10);
+	const byDay = new Map<string, PaceDay>();
+	for (const row of days) {
+		if (byDay.has(row.day)) return null;
+		byDay.set(row.day, row);
+	}
+	if (!((byDay.get(date(0))?.blocks ?? 0) > 0)) return null;
+	const complete: PaceDay[] = [];
+	for (let offset = PACE_DAYS; offset >= 1; offset--) {
+		const row = byDay.get(date(offset));
+		if (!row) return null;
+		complete.push(row);
+	}
 	const blocks = complete.reduce((sum, row) => sum + row.blocks, 0);
 	if (!(blocks > 0)) return null;
 	const fees = complete.reduce((sum, row) => sum + row.feesCollected, 0);
