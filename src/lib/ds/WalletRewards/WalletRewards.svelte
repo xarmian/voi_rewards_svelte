@@ -48,6 +48,7 @@
 		blockRewardForecast,
 		chanceText,
 		createBlockRewardPager,
+		currentStatus,
 		createBlockRewardsState,
 		emptyBlockRewardPages,
 		historyTotals,
@@ -295,7 +296,8 @@
 			cell: statusCell
 		}
 	]);
-	let blockStatus = $derived(blockSources.status.value);
+	let statusSource = $derived(currentStatus(blockSources.status, isContract));
+	let blockStatus = $derived(statusSource.value);
 	let contract = $derived(blockRewardContract(isContract, ownerLookup));
 	let contractUnknown = $derived(contract === 'unknown');
 	let funding = $derived(blockSources.funding.value);
@@ -319,8 +321,12 @@
 	let historyState: DataState = $derived(
 		blockSources.daily.state === 'empty' ? 'ready' : blockSources.daily.state
 	);
-	let dayForecast = $derived(blockRewardForecast(blockSources, FORECAST_PERIOD_SECONDS.day));
-	let weekForecast = $derived(blockRewardForecast(blockSources, FORECAST_PERIOD_SECONDS.week));
+	let dayForecast = $derived(
+		blockRewardForecast(blockSources, FORECAST_PERIOD_SECONDS.day, isContract)
+	);
+	let weekForecast = $derived(
+		blockRewardForecast(blockSources, FORECAST_PERIOD_SECONDS.week, isContract)
+	);
 	const forecastSources = ['status', 'funding', 'network', 'onlineStake', 'lastRound'] as const;
 	let notRegistered = $derived(!contractUnknown && blockStatus?.registered === false);
 	// An unknown contract status leaves both forecasts unavailable until the lookup succeeds.
@@ -329,7 +335,9 @@
 			? 'error'
 			: notRegistered
 				? 'ready'
-				: forecastSources.some((key) => blockSources[key].state === 'loading')
+				: forecastSources.some(
+							(key) => (key === 'status' ? statusSource : blockSources[key]).state === 'loading'
+					  )
 					? 'loading'
 					: dayForecast && weekForecast
 						? 'ready'
@@ -673,7 +681,7 @@
 							>{/if}
 					{/if}
 					<p class="text-label text-ink-muted">{BLOCK_REWARD_LOOKBACK_NOTE}</p>
-				{:else if blockSources.status.state === 'error'}
+				{:else if statusSource.state === 'error'}
 					<InlineAlert
 						message="Block reward registration status unavailable"
 						onretry={() => void retryBlock('status')}

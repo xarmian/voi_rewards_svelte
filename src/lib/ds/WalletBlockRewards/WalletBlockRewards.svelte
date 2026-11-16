@@ -23,6 +23,7 @@
 		blockRewardForecast,
 		chanceText,
 		createBlockRewardsState,
+		currentStatus,
 		historyTotals,
 		lagMinutes
 	} from '$lib/wallet/blockRewardsCard';
@@ -98,7 +99,8 @@
 
 	let contract = $derived(blockRewardContract(isContract, ownerLookup));
 	let contractUnknown = $derived(contract === 'unknown');
-	let status = $derived(sources.status.value);
+	let statusSource = $derived(currentStatus(sources.status, isContract));
+	let status = $derived(statusSource.value);
 	let funding = $derived(sources.funding.value);
 	let fundingPaused = $derived(funding?.funding === 'paused');
 	let fundingUnknown = $derived(
@@ -119,7 +121,7 @@
 	let historyState: DataState = $derived(
 		sources.daily.state === 'empty' ? 'ready' : sources.daily.state
 	);
-	let forecast = $derived(blockRewardForecast(sources, FORECAST_PERIOD_SECONDS.day));
+	let forecast = $derived(blockRewardForecast(sources, FORECAST_PERIOD_SECONDS.day, isContract));
 	const forecastSources = ['status', 'funding', 'network', 'onlineStake', 'lastRound'] as const;
 	let notRegistered = $derived(!contractUnknown && status?.registered === false);
 	let forecastState: DataState = $derived(
@@ -127,7 +129,9 @@
 			? 'error'
 			: notRegistered
 				? 'ready'
-				: forecastSources.some((key) => sources[key].state === 'loading')
+				: forecastSources.some(
+							(key) => (key === 'status' ? statusSource : sources[key]).state === 'loading'
+					  )
 					? 'loading'
 					: forecast
 						? 'ready'
@@ -160,7 +164,7 @@
 						{#each status.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
 					</ul>
 				{/if}
-			{:else if sources.status.state === 'error'}
+			{:else if statusSource.state === 'error'}
 				<InlineAlert
 					message="Block reward registration status unavailable"
 					onretry={() => void retry('status')}

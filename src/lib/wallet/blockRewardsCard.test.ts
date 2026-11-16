@@ -5,6 +5,7 @@ import {
 	blockRewardCount,
 	blockRewardForecast,
 	chanceText,
+	currentStatus,
 	createBlockRewardPager,
 	createBlockRewardsState,
 	historyTotals,
@@ -265,7 +266,7 @@ describe('blockRewardForecast', () => {
 		...overrides
 	});
 	it('forecasts from the status balance, online stake, round, bonus and network pace', () => {
-		expect(blockRewardForecast(state(), FORECAST_PERIOD_SECONDS.day)).toEqual(
+		expect(blockRewardForecast(state(), FORECAST_PERIOD_SECONDS.day, false)).toEqual(
 			forecastBlockRewards({
 				stake: 100_000_000_000,
 				onlineStake: 1_000_000_000_000_000,
@@ -282,7 +283,10 @@ describe('blockRewardForecast', () => {
 		const late = state({
 			network: ready(networkRows, Date.parse('2026-11-07T23:59:50Z'))
 		});
-		expect(blockRewardForecast(late, FORECAST_PERIOD_SECONDS.week)).not.toBeNull();
+		expect(blockRewardForecast(late, FORECAST_PERIOD_SECONDS.week, false)).not.toBeNull();
+	});
+	it('is null while the status was read for the other contract classification', () => {
+		expect(blockRewardForecast(state(), FORECAST_PERIOD_SECONDS.day, true)).toBeNull();
 	});
 	it('is null when any input is missing', () => {
 		const missing: Partial<BlockRewardsState>[] = [
@@ -294,7 +298,7 @@ describe('blockRewardForecast', () => {
 			{ network: ready(networkRows.slice(1), Date.parse('2026-11-07T11:59:00Z')) }
 		];
 		for (const overrides of missing)
-			expect(blockRewardForecast(state(overrides), FORECAST_PERIOD_SECONDS.day)).toBeNull();
+			expect(blockRewardForecast(state(overrides), FORECAST_PERIOD_SECONDS.day, false)).toBeNull();
 	});
 });
 
@@ -308,5 +312,34 @@ describe('blockRewardContract', () => {
 	});
 	it('is an account otherwise', () => {
 		expect(blockRewardContract(false, 'ok')).toBe('account');
+	});
+});
+
+describe('currentStatus', () => {
+	const contract = { code: 'contract' as const, text: 'c' };
+	const account = { registered: true, reasons: [], balance: 1 };
+	const contractStatus = { registered: false, reasons: [contract], balance: 1 };
+	it('keeps a status read for the same classification', () => {
+		const ready = { state: 'ready' as const, value: account, asOf: 1 };
+		expect(currentStatus(ready, false)).toBe(ready);
+		const forContract = { state: 'stale' as const, value: contractStatus, asOf: 1 };
+		expect(currentStatus(forContract, true)).toBe(forContract);
+	});
+	it('reads as loading while a status for the other classification reloads', () => {
+		expect(currentStatus({ state: 'stale', value: account, asOf: 1 }, true)).toEqual({
+			state: 'loading'
+		});
+		expect(currentStatus({ state: 'ready', value: contractStatus, asOf: 1 }, false)).toEqual({
+			state: 'loading'
+		});
+	});
+	it('reads as an error when the reload for the new classification failed', () => {
+		expect(currentStatus({ state: 'stale', value: account, asOf: 1, error: 'down' }, true)).toEqual(
+			{ state: 'error', error: 'down' }
+		);
+	});
+	it('passes through a source with no value', () => {
+		const loading = { state: 'loading' as const };
+		expect(currentStatus(loading, true)).toBe(loading);
 	});
 });

@@ -212,6 +212,22 @@ describe('WalletBlockRewards', () => {
 		expect(html).not.toContain(UNKNOWN_REGISTRATION);
 	});
 
+	it('does not show a status read for the other contract classification', () => {
+		const stale = {
+			state: 'stale' as const,
+			value: { registered: true, reasons: [], balance: 100_000_000_000 },
+			asOf: 1
+		};
+		const reloading = draw({ status: stale }, { isContract: true });
+		expect(text(reloading)).not.toContain('Registered for block rewards');
+		expect(text(reloading)).toContain('Loading block reward registration status');
+		expect(tile(reloading, 'Chance of a block reward · next 24 hours')).not.toMatch(/%/);
+		expect(reloading).not.toContain('Unable to load Chance');
+		const failed = draw({ status: { ...stale, error: 'down' } }, { isContract: true });
+		expect(text(failed)).not.toContain('Registered for block rewards');
+		expect(text(failed)).toContain('Block reward registration status unavailable');
+	});
+
 	it('links to the rewards tab for details', () => {
 		const link = draw().match(/<a[^>]*href="#rewards"[^>]*>([\s\S]*?)<\/a>/);
 		expect(link?.[1].replace(/<[^>]+>/g, '')).toBe('Details on block rewards →');

@@ -502,6 +502,29 @@ describe('Block rewards card', () => {
 		}
 	});
 
+	it('does not show a status read for the other contract classification', () => {
+		vi.mocked(createBlockRewardsState).mockReturnValue({
+			...blockFixture(),
+			status: {
+				state: 'stale',
+				value: { registered: true, reasons: [], balance: 100_000_000_000 },
+				asOf: 1
+			}
+		});
+		const html = card(
+			render(WalletRewards, {
+				props: { pageAddress: 'Y', isContract: true, now: new Date('2026-11-07T12:00:00Z') }
+			}).body
+		);
+		expect(html).not.toContain('Registered for block rewards');
+		expect(html).toContain('Loading block reward registration status');
+		for (const label of ['Chance of a block reward · next 24 hours', 'Next 7 days']) {
+			expect(tile(html, label), label).not.toMatch(/%|VOI/);
+			expect(html).not.toContain(`Unable to load ${label}.`);
+		}
+		expect(legend(html)).not.toContain('Expected at current balance');
+	});
+
 	it('shows registration status unavailable when the page cannot tell whether it is a contract', () => {
 		const onretrylookup = vi.fn();
 		alerts.length = 0;

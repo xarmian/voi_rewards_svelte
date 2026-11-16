@@ -89,8 +89,12 @@ export function chanceText(chance: number): string {
  * rows were read, so the clock passing UTC midnight does not leave the new day looking
  * unindexed.
  */
-export function blockRewardForecast(state: BlockRewardsState, seconds: number): Forecast | null {
-	const status = state.status.value;
+export function blockRewardForecast(
+	state: BlockRewardsState,
+	seconds: number,
+	isContract: boolean
+): Forecast | null {
+	const status = currentStatus(state.status, isContract).value;
 	const onlineStake = state.onlineStake.value;
 	const round = state.lastRound.value;
 	const bonus = state.funding.value?.bonus;
@@ -108,6 +112,22 @@ export function blockRewardForecast(state: BlockRewardsState, seconds: number): 
 		seconds,
 		eligible: status.registered
 	});
+}
+
+/**
+ * The status source as it stands for the current contract classification. A status carries
+ * the contract reason exactly when it was read for a contract, so a value read for the other
+ * classification (kept while the reader reloads, or after that reload failed) is not shown:
+ * it reads as loading, or as the reload's error.
+ */
+export function currentStatus<T extends BlockRewardStatus>(
+	source: Source<T>,
+	isContract: boolean
+): Source<T> {
+	const value = source.value;
+	if (value === undefined) return source;
+	if (value.reasons.some((reason) => reason.code === 'contract') === isContract) return source;
+	return source.error ? { state: 'error', error: source.error } : { state: 'loading' };
 }
 
 /**
