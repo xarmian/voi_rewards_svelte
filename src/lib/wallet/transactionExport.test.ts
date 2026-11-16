@@ -160,6 +160,10 @@ describe('block reward classification', () => {
 		expect(types(payout({ note: '' }))).toContainEqual(['B', 'payment']);
 		expect(types(payout({ note: 'base64:AAEC' }))).toContainEqual(['B', 'payment']);
 	});
+	it('prefers block reward over reward payout when the fee sink is also a known reward sender', () => {
+		expect(types(payout(), [FEE_SINK_ADDRESS])).toContainEqual(['B', 'block-reward']);
+		expect(types(payout({ note: '' }), [FEE_SINK_ADDRESS])).toContainEqual(['B', 'reward-payout']);
+	});
 	it('still classifies known reward senders as reward payouts', () => {
 		expect(types(payout({ sender: 'R', note: '' }))).toEqual([['B', 'reward-payout']]);
 		expect(types(payout({ sender: 'R' }))).toEqual([['B', 'reward-payout']]);

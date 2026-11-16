@@ -324,10 +324,12 @@
 				<p id="export-types-help" class="text-sm text-ink-muted">
 					Payments and asset transfers include inner transactions. Zero-amount asset transfers and
 					close-outs are included. Known reward payouts are native VOI only, classified by sender;
-					estimated rewards are excluded. The Staking contract column marks transfers to and from
-					the staking contracts this wallet owns now, as this site knows them. Contracts it owned
-					earlier are not marked unless you add their address. ARC-200 transfer records use Asset
-					transfers. Type/date filters may not reduce ARC-200 scanning time.
+					estimated rewards are excluded. Block rewards are the fee sink's rewards to the account
+					that proposed a block; they are listed as Block rewards, not Payments. The Staking
+					contract column marks transfers to and from the staking contracts this wallet owns now, as
+					this site knows them. Contracts it owned earlier are not marked unless you add their
+					address. ARC-200 transfer records use Asset transfers. Type/date filters may not reduce
+					ARC-200 scanning time.
 				</p>
 				{#if !stakingContractsAvailable}
 					<InlineAlert
