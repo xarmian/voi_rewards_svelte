@@ -32,6 +32,7 @@
 		validateStake
 	} from './calculatorView';
 	import { buildScheduleCsv, scheduleRows, type ScheduleRow } from './calculatorSchedule';
+	import CalculatorBlockRewards from './CalculatorBlockRewards.svelte';
 
 	export let walletAddress: string | undefined = undefined;
 	export let childAccounts: unknown[] = [];
@@ -764,6 +765,10 @@
 			</p>
 		</div>
 	</section>
+	<CalculatorBlockRewards
+		stake={stakeError ? null : Number(calculationAmount)}
+		price={hasPrice ? effectivePrice : null}
+	/>
 
 	<Card>
 		<div class="flex flex-wrap items-center justify-between gap-3">
