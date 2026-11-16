@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import Card from '../Card/Card.svelte';
 	import Button from '../Button/Button.svelte';
 	import DataTable from '../DataTable/DataTable.svelte';
@@ -51,6 +51,10 @@
 		lagMinutes,
 		mergeBlockRewards,
 		morePagesAvailable,
+		nextRewardStep,
+		weekForecastText,
+		BLOCK_REWARD_ROWS_SHOWN,
+		BLOCK_REWARD_ROWS_STEP,
 		type BlockRewardsState
 	} from '$lib/wallet/blockRewardsCard';
 	import { readLastRound, readOnlineStake } from '$lib/rewards/blockRewardChain';
@@ -134,19 +138,26 @@
 			(result) => (blockSources.recent = result)
 		)
 	};
+	let visibleCount = $state(BLOCK_REWARD_ROWS_SHOWN);
+	let pageResets = 0;
+	function resetPages(address: string) {
+		pageResets++;
+		pager.reset(address);
+		visibleCount = BLOCK_REWARD_ROWS_SHOWN;
+	}
 	function retryBlock(source: keyof BlockRewardsState) {
-		if (source === 'recent') pager.reset(pageAddress);
+		if (source === 'recent') resetPages(pageAddress);
 		return blockReaders[source].load(pageAddress, true);
 	}
 	function refreshBlock(address = pageAddress) {
-		pager.reset(address);
+		resetPages(address);
 		for (const reader of Object.values(blockReaders)) void reader.load(address, true);
 	}
 	$effect(() => {
 		const address = pageAddress;
 		void isContract;
 		untrack(() => {
-			pager.reset(address);
+			resetPages(address);
 			for (const reader of Object.values(blockReaders)) void reader.load(address);
 		});
 		return () => {
@@ -278,8 +289,12 @@
 	let fundingUnknown = $derived(
 		blockSources.funding.state === 'error' || funding?.funding === 'unknown'
 	);
+	// Pace is judged at the time the network rows were read, so the clock passing UTC
+	// midnight does not leave the new day looking unindexed.
 	let pace = $derived(
-		blockSources.network.value ? networkPace(blockSources.network.value, at) : null
+		blockSources.network.value
+			? networkPace(blockSources.network.value, new Date(blockSources.network.asOf))
+			: null
 	);
 	let lag = $derived(
 		blockSources.network.value && blockSources.lastRound.value !== undefined
@@ -327,12 +342,9 @@
 		const percent = chance * 100;
 		return percent > 99 ? '>99%' : pct(percent, percent < 1 ? 2 : 0);
 	}
-	function voiFigure(micro: number) {
-		const value = micro / 1e6;
-		return compact(value, value < 10 ? 2 : 0);
-	}
 	let expectedShare = $derived(
-		blockStatus &&
+		blockStatus?.registered === true &&
+			!isContract &&
 			blockSources.onlineStake.value !== undefined &&
 			blockStatus.balance >= BLOCK_REWARD_MIN_MICROVOI &&
 			blockStatus.balance <= BLOCK_REWARD_MAX_MICROVOI
@@ -368,8 +380,40 @@
 		Math.max(1, ...blockDays.flatMap((day) => [day.count, day.expected ?? 0])) * 1.2
 	);
 	let recentRows = $derived(mergeBlockRewards(blockSources.recent.value ?? [], pages.extra));
+	let nextStep = $derived(
+		nextRewardStep(
+			recentRows.length,
+			visibleCount,
+			blockSources.recent.value !== undefined &&
+				morePagesAvailable(blockSources.recent.value, pages)
+		)
+	);
+	// Only off a settled first page: paging from a page being refreshed could mix two reads.
 	let showMore = $derived(
-		blockSources.recent.value !== undefined && morePagesAvailable(blockSources.recent.value, pages)
+		blockSources.recent.state === 'ready' && pages.state !== 'error' && nextStep !== null
+	);
+	let shownRecent = $derived(recentRows.slice(0, visibleCount));
+	async function showMoreRewards() {
+		if (pages.state === 'loading' || nextStep === null) return;
+		const address = pageAddress;
+		const resets = pageResets;
+		const before = shownRecent.length;
+		if (nextStep === 'fetch') {
+			await pager.more(recentRows);
+			// A refresh or address change during the fetch already reset the rows shown.
+			if (resets !== pageResets || address !== pageAddress || pages.state === 'error') return;
+		}
+		visibleCount = Math.min(before + BLOCK_REWARD_ROWS_STEP, recentRows.length);
+		const revealed = recentRows[before];
+		await tick();
+		if (showMore || !revealed || address !== pageAddress) return;
+		document
+			.querySelector<HTMLElement>(`[data-block-reward-tx="${CSS.escape(revealed.txid)}"]`)
+			?.focus();
+	}
+	const fixableReasons = new Set(['suspended', 'not-opted-in', 'offline', 'keys-expired']);
+	let canGoOnline = $derived(
+		!isContract && !!blockStatus?.reasons.some((reason) => fixableReasons.has(reason.code))
 	);
 	const microVoi = (micro: number) => comma(micro / 1e6, 6);
 	let blockColumns: Column<BlockReward>[] = $derived([
@@ -398,7 +442,9 @@
 		href={`https://block.voi.network/explorer/transaction/${encodeURIComponent(row.txid)}`}
 		target="_blank"
 		rel="noopener noreferrer"
-		title={row.txid}>{shortAddr(row.txid)}<span class="sr-only"> (opens in a new tab)</span></a
+		title={row.txid}
+		data-block-reward-tx={row.txid}
+		>{shortAddr(row.txid)}<span class="sr-only"> (opens in a new tab)</span></a
 	>{/snippet}
 {#snippet warning(source: keyof RewardsState, message: string)}
 	{#if sources[source].state === 'error' || sources[source].error}
@@ -615,13 +661,11 @@
 					{:else}
 						<StatusPill tone="warn" label="Not registered for block rewards" />
 						<ul class="space-y-1 text-sm">
-							{#each blockStatus.reasons as reason (reason.code)}<li>
-									{reason.text}
-									{#if reason.code !== 'contract'}<a class="text-accent underline" href="#overview"
-											>Go online with the 2 VOI incentive fee</a
-										>{/if}
-								</li>{/each}
+							{#each blockStatus.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
 						</ul>
+						{#if canGoOnline}<a class="text-sm text-accent underline" href="#overview"
+								>Go online with the 2 VOI incentive fee</a
+							>{/if}
 					{/if}
 					<p class="text-label text-ink-muted">{BLOCK_REWARD_LOOKBACK_NOTE}</p>
 				{:else if blockSources.status.state === 'error'}
@@ -680,7 +724,7 @@
 						value={notRegistered
 							? 'Not registered'
 							: weekForecast
-								? `${blockRewardCount(Math.round(weekForecast.expectedCount))} (${comma(weekForecast.range[0])}–${comma(weekForecast.range[1])}), ≈ ${voiFigure(weekForecast.expectedMicroVoi)} VOI`
+								? weekForecastText(weekForecast)
 								: MISSING}
 						state={forecastState}
 						onretry={retryForecast}
@@ -726,7 +770,7 @@
 				<h3 class="text-sm font-bold">Recent block rewards</h3>
 				<DataTable
 					columns={blockColumns}
-					rows={recentRows}
+					rows={shownRecent}
 					rowKey={(row) => row.txid}
 					rowName={(row) => `round ${row.round}`}
 					caption={`Recent block rewards for ${pageAddress}; amounts in VOI, newest first`}
@@ -737,19 +781,23 @@
 					state={blockSources.recent.state}
 					asOf={blockSources.recent.asOf}
 					onretry={() => void retryBlock('recent')}
-					limit={10}
-					moreLabel={(hidden) => `See ${hidden} more block rewards`}
 					emptyText="No block rewards returned for this address"
 				/>
 				{#if pages.state === 'error'}<InlineAlert
 						tone="warn"
 						message="Older block rewards unavailable"
-						onretry={() => void pager.more(recentRows)}
+						onretry={() => void showMoreRewards()}
 					/>{/if}
+				<p class="sr-only" aria-live="polite">
+					{#if recentRows.length}Showing {shownRecent.length} of {recentRows.length} loaded block rewards{/if}
+				</p>
 				{#if showMore}<Button
 						variant="soft"
-						disabled={pages.state === 'loading'}
-						onclick={() => void pager.more(recentRows)}>Load more</Button
+						aria-busy={pages.state === 'loading' || undefined}
+						onclick={() => void showMoreRewards()}
+						>{pages.state === 'loading'
+							? 'Loading older block rewards…'
+							: 'Show more block rewards'}</Button
 					>{/if}
 			</div>
 		</div>

@@ -14,6 +14,7 @@ vi.mock('$lib/wallet/blockRewardsCard', async (original) => ({
 import { createRewardsState, validatePayouts } from '$lib/wallet/rewards';
 import { createBlockRewardsState, type BlockRewardsState } from '$lib/wallet/blockRewardsCard';
 import { BLOCK_REWARD_PAGE_SIZE, type BlockReward } from '$lib/wallet/blockRewards';
+import { BLOCK_REWARD_STATUS_TEXT, type BlockRewardReason } from '$lib/rewards/blockRewardStatus';
 import WalletRewards from './WalletRewards.svelte';
 const ready = <T>(value: T) => ({ state: 'ready' as const, value, asOf: 1 });
 function fixture() {
@@ -143,6 +144,13 @@ const networkDay = (day: string, lastRound: number | null = null) => ({
 	feesCollected: 3_000_000,
 	lastRound
 });
+const networkRows = (days = 8, end = '2026-11-07') =>
+	Array.from({ length: days }, (_, i) => {
+		const day = new Date(Date.parse(`${end}T00:00:00Z`) - (days - 1 - i) * 86400000)
+			.toISOString()
+			.slice(0, 10);
+		return networkDay(day, i === days - 1 ? 5_000_000 : null);
+	});
 function blockFixture(): BlockRewardsState {
 	return {
 		status: ready({ registered: true, reasons: [], balance: 100_000_000_000 }),
@@ -154,19 +162,10 @@ function blockFixture(): BlockRewardsState {
 			{ day: '2026-11-03', count: 2, amount: 3_500_000 },
 			{ day: '2026-11-07', count: 1, amount: 2_000_000 }
 		]),
-		network: ready(
-			[
-				'2026-10-31',
-				'2026-11-01',
-				'2026-11-02',
-				'2026-11-03',
-				'2026-11-04',
-				'2026-11-05',
-				'2026-11-06'
-			]
-				.map((day) => networkDay(day))
-				.concat(networkDay('2026-11-07', 5_000_000))
-		),
+		network: {
+			...ready(networkRows()),
+			asOf: Date.parse('2026-11-07T11:59:00Z')
+		},
 		onlineStake: ready(1_000_000_000_000_000),
 		lastRound: ready(5_000_100),
 		recent: ready([
@@ -194,6 +193,8 @@ const tile = (html: string, label: string) => {
 	return clean
 		.slice(start + 1, start + 1500)
 		.replace(/<[^>]+>/g, ' ')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
 		.replace(/\s+/g, ' ');
 };
 
@@ -219,42 +220,45 @@ describe('Block rewards card', () => {
 		expect(html).toContain('Changes take effect after about 320 rounds (~15 minutes).');
 	});
 
-	it('lists every reason with a go-online link for each non-contract reason', () => {
-		const html = card(
-			drawBlock({
-				status: ready({
-					registered: false,
-					balance: 1_000_000,
-					reasons: [
-						{ code: 'not-opted-in' as const, text: 'Online without the 2 VOI incentive fee.' },
-						{
-							code: 'below-range' as const,
-							text: 'Balance below 30,000 VOI: no block rewards while outside this range.'
-						}
-					]
-				})
-			})
-		);
+	const unregistered = (codes: BlockRewardReason[], balance = 100_000_000_000) =>
+		ready({
+			registered: false,
+			balance,
+			reasons: codes.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
+		});
+
+	it('lists every reason and one go-online link when a reason can be fixed by going online', () => {
+		const html = card(drawBlock({ status: unregistered(['not-opted-in', 'below-range'], 1) }));
 		expect(html).toContain('Not registered for block rewards');
 		expect(html).toContain('Online without the 2 VOI incentive fee.');
 		expect(html).toContain('Balance below 30,000 VOI: no block rewards while outside this range.');
-		expect(html.match(GO_ONLINE)?.length).toBe(2);
+		expect(html.match(GO_ONLINE)?.length).toBe(1);
+		const twoFixable = card(drawBlock({ status: unregistered(['not-opted-in', 'keys-expired']) }));
+		expect(twoFixable).toContain('Participation keys expired.');
+		expect(twoFixable.match(GO_ONLINE)?.length).toBe(1);
+		const link = twoFixable.indexOf('Go online with the 2 VOI incentive fee');
+		expect(link).toBeGreaterThan(twoFixable.indexOf('</ul>'));
+		for (const code of ['suspended', 'offline'] as const)
+			expect(card(drawBlock({ status: unregistered([code]) })).match(GO_ONLINE)?.length, code).toBe(
+				1
+			);
 	});
 
-	it('shows the contract text without a go-online link for it', () => {
-		const html = card(
-			drawBlock(
-				{
-					status: ready({
-						registered: false,
-						balance: 100_000_000_000,
-						reasons: [{ code: 'contract' as const, text: CONTRACT_TEXT }]
-					})
-				},
-				true
+	it('offers no go-online link for balance range reasons alone', () => {
+		expect(
+			card(drawBlock({ status: unregistered(['below-range'], 1) })).match(GO_ONLINE)
+		).toBeNull();
+		expect(
+			card(drawBlock({ status: unregistered(['above-range'], 80_000_000_000_000) })).match(
+				GO_ONLINE
 			)
-		);
+		).toBeNull();
+	});
+
+	it('shows the contract text and never a go-online link on a contract page', () => {
+		const html = card(drawBlock({ status: unregistered(['contract', 'not-opted-in']) }, true));
 		expect(html.replace(/&#39;/g, "'")).toContain(CONTRACT_TEXT);
+		expect(html).toContain('Online without the 2 VOI incentive fee.');
 		expect(html.match(GO_ONLINE)).toBeNull();
 	});
 
@@ -322,6 +326,32 @@ describe('Block rewards card', () => {
 		expect(tile(html, 'Next 7 days')).toMatch(/\(\d{1,3}(,\d{3})+–\d{1,3}(,\d{3})+\)/);
 	});
 
+	it('keeps forecasting after the clock passes UTC midnight', () => {
+		vi.mocked(createBlockRewardsState).mockReturnValue({
+			...blockFixture(),
+			network: { ...ready(networkRows()), asOf: Date.parse('2026-11-07T23:59:50Z') }
+		});
+		const html = card(
+			render(WalletRewards, {
+				props: { pageAddress: 'Y', now: new Date('2026-11-08T00:00:40Z') }
+			}).body
+		);
+		expect(tile(html, 'Chance of a block reward · next 24 hours')).toMatch(/\d+(\.\d+)?%/);
+		expect(tile(html, 'Next 7 days')).toContain('≈');
+		expect(html).not.toContain('Unable to load Next 7 days.');
+	});
+
+	it('says under one block reward when fewer than one is expected', () => {
+		const html = card(
+			drawBlock({
+				status: ready({ registered: true, reasons: [], balance: 30_000_000_000 }),
+				onlineStake: ready(20_000_000_000_000_000)
+			})
+		);
+		expect(tile(html, 'Next 7 days')).toMatch(/<1 block reward \(0–1\), ≈ [\d.,]+ VOI/);
+		expect(tile(html, 'Next 7 days')).not.toContain('0 block rewards');
+	});
+
 	it('shows forecast tiles unavailable when an input is missing', () => {
 		const html = card(drawBlock({ onlineStake: { state: 'error', error: 'offline' } }));
 		expect(html).toContain('Unable to load Next 7 days.');
@@ -335,17 +365,49 @@ describe('Block rewards card', () => {
 		expect(html).toContain('(opens in a new tab)');
 	});
 
-	it('offers Load more only after a full page', () => {
-		expect(card(drawBlock())).not.toContain('Load more');
-		const full = Array.from({ length: BLOCK_REWARD_PAGE_SIZE }, (_, i) => reward(5_000_000 - i));
-		const html = card(drawBlock({ recent: ready(full) }));
-		expect(html).toMatch(/<button[^>]*>(?:<!---->|\s)*Load more/);
-		expect(html).toContain(`See ${BLOCK_REWARD_PAGE_SIZE - 10} more block rewards`);
+	const rows = (count: number) => Array.from({ length: count }, (_, i) => reward(5_000_000 - i));
+	const shownRows = (html: string) => html.match(/\/explorer\/transaction\//g)?.length ?? 0;
+	const SHOW_MORE = /<button[^>]*>(?:<!---->|\s)*Show more block rewards/;
+
+	it('shows ten rows and one control to show more after a full page', () => {
+		const html = card(drawBlock({ recent: ready(rows(BLOCK_REWARD_PAGE_SIZE)) }));
+		expect(shownRows(html)).toBe(10);
+		expect(html).toMatch(SHOW_MORE);
+		expect(html.match(/Show more block rewards/g)?.length).toBe(1);
+		expect(html).not.toMatch(/See \d+ more block rewards|Load more/);
+		expect(html).toContain('Showing 10 of 100 loaded block rewards');
+		expect(html).toMatch(/aria-live="polite"[^>]*>(?:<!--[^>]*-->|\s)*Showing 10 of 100/);
 	});
 
-	it('wires Load more to the pager with the merged rows', () => {
+	it('offers the control for hidden rows even after a short page', () => {
+		const html = card(drawBlock({ recent: ready(rows(12)) }));
+		expect(shownRows(html)).toBe(10);
+		expect(html).toMatch(SHOW_MORE);
+	});
+
+	it('offers no control when every row is shown and the page was short', () => {
+		for (const count of [2, 10]) {
+			const html = card(drawBlock({ recent: ready(rows(count)) }));
+			expect(shownRows(html), String(count)).toBe(count);
+			expect(html, String(count)).not.toContain('Show more block rewards');
+		}
+	});
+
+	it('offers no control while the first page is refreshing', () => {
+		const html = card(
+			drawBlock({ recent: { state: 'stale', value: rows(BLOCK_REWARD_PAGE_SIZE), asOf: 1 } })
+		);
+		expect(html).not.toContain('Show more block rewards');
+	});
+
+	it('wires the control to one handler that never disables it', () => {
 		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
-		expect(source).toMatch(/onclick=\{\(\) => void pager\.more\(recentRows\)\}/);
+		const button = source.slice(source.indexOf('Show more block rewards') - 600);
+		expect(button.slice(0, 600)).toMatch(/onclick=\{\(\) => void showMoreRewards\(\)\}/);
+		expect(button.slice(0, 600)).toMatch(/aria-busy=/);
+		expect(button.slice(0, 600)).not.toMatch(/disabled=/);
+		expect(source).toContain('Loading older block rewards…');
+		expect(source).toMatch(/void pager\.more\(recentRows\)|await pager\.more\(recentRows\)/);
 		expect(source).toMatch(
 			/mergeBlockRewards\(blockSources\.recent\.value \?\? \[\], pages\.extra\)/
 		);
@@ -360,17 +422,29 @@ describe('Block rewards card', () => {
 		).not.toMatch(/payout/i);
 	});
 
-	it('draws expected bars only when the balance is in range', () => {
+	const legend = (html: string) => {
+		const start = html.indexOf('legend"');
+		return start < 0 ? '' : html.slice(start, html.indexOf('</ul>', start));
+	};
+
+	it('draws expected bars only for a registered account with a balance in range', () => {
 		const html = card(drawBlock());
 		expect(html).toContain('Daily block rewards · last 30 days');
-		expect(html).toContain('Above expected');
+		expect(legend(html)).toContain('Expected at current balance');
 		expect(html).toContain('stroke-expected');
-		const low = card(
-			drawBlock({
-				status: ready({ registered: false, balance: 1, reasons: [] })
-			})
-		);
-		expect(low).not.toContain('Above expected');
-		expect(low).not.toContain('stroke-expected');
+		const cases = {
+			'unregistered in range': drawBlock({ status: unregistered(['offline']) }),
+			'contract page': drawBlock(
+				{ status: ready({ registered: true, reasons: [], balance: 100_000_000_000 }) },
+				true
+			),
+			'below range': drawBlock({ status: unregistered(['below-range'], 1) })
+		};
+		for (const [name, page] of Object.entries(cases)) {
+			const body = card(page);
+			expect(legend(body), name).toContain('Block rewards');
+			expect(legend(body), name).not.toContain('Expected at current balance');
+			expect(body, name).not.toContain('stroke-expected');
+		}
 	});
 });

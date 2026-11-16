@@ -1,4 +1,5 @@
-import { comma } from '$lib/ds/format';
+import { comma, compact } from '$lib/ds/format';
+import type { Forecast } from '$lib/rewards/blockRewardForecast';
 import type { BlockRewardFunding, BlockRewardStatus } from '$lib/rewards/blockRewardStatus';
 import {
 	BLOCK_REWARD_PAGE_SIZE,
@@ -69,6 +70,13 @@ export function blockRewardCount(count: number): string {
 	return `${comma(count)} block reward${count === 1 ? '' : 's'}`;
 }
 
+/** "42 block rewards (34–50), ≈ 418 VOI"; under one expected reads "<1 block reward". */
+export function weekForecastText(forecast: Forecast): string {
+	const count = Math.round(forecast.expectedCount);
+	const voi = forecast.expectedMicroVoi / 1e6;
+	return `${count === 0 && forecast.expectedCount > 0 ? '<1 block reward' : blockRewardCount(count)} (${comma(forecast.range[0])}–${comma(forecast.range[1])}), ≈ ${compact(voi, voi < 10 ? 2 : 0)} VOI`;
+}
+
 /** Whole minutes of lag, at least one. */
 export function lagMinutes(lag: number, pace: { blockTime: number } | null): number {
 	return Math.max(1, Math.round((lag * (pace?.blockTime ?? FALLBACK_BLOCK_TIME)) / 60));
@@ -98,6 +106,20 @@ export const emptyBlockRewardPages = (): BlockRewardPages => ({
 /** Whether the most recent page was full, so an older page may exist. */
 export function morePagesAvailable(firstPage: BlockReward[], pages: BlockRewardPages): boolean {
 	return (pages.lastPageSize ?? firstPage.length) === BLOCK_REWARD_PAGE_SIZE;
+}
+
+/** Rows shown before any request for more, and how many more each request reveals. */
+export const BLOCK_REWARD_ROWS_SHOWN = 10;
+export const BLOCK_REWARD_ROWS_STEP = 25;
+
+/** Reveal loaded rows that are hidden; otherwise fetch an older page when one may exist. */
+export function nextRewardStep(
+	loaded: number,
+	visible: number,
+	pageAvailable: boolean
+): 'reveal' | 'fetch' | null {
+	if (loaded > visible) return 'reveal';
+	return pageAvailable ? 'fetch' : null;
 }
 
 /** Older pages for one address; a reset drops any response still in flight. */

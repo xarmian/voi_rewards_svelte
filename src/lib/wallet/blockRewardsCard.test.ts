@@ -8,6 +8,8 @@ import {
 	lagMinutes,
 	mergeBlockRewards,
 	morePagesAvailable,
+	nextRewardStep,
+	weekForecastText,
 	type BlockRewardPages
 } from './blockRewardsCard';
 
@@ -106,6 +108,48 @@ describe('morePagesAvailable', () => {
 				state: 'idle'
 			})
 		).toBe(true);
+	});
+});
+
+describe('nextRewardStep', () => {
+	it('reveals loaded rows that are hidden', () => {
+		expect(nextRewardStep(30, 10, false)).toBe('reveal');
+		expect(nextRewardStep(30, 10, true)).toBe('reveal');
+	});
+	it('fetches when every loaded row is shown and the last page was full', () => {
+		expect(nextRewardStep(100, 100, true)).toBe('fetch');
+		expect(nextRewardStep(100, 120, true)).toBe('fetch');
+	});
+	it('does nothing when every row is shown and no page remains', () => {
+		expect(nextRewardStep(10, 10, false)).toBeNull();
+		expect(nextRewardStep(4, 10, false)).toBeNull();
+		expect(nextRewardStep(0, 10, false)).toBeNull();
+	});
+});
+
+describe('weekForecastText', () => {
+	it('shows the rounded count, the grouped range and the VOI figure', () => {
+		expect(
+			weekForecastText({
+				chance: 1,
+				expectedCount: 41.6,
+				range: [1200, 1500],
+				expectedMicroVoi: 418_400_000
+			})
+		).toBe('42 block rewards (1,200–1,500), ≈ 418 VOI');
+	});
+	it('says under one block reward rather than zero when some are expected', () => {
+		expect(
+			weekForecastText({
+				chance: 0.27,
+				expectedCount: 0.32,
+				range: [0, 1],
+				expectedMicroVoi: 1_600_000
+			})
+		).toBe('<1 block reward (0–1), ≈ 1.6 VOI');
+		expect(
+			weekForecastText({ chance: 0, expectedCount: 0, range: [0, 0], expectedMicroVoi: 0 })
+		).toBe('0 block rewards (0–0), ≈ 0 VOI');
 	});
 });
 
