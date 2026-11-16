@@ -8,7 +8,13 @@ import {
 	type ExportDependencies,
 	type ExportPage
 } from './transactionExport';
-import { normalizeOptions, type ExportInput, type ExportQuery } from '../wallet/transactionExport';
+import {
+	mapTransaction,
+	normalizeOptions,
+	type ExportInput,
+	type ExportQuery
+} from '../wallet/transactionExport';
+import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '../rewards/blockRewardConstants';
 
 const raw = (id = 'ROOT', changes: Record<string, unknown> = {}) => ({
 	id,
@@ -27,7 +33,7 @@ const opts = (changes: Partial<ExportInput> = {}) =>
 			pageAddress: 'A',
 			addresses: ['A'],
 			allDates: true,
-			types: ['payment', 'reward-payout', 'asset-transfer', 'close-out', 'fee'],
+			types: ['payment', 'reward-payout', 'block-reward', 'asset-transfer', 'close-out', 'fee'],
 			...changes
 		},
 		'2024-12-31',
@@ -85,6 +91,16 @@ describe('SDK boundary', () => {
 		expect(
 			normalizeTransaction(raw('ROOT', { fee: '9007199254740993', note: new Uint8Array([255]) }))
 		).toMatchObject({ fee: 9007199254740993n, note: 'base64:/w==' });
+	});
+	it('classifies an indexer block reward with a byte note as a block reward', () => {
+		const reward = (note: Uint8Array) =>
+			mapTransaction(
+				normalizeTransaction(raw('ROOT', { sender: FEE_SINK_ADDRESS, fee: 0n, note })),
+				new Set(['B']),
+				new Set()
+			)[0].type;
+		expect(reward(new TextEncoder().encode(BLOCK_REWARD_NOTE_PREFIX + '10'))).toBe('block-reward');
+		expect(reward(new TextEncoder().encode(BLOCK_REWARD_NOTE_PREFIX + '11'))).toBe('payment');
 	});
 	it('maps only verified SDK query methods and supplies an abort signal to do', async () => {
 		const builder = {

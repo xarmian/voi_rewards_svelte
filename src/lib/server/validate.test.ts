@@ -83,6 +83,57 @@ it('accepts offset zero for user-only transfers', () => {
 		params: { p_user: A, p_limit: 100, p_offset: 0, p_min_round: 1, p_max_round: 100 }
 	});
 });
+const MAX = String(Number.MAX_SAFE_INTEGER);
+const blockRewards = `action=get_block_rewards&p_address=${A}&p_before_round=${MAX}&p_limit=1000`;
+const blockRewardsDaily = `action=get_block_rewards_daily&p_address=${A}&p_days=90`;
+const networkDaily = 'action=get_block_rewards_network_daily&p_days=31';
+it('accepts block reward pages, including the first-page safe-integer cursor', () => {
+	expect(validate(blockRewards)).toEqual({
+		action: 'get_block_rewards',
+		params: { p_address: A, p_before_round: Number.MAX_SAFE_INTEGER, p_limit: 1000 }
+	});
+	expect(validate(blockRewards.replace(`=${MAX}`, '=1').replace('=1000', '=1'))).toEqual({
+		action: 'get_block_rewards',
+		params: { p_address: A, p_before_round: 1, p_limit: 1 }
+	});
+});
+it('accepts account and network daily block reward totals', () => {
+	expect(validate(blockRewardsDaily)).toEqual({
+		action: 'get_block_rewards_daily',
+		params: { p_address: A, p_days: 90 }
+	});
+	expect(validate(networkDaily)).toEqual({
+		action: 'get_block_rewards_network_daily',
+		params: { p_days: 31 }
+	});
+	expect(validate(networkDaily.replace('=31', '=1'))).toEqual({
+		action: 'get_block_rewards_network_daily',
+		params: { p_days: 1 }
+	});
+});
+it.each([
+	blockRewards.replace('p_limit=1000', 'p_limit=1001'),
+	blockRewards.replace('p_limit=1000', 'p_limit=0'),
+	blockRewards.replace(`p_before_round=${MAX}`, 'p_before_round=0'),
+	blockRewards.replace(`p_before_round=${MAX}`, 'p_before_round=9007199254740992'),
+	blockRewards.replace(A, 'a'.repeat(58)),
+	blockRewards.replace(`&p_address=${A}`, ''),
+	blockRewards.replace(`&p_before_round=${MAX}`, ''),
+	blockRewards.replace('&p_limit=1000', ''),
+	blockRewards + '&p_days=1',
+	blockRewardsDaily.replace('p_days=90', 'p_days=91'),
+	blockRewardsDaily.replace('p_days=90', 'p_days=0'),
+	blockRewardsDaily.replace(A, 'A'.repeat(57)),
+	blockRewardsDaily.replace(`&p_address=${A}`, ''),
+	blockRewardsDaily.replace('&p_days=90', ''),
+	blockRewardsDaily + '&p_limit=1',
+	networkDaily.replace('p_days=31', 'p_days=32'),
+	networkDaily.replace('p_days=31', 'p_days=0'),
+	networkDaily.replace('&p_days=31', ''),
+	networkDaily + `&p_address=${A}`
+])('rejects invalid block reward query %s', (query) => {
+	expect(validate(query)).toHaveProperty('error');
+});
 it('still accepts offset 100 for contract and user transfers', () => {
 	expect(validate(base.replace('p_offset=0', 'p_offset=100') + '&p_contractid=7')).toEqual({
 		action: 'get_arc200_transfers',

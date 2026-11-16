@@ -265,9 +265,9 @@ it('marks asset transfers, close-outs and fees using their own serialized endpoi
 	);
 });
 it('keeps all 23 columns and empty staking cells when contracts are unavailable', () => {
-	const rows = (['payment', 'reward-payout', 'asset-transfer', 'close-out', 'fee'] as const).map(
-		(type) => ({ ...row, type, from: 'CONTRACT', note: '' })
-	);
+	const rows = (
+		['payment', 'reward-payout', 'block-reward', 'asset-transfer', 'close-out', 'fee'] as const
+	).map((type) => ({ ...row, type, from: 'CONTRACT', note: '' }));
 	const lines = serializeCsv(rows, context).trimEnd().split('\r\n');
 	expect(lines[0].split(',')).toHaveLength(23);
 	expect(lines[0].split(',').at(-1)).toBe('"Staking contract"');

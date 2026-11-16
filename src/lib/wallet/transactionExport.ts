@@ -1,4 +1,12 @@
-export type ActivityType = 'payment' | 'reward-payout' | 'asset-transfer' | 'close-out' | 'fee';
+import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '$lib/rewards/blockRewardConstants';
+
+export type ActivityType =
+	| 'payment'
+	| 'reward-payout'
+	| 'block-reward'
+	| 'asset-transfer'
+	| 'close-out'
+	| 'fee';
 export type ExportStatus =
 	| 'complete-indexed'
 	| 'partial-source'
@@ -93,6 +101,7 @@ export class OptionsError extends Error {
 const activityTypes: readonly ActivityType[] = [
 	'payment',
 	'reward-payout',
+	'block-reward',
 	'asset-transfer',
 	'close-out',
 	'fee'
@@ -191,6 +200,8 @@ export function mapTransaction(
 	rewardSenders: ReadonlySet<string>
 ): ExportRow[] {
 	const rows: ExportRow[] = [];
+	// round is a bigint after normalisation; String() renders a bigint or safe-integer number as plain digits.
+	const blockRewardNote = BLOCK_REWARD_NOTE_PREFIX + String(root.round);
 	function visit(node: TransactionNode, innerPath: string, parentApp?: bigint) {
 		const applicationId = node.type === 'appl' ? node.applicationId : parentApp;
 		const base = {
@@ -222,9 +233,14 @@ export function mapTransaction(
 						? 'close-out'
 						: assetId !== null
 							? 'asset-transfer'
-							: direction === 'in' && rewardSenders.has(from)
-								? 'reward-payout'
-								: 'payment';
+							: direction === 'in' &&
+								  from === FEE_SINK_ADDRESS &&
+								  node.type === 'pay' &&
+								  node.note === blockRewardNote
+								? 'block-reward'
+								: direction === 'in' && rewardSenders.has(from)
+									? 'reward-payout'
+									: 'payment';
 				rows.push({
 					...base,
 					assetKind: assetId === null ? 'native' : 'asa',

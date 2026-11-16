@@ -59,6 +59,18 @@ const mimirSchemas: Record<string, Record<string, ParamParser>> = {
 	get_account_transactions_multi: {
 		from_addresses: parseAddressArray,
 		to_address: parseAddress
+	},
+	get_block_rewards: {
+		p_address: parseAddress,
+		p_before_round: (value) => parseInteger(value, 1),
+		p_limit: (value) => parseInteger(value, 1, 1000)
+	},
+	get_block_rewards_daily: {
+		p_address: parseAddress,
+		p_days: (value) => parseInteger(value, 1, 90)
+	},
+	get_block_rewards_network_daily: {
+		p_days: (value) => parseInteger(value, 1, 31)
 	}
 };
 
