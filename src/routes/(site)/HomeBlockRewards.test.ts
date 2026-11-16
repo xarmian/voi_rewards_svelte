@@ -10,6 +10,13 @@ vi.mock('$lib/ds/InlineAlert/InlineAlert.svelte', async (original) => {
 		}
 	};
 });
+const flag = vi.hoisted(() => ({ testing: true }));
+vi.mock('$lib/rewards/blockRewardLabels', async (original) => ({
+	...(await original<typeof import('$lib/rewards/blockRewardLabels')>()),
+	get REALTIME_BLOCK_REWARDS_TESTING() {
+		return flag.testing;
+	}
+}));
 vi.mock('$lib/home/blockRewards', async (original) => ({
 	...(await original<typeof import('$lib/home/blockRewards')>()),
 	createHomeBlockRewardsState: vi.fn()
@@ -25,9 +32,9 @@ import HomeBlockRewards from './HomeBlockRewards.svelte';
 
 const ready = <T>(value: T) => ({ state: 'ready' as const, value, asOf: 1 });
 const PAUSED =
-	'Block rewards are paused. Real-time block rewards are in testing; epoch rewards continue until testing is complete.';
-const UNKNOWN = 'Block reward status unavailable';
-const SPARKLINE = 'Daily block rewards, last 7 days (VOI)';
+	'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.';
+const UNKNOWN = 'Real-time block reward status unavailable';
+const SPARKLINE = 'Daily real-time block rewards, last 7 days (VOI)';
 const networkRows = (days = 30) =>
 	Array.from({ length: days }, (_, i) => ({
 		day: new Date(Date.parse('2026-11-16T00:00:00Z') - (days - 1 - i) * 86400000)
@@ -66,6 +73,7 @@ const tile = (html: string, label: string) => {
 
 beforeEach(() => {
 	alerts.length = 0;
+	flag.testing = true;
 	vi.mocked(loadNetworkBlockRewardsDaily).mockClear();
 	vi.mocked(loadBlockRewardFunding).mockClear();
 });
@@ -77,12 +85,12 @@ describe('HomeBlockRewards', () => {
 			funding: { state: 'loading' }
 		});
 		const html = render(HomeBlockRewards).body;
-		expect(html.match(/<h2[^>]*>Block rewards(?:<!---->)?<\/h2>/g)?.length).toBe(1);
+		expect(html.match(/<h2[^>]*>Real-time block rewards(?:<!---->)?<\/h2>/g)?.length).toBe(1);
 		expect(html).toContain('aria-busy="true"');
 		expect(html).toContain('Loading Today (UTC)…');
 		expect(html).toContain('Loading Current bonus…');
 		expect(html).toContain(`Loading ${SPARKLINE}…`);
-		expect(html).toContain('Refresh block rewards');
+		expect(html).toContain('Refresh real-time block rewards');
 		expect(html).not.toContain('lg:col-span');
 		expect(loadNetworkBlockRewardsDaily).not.toHaveBeenCalled();
 		expect(loadBlockRewardFunding).not.toHaveBeenCalled();
@@ -154,5 +162,38 @@ describe('HomeBlockRewards', () => {
 			draw({ network: { state: 'error', error: 'x' }, funding: { state: 'error', error: 'x' } })
 		])
 			expect(text(html)).not.toMatch(/payout/i);
+	});
+});
+
+// Rendered "block reward" wording that neither names the real-time stream nor counts rewards.
+const bareBlockRewards = (rendered: string) =>
+	rendered
+		.replace(/real-time block rewards?/gi, '')
+		.replace(/<1 block reward\b/gi, '')
+		.replace(/\d[\d,]*\s+block rewards?\b/gi, '')
+		.match(/block reward/gi) ?? [];
+
+describe('HomeBlockRewards real-time labelling', () => {
+	it('titles the card Real-time block rewards with a Testing badge', () => {
+		const html = draw();
+		expect(html.match(/<h2[^>]*>Real-time block rewards(?:<!---->)?<\/h2>/g)?.length).toBe(1);
+		expect(text(html)).toMatch(/Real-time block rewards ◆ Testing Refresh real-time block rewards/);
+	});
+
+	it('drops the Testing badge when testing is switched off', () => {
+		flag.testing = false;
+		const html = text(draw());
+		expect(html).toContain('Real-time block rewards');
+		expect(html).not.toContain('Testing');
+	});
+
+	it('names every block reward as real-time, apart from counts', () => {
+		for (const html of [
+			draw(),
+			draw({ funding: ready({ funding: 'paused' as const, bonus: 5 }) }),
+			draw({ funding: ready({ funding: 'unknown' as const, bonus: null }) }),
+			draw({ network: { state: 'error', error: 'x' }, funding: { state: 'error', error: 'x' } })
+		])
+			expect(bareBlockRewards(text(html))).toEqual([]);
 	});
 });

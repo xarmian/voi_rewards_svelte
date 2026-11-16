@@ -33,7 +33,7 @@ export const FORECAST_PERIOD_SECONDS = {
 } as const;
 
 export const FORECAST_ASSUMPTIONS =
-	"Assumes this balance and total online stake stay the same, the account stays registered, block rewards stay funded, and blocks keep their recent pace. Each round's proposer is picked in proportion to stake.";
+	"Assumes this balance and total online stake stay the same, the account stays registered, real-time block rewards stay funded, and blocks keep their recent pace. Each round's proposer is picked in proportion to stake.";
 
 const LOW_PERCENTILE = 0.1;
 const HIGH_PERCENTILE = 0.9;

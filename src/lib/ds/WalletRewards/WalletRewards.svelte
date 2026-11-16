@@ -10,6 +10,7 @@
 	import LineChart from '../charts/LineChart.svelte';
 	import StatTile from '../StatTile/StatTile.svelte';
 	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
+	import RealtimeTestingBadge from '../RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { comma, compact, MISSING, pct, shortAddr } from '../format';
 	import type { Column } from '../DataTable/types';
 	import type { DataState } from '../types';
@@ -71,6 +72,7 @@
 		BLOCK_REWARD_LOOKBACK_NOTE,
 		BLOCK_REWARDS_UNKNOWN_TEXT
 	} from '$lib/rewards/blockRewardStatus';
+	import { REALTIME_BLOCK_REWARDS_TITLE } from '$lib/rewards/blockRewardLabels';
 	import {
 		BLOCK_REWARD_MAX_MICROVOI,
 		BLOCK_REWARD_MIN_MICROVOI,
@@ -370,7 +372,7 @@
 			})
 	);
 	let blockChartData = $derived({
-		columns: ['UTC date', 'Block rewards', 'Expected at current balance', 'VOI'],
+		columns: ['UTC date', 'Real-time block rewards', 'Expected at current balance', 'VOI'],
 		rows: blockDays.map((day) => [
 			day.day,
 			day.count,
@@ -657,22 +659,24 @@
 			</ChartFrame>
 		</div>
 	</div>
-	<Card title="Block rewards">
-		{#snippet actions()}<Button variant="soft" onclick={() => refreshBlock()}
-				>Refresh block rewards</Button
-			>{/snippet}
+	<Card title={REALTIME_BLOCK_REWARDS_TITLE}>
+		{#snippet actions()}<div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+				<RealtimeTestingBadge /><Button variant="soft" onclick={() => refreshBlock()}
+					>Refresh real-time block rewards</Button
+				>
+			</div>{/snippet}
 		<div class="min-w-0 space-y-4">
 			<div class="space-y-2">
 				{#if contractUnknown}
 					<InlineAlert
-						message="Block reward registration status unavailable"
+						message="Real-time block reward registration status unavailable"
 						onretry={onretrylookup}
 					/>
 				{:else if blockStatus}
 					{#if blockStatus.registered}
-						<StatusPill tone="ok" label="Registered for block rewards" />
+						<StatusPill tone="ok" label="Registered for real-time block rewards" />
 					{:else}
-						<StatusPill tone="warn" label="Not registered for block rewards" />
+						<StatusPill tone="warn" label="Not registered for real-time block rewards" />
 						<ul class="space-y-1 text-sm">
 							{#each blockStatus.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
 						</ul>
@@ -683,12 +687,12 @@
 					<p class="text-label text-ink-muted">{BLOCK_REWARD_LOOKBACK_NOTE}</p>
 				{:else if statusSource.state === 'error'}
 					<InlineAlert
-						message="Block reward registration status unavailable"
+						message="Real-time block reward registration status unavailable"
 						onretry={() => void retryBlock('status')}
 					/>
 				{:else}
 					<div aria-busy="true" class="h-7 w-56 max-w-full rounded-ds-xs bg-grid">
-						<span class="sr-only">Loading block reward registration status…</span>
+						<span class="sr-only">Loading real-time block reward registration status…</span>
 					</div>
 				{/if}
 			</div>
@@ -705,7 +709,7 @@
 				{@const minutes = lagMinutes(lag, pace)}
 				<InlineAlert
 					tone="warn"
-					message={`Block reward history is about ${minutes} minute${minutes === 1 ? '' : 's'} behind the chain.`}
+					message={`Real-time block reward history is about ${minutes} minute${minutes === 1 ? '' : 's'} behind the chain.`}
 				/>
 			{/if}
 			<div class="grid min-w-0 gap-3 sm:grid-cols-3">
@@ -723,7 +727,7 @@
 			<div class="space-y-2">
 				<div class="grid min-w-0 gap-3 sm:grid-cols-2">
 					<StatTile
-						label="Chance of a block reward · next 24 hours"
+						label="Chance of a real-time block reward · next 24 hours"
 						value={notRegistered
 							? 'Not registered'
 							: dayForecast
@@ -748,12 +752,12 @@
 				</p>
 			</div>
 			{#if blockSources.daily.state === 'empty'}<p class="text-label text-ink-muted">
-					No block rewards returned in the last 30 days
+					No real-time block rewards returned in the last 30 days
 				</p>{/if}
 			<ChartFrame
-				title="Daily block rewards · last 30 days"
+				title="Daily real-time block rewards · last 30 days"
 				headingLevel={3}
-				summary="Daily block rewards and expected block rewards at the current balance for this address, UTC"
+				summary="Daily real-time block rewards and expected real-time block rewards at the current balance for this address, UTC"
 				data={blockChartData}
 				state={blockSources.daily.state}
 				onretry={() => void retryBlock('daily')}
@@ -762,11 +766,11 @@
 				y={{ domain: [0, blockMax] }}
 				legend={blockDays.some((day) => day.expected !== null)
 					? [
-							{ label: 'Block rewards', swatch: 'fill' },
+							{ label: 'Real-time block rewards', swatch: 'fill' },
 							{ label: 'Expected at current balance', swatch: 'expected' },
 							{ label: 'Above expected', swatch: 'hi' }
 						]
-					: [{ label: 'Block rewards', swatch: 'fill' }]}
+					: [{ label: 'Real-time block rewards', swatch: 'fill' }]}
 				describe={(index) => blockChartData.rows[index].join(' · ')}
 				height={240}
 			>
@@ -780,13 +784,13 @@
 					/>{/snippet}
 			</ChartFrame>
 			<div class="min-w-0 space-y-3">
-				<h3 class="text-sm font-bold">Recent block rewards</h3>
+				<h3 class="text-sm font-bold">Recent real-time block rewards</h3>
 				<DataTable
 					columns={blockColumns}
 					rows={shownRecent}
 					rowKey={(row) => row.txid}
 					rowName={(row) => `round ${row.round}`}
-					caption={`Recent block rewards for ${pageAddress}; amounts in VOI, newest first`}
+					caption={`Recent real-time block rewards for ${pageAddress}; amounts in VOI, newest first`}
 					captionHidden
 					id="wallet-block-rewards"
 					density="compact"
@@ -794,29 +798,29 @@
 					state={blockSources.recent.state}
 					asOf={blockSources.recent.asOf}
 					onretry={() => void retryBlock('recent')}
-					emptyText="No block rewards returned for this address"
+					emptyText="No real-time block rewards returned for this address"
 				/>
 				{#if blockSources.recent.state === 'stale' && blockSources.recent.error}<InlineAlert
 						tone="warn"
-						message="Recent block rewards did not refresh. Older block rewards load after a successful refresh."
+						message="Recent real-time block rewards did not refresh. Older real-time block rewards load after a successful refresh."
 						onretry={() => void retryBlock('recent')}
 					/>{/if}
 				{#if pages.state === 'error'}<InlineAlert
 						tone="warn"
-						message="Older block rewards unavailable. Show more block rewards tries again."
+						message="Older real-time block rewards unavailable. Show more real-time block rewards tries again."
 					/>{/if}
 				<p class="sr-only" aria-live="polite">
 					{#if announce && recentRows.length}Showing {shownRecent.length} of {recentRows.length} loaded
-						block rewards{#if !showMore && blockSources.recent.state === 'ready'}; no older block
-							rewards{/if}{/if}
+						real-time block rewards{#if !showMore && blockSources.recent.state === 'ready'}; no
+							older real-time block rewards{/if}{/if}
 				</p>
 				{#if showMore}<Button
 						variant="soft"
 						aria-busy={pages.state === 'loading' || undefined}
 						onclick={() => void showMoreRewards()}
 						>{pages.state === 'loading'
-							? 'Loading older block rewards…'
-							: 'Show more block rewards'}</Button
+							? 'Loading older real-time block rewards…'
+							: 'Show more real-time block rewards'}</Button
 					>{/if}
 			</div>
 		</div>

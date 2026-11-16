@@ -105,30 +105,32 @@ describe('blockRewardStatus', () => {
 			{ code: 'not-opted-in', text: 'Online without the 2 VOI incentive fee.' },
 			{
 				code: 'below-range',
-				text: 'Balance below 30,000 VOI: no block rewards while outside this range.'
+				text: 'Balance below 30,000 VOI: no real-time block rewards while outside this range.'
 			}
 		]);
 	});
 
 	it('uses the exact texts', () => {
 		expect(BLOCK_REWARD_STATUS_TEXT).toEqual({
-			registered: 'Registered for block rewards',
+			registered: 'Registered for real-time block rewards',
 			suspended: 'Taken offline for missing proposals (suspended).',
 			'not-opted-in': 'Online without the 2 VOI incentive fee.',
 			offline: 'Account is offline.',
 			'keys-expired': 'Participation keys expired.',
-			'below-range': 'Balance below 30,000 VOI: no block rewards while outside this range.',
-			'above-range': 'Balance above 70,000,000 VOI: no block rewards while outside this range.',
+			'below-range':
+				'Balance below 30,000 VOI: no real-time block rewards while outside this range.',
+			'above-range':
+				'Balance above 70,000,000 VOI: no real-time block rewards while outside this range.',
 			contract:
-				"Staking contracts don't earn block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
+				"Staking contracts don't earn real-time block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
 		});
 		expect(BLOCK_REWARD_LOOKBACK_NOTE).toBe(
 			'Changes take effect after about 320 rounds (~15 minutes).'
 		);
 		expect(BLOCK_REWARDS_PAUSED_TEXT).toBe(
-			'Block rewards are paused. Real-time block rewards are in testing; epoch rewards continue until testing is complete.'
+			'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.'
 		);
-		expect(BLOCK_REWARDS_UNKNOWN_TEXT).toBe('Block reward status unavailable');
+		expect(BLOCK_REWARDS_UNKNOWN_TEXT).toBe('Real-time block reward status unavailable');
 	});
 
 	it('contains no forbidden wording', () => {

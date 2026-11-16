@@ -28,20 +28,20 @@ export type BlockRewardFunding = 'funded' | 'paused' | 'unknown';
 const voi = (micro: number) => (micro / 1e6).toLocaleString('en-US');
 
 export const BLOCK_REWARD_STATUS_TEXT: Record<BlockRewardReason | 'registered', string> = {
-	registered: 'Registered for block rewards',
+	registered: 'Registered for real-time block rewards',
 	suspended: 'Taken offline for missing proposals (suspended).',
 	'not-opted-in': 'Online without the 2 VOI incentive fee.',
 	offline: 'Account is offline.',
 	'keys-expired': 'Participation keys expired.',
-	'below-range': `Balance below ${voi(BLOCK_REWARD_MIN_MICROVOI)} VOI: no block rewards while outside this range.`,
-	'above-range': `Balance above ${voi(BLOCK_REWARD_MAX_MICROVOI)} VOI: no block rewards while outside this range.`,
+	'below-range': `Balance below ${voi(BLOCK_REWARD_MIN_MICROVOI)} VOI: no real-time block rewards while outside this range.`,
+	'above-range': `Balance above ${voi(BLOCK_REWARD_MAX_MICROVOI)} VOI: no real-time block rewards while outside this range.`,
 	contract:
-		"Staking contracts don't earn block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
+		"Staking contracts don't earn real-time block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
 };
 export const BLOCK_REWARD_LOOKBACK_NOTE = `Changes take effect after about ${BALANCE_LOOKBACK_ROUNDS} rounds (~15 minutes).`;
 export const BLOCK_REWARDS_PAUSED_TEXT =
-	'Block rewards are paused. Real-time block rewards are in testing; epoch rewards continue until testing is complete.';
-export const BLOCK_REWARDS_UNKNOWN_TEXT = 'Block reward status unavailable';
+	'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.';
+export const BLOCK_REWARDS_UNKNOWN_TEXT = 'Real-time block reward status unavailable';
 
 const big = (value: bigint | number) => (typeof value === 'bigint' ? value : BigInt(value));
 

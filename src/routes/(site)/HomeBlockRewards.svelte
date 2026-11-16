@@ -5,11 +5,13 @@
 	import StatTile from '$lib/ds/StatTile/StatTile.svelte';
 	import Sparkline from '$lib/ds/Sparkline/Sparkline.svelte';
 	import BlockRewardsPausedAlert from '$lib/ds/BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
+	import RealtimeTestingBadge from '$lib/ds/RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { MISSING } from '$lib/ds/format';
 	import type { DataState } from '$lib/ds/types';
 	import { createReadSource } from '$lib/wallet/read';
 	import { loadBlockRewardFunding, loadNetworkBlockRewardsDaily } from '$lib/wallet/blockRewards';
 	import { BLOCK_REWARDS_UNKNOWN_TEXT } from '$lib/rewards/blockRewardStatus';
+	import { REALTIME_BLOCK_REWARDS_TITLE } from '$lib/rewards/blockRewardLabels';
 	import {
 		createHomeBlockRewardsState,
 		todayDetail,
@@ -18,7 +20,7 @@
 		weekSeries
 	} from '$lib/home/blockRewards';
 
-	const SPARKLINE_LABEL = 'Daily block rewards, last 7 days (VOI)';
+	const SPARKLINE_LABEL = 'Daily real-time block rewards, last 7 days (VOI)';
 	let sources = $state(createHomeBlockRewardsState());
 	const readers = {
 		// Thirty days, as on the wallet and analytics views, so all share one cached read.
@@ -65,9 +67,12 @@
 	let series = $derived(weekSeries(rows));
 </script>
 
-<Card title="Block rewards">
-	{#snippet actions()}<Button variant="soft" onclick={refresh}>Refresh block rewards</Button
-		>{/snippet}
+<Card title={REALTIME_BLOCK_REWARDS_TITLE}>
+	{#snippet actions()}<div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+			<RealtimeTestingBadge /><Button variant="soft" onclick={refresh}
+				>Refresh real-time block rewards</Button
+			>
+		</div>{/snippet}
 	<div class="min-w-0 space-y-4">
 		{#if fundingPaused}
 			<BlockRewardsPausedAlert />
