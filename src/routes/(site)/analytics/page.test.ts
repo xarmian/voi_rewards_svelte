@@ -8,6 +8,9 @@ import epochs from '$lib/network/fixtures/epochs.json';
 import stake from '$lib/network/fixtures/online-stake-history.json';
 import prices from '$lib/network/fixtures/price-history-7d.json';
 import transactions from '$lib/network/fixtures/tx-counts-day-30.json';
+import { MISSING } from '$lib/ds/format';
+import { loadNetworkBlockRewardsDaily, type NetworkBlockRewardDay } from '$lib/wallet/blockRewards';
+import type { Source } from '$lib/wallet/read';
 
 const plots = vi.hoisted(() => ({
 	points: [] as { x: unknown; y: number }[][],
@@ -36,6 +39,58 @@ vi.mock('$lib/ds/charts/scales', async (original) => {
 		}
 	};
 });
+
+const blockRead = vi.hoisted(() => ({
+	result: null as Source<unknown> | null,
+	loads: [] as [string, boolean | undefined][]
+}));
+vi.mock('$lib/wallet/blockRewards', async (original) => ({
+	...(await original<typeof import('$lib/wallet/blockRewards')>()),
+	loadNetworkBlockRewardsDaily: vi.fn()
+}));
+vi.mock('$lib/wallet/read', async (original) => {
+	const actual = await original<typeof import('$lib/wallet/read')>();
+	return {
+		...actual,
+		createReadSource: <T>(
+			read: (address: string, force: boolean) => Promise<T>,
+			publish: (result: Source<T>) => void
+		) => {
+			if (!blockRead.result) return actual.createReadSource(read, publish);
+			publish(blockRead.result as Source<T>);
+			return {
+				load: async (key: string, force?: boolean) => {
+					blockRead.loads.push([key, force]);
+				},
+				dispose: () => {}
+			};
+		}
+	};
+});
+
+const BLOCK_TITLE = 'Real-time block rewards by day';
+const blockDay = (
+	day: string,
+	over: Partial<NetworkBlockRewardDay> = {}
+): NetworkBlockRewardDay => ({
+	day,
+	blocks: 30_000,
+	rewardedBlocks: 1_234,
+	amount: 2_500_000_000,
+	feesCollected: 0,
+	lastRound: null,
+	...over
+});
+const blockDays = [
+	blockDay('2026-11-04', { blocks: 0, rewardedBlocks: 0, amount: 0 }),
+	blockDay('2026-11-05'),
+	blockDay('2026-11-06', { amount: 1_000_000_000 })
+];
+const visible = (html: string) =>
+	html
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 
 const now = Date.parse('2026-11-06T12:00:00Z');
 function setup(overrides: { price?: unknown; tx?: unknown; fail?: string } = {}) {
@@ -66,12 +121,15 @@ const htmlFor = (model: ReturnType<typeof createNetwork>) => {
 };
 
 afterEach(() => {
+	blockRead.result = null;
+	blockRead.loads = [];
+	vi.mocked(loadNetworkBlockRewardsDaily).mockClear();
 	plots.points = [];
 	plots.scales = [];
 	vi.restoreAllMocks();
 });
 
-it('renders the six sections in reading order with no Relays element', async () => {
+it('renders the seven sections in reading order with no Relays element', async () => {
 	const { model } = setup();
 	await model.load();
 	const html = htmlFor(model);
@@ -80,6 +138,7 @@ it('renders the six sections in reading order with no Relays element', async () 
 	expect(titles).toEqual([
 		'APR by epoch',
 		'Online stake',
+		BLOCK_TITLE,
 		'Accounts earning by epoch',
 		'Current stake split',
 		'VOI price',
@@ -243,4 +302,61 @@ it('binds segmented controls to the tested range and period handlers with 44px t
 	expect(page).toContain('onchange={model.setRange}');
 	expect(page).toContain('onchange={model.setPeriod}');
 	expect(page).toContain('min-height: 44px');
+});
+
+it('server-renders the daily block reward chart as loading after online stake without a read', async () => {
+	const { model } = setup();
+	await model.load();
+	const html = htmlFor(model);
+	const titles = [...html.matchAll(/<h2\b[^>]*>([^<]+)<\/h2>/g)].map((m) => m[1]);
+	expect(titles.indexOf(BLOCK_TITLE)).toBe(titles.indexOf('Online stake') + 1);
+	const block = section(html, BLOCK_TITLE);
+	expect(block).toContain('aria-busy="true"');
+	expect(block).toContain(`Loading ${BLOCK_TITLE}`);
+	expect(loadNetworkBlockRewardsDaily).not.toHaveBeenCalled();
+});
+
+it('tabulates and plots ready daily block rewards with a missing share for a day with no blocks', async () => {
+	blockRead.result = { state: 'ready', value: blockDays, asOf: now };
+	const { model } = setup();
+	await model.load();
+	const block = section(htmlFor(model), BLOCK_TITLE);
+	const headers = [...block.matchAll(/<th\b[^>]*>([^<]+)<\/th>/g)].map((m) => m[1]);
+	expect(headers).toEqual(['UTC date', 'Blocks', 'Blocks rewarded', 'Share rewarded', 'VOI']);
+	const rows = [
+		...(block.match(/<tbody>[\s\S]*?<\/tbody>/)?.[0] ?? '').matchAll(/<tr>([\s\S]*?)<\/tr>/g)
+	].map((m) => [...m[1].matchAll(/<td\b[^>]*>([^<]*)<\/td>/g)].map((c) => c[1]));
+	expect(rows).toEqual([
+		['2026-11-04', '0', '0', MISSING, '0'],
+		['2026-11-05', '30,000', '1,234', '4.1%', '2,500'],
+		['2026-11-06', '30,000', '1,234', '4.1%', '1,000']
+	]);
+	expect(plots.points).toContainEqual([
+		{ x: '2026-11-04', y: 0 },
+		{ x: '2026-11-05', y: 2500 },
+		{ x: '2026-11-06', y: 1000 }
+	]);
+	expect(block).toContain('<svg');
+	expect(block).toContain('3 UTC days');
+});
+
+it('shows the daily block reward error state with a retry control', async () => {
+	blockRead.result = { state: 'error', error: 'Request failed' };
+	const { model } = setup();
+	await model.load();
+	const block = section(htmlFor(model), BLOCK_TITLE);
+	expect(block).toContain(`Couldn't load ${BLOCK_TITLE}.`);
+	expect(block).toContain('Retry');
+	expect(block).not.toContain('<svg');
+});
+
+it('labels the daily block reward chart as testing without mentioning payouts', async () => {
+	for (const result of [null, { state: 'ready', value: blockDays, asOf: now }] as const) {
+		blockRead.result = result;
+		const { model } = setup();
+		await model.load();
+		const text = visible(section(htmlFor(model), BLOCK_TITLE));
+		expect(text).toContain('Testing');
+		expect(text).not.toMatch(/payout/i);
+	}
 });
