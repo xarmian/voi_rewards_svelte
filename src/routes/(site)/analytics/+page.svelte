@@ -4,6 +4,7 @@
 	import LineChart from '$lib/ds/charts/LineChart.svelte';
 	import Tabs from '$lib/ds/Tabs/Tabs.svelte';
 	import StakeSplit from '$lib/network/StakeSplit.svelte';
+	import RealtimeTestingBadge from '$lib/ds/RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { compact, comma as num } from '$lib/ds/format';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import { chainStatus } from '$lib/stores/chainStatus';
@@ -11,11 +12,37 @@
 	import { epochRange, freshnessText, type Resource } from '$lib/network/series';
 	import type { DataState } from '$lib/ds/types';
 	import type { XSpec } from '$lib/ds/charts/types';
+	import { createReadSource, type Source } from '$lib/wallet/read';
+	import {
+		loadNetworkBlockRewardsDaily,
+		type NetworkBlockRewardDay
+	} from '$lib/wallet/blockRewards';
+	import { REALTIME_BLOCK_REWARDS_TITLE } from '$lib/rewards/blockRewardLabels';
+	import { blockRewardDayRows, blockRewardSummary, shareText } from '$lib/network/blockRewards';
 
 	const model = createNetwork();
 	onMount(() => {
 		void model.load();
 	});
+	let blockSource: Source<NetworkBlockRewardDay[]> = $state({ state: 'loading' });
+	// Thirty days, as on the home and wallet views, so all share one cached read.
+	const blockReader = createReadSource(
+		(_, force) => loadNetworkBlockRewardsDaily(30, force),
+		(result) => (blockSource = result)
+	);
+	// Effects do not run on the server, so the server render stays the loading state.
+	$effect(() => {
+		void blockReader.load('network');
+		return () => blockReader.dispose();
+	});
+	const blockRows = $derived(blockRewardDayRows(blockSource.value ?? []));
+	const blockState: DataState = $derived(
+		blockSource.state === 'loading' || blockSource.state === 'error'
+			? blockSource.state
+			: blockRows.length
+				? blockSource.state
+				: 'empty'
+	);
 	const aprRows = $derived(epochRange($model.epochs?.rows ?? [], $model.range));
 	const accountRows = $derived(epochRange($model.epochs?.rows ?? [], '26'));
 	const stakeRows = $derived($model.stake?.rows ?? []);
@@ -176,6 +203,37 @@
 		{#snippet children(ctx)}<LineChart
 				{ctx}
 				points={stakeRows.map((r) => ({ x: r.date, y: r.value ?? NaN }))}
+				area={false}
+				format={(v) => `${compact(v)} VOI`}
+			/>{/snippet}
+	</ChartFrame>
+
+	<ChartFrame
+		title={`${REALTIME_BLOCK_REWARDS_TITLE} by day`}
+		summary={blockRewardSummary(blockRows)}
+		state={blockState}
+		onretry={() => void blockReader.load('network', true)}
+		asOf={blockSource.asOf}
+		data={{
+			columns: ['UTC date', 'Blocks', 'Blocks rewarded', 'Share rewarded', 'VOI'],
+			rows: blockRows.map((r) => [
+				r.date,
+				num(r.blocks),
+				num(r.rewardedBlocks),
+				shareText(r.share),
+				num(r.voi, 2)
+			]),
+			caption:
+				'Daily real-time block rewards paid to block proposers in VOI, last 30 UTC days. Today (UTC) is in progress. Days before real-time block rewards started show 0. Epoch rewards are separate and not included.'
+		}}
+		x={timeAxis(blockRows)}
+		y={{ domain: domain(blockRows.map((r) => r.voi)), format: compact }}
+		height={230}
+	>
+		{#snippet actions()}<RealtimeTestingBadge />{/snippet}
+		{#snippet children(ctx)}<LineChart
+				{ctx}
+				points={blockRows.map((r) => ({ x: r.date, y: r.voi }))}
 				area={false}
 				format={(v) => `${compact(v)} VOI`}
 			/>{/snippet}
