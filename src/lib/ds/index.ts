@@ -51,4 +51,5 @@ export { WalletNfts } from './WalletNfts';
 export { WalletContractsPanel } from './WalletContractsPanel';
 
 export { WalletRewards } from './WalletRewards';
+export { WalletBlockRewards } from './WalletBlockRewards';
 export { WalletSearchPage } from './WalletSearchPage';

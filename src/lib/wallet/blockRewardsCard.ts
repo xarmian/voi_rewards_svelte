@@ -1,5 +1,5 @@
-import { comma, compact } from '$lib/ds/format';
-import type { Forecast } from '$lib/rewards/blockRewardForecast';
+import { comma, compact, pct } from '$lib/ds/format';
+import { forecastBlockRewards, networkPace, type Forecast } from '$lib/rewards/blockRewardForecast';
 import type { BlockRewardFunding, BlockRewardStatus } from '$lib/rewards/blockRewardStatus';
 import {
 	BLOCK_REWARD_PAGE_SIZE,
@@ -75,6 +75,51 @@ export function weekForecastText(forecast: Forecast): string {
 	const count = Math.round(forecast.expectedCount);
 	const voi = forecast.expectedMicroVoi / 1e6;
 	return `${count === 0 && forecast.expectedCount > 0 ? '<1 block reward' : blockRewardCount(count)} (${comma(forecast.range[0])}–${comma(forecast.range[1])}), ≈ ${compact(voi, voi < 10 ? 2 : 0)} VOI`;
+}
+
+/** A whole percent, two decimals under 1%, and ">99%" rather than ever reading as certain. */
+export function chanceText(chance: number): string {
+	const percent = chance * 100;
+	return percent > 99 ? '>99%' : pct(percent, percent < 1 ? 2 : 0);
+}
+
+/**
+ * Forecast for the next `seconds` from the status balance, online stake, last round, bonus
+ * and network pace; null when any input is missing. Pace is judged at the time the network
+ * rows were read, so the clock passing UTC midnight does not leave the new day looking
+ * unindexed.
+ */
+export function blockRewardForecast(state: BlockRewardsState, seconds: number): Forecast | null {
+	const status = state.status.value;
+	const onlineStake = state.onlineStake.value;
+	const round = state.lastRound.value;
+	const bonus = state.funding.value?.bonus;
+	const network = state.network;
+	const pace = network.value ? networkPace(network.value, new Date(network.asOf)) : null;
+	if (!status || onlineStake === undefined || round === undefined || bonus == null || !pace)
+		return null;
+	return forecastBlockRewards({
+		stake: status.balance,
+		onlineStake,
+		blockTime: pace.blockTime,
+		avgFees: pace.avgFees,
+		bonus,
+		round,
+		seconds,
+		eligible: status.registered
+	});
+}
+
+/**
+ * Whether the page is a staking contract, an ordinary account, or unknown: not known to be a
+ * contract while the owner lookup that would tell failed.
+ */
+export function blockRewardContract(
+	isContract: boolean,
+	ownerLookup: 'ok' | 'unavailable'
+): 'contract' | 'account' | 'unknown' {
+	if (isContract) return 'contract';
+	return ownerLookup === 'unavailable' ? 'unknown' : 'account';
 }
 
 /** Whole minutes of lag, at least one. */

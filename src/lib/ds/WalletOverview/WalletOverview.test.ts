@@ -312,3 +312,30 @@ it('does not print a liquid balance on a contract route while holdings are unava
 	expect(text).toContain('Holdings valuation unavailable');
 	expect(text).not.toContain('Liquid:');
 });
+
+it('renders a Block rewards card after Next unlocks, with an unknown status when the owner lookup failed', () => {
+	const draw = (ownerLookup: 'ok' | 'unavailable') =>
+		render(WalletOverview, {
+			props: {
+				summary: summarizeWallet({
+					owner: null,
+					contracts: [],
+					current: null,
+					history: [],
+					state: 'ready',
+					ownerLookup,
+					now: 0
+				}),
+				contracts: [],
+				current: null,
+				pageAddress: 'OWNER',
+				accountState: { state: 'read-only' },
+				now: 0
+			}
+		}).body;
+	const html = draw('ok');
+	const heading = html.search(/<h2[^>]*>Block rewards(?:<!---->)?<\/h2>/);
+	expect(heading).toBeGreaterThan(html.indexOf('Next unlocks'));
+	expect(html).not.toContain('Block reward registration status unavailable');
+	expect(draw('unavailable')).toContain('Block reward registration status unavailable');
+});

@@ -48,8 +48,18 @@ describe('wallet page selection wiring (TASK-132)', () => {
 test('read-only panels receive the page address and search only navigates', () => {
 	expect(source).toMatch(/<WalletRewards\s+pageAddress=\{walletId\}/);
 	expect(source).toMatch(
-		/<WalletRewards\s+pageAddress=\{walletId\}\s+isContract=\{!!parentWalletId\}\s*\/>/
+		/<WalletRewards\s+pageAddress=\{walletId\}\s+isContract=\{!!parentWalletId\}[^>]*\/>/
 	);
 	expect(source).toMatch(/<WalletSearchPage\s+onsubmit=\{searchWallet\}/);
 	expect(source).not.toMatch(/selectWallet\s*\(|selectedWallet\.set\s*\(/);
+});
+
+test('block reward surfaces receive the contract status and the owner lookup retry', () => {
+	const rewards = source.match(/<WalletRewards\b[^>]*\/>/)?.[0] ?? '';
+	// Shorthand or explicit attribute.
+	expect(rewards).toMatch(/\{ownerLookup\}|\bownerLookup=\{ownerLookup\}/);
+	expect(rewards).toMatch(/\bonretrylookup=\{refresh\}/);
+	const overview = source.match(/<WalletOverview\b[^>]*\/>/)?.[0] ?? '';
+	expect(overview).toMatch(/\bisContract=\{!!parentWalletId\}/);
+	expect(overview).toMatch(/\bonrefresh=\{refresh\}/);
 });
