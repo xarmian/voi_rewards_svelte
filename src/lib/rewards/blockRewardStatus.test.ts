@@ -120,7 +120,7 @@ describe('blockRewardStatus', () => {
 			'below-range': 'Balance below 30,000 VOI: no block rewards while outside this range.',
 			'above-range': 'Balance above 70,000,000 VOI: no block rewards while outside this range.',
 			contract:
-				"Staking contracts cannot pay the 2 VOI incentive fee, so they don't earn block rewards."
+				"Staking contracts don't earn block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
 		});
 		expect(BLOCK_REWARD_LOOKBACK_NOTE).toBe(
 			'Changes take effect after about 320 rounds (~15 minutes).'

@@ -36,7 +36,7 @@ export const BLOCK_REWARD_STATUS_TEXT: Record<BlockRewardReason | 'registered', 
 	'below-range': `Balance below ${voi(BLOCK_REWARD_MIN_MICROVOI)} VOI: no block rewards while outside this range.`,
 	'above-range': `Balance above ${voi(BLOCK_REWARD_MAX_MICROVOI)} VOI: no block rewards while outside this range.`,
 	contract:
-		"Staking contracts cannot pay the 2 VOI incentive fee, so they don't earn block rewards."
+		"Staking contracts don't earn block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
 };
 export const BLOCK_REWARD_LOOKBACK_NOTE = `Changes take effect after about ${BALANCE_LOOKBACK_ROUNDS} rounds (~15 minutes).`;
 export const BLOCK_REWARDS_PAUSED_TEXT =
