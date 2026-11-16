@@ -16,11 +16,11 @@
 		createHomeBlockRewardsState,
 		todayDetail,
 		todayRow,
-		voiAmount,
+		voiFigure,
 		weekSeries
 	} from '$lib/home/blockRewards';
 
-	const SPARKLINE_LABEL = 'Daily real-time block rewards, last 7 days (VOI)';
+	const SPARKLINE_LABEL = 'Daily real-time block rewards, last 7 complete UTC days (VOI)';
 	let sources = $state(createHomeBlockRewardsState());
 	const readers = {
 		// Thirty days, as on the wallet and analytics views, so all share one cached read.
@@ -83,10 +83,11 @@
 				onretry={() => void retry('funding')}
 			/>
 		{/if}
-		<div class="grid min-w-0 grid-cols-2 gap-3">
+		<div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
 			<StatTile
 				label="Today (UTC)"
-				value={today ? voiAmount(today.amount / 1e6) : MISSING}
+				value={today ? voiFigure(today.amount / 1e6) : MISSING}
+				unit="VOI"
 				detail={today ? todayDetail(today) : undefined}
 				state={networkState}
 				asOf={sources.network.asOf}
@@ -94,7 +95,8 @@
 			/>
 			<StatTile
 				label="Current bonus"
-				value={bonus === null ? MISSING : voiAmount(bonus / 1e6)}
+				value={bonus === null ? MISSING : voiFigure(bonus / 1e6)}
+				unit="VOI"
 				detail="per block"
 				state={bonusState}
 				asOf={sources.funding.asOf}
@@ -109,7 +111,7 @@
 				asOf={sources.network.asOf}
 				onretry={() => void retry('network')}
 			/>
-			<figcaption class="mt-1 text-label text-ink-muted">Last 7 days</figcaption>
+			<figcaption class="mt-1 text-label text-ink-muted">Last 7 complete days (UTC)</figcaption>
 		</figure>
 	</div>
 </Card>

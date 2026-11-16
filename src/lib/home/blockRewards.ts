@@ -30,12 +30,15 @@ export function todayDetail(row: NetworkBlockRewardDay): string {
 	return `${comma(row.rewardedBlocks)} of ${comma(row.blocks)} blocks rewarded (${share})`;
 }
 
-/** Daily VOI over the last seven rows, oldest first. */
+/** Daily VOI over the seven complete days before today, oldest first; today is partial. */
 export function weekSeries(rows: NetworkBlockRewardDay[]): number[] {
-	return rows.slice(-7).map((row) => row.amount / 1e6);
+	return rows
+		.slice(0, -1)
+		.slice(-7)
+		.map((row) => row.amount / 1e6);
 }
 
-/** A VOI figure, as on the wallet block reward card. */
-export function voiAmount(value: number): string {
-	return value > 0 && value < 0.01 ? '<0.01 VOI' : `${compact(value, 2)} VOI`;
+/** A VOI figure without its unit, rounded as on the wallet block reward card. */
+export function voiFigure(value: number): string {
+	return value > 0 && value < 0.01 ? '<0.01' : compact(value, 2);
 }

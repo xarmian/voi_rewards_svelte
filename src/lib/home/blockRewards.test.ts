@@ -5,7 +5,7 @@ import {
 	rewardedShare,
 	todayDetail,
 	todayRow,
-	voiAmount,
+	voiFigure,
 	weekSeries
 } from './blockRewards';
 
@@ -41,20 +41,21 @@ describe('home block reward derivations', () => {
 		expect(detail).not.toMatch(/NaN|%/);
 	});
 
-	it('builds the 7-day series from the last seven amounts in VOI, oldest first', () => {
-		expect(weekSeries(days(30))).toEqual([24, 25, 26, 27, 28, 29, 30]);
+	it('builds the series from the seven complete days before today, in VOI, oldest first', () => {
+		expect(weekSeries(days(30))).toEqual([23, 24, 25, 26, 27, 28, 29]);
 	});
 
-	it('uses every row when fewer than seven are present', () => {
-		expect(weekSeries(days(3))).toEqual([1, 2, 3]);
+	it('uses every complete day when fewer than seven are present, and never today', () => {
+		expect(weekSeries(days(3))).toEqual([1, 2]);
+		expect(weekSeries(days(1))).toEqual([]);
 		expect(weekSeries([])).toEqual([]);
 	});
 
-	it('formats VOI amounts like the wallet block reward card', () => {
-		expect(voiAmount(2)).toBe('2 VOI');
-		expect(voiAmount(0.001)).toBe('<0.01 VOI');
-		expect(voiAmount(0)).toBe('0 VOI');
-		expect(voiAmount(12_345.678)).toBe('12.35k VOI');
+	it('formats VOI figures like the wallet block reward card, without the unit', () => {
+		expect(voiFigure(2)).toBe('2');
+		expect(voiFigure(0.001)).toBe('<0.01');
+		expect(voiFigure(0)).toBe('0');
+		expect(voiFigure(12_345.678)).toBe('12.35k');
 	});
 
 	it('starts both sources loading', () => {

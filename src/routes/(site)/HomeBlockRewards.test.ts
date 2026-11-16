@@ -34,7 +34,7 @@ const ready = <T>(value: T) => ({ state: 'ready' as const, value, asOf: 1 });
 const PAUSED =
 	'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.';
 const UNKNOWN = 'Real-time block reward status unavailable';
-const SPARKLINE = 'Daily real-time block rewards, last 7 days (VOI)';
+const SPARKLINE = 'Daily real-time block rewards, last 7 complete UTC days (VOI)';
 const networkRows = (days = 30) =>
 	Array.from({ length: days }, (_, i) => ({
 		day: new Date(Date.parse('2026-11-16T00:00:00Z') - (days - 1 - i) * 86400000)
@@ -102,8 +102,8 @@ describe('HomeBlockRewards', () => {
 			/^Today \(UTC\) 30 VOI 1,234 of 30,000 blocks rewarded \(4\.1%\) /
 		);
 		expect(tile(html, 'Current bonus')).toMatch(/^Current bonus 5 VOI per block /);
-		expect(html).toContain(`aria-label="${SPARKLINE}: from 24 to 30"`);
-		expect(text(html)).toContain('Last 7 days');
+		expect(html).toContain(`aria-label="${SPARKLINE}: from 23 to 29"`);
+		expect(text(html)).toContain('Last 7 complete days (UTC)');
 	});
 
 	it('shows no share before the first block of the day', () => {
