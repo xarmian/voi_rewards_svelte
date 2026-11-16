@@ -461,6 +461,7 @@
 						historyState={snapshot?.historyState ?? 'loading'}
 						price={snapshot?.price ?? null}
 						pageAddress={walletId}
+						isContract={!!parentWalletId}
 						{accountState}
 						asOf={snapshot?.asOf}
 						{now}
@@ -498,7 +499,12 @@
 						/>
 					</div>
 				{:else if tabs.current === 'rewards'}
-					<WalletRewards pageAddress={walletId} isContract={!!parentWalletId} />
+					<WalletRewards
+						pageAddress={walletId}
+						isContract={!!parentWalletId}
+						{ownerLookup}
+						onretrylookup={refresh}
+					/>
 				{:else if tabs.current === 'contracts'}
 					<WalletContractsPanel
 						contracts={contractsMatch ? (contractsSnapshot?.contracts ?? []) : []}

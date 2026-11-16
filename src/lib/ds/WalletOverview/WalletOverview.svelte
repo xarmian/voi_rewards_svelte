@@ -11,6 +11,7 @@
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import Chip from '../Chip/Chip.svelte';
 	import WalletContracts from '../WalletContracts/WalletContracts.svelte';
+	import WalletBlockRewards from '../WalletBlockRewards/WalletBlockRewards.svelte';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import { ago, comma, compact, pct, usd } from '../format';
 
@@ -21,6 +22,7 @@
 		historyState = 'loading',
 		price = null,
 		pageAddress,
+		isContract = false,
 		accountState,
 		asOf,
 		now,
@@ -32,6 +34,8 @@
 		historyState?: DataState;
 		price?: number | null;
 		pageAddress: string;
+		/** Whether the page address is a staking contract. */
+		isContract?: boolean;
 		accountState: PageAccountState<{ address: string; app: string; walletId?: string }>;
 		asOf?: string;
 		now: number;
@@ -379,4 +383,10 @@
 			</p>
 		{/if}
 	</Card>
+	<WalletBlockRewards
+		{pageAddress}
+		{isContract}
+		ownerLookup={summary.ownerLookup === 'unavailable' ? 'unavailable' : 'ok'}
+		onretrylookup={onrefresh}
+	/>
 </div>

@@ -3,6 +3,16 @@ import { render } from 'svelte/server';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+const alerts = vi.hoisted(() => [] as { message: string; onretry?: () => void }[]);
+vi.mock('../InlineAlert/InlineAlert.svelte', async (original) => {
+	const real = (await original<typeof import('../InlineAlert/InlineAlert.svelte')>()).default;
+	return {
+		default: (...args: Parameters<typeof real>) => {
+			alerts.push(args[1] as (typeof alerts)[number]);
+			return real(...args);
+		}
+	};
+});
 vi.mock('$lib/wallet/rewards', async (original) => ({
 	...(await original<typeof import('$lib/wallet/rewards')>()),
 	createRewardsState: vi.fn()
@@ -490,5 +500,65 @@ describe('Block rewards card', () => {
 			expect(legend(body), name).not.toContain('Expected at current balance');
 			expect(body, name).not.toContain('stroke-expected');
 		}
+	});
+
+	it('does not show a status read for the other contract classification', () => {
+		vi.mocked(createBlockRewardsState).mockReturnValue({
+			...blockFixture(),
+			status: {
+				state: 'stale',
+				value: { registered: true, reasons: [], balance: 100_000_000_000 },
+				asOf: 1
+			}
+		});
+		const html = card(
+			render(WalletRewards, {
+				props: { pageAddress: 'Y', isContract: true, now: new Date('2026-11-07T12:00:00Z') }
+			}).body
+		);
+		expect(html).not.toContain('Registered for block rewards');
+		expect(html).toContain('Loading block reward registration status');
+		for (const label of ['Chance of a block reward · next 24 hours', 'Next 7 days']) {
+			expect(tile(html, label), label).not.toMatch(/%|VOI/);
+			expect(html).not.toContain(`Unable to load ${label}.`);
+		}
+		expect(legend(html)).not.toContain('Expected at current balance');
+	});
+
+	it('shows registration status unavailable when the page cannot tell whether it is a contract', () => {
+		const onretrylookup = vi.fn();
+		alerts.length = 0;
+		vi.mocked(createBlockRewardsState).mockReturnValue({
+			...blockFixture(),
+			status: unregistered(['not-opted-in'])
+		});
+		const html = card(
+			render(WalletRewards, {
+				props: {
+					pageAddress: 'Y',
+					ownerLookup: 'unavailable',
+					onretrylookup,
+					now: new Date('2026-11-07T12:00:00Z')
+				}
+			}).body
+		);
+		expect(html).toContain('Block reward registration status unavailable');
+		expect(html).not.toContain('Not registered for block rewards');
+		expect(html.match(GO_ONLINE)).toBeNull();
+		expect(html).not.toContain('Go online with the 2 VOI incentive fee');
+		for (const label of ['Chance of a block reward · next 24 hours', 'Next 7 days']) {
+			expect(tile(html, label), label).not.toContain('Not registered');
+			expect(tile(html, label), label).toContain(`Unable to load ${label}.`);
+		}
+		expect(legend(html)).not.toContain('Expected at current balance');
+		expect(tile(html, 'Today (UTC)')).toMatch(/^Today \(UTC\) 2 VOI 1 block reward /);
+		const lookups = alerts.filter((alert) => alert.onretry === onretrylookup);
+		expect(lookups.map((alert) => alert.message)).toEqual([
+			'Block reward registration status unavailable',
+			'Unable to load Chance of a block reward · next 24 hours.',
+			'Unable to load Next 7 days.'
+		]);
+		lookups[0].onretry!();
+		expect(onretrylookup).toHaveBeenCalledTimes(1);
 	});
 });

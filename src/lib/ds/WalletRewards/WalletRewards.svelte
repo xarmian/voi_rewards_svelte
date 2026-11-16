@@ -43,8 +43,12 @@
 		type BlockReward
 	} from '$lib/wallet/blockRewards';
 	import {
+		blockRewardContract,
 		blockRewardCount,
+		blockRewardForecast,
+		chanceText,
 		createBlockRewardPager,
+		currentStatus,
 		createBlockRewardsState,
 		emptyBlockRewardPages,
 		historyTotals,
@@ -61,7 +65,6 @@
 	import {
 		FORECAST_ASSUMPTIONS,
 		FORECAST_PERIOD_SECONDS,
-		forecastBlockRewards,
 		networkPace
 	} from '$lib/rewards/blockRewardForecast';
 	import {
@@ -76,8 +79,17 @@
 	let {
 		pageAddress,
 		isContract = false,
+		ownerLookup = 'ok',
+		onretrylookup,
 		now
-	}: { pageAddress: string; isContract?: boolean; now?: Date } = $props();
+	}: {
+		pageAddress: string;
+		isContract?: boolean;
+		/** 'unavailable' when the page could not tell whether this address is a staking contract. */
+		ownerLookup?: 'ok' | 'unavailable';
+		onretrylookup?: () => void;
+		now?: Date;
+	} = $props();
 	let clock = $state(new Date());
 	let at = $derived(now ?? clock);
 	let sources = $state(createRewardsState());
@@ -284,7 +296,10 @@
 			cell: statusCell
 		}
 	]);
-	let blockStatus = $derived(blockSources.status.value);
+	let statusSource = $derived(currentStatus(blockSources.status, isContract));
+	let blockStatus = $derived(statusSource.value);
+	let contract = $derived(blockRewardContract(isContract, ownerLookup));
+	let contractUnknown = $derived(contract === 'unknown');
 	let funding = $derived(blockSources.funding.value);
 	let fundingPaused = $derived(funding?.funding === 'paused');
 	let fundingUnknown = $derived(
@@ -306,46 +321,34 @@
 	let historyState: DataState = $derived(
 		blockSources.daily.state === 'empty' ? 'ready' : blockSources.daily.state
 	);
-	function forecastFor(seconds: number) {
-		const onlineStake = blockSources.onlineStake.value;
-		const round = blockSources.lastRound.value;
-		const bonus = funding?.bonus;
-		if (!blockStatus || onlineStake === undefined || round === undefined || bonus == null || !pace)
-			return null;
-		return forecastBlockRewards({
-			stake: blockStatus.balance,
-			onlineStake,
-			blockTime: pace.blockTime,
-			avgFees: pace.avgFees,
-			bonus,
-			round,
-			seconds,
-			eligible: blockStatus.registered
-		});
-	}
-	let dayForecast = $derived(forecastFor(FORECAST_PERIOD_SECONDS.day));
-	let weekForecast = $derived(forecastFor(FORECAST_PERIOD_SECONDS.week));
+	let dayForecast = $derived(
+		blockRewardForecast(blockSources, FORECAST_PERIOD_SECONDS.day, isContract)
+	);
+	let weekForecast = $derived(
+		blockRewardForecast(blockSources, FORECAST_PERIOD_SECONDS.week, isContract)
+	);
 	const forecastSources = ['status', 'funding', 'network', 'onlineStake', 'lastRound'] as const;
-	let notRegistered = $derived(blockStatus?.registered === false);
+	let notRegistered = $derived(!contractUnknown && blockStatus?.registered === false);
+	// An unknown contract status leaves both forecasts unavailable until the lookup succeeds.
 	let forecastState: DataState = $derived(
-		notRegistered
-			? 'ready'
-			: forecastSources.some((key) => blockSources[key].state === 'loading')
-				? 'loading'
-				: dayForecast && weekForecast
-					? 'ready'
-					: 'error'
+		contractUnknown
+			? 'error'
+			: notRegistered
+				? 'ready'
+				: forecastSources.some(
+							(key) => (key === 'status' ? statusSource : blockSources[key]).state === 'loading'
+					  )
+					? 'loading'
+					: dayForecast && weekForecast
+						? 'ready'
+						: 'error'
 	);
 	function retryForecast() {
 		for (const key of forecastSources) void retryBlock(key);
 	}
-	function chanceText(chance: number) {
-		const percent = chance * 100;
-		return percent > 99 ? '>99%' : pct(percent, percent < 1 ? 2 : 0);
-	}
 	let expectedShare = $derived(
 		blockStatus?.registered === true &&
-			!isContract &&
+			contract === 'account' &&
 			blockSources.onlineStake.value !== undefined &&
 			blockStatus.balance >= BLOCK_REWARD_MIN_MICROVOI &&
 			blockStatus.balance <= BLOCK_REWARD_MAX_MICROVOI
@@ -417,7 +420,8 @@
 	}
 	const fixableReasons = new Set(['suspended', 'not-opted-in', 'offline', 'keys-expired']);
 	let canGoOnline = $derived(
-		!isContract && !!blockStatus?.reasons.some((reason) => fixableReasons.has(reason.code))
+		contract === 'account' &&
+			!!blockStatus?.reasons.some((reason) => fixableReasons.has(reason.code))
 	);
 	const microVoi = (micro: number) => comma(micro / 1e6, 6);
 	let blockColumns: Column<BlockReward>[] = $derived([
@@ -659,7 +663,12 @@
 			>{/snippet}
 		<div class="min-w-0 space-y-4">
 			<div class="space-y-2">
-				{#if blockStatus}
+				{#if contractUnknown}
+					<InlineAlert
+						message="Block reward registration status unavailable"
+						onretry={onretrylookup}
+					/>
+				{:else if blockStatus}
 					{#if blockStatus.registered}
 						<StatusPill tone="ok" label="Registered for block rewards" />
 					{:else}
@@ -672,7 +681,7 @@
 							>{/if}
 					{/if}
 					<p class="text-label text-ink-muted">{BLOCK_REWARD_LOOKBACK_NOTE}</p>
-				{:else if blockSources.status.state === 'error'}
+				{:else if statusSource.state === 'error'}
 					<InlineAlert
 						message="Block reward registration status unavailable"
 						onretry={() => void retryBlock('status')}
@@ -721,7 +730,7 @@
 								? chanceText(dayForecast.chance)
 								: MISSING}
 						state={forecastState}
-						onretry={retryForecast}
+						onretry={contractUnknown ? onretrylookup : retryForecast}
 					/>
 					<StatTile
 						label="Next 7 days"
@@ -731,7 +740,7 @@
 								? weekForecastText(weekForecast)
 								: MISSING}
 						state={forecastState}
-						onretry={retryForecast}
+						onretry={contractUnknown ? onretrylookup : retryForecast}
 					/>
 				</div>
 				<p class="text-label text-ink-muted">
