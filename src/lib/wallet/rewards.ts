@@ -62,7 +62,7 @@ function count(value: unknown): number {
 		throw new Error('Invalid block count');
 	return number;
 }
-async function json(url: string, force = false): Promise<unknown> {
+export async function json(url: string, force = false): Promise<unknown> {
 	return boundedRead(
 		fetch(url, { cache: force ? 'no-store' : 'default', signal: AbortSignal.timeout(15000) }).then(
 			async (response) => {
