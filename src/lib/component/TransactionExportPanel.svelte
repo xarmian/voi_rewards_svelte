@@ -47,6 +47,7 @@
 	let types = $state<ActivityType[]>([
 		'payment',
 		'reward-payout',
+		'block-reward',
 		'asset-transfer',
 		'close-out',
 		'fee'
@@ -54,6 +55,7 @@
 	const typeChoices: { value: ActivityType; label: string }[] = [
 		{ value: 'payment', label: 'Payments' },
 		{ value: 'reward-payout', label: 'Known reward payouts' },
+		{ value: 'block-reward', label: 'Block rewards' },
 		{ value: 'asset-transfer', label: 'Asset transfers' },
 		{ value: 'close-out', label: 'Close-outs' },
 		{ value: 'fee', label: 'Fees' }

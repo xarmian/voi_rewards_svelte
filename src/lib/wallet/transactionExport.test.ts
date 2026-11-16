@@ -9,6 +9,7 @@ import {
 	type ExportInput,
 	type NormalizedTransaction
 } from './transactionExport';
+import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '$lib/rewards/blockRewardConstants';
 
 const input: ExportInput = {
 	assets: { mode: 'native' },
@@ -17,7 +18,7 @@ const input: ExportInput = {
 	allDates: false,
 	from: '2024-02-29',
 	through: '2024-02-29',
-	types: ['payment', 'reward-payout', 'asset-transfer', 'close-out', 'fee']
+	types: ['payment', 'reward-payout', 'block-reward', 'asset-transfer', 'close-out', 'fee']
 };
 const options = (changes: Partial<ExportInput> = {}) =>
 	normalizeOptions({ ...input, ...changes }, '2024-12-31', (a) => /^[A-Z]+$/.test(a));
@@ -118,6 +119,98 @@ describe('native transaction effects', () => {
 			[1, '0.10'],
 			[undefined, '']
 		]);
+	});
+});
+
+describe('block reward classification', () => {
+	const payout = (changes: Partial<NormalizedTransaction> = {}): NormalizedTransaction => ({
+		...root,
+		round: 23944300n,
+		sender: FEE_SINK_ADDRESS,
+		fee: 0n,
+		note: BLOCK_REWARD_NOTE_PREFIX + '23944300',
+		payment: { receiver: 'B', amount: 5n, closeAmount: 0n },
+		...changes
+	});
+	const types = (tx: NormalizedTransaction, rewards = ['R']) =>
+		map(tx, ['B', FEE_SINK_ADDRESS], rewards).map((r) => [r.account, r.type]);
+	it('classifies an incoming fee sink payment noted for the same round as a block reward', () => {
+		expect(types(payout())).toEqual([
+			[FEE_SINK_ADDRESS, 'payment'],
+			['B', 'block-reward']
+		]);
+		expect(
+			map(
+				payout({ round: 9007199254740993n, note: BLOCK_REWARD_NOTE_PREFIX + '9007199254740993' }),
+				['B']
+			)[0].type
+		).toBe('block-reward');
+	});
+	it('keeps fee sink payments noted for a different round as payments', () => {
+		expect(types(payout({ note: BLOCK_REWARD_NOTE_PREFIX + '23944299' }))).toContainEqual([
+			'B',
+			'payment'
+		]);
+		expect(types(payout({ note: BLOCK_REWARD_NOTE_PREFIX + '23944300 ' }))).toContainEqual([
+			'B',
+			'payment'
+		]);
+	});
+	it('keeps fee sink payments without the payout note as payments', () => {
+		expect(types(payout({ note: '' }))).toContainEqual(['B', 'payment']);
+		expect(types(payout({ note: 'base64:AAEC' }))).toContainEqual(['B', 'payment']);
+	});
+	it('still classifies known reward senders as reward payouts', () => {
+		expect(types(payout({ sender: 'R', note: '' }))).toEqual([['B', 'reward-payout']]);
+		expect(types(payout({ sender: 'R' }))).toEqual([['B', 'reward-payout']]);
+	});
+	it('never classifies an outgoing payment to the fee sink as a block reward', () => {
+		const rows = map(
+			payout({ sender: 'B', payment: { receiver: FEE_SINK_ADDRESS, amount: 5n, closeAmount: 0n } }),
+			['B']
+		);
+		expect(rows.map((r) => [r.direction, r.type])).toEqual([['out', 'payment']]);
+	});
+	it('never classifies a fee sink close-out or asset transfer as a block reward', () => {
+		const close = map(
+			payout({ payment: { receiver: 'C', amount: 0n, closeAmount: 5n, closeTo: 'B' } }),
+			['B']
+		);
+		expect(close.map((r) => r.type)).toEqual(['close-out']);
+		const asset = map(
+			payout({
+				type: 'axfer',
+				payment: undefined,
+				assetTransfer: { assetId: 1n, receiver: 'B', amount: 5n, closeAmount: 0n }
+			}),
+			['B']
+		);
+		expect(asset.map((r) => r.type)).toEqual(['asset-transfer']);
+	});
+	it('respects the block reward type filter', () => {
+		const ordinary = payout({
+			sender: 'B',
+			note: '',
+			payment: { receiver: 'C', amount: 1n, closeAmount: 0n }
+		});
+		const rows = [...map(payout(), ['B']), ...map(ordinary, ['B'], [])];
+		const all = { allDates: true, from: '', through: '' };
+		expect(rows.map((r) => r.type)).toEqual(['block-reward', 'payment']);
+		expect(
+			rows
+				.filter((r) =>
+					matchesFilters(r, options({ ...all, types: ['payment', 'reward-payout', 'fee'] }))
+				)
+				.map((r) => r.type)
+		).toEqual(['payment']);
+		expect(
+			rows
+				.filter((r) => matchesFilters(r, options({ ...all, types: ['block-reward'] })))
+				.map((r) => r.type)
+		).toEqual(['block-reward']);
+	});
+	it('accepts block-reward as a selectable activity type', () => {
+		expect(options({ types: ['block-reward'] }).types).toEqual(['block-reward']);
 	});
 });
 

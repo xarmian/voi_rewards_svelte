@@ -27,7 +27,7 @@ const opts = (changes: Partial<ExportInput> = {}) =>
 			pageAddress: 'A',
 			addresses: ['A'],
 			allDates: true,
-			types: ['payment', 'reward-payout', 'asset-transfer', 'close-out', 'fee'],
+			types: ['payment', 'reward-payout', 'block-reward', 'asset-transfer', 'close-out', 'fee'],
 			...changes
 		},
 		'2024-12-31',

@@ -37,6 +37,10 @@ it('shows labelled asset choices without the ARC source warning for the native d
 	expect(html).toContain('One asset (ASA/VSA)');
 	expect(html).toMatch(/<input[^>]*value="asset-transfer"[^>]*checked/);
 	expect(html).toContain('Asset transfers');
+	expect(html).toMatch(/<input[^>]*value="block-reward"[^>]*checked/);
+	expect(html).toContain('Block rewards');
+	expect(html.indexOf('Known reward payouts')).toBeLessThan(html.indexOf('Block rewards'));
+	expect(html.indexOf('Block rewards')).toBeLessThan(html.indexOf('Asset transfers'));
 	for (const copy of [
 		'Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts. All assets includes ARC-200. LP positions and valuations are excluded.',
 		'When Fees is selected, all VOI fees paid by selected accounts are included, regardless of asset.',

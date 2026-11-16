@@ -11,6 +11,7 @@ import {
 	decodeAltDepositEvent,
 	decodeAltWithdrawEvent
 } from '$lib/chain/arc200Events';
+import { FEE_SINK_ADDRESS } from '$lib/rewards/blockRewardConstants';
 
 export class TransfersUnavailableError extends Error {
 	constructor(cause: unknown) {
@@ -155,7 +156,7 @@ export async function fetchTokenTransfers({
 					// Only add standalone fee transfer if this is not a payment transaction
 					transfers.push({
 						from: tx.sender,
-						to: 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY',
+						to: FEE_SINK_ADDRESS,
 						amount: scaleAmount(tx.fee, token.decimals),
 						round: Number(tx.confirmedRound),
 						transactionid: tx.id ?? '',
@@ -610,7 +611,7 @@ export async function fetchTokenTransfers({
 		];
 		const envoiNames = await getEnvoiNames(uniqueAddresses);
 		newTransfers.forEach((t: Transfer) => {
-			if (t.to === 'TBEIGCNK4UCN3YDP2NODK3MJHTUZMYS3TABRM2MVSI2MPUR2V36E5JYHSY') {
+			if (t.to === FEE_SINK_ADDRESS) {
 				t.to_name = 'Fee Sink';
 			} else {
 				t.to_name = envoiNames.find((n) => n.address === t.to)?.name || undefined;
