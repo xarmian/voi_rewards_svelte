@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+const flag = vi.hoisted(() => ({ testing: true }));
+vi.mock('$lib/rewards/blockRewardLabels', async (original) => ({
+	...(await original<typeof import('$lib/rewards/blockRewardLabels')>()),
+	get REALTIME_BLOCK_REWARDS_TESTING() {
+		return flag.testing;
+	}
+}));
 import { compile } from 'svelte/compiler';
 import * as svelte from 'svelte';
 // @ts-expect-error Svelte's compiler-generated SSR runtime has no public declarations.
@@ -10,12 +17,36 @@ import * as arcReader from '$lib/services/arc200Export';
 import * as arcExport from '$lib/wallet/arc200Export';
 import * as ds from '$lib/ds';
 import * as rewards from '$lib/rewards/calculateEpochRewards';
+import * as labels from '$lib/rewards/blockRewardLabels';
 import * as options from '$lib/wallet/transactionExport';
 import * as staking from '$lib/wallet/stakingContracts';
 import * as csv from '$lib/wallet/transactionCsv';
 import * as service from '$lib/services/transactionExport';
 import { render } from 'svelte/server';
 import Panel from './TransactionExportPanel.svelte';
+
+beforeEach(() => {
+	flag.testing = true;
+});
+const drawPanel = () =>
+	render(Panel, {
+		props: {
+			pageAddress: 'A',
+			suggestions: [],
+			suggestionsAvailable: false,
+			stakingContracts: [],
+			stakingContractsAvailable: false,
+			onclose: () => {}
+		}
+	}).body.replace(/\s+/g, ' ');
+const blockRewardOption = (html: string) =>
+	html.match(/<input[^>]*value="block-reward"[^>]*>(?:<!---->)?([^<]*)<\/label>/)?.[1];
+
+it('labels the block reward choice as real-time, marked testing while in testing', () => {
+	expect(blockRewardOption(drawPanel())).toBe('Real-time block rewards (testing)');
+	flag.testing = false;
+	expect(blockRewardOption(drawPanel())).toBe('Real-time block rewards');
+});
 
 it('shows labelled asset choices without the ARC source warning for the native default', () => {
 	const { body } = render(Panel, {
@@ -38,9 +69,13 @@ it('shows labelled asset choices without the ARC source warning for the native d
 	expect(html).toMatch(/<input[^>]*value="asset-transfer"[^>]*checked/);
 	expect(html).toContain('Asset transfers');
 	expect(html).toMatch(/<input[^>]*value="block-reward"[^>]*checked/);
-	expect(html).toContain('Block rewards');
-	expect(html.indexOf('Known reward payouts')).toBeLessThan(html.indexOf('Block rewards'));
-	expect(html.indexOf('Block rewards')).toBeLessThan(html.indexOf('Asset transfers'));
+	expect(html).toContain('Real-time block rewards (testing)');
+	expect(html.indexOf('Known reward payouts')).toBeLessThan(
+		html.indexOf('Real-time block rewards (testing)')
+	);
+	expect(html.indexOf('Real-time block rewards (testing)')).toBeLessThan(
+		html.indexOf('Asset transfers')
+	);
 	for (const copy of [
 		'Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts. All assets includes ARC-200. LP positions and valuations are excluded.',
 		'When Fees is selected, all VOI fees paid by selected accounts are included, regardless of asset.',
@@ -128,6 +163,7 @@ function renderSelection(assetMode: 'all' | 'asset', transfers: boolean, complet
 		'$lib/wallet/arc200Export': arcExport,
 		'$lib/ds': ds,
 		'$lib/rewards/calculateEpochRewards': rewards,
+		'$lib/rewards/blockRewardLabels': labels,
 		'$lib/wallet/transactionExport': options,
 		'$lib/wallet/stakingContracts': staking,
 		'$lib/wallet/transactionCsv': csv,

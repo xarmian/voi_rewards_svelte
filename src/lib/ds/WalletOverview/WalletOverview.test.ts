@@ -334,8 +334,8 @@ it('renders a Block rewards card after Next unlocks, with an unknown status when
 			}
 		}).body;
 	const html = draw('ok');
-	const heading = html.search(/<h2[^>]*>Block rewards(?:<!---->)?<\/h2>/);
+	const heading = html.search(/<h2[^>]*>Real-time block rewards(?:<!---->)?<\/h2>/);
 	expect(heading).toBeGreaterThan(html.indexOf('Next unlocks'));
-	expect(html).not.toContain('Block reward registration status unavailable');
-	expect(draw('unavailable')).toContain('Block reward registration status unavailable');
+	expect(html).not.toContain('Real-time block reward registration status unavailable');
+	expect(draw('unavailable')).toContain('Real-time block reward registration status unavailable');
 });

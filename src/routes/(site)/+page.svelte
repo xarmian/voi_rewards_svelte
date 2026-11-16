@@ -1,5 +1,6 @@
 <script lang="ts">
 	import HomeRewards from './HomeRewards.svelte';
+	import HomeBlockRewards from './HomeBlockRewards.svelte';
 	import LatestBlocks from './LatestBlocks.svelte';
 	import RunNodeCard from './RunNodeCard.svelte';
 	import MarketsCard from './MarketsCard.svelte';
@@ -17,6 +18,7 @@
 		price={data.price}
 	/>
 	<div class="min-w-0 lg:col-span-4 md:col-span-2 flex flex-col gap-bento">
+		<HomeBlockRewards />
 		<LatestBlocks />
 		<RunNodeCard />
 		<MarketsCard markets={data.markets} />

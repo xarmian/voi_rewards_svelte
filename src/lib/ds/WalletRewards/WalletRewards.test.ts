@@ -13,6 +13,13 @@ vi.mock('../InlineAlert/InlineAlert.svelte', async (original) => {
 		}
 	};
 });
+const flag = vi.hoisted(() => ({ testing: true }));
+vi.mock('$lib/rewards/blockRewardLabels', async (original) => ({
+	...(await original<typeof import('$lib/rewards/blockRewardLabels')>()),
+	get REALTIME_BLOCK_REWARDS_TESTING() {
+		return flag.testing;
+	}
+}));
 vi.mock('$lib/wallet/rewards', async (original) => ({
 	...(await original<typeof import('$lib/wallet/rewards')>()),
 	createRewardsState: vi.fn()
@@ -42,6 +49,7 @@ const draw = () =>
 	render(WalletRewards, { props: { pageAddress: 'Y', now: new Date('2026-11-07T12:00:00Z') } })
 		.body;
 beforeEach(() => {
+	flag.testing = true;
 	vi.mocked(createRewardsState).mockReturnValue(fixture());
 	vi.mocked(createBlockRewardsState).mockImplementation(
 		() =>
@@ -132,9 +140,9 @@ it('server rendering performs no reads and keeps all loading footprints', () => 
 });
 
 const PAUSED =
-	'Block rewards are paused. Real-time block rewards are in testing; epoch rewards continue until testing is complete.';
+	'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.';
 const CONTRACT_TEXT =
-	"Staking contracts don't earn block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards.";
+	"Staking contracts don't earn real-time block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards.";
 const GO_ONLINE = /<a[^>]*href="#overview"[^>]*>\s*Go online with the 2 VOI incentive fee\s*<\/a>/g;
 const reward = (round: number, overrides: Partial<BlockReward> = {}): BlockReward => ({
 	round,
@@ -189,7 +197,11 @@ function blockFixture(): BlockRewardsState {
 		])
 	};
 }
-const card = (html: string) => html.slice(html.indexOf('id="ds-card-block-rewards"'));
+const card = (html: string) => {
+	const start = html.indexOf('id="ds-card-real-time-block-rewards"');
+	expect(start).toBeGreaterThan(0);
+	return html.slice(start);
+};
 const drawBlock = (state: Partial<BlockRewardsState> = {}, isContract = false) => {
 	vi.mocked(createBlockRewardsState).mockReturnValue({ ...blockFixture(), ...state });
 	return render(WalletRewards, {
@@ -208,6 +220,65 @@ const tile = (html: string, label: string) => {
 		.replace(/\s+/g, ' ');
 };
 
+const text = (html: string) =>
+	html
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&#39;/g, "'")
+		.replace(/\s+/g, ' ');
+// Rendered "block reward" wording that neither names the real-time stream nor counts rewards.
+const bareBlockRewards = (rendered: string) =>
+	rendered
+		.replace(/real-time block rewards?/gi, '')
+		.replace(/<1 block reward\b/gi, '')
+		.replace(/\d[\d,]*\s+block rewards?\b/gi, '')
+		.match(/block reward/gi) ?? [];
+
+describe('Real-time block rewards card labelling', () => {
+	const unregistered = (codes: BlockRewardReason[], balance = 100_000_000_000) =>
+		ready({
+			registered: false,
+			balance,
+			reasons: codes.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
+		});
+
+	it('titles the card Real-time block rewards with a Testing badge', () => {
+		const html = drawBlock();
+		expect(html.match(/<h2[^>]*>Real-time block rewards(?:<!---->)?<\/h2>/g)?.length).toBe(1);
+		expect(text(card(html))).toMatch(
+			/^[^<]*Real-time block rewards ◆ Testing Refresh real-time block rewards/
+		);
+	});
+
+	it('drops the Testing badge when testing is switched off', () => {
+		flag.testing = false;
+		const html = text(card(drawBlock()));
+		expect(html).toContain('Real-time block rewards');
+		expect(html).not.toContain('Testing');
+	});
+
+	it('names every block reward as real-time, apart from counts', () => {
+		for (const html of [
+			drawBlock(),
+			drawBlock({ lastRound: ready(5_000_201) }),
+			drawBlock({ daily: { state: 'empty', value: [], asOf: 1 } }),
+			drawBlock({ funding: ready({ funding: 'paused' as const, bonus: 5 }) }),
+			drawBlock({ funding: ready({ funding: 'unknown' as const, bonus: null }) }),
+			drawBlock({ status: unregistered(['not-opted-in', 'below-range', 'above-range'], 1) }),
+			drawBlock({ status: unregistered(['contract']) }, true),
+			drawBlock({ status: { state: 'error', error: 'x' } }),
+			drawBlock({ onlineStake: { state: 'error', error: 'x' } }),
+			drawBlock({ recent: { state: 'empty', value: [], asOf: 1 } }),
+			drawBlock({
+				recent: { state: 'stale', value: [reward(5_000_050)], asOf: 1, error: 'timed out' }
+			})
+		])
+			expect(bareBlockRewards(text(card(html)))).toEqual([]);
+	});
+});
+
 describe('Block rewards card', () => {
 	it('shows today, 7-day and 30-day totals from the daily rows', () => {
 		const html = card(drawBlock());
@@ -225,8 +296,8 @@ describe('Block rewards card', () => {
 
 	it('shows the registered pill', () => {
 		const html = card(drawBlock());
-		expect(html).toContain('Registered for block rewards');
-		expect(html).not.toContain('Not registered for block rewards');
+		expect(html).toContain('Registered for real-time block rewards');
+		expect(html).not.toContain('Not registered for real-time block rewards');
 		expect(html).toContain('Changes take effect after about 320 rounds (~15 minutes).');
 	});
 
@@ -239,9 +310,11 @@ describe('Block rewards card', () => {
 
 	it('lists every reason and one go-online link when a reason can be fixed by going online', () => {
 		const html = card(drawBlock({ status: unregistered(['not-opted-in', 'below-range'], 1) }));
-		expect(html).toContain('Not registered for block rewards');
+		expect(html).toContain('Not registered for real-time block rewards');
 		expect(html).toContain('Online without the 2 VOI incentive fee.');
-		expect(html).toContain('Balance below 30,000 VOI: no block rewards while outside this range.');
+		expect(html).toContain(
+			'Balance below 30,000 VOI: no real-time block rewards while outside this range.'
+		);
 		expect(html.match(GO_ONLINE)?.length).toBe(1);
 		const twoFixable = card(drawBlock({ status: unregistered(['not-opted-in', 'keys-expired']) }));
 		expect(twoFixable).toContain('Participation keys expired.');
@@ -274,7 +347,7 @@ describe('Block rewards card', () => {
 
 	it('shows the status alert when the status read fails', () => {
 		const html = card(drawBlock({ status: { state: 'error', error: 'offline' } }));
-		expect(html).toContain('Block reward registration status unavailable');
+		expect(html).toContain('Real-time block reward registration status unavailable');
 	});
 
 	it('shows the paused banner only for paused funding', () => {
@@ -284,27 +357,29 @@ describe('Block rewards card', () => {
 		const unknown = card(
 			drawBlock({ funding: ready({ funding: 'unknown' as const, bonus: null }) })
 		);
-		expect(unknown).toContain('Block reward status unavailable');
+		expect(unknown).toContain('Real-time block reward status unavailable');
 		expect(unknown).not.toContain(PAUSED);
 		const failed = card(drawBlock({ funding: { state: 'error', error: 'offline' } }));
-		expect(failed).toContain('Block reward status unavailable');
+		expect(failed).toContain('Real-time block reward status unavailable');
 		expect(failed).not.toContain(PAUSED);
 		const funded = card(drawBlock());
 		expect(funded).not.toContain(PAUSED);
-		expect(funded).not.toContain('Block reward status unavailable');
+		expect(funded).not.toContain('Real-time block reward status unavailable');
 		expect(funded).not.toContain('Forecasts show rewards while funded.');
 	});
 
 	it('alerts on indexing lag above 200 rounds only', () => {
 		expect(card(drawBlock({ lastRound: ready(5_000_201) }))).toContain(
-			'Block reward history is about 10 minutes behind the chain.'
+			'Real-time block reward history is about 10 minutes behind the chain.'
 		);
 		expect(card(drawBlock({ lastRound: ready(5_000_200) }))).not.toContain('behind the chain');
 	});
 
 	it('shows forecasts for a registered account and Not registered otherwise', () => {
 		const html = card(drawBlock());
-		expect(tile(html, 'Chance of a block reward · next 24 hours')).toMatch(/\d+(\.\d+)?%/);
+		expect(tile(html, 'Chance of a real-time block reward · next 24 hours')).toMatch(
+			/\d+(\.\d+)?%/
+		);
 		expect(tile(html, 'Next 7 days')).toMatch(/\d+ block rewards \(\d+–\d+\), ≈ [\d.,]+ VOI/);
 		expect(html).toContain('Assumes this balance and total online stake stay the same');
 		const unregistered = card(
@@ -316,7 +391,7 @@ describe('Block rewards card', () => {
 				})
 			})
 		);
-		expect(tile(unregistered, 'Chance of a block reward · next 24 hours')).toContain(
+		expect(tile(unregistered, 'Chance of a real-time block reward · next 24 hours')).toContain(
 			'Not registered'
 		);
 		expect(tile(unregistered, 'Next 7 days')).toContain('Not registered');
@@ -330,7 +405,7 @@ describe('Block rewards card', () => {
 				onlineStake: ready(100_000_000_000_000)
 			})
 		);
-		const chance = tile(html, 'Chance of a block reward · next 24 hours');
+		const chance = tile(html, 'Chance of a real-time block reward · next 24 hours');
 		expect(chance).toContain('>99%');
 		expect(chance).not.toContain('100%');
 		expect(tile(html, 'Next 7 days')).toMatch(/\(\d{1,3}(,\d{3})+–\d{1,3}(,\d{3})+\)/);
@@ -346,7 +421,9 @@ describe('Block rewards card', () => {
 				props: { pageAddress: 'Y', now: new Date('2026-11-08T00:00:40Z') }
 			}).body
 		);
-		expect(tile(html, 'Chance of a block reward · next 24 hours')).toMatch(/\d+(\.\d+)?%/);
+		expect(tile(html, 'Chance of a real-time block reward · next 24 hours')).toMatch(
+			/\d+(\.\d+)?%/
+		);
 		expect(tile(html, 'Next 7 days')).toContain('≈');
 		expect(html).not.toContain('Unable to load Next 7 days.');
 	});
@@ -369,7 +446,7 @@ describe('Block rewards card', () => {
 
 	it('marks partial rows and links each transaction to the explorer', () => {
 		const html = card(drawBlock());
-		expect(html).toContain('Recent block rewards');
+		expect(html).toContain('Recent real-time block rewards');
 		expect(html).toContain('Partial (fee sink low)');
 		expect(html).toContain('href="https://block.voi.network/explorer/transaction/AB%2FC%2BD"');
 		expect(html).toContain('(opens in a new tab)');
@@ -377,14 +454,14 @@ describe('Block rewards card', () => {
 
 	const rows = (count: number) => Array.from({ length: count }, (_, i) => reward(5_000_000 - i));
 	const shownRows = (html: string) => html.match(/\/explorer\/transaction\//g)?.length ?? 0;
-	const SHOW_MORE = /<button[^>]*>(?:<!---->|\s)*Show more block rewards/;
+	const SHOW_MORE = /<button[^>]*>(?:<!---->|\s)*Show more real-time block rewards/;
 
 	it('shows ten rows and one control to show more after a full page', () => {
 		const html = card(drawBlock({ recent: ready(rows(BLOCK_REWARD_PAGE_SIZE)) }));
 		expect(shownRows(html)).toBe(10);
 		expect(html).toMatch(SHOW_MORE);
-		expect(html.match(/Show more block rewards/g)?.length).toBe(1);
-		expect(html).not.toMatch(/See \d+ more block rewards|Load more/);
+		expect(html.match(/Show more real-time block rewards/g)?.length).toBe(1);
+		expect(html).not.toMatch(/See \d+ more (?:real-time )?block rewards|Load more/);
 		// The live count speaks only after the user asks for more rows.
 		expect(html).not.toContain('Showing 10 of 100 loaded block rewards');
 		expect(html).toMatch(/<p class="sr-only" aria-live="polite">/);
@@ -400,7 +477,7 @@ describe('Block rewards card', () => {
 		for (const count of [2, 10]) {
 			const html = card(drawBlock({ recent: ready(rows(count)) }));
 			expect(shownRows(html), String(count)).toBe(count);
-			expect(html, String(count)).not.toContain('Show more block rewards');
+			expect(html, String(count)).not.toContain('Show more real-time block rewards');
 		}
 	});
 
@@ -431,36 +508,36 @@ describe('Block rewards card', () => {
 			})
 		);
 		expect(failed).toContain(
-			'Recent block rewards did not refresh. Older block rewards load after a successful refresh.'
+			'Recent real-time block rewards did not refresh. Older real-time block rewards load after a successful refresh.'
 		);
 		const refreshing = card(
 			drawBlock({ recent: { state: 'stale', value: rows(BLOCK_REWARD_PAGE_SIZE), asOf: 1 } })
 		);
-		expect(refreshing).not.toContain('Recent block rewards did not refresh');
-		expect(card(drawBlock())).not.toContain('Recent block rewards did not refresh');
+		expect(refreshing).not.toContain('Recent real-time block rewards did not refresh');
+		expect(card(drawBlock())).not.toContain('Recent real-time block rewards did not refresh');
 	});
 
 	it('marks the end of the history in the live count', () => {
 		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
-		expect(source).toMatch(/; no older\s+block\s+rewards/);
+		expect(source).toMatch(/; no\s+older\s+real-time\s+block\s+rewards/);
 	});
 
 	it('keeps the control through a paging error so pressing it again retries', () => {
 		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
 		const start = source.indexOf("{#if pages.state === 'error'}");
 		const alert = source.slice(start, source.indexOf('{/if}', start));
-		expect(alert).toContain('Older block rewards unavailable');
+		expect(alert).toContain('Older real-time block rewards unavailable');
 		expect(alert).not.toMatch(/onretry=/);
 		expect(source).not.toMatch(/pages\.state !== 'error' &&/);
 	});
 
 	it('wires the control to one handler that never disables it', () => {
 		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
-		const button = source.slice(source.indexOf("'Show more block rewards'") - 600);
+		const button = source.slice(source.indexOf("'Show more real-time block rewards'") - 600);
 		expect(button.slice(0, 600)).toMatch(/onclick=\{\(\) => void showMoreRewards\(\)\}/);
 		expect(button.slice(0, 600)).toMatch(/aria-busy=/);
 		expect(button.slice(0, 600)).not.toMatch(/disabled=/);
-		expect(source).toContain('Loading older block rewards…');
+		expect(source).toContain('Loading older real-time block rewards…');
 		expect(source).toMatch(/void pager\.more\(recentRows\)|await pager\.more\(recentRows\)/);
 		expect(source).toMatch(
 			/mergeBlockRewards\(blockSources\.recent\.value \?\? \[\], pages\.extra\)/
@@ -483,7 +560,7 @@ describe('Block rewards card', () => {
 
 	it('draws expected bars only for a registered account with a balance in range', () => {
 		const html = card(drawBlock());
-		expect(html).toContain('Daily block rewards · last 30 days');
+		expect(html).toContain('Daily real-time block rewards · last 30 days');
 		expect(legend(html)).toContain('Expected at current balance');
 		expect(html).toContain('stroke-expected');
 		const cases = {
@@ -496,7 +573,7 @@ describe('Block rewards card', () => {
 		};
 		for (const [name, page] of Object.entries(cases)) {
 			const body = card(page);
-			expect(legend(body), name).toContain('Block rewards');
+			expect(legend(body), name).toContain('Real-time block rewards');
 			expect(legend(body), name).not.toContain('Expected at current balance');
 			expect(body, name).not.toContain('stroke-expected');
 		}
@@ -516,9 +593,9 @@ describe('Block rewards card', () => {
 				props: { pageAddress: 'Y', isContract: true, now: new Date('2026-11-07T12:00:00Z') }
 			}).body
 		);
-		expect(html).not.toContain('Registered for block rewards');
-		expect(html).toContain('Loading block reward registration status');
-		for (const label of ['Chance of a block reward · next 24 hours', 'Next 7 days']) {
+		expect(html).not.toContain('Registered for real-time block rewards');
+		expect(html).toContain('Loading real-time block reward registration status');
+		for (const label of ['Chance of a real-time block reward · next 24 hours', 'Next 7 days']) {
 			expect(tile(html, label), label).not.toMatch(/%|VOI/);
 			expect(html).not.toContain(`Unable to load ${label}.`);
 		}
@@ -542,11 +619,11 @@ describe('Block rewards card', () => {
 				}
 			}).body
 		);
-		expect(html).toContain('Block reward registration status unavailable');
-		expect(html).not.toContain('Not registered for block rewards');
+		expect(html).toContain('Real-time block reward registration status unavailable');
+		expect(html).not.toContain('Not registered for real-time block rewards');
 		expect(html.match(GO_ONLINE)).toBeNull();
 		expect(html).not.toContain('Go online with the 2 VOI incentive fee');
-		for (const label of ['Chance of a block reward · next 24 hours', 'Next 7 days']) {
+		for (const label of ['Chance of a real-time block reward · next 24 hours', 'Next 7 days']) {
 			expect(tile(html, label), label).not.toContain('Not registered');
 			expect(tile(html, label), label).toContain(`Unable to load ${label}.`);
 		}
@@ -554,8 +631,8 @@ describe('Block rewards card', () => {
 		expect(tile(html, 'Today (UTC)')).toMatch(/^Today \(UTC\) 2 VOI 1 block reward /);
 		const lookups = alerts.filter((alert) => alert.onretry === onretrylookup);
 		expect(lookups.map((alert) => alert.message)).toEqual([
-			'Block reward registration status unavailable',
-			'Unable to load Chance of a block reward · next 24 hours.',
+			'Real-time block reward registration status unavailable',
+			'Unable to load Chance of a real-time block reward · next 24 hours.',
 			'Unable to load Next 7 days.'
 		]);
 		lookups[0].onretry!();

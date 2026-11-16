@@ -6,6 +6,7 @@
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import StatTile from '../StatTile/StatTile.svelte';
 	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
+	import RealtimeTestingBadge from '../RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { compact, MISSING } from '../format';
 	import type { DataState } from '../types';
 	import { createReadSource } from '$lib/wallet/read';
@@ -30,6 +31,7 @@
 	import { readLastRound, readOnlineStake } from '$lib/rewards/blockRewardChain';
 	import { FORECAST_PERIOD_SECONDS, networkPace } from '$lib/rewards/blockRewardForecast';
 	import { BLOCK_REWARDS_UNKNOWN_TEXT } from '$lib/rewards/blockRewardStatus';
+	import { REALTIME_BLOCK_REWARDS_TITLE } from '$lib/rewards/blockRewardLabels';
 
 	let {
 		pageAddress,
@@ -145,33 +147,36 @@
 	}
 </script>
 
-<Card title="Block rewards" span={{ lg: 12, md: 2 }}>
-	{#snippet actions()}<Button variant="soft" onclick={() => refresh()}>Refresh block rewards</Button
-		>{/snippet}
+<Card title={REALTIME_BLOCK_REWARDS_TITLE} span={{ lg: 12, md: 2 }}>
+	{#snippet actions()}<div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+			<RealtimeTestingBadge /><Button variant="soft" onclick={() => refresh()}
+				>Refresh real-time block rewards</Button
+			>
+		</div>{/snippet}
 	<div class="min-w-0 space-y-4">
 		<div class="space-y-2">
 			{#if contractUnknown}
 				<InlineAlert
-					message="Block reward registration status unavailable"
+					message="Real-time block reward registration status unavailable"
 					onretry={onretrylookup}
 				/>
 			{:else if status}
 				{#if status.registered}
-					<StatusPill tone="ok" label="Registered for block rewards" />
+					<StatusPill tone="ok" label="Registered for real-time block rewards" />
 				{:else}
-					<StatusPill tone="warn" label="Not registered for block rewards" />
+					<StatusPill tone="warn" label="Not registered for real-time block rewards" />
 					<ul class="space-y-1 text-sm [overflow-wrap:anywhere]">
 						{#each status.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
 					</ul>
 				{/if}
 			{:else if statusSource.state === 'error'}
 				<InlineAlert
-					message="Block reward registration status unavailable"
+					message="Real-time block reward registration status unavailable"
 					onretry={() => void retry('status')}
 				/>
 			{:else}
 				<div aria-busy="true" class="h-7 w-56 max-w-full rounded-ds-xs bg-grid">
-					<span class="sr-only">Loading block reward registration status…</span>
+					<span class="sr-only">Loading real-time block reward registration status…</span>
 				</div>
 			{/if}
 		</div>
@@ -188,7 +193,7 @@
 			{@const minutes = lagMinutes(lag, pace)}
 			<InlineAlert
 				tone="warn"
-				message={`Block reward history is about ${minutes} minute${minutes === 1 ? '' : 's'} behind the chain.`}
+				message={`Real-time block reward history is about ${minutes} minute${minutes === 1 ? '' : 's'} behind the chain.`}
 			/>
 		{/if}
 		<div class="grid min-w-0 gap-3 sm:grid-cols-3">
@@ -203,7 +208,7 @@
 				/>
 			{/each}
 			<StatTile
-				label="Chance of a block reward · next 24 hours"
+				label="Chance of a real-time block reward · next 24 hours"
 				value={notRegistered ? 'Not registered' : forecast ? chanceText(forecast.chance) : MISSING}
 				state={forecastState}
 				onretry={contractUnknown ? onretrylookup : retryForecast}
@@ -214,6 +219,6 @@
 			</p>{/if}
 	</div>
 	<a href="#rewards" class="mt-4 inline-block font-bold text-accent underline"
-		>Details<span class="sr-only">{' on block rewards'}</span> →</a
+		>Details<span class="sr-only">{' on real-time block rewards'}</span> →</a
 	>
 </Card>

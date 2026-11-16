@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test, vi } from 'vitest';
 import { render } from 'svelte/server';
 import LatestBlocks from './LatestBlocks.svelte';
@@ -93,4 +94,11 @@ test('pending markets never show zero and failed markets offer Retry', () => {
 	}).body;
 	assert.match(error, /role="alert"/);
 	assert.match(error.replace(/<!--[\s\S]*?-->/g, ''), />Retry<\/button>/);
+});
+test('the home side column shows block rewards directly above the latest blocks', () => {
+	const source = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+	const column = source.match(/<div class="[^"]*lg:col-span-4[^"]*">([\s\S]*?)<\/div>/)![1];
+	const cards = column.match(/<[A-Z]\w*/g);
+	assert.deepEqual(cards?.slice(0, 2), ['<HomeBlockRewards', '<LatestBlocks']);
+	assert.match(column, /<HomeBlockRewards \/>\s*<LatestBlocks \/>/);
 });
