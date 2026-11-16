@@ -114,6 +114,22 @@ describe('HomeBlockRewards', () => {
 		expect(html).toContain(`aria-label="${SPARKLINE}: from 23 to 29"`);
 	});
 
+	it('dates the rows by the time of the read, not the current time', () => {
+		vi.useFakeTimers();
+		try {
+			vi.setSystemTime(new Date('2026-11-17T00:01:00Z'));
+			vi.mocked(createHomeBlockRewardsState).mockReturnValue({
+				...fixture(),
+				network: { state: 'ready', value: networkRows(), asOf: Date.parse('2026-11-16T23:59:00Z') }
+			});
+			const html = render(HomeBlockRewards).body;
+			expect(tile(html, 'Today (UTC)')).toMatch(/^Today \(UTC\) 30 VOI 1,234 of 30,000 blocks/);
+			expect(html).toContain(`aria-label="${SPARKLINE}: from 23 to 29"`);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('shows no share before the first block of the day', () => {
 		const rows = networkRows();
 		rows[rows.length - 1] = { ...rows[rows.length - 1], blocks: 0, rewardedBlocks: 0, amount: 0 };
