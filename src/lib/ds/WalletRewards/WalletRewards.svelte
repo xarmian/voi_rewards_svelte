@@ -787,13 +787,19 @@
 					onretry={() => void retryBlock('recent')}
 					emptyText="No block rewards returned for this address"
 				/>
+				{#if blockSources.recent.state === 'stale' && blockSources.recent.error}<InlineAlert
+						tone="warn"
+						message="Recent block rewards did not refresh. Older block rewards load after a successful refresh."
+						onretry={() => void retryBlock('recent')}
+					/>{/if}
 				{#if pages.state === 'error'}<InlineAlert
 						tone="warn"
 						message="Older block rewards unavailable. Show more block rewards tries again."
 					/>{/if}
 				<p class="sr-only" aria-live="polite">
 					{#if announce && recentRows.length}Showing {shownRecent.length} of {recentRows.length} loaded
-						block rewards{/if}
+						block rewards{#if !showMore && blockSources.recent.state === 'ready'}; no older block
+							rewards{/if}{/if}
 				</p>
 				{#if showMore}<Button
 						variant="soft"

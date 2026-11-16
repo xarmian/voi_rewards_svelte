@@ -409,6 +409,32 @@ describe('Block rewards card', () => {
 		expect(html).toMatch(SHOW_MORE);
 	});
 
+	it('says when recent block rewards failed to refresh, so the loaded rows do not read as the full history', () => {
+		const failed = card(
+			drawBlock({
+				recent: {
+					state: 'stale',
+					value: rows(BLOCK_REWARD_PAGE_SIZE),
+					asOf: 1,
+					error: 'Request timed out after 15 seconds'
+				}
+			})
+		);
+		expect(failed).toContain(
+			'Recent block rewards did not refresh. Older block rewards load after a successful refresh.'
+		);
+		const refreshing = card(
+			drawBlock({ recent: { state: 'stale', value: rows(BLOCK_REWARD_PAGE_SIZE), asOf: 1 } })
+		);
+		expect(refreshing).not.toContain('Recent block rewards did not refresh');
+		expect(card(drawBlock())).not.toContain('Recent block rewards did not refresh');
+	});
+
+	it('marks the end of the history in the live count', () => {
+		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
+		expect(source).toMatch(/; no older\s+block\s+rewards/);
+	});
+
 	it('keeps the control through a paging error so pressing it again retries', () => {
 		const source = readFileSync(new URL('./WalletRewards.svelte', import.meta.url), 'utf8');
 		const start = source.indexOf("{#if pages.state === 'error'}");
