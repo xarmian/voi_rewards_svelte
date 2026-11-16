@@ -54,3 +54,16 @@ it('retains standalone schedule and CSV shape', () => {
 	);
 	expect(scheduleRows(Array(52).fill(1400), 1, start, start)).toHaveLength(52);
 });
+it('mounts the block reward estimates after the epoch rewards section', () => {
+	const markup = source.split('</script>').slice(1).join('</script>');
+	const epoch = markup.indexOf('<section aria-labelledby="estimated-rewards-heading"');
+	expect(epoch).toBeGreaterThan(0);
+	const epochEnd = markup.indexOf('</section>', epoch);
+	const mount = markup.indexOf('<CalculatorBlockRewards');
+	expect(mount).toBeGreaterThan(epochEnd);
+	expect(markup.slice(epochEnd + '</section>'.length, mount).trim()).toBe('');
+	expect(markup.slice(mount, markup.indexOf('/>', mount) + 2)).toBe(
+		'<CalculatorBlockRewards\n\t\tstake={stakeError ? null : Number(calculationAmount)}\n\t\tprice={hasPrice ? effectivePrice : null}\n\t/>'
+	);
+	expect(source).toContain("import CalculatorBlockRewards from './CalculatorBlockRewards.svelte';");
+});
