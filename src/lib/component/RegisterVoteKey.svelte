@@ -740,7 +740,7 @@
 						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
 					/>
 					<span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-						Pay 2 VOI to become eligible for real-time block rewards (incentive eligible)
+						Pay 2 VOI to become eligible for block rewards (incentive eligible)
 					</span>
 				</label>
 				<p id="incentive-fee-help" class="mt-1 ml-7 text-xs text-gray-600 dark:text-gray-400">
