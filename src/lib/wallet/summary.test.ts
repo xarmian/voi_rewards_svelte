@@ -237,6 +237,8 @@ it('unknown route ownership withholds the locked/liquid split and total even wit
 	expect(summary.holdings.total).toBeNull();
 });
 
+// The first import of the overview compiles its whole component tree, which can take
+// longer than the default timeout when the full suite runs in parallel.
 it('unknown ownership renders unavailable native split in Overview', async () => {
 	const { render } = await import('svelte/server');
 	const { default: Overview } = await import('$lib/ds/WalletOverview/WalletOverview.svelte');
@@ -266,4 +268,4 @@ it('unknown ownership renders unavailable native split in Overview', async () =>
 		.replace(/\s+/g, ' ');
 	expect(text).toContain('Locked balance unavailable');
 	expect(text).toMatch(/Liquid: Unavailable/);
-});
+}, 30000);
