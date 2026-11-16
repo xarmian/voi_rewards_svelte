@@ -35,6 +35,7 @@ const PAUSED =
 	'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.';
 const UNKNOWN = 'Real-time block reward status unavailable';
 const SPARKLINE = 'Daily real-time block rewards, last 7 complete UTC days (VOI)';
+const NOW = new Date('2026-11-16T12:00:00Z');
 const networkRows = (days = 30) =>
 	Array.from({ length: days }, (_, i) => ({
 		day: new Date(Date.parse('2026-11-16T00:00:00Z') - (days - 1 - i) * 86400000)
@@ -54,7 +55,7 @@ function fixture(): HomeBlockRewardsState {
 }
 const draw = (state: Partial<HomeBlockRewardsState> = {}) => {
 	vi.mocked(createHomeBlockRewardsState).mockReturnValue({ ...fixture(), ...state });
-	return render(HomeBlockRewards).body;
+	return render(HomeBlockRewards, { props: { now: NOW } }).body;
 };
 const text = (html: string) =>
 	html
@@ -104,6 +105,13 @@ describe('HomeBlockRewards', () => {
 		expect(tile(html, 'Current bonus')).toMatch(/^Current bonus 5 VOI per block /);
 		expect(html).toContain(`aria-label="${SPARKLINE}: from 23 to 29"`);
 		expect(text(html)).toContain('Last 7 complete days (UTC)');
+	});
+
+	it("shows no figure for today when the data has no row for today's UTC date", () => {
+		const html = draw({ network: ready(networkRows().slice(0, -1)) });
+		const today = tile(html, 'Today (UTC)').split('Current bonus')[0];
+		expect(today).not.toMatch(/VOI|blocks rewarded/);
+		expect(html).toContain(`aria-label="${SPARKLINE}: from 23 to 29"`);
 	});
 
 	it('shows no share before the first block of the day', () => {

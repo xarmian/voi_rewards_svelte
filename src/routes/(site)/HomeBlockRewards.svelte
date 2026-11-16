@@ -20,6 +20,7 @@
 		weekSeries
 	} from '$lib/home/blockRewards';
 
+	let { now }: { now?: Date } = $props();
 	const SPARKLINE_LABEL = 'Daily real-time block rewards, last 7 complete UTC days (VOI)';
 	let sources = $state(createHomeBlockRewardsState());
 	const readers = {
@@ -54,7 +55,9 @@
 		sources.funding.state === 'error' || funding?.funding === 'unknown'
 	);
 	let rows = $derived(sources.network.value ?? []);
-	let today = $derived(todayRow(rows));
+	// Rows are matched to UTC dates as of the read, so a set from before UTC midnight is not shown as today.
+	let readAt = $derived(now ?? new Date(sources.network.asOf ?? Date.now()));
+	let today = $derived(todayRow(rows, readAt));
 	let networkState: DataState = $derived(sources.network.state);
 	let bonus = $derived(funding?.bonus ?? null);
 	let bonusState: DataState = $derived(
@@ -64,7 +67,7 @@
 				? 'error'
 				: sources.funding.state
 	);
-	let series = $derived(weekSeries(rows));
+	let series = $derived(weekSeries(rows, readAt));
 </script>
 
 <Card title={REALTIME_BLOCK_REWARDS_TITLE}>

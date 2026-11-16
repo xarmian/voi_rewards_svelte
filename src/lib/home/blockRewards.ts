@@ -13,9 +13,18 @@ export function createHomeBlockRewardsState(): HomeBlockRewardsState {
 	return { network: { state: 'loading' }, funding: { state: 'loading' } };
 }
 
-/** The network rows end with today (UTC). */
-export function todayRow(rows: NetworkBlockRewardDay[]): NetworkBlockRewardDay | undefined {
-	return rows[rows.length - 1];
+const utcDate = (now: Date, offset = 0) =>
+	new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - offset * 86400000)
+		.toISOString()
+		.slice(0, 10);
+
+/** The row for today's UTC date, if the data has one. */
+export function todayRow(
+	rows: NetworkBlockRewardDay[],
+	now: Date
+): NetworkBlockRewardDay | undefined {
+	const today = utcDate(now);
+	return rows.find((row) => row.day === today);
 }
 
 /** Rewarded blocks as a percent with one decimal place, or null before any block. */
@@ -30,12 +39,13 @@ export function todayDetail(row: NetworkBlockRewardDay): string {
 	return `${comma(row.rewardedBlocks)} of ${comma(row.blocks)} blocks rewarded (${share})`;
 }
 
-/** Daily VOI over the seven complete days before today, oldest first; today is partial. */
-export function weekSeries(rows: NetworkBlockRewardDay[]): number[] {
-	return rows
-		.slice(0, -1)
-		.slice(-7)
-		.map((row) => row.amount / 1e6);
+/** Daily VOI for the seven UTC dates before today, oldest first; dates with no row are left out. */
+export function weekSeries(rows: NetworkBlockRewardDay[], now: Date): number[] {
+	const byDay = new Map(rows.map((row) => [row.day, row]));
+	return [7, 6, 5, 4, 3, 2, 1].flatMap((offset) => {
+		const row = byDay.get(utcDate(now, offset));
+		return row ? [row.amount / 1e6] : [];
+	});
 }
 
 /** A VOI figure without its unit, rounded as on the wallet block reward card. */

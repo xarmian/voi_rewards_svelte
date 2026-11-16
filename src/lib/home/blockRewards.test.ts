@@ -24,9 +24,16 @@ const days = (count: number) =>
 	);
 
 describe('home block reward derivations', () => {
-	it('takes the last row as today', () => {
-		expect(todayRow(days(10))?.day).toBe('2026-11-10');
-		expect(todayRow([])).toBeUndefined();
+	const NOW = new Date('2026-11-10T12:00:00Z');
+
+	it("takes today's row by its UTC date", () => {
+		expect(todayRow(days(10), NOW)?.day).toBe('2026-11-10');
+		expect(todayRow([], NOW)).toBeUndefined();
+	});
+
+	it('finds no row for today when the data ends on an earlier day', () => {
+		expect(todayRow(days(9), NOW)).toBeUndefined();
+		expect(todayRow(days(10), new Date('2026-11-11T00:00:30Z'))).toBeUndefined();
 	});
 
 	it('shows the rewarded share with one decimal place', () => {
@@ -41,14 +48,20 @@ describe('home block reward derivations', () => {
 		expect(detail).not.toMatch(/NaN|%/);
 	});
 
-	it('builds the series from the seven complete days before today, in VOI, oldest first', () => {
-		expect(weekSeries(days(30))).toEqual([23, 24, 25, 26, 27, 28, 29]);
+	it('builds the series from the seven UTC dates before today, in VOI, oldest first', () => {
+		expect(weekSeries(days(30).slice(0, 10), NOW)).toEqual([3, 4, 5, 6, 7, 8, 9]);
 	});
 
-	it('uses every complete day when fewer than seven are present, and never today', () => {
-		expect(weekSeries(days(3))).toEqual([1, 2]);
-		expect(weekSeries(days(1))).toEqual([]);
-		expect(weekSeries([])).toEqual([]);
+	it('uses the seven dates before today even when today has no row yet', () => {
+		expect(weekSeries(days(9), NOW)).toEqual([3, 4, 5, 6, 7, 8, 9]);
+	});
+
+	it('leaves out dates with no row and never includes today', () => {
+		const gappy = days(10).filter((row) => row.day !== '2026-11-05');
+		expect(weekSeries(gappy, NOW)).toEqual([3, 4, 6, 7, 8, 9]);
+		expect(weekSeries(days(3), NOW)).toEqual([3]);
+		expect(weekSeries(days(2), NOW)).toEqual([]);
+		expect(weekSeries([], NOW)).toEqual([]);
 	});
 
 	it('formats VOI figures like the wallet block reward card, without the unit', () => {
