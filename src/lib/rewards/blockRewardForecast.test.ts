@@ -160,6 +160,29 @@ describe('networkPace', () => {
 		expect(networkPace([...days(9, 7), today], now)).not.toBeNull();
 	});
 
+	it('is null when a day inside the window appears twice', () => {
+		const extra = { day: '2026-11-12', blocks: 1, feesCollected: 0 };
+		expect(networkPace([...days(9, 7), extra, today], now)).toBeNull();
+	});
+
+	it('finds the seven days across a month and a year boundary', () => {
+		const row = (day: string) => ({ day, blocks: 30_000, feesCollected: 0 });
+		const december = ['2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29', '2026-11-30'];
+		expect(
+			networkPace(
+				[...december, '2026-12-01', '2026-12-02', '2026-12-03'].map(row),
+				new Date('2026-12-03T00:00:01Z')
+			)
+		).not.toBeNull();
+		const newYear = ['2026-12-25', '2026-12-26', '2026-12-27', '2026-12-28', '2026-12-29'];
+		expect(
+			networkPace(
+				[...newYear, '2026-12-30', '2026-12-31', '2027-01-01'].map(row),
+				new Date('2027-01-01T23:59:59Z')
+			)
+		).not.toBeNull();
+	});
+
 	it('is null until today has blocks, so a cut-short yesterday is not used', () => {
 		expect(networkPace(days(9, 7), now)).toBeNull();
 		expect(networkPace([...days(9, 7), { ...today, blocks: 0 }], now)).toBeNull();
