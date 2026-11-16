@@ -141,10 +141,10 @@
 	}
 </script>
 
-<Card title="Block rewards" span={{ lg: 4 }}>
+<Card title="Block rewards" span={{ lg: 12, md: 2 }}>
 	{#snippet actions()}<Button variant="soft" onclick={() => refresh()}>Refresh block rewards</Button
 		>{/snippet}
-	<div class="min-w-0 space-y-4 [overflow-wrap:anywhere]">
+	<div class="min-w-0 space-y-4">
 		<div class="space-y-2">
 			{#if contractUnknown}
 				<InlineAlert
@@ -156,7 +156,7 @@
 					<StatusPill tone="ok" label="Registered for block rewards" />
 				{:else}
 					<StatusPill tone="warn" label="Not registered for block rewards" />
-					<ul class="space-y-1 text-sm">
+					<ul class="space-y-1 text-sm [overflow-wrap:anywhere]">
 						{#each status.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
 					</ul>
 				{/if}
@@ -187,7 +187,7 @@
 				message={`Block reward history is about ${minutes} minute${minutes === 1 ? '' : 's'} behind the chain.`}
 			/>
 		{/if}
-		<div class="grid min-w-0 grid-cols-2 gap-3">
+		<div class="grid min-w-0 gap-3 sm:grid-cols-3">
 			{#each [{ label: 'Today (UTC)', total: totals.today }, { label: 'Last 7 days', total: totals.week }] as item (item.label)}
 				<StatTile
 					label={item.label}
@@ -198,18 +198,16 @@
 					onretry={() => void retry('daily')}
 				/>
 			{/each}
-		</div>
-		<div class="space-y-2">
 			<StatTile
 				label="Chance of a block reward · next 24 hours"
 				value={notRegistered ? 'Not registered' : forecast ? chanceText(forecast.chance) : MISSING}
 				state={forecastState}
 				onretry={contractUnknown ? onretrylookup : retryForecast}
 			/>
-			{#if fundingPaused}<p class="text-label text-ink-muted">
-					Forecast shows rewards while funded.
-				</p>{/if}
 		</div>
+		{#if fundingPaused}<p class="text-label text-ink-muted">
+				Forecast shows rewards while funded.
+			</p>{/if}
 	</div>
 	<a href="#rewards" class="mt-4 inline-block font-bold text-accent underline"
 		>Details<span class="sr-only"> on block rewards</span> →</a
