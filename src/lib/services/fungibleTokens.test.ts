@@ -461,6 +461,111 @@ test('Humble LP valuation is unchanged and its card supply stays in base units',
 	assert.equal(result.partial, false);
 });
 
+function heldLp(balance: string, contractId: number, usdValue: string | null = null) {
+	return [
+		{
+			name: 'Humble LP',
+			symbol: 'HLP',
+			balance,
+			decimals: 6,
+			imageUrl: '',
+			usdValue,
+			verified: 0,
+			accountId: 'wallet',
+			assetType: 'arc200',
+			contractId
+		}
+	];
+}
+
+function heldFetch(held: ReturnType<typeof heldLp>): typeof fetch {
+	return async (input) =>
+		new URL(String(input)).pathname === '/account/assets'
+			? Response.json({
+					balances: held,
+					'next-token': null,
+					'total-count': 1,
+					'current-round': 100
+				})
+			: Response.json({ approvals: [] });
+}
+
+test('an LP balance above the pool supply is not a share and has no valuation', async () => {
+	// Pool 395509 (Humble, wVOI/ROCKET): its escrow holds the unissued LP supply.
+	const pool: PoolInfo = {
+		poolId: '395509',
+		tokAId: '390001',
+		tokBId: '395510',
+		poolBalA: '1000000',
+		poolBalB: '1000000',
+		supply: '695368834346728981',
+		tvl: 20,
+		provider: 'humble'
+	};
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [pool],
+		fetch: heldFetch(
+			heldLp(
+				'115792089237316195423570985008687907853269984665640564039456888639078782910954',
+				395509
+			)
+		)
+	});
+	const lp = result.tokens.find((token) => token.id === '395509');
+	assert.equal(lp?.value, 0);
+	assert.equal(lp?.usdValue, null);
+	assert.equal(result.partial, false);
+});
+
+test('an LP balance above the pool supply has no valuation from an API USD price either', async () => {
+	// The escrow's asset row carries a per-unit usdValue, so this is the path production takes.
+	const pool: PoolInfo = {
+		poolId: '395509',
+		tokAId: '390001',
+		tokBId: '395510',
+		poolBalA: '1000000',
+		poolBalB: '1000000',
+		supply: '695368834346728981',
+		tvl: 20,
+		provider: 'humble'
+	};
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [pool],
+		fetch: heldFetch(
+			heldLp(
+				'115792089237316195423570985008687907853269984665640564039456888639078782910954',
+				395509,
+				'0.0000000000018157099089439184114593172682232'
+			)
+		)
+	});
+	const lp = result.tokens.find((token) => token.id === '395509');
+	assert.equal(lp?.value, 0);
+	assert.equal(lp?.usdValue, null);
+	assert.equal(result.partial, false);
+});
+
+test('an LP balance within the pool supply keeps its API USD valuation', async () => {
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [lpPool()],
+		fetch: heldFetch(heldLp('10000000', 123, '0.0004'))
+	});
+	// 10 LP units at $0.0004 each, at a VOI price of $0.0002.
+	assert.equal(result.tokens[0].usdValue, 0.004);
+	assert.ok(Math.abs((result.tokens[0].value as number) - 20) < 1e-9);
+	assert.equal(result.partial, false);
+});
+
+test('an LP balance equal to the pool supply is the whole pool', async () => {
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [lpPool()],
+		fetch: heldFetch(heldLp('10000000', 123))
+	});
+	assert.equal(result.tokens[0].value, 20);
+	assert.equal(result.tokens[0].usdValue, 0.004);
+	assert.equal(result.partial, false);
+});
+
 test('a Humble LP takes side decimals from the pool when the holder lacks the token', async () => {
 	// TASK-97: only the holder's own balances supplied decimals, so an unheld 8-decimal
 	// side fell back to 6.
