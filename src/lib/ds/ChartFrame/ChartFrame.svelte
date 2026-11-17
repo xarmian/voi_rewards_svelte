@@ -31,6 +31,7 @@
 	import { compact } from '../format';
 	import { slug } from '../slug';
 	import { makeX, makeY, tickValues } from '../charts/scales';
+	import { timeTickLabels } from '../charts/timeTicks';
 	import { layoutAnnotations } from '../charts/annotations';
 	import { shownMark, stepMark } from '../charts/interaction';
 	let {
@@ -102,12 +103,14 @@
 	let xGap = $derived(
 		Math.max(
 			44,
-			...xScale
-				.ticks(Math.max(1, Math.floor(plotWidth / 44)))
-				.map((value) => tickLabel(value).length * charWidth + 12)
+			...tickLabels(xScale.ticks(Math.max(1, Math.floor(plotWidth / 44)))).map(
+				(label) => label.length * charWidth + 12
+			)
 		)
 	);
 	let xTicks = $derived(tickValues(xScale, plotWidth, xGap));
+	// Time labels depend on the whole tick set (the year marks follow the ticks actually shown).
+	let xLabels = $derived(tickLabels(xTicks));
 	// Edge labels are anchored at their end or start, which shifts their box towards a neighbour, so
 	// a tick whose rendered box comes within 12 px of the previous kept one is dropped.
 	let xTickLabels = $derived.by(() => {
@@ -119,9 +122,9 @@
 			right: number;
 			label: string;
 		}[] = [];
-		for (const value of xTicks) {
+		for (const [index, value] of xTicks.entries()) {
 			const position = xScale.position(value) + xScale.bandwidth / 2;
-			const label = tickLabel(value);
+			const label = xLabels[index];
 			const labelWidth = label.length * charWidth;
 			const anchor =
 				position + labelWidth / 2 > width - right
@@ -179,10 +182,10 @@
 		active = marks[next].index;
 		announcement = describeMark(active);
 	}
-	function tickLabel(value: number | string | Date) {
-		return value instanceof Date
-			? value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-			: String(value);
+	function tickLabels(values: (number | string | Date)[]) {
+		return values.every((value): value is Date => value instanceof Date)
+			? timeTickLabels(values)
+			: values.map(String);
 	}
 	function absoluteTime(value: typeof asOf) {
 		const time = value === undefined ? NaN : new Date(value).getTime();
