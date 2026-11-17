@@ -12,6 +12,7 @@ import {
 	loadRewardEpochs,
 	loadDailyProposals,
 	loadEligibleStakes,
+	missingEpochsMessage,
 	type RewardEpoch
 } from './rewards';
 import { createReadSource, type Source } from './read';
@@ -291,6 +292,98 @@ it('loads every completed epoch when one snapshot has an empty proposers array',
 		[63, 12],
 		[64, 42]
 	]);
+});
+it('keeps a completed epoch with no snapshot as a missing row in order', async () => {
+	vi.mocked(dataTable.fetchDateRanges).mockResolvedValue([
+		{ epoch: 62, id: 'first', desc: '' },
+		{ epoch: 63, id: 'second', desc: '' },
+		{ epoch: 64, id: 'third', desc: '' },
+		{ epoch: 65, id: 'live', desc: '' }
+	]);
+	vi.mocked(dataTable.fetchData).mockResolvedValue({
+		num_blocks: 120,
+		max_timestamp: new Date(epochRange(65).start.getTime() + 86400000).toISOString(),
+		data: [{ proposer: address, block_count: 42 }]
+	});
+	vi.stubGlobal('fetch', async () =>
+		Response.json({
+			snapshots: [62, 64].map((e) => ({
+				start_date: epochRange(e).start.toISOString(),
+				end_date: epochRange(e).end.toISOString(),
+				total_blocks: 120,
+				proposers: { PAGE: 12 }
+			}))
+		})
+	);
+	const result = await loadRewardEpochs(address, true);
+	expect(result.map((e) => e.epoch)).toEqual([62, 63, 64, 65]);
+	expect(result[1]).toEqual({
+		epoch: 63,
+		blocks: 0,
+		networkBlocks: 0,
+		estimate: null,
+		current: false,
+		missing: true
+	});
+	expect(result[0].missing).toBeUndefined();
+	expect(result[2].missing).toBeUndefined();
+	expect(result[3]).toMatchObject({ current: true, blocks: 42 });
+});
+const missingRow: RewardEpoch = {
+	epoch: 62,
+	blocks: 0,
+	networkBlocks: 0,
+	estimate: null,
+	current: false,
+	missing: true
+};
+it('matches a following-week payment to a missing epoch without an expectation', () => {
+	const [row] = mergeRewardRows(
+		[missingRow],
+		payments(tx('paid', 3_000_000)),
+		now,
+		{ balance: 1000, online: true },
+		[{ epoch_number: 62, eligible_online_stake: 1000 }]
+	);
+	expect(row).toMatchObject({
+		status: 'Paid',
+		tone: 'ok',
+		actual: 3,
+		expected: null,
+		ratio: null,
+		estimate: null,
+		tooEarly: false,
+		explanation: ''
+	});
+	expect(row.payments.map((p) => p.txid)).toEqual(['paid']);
+});
+it('shows a missing epoch with no matched payment as not yet available', () => {
+	const [row] = rows(payments(), [missingRow]);
+	expect(row).toMatchObject({
+		status: null,
+		tone: 'neutral',
+		payoutText: 'Not yet available',
+		actual: null,
+		expected: null,
+		ratio: null,
+		estimate: null,
+		explanation: ''
+	});
+	expect(rows({ state: 'loading' }, [missingRow])[0].payoutText).toBe('Loading epoch rewards');
+});
+it('names missing epochs ascending in one message', () => {
+	const at = (n: number): RewardEpoch => ({ ...missingRow, epoch: n });
+	expect(missingEpochsMessage([epoch])).toBeNull();
+	expect(missingEpochsMessage([])).toBeNull();
+	expect(missingEpochsMessage([epoch, at(105)])).toBe(
+		'Reward history incomplete: epoch 105 is not yet available.'
+	);
+	expect(missingEpochsMessage([at(106), at(105)])).toBe(
+		'Reward history incomplete: epochs 105 and 106 are not yet available.'
+	);
+	expect(missingEpochsMessage([at(105), epoch, at(101), at(102)])).toBe(
+		'Reward history incomplete: epochs 101, 102 and 105 are not yet available.'
+	);
 });
 it('rejects malformed daily records instead of claiming empty data', async () => {
 	vi.stubGlobal('fetch', async () => Response.json({ '2026-11-07': null }));

@@ -67,6 +67,23 @@ it('renders Not found with an explanation and no absent transaction link', () =>
 	expect(html).toContain('View data');
 	expect(html).toContain('Rewards by epoch');
 });
+it('shows a missing epoch as not yet available and names it in a warning', () => {
+	alerts.length = 0;
+	vi.mocked(createRewardsState).mockReturnValue({
+		...fixture(),
+		epochs: ready([
+			{ epoch: 61, blocks: 0, networkBlocks: 0, estimate: null, current: false, missing: true },
+			{ epoch: 62, blocks: 12, networkBlocks: 120, estimate: 140, current: false }
+		])
+	});
+	const html = draw();
+	expect(html).toContain('Not yet available');
+	expect(html).not.toContain('0 / Unavailable');
+	expect(html).toContain('Epoch snapshot not yet available.');
+	const message = 'Reward history incomplete: epoch 61 is not yet available.';
+	expect(html).toContain(message);
+	expect(alerts.find((alert) => alert.message === message)?.onretry).toBeTypeOf('function');
+});
 it('keeps estimates visible and payout cells Unavailable after payout failure', () => {
 	vi.mocked(createRewardsState).mockReturnValue({
 		...fixture(),
