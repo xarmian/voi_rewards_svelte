@@ -21,8 +21,9 @@ const cases: [string, string, Redirect | null][] = [
 	['/ecosystem', 'GET', { status: 308, location: '/directory' }],
 	['/ecosystem/defi/nested?x=1', 'GET', { status: 308, location: '/directory/defi/nested?x=1' }],
 	['/ecosystem//evil.example', 'GET', { status: 308, location: '/directory//evil.example' }],
-	['/what_is_voi', 'GET', { status: 308, location: '/about#what-is-voi' }],
-	['/what_is_voi?x=1', 'GET', { status: 308, location: '/about?x=1#what-is-voi' }],
+	['/what_is_voi', 'GET', { status: 308, location: '/about' }],
+	['/what_is_voi?x=1', 'GET', { status: 308, location: '/about?x=1' }],
+	['/what_is_voi/', 'POST', { status: 308, location: '/about' }],
 	['/phase1/', 'GET', { status: 308, location: '/archive/testnet/phase1' }],
 	['/phase1?x=1', 'GET', { status: 308, location: '/archive/testnet/phase1?x=1' }],
 	['/phase2', 'GET', { status: 308, location: '/archive/testnet/phase2' }],
@@ -110,15 +111,20 @@ const cases: [string, string, Redirect | null][] = [
 		'https://evilquests.voirewards.com/',
 		'https://quests.voirewards.com.evil.com/'
 	].map((path): [string, string, null] => [path, 'GET', null]),
-	...['/accounts', '/accounts/auth'].flatMap((path) =>
-		['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'get'].map((method): [string, string, null] => [
-			path,
-			method,
-			null
-		])
+	// The account pages and their form actions are gone, so every method redirects.
+	...['/accounts', '/accounts/', '/accounts/auth', '/accounts/auth/?x=1'].flatMap((path) =>
+		['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'get'].map(
+			(method): [string, string, Redirect] => [
+				path,
+				method,
+				{ status: 308, location: `/archive/testnet${path.endsWith('?x=1') ? '?x=1' : ''}` }
+			]
+		)
 	)
 ];
 
-test.each(cases)('%s (%s)', (path, method, expected) => {
-	expect(redirectFor(new URL(path, 'https://voirewards.com'), method)).toEqual(expected);
+// The method column names the request each row stands for. redirectFor takes no method, so a row
+// proves the answer for that method too; hooks.server.redirects.test.ts checks a POST end to end.
+test.each(cases)('%s (%s)', (path, _method, expected) => {
+	expect(redirectFor(new URL(path, 'https://voirewards.com'))).toEqual(expected);
 });

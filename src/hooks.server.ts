@@ -25,8 +25,7 @@ function requestUrl(input: RequestInfo | URL): string {
 export const handle: Handle = async ({ event, resolve }) => {
 	// Prerendering also runs through this hook: a prerendered page must not become a redirect (and
 	// SvelteKit forbids reading url.search then), so the table applies only to real requests.
-	const redirect =
-		!building && event.url ? redirectFor(event.url, event.request?.method ?? 'GET') : null;
+	const redirect = !building && event.url ? redirectFor(event.url) : null;
 	if (redirect) {
 		return new Response(null, {
 			status: redirect.status,

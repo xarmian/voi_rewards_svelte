@@ -1,6 +1,7 @@
 export type Redirect = { status: 302 | 308; location: string };
 
-export function redirectFor(url: URL, method: string): Redirect | null {
+// Every row redirects for every request method: none of the sources has a page or action left.
+export function redirectFor(url: URL): Redirect | null {
 	if (url.hostname === 'quests.voirewards.com') {
 		return {
 			status: 308,
@@ -17,18 +18,10 @@ export function redirectFor(url: URL, method: string): Redirect | null {
 		return { status: 302, location: `https://nftnavigator.xyz${valid ? destination : '/'}` };
 	}
 
-	if (path === '/what_is_voi') {
-		return { status: 308, location: `/about${url.search}#what-is-voi` };
-	}
-
-	if (
-		(path === '/accounts' || path === '/accounts/auth') &&
-		(method === 'GET' || method === 'HEAD')
-	) {
-		return { status: 308, location: `/archive/testnet${url.search}` };
-	}
-
 	for (const [from, to, nested] of [
+		['/what_is_voi', '/about', false],
+		['/accounts/auth', '/archive/testnet', false],
+		['/accounts', '/archive/testnet', false],
 		['/ecosystem', '/directory', true],
 		['/phase1', '/archive/testnet/phase1', false],
 		['/phase2', '/archive/testnet/phase2', true],
