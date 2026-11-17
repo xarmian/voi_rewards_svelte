@@ -114,16 +114,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/SendTokenModal.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/TokenTransfersModal.svelte": {
 			"@typescript-eslint/no-unused-expressions": {
 				"errors": 5,

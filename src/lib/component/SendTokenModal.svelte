@@ -1131,12 +1131,12 @@
 	}
 
 	// Helper function to determine if token is native VOI
-	function isNativeToken(token: any): boolean {
+	function isNativeToken(token: { type?: unknown }): boolean {
 		return token.type === 'native';
 	}
 
 	// Helper function to determine if token is ARC-200
-	function isARC200Token(token: any): boolean {
+	function isARC200Token(token: { type?: unknown }): boolean {
 		return token.type === 'arc200';
 	}
 
@@ -1392,8 +1392,8 @@
 				<div class="flex-none">
 					<div class="flex flex-wrap gap-2 items-center justify-between mb-6">
 						<h3 class="text-lg font-medium">Recipients</h3>
-						<div class="flex flex-wrap gap-2">
-							<div class="relative" use:clickOutside={() => (showCombineOptions = false)}>
+						<div class="relative flex flex-wrap gap-2">
+							<div class="sm:relative" use:clickOutside={() => (showCombineOptions = false)}>
 								<Button
 									size="xs"
 									color={hasDuplicateRecipients(recipients) ? 'blue' : 'light'}
@@ -1406,7 +1406,7 @@
 								</Button>
 								{#if showCombineOptions}
 									<div
-										class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
+										class="absolute left-0 right-0 sm:left-auto mt-1 sm:w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
 									>
 										<div class="py-1">
 											<button
@@ -1444,7 +1444,7 @@
 								Clear
 							</Button>
 							<div
-								class="relative"
+								class="sm:relative"
 								use:clickOutside={() => {
 									showAmountMenu = false;
 									amountToDistribute = '';
@@ -1456,7 +1456,7 @@
 								</Button>
 								{#if showAmountMenu}
 									<div
-										class="absolute right-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
+										class="absolute left-0 right-0 sm:left-auto mt-1 sm:w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
 									>
 										<div class="p-3 space-y-3">
 											<div>
@@ -1541,7 +1541,7 @@
 									</div>
 								{/if}
 							</div>
-							<div class="relative">
+							<div class="sm:relative">
 								<Button
 									size="xs"
 									color="light"
@@ -1553,7 +1553,7 @@
 								</Button>
 								{#if showNoteMenu}
 									<div
-										class="absolute right-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[100]"
+										class="absolute left-0 right-0 sm:left-auto mt-1 sm:w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[100]"
 										data-set-notes-menu
 									>
 										<div class="p-3 space-y-3">
@@ -1609,7 +1609,7 @@
 
 							<!-- Recipients -->
 							<div class="divide-y divide-gray-200 dark:divide-gray-700 relative">
-								{#each recipients as recipient, index}
+								{#each recipients, index}
 									<RecipientRow
 										bind:recipient={recipients[index]}
 										{index}
