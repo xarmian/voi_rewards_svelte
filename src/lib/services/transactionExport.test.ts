@@ -1746,8 +1746,12 @@ describe('NFT export phase', () => {
 });
 describe('Group ID on ARC-200 and NFT rows', () => {
 	const G = new Uint8Array([1, 2, 3]);
-	const grouped = (id: string, group: Uint8Array | undefined = G) =>
-		raw(id, { sender: A, paymentTransaction: { receiver: B, amount: 4n }, group });
+	const grouped = (id: string, group: Uint8Array | null = G) =>
+		raw(id, {
+			sender: A,
+			paymentTransaction: { receiver: B, amount: 4n },
+			group: group ?? undefined
+		});
 	const indexer = (...transactions: unknown[]) =>
 		vi.fn(async (q: ExportQuery) => ({ transactions: q.address ? transactions : [] }));
 	const groupsOf = (rows: readonly { assetKind?: string; txId: string; group: string }[]) =>
@@ -1782,7 +1786,7 @@ describe('Group ID on ARC-200 and NFT rows', () => {
 	it('leaves the group empty for an unknown, empty or ungrouped transaction ID', async () => {
 		const { run } = arcSetup(
 			{
-				readPage: indexer(grouped('X'), grouped('U', undefined)),
+				readPage: indexer(grouped('X'), grouped('U', null)),
 				readArc200Page: vi.fn(async () => [
 					arcRecord({ transactionid: 'OTHER' }),
 					arcRecord({ transactionid: null }),
