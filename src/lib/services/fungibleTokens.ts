@@ -272,15 +272,20 @@ export async function fetchFungibleTokens(
 					pool.provider === 'nomadex' && Number(asset.balance) === 0
 						? 0
 						: calculateTokenValueFromPool(asset, pool);
-				if (poolValue === null || !Number.isFinite(poolValue)) {
-					partial = true;
+				if (poolValue === NOT_A_SHARE) {
+					// Not missing data: the row is unvalued (zero placeholder) without marking partial.
+					tokenUsdValue = null;
 				} else {
-					tokenValue = poolValue;
-				}
+					if (poolValue === null || !Number.isFinite(poolValue)) {
+						partial = true;
+					} else {
+						tokenValue = poolValue;
+					}
 
-				// Calculate USD value for LP tokens
-				// TASK-91: without a VOI price the USD value is unknown (null, shown as unavailable), not $0.
-				tokenUsdValue = voiPriceUSD > 0 ? tokenValue * voiPriceUSD : null;
+					// Calculate USD value for LP tokens
+					// TASK-91: without a VOI price the USD value is unknown (null, shown as unavailable), not $0.
+					tokenUsdValue = voiPriceUSD > 0 ? tokenValue * voiPriceUSD : null;
+				}
 			} else if (asset.assetType === 'asa' && asset.contractId === 302190) {
 				// Special handling for aUSDC - 1:1 with USD
 				const usdcAmount = Number(asset.balance) / Math.pow(10, asset.decimals);
@@ -511,18 +516,32 @@ export async function fetchFungibleTokens(
 	}
 }
 
-function calculateTokenValueFromPool(asset: UnifiedAssetBalance, pool: PoolInfo): number | null {
+const NOT_A_SHARE = 'not-a-share';
+
+function calculateTokenValueFromPool(
+	asset: UnifiedAssetBalance,
+	pool: PoolInfo
+): number | null | typeof NOT_A_SHARE {
 	try {
+		const supply = pool.supply;
 		// Unknown live reserves or supply must not produce a Nomadex valuation.
 		if (
 			pool.provider === 'nomadex' &&
-			![pool.poolBalA, pool.poolBalB, pool.supply].every((value) => /^\d+$/.test(value))
+			![pool.poolBalA, pool.poolBalB, supply].every((value) => /^\d+$/.test(value))
 		) {
 			return null;
 		}
+		// A balance above the outstanding supply (a pool escrow's unissued LP) is not a share.
+		if (
+			/^\d+$/.test(asset.balance) &&
+			/^\d+$/.test(supply) &&
+			BigInt(asset.balance) > BigInt(supply)
+		) {
+			return NOT_A_SHARE;
+		}
 		// For LP tokens, calculate value based on user's share of the pool
 		const userLpBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
-		const totalLpSupply = Number(pool.supply) / Math.pow(10, 6); // pool.supply needs to be converted from micro units
+		const totalLpSupply = Number(supply) / Math.pow(10, 6); // pool.supply needs to be converted from micro units
 
 		if (totalLpSupply === 0) return 0;
 
