@@ -140,3 +140,69 @@ it('still accepts offset 100 for contract and user transfers', () => {
 		params: { p_contractid: 7, p_user: A, p_limit: 100, p_offset: 100 }
 	});
 });
+const arc72 = `action=get_arc72_transfers&user=${A}&min-round=1&max-round=1000001&limit=1000&next-token=0`;
+it('accepts a bounded ARC-72 user window with fixed limit and zero offset', () => {
+	expect(validate(arc72)).toEqual({
+		action: 'get_arc72_transfers',
+		params: { user: A, 'min-round': 1, 'max-round': 1000001, limit: 1000, 'next-token': 0 }
+	});
+	expect(validate(arc72.replace('max-round=1000001', 'max-round=1'))).toEqual({
+		action: 'get_arc72_transfers',
+		params: { user: A, 'min-round': 1, 'max-round': 1, limit: 1000, 'next-token': 0 }
+	});
+});
+it.each([
+	arc72.replace('max-round=1000001', 'max-round=1000002'),
+	arc72.replace('min-round=1&max-round=1000001', 'min-round=3&max-round=2'),
+	arc72.replace('min-round=1', 'min-round=0'),
+	arc72.replace('max-round=1000001', 'max-round=9007199254740992'),
+	arc72.replace('max-round=1000001', 'max-round=-1'),
+	arc72.replace('max-round=1000001', 'max-round=1.5'),
+	arc72.replace('next-token=0', 'next-token=1'),
+	arc72.replace('next-token=0', 'next-token=1000'),
+	arc72.replace('next-token=0', 'next-token='),
+	arc72.replace('limit=1000', 'limit=999'),
+	arc72.replace('limit=1000', 'limit=1001'),
+	arc72.replace('limit=1000', 'limit=100'),
+	arc72.replace(A, 'a'.repeat(58)),
+	arc72.replace(A, 'A'.repeat(57)),
+	arc72 + '&user=' + A
+])('refuses invalid ARC-72 query %s', (query) => {
+	expect(validate(query)).toHaveProperty('error');
+});
+it('names the refused ARC-72 round window', () => {
+	expect(validate(arc72.replace('max-round=1000001', 'max-round=1000002'))).toEqual({
+		error: 'Invalid ARC-72 round window'
+	});
+});
+it.each(['user', 'min-round', 'max-round', 'limit', 'next-token'])(
+	'requires the ARC-72 parameter %s',
+	(key) => {
+		const params = new URLSearchParams(arc72);
+		params.delete(key);
+		expect(validateMimirParams(params)).toEqual({ error: `Missing required parameter: ${key}` });
+	}
+);
+it.each(['contractId', 'tokenId', 'from', 'to', 'round', 'min-time', 'max-time'])(
+	'refuses the unused ARC-72 filter %s',
+	(key) => {
+		expect(validate(arc72 + `&${key}=1`)).toEqual({ error: `Unknown parameter: ${key}` });
+	}
+);
+it.each([
+	['action=get_online_account_count', { action: 'get_online_account_count', params: {} }],
+	['', { action: 'get_online_account_count', params: {} }],
+	[
+		'action=get_tx_counts&p_period=week&p_n=60',
+		{ action: 'get_tx_counts', params: { p_period: 'week', p_n: 60 } }
+	],
+	[
+		`action=get_account_transactions_multi&from_addresses={${A},${A}}&to_address=${A}`,
+		{
+			action: 'get_account_transactions_multi',
+			params: { from_addresses: [A, A], to_address: A }
+		}
+	]
+])('keeps the existing action %s unchanged', (query, expected) => {
+	expect(validate(query)).toEqual(expected);
+});
