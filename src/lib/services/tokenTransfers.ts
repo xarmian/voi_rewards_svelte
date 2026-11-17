@@ -87,6 +87,22 @@ function scaleAmount(amount: bigint, decimals: number): string {
 	return `${negative ? '-' : ''}${whole}${fraction ? `.${fraction}` : ''}`;
 }
 
+// ARC-200 rows carry base units as a string (sometimes a number). Integers scale exactly;
+// anything else, or decimals that are not a non-negative integer, keeps the number path so
+// an odd row still renders instead of throwing.
+function scaleArc200Amount(amount: unknown, decimals: number): string {
+	if (!Number.isInteger(decimals) || decimals < 0) {
+		return (Number(amount) / Math.pow(10, decimals)).toString();
+	}
+	if (typeof amount === 'string' && /^-?\d+$/.test(amount.trim())) {
+		return scaleAmount(BigInt(amount.trim()), decimals);
+	}
+	if (typeof amount === 'number' && Number.isSafeInteger(amount)) {
+		return scaleAmount(BigInt(amount), decimals);
+	}
+	return (Number(amount) / Math.pow(10, decimals)).toString();
+}
+
 function requireAssetTransfer(tx: {
 	id?: string;
 	assetTransferTransaction?: { receiver: string; amount: bigint };
@@ -236,7 +252,7 @@ export async function fetchTokenTransfers({
 
 		newTransfers = result.data.map((transfer: Transfer) => ({
 			...transfer,
-			amount: (Number(transfer.amount) / Math.pow(10, token.decimals)).toString()
+			amount: scaleArc200Amount(transfer.amount, token.decimals)
 		}));
 
 		// For LP tokens, fetch additional atomic transaction info
