@@ -155,4 +155,56 @@ describe('LP statistics', () => {
 		expect(formatChange(sent, token, 'wallet')).toBe('-0.30');
 		expect(formatChange(fee, token, 'wallet')).toBe('-0.01');
 	});
+
+	it('formats a received amount above 2^53 at 0 decimals exactly', () => {
+		const whole = { ...token, decimals: 0 };
+		expect(formatChange({ ...transfer, amount: '9007199254740993' }, whole, 'wallet')).toBe(
+			'+9007199254740993'
+		);
+	});
+	it('formats 18-decimal amounts exactly with fixed fraction digits', () => {
+		const wei = { ...token, decimals: 18 };
+		const sent = { ...transfer, from: 'wallet', to: 'other' };
+		expect(formatChange({ ...transfer, amount: '1234567.123456789012345678' }, wei, 'wallet')).toBe(
+			'+1234567.123456789012345678'
+		);
+		expect(formatChange({ ...sent, amount: '0.5' }, wei, 'wallet')).toBe('-0.500000000000000000');
+	});
+	it('reverses a newer amount from a balance above 2^53 in base units', () => {
+		const whole = {
+			...token,
+			decimals: 0,
+			balance: Number('9007199254740993'),
+			balanceRaw: '9007199254740993'
+		};
+		expect(
+			calculateRunningBalance(1, whole, [{ ...transfer, amount: '1' }, transfer], 'wallet')
+		).toBe('9007199254740992');
+	});
+	it('reverses an 18-decimal amount exactly where the number path rounds', () => {
+		const wei = { ...token, decimals: 18, balance: 1e18, balanceRaw: '1000000000000000000' };
+		const transfers = [{ ...transfer, amount: '0.1' }, transfer];
+		expect((1 - 0.1).toFixed(18)).not.toBe('0.900000000000000000');
+		expect(calculateRunningBalance(1, wei, transfers, 'wallet')).toBe('0.900000000000000000');
+	});
+	it('keeps the number path for an amount in exponent form', () => {
+		const eight = { ...token, decimals: 8, balance: 100000000 };
+		const odd = { ...transfer, amount: '1e-7' };
+		expect(() => formatChange(odd, eight, 'wallet')).not.toThrow();
+		expect(formatChange(odd, eight, 'wallet')).toBe(`+${Number('1e-7').toFixed(8)}`);
+		expect(calculateRunningBalance(1, eight, [odd, transfer], 'wallet')).toBe(
+			(100000000 / 1e8 - Number('1e-7')).toFixed(8)
+		);
+	});
+	it('formats zero, negative and 0-decimal values without a trailing point', () => {
+		const whole = { ...token, decimals: 0, balance: 0, balanceRaw: '0' };
+		const other = { ...transfer, to: 'someone' };
+		expect(formatChange({ ...transfer, amount: '0' }, whole, 'wallet')).toBe('+0');
+		expect(formatChange({ ...other, amount: '-5' }, whole, 'wallet')).toBe('-5');
+		expect(formatChange({ ...other, amount: '-0.5' }, token, 'wallet')).toBe('-0.50');
+		expect(formatChange({ ...transfer, amount: '7' }, whole, 'wallet')).toBe('+7');
+		expect(
+			calculateRunningBalance(1, whole, [{ ...transfer, amount: '1' }, transfer], 'wallet')
+		).toBe('-1');
+	});
 });

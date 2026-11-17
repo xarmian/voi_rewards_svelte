@@ -38,11 +38,15 @@
 	<div class="p-3 md:p-4">
 		<!-- Mobile Layout -->
 		<div class="md:hidden">
-			<div class="flex justify-between items-start mb-2">
-				<div>
-					<div class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-						{transfer.amount}
-						{token.symbol}
+			<div class="flex flex-wrap justify-between items-start gap-x-3 gap-y-1 mb-2">
+				<div class="min-w-0">
+					<div
+						class="text-sm font-medium text-gray-900 dark:text-white flex flex-wrap items-center gap-2"
+					>
+						<span class="min-w-0 [overflow-wrap:anywhere]">
+							{transfer.amount}
+							{token.symbol}
+						</span>
 						{#if transfer.type === 'fee'}
 							<span
 								class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full"
@@ -73,22 +77,22 @@
 						{formatTimestamp(transfer.timestamp)}
 					</div>
 				</div>
-				<div class="text-right">
+				<div class="min-w-0 ml-auto text-right">
 					<div class="text-sm">
 						<span
-							class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+							class={`font-medium [overflow-wrap:anywhere] ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
 						>
 							{change}
 							{token.symbol}
 						</span>
 						{#if token.type === 'native' && transfer.type === 'payment' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
-							<div class="text-xs text-gray-500 dark:text-gray-400">
+							<div class="text-xs text-gray-500 dark:text-gray-400 [overflow-wrap:anywhere]">
 								-{(transfer.fee / Math.pow(10, token.decimals)).toFixed(token.decimals)}
 								{token.symbol} fee
 							</div>
 						{/if}
 					</div>
-					<div class="text-xs text-gray-500 dark:text-gray-400">
+					<div class="text-xs text-gray-500 dark:text-gray-400 [overflow-wrap:anywhere]">
 						Balance: {runningBalance}
 						{token.symbol}
 					</div>
@@ -140,10 +144,12 @@
 
 		<!-- Desktop Layout -->
 		<div class="hidden md:flex items-start gap-4 md:gap-6">
-			<div class="flex-none w-44">
+			<div class="flex-none w-44 min-w-0">
 				<div class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-					{transfer.amount}
-					{token.symbol}
+					<span class="min-w-0 [overflow-wrap:anywhere]">
+						{transfer.amount}
+						{token.symbol}
+					</span>
 					{#if transfer.type === 'fee'}
 						<span
 							class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full"
@@ -209,22 +215,22 @@
 				</div>
 			</div>
 
-			<div class="flex-none w-44 text-right">
+			<div class="flex-none w-44 min-w-0 text-right">
 				<div class="text-sm">
 					<span
-						class={`font-medium ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+						class={`font-medium [overflow-wrap:anywhere] ${transfer.to === walletId ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
 					>
 						{change}
 						{token.symbol}
 					</span>
 					{#if token.type === 'native' && transfer.type === 'payment' && transfer.fee && transfer.fee > 0 && transfer.from === walletId}
-						<div class="text-xs text-gray-500 dark:text-gray-400">
+						<div class="text-xs text-gray-500 dark:text-gray-400 [overflow-wrap:anywhere]">
 							-{(transfer.fee / Math.pow(10, token.decimals)).toFixed(token.decimals)}
 							{token.symbol} fee
 						</div>
 					{/if}
 				</div>
-				<div class="text-xs text-gray-500 dark:text-gray-400">
+				<div class="text-xs text-gray-500 dark:text-gray-400 [overflow-wrap:anywhere]">
 					Balance: {runningBalance}
 					{token.symbol}
 				</div>
