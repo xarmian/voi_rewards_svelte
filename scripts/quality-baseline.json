@@ -130,28 +130,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/ui/Collection.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"no-unreachable": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
-				"errors": 5,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/ui/Modal.svelte": {
 			"svelte/no-unused-svelte-ignore": {
 				"errors": 1,
@@ -170,16 +148,6 @@
 				"warnings": 0
 			},
 			"svelte/no-at-html-tags": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/TokenCard.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
 				"errors": 1,
 				"warnings": 0
 			}
@@ -498,26 +466,6 @@
 			"ts:7006": {
 				"errors": 5,
 				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/Collection.svelte": {
-			"svelte:a11y_click_events_have_key_events": {
-				"errors": 0,
-				"warnings": 1
-			},
-			"svelte:a11y_missing_attribute": {
-				"errors": 0,
-				"warnings": 3
-			},
-			"svelte:a11y_no_static_element_interactions": {
-				"errors": 0,
-				"warnings": 1
-			}
-		},
-		"src/lib/component/ui/TokenCard.svelte": {
-			"svelte:a11y_no_static_element_interactions": {
-				"errors": 0,
-				"warnings": 1
 			}
 		},
 		"src/lib/components/OHLCVChart.svelte": {
