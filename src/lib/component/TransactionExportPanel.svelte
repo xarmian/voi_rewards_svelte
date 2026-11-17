@@ -52,6 +52,7 @@
 		'payment',
 		'epoch-reward',
 		'block-reward',
+		'protocol-reward',
 		'asset-transfer',
 		'close-out',
 		'fee'
@@ -63,6 +64,7 @@
 			value: 'block-reward',
 			label: `${REALTIME_BLOCK_REWARDS_TITLE}${REALTIME_BLOCK_REWARDS_TESTING ? ' (testing)' : ''}`
 		},
+		{ value: 'protocol-reward', label: 'Legacy protocol rewards' },
 		{ value: 'asset-transfer', label: 'Asset transfers' },
 		{ value: 'close-out', label: 'Close-outs' },
 		{ value: 'fee', label: 'Fees' }
@@ -333,10 +335,12 @@
 					close-outs are included. Epoch rewards are native VOI only, classified by sender;
 					estimated rewards are excluded. Real-time block rewards are the fee sink's rewards to the
 					account that proposed a block; they are listed as Real-time block rewards, not Payments.
-					The Staking contract column marks transfers to and from the staking contracts this wallet
-					owns now, as this site knows them. Contracts it owned earlier are not marked unless you
-					add their address. ARC-200 transfer records use Asset transfers. Type/date filters may not
-					reduce ARC-200 scanning time.
+					Legacy protocol rewards are a one-time network credit to accounts that held VOI before
+					round 8,320,707. It has no transaction of its own, so it is listed under the transaction
+					that applied it. The Staking contract column marks transfers to and from the staking
+					contracts this wallet owns now, as this site knows them. Contracts it owned earlier are
+					not marked unless you add their address. ARC-200 transfer records use Asset transfers.
+					Type/date filters may not reduce ARC-200 scanning time.
 				</p>
 				{#if !stakingContractsAvailable}
 					<InlineAlert

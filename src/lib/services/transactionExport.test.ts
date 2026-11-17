@@ -33,7 +33,15 @@ const opts = (changes: Partial<ExportInput> = {}) =>
 			pageAddress: 'A',
 			addresses: ['A'],
 			allDates: true,
-			types: ['payment', 'epoch-reward', 'block-reward', 'asset-transfer', 'close-out', 'fee'],
+			types: [
+				'payment',
+				'epoch-reward',
+				'block-reward',
+				'protocol-reward',
+				'asset-transfer',
+				'close-out',
+				'fee'
+			],
 			...changes
 		},
 		'2024-12-31',
@@ -76,6 +84,89 @@ const httpError = (status: number, retryAfter?: string) =>
 		response: { status, headers: new Headers(retryAfter ? { 'Retry-After': retryAfter } : {}) }
 	});
 afterEach(() => vi.useRealTimers());
+
+const LEGACY_SENDER = 'H7W63MIQJMYBOEYPM5NJEGX3P54H54RZIV2G3OQ2255AULG6U74BE5KFC4';
+const LEGACY_RECEIVER = 'ARAMIDFJYV2TOFB5MRNZJIXBSAVZCVAUDAPFGKR5PNX4MTILGAZABBTXQQ';
+const legacyRewardTx = () =>
+	raw('KO34YPCDK4WOQCYK7MXHFULLVPUO5Q2NSEFM3CVHNSMWUTFAQA4A', {
+		confirmedRound: 8325339n,
+		sender: LEGACY_SENDER,
+		fee: 1000n,
+		paymentTransaction: { receiver: LEGACY_RECEIVER, amount: 1000000n },
+		senderRewards: 407n,
+		receiverRewards: 44048243n,
+		closeRewards: 0n
+	});
+describe('legacy protocol reward fields', () => {
+	it('reads sender, receiver and close rewards from the applying transaction', () => {
+		expect(normalizeTransaction(legacyRewardTx()).rewards).toEqual({
+			sender: 407n,
+			receiver: 44048243n,
+			close: 0n
+		});
+	});
+	it('treats absent reward fields as zero', () => {
+		expect(normalizeTransaction(raw('ROOT')).rewards).toEqual({
+			sender: 0n,
+			receiver: 0n,
+			close: 0n
+		});
+	});
+	it('reads reward fields on inner transactions', () => {
+		const tx = normalizeTransaction(
+			raw('ROOT', {
+				txType: 'appl',
+				paymentTransaction: undefined,
+				applicationTransaction: { applicationId: 9n },
+				innerTxns: [
+					{
+						...raw('CHILD'),
+						senderRewards: '5',
+						receiverRewards: 6n,
+						closeRewards: 7n,
+						paymentTransaction: { receiver: 'B', amount: 1n, closeRemainderTo: 'C' }
+					}
+				]
+			})
+		);
+		expect(tx.rewards).toEqual({ sender: 0n, receiver: 0n, close: 0n });
+		expect(tx.inner[0].rewards).toEqual({ sender: 5n, receiver: 6n, close: 7n });
+	});
+	it('rejects receiver or close rewards on a non-payment transaction', () => {
+		for (const changes of [{ receiverRewards: 1n }, { closeRewards: 1n }])
+			expect(() => normalizeTransaction({ ...assetTx('ROOT', 1n), ...changes })).toThrow(
+				'Rewards on a non-payment transaction.'
+			);
+		expect(normalizeTransaction({ ...assetTx('ROOT', 1n), senderRewards: 3n }).rewards).toEqual({
+			sender: 3n,
+			receiver: 0n,
+			close: 0n
+		});
+	});
+	it('rejects close rewards with no close recipient', () => {
+		expect(() => normalizeTransaction(raw('ROOT', { closeRewards: 1n }))).toThrow(
+			'Close rewards have no recipient.'
+		);
+	});
+	it('rejects inexact reward values', () => {
+		for (const changes of [{ senderRewards: 1 }, { receiverRewards: -1n }, { closeRewards: '1.5' }])
+			expect(() => normalizeTransaction(raw('ROOT', changes))).toThrow();
+	});
+	it('maps the applying transaction to a protocol-reward row for each selected account', () => {
+		const tx = normalizeTransaction(legacyRewardTx());
+		expect(
+			mapTransaction(tx, new Set([LEGACY_RECEIVER]), new Set()).map((r) => [
+				r.account,
+				r.type,
+				r.direction,
+				r.amount
+			])
+		).toEqual([
+			[LEGACY_RECEIVER, 'payment', 'in', 1000000n],
+			[LEGACY_RECEIVER, 'protocol-reward', 'in', 44048243n]
+		]);
+	});
+});
 
 describe('SDK boundary', () => {
 	it('rejects unsafe numeric amounts, missing root identity/time, malformed recursion and close recipients', () => {

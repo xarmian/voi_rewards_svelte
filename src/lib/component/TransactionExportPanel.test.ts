@@ -218,3 +218,20 @@ it.each([
 it('shows the ARC source warning only once when the run result supplies it', () => {
 	expect(renderSelection('all', true, true).split(arcExport.ARC200_SOURCE_WARNING)).toHaveLength(2);
 });
+
+it('offers legacy protocol rewards, checked by default, and explains where they are listed', () => {
+	const html = drawPanel();
+	expect(
+		html.match(/<input[^>]*value="protocol-reward"[^>]*>(?:<!---->)?([^<]*)<\/label>/)?.[1]
+	).toBe('Legacy protocol rewards');
+	expect(html).toMatch(/<input[^>]*value="protocol-reward"[^>]*checked/);
+	expect(html.indexOf('value="block-reward"')).toBeLessThan(
+		html.indexOf('value="protocol-reward"')
+	);
+	expect(html.indexOf('value="protocol-reward"')).toBeLessThan(
+		html.indexOf('value="asset-transfer"')
+	);
+	expect(html).toContain(
+		'not Payments. Legacy protocol rewards are a one-time network credit to accounts that held VOI before round 8,320,707. It has no transaction of its own, so it is listed under the transaction that applied it.'
+	);
+});

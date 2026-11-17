@@ -200,6 +200,7 @@ it('marks inner payments and preserves reward payout precedence', () => {
 			sender: 'B',
 			fee: 0n,
 			note: '',
+			rewards: { sender: 0n, receiver: 0n, close: 0n },
 			applicationId: 99n,
 			inner: [
 				{
@@ -207,6 +208,7 @@ it('marks inner payments and preserves reward payout precedence', () => {
 					sender: 'CONTRACT',
 					fee: 0n,
 					note: '',
+					rewards: { sender: 0n, receiver: 0n, close: 0n },
 					inner: [],
 					payment: { receiver: 'B', amount: 1n, closeAmount: 0n }
 				}
@@ -230,6 +232,7 @@ it('marks asset transfers, close-outs and fees using their own serialized endpoi
 			sender: 'SECOND',
 			fee: 1n,
 			note: '',
+			rewards: { sender: 0n, receiver: 0n, close: 0n },
 			inner: [],
 			assetTransfer: {
 				assetId: 1n,
@@ -266,7 +269,15 @@ it('marks asset transfers, close-outs and fees using their own serialized endpoi
 });
 it('keeps all 23 columns and empty staking cells when contracts are unavailable', () => {
 	const rows = (
-		['payment', 'epoch-reward', 'block-reward', 'asset-transfer', 'close-out', 'fee'] as const
+		[
+			'payment',
+			'epoch-reward',
+			'block-reward',
+			'protocol-reward',
+			'asset-transfer',
+			'close-out',
+			'fee'
+		] as const
 	).map((type) => ({ ...row, type, from: 'CONTRACT', note: '' }));
 	const lines = serializeCsv(rows, context).trimEnd().split('\r\n');
 	expect(lines[0].split(',')).toHaveLength(23);
@@ -327,4 +338,32 @@ it('writes a literal ARC golden with raw units, duplicate records, independent n
 			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12"\r\n'
 	);
 	expect(csv.split('\r\n')[0].split(',')).toHaveLength(23);
+});
+
+it('writes a legacy protocol reward as an incoming native credit with no sender', () => {
+	const rows = mapTransaction(
+		{
+			id: 'KO34YPCDK4WOQCYK7MXHFULLVPUO5Q2NSEFM3CVHNSMWUTFAQA4A',
+			round: 8325339n,
+			timestamp: 0,
+			group: '',
+			type: 'pay',
+			sender: 'S',
+			fee: 1000n,
+			note: '',
+			rewards: { sender: 407n, receiver: 44048243n, close: 0n },
+			inner: [],
+			payment: { receiver: 'R', amount: 0n, closeAmount: 0n }
+		},
+		new Set(['R']),
+		new Set()
+	);
+	const csv = serializeCsv(
+		rows.filter((r) => r.type === 'protocol-reward'),
+		context
+	);
+	expect(csv).toBe(
+		header +
+			'"1970-01-01T00:00:00.000Z","R","KO34YPCDK4WOQCYK7MXHFULLVPUO5Q2NSEFM3CVHNSMWUTFAQA4A","","pay","protocol-reward","in","","R","VOI","44.048243","0","8325339","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6",""\r\n'
+	);
 });
