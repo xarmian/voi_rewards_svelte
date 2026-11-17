@@ -343,6 +343,26 @@ describe('fetchTokenTransfers', () => {
 		});
 		expect(getEnvoiNames).toHaveBeenCalledWith(['previous', 'other', 'wallet']);
 	});
+	it.each([
+		['123456789012345678901', 6, '123456789012345.678901'],
+		['9007199254740993', 0, '9007199254740993'],
+		['1', 7, '0.0000001'],
+		['200', 2, '2'],
+		['0', 2, '0'],
+		[200, 2, '2'],
+		[123456789, 4, '12345.6789'],
+		['1.5', 2, (Number('1.5') / Math.pow(10, 2)).toString()]
+	] as const)(
+		'scales ARC200 amount %j at %i decimals to %s',
+		async (amount, decimals, expected) => {
+			fetchMock.mockResolvedValue(Response.json({ data: [{ ...arcTransfer, amount }] }));
+			const result = await fetchTokenTransfers({
+				token: { ...token, type: 'arc200', decimals },
+				walletId: 'wallet'
+			});
+			expect(result.transfers[0].amount).toBe(expected);
+		}
+	);
 	it('enriches an LP transfer from its Deposit log', async () => {
 		fetchMock.mockResolvedValue(Response.json({ data: [arcTransfer] }));
 		const deposit = Buffer.concat([
