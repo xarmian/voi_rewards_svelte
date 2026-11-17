@@ -7,7 +7,8 @@ export type ActivityType =
 	| 'protocol-reward'
 	| 'asset-transfer'
 	| 'close-out'
-	| 'fee';
+	| 'fee'
+	| 'nft-transfer';
 export type ExportStatus =
 	| 'complete-indexed'
 	| 'partial-source'
@@ -71,8 +72,10 @@ export interface NormalizedTransaction extends TransactionNode {
 	group: string;
 }
 export interface ExportRow {
-	assetKind: 'native' | 'asa' | 'arc200';
+	assetKind: 'native' | 'asa' | 'arc200' | 'arc72';
 	arc200Occurrence?: number;
+	nftTokenId?: bigint;
+	nftEvent?: 'mint' | 'burn' | 'transfer';
 	assetId: bigint | null;
 	timestamp: number;
 	account: string;
@@ -107,7 +110,8 @@ const activityTypes: readonly ActivityType[] = [
 	'protocol-reward',
 	'asset-transfer',
 	'close-out',
-	'fee'
+	'fee',
+	'nft-transfer'
 ];
 function dateTime(date: string | undefined): number {
 	if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
@@ -312,23 +316,38 @@ export function mapTransaction(
 export function matchesFilters(row: ExportRow, options: ExportOptions): boolean {
 	return (
 		options.types.includes(row.type) &&
-		(options.assets.mode === 'asset'
-			? (row.assetKind === 'asa' && row.assetId === options.assets.id) ||
-				(row.assetKind === 'native' && row.type === 'fee')
-			: options.assets.mode === 'all' || row.assetKind === 'native') &&
+		// The asset choice describes fungible assets; NFT rows have their own type control.
+		(row.assetKind === 'arc72' ||
+			(options.assets.mode === 'asset'
+				? (row.assetKind === 'asa' && row.assetId === options.assets.id) ||
+					(row.assetKind === 'native' && row.type === 'fee')
+				: options.assets.mode === 'all' || row.assetKind === 'native')) &&
 		(options.allDates || (row.timestamp >= options.startTime! && row.timestamp < options.endTime!))
 	);
 }
 function lexical(a: string, b: string): number {
 	return a < b ? -1 : a > b ? 1 : 0;
 }
+function numeric(a: bigint | null | undefined, b: bigint | null | undefined): number {
+	return (a ?? -1n) < (b ?? -1n) ? -1 : (a ?? -1n) > (b ?? -1n) ? 1 : 0;
+}
+const sourceRank = { native: 0, asa: 0, arc200: 1, arc72: 2 };
 export function compareRows(a: ExportRow, b: ExportRow): number {
 	if (a.round !== b.round) return a.round < b.round ? -1 : 1;
-	const aArc = a.assetKind === 'arc200';
-	const bArc = b.assetKind === 'arc200';
-	if (aArc !== bArc) return aArc ? 1 : -1;
-	if (aArc && bArc)
+	const rank = sourceRank[a.assetKind] - sourceRank[b.assetKind];
+	if (rank) return rank;
+	if (a.assetKind === 'arc200')
 		return lexical(a.account, b.account) || b.arc200Occurrence! - a.arc200Occurrence!;
+	// The NFT source has no intra-round order, so ties sort by content.
+	if (a.assetKind === 'arc72')
+		return (
+			lexical(a.account, b.account) ||
+			lexical(a.txId, b.txId) ||
+			numeric(a.assetId, b.assetId) ||
+			numeric(a.nftTokenId, b.nftTokenId) ||
+			lexical(a.from, b.from) ||
+			lexical(a.to, b.to)
+		);
 	const offset =
 		Number(a.offset === undefined) - Number(b.offset === undefined) ||
 		(a.offset ?? 0) - (b.offset ?? 0);

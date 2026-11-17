@@ -36,14 +36,7 @@ export type Arc72Window =
 	| { kind: 'split' }
 	| { kind: 'cap'; round: bigint }
 	| { kind: 'done'; accepted: readonly Arc72Transfer[] };
-export type Arc72Event = 'mint' | 'burn' | 'transfer';
-// ExportRow gains the arc72 kind and NFT fields with the export leg; until then this is its exact shape.
-export type Arc72ExportRow = Omit<ExportRow, 'assetKind' | 'type'> & {
-	assetKind: 'arc72';
-	type: 'nft-transfer';
-	nftTokenId: bigint;
-	nftEvent: Arc72Event;
-};
+export type Arc72Event = NonNullable<ExportRow['nftEvent']>;
 
 function object(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -149,7 +142,7 @@ export function selectArc72Window(page: Arc72Page, query: Arc72Query): Arc72Wind
 		throw new Error('NFT page disagrees with its own total count.');
 	return { kind: 'done', accepted: page.transfers };
 }
-export function mapArc72Transfer(transfer: Arc72Transfer, account: string): Arc72ExportRow {
+export function mapArc72Transfer(transfer: Arc72Transfer, account: string): ExportRow {
 	return {
 		assetKind: 'arc72',
 		assetId: transfer.contractId,
