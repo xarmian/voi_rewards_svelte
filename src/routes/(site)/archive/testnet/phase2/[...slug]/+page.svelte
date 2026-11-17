@@ -299,17 +299,7 @@
 									{#if data.props.questData?.discord_linked}
 										<span class="text-green-500">✓ Linked</span>
 									{:else}
-										<span class="text-red-500 flex flex-row"
-											>✗ Not Linked
-											<InfoButton noAbsolute={true}>
-												<div class="text-sm">
-													Receive a reward boost by linking your Discord Account by going to <a
-														href="https://voirewards.com/accounts"
-														target="_blank">https://voirewards.com/accounts</a
-													> and clicking the "Link Discord" button.
-												</div>
-											</InfoButton>
-										</span>
+										<span class="text-red-500">✗ Not Linked</span>
 									{/if}
 								</div>
 								<div class="flex items-center">
