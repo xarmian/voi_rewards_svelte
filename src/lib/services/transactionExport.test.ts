@@ -1650,7 +1650,7 @@ describe('NFT export phase', () => {
 		});
 	});
 	it('still reads the indexer for every account when NFT transfers are mixed with another type', async () => {
-		const readPage = vi.fn(async () => ({ transactions: [] }));
+		const readPage = vi.fn<ExportDependencies['readPage']>(async () => ({ transactions: [] }));
 		const { run } = nftSetup(
 			{ readPage, readArc72Page: vi.fn(async () => nftPage([])) },
 			{ types: ['fee', 'nft-transfer'], addresses: [A, B] }
