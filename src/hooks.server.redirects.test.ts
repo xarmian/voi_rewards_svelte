@@ -25,12 +25,13 @@ function request(path: string, method = 'GET') {
 }
 
 test.each([
-	['/phase1?x=1', 308, '/archive/testnet/phase1?x=1'],
-	['/arc72', 302, 'https://nftnavigator.xyz/']
+	['/phase1?x=1', 'GET', 308, '/archive/testnet/phase1?x=1'],
+	['/arc72', 'GET', 302, 'https://nftnavigator.xyz/'],
+	['/accounts', 'POST', 308, '/archive/testnet']
 ] as const)(
-	'%s redirects before creating a client or resolving',
-	async (path, status, location) => {
-		const { event, resolve } = request(path);
+	'%s (%s) redirects before creating a client or resolving',
+	async (path, method, status, location) => {
+		const { event, resolve } = request(path, method);
 		const response = await handle({ event, resolve });
 		expect(response.status).toBe(status);
 		expect(response.headers.get('location')).toBe(location);
@@ -42,7 +43,7 @@ test.each([
 
 test.each([
 	['/directory', 'GET'],
-	['/accounts', 'POST']
+	['/directory', 'POST']
 ])('%s (%s) resolves normally', async (path, method) => {
 	const { event, resolve } = request(path, method);
 	const response = await handle({ event, resolve });
