@@ -10,6 +10,7 @@ import {
 	type NormalizedTransaction
 } from './transactionExport';
 import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '$lib/rewards/blockRewardConstants';
+import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 
 const input: ExportInput = {
 	assets: { mode: 'native' },
@@ -18,7 +19,7 @@ const input: ExportInput = {
 	allDates: false,
 	from: '2024-02-29',
 	through: '2024-02-29',
-	types: ['payment', 'reward-payout', 'block-reward', 'asset-transfer', 'close-out', 'fee']
+	types: ['payment', 'epoch-reward', 'block-reward', 'asset-transfer', 'close-out', 'fee']
 };
 const options = (changes: Partial<ExportInput> = {}) =>
 	normalizeOptions({ ...input, ...changes }, '2024-12-31', (a) => /^[A-Z]+$/.test(a));
@@ -42,7 +43,7 @@ describe('native transaction effects', () => {
 		const rows = map();
 		expect(rows.map((r) => [r.account, r.type, r.direction, r.amount, r.fee])).toEqual([
 			['A', 'payment', 'out', 9007199254740993n, 0n],
-			['B', 'reward-payout', 'in', 9007199254740993n, 0n],
+			['B', 'epoch-reward', 'in', 9007199254740993n, 0n],
 			['A', 'close-out', 'out', 10n, 0n],
 			['C', 'close-out', 'in', 10n, 0n],
 			['A', 'fee', 'fee', 0n, 9007199254740993n]
@@ -94,7 +95,7 @@ describe('native transaction effects', () => {
 		expect(rows.map((r) => [r.innerPath, r.type, r.fee])).toEqual([
 			['', 'fee', 3000n],
 			['0.0.0', 'payment', 0n],
-			['0.0.0', 'reward-payout', 0n],
+			['0.0.0', 'epoch-reward', 0n],
 			['0.0.0', 'fee', 7n]
 		]);
 		expect(rows[1]).toMatchObject({ applicationId: 2n, note: 'child', txId: 'ROOT' });
@@ -162,11 +163,24 @@ describe('block reward classification', () => {
 	});
 	it('prefers block reward over reward payout when the fee sink is also a known reward sender', () => {
 		expect(types(payout(), [FEE_SINK_ADDRESS])).toContainEqual(['B', 'block-reward']);
-		expect(types(payout({ note: '' }), [FEE_SINK_ADDRESS])).toContainEqual(['B', 'reward-payout']);
+		expect(types(payout({ note: '' }), [FEE_SINK_ADDRESS])).toContainEqual(['B', 'epoch-reward']);
+	});
+	it('classifies an epoch reward from a known reward sender as epoch-reward, never reward-payout', () => {
+		const sender = REWARDS_ADDRESSES[0];
+		const rows = [
+			...map(payout({ sender, note: '' }), ['B'], [...REWARDS_ADDRESSES]),
+			...map(payout({ sender }), ['B', sender], [...REWARDS_ADDRESSES]),
+			...map()
+		];
+		expect(map(payout({ sender, note: '' }), ['B'], [...REWARDS_ADDRESSES])).toMatchObject([
+			{ account: 'B', type: 'epoch-reward' }
+		]);
+		expect(rows.length).toBeGreaterThan(0);
+		for (const row of rows) expect(row.type).not.toBe('reward-payout');
 	});
 	it('still classifies known reward senders as reward payouts', () => {
-		expect(types(payout({ sender: 'R', note: '' }))).toEqual([['B', 'reward-payout']]);
-		expect(types(payout({ sender: 'R' }))).toEqual([['B', 'reward-payout']]);
+		expect(types(payout({ sender: 'R', note: '' }))).toEqual([['B', 'epoch-reward']]);
+		expect(types(payout({ sender: 'R' }))).toEqual([['B', 'epoch-reward']]);
 	});
 	it('never classifies an outgoing payment to the fee sink as a block reward', () => {
 		const rows = map(
@@ -203,7 +217,7 @@ describe('block reward classification', () => {
 		expect(
 			rows
 				.filter((r) =>
-					matchesFilters(r, options({ ...all, types: ['payment', 'reward-payout', 'fee'] }))
+					matchesFilters(r, options({ ...all, types: ['payment', 'epoch-reward', 'fee'] }))
 				)
 				.map((r) => r.type)
 		).toEqual(['payment']);

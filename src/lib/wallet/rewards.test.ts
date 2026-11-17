@@ -65,7 +65,7 @@ it('shows payouts that are still loading as loading, not as unavailable', () => 
 	expect(rows({ state: 'loading' })[0]).toMatchObject({
 		status: null,
 		actual: null,
-		payoutText: 'Loading payouts',
+		payoutText: 'Loading epoch rewards',
 		estimate: 140
 	});
 });

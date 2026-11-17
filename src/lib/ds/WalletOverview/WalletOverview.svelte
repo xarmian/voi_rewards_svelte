@@ -234,7 +234,7 @@
 						<dt>Reward estimate · epoch pool ÷ projected network blocks × produced</dt>
 						<dd>
 							{comma(summary.current.reward, 6)} VOI; pool {comma(current?.pool)} VOI. This is an estimate,
-							not a payout.
+							not a recorded reward.
 						</dd>
 					</div>
 				</dl>

@@ -17,8 +17,8 @@ const examples: FAQItem[] = [
 describe('legacy slugs and hash resolution', () => {
 	it.each([
 		[
-			'Can **Locked** or Non-vested Voi tokens earn block rewards?',
-			'can-locked-or-non-vested-voi-tokens-earn-block-rewards-'
+			'Can **Locked** or Non-vested Voi tokens earn epoch rewards?',
+			'can-locked-or-non-vested-voi-tokens-earn-epoch-rewards-'
 		],
 		['How do I create a Voi Account?', 'how-do-i-create-a-voi-account-'],
 		['How can I obtain **VOI** tokens?', 'how-can-i-obtain-voi-tokens-'],

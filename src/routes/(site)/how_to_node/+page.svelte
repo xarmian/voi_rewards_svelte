@@ -36,7 +36,7 @@
 		<h1 class="text-display">Run a node</h1>
 		<p class="mt-4 text-lede">Set up. Estimate. Check.</p>
 		<p class="mt-4 text-body text-ink-muted">
-			Node Runners earn block rewards for each block they propose. Block proposals are a key part of
+			Node Runners earn epoch rewards for the blocks they propose. Block proposals are a key part of
 			the Voi consensus mechanism.
 		</p>
 	</header>
@@ -57,7 +57,7 @@
 				<Chip label="2" />
 				<h2 class="mt-3 text-h2">Estimate rewards</h2>
 				<p class="mt-3 text-body text-ink-muted">
-					Explore potential block rewards for the amount you plan to stake.
+					Explore potential epoch and real-time block rewards for the amount you plan to stake.
 				</p>
 				<Button href="/calculator" variant="soft" class="mt-4">Open rewards calculator</Button>
 			</Card>

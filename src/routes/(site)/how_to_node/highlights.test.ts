@@ -4,7 +4,7 @@ import { FAQ_HIGHLIGHTS } from './guides';
 import { faqHighlights, faqSlug } from './highlights';
 
 const questions = [
-	'Can **Locked** or Non-vested Voi tokens earn block rewards?',
+	'Can **Locked** or Non-vested Voi tokens earn epoch rewards?',
 	'How do I get started running a node?'
 ] as const;
 const item = (question: string, answer: string): FAQItem => ({
@@ -26,7 +26,7 @@ describe('FAQ highlights', () => {
 
 	test('preserves punctuation hyphens to match FAQ hashes', () => {
 		expect(faqSlug(questions[1])).toBe('how-do-i-get-started-running-a-node-');
-		expect(faqSlug(questions[0])).toBe('can-locked-or-non-vested-voi-tokens-earn-block-rewards-');
+		expect(faqSlug(questions[0])).toBe('can-locked-or-non-vested-voi-tokens-earn-epoch-rewards-');
 	});
 
 	test('strips markdown and keeps only the first paragraph', () => {

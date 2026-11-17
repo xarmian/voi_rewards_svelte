@@ -76,7 +76,7 @@ it('keeps estimates visible and payout cells Unavailable after payout failure', 
 	expect(html).toContain('140');
 	expect(html).toContain('Unavailable');
 	expect(html).not.toContain('Not found');
-	expect(html).toContain('Recorded payouts unavailable');
+	expect(html).toContain('Recorded epoch rewards unavailable');
 });
 it('wires daily Retry and preserves bars when expected data fails', () => {
 	const state = fixture();
@@ -122,6 +122,30 @@ it('shows recorded payments outside row windows in View data without inventing a
 	expect(html).toContain('2024-10-30');
 	expect(html).not.toContain('/explorer/transaction/outside');
 });
+it('names recorded epoch rewards and uses no payout wording anywhere in the rendered text', () => {
+	vi.mocked(createRewardsState).mockReturnValue({
+		...fixture(),
+		payouts: ready(
+			validatePayouts([{ txid: 'paid', amount: 7_000_000, tx_timestamp: '2026-11-03T00:00:00Z' }])
+		)
+	});
+	const html = draw();
+	expect(html).toContain('Recorded epoch rewards');
+	expect(html).toContain('Actual reward');
+	const attributes = [...html.matchAll(/\s[\w:-]+="([^"]*)"/g)].map((match) => match[1]);
+	const text = html.replace(/<[^>]+>/g, ' ');
+	expect([text, ...attributes].join(' ')).not.toMatch(/payout/i);
+	for (const state of [
+		{ ...fixture(), payouts: { state: 'error' as const, error: 'offline' } },
+		{ ...fixture(), payouts: ready({ payments: [], complete: false }) },
+		{ ...fixture(), payouts: { state: 'loading' as const } }
+	]) {
+		vi.mocked(createRewardsState).mockReturnValue(state);
+		const other = draw();
+		const values = [...other.matchAll(/\s[\w:-]+="([^"]*)"/g)].map((match) => match[1]);
+		expect([other.replace(/<[^>]+>/g, ' '), ...values].join(' ')).not.toMatch(/payout/i);
+	}
+});
 it('server rendering performs no reads and keeps all loading footprints', () => {
 	const loading = { state: 'loading' as const };
 	vi.mocked(createRewardsState).mockReturnValue({
@@ -136,7 +160,7 @@ it('server rendering performs no reads and keeps all loading footprints', () => 
 	const html = draw();
 	expect(html).toContain('aria-busy="true"');
 	expect(html).toContain('Daily proposals');
-	expect(html).toContain('Recorded payouts');
+	expect(html).toContain('Recorded epoch rewards');
 });
 
 const PAUSED =

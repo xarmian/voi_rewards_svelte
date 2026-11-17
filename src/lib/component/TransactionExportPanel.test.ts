@@ -70,7 +70,7 @@ it('shows labelled asset choices without the ARC source warning for the native d
 	expect(html).toContain('Asset transfers');
 	expect(html).toMatch(/<input[^>]*value="block-reward"[^>]*checked/);
 	expect(html).toContain('Real-time block rewards (testing)');
-	expect(html.indexOf('Known reward payouts')).toBeLessThan(
+	expect(html.indexOf('Epoch rewards')).toBeLessThan(
 		html.indexOf('Real-time block rewards (testing)')
 	);
 	expect(html.indexOf('Real-time block rewards (testing)')).toBeLessThan(
@@ -118,6 +118,16 @@ it.each([true, false])(
 		expect(html.includes(warning)).toBe(!stakingContractsAvailable);
 	}
 );
+
+it('names the epoch reward choice and uses no payout wording', () => {
+	const html = drawPanel();
+	const attributes = [...html.matchAll(/\s[\w:-]+="([^"]*)"/g)].map((match) => match[1]);
+	const text = html.replace(/<[^>]+>/g, ' ');
+	expect(text).toContain('Epoch rewards');
+	expect(html).toMatch(/<input[^>]*value="epoch-reward"[^>]*checked/);
+	expect(html).toContain('Epoch rewards are native VOI only, classified by sender;');
+	expect([text, ...attributes].join(' ')).not.toMatch(/payout/i);
+});
 
 it('removes the obsolete ARC-200 exclusion', () => {
 	const { body } = render(Panel, {

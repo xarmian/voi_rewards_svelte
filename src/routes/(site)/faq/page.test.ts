@@ -28,9 +28,9 @@ it.each([true, false])('loads FAQ without fetching when browser is %s', async (b
 });
 
 it('uses a legacy hash for the highlighted FAQ and meta title', async () => {
-	const question = 'Can **Locked** or Non-vested Voi tokens earn block rewards?';
+	const question = 'Can **Locked** or Non-vested Voi tokens earn epoch rewards?';
 	const result = (await load(
-		event(vi.fn(), '#can-locked-or-non-vested-voi-tokens-earn-block-rewards-')
+		event(vi.fn(), '#can-locked-or-non-vested-voi-tokens-earn-epoch-rewards-')
 	)) as LoadResult;
 	expect(result.highlightedFAQ).toBe(faqData.find((item) => item.question === question));
 	expect(result.pageMetaTags.title).toBe(`FAQ: ${question} | Voi Network`);

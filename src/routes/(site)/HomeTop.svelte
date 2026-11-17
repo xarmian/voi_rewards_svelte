@@ -28,7 +28,7 @@
 	<div class="container-page text-center">
 		<h1 class="mx-auto max-w-3xl text-display">Check your Voi node's rewards in seconds</h1>
 		<p class="mx-auto mt-4 max-w-2xl text-lede text-on-hero-muted">
-			Status, key expiry, blocks and estimated payouts for any account or staking contract.
+			Status, key expiry, blocks and estimated rewards for any account or staking contract.
 			{#if data.headline.state === 'ready'}Staking currently earns <strong>{figures.apr} APR</strong
 				>.{/if}
 		</p>
@@ -112,7 +112,12 @@
 	</div>
 	<div class="grid min-w-0 md:col-span-1 lg:col-span-3">
 		{#await data.onlineStake}
-			<StatTile label="Online stake" icon="ϟ" {...onlineStakeTile(data.currentStake)} onretry={retry} />
+			<StatTile
+				label="Online stake"
+				icon="ϟ"
+				{...onlineStakeTile(data.currentStake)}
+				onretry={retry}
+			/>
 		{:then stake}
 			<StatTile
 				label="Online stake"

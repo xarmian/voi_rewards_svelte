@@ -70,6 +70,6 @@ export const guideGroups = [
 ];
 
 export const FAQ_HIGHLIGHTS = [
-	'Can **Locked** or Non-vested Voi tokens earn block rewards?',
+	'Can **Locked** or Non-vested Voi tokens earn epoch rewards?',
 	'How do I get started running a node?'
 ] as const;
