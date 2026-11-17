@@ -401,13 +401,14 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	const arc200Assets = new Map<bigint, Arc200Metadata>();
 	const arcRequested = options.assets.mode === 'all' && options.types.includes('asset-transfer');
 	const nftRequested = options.types.includes('nft-transfer');
+	// NFT transfers come only from Mimir, so an NFT-only run has no per-account indexer leg.
+	const indexerRequested = options.types.some((type) => type !== 'nft-transfer');
 	let phase: 'indexer' | 'arc200' | 'arc72' = 'indexer';
 	let nftAccountIndex = 0,
 		arc72Scanned = 0;
 	// The NFT window resumes from here on retry: its upper round and its span in rounds.
 	let nftUpper: bigint | undefined;
 	let nftSpan = BigInt(ARC72_MAX_ROUND_WINDOW);
-	const nftKeys = new Set<string>();
 	let arcAccountIndex = 0,
 		arc200Scanned = 0,
 		occurrence = 0,
@@ -679,6 +680,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				snapshotRound = positive(
 					await request((signal) => deps.bootstrap(options.addresses[0], signal))
 				);
+			if (!indexerRequested) accountIndex = options.addresses.length;
 			while (accountIndex < options.addresses.length) {
 				controller.signal.throwIfAborted();
 				if (dataResponses >= maxPages || rows.length >= maxRows) {
@@ -890,18 +892,8 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 							'The next page exceeds the row cap; none of that page was retained. Narrow the dates.';
 						return result();
 					}
-					// Windows never share a round, so a repeat of an earlier window's row is a source fault.
-					// Repeats inside one window are distinct source rows and are kept.
-					const keys = stagedRows.map((row) =>
-						[row.account, row.txId, row.assetId, row.nftTokenId, row.round, row.from, row.to].join(
-							'|'
-						)
-					);
-					if (keys.some((key) => nftKeys.has(key)))
-						throw new SchemaError('The NFT source repeated a transfer from an earlier window.');
 					controller.signal.throwIfAborted();
 					rows.push(...stagedRows);
-					for (const key of keys) nftKeys.add(key);
 					for (const row of stagedRows) {
 						oldestTimestamp = Math.min(oldestTimestamp ?? row.timestamp, row.timestamp);
 						newestTimestamp = Math.max(newestTimestamp ?? row.timestamp, row.timestamp);
@@ -976,7 +968,6 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			assets.clear();
 			arc200Assets.clear();
 			cursors.clear();
-			nftKeys.clear();
 		}
 	};
 }

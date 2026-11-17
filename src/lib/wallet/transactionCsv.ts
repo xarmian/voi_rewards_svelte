@@ -157,12 +157,14 @@ export function exportFilename(
 		!/^(all-dates|\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2})$/.test(range)
 	)
 		throw new Error('Invalid filename parameters.');
-	const prefix =
-		options.assets.mode === 'asset'
+	const nftOnly = options.types.length === 1 && options.types[0] === 'nft-transfer';
+	const prefix = nftOnly
+		? 'voi-nft-transfers-activity'
+		: options.assets.mode === 'asset'
 			? `voi-asset-${numeric(options.assets.id)}-activity`
 			: options.assets.mode === 'all'
 				? 'voi-all-assets-activity'
 				: 'voi-native-only-activity';
-	const nfts = options.types.includes('nft-transfer') ? '-with-nfts' : '';
+	const nfts = !nftOnly && options.types.includes('nft-transfer') ? '-with-nfts' : '';
 	return `${prefix}${nfts}-${context.pageAddress.slice(0, 8)}-${range}-${options.addresses.length}accounts-r${numeric(context.snapshotRound)}${context.status === 'complete-indexed' ? '' : '-partial'}.csv`;
 }

@@ -3,7 +3,7 @@
 	import { createArc200Reader } from '$lib/services/arc200Export';
 	import { ARC200_SOURCE_WARNING, ARC200_CAP_WARNING } from '$lib/wallet/arc200Export';
 	import { createArc72Reader } from '$lib/services/arc72Export';
-	import { ARC72_SOURCE_NOTE } from '$lib/wallet/arc72Export';
+	import { ARC72_SOURCE_NOTE, ARC72_CAP_WARNING } from '$lib/wallet/arc72Export';
 	import { Button, Card, InlineAlert, StatusPill } from '$lib/ds';
 	import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import {
@@ -103,11 +103,13 @@
 				: ''
 	);
 	const scope = $derived(
-		(frozen?.assets.mode === 'asset'
-			? `Asset ${frozen.assets.id} (ASA/VSA)`
-			: frozen?.assets.mode === 'all'
-				? 'VOI and all assets (ASA/VSA + ARC-200)'
-				: 'VOI only') + (frozen?.types.includes('nft-transfer') ? ' + NFT transfers' : '')
+		frozen?.types.length === 1 && frozen.types[0] === 'nft-transfer'
+			? 'NFT transfers only'
+			: (frozen?.assets.mode === 'asset'
+					? `Asset ${frozen.assets.id} (ASA/VSA)`
+					: frozen?.assets.mode === 'all'
+						? 'VOI and all assets (ASA/VSA + ARC-200)'
+						: 'VOI only') + (frozen?.types.includes('nft-transfer') ? ' + NFT transfers' : '')
 	);
 	const statusText = $derived(
 		busy
@@ -251,6 +253,7 @@
 				<p class="text-sm text-ink-muted">
 					Up to 200 data pages, 100,000 rows or 200 asset/token definitions. ARC-200 scanning stops
 					if a round fills a 100-record window. Dates are UTC. {ARC200_CAP_WARNING}
+					{ARC72_CAP_WARNING}
 				</p>
 			</div>
 			<fieldset
