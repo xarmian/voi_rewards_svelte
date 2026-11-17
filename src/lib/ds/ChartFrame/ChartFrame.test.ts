@@ -6,6 +6,7 @@ import ChartFrame from './ChartFrame.svelte';
 import LineChart from '../charts/LineChart.svelte';
 import BarsVsExpected from '../charts/BarsVsExpected.svelte';
 import type { ChartContext, XSpec } from '../charts/types';
+import { makeX, tickValues } from '../charts/scales';
 import { annotationsFor } from '../../data/chartEvents';
 import { blockHistory } from '../../../routes/ds/fixtures';
 const annotations = annotationsFor('blocksVsExpected', 'epoch');
@@ -151,4 +152,59 @@ test('the plot container is a programmatic focus target so Retry can keep focus 
 			/<div[^>]*tabindex="-1"[^>]*class="relative min-w-0|<div[^>]*class="relative min-w-0[^"]*"[^>]*tabindex="-1"/
 		);
 	}
+});
+
+function xTickTexts(html: string) {
+	// X tick labels sit on the baseline at height - 8 (232 for the default 240 px height).
+	return [...html.matchAll(/<text([^>]*y="232"[^>]*)>([^<]*)<\/text>/g)].map((m) => ({
+		x: Number(m[1].match(/\bx="([^"]*)"/)?.[1]),
+		anchor: m[1].match(/text-anchor="([^"]*)"/)?.[1],
+		label: m[2]
+	}));
+}
+test('long date band labels are spaced to their width and stay inside the svg', () => {
+	const days = Array.from({ length: 30 }, (_, i) =>
+		new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10)
+	);
+	const html = render(ChartFrame, {
+		props: {
+			...props,
+			annotations: [],
+			data: { ...data, rows: days.map((d) => [d, 1, 1]) },
+			x: { kind: 'band', values: days },
+			children: createRawSnippet<[ChartContext]>(() => ({ render: () => '<g></g>' }))
+		}
+	}).body;
+	const svgWidth = Number(html.match(/<svg[^>]*\bwidth="([^"]*)"/)?.[1]);
+	const ticks = xTickTexts(html);
+	assert.ok(ticks.length > 1);
+	for (let i = 1; i < ticks.length; i++)
+		assert.ok(ticks[i].x - ticks[i - 1].x >= 10 * 6.6 + 12 - 1e-8, `${ticks[i].label} too close`);
+	for (const tick of ticks) {
+		const labelWidth = tick.label.length * 6.6;
+		if (tick.anchor === 'middle') {
+			assert.ok(tick.x - labelWidth / 2 >= 0, `${tick.label} spills left`);
+			assert.ok(tick.x + labelWidth / 2 <= svgWidth, `${tick.label} spills right`);
+		}
+	}
+});
+test('short band labels keep the 44 px tick count on a desktop width', () => {
+	const epochs = Array.from({ length: 30 }, (_, i) => i + 1);
+	const html = render(ChartFrame, {
+		props: {
+			...props,
+			annotations: [],
+			data: { ...data, rows: epochs.map((e) => [e, 1, 1]) },
+			x: { kind: 'band', values: epochs },
+			children: createRawSnippet<[ChartContext]>(() => ({ render: () => '<g></g>' }))
+		}
+	}).body;
+	// Default width 640, y labels up to "30k" keep the 48 px left column, right margin 16.
+	const plotWidth = 640 - 48 - 16;
+	const expected = tickValues(
+		makeX({ kind: 'band', values: epochs }, [48, 48 + plotWidth]),
+		plotWidth,
+		44
+	);
+	assert.equal(xTickTexts(html).length, expected.length);
 });

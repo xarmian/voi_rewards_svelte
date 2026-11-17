@@ -97,7 +97,17 @@
 		y: yScale,
 		margin
 	});
-	let xTicks = $derived(tickValues(xScale, plotWidth));
+	// Tick labels use the tabular 11 px digits (about 6.6 px a character) and need 12 px between them.
+	const charWidth = 6.6;
+	let xGap = $derived(
+		Math.max(
+			44,
+			...xScale
+				.ticks(Math.max(1, Math.floor(plotWidth / 44)))
+				.map((value) => tickLabel(value).length * charWidth + 12)
+		)
+	);
+	let xTicks = $derived(tickValues(xScale, plotWidth, xGap));
 	let yTicks = $derived(yScale.ticks(4));
 	let marks = $derived(
 		data.rows
@@ -246,10 +256,15 @@
 					{/each}
 					{#each xTicks as value (String(value))}
 						{@const position = xScale.position(value) + xScale.bandwidth / 2}
+						{@const labelWidth = tickLabel(value).length * charWidth}
 						<text
 							x={position}
 							y={height - 8}
-							text-anchor={position > width - 32 ? 'end' : 'middle'}
+							text-anchor={position + labelWidth / 2 > width - right
+								? 'end'
+								: position - labelWidth / 2 < 0
+									? 'start'
+									: 'middle'}
 							font-size="11"
 							class="fill-ink-muted num">{tickLabel(value)}</text
 						>

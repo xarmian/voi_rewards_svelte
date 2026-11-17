@@ -56,3 +56,14 @@ test('a narrow log domain keeps its extent and a wide one gets a short readable 
 	assert.ok(ticks.every((value) => value >= 0.000121 && value <= 0.000127));
 	assert.ok(makeY([0.0001, 0.1], [200, 0], 'log').ticks(4).length <= 5);
 });
+
+test('a wider minimum gap spaces long band labels further apart', () => {
+	const values = Array.from({ length: 30 }, (_, i) =>
+		new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10)
+	);
+	const x = makeX({ kind: 'band', values }, [0, 330]);
+	const ticks = tickValues(x, 330, 78);
+	assert.ok(ticks.length > 1);
+	for (let i = 1; i < ticks.length; i++)
+		assert.ok(x.position(ticks[i]) - x.position(ticks[i - 1]) >= 78 - 1e-8);
+});

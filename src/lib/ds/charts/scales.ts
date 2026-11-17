@@ -54,14 +54,17 @@ export function makeY(
 		}
 	);
 }
-/** D3's tick count is a hint; the final filter guarantees 44 physical pixels. */
-export function tickValues(x: ReturnType<typeof makeX>, width: number): XValue[] {
-	const candidates = x.ticks(Math.max(1, Math.floor(width / 44)));
+/**
+ * D3's tick count is a hint; the final filter guarantees at least `minGap` physical pixels between
+ * ticks: 44 px by default, or more for wider labels.
+ */
+export function tickValues(x: ReturnType<typeof makeX>, width: number, minGap = 44): XValue[] {
+	const candidates = x.ticks(Math.max(1, Math.floor(width / minGap)));
 	const result: XValue[] = [];
 	let last = -Infinity;
 	for (const value of candidates) {
 		const position = x.position(value);
-		if (Number.isFinite(position) && position - last >= 44 - 1e-8) {
+		if (Number.isFinite(position) && position - last >= minGap - 1e-8) {
 			result.push(value);
 			last = position;
 		}
