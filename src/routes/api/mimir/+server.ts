@@ -5,10 +5,14 @@ import { json } from '@sveltejs/kit';
 import { validateMimirParams } from '$lib/server/validate';
 import type { RequestEvent } from './$types';
 
+// RPCs that take one jsonb argument rather than named parameters.
+const JSONB_PARAM_ACTIONS = new Set(['get_arc200_tokens', 'get_arc72_transfers']);
+
 export async function GET({ url, request }: RequestEvent) {
 	const action = url.searchParams.get('action');
 	const uncached =
 		action === 'get_arc200_tokens' ||
+		action === 'get_arc72_transfers' ||
 		(action === 'get_arc200_transfers' && !url.searchParams.has('p_contractid'));
 	const errorHeaders = uncached ? { 'Cache-Control': 'no-store' } : undefined;
 	try {
@@ -19,7 +23,7 @@ export async function GET({ url, request }: RequestEvent) {
 		const { action, params } = validation;
 
 		const { data, error } = await supabaseMimirClient
-			.rpc(action, action === 'get_arc200_tokens' ? { params } : params)
+			.rpc(action, JSONB_PARAM_ACTIONS.has(action) ? { params } : params)
 			.abortSignal(AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]));
 
 		if (error) {
