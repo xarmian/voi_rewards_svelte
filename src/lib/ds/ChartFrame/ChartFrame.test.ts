@@ -263,3 +263,41 @@ test('short band labels keep the 44 px tick count on a desktop width', () => {
 	);
 	assert.equal(xTickTexts(html).length, expected.length);
 });
+function timeChart(domain: [Date, Date]) {
+	return render(ChartFrame, {
+		props: {
+			...props,
+			annotations: [],
+			data: { ...data, rows: domain.map((d) => [d.toISOString(), 1, 1]) },
+			x: { kind: 'time', domain },
+			markX: (row) => new Date(String(row[0])),
+			children: createRawSnippet<[ChartContext]>(() => ({ render: () => '<g></g>' }))
+		}
+	}).body;
+}
+test('a multi-year time axis names the year on its first tick', () => {
+	const ticks = xTickTexts(
+		timeChart([new Date('2027-01-01T00:00Z'), new Date('2029-01-01T00:00Z')])
+	);
+	assert.ok(ticks.length > 1);
+	assert.match(ticks[0].label, /\b\d{4}\b/);
+	for (let i = 1; i < ticks.length; i++)
+		assert.ok(
+			ticks[i].x - ticks[i - 1].x >= ticks[i - 1].label.length * 6.6 - 1e-8,
+			`${ticks[i - 1].label} and ${ticks[i].label} overlap`
+		);
+});
+test('a multi-day time axis prints each date once', () => {
+	for (const days of [7, 3]) {
+		const start = new Date('2026-10-25T00:00Z');
+		const labels = xTickTexts(timeChart([start, new Date(+start + days * 86400000)])).map(
+			(tick) => tick.label
+		);
+		assert.ok(labels.length > 1, `${days} days: ${labels.join()}`);
+		assert.equal(new Set(labels).size, labels.length, `${days} days: ${labels.join()}`);
+		assert.ok(
+			labels.every((label) => /^[A-Z][a-z]{2} \d{1,2}$/.test(label)),
+			`${days} days: ${labels.join()}`
+		);
+	}
+});

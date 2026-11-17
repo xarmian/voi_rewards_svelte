@@ -67,3 +67,35 @@ test('a wider minimum gap spaces long band labels further apart', () => {
 	for (let i = 1; i < ticks.length; i++)
 		assert.ok(x.position(ticks[i]) - x.position(ticks[i - 1]) >= 78 - 1e-8);
 });
+
+const isMidnight = (value: number | string | Date) =>
+	value instanceof Date && value.getTime() % 86400000 === 0;
+test('a multi-day time axis at a desktop width ticks only at UTC midnight, each date once', () => {
+	const plotWidth = 1360;
+	const x = makeX(
+		{ kind: 'time', domain: [new Date('2026-10-25T00:00Z'), new Date('2026-11-01T00:00Z')] },
+		[0, plotWidth]
+	);
+	const ticks = tickValues(x, plotWidth);
+	assert.ok(ticks.length > 1);
+	assert.ok(ticks.every(isMidnight), ticks.map((t) => (t as Date).toISOString()).join());
+	const days = ticks.map((t) => (t as Date).toISOString().slice(0, 10));
+	assert.equal(new Set(days).size, days.length);
+});
+test('a one-day time axis keeps sub-day ticks', () => {
+	const x = makeX(
+		{ kind: 'time', domain: [new Date('2026-10-30T00:00Z'), new Date('2026-10-31T00:00Z')] },
+		[0, 1360]
+	);
+	assert.ok(tickValues(x, 1360).some((t) => !isMidnight(t)));
+});
+test('a multi-day time axis falls back to daily midnights when the hint gives under two ticks', () => {
+	const x = makeX(
+		{ kind: 'time', domain: [new Date('2026-10-30T06:00Z'), new Date('2026-11-01T18:00Z')] },
+		[0, 40]
+	);
+	assert.deepEqual(
+		x.ticks(1).map((t) => (t as Date).toISOString()),
+		['2026-10-31T00:00:00.000Z', '2026-11-01T00:00:00.000Z']
+	);
+});

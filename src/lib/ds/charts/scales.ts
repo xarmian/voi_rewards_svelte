@@ -1,5 +1,6 @@
 import { scaleBand, scaleLinear, scaleLog, scaleUtc } from 'd3-scale';
 import type { XSpec } from './types';
+import { dailyTicks } from './timeTicks';
 type XValue = number | string | Date;
 export function makeX(spec: XSpec, range: [number, number]) {
 	if (spec.kind === 'band') {
@@ -25,7 +26,10 @@ export function makeX(spec: XSpec, range: [number, number]) {
 			const n = numeric(v);
 			return Number.isFinite(n) && n >= Math.min(...ends) && n <= Math.max(...ends);
 		},
-		ticks: (count: number) => scale.ticks(count)
+		ticks: (count: number): XValue[] =>
+			spec.kind === 'time'
+				? dailyTicks(scale.ticks(count) as Date[], spec.domain)
+				: scale.ticks(count)
 	};
 }
 export function makeY(
