@@ -1375,7 +1375,7 @@ describe('NFT export phase', () => {
 			sourceScans: { indexer: [A], arc200: [], arc72: [] }
 		});
 	});
-	it('runs the NFT leg whatever the asset choice, with no ARC-200 reads, and stays complete-indexed', async () => {
+	it('runs the NFT leg whatever the asset choice, with no ARC-200 reads, and ends partial-source', async () => {
 		for (const assets of [{ mode: 'native' }, { mode: 'asset', id: '9' }] as const) {
 			const readArc72Page = vi.fn(async () => nftPage([nftRecord()]));
 			const { run, deps } = nftSetup({ readArc72Page }, { assets });
@@ -1387,7 +1387,8 @@ describe('NFT export phase', () => {
 				expect.any(AbortSignal)
 			);
 			expect(result).toMatchObject({
-				status: 'complete-indexed',
+				status: 'partial-source',
+				reason: 'NFT history completeness is unverified.',
 				arc72Scanned: 1,
 				completedAddresses: [A],
 				sourceScans: { arc72: [A] }
@@ -1519,9 +1520,13 @@ describe('NFT export phase', () => {
 		expect(result.reason).toMatch(/behind the snapshot round/);
 	});
 	it.each([
-		['with ARC-200', { assets: { mode: 'all' }, types: ['asset-transfer', 'nft-transfer'] }],
-		['without ARC-200', { types: ['nft-transfer'] }]
-	] as const)('shares one date lower-bound request %s', async (_, input) => {
+		[
+			'with ARC-200',
+			{ assets: { mode: 'all' }, types: ['asset-transfer', 'nft-transfer'] },
+			'ARC-200 and NFT history completeness is unverified.'
+		],
+		['without ARC-200', { types: ['nft-transfer'] }, 'NFT history completeness is unverified.']
+	] as const)('shares one date lower-bound request %s', async (_, input, reason) => {
 		const readPage = vi.fn(async (q: ExportQuery) => ({
 			transactions: q.address ? [] : [raw('FIRST', { confirmedRound: 1501000n })]
 		}));
@@ -1543,6 +1548,7 @@ describe('NFT export phase', () => {
 		]);
 		expect(result.completedAddresses).toEqual([A, B]);
 		expect(result.sourceScans.arc72).toEqual([A, B]);
+		expect(result).toMatchObject({ status: 'partial-source', reason });
 	});
 	it('skips the NFT leg for every account when the date lower-bound search is empty', async () => {
 		const { run, deps } = nftSetup(

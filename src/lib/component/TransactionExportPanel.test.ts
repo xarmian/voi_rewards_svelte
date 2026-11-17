@@ -153,7 +153,8 @@ function renderSelection(
 	transfers: boolean,
 	completed = false,
 	nft = false,
-	frozenTypes?: string[]
+	frozenTypes?: string[],
+	reason = 'ARC-200 history completeness is unverified.'
 ) {
 	const source = readFileSync(new URL('./TransactionExportPanel.svelte', import.meta.url), 'utf8');
 	const seeded = source.replace(
@@ -166,7 +167,7 @@ function renderSelection(
 		frozen = { assets: { mode: 'all' }, allDates: true, addresses: ${nft ? "['A', 'B']" : "['A']"},
 			types: ${JSON.stringify(frozenTypes ?? (nft ? ['asset-transfer', 'nft-transfer'] : ['asset-transfer']))} };
 		result = {
-			status: 'partial-source', reason: 'ARC-200 history completeness is unverified.',
+			status: 'partial-source', reason: ${JSON.stringify(reason)},
 			warnings: [ARC200_SOURCE_WARNING], rows: [], snapshotRound: 100n,
 			dataResponses: 2, scanned: 0, arc200Scanned: 0, arc72Scanned: 0,
 			completedAddresses: ['A'], unfinishedAddresses: ${nft ? "['B']" : '[]'},
@@ -290,4 +291,19 @@ it('reports an NFT-only export as NFT transfers only, and a mixed one with + NFT
 	);
 	expect(mixed).toContain('rows · VOI and all assets (ASA/VSA + ARC-200) + NFT transfers ·');
 	expect(mixed).not.toContain('NFT transfers only');
+});
+
+it('explains an empty partial-source export with the run reason, not a fixed ARC-200 line', () => {
+	const nftOnly = renderSelection(
+		'all',
+		true,
+		true,
+		true,
+		['nft-transfer'],
+		'NFT history completeness is unverified.'
+	).replace(/\s+/g, ' ');
+	expect(nftOnly).toContain('No matching rows returned. NFT history completeness is unverified.');
+	expect(nftOnly).not.toContain('ARC-200 history completeness is unverified.');
+	const arc = renderSelection('all', true, true).replace(/\s+/g, ' ');
+	expect(arc).toContain('No matching rows returned. ARC-200 history completeness is unverified.');
 });
