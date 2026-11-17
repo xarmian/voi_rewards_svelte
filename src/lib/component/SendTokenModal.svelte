@@ -1131,12 +1131,12 @@
 	}
 
 	// Helper function to determine if token is native VOI
-	function isNativeToken(token: any): boolean {
+	function isNativeToken(token: { type?: unknown }): boolean {
 		return token.type === 'native';
 	}
 
 	// Helper function to determine if token is ARC-200
-	function isARC200Token(token: any): boolean {
+	function isARC200Token(token: { type?: unknown }): boolean {
 		return token.type === 'arc200';
 	}
 
@@ -1609,7 +1609,7 @@
 
 							<!-- Recipients -->
 							<div class="divide-y divide-gray-200 dark:divide-gray-700 relative">
-								{#each recipients as recipient, index}
+								{#each recipients, index}
 									<RecipientRow
 										bind:recipient={recipients[index]}
 										{index}
