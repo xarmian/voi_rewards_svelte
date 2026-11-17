@@ -11,24 +11,6 @@ export interface Token {
 	approved: string;
 }
 
-export interface Transfer {
-	contractId: number;
-	tokenId: string;
-	from: string;
-	to: string;
-	round: number;
-	transactionId: string;
-	timestamp: number;
-}
-
-export interface Collection {
-	firstToken: RawToken;
-	contractId: number;
-	totalSupply: number;
-	mintRound: number;
-	tokens: Token[];
-}
-
 export interface RawToken {
 	owner: string;
 	contractId: number;
