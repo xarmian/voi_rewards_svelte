@@ -19,7 +19,15 @@ const input: ExportInput = {
 	allDates: false,
 	from: '2024-02-29',
 	through: '2024-02-29',
-	types: ['payment', 'epoch-reward', 'block-reward', 'asset-transfer', 'close-out', 'fee']
+	types: [
+		'payment',
+		'epoch-reward',
+		'block-reward',
+		'protocol-reward',
+		'asset-transfer',
+		'close-out',
+		'fee'
+	]
 };
 const options = (changes: Partial<ExportInput> = {}) =>
 	normalizeOptions({ ...input, ...changes }, '2024-12-31', (a) => /^[A-Z]+$/.test(a));
@@ -32,6 +40,7 @@ const root: NormalizedTransaction = {
 	sender: 'A',
 	fee: 9007199254740993n,
 	note: '',
+	rewards: { sender: 0n, receiver: 0n, close: 0n },
 	inner: [],
 	payment: { receiver: 'B', amount: 9007199254740993n, closeAmount: 10n, closeTo: 'C' }
 };
@@ -229,6 +238,145 @@ describe('block reward classification', () => {
 	});
 	it('accepts block-reward as a selectable activity type', () => {
 		expect(options({ types: ['block-reward'] }).types).toEqual(['block-reward']);
+	});
+});
+
+describe('legacy protocol rewards', () => {
+	const S = 'H7W63MIQJMYBOEYPM5NJEGX3P54H54RZIV2G3OQ2255AULG6U74BE5KFC4';
+	const R = 'ARAMIDFJYV2TOFB5MRNZJIXBSAVZCVAUDAPFGKR5PNX4MTILGAZABBTXQQ';
+	const applied: NormalizedTransaction = {
+		...root,
+		id: 'KO34YPCDK4WOQCYK7MXHFULLVPUO5Q2NSEFM3CVHNSMWUTFAQA4A',
+		round: 8325339n,
+		sender: S,
+		fee: 1000n,
+		rewards: { sender: 407n, receiver: 44048243n, close: 0n },
+		payment: { receiver: R, amount: 1000000n, closeAmount: 0n }
+	};
+	const shape = (rows: ReturnType<typeof map>) =>
+		rows.map((r) => [r.account, r.effect, r.type, r.direction, r.from, r.to, r.amount, r.fee]);
+	it('credits the receiver under the applying transaction', () => {
+		const rows = map(applied, [R], []);
+		expect(shape(rows)).toEqual([
+			[R, 'amount', 'payment', 'in', S, R, 1000000n, 0n],
+			[R, 'reward', 'protocol-reward', 'in', '', R, 44048243n, 0n]
+		]);
+		expect(rows[1]).toMatchObject({
+			txId: applied.id,
+			innerPath: '',
+			transactionType: 'pay',
+			assetKind: 'native',
+			assetId: null,
+			round: 8325339n
+		});
+	});
+	it('credits the sender after its payment and fee', () => {
+		expect(shape(map(applied, [S], []))).toEqual([
+			[S, 'amount', 'payment', 'out', S, R, 1000000n, 0n],
+			[S, 'fee', 'fee', 'fee', S, '', 0n, 1000n],
+			[S, 'reward', 'protocol-reward', 'in', '', S, 407n, 0n]
+		]);
+	});
+	it('credits the close recipient and keeps same-account fields as separate rows', () => {
+		const tx = {
+			...applied,
+			fee: 0n,
+			rewards: { sender: 0n, receiver: 3n, close: 9n },
+			payment: { receiver: 'C', amount: 0n, closeAmount: 5n, closeTo: 'C' }
+		};
+		expect(
+			map(tx, ['C'], [])
+				.filter((r) => r.type === 'protocol-reward')
+				.map((r) => [r.account, r.amount])
+		).toEqual([
+			['C', 3n],
+			['C', 9n]
+		]);
+		expect(
+			map({ ...tx, payment: { ...tx.payment, closeTo: 'D' } }, ['D'], [])
+				.filter((r) => r.type === 'protocol-reward')
+				.map((r) => [r.account, r.to, r.amount])
+		).toEqual([['D', 'D', 9n]]);
+	});
+	it('gives no reward row to an account that is not selected', () => {
+		expect(map(applied, ['X'], [])).toEqual([]);
+		expect(map(applied, [S], []).some((r) => r.account === R)).toBe(false);
+	});
+	it('reads sender rewards on an inner node with that inner path', () => {
+		const tx: NormalizedTransaction = {
+			...root,
+			type: 'appl',
+			sender: 'X',
+			fee: 0n,
+			payment: undefined,
+			applicationId: 5n,
+			inner: [
+				{
+					...root,
+					type: 'appl',
+					sender: 'X',
+					fee: 0n,
+					payment: undefined,
+					applicationId: 6n,
+					inner: [
+						{ ...root, type: 'keyreg', sender: 'A', fee: 0n, payment: undefined },
+						{
+							...root,
+							type: 'keyreg',
+							sender: 'A',
+							fee: 0n,
+							payment: undefined,
+							rewards: { sender: 12n, receiver: 0n, close: 0n }
+						}
+					]
+				}
+			]
+		};
+		expect(
+			map(tx, ['A'], []).map((r) => [r.innerPath, r.type, r.amount, r.applicationId, r.txId])
+		).toEqual([['0.1', 'protocol-reward', 12n, 6n, 'ROOT']]);
+	});
+	it('filters protocol rewards as native activity of their own type', () => {
+		const reward = map(applied, [R], [])[1];
+		const all = { allDates: true, from: '', through: '' };
+		expect(matchesFilters(reward, options({ ...all, types: ['protocol-reward'] }))).toBe(true);
+		expect(
+			matchesFilters(
+				reward,
+				options({ ...all, assets: { mode: 'all' }, types: ['protocol-reward'] })
+			)
+		).toBe(true);
+		expect(
+			matchesFilters(reward, options({ ...all, types: ['payment', 'block-reward', 'fee'] }))
+		).toBe(false);
+		expect(
+			matchesFilters(
+				reward,
+				options({ ...all, assets: { mode: 'asset', id: '1' }, types: ['protocol-reward'] })
+			)
+		).toBe(false);
+		expect(options({ types: ['protocol-reward'] }).types).toEqual(['protocol-reward']);
+	});
+	it('orders amount, close, fee then reward within one transaction and inner path', () => {
+		const base = map(applied, [S], [])[0];
+		const effects = ['reward', 'fee', 'close', 'amount'] as const;
+		const rows = effects.map((effect) => ({ ...base, effect }));
+		expect([...rows].sort(compareRows).map((r) => r.effect)).toEqual([
+			'amount',
+			'close',
+			'fee',
+			'reward'
+		]);
+		const tx = {
+			...applied,
+			rewards: { sender: 1n, receiver: 0n, close: 2n },
+			payment: { receiver: S, amount: 3n, closeAmount: 4n, closeTo: S }
+		};
+		expect(
+			map(tx, [S], [])
+				.sort(compareRows)
+				.map((r) => r.effect)
+		).toEqual(['amount', 'close', 'fee', 'reward', 'reward']);
 	});
 });
 

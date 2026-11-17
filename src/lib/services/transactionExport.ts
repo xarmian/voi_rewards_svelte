@@ -103,8 +103,15 @@ function normalizeNode(value: unknown, ancestors: Set<unknown>): TransactionNode
 		sender: text(tx.sender),
 		fee: exact(tx.fee),
 		note: note(tx.note),
+		rewards: {
+			sender: exact(tx.senderRewards ?? 0n),
+			receiver: exact(tx.receiverRewards ?? 0n),
+			close: exact(tx.closeRewards ?? 0n)
+		},
 		inner: []
 	};
+	if (type !== 'pay' && (result.rewards.receiver > 0n || result.rewards.close > 0n))
+		throw new SchemaError('Rewards on a non-payment transaction.');
 	if (type === 'pay') {
 		const pay = object(tx.paymentTransaction);
 		const closeAmount = exact(pay.closeAmount ?? tx.closingAmount ?? 0n);
@@ -117,6 +124,8 @@ function normalizeNode(value: unknown, ancestors: Set<unknown>): TransactionNode
 		const closeTo = pay.closeRemainderTo === undefined ? undefined : text(pay.closeRemainderTo);
 		if (closeAmount > 0n && !closeTo)
 			throw new SchemaError('Positive close amount has no recipient.');
+		if (result.rewards.close > 0n && !closeTo)
+			throw new SchemaError('Close rewards have no recipient.');
 		result.payment = {
 			receiver: text(pay.receiver),
 			amount: exact(pay.amount),

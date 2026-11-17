@@ -4,6 +4,7 @@ export type ActivityType =
 	| 'payment'
 	| 'epoch-reward'
 	| 'block-reward'
+	| 'protocol-reward'
 	| 'asset-transfer'
 	| 'close-out'
 	| 'fee';
@@ -49,6 +50,7 @@ export interface TransactionNode {
 	sender: string;
 	fee: bigint;
 	note: string;
+	rewards: { sender: bigint; receiver: bigint; close: bigint };
 	applicationId?: bigint;
 	payment?: { receiver: string; amount: bigint; closeAmount: bigint; closeTo?: string };
 	assetTransfer?: {
@@ -78,7 +80,7 @@ export interface ExportRow {
 	innerPath: string;
 	transactionType: string;
 	type: ActivityType;
-	effect: 'amount' | 'close' | 'fee';
+	effect: 'amount' | 'close' | 'fee' | 'reward';
 	direction: 'in' | 'out' | 'self' | 'fee';
 	from: string;
 	to: string;
@@ -102,6 +104,7 @@ const activityTypes: readonly ActivityType[] = [
 	'payment',
 	'epoch-reward',
 	'block-reward',
+	'protocol-reward',
 	'asset-transfer',
 	'close-out',
 	'fee'
@@ -282,6 +285,23 @@ export function mapTransaction(
 				amount: 0n,
 				fee: node.fee
 			});
+		for (const [account, amount] of [
+			[node.sender, node.rewards.sender],
+			[node.payment?.receiver, node.rewards.receiver],
+			[node.payment?.closeTo, node.rewards.close]
+		] as const)
+			if (amount > 0n && account !== undefined && accounts.has(account))
+				rows.push({
+					...base,
+					account,
+					effect: 'reward',
+					type: 'protocol-reward',
+					direction: 'in',
+					from: '',
+					to: account,
+					amount,
+					fee: 0n
+				});
 		node.inner.forEach((child, i) =>
 			visit(child, innerPath ? `${innerPath}.${i}` : String(i), applicationId)
 		);
@@ -319,7 +339,7 @@ export function compareRows(a: ExportRow, b: ExportRow): number {
 	const bp = b.innerPath ? b.innerPath.split('.').map(Number) : [];
 	for (let i = 0; i < Math.min(ap.length, bp.length); i++)
 		if (ap[i] !== bp[i]) return ap[i] - bp[i];
-	const order = { amount: 0, close: 1, fee: 2 };
+	const order = { amount: 0, close: 1, fee: 2, reward: 3 };
 	return (
 		ap.length - bp.length || order[a.effect] - order[b.effect] || lexical(a.account, b.account)
 	);
