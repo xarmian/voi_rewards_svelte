@@ -15,6 +15,8 @@ import * as svelte from 'svelte';
 import * as server from 'svelte/internal/server'; // eslint-disable-line svelte/no-svelte-internal -- Used only to execute compiler output in this test.
 import * as arcReader from '$lib/services/arc200Export';
 import * as arcExport from '$lib/wallet/arc200Export';
+import * as nftReader from '$lib/services/arc72Export';
+import * as nftExport from '$lib/wallet/arc72Export';
 import * as ds from '$lib/ds';
 import * as rewards from '$lib/rewards/calculateEpochRewards';
 import * as labels from '$lib/rewards/blockRewardLabels';
@@ -145,7 +147,12 @@ it('removes the obsolete ARC-200 exclusion', () => {
 
 // SSR has no DOM events. Seed only the panel's local state, then compile and render
 // its real template and derived expressions with statically imported dependencies.
-function renderSelection(assetMode: 'all' | 'asset', transfers: boolean, completed = false) {
+function renderSelection(
+	assetMode: 'all' | 'asset',
+	transfers: boolean,
+	completed = false,
+	nft = false
+) {
 	const source = readFileSync(new URL('./TransactionExportPanel.svelte', import.meta.url), 'utf8');
 	const seeded = source.replace(
 		'</script>',
@@ -154,13 +161,15 @@ function renderSelection(assetMode: 'all' | 'asset', transfers: boolean, complet
 		${
 			completed
 				? `
-		frozen = { assets: { mode: 'all' }, allDates: true, addresses: ['A'] };
+		frozen = { assets: { mode: 'all' }, allDates: true, addresses: ${nft ? "['A', 'B']" : "['A']"},
+			types: ${JSON.stringify(nft ? ['asset-transfer', 'nft-transfer'] : ['asset-transfer'])} };
 		result = {
 			status: 'partial-source', reason: 'ARC-200 history completeness is unverified.',
 			warnings: [ARC200_SOURCE_WARNING], rows: [], snapshotRound: 100n,
-			dataResponses: 2, scanned: 0, arc200Scanned: 0,
-			completedAddresses: ['A'], unfinishedAddresses: [],
-			sourceScans: { indexer: ['A'], arc200: ['A'] }, canRetry: false
+			dataResponses: 2, scanned: 0, arc200Scanned: 0, arc72Scanned: 0,
+			completedAddresses: ['A'], unfinishedAddresses: ${nft ? "['B']" : '[]'},
+			${nft ? "boundary: { source: 'arc72', address: 'B', upperRound: 50n }," : ''}
+			sourceScans: { indexer: ${nft ? "['A', 'B']" : "['A']"}, arc200: ${nft ? "['A', 'B']" : "['A']"}, arc72: ${nft ? "['A']" : '[]'} }, canRetry: false
 		};`
 				: ''
 		}
@@ -171,6 +180,8 @@ function renderSelection(assetMode: 'all' | 'asset', transfers: boolean, complet
 		svelte,
 		'$lib/services/arc200Export': arcReader,
 		'$lib/wallet/arc200Export': arcExport,
+		'$lib/services/arc72Export': nftReader,
+		'$lib/wallet/arc72Export': nftExport,
 		'$lib/ds': ds,
 		'$lib/rewards/calculateEpochRewards': rewards,
 		'$lib/rewards/blockRewardLabels': labels,
@@ -234,4 +245,34 @@ it('offers legacy protocol rewards, checked by default, and explains where they 
 	expect(html).toContain(
 		'not Payments. Legacy protocol rewards are a one-time network credit to accounts that held VOI before round 8,320,707. It has no transaction of its own, so it is listed under the transaction that applied it.'
 	);
+});
+
+it('offers NFT transfers after Asset transfers, unchecked by default, and explains them', () => {
+	const html = drawPanel();
+	expect(
+		html.match(/<input[^>]*value="nft-transfer"[^>]*>(?:<!---->)?([^<]*)<\/label>/)?.[1]
+	).toBe('NFT transfers');
+	expect(html).not.toMatch(/<input[^>]*value="nft-transfer"[^>]*checked/);
+	expect(html.indexOf('value="asset-transfer"')).toBeLessThan(html.indexOf('value="nft-transfer"'));
+	expect(html.indexOf('value="nft-transfer"')).toBeLessThan(html.indexOf('value="close-out"'));
+	const help = html.slice(html.indexOf('id="export-types-help"'));
+	for (const copy of [
+		'NFT transfers are ARC-72 transfer records from Mimir, including mints and burns.',
+		'If one transaction moves the same NFT more than once, only the first move is recorded.',
+		'The Assets choice does not apply to NFT transfers.'
+	]) {
+		expect(help).toContain(copy);
+		expect(html.indexOf(copy)).toBeLessThan(html.indexOf('Start export'));
+	}
+	expect(html.split(nftExport.ARC72_SOURCE_NOTE)).toHaveLength(2);
+});
+
+it('reports NFT scope, scanned accounts and the NFT boundary after a run', () => {
+	const html = renderSelection('all', true, true, true).replace(/\s+/g, ' ');
+	expect(html).toContain('VOI and all assets (ASA/VSA + ARC-200) + NFT transfers');
+	expect(html).toContain('NFT accounts scanned: 1');
+	expect(html).toContain('Current account boundary: NFT at or before round 50.');
+	const plain = renderSelection('all', true, true).replace(/\s+/g, ' ');
+	expect(plain).not.toContain('+ NFT transfers');
+	expect(plain).toContain('NFT accounts scanned: 0');
 });

@@ -628,3 +628,79 @@ describe('ARC-200 namespaces and ordering', () => {
 				expect(compareRows(sorted[a], sorted[b])).toBeLessThan(0);
 	});
 });
+
+describe('ARC-72 NFT rows', () => {
+	const nft = {
+		...map()[0],
+		assetKind: 'arc72' as const,
+		assetId: 5n,
+		applicationId: 5n,
+		nftTokenId: 7n,
+		nftEvent: 'transfer' as const,
+		transactionType: 'appl',
+		type: 'nft-transfer' as const,
+		offset: undefined,
+		group: '',
+		innerPath: '',
+		fee: 0n,
+		amount: 1n
+	};
+	it('accepts the NFT transfer type as an activity choice', () => {
+		expect(options({ types: ['nft-transfer'] }).types).toEqual(['nft-transfer']);
+		expect(options({ types: ['nft-transfer', 'payment'] }).types).toEqual([
+			'nft-transfer',
+			'payment'
+		]);
+	});
+	it('ignores the asset choice but keeps the type filter and the half-open UTC day', () => {
+		for (const assets of [
+			{ mode: 'native' },
+			{ mode: 'all' },
+			{ mode: 'asset', id: '1' }
+		] as const)
+			expect(matchesFilters(nft, options({ assets, types: ['nft-transfer'] }))).toBe(true);
+		expect(matchesFilters(nft, options({ types: ['payment', 'asset-transfer'] }))).toBe(false);
+		expect(
+			[-1, 0, 86399, 86400].map((delta) =>
+				matchesFilters(
+					{ ...nft, timestamp: root.timestamp + delta },
+					options({ types: ['nft-transfer'] })
+				)
+			)
+		).toEqual([false, true, true, false]);
+	});
+	it('orders NFT rows after ARC-200 in a round with a content-based tie order', () => {
+		const native = map()[0];
+		const arc = { ...native, assetKind: 'arc200' as const, arc200Occurrence: 0, account: 'Z' };
+		const rows = [
+			{ ...nft, account: 'B' },
+			{ ...nft, to: 'D' },
+			{ ...nft, from: 'B' },
+			{ ...nft, nftTokenId: 8n },
+			{ ...nft, nftTokenId: 10n },
+			{ ...nft, assetId: 40n },
+			{ ...nft, txId: 'TX2' },
+			nft,
+			arc,
+			native,
+			{ ...nft, round: native.round - 1n, account: 'Z' }
+		];
+		const sorted = [...rows].sort(compareRows);
+		expect(sorted).toEqual([
+			rows[10],
+			native,
+			arc,
+			nft,
+			rows[1],
+			rows[2],
+			rows[3],
+			rows[4],
+			rows[5],
+			rows[6],
+			rows[0]
+		]);
+		for (let a = 0; a < sorted.length; a++)
+			for (let b = a + 1; b < sorted.length; b++)
+				expect(compareRows(sorted[a], sorted[b])).toBeLessThan(0);
+	});
+});
