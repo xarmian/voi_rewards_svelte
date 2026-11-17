@@ -1575,4 +1575,93 @@ describe('NFT export phase', () => {
 		expect(result.status).toBe('complete-indexed');
 		expect(result.rows).toHaveLength(2);
 	});
+	it('skips the per-account indexer reads for an NFT-only run and still exports NFT rows', async () => {
+		const readPage = vi.fn(async (q: ExportQuery) => ({
+			transactions: q.address ? [raw('NATIVE')] : [raw('FIRST', { confirmedRound: 50n })]
+		}));
+		const progress = vi.fn();
+		const { run, deps } = nftSetup(
+			{
+				readPage,
+				readArc72Page: vi.fn(async () => nftPage([nftRecord()])),
+				onProgress: progress
+			},
+			{
+				types: ['nft-transfer'],
+				allDates: false,
+				from: '2024-01-01',
+				through: '2024-01-02',
+				addresses: [A, B]
+			}
+		);
+		const result = await run.start();
+		expect(deps.bootstrap).toHaveBeenCalledTimes(1);
+		expect(readPage.mock.calls.filter(([q]) => q.address !== undefined)).toEqual([]);
+		expect(readPage.mock.calls.filter(([q]) => q.address === undefined)).toHaveLength(1);
+		expect(windows(deps.readArc72Page)).toEqual([
+			[1n, 100n],
+			[1n, 100n]
+		]);
+		expect(result).toMatchObject({
+			status: 'complete-indexed',
+			snapshotRound: 100n,
+			pages: 3,
+			scanned: 0,
+			arc72Scanned: 2,
+			dataResponses: 3,
+			completedAddresses: [A, B],
+			unfinishedAddresses: [],
+			sourceScans: { indexer: [A, B], arc200: [], arc72: [A, B] },
+			boundary: undefined
+		});
+		expect(result.rows.map((r) => [r.type, r.account])).toEqual([
+			['nft-transfer', A],
+			['nft-transfer', B]
+		]);
+		for (const [event] of progress.mock.calls)
+			expect(event.account).toBeLessThanOrEqual(event.accounts);
+		expect(progress.mock.calls.at(-1)![0]).toMatchObject({
+			phase: 'arc72',
+			account: 2,
+			accounts: 2
+		});
+	});
+	it('reports an NFT boundary, not an indexer one, when an NFT-only run fails', async () => {
+		const readPage = vi.fn(async (q: ExportQuery) => ({
+			transactions: q.address ? [raw('NATIVE')] : []
+		}));
+		const readArc72Page = vi
+			.fn()
+			.mockResolvedValueOnce(nftPage([nftRecord()]))
+			.mockRejectedValue(new Error('NFT read failed'));
+		const { run } = nftSetup(
+			{ readPage, readArc72Page, sleep: async () => {} },
+			{ types: ['nft-transfer'], addresses: [A, B] }
+		);
+		const result = await run.start();
+		expect(readPage.mock.calls.filter(([q]) => q.address !== undefined)).toEqual([]);
+		expect(result).toMatchObject({
+			status: 'partial-error',
+			canRetry: true,
+			completedAddresses: [A],
+			unfinishedAddresses: [B],
+			sourceScans: { indexer: [A, B], arc72: [A] },
+			boundary: { source: 'arc72', address: B, upperRound: 100n }
+		});
+	});
+	it('still reads the indexer for every account when NFT transfers are mixed with another type', async () => {
+		const readPage = vi.fn(async () => ({ transactions: [] }));
+		const { run } = nftSetup(
+			{ readPage, readArc72Page: vi.fn(async () => nftPage([])) },
+			{ types: ['fee', 'nft-transfer'], addresses: [A, B] }
+		);
+		const result = await run.start();
+		expect(readPage.mock.calls.map(([q]) => q.address)).toEqual([A, B]);
+		expect(result).toMatchObject({
+			status: 'complete-indexed',
+			pages: 4,
+			completedAddresses: [A, B],
+			sourceScans: { indexer: [A, B], arc72: [A, B] }
+		});
+	});
 });

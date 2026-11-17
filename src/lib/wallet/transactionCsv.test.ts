@@ -429,10 +429,20 @@ it('adds -with-nfts to the filename only when NFT transfers are selected', () =>
 	expect(name(['fee', 'nft-transfer'], 'native')).toBe(
 		'voi-native-only-activity-with-nfts-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
 	);
-	expect(name(['nft-transfer'], 'all')).toBe(
+	expect(name(['fee', 'nft-transfer'], 'all')).toBe(
 		'voi-all-assets-activity-with-nfts-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
 	);
 	expect(name(['fee'], 'native')).toBe(
 		'voi-native-only-activity-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
 	);
+});
+it('names an NFT-only export for NFT transfers whatever the asset choice', () => {
+	const base = { pageAddress: 'ABCDEFGHXYZ', addresses: ['A'], allDates: true };
+	for (const assets of [{ mode: 'native' }, { mode: 'all' }, { mode: 'asset', id: '9' }] as const)
+		expect(
+			exportFilename(
+				normalizeOptions({ ...base, types: ['nft-transfer'], assets }, '2024-12-31', () => true),
+				{ ...context, pageAddress: base.pageAddress }
+			)
+		).toBe('voi-nft-transfers-activity-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv');
 });

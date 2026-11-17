@@ -84,6 +84,7 @@ it('shows labelled asset choices without the ARC source warning for the native d
 		'Up to 200 data pages, 100,000 rows or 200 asset/token definitions.',
 		'ARC-200 scanning stops if a round fills a 100-record window.',
 		'ARC-200 history is scanned in windows of up to 1,000,000 rounds; long date ranges or many accounts may reach the cap.',
+		nftExport.ARC72_CAP_WARNING,
 		'Zero-amount asset transfers and close-outs are included.'
 	]) {
 		expect(html).toContain(copy);
@@ -151,7 +152,8 @@ function renderSelection(
 	assetMode: 'all' | 'asset',
 	transfers: boolean,
 	completed = false,
-	nft = false
+	nft = false,
+	frozenTypes?: string[]
 ) {
 	const source = readFileSync(new URL('./TransactionExportPanel.svelte', import.meta.url), 'utf8');
 	const seeded = source.replace(
@@ -162,7 +164,7 @@ function renderSelection(
 			completed
 				? `
 		frozen = { assets: { mode: 'all' }, allDates: true, addresses: ${nft ? "['A', 'B']" : "['A']"},
-			types: ${JSON.stringify(nft ? ['asset-transfer', 'nft-transfer'] : ['asset-transfer'])} };
+			types: ${JSON.stringify(frozenTypes ?? (nft ? ['asset-transfer', 'nft-transfer'] : ['asset-transfer']))} };
 		result = {
 			status: 'partial-source', reason: 'ARC-200 history completeness is unverified.',
 			warnings: [ARC200_SOURCE_WARNING], rows: [], snapshotRound: 100n,
@@ -275,4 +277,17 @@ it('reports NFT scope, scanned accounts and the NFT boundary after a run', () =>
 	const plain = renderSelection('all', true, true).replace(/\s+/g, ' ');
 	expect(plain).not.toContain('+ NFT transfers');
 	expect(plain).toContain('NFT accounts scanned: 0');
+});
+
+it('reports an NFT-only export as NFT transfers only, and a mixed one with + NFT transfers', () => {
+	const only = renderSelection('all', true, true, true, ['nft-transfer']).replace(/\s+/g, ' ');
+	expect(only).toContain('rows · NFT transfers only ·');
+	expect(only).not.toContain('+ NFT transfers');
+	expect(only).not.toContain('VOI and all assets (ASA/VSA + ARC-200) ·');
+	const mixed = renderSelection('all', true, true, true, ['fee', 'nft-transfer']).replace(
+		/\s+/g,
+		' '
+	);
+	expect(mixed).toContain('rows · VOI and all assets (ASA/VSA + ARC-200) + NFT transfers ·');
+	expect(mixed).not.toContain('NFT transfers only');
 });
