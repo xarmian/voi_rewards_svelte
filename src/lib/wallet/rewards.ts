@@ -136,9 +136,12 @@ export function completedEpoch(
 	address: string,
 	pool: number
 ): RewardEpoch {
+	// The API serialises an epoch with no proposers as [] rather than {}.
+	const listed = record(raw) ? raw.proposers : undefined;
+	const proposers = Array.isArray(listed) && listed.length === 0 ? {} : listed;
 	if (
 		!record(raw) ||
-		!record(raw.proposers) ||
+		!record(proposers) ||
 		typeof raw.start_date !== 'string' ||
 		typeof raw.end_date !== 'string' ||
 		!Number.isFinite(Date.parse(raw.start_date)) ||
@@ -149,7 +152,7 @@ export function completedEpoch(
 		throw new Error('Invalid epoch snapshot');
 	const total = count(raw.total_blocks);
 	const ballast = epoch < 62 ? count(raw.ballast_blocks ?? 0) : 0;
-	const blocks = count(raw.proposers[address] ?? 0);
+	const blocks = count(proposers[address] ?? 0);
 	const result = calculateEpochRewards(
 		{ total_blocks: total, ballast_blocks: ballast },
 		epoch,
