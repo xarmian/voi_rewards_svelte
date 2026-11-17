@@ -22,12 +22,67 @@ export function isLPToken(token: FungibleTokenType | LPToken): token is LPToken 
 	return 'poolInfo' in token && token.poolInfo !== undefined;
 }
 
+// A plain decimal string in whole tokens as exact base units at `decimals`; null when it is
+// not plain decimal or carries more fraction digits than `decimals` allows.
+function toBaseUnits(value: string, decimals: number): bigint | null {
+	if (!Number.isInteger(decimals) || decimals < 0) return null;
+	const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value.trim());
+	if (!match) return null;
+	const [, sign, whole, fraction = ''] = match;
+	if (fraction.length > decimals) return null;
+	const units = BigInt(whole + fraction.padEnd(decimals, '0'));
+	return sign ? -units : units;
+}
+
+// Base units as a whole-token string with exactly `decimals` fraction digits, as toFixed prints.
+function formatBaseUnits(units: bigint, decimals: number): string {
+	const sign = units < 0n ? '-' : '';
+	const digits = (units < 0n ? -units : units).toString().padStart(decimals + 1, '0');
+	if (decimals === 0) return sign + digits;
+	return `${sign}${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`;
+}
+
+function startBalanceUnits(token: FungibleTokenType | LPToken): bigint | null {
+	if (typeof token.balanceRaw === 'string' && /^-?\d+$/.test(token.balanceRaw.trim())) {
+		return BigInt(token.balanceRaw.trim());
+	}
+	return Number.isSafeInteger(token.balance) ? BigInt(token.balance) : null;
+}
+
+function exactRunningBalance(
+	index: number,
+	token: FungibleTokenType | LPToken,
+	filteredTransfers: Transfer[],
+	walletId: string
+): string | null {
+	if (!Number.isInteger(token.decimals) || token.decimals < 0) return null;
+	let balance = startBalanceUnits(token);
+	if (balance === null) return null;
+	for (let i = 0; i < index; i++) {
+		const t = filteredTransfers[i];
+		const amount = toBaseUnits(String(t.amount), token.decimals);
+		if (amount === null) return null;
+		if (t.type === 'fee') {
+			balance += amount;
+		} else if (t.to === walletId) {
+			balance -= amount;
+		} else if (t.from === walletId) {
+			balance += amount;
+		}
+	}
+	return formatBaseUnits(balance, token.decimals);
+}
+
 export function calculateRunningBalance(
 	index: number,
 	token: FungibleTokenType | LPToken,
 	filteredTransfers: Transfer[],
 	walletId: string
 ): string {
+	// Exact base units when the balance and every newer amount parse; otherwise the number path
+	const exact = exactRunningBalance(index, token, filteredTransfers, walletId);
+	if (exact !== null) return exact;
+
 	// Start with current balance in decimal form
 	let runningBalance = Number(token.balance) / Math.pow(10, token.decimals);
 
@@ -58,18 +113,22 @@ export function formatChange(
 	token: FungibleTokenType | LPToken,
 	walletId: string
 ): string {
-	// Amount is already in decimal form
-	const amount = Number(transfer.amount);
+	// Amount is already in decimal form; format it exactly when it is a plain decimal string
+	const units = toBaseUnits(String(transfer.amount), token.decimals);
+	const formatted =
+		units === null
+			? Number(transfer.amount).toFixed(token.decimals)
+			: formatBaseUnits(units, token.decimals);
 	if (transfer.type === 'fee') {
-		return `-${amount.toFixed(token.decimals)}`; // Fees are always negative
+		return `-${formatted}`; // Fees are always negative
 	}
 	if (transfer.to === walletId) {
-		return `+${amount.toFixed(token.decimals)}`;
+		return `+${formatted}`;
 	}
 	if (transfer.from === walletId) {
-		return `-${amount.toFixed(token.decimals)}`;
+		return `-${formatted}`;
 	}
-	return amount.toFixed(token.decimals);
+	return formatted;
 }
 
 export function calculateLPStatistics(
