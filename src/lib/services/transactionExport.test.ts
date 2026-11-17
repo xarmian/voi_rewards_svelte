@@ -1744,3 +1744,118 @@ describe('NFT export phase', () => {
 		});
 	});
 });
+describe('Group ID on ARC-200 and NFT rows', () => {
+	const G = new Uint8Array([1, 2, 3]);
+	const grouped = (id: string, group: Uint8Array | null = G) =>
+		raw(id, {
+			sender: A,
+			paymentTransaction: { receiver: B, amount: 4n },
+			group: group ?? undefined
+		});
+	const indexer = (...transactions: unknown[]) =>
+		vi.fn(async (q: ExportQuery) => ({ transactions: q.address ? transactions : [] }));
+	const groupsOf = (rows: readonly { assetKind?: string; txId: string; group: string }[]) =>
+		rows.map((row) => [row.assetKind ?? 'native', row.txId, row.group]);
+	it('gives an ARC-200 row the group of the indexed root with the same transaction ID', async () => {
+		const { run } = arcSetup(
+			{
+				readPage: indexer(grouped('X')),
+				readArc200Page: vi.fn(async () => [arcRecord({ transactionid: 'X' })])
+			},
+			{ addresses: [A] }
+		);
+		const result = await run.start();
+		const native = result.rows.find((row) => row.assetKind !== 'arc200')!;
+		expect(native.group).toBe('AQID');
+		expect(result.rows.find((row) => row.assetKind === 'arc200')).toMatchObject({
+			txId: 'X',
+			group: native.group
+		});
+	});
+	it('keeps the group when every row of that root is filtered out', async () => {
+		const { run } = arcSetup(
+			{
+				readPage: indexer(grouped('X')),
+				readArc200Page: vi.fn(async () => [arcRecord({ transactionid: 'X' })])
+			},
+			{ addresses: [A], types: ['asset-transfer'] }
+		);
+		const result = await run.start();
+		expect(groupsOf(result.rows)).toEqual([['arc200', 'X', 'AQID']]);
+	});
+	it('leaves the group empty for an unknown, empty or ungrouped transaction ID', async () => {
+		const { run } = arcSetup(
+			{
+				readPage: indexer(grouped('X'), grouped('U', null)),
+				readArc200Page: vi.fn(async () => [
+					arcRecord({ transactionid: 'OTHER' }),
+					arcRecord({ transactionid: null }),
+					arcRecord({ transactionid: 'U' })
+				])
+			},
+			{ addresses: [A], types: ['asset-transfer'] }
+		);
+		const result = await run.start();
+		expect(
+			groupsOf(result.rows)
+				.map(([, txId, group]) => [txId, group])
+				.sort()
+		).toEqual([
+			['', ''],
+			['OTHER', ''],
+			['U', '']
+		]);
+	});
+	it('does not keep the group of a root from a page that was rolled back', async () => {
+		const readAsset = vi.fn(async (id: bigint) => {
+			if (id === 3n && readAsset.mock.calls.length === 1) throw httpError(404);
+			return metadata(id);
+		});
+		const { run } = setup(
+			[
+				{ transactions: [grouped('X'), assetTx('NEEDS', 3n)] },
+				{ transactions: [assetTx('NEEDS', 3n)] }
+			],
+			{
+				readAsset,
+				readArc200Page: vi.fn(async () => [arcRecord({ transactionid: 'X' })])
+			},
+			{ ...assetInput, addresses: [A] }
+		);
+		expect((await run.start()).status).toBe('partial-error');
+		const result = await run.retry();
+		expect(result.status).toBe('partial-source');
+		expect(result.rows.find((row) => row.assetKind === 'arc200')).toMatchObject({
+			txId: 'X',
+			group: ''
+		});
+	});
+	it('gives an NFT row the group of the indexed root in a mixed run', async () => {
+		const { run } = nftSetup({
+			readPage: indexer(grouped('TX')),
+			readArc72Page: vi.fn(async () =>
+				nftPage([nftRecord(), nftRecord({ transactionId: 'NONE', tokenId: '8' })])
+			)
+		});
+		const result = await run.start();
+		expect(
+			result.rows.filter((row) => row.assetKind === 'arc72').map((row) => [row.txId, row.group])
+		).toEqual(
+			expect.arrayContaining([
+				['TX', 'AQID'],
+				['NONE', '']
+			])
+		);
+	});
+	it('leaves the group empty on NFT rows of an NFT-only run', async () => {
+		const { run } = nftSetup(
+			{
+				readPage: indexer(grouped('TX')),
+				readArc72Page: vi.fn(async () => nftPage([nftRecord()]))
+			},
+			{ types: ['nft-transfer'] }
+		);
+		const result = await run.start();
+		expect(groupsOf(result.rows)).toEqual([['arc72', 'TX', '']]);
+	});
+});

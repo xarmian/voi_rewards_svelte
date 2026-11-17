@@ -421,6 +421,8 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	let resolvingAssetId: bigint | undefined;
 	let rows: ExportRow[] = [];
 	const roots = new Map<string, string>();
+	// Mimir records carry the root transaction ID, so ARC-200 and NFT rows take its indexed group.
+	const groups = new Map<string, string>();
 	const cursors = new Set<string>();
 	let accountIndex = 0,
 		pages = 0,
@@ -642,6 +644,9 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			);
 		}
 	}
+	function groupOf(txId: string): string {
+		return (txId && groups.get(txId)) || '';
+	}
 	function atCap(): boolean {
 		if (dataResponses < maxPages && rows.length < maxRows) return false;
 		status = 'partial-cap';
@@ -702,6 +707,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				if (page.nextToken && cursors.has(page.nextToken))
 					throw new CursorError('The indexer repeated a cursor. Start again.');
 				const stagedRoots = new Map<string, string>();
+				const stagedGroups = new Map<string, string>();
 				const stagedRows: ExportRow[] = [];
 				for (const raw of page.transactions) {
 					const root = normalizeTransaction(raw);
@@ -717,6 +723,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 						continue;
 					}
 					stagedRoots.set(root.id, fingerprint);
+					if (root.group) stagedGroups.set(root.id, root.group);
 					stagedRows.push(
 						...mapTransaction(root, accounts, rewards).filter((row) => matchesFilters(row, options))
 					);
@@ -753,6 +760,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				}
 				controller.signal.throwIfAborted();
 				for (const [id, fingerprint] of stagedRoots) roots.set(id, fingerprint);
+				for (const [id, group] of stagedGroups) groups.set(id, group);
 				rows.push(...stagedRows);
 				for (const row of stagedRows) {
 					oldestTimestamp = Math.min(oldestTimestamp ?? row.timestamp, row.timestamp);
@@ -799,7 +807,10 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 						return result();
 					}
 					const stagedRows = window.accepted
-						.map((transfer, i) => mapArc200Transfer(transfer, address, occurrence + i))
+						.map((transfer, i) => ({
+							...mapArc200Transfer(transfer, address, occurrence + i),
+							group: groupOf(transfer.txId)
+						}))
 						.filter((row) => matchesFilters(row, options));
 					if (rows.length + stagedRows.length > maxRows) {
 						status = 'partial-cap';
@@ -895,7 +906,10 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 						return result();
 					}
 					const stagedRows = window.accepted
-						.map((transfer) => mapArc72Transfer(transfer, address))
+						.map((transfer) => ({
+							...mapArc72Transfer(transfer, address),
+							group: groupOf(transfer.txId)
+						}))
 						.filter((row) => matchesFilters(row, options));
 					if (rows.length + stagedRows.length > maxRows) {
 						status = 'partial-cap';
@@ -984,6 +998,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			cancel();
 			rows = [];
 			roots.clear();
+			groups.clear();
 			assets.clear();
 			arc200Assets.clear();
 			cursors.clear();
