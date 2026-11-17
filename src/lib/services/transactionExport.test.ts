@@ -983,16 +983,21 @@ describe('bounded ARC-200 export phase', () => {
 		);
 	});
 	it('derives one shared padded lower bound from the first returned round and stops there', async () => {
+		// Nothing is indexed at or after the end date, so the walk starts at the snapshot.
 		const readPage = vi.fn(async (q: ExportQuery) => ({
-			transactions: q.address ? [] : [raw('FIRST', { confirmedRound: 1501000n })]
+			transactions:
+				q.address || q.afterTime === '2024-01-03T00:00:00.000Z'
+					? []
+					: [raw('FIRST', { confirmedRound: 1501000n })]
 		}));
 		const { run, deps } = arcSetup(
 			{ bootstrap: async () => 3000000n, readPage },
 			{ allDates: false, from: '2024-01-01', through: '2024-01-02', addresses: [A, B] }
 		);
-		expect(await run.start()).toMatchObject({ status: 'partial-source', pages: 7 });
+		expect(await run.start()).toMatchObject({ status: 'partial-source', pages: 8 });
 		expect(readPage.mock.calls.filter(([q]) => !q.address).map(([q]) => q)).toEqual([
-			{ afterTime: '2024-01-01T00:00:00.000Z', limit: 1, maxRound: 3000000n }
+			{ afterTime: '2024-01-01T00:00:00.000Z', limit: 1, maxRound: 3000000n },
+			{ afterTime: '2024-01-03T00:00:00.000Z', limit: 1, maxRound: 3000000n }
 		]);
 		expect(
 			vi.mocked(deps.readArc200Page).mock.calls.map(([q]) => [q.minRound, q.maxRound])
@@ -1009,7 +1014,12 @@ describe('bounded ARC-200 export phase', () => {
 			const { run, deps } = arcSetup(
 				{
 					bootstrap: async () => 2000n,
-					readPage: async (q) => ({ transactions: q.address ? [] : [{ confirmedRound: first }] })
+					readPage: async (q) => ({
+						transactions:
+							q.address || q.afterTime === '2024-01-02T00:00:00.000Z'
+								? []
+								: [{ confirmedRound: first }]
+					})
 				},
 				{ allDates: false, from: '2024-01-01', through: '2024-01-01' }
 			);
@@ -1527,8 +1537,12 @@ describe('NFT export phase', () => {
 		],
 		['without ARC-200', { types: ['nft-transfer'] }, 'NFT history completeness is unverified.']
 	] as const)('shares one date lower-bound request %s', async (_, input, reason) => {
+		// Nothing is indexed at or after the end date, so the walk starts at the snapshot.
 		const readPage = vi.fn(async (q: ExportQuery) => ({
-			transactions: q.address ? [] : [raw('FIRST', { confirmedRound: 1501000n })]
+			transactions:
+				q.address || q.afterTime === '2024-01-03T00:00:00.000Z'
+					? []
+					: [raw('FIRST', { confirmedRound: 1501000n })]
 		}));
 		const { run, deps } = nftSetup(
 			{
@@ -1539,7 +1553,10 @@ describe('NFT export phase', () => {
 			{ allDates: false, from: '2024-01-01', through: '2024-01-02', addresses: [A, B], ...input }
 		);
 		const result = await run.start();
-		expect(readPage.mock.calls.filter(([q]) => !q.address)).toHaveLength(1);
+		expect(readPage.mock.calls.filter(([q]) => !q.address).map(([q]) => q.afterTime)).toEqual([
+			'2024-01-01T00:00:00.000Z',
+			'2024-01-03T00:00:00.000Z'
+		]);
 		expect(windows(deps.readArc72Page)).toEqual([
 			[2000001n, 3000000n],
 			[1500000n, 2000000n],
@@ -1603,7 +1620,8 @@ describe('NFT export phase', () => {
 		const result = await run.start();
 		expect(deps.bootstrap).toHaveBeenCalledTimes(1);
 		expect(readPage.mock.calls.filter(([q]) => q.address !== undefined)).toEqual([]);
-		expect(readPage.mock.calls.filter(([q]) => q.address === undefined)).toHaveLength(1);
+		// The lower and the upper date search; the padded upper round clamps to the snapshot.
+		expect(readPage.mock.calls.filter(([q]) => q.address === undefined)).toHaveLength(2);
 		expect(windows(deps.readArc72Page)).toEqual([
 			[1n, 100n],
 			[1n, 100n]
@@ -1611,10 +1629,10 @@ describe('NFT export phase', () => {
 		expect(result).toMatchObject({
 			status: 'partial-source',
 			snapshotRound: 100n,
-			pages: 3,
+			pages: 4,
 			scanned: 0,
 			arc72Scanned: 2,
-			dataResponses: 3,
+			dataResponses: 4,
 			completedAddresses: [A, B],
 			unfinishedAddresses: [],
 			sourceScans: { indexer: [], arc200: [], arc72: [A, B] },
@@ -1626,7 +1644,7 @@ describe('NFT export phase', () => {
 		]);
 		for (const [event] of progress.mock.calls)
 			expect(event.account).toBeLessThanOrEqual(event.accounts);
-		// Bootstrap, the lower-bound search and every window are all reported as the NFT phase.
+		// Bootstrap, both date-bound searches and every window are all reported as the NFT phase.
 		expect(progress.mock.calls.length).toBeGreaterThan(2);
 		expect(progress.mock.calls.map(([event]) => event.phase)).toEqual(
 			progress.mock.calls.map(() => 'arc72')
@@ -1694,7 +1712,8 @@ describe('NFT export phase', () => {
 		);
 		await run.start();
 		expect(progress.mock.calls[0][0].phase).toBe('indexer');
-		expect(phaseAtLowerBound).toEqual(['arc72']);
+		// The lower and then the upper date search.
+		expect(phaseAtLowerBound).toEqual(['arc72', 'arc72']);
 	});
 	it('names NFT, not ARC-200, when an NFT record fails validation', async () => {
 		const { run } = nftSetup(
@@ -1812,11 +1831,11 @@ describe('dated ARC-200 and NFT round walks start at the end date', () => {
 		expect(arcWindows(deps.readArc200Page)).toEqual([[9499000n, SNAPSHOT]]);
 	});
 	it('clamps the padded upper round to the snapshot', async () => {
-		const readPage = bounds([at(9000000n)], [at(SNAPSHOT - 999n)]);
+		const readPage = bounds([at(9500000n)], [at(SNAPSHOT - 999n)]);
 		const { run, deps } = nftSetup(nftDeps(readPage), { ...PAST, types: ['nft-transfer'] });
 		expect((await run.start()).status).toBe('partial-source');
 		expect(searches(readPage)).toEqual([lowerSearch, upperSearch]);
-		expect(windows(deps.readArc72Page)).toEqual([[8999000n, SNAPSHOT]]);
+		expect(windows(deps.readArc72Page)).toEqual([[9499000n, SNAPSHOT]]);
 	});
 	it('makes no upper search with All indexed dates', async () => {
 		const readPage = bounds([at(1n)], [at(1n)]);
