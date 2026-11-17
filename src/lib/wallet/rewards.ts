@@ -127,7 +127,7 @@ export async function loadPayouts(address: string, force = false): Promise<Payou
 	});
 	const result = await json(`/api/mimir?${params}`, force);
 	if (!record(result) || !Array.isArray(result.data))
-		throw new Error('Recorded payouts unavailable');
+		throw new Error('Recorded epoch rewards unavailable');
 	return validatePayouts(result.data, address);
 }
 export function completedEpoch(
@@ -443,7 +443,7 @@ export function mergeRewardRows(
 			payoutText: noBlocks
 				? 'No blocks'
 				: loading && !epoch.current
-					? 'Loading payouts'
+					? 'Loading epoch rewards'
 					: status === 'In progress' || status === 'Pending'
 						? 'Not yet reported'
 						: status === 'Paid'

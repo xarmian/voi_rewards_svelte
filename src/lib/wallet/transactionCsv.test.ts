@@ -216,7 +216,7 @@ it('marks inner payments and preserves reward payout precedence', () => {
 		new Set(['CONTRACT'])
 	);
 	expect(rows).toHaveLength(1);
-	expect(rows[0]).toMatchObject({ innerPath: '0', from: 'CONTRACT', type: 'reward-payout' });
+	expect(rows[0]).toMatchObject({ innerPath: '0', from: 'CONTRACT', type: 'epoch-reward' });
 	expect(stakingCell(rows[0])).toBe('"9007199254740993"');
 });
 it('marks asset transfers, close-outs and fees using their own serialized endpoints', () => {
@@ -266,7 +266,7 @@ it('marks asset transfers, close-outs and fees using their own serialized endpoi
 });
 it('keeps all 23 columns and empty staking cells when contracts are unavailable', () => {
 	const rows = (
-		['payment', 'reward-payout', 'block-reward', 'asset-transfer', 'close-out', 'fee'] as const
+		['payment', 'epoch-reward', 'block-reward', 'asset-transfer', 'close-out', 'fee'] as const
 	).map((type) => ({ ...row, type, from: 'CONTRACT', note: '' }));
 	const lines = serializeCsv(rows, context).trimEnd().split('\r\n');
 	expect(lines[0].split(',')).toHaveLength(23);

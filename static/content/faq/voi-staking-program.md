@@ -9,7 +9,7 @@ The Voi Staking Program is a key initiative designed to incentivize early partic
 
 1. Locking up tokens: By locking VOI tokens in a special contract, you can earn bonus rewards through an airdrop. The bonus depends on when you stake (earlier weeks offer higher rewards) and how long you lock up (longer periods provide higher bonus rates).
 
-2. Staking for network security: By staking your locked and bonus tokens on a node, you contribute to network security and earn block rewards.
+2. Staking for network security: By staking your locked and bonus tokens on a node, you contribute to network security and earn epoch rewards.
 
 Key features include:
 
@@ -17,6 +17,6 @@ Key features include:
 - Incentivized early lockup with decreasing weekly bonuses
 - Flexible lockup durations (1-18 months)
 - Weekly cap of 50 million tokens with an overflow mechanism
-- Immediate bonus and block rewards
+- Immediate bonus and epoch rewards
 
 The program started on September 30th, following the exchange listings on September 26th. For detailed information and participation instructions, refer to the [Voi Staking Guide](https://medium.com/@voifoundation/staking-program-how-to-guide-382ea5085dab).

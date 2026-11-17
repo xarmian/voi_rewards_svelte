@@ -50,7 +50,7 @@
 	let assetId = $state('');
 	let types = $state<ActivityType[]>([
 		'payment',
-		'reward-payout',
+		'epoch-reward',
 		'block-reward',
 		'asset-transfer',
 		'close-out',
@@ -58,7 +58,7 @@
 	]);
 	const typeChoices: { value: ActivityType; label: string }[] = [
 		{ value: 'payment', label: 'Payments' },
-		{ value: 'reward-payout', label: 'Known reward payouts' },
+		{ value: 'epoch-reward', label: 'Epoch rewards' },
 		{
 			value: 'block-reward',
 			label: `${REALTIME_BLOCK_REWARDS_TITLE}${REALTIME_BLOCK_REWARDS_TESTING ? ' (testing)' : ''}`
@@ -330,7 +330,7 @@
 					>{/each}
 				<p id="export-types-help" class="text-sm text-ink-muted">
 					Payments and asset transfers include inner transactions. Zero-amount asset transfers and
-					close-outs are included. Known reward payouts are native VOI only, classified by sender;
+					close-outs are included. Epoch rewards are native VOI only, classified by sender;
 					estimated rewards are excluded. Real-time block rewards are the fee sink's rewards to the
 					account that proposed a block; they are listed as Real-time block rewards, not Payments.
 					The Staking contract column marks transfers to and from the staking contracts this wallet

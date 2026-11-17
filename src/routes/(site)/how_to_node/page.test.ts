@@ -15,7 +15,7 @@ vi.mock('$lib/faqData', () => ({
 			sort: 4
 		},
 		{
-			question: 'Can **Locked** or Non-vested Voi tokens earn block rewards?',
+			question: 'Can **Locked** or Non-vested Voi tokens earn epoch rewards?',
 			answer: '**Locked** answer.\n\nMore details.',
 			category: 'Staking',
 			sort: 13
@@ -24,8 +24,8 @@ vi.mock('$lib/faqData', () => ({
 }));
 const highlights = [
 	{
-		question: 'Can **Locked** or Non-vested Voi tokens earn block rewards?',
-		slug: 'can-locked-or-non-vested-voi-tokens-earn-block-rewards-',
+		question: 'Can **Locked** or Non-vested Voi tokens earn epoch rewards?',
+		slug: 'can-locked-or-non-vested-voi-tokens-earn-epoch-rewards-',
 		excerpt: 'Locked answer.'
 	},
 	{

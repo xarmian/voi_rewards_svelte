@@ -282,7 +282,7 @@
 		},
 		{
 			key: 'actual',
-			header: 'Actual payout',
+			header: 'Actual reward',
 			priority: 1,
 			numeric: true,
 			sortable: true,
@@ -502,7 +502,7 @@
 				: pct(row.ratio * 100)}
 		</p>
 		<p title={String(row.estimate ?? 'Unavailable')}>
-			Estimated reward: {row.tooEarly ? 'Too early to project' : amount(row.estimate)} · Payout: {row.actual ===
+			Estimated reward: {row.tooEarly ? 'Too early to project' : amount(row.estimate)} · Actual: {row.actual ===
 			null
 				? row.payoutText
 				: `${comma(row.actual, 2)} VOI`}
@@ -536,13 +536,13 @@
 			Expected using current online balance; historical account stake is unavailable.
 		</p>
 		{@render warning('epochs', 'Reward history unavailable')}
-		{@render warning('payouts', 'Recorded payouts unavailable')}
+		{@render warning('payouts', 'Recorded epoch rewards unavailable')}
 		{@render warning('account', 'Current account balance unavailable')}
 		{@render warning('eligible', 'Historical eligible stake unavailable')}
 		{@render warning('supply', 'Current eligible stake unavailable')}
 		{#if sources.payouts.value?.complete === false}<InlineAlert
 				tone="warn"
-				message="Recorded payouts incomplete. Payout attribution unavailable."
+				message="Recorded epoch rewards incomplete. Reward attribution unavailable."
 				onretry={() => void retry('payouts')}
 			/>{/if}
 		{#if sources.epochs.state === 'loading'}
@@ -558,7 +558,7 @@
 				{rows}
 				rowKey={(row) => String(row.epoch)}
 				rowName={(row) => `epoch ${row.epoch}`}
-				caption={`Rewards by epoch for ${pageAddress}; estimates and payouts in VOI`}
+				caption={`Rewards by epoch for ${pageAddress}; estimates and actual rewards in VOI`}
 				id="wallet-reward-epochs"
 				density="compact"
 				sort={{ key: 'epoch', dir: 'desc' }}
@@ -624,10 +624,10 @@
 		</div>
 		<div class="min-w-0 space-y-3 lg:col-span-4">
 			{#if sources.payouts.value?.complete && !recorded.length}<p class="text-label text-ink-muted">
-					No recorded payouts returned.
+					No recorded epoch rewards returned.
 				</p>{/if}
 			<ChartFrame
-				title="Recorded payouts"
+				title="Recorded epoch rewards"
 				summary="Cumulative recorded VOI payments, matched rewards senders and this recipient"
 				data={payoutData}
 				state={sources.payouts.value?.complete === false

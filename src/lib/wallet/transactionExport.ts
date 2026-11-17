@@ -2,7 +2,7 @@ import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '$lib/rewards/blockRe
 
 export type ActivityType =
 	| 'payment'
-	| 'reward-payout'
+	| 'epoch-reward'
 	| 'block-reward'
 	| 'asset-transfer'
 	| 'close-out'
@@ -100,7 +100,7 @@ export class OptionsError extends Error {
 }
 const activityTypes: readonly ActivityType[] = [
 	'payment',
-	'reward-payout',
+	'epoch-reward',
 	'block-reward',
 	'asset-transfer',
 	'close-out',
@@ -239,7 +239,7 @@ export function mapTransaction(
 								  node.note === blockRewardNote
 								? 'block-reward'
 								: direction === 'in' && rewardSenders.has(from)
-									? 'reward-payout'
+									? 'epoch-reward'
 									: 'payment';
 				rows.push({
 					...base,

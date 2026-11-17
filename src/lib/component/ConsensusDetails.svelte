@@ -176,10 +176,10 @@
 			<p class="text-sm font-medium text-gray-700 dark:text-gray-300">{accountStatus}</p>
 		</div>
 		{#if accountStatus === 'Online'}
-			This account is participating in consensus and can earn block rewards. Click the voting status
+			This account is participating in consensus and can earn epoch rewards. Click the voting status
 			button for more details.
 		{:else}
-			This account is not participating in consensus. To earn block rewards, you need to register a
+			This account is not participating in consensus. To earn epoch rewards, you need to register a
 			participation key.
 		{/if}
 	</InfoButton>

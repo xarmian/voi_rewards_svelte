@@ -3,7 +3,7 @@
 	const links = [
 		{ href: '/how_to_node', title: 'Setup guides', detail: 'Pick a guide for your platform' },
 		{ href: '/calculator', title: 'Rewards calculator', detail: 'What will my stake earn?' },
-		{ href: '/faq', title: 'FAQ', detail: 'Keys, lock contracts, payouts' }
+		{ href: '/faq', title: 'FAQ', detail: 'Keys, lock contracts, rewards' }
 	];
 </script>
 
