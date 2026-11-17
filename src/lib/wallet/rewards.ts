@@ -17,6 +17,8 @@ export type RewardEpoch = {
 	current: boolean;
 	progress?: number;
 	pool?: number;
+	/** A completed epoch with no published snapshot: blocks are unknown, not zero. */
+	missing?: true;
 };
 export type Payment = { txid: string; timestamp: string; amount: number };
 export type Payouts = { payments: Payment[]; complete: boolean };
@@ -200,6 +202,21 @@ export function liveEpoch(raw: unknown, epoch: number, address: string, pool: nu
 		pool
 	};
 }
+function missingEpoch(epoch: number): RewardEpoch {
+	return { epoch, blocks: 0, networkBlocks: 0, estimate: null, current: false, missing: true };
+}
+/** The warning naming completed epochs whose snapshot is not yet published, or null if none. */
+export function missingEpochsMessage(epochs: RewardEpoch[]): string | null {
+	const missing = epochs
+		.filter((epoch) => epoch.missing)
+		.map((epoch) => epoch.epoch)
+		.sort((a, b) => a - b);
+	if (!missing.length) return null;
+	if (missing.length === 1)
+		return `Reward history incomplete: epoch ${missing[0]} is not yet available.`;
+	const list = `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`;
+	return `Reward history incomplete: epochs ${list} are not yet available.`;
+}
 export async function loadRewardEpochs(address: string, force = false): Promise<RewardEpoch[]> {
 	const [dates, response] = await Promise.all([
 		boundedRead(dataTable.fetchDateRanges(force)),
@@ -213,7 +230,7 @@ export async function loadRewardEpochs(address: string, force = false): Promise<
 	if (!dates.length) return [];
 	const latest = dates.at(-1)!;
 	const result = await Promise.all(
-		dates.slice(0, -1).flatMap((date) => {
+		dates.slice(0, -1).map((date): RewardEpoch | Promise<RewardEpoch> => {
 			const raw =
 				snapshots.find(
 					(item) =>
@@ -227,12 +244,10 @@ export async function loadRewardEpochs(address: string, force = false): Promise<
 						Date.parse(item.start_date) === epochRange(date.epoch).start.getTime()
 				);
 			return raw === undefined
-				? []
-				: [
-						getTokensByEpoch(date.epoch).then((pool) =>
-							completedEpoch(raw, date.epoch, address, pool)
-						)
-					];
+				? missingEpoch(date.epoch)
+				: getTokensByEpoch(date.epoch).then((pool) =>
+						completedEpoch(raw, date.epoch, address, pool)
+					);
 		})
 	);
 	const [live, pool] = await Promise.all([
@@ -355,7 +370,7 @@ export function mergeRewardRows(
 			? liveStake
 			: stakes.find((row) => row.epoch_number === epoch.epoch)?.eligible_online_stake;
 		let expected =
-			stake && account
+			!epoch.missing && stake && account
 				? (epoch.networkBlocks * (account.online ? account.balance : 0)) / stake
 				: null;
 		let ratio = expected !== null && expected > 0 ? epoch.blocks / expected : null;
@@ -399,7 +414,8 @@ export function mergeRewardRows(
 		const end = epochRange(epoch.epoch + 2).start.getTime();
 		const known = payouts.value?.complete === true && !payouts.error;
 		// Zero produced blocks establish no payout expectation, regardless of the payment source.
-		const noBlocks = epoch.blocks === 0;
+		// A missing snapshot leaves blocks unknown, so payments are still matched.
+		const noBlocks = epoch.blocks === 0 && !epoch.missing;
 		const payments =
 			noBlocks || !known || epoch.current
 				? []
@@ -413,17 +429,21 @@ export function mergeRewardRows(
 		const loading = payouts.state === 'loading';
 		const status = noBlocks
 			? null
-			: epoch.current
-				? 'In progress'
-				: loading
-					? null
-					: !known
-						? 'Unavailable'
-						: payments.length
-							? 'Paid'
-							: now < end
-								? 'Pending'
-								: 'Not found';
+			: epoch.missing
+				? payments.length
+					? 'Paid'
+					: null
+				: epoch.current
+					? 'In progress'
+					: loading
+						? null
+						: !known
+							? 'Unavailable'
+							: payments.length
+								? 'Paid'
+								: now < end
+									? 'Pending'
+									: 'Not found';
 		const tone: Tone =
 			status === 'Paid'
 				? 'ok'
@@ -445,13 +465,19 @@ export function mergeRewardRows(
 			explanation: status === 'Not found' ? 'No payment found in the following week.' : '',
 			payoutText: noBlocks
 				? 'No blocks'
-				: loading && !epoch.current
-					? 'Loading epoch rewards'
-					: status === 'In progress' || status === 'Pending'
-						? 'Not yet reported'
-						: status === 'Paid'
+				: epoch.missing
+					? loading
+						? 'Loading epoch rewards'
+						: payments.length
 							? ''
-							: (status ?? 'Unavailable')
+							: 'Not yet available'
+					: loading && !epoch.current
+						? 'Loading epoch rewards'
+						: status === 'In progress' || status === 'Pending'
+							? 'Not yet reported'
+							: status === 'Paid'
+								? ''
+								: (status ?? 'Unavailable')
 		};
 	});
 }

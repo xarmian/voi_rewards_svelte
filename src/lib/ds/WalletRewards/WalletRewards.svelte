@@ -27,6 +27,7 @@
 		loadDailyStake,
 		loadRewardSupply,
 		mergeRewardRows,
+		missingEpochsMessage,
 		dailyProposals,
 		cumulativePayouts,
 		recordedPayouts,
@@ -194,6 +195,7 @@
 			sources.supply.value
 		)
 	);
+	let missingMessage = $derived(missingEpochsMessage(sources.epochs.value ?? []));
 	let days = $derived(
 		dailyProposals(
 			sources.daily.value ?? {},
@@ -237,6 +239,7 @@
 		Math.max(1, ...days.flatMap((day) => [day.actual ?? 0, day.expected ?? 0])) * 1.2
 	);
 	let payoutMax = $derived(Math.max(1, ...cumulative.map((payment) => payment.running)) * 1.1);
+	const SNAPSHOT_MISSING = 'Not yet available';
 	function amount(value: number | null) {
 		return value === null
 			? 'Unavailable'
@@ -259,7 +262,7 @@
 			priority: 2,
 			numeric: true,
 			sortable: true,
-			sortValue: (row) => row.blocks,
+			sortValue: (row) => (row.missing ? null : row.blocks),
 			cell: blocksCell
 		},
 		{
@@ -470,16 +473,19 @@
 				: ''}
 		</p>{/if}
 {/snippet}
-{#snippet blocksCell(row: RewardRow)}<span
-		title={`${row.blocks} / ${row.expected ?? 'Unavailable'}`}
-		>{comma(row.blocks)} / {row.expected === null ? 'Unavailable' : comma(row.expected, 1)}</span
-	>{/snippet}
-{#snippet luckCell(row: RewardRow)}{row.ratio === null
-		? 'Unavailable'
-		: pct(row.ratio * 100)}{/snippet}
-{#snippet estimateCell(row: RewardRow)}<span title={String(row.estimate ?? 'Unavailable')}
-		>{row.tooEarly ? 'Too early to project' : amount(row.estimate)}</span
-	>{/snippet}
+{#snippet blocksCell(row: RewardRow)}{#if row.missing}{SNAPSHOT_MISSING}{:else}<span
+			title={`${row.blocks} / ${row.expected ?? 'Unavailable'}`}
+			>{comma(row.blocks)} / {row.expected === null ? 'Unavailable' : comma(row.expected, 1)}</span
+		>{/if}{/snippet}
+{#snippet luckCell(row: RewardRow)}{row.missing
+		? SNAPSHOT_MISSING
+		: row.ratio === null
+			? 'Unavailable'
+			: pct(row.ratio * 100)}{/snippet}
+{#snippet estimateCell(row: RewardRow)}{#if row.missing}{SNAPSHOT_MISSING}{:else}<span
+			title={String(row.estimate ?? 'Unavailable')}
+			>{row.tooEarly ? 'Too early to project' : amount(row.estimate)}</span
+		>{/if}{/snippet}
 {#snippet payoutCell(row: RewardRow)}
 	<span
 		class="break-words"
@@ -494,21 +500,27 @@
 {#snippet detail(row: RewardRow)}
 	<div class="space-y-2 break-words text-label">
 		<p>{epochRange(row.epoch).label} (UTC)</p>
-		<p>
-			Produced: {comma(row.blocks)} · Expected: {row.expected === null
-				? 'Unavailable'
-				: comma(row.expected, 2)} · Luck: {row.ratio === null
-				? 'Unavailable'
-				: pct(row.ratio * 100)}
-		</p>
-		<p title={String(row.estimate ?? 'Unavailable')}>
-			Estimated reward: {row.tooEarly ? 'Too early to project' : amount(row.estimate)} · Actual: {row.actual ===
-			null
-				? row.payoutText
-				: `${comma(row.actual, 2)} VOI`}
-		</p>
+		{#if row.missing}<p>
+				Epoch snapshot not yet available. Produced and expected blocks will appear once it is
+				published.
+			</p>
+			<p>
+				Actual: {row.actual === null ? row.payoutText : `${comma(row.actual, 2)} VOI`}
+			</p>{:else}<p>
+				Produced: {comma(row.blocks)} · Expected: {row.expected === null
+					? 'Unavailable'
+					: comma(row.expected, 2)} · Luck: {row.ratio === null
+					? 'Unavailable'
+					: pct(row.ratio * 100)}
+			</p>
+			<p title={String(row.estimate ?? 'Unavailable')}>
+				Estimated reward: {row.tooEarly ? 'Too early to project' : amount(row.estimate)} · Actual: {row.actual ===
+				null
+					? row.payoutText
+					: `${comma(row.actual, 2)} VOI`}
+			</p>{/if}
 		{#if row.explanation}<p>{row.explanation}</p>{/if}
-		{#if row.blocks > 0}<p>
+		{#if row.blocks > 0 || row.missing}<p>
 				Matched by receipt date in the following week: {epochRange(
 					row.epoch + 1
 				).start.toISOString()} inclusive to {epochRange(row.epoch + 2).start.toISOString()} exclusive.
@@ -544,6 +556,11 @@
 				tone="warn"
 				message="Recorded epoch rewards incomplete. Reward attribution unavailable."
 				onretry={() => void retry('payouts')}
+			/>{/if}
+		{#if missingMessage}<InlineAlert
+				tone="warn"
+				message={missingMessage}
+				onretry={() => void retry('epochs')}
 			/>{/if}
 		{#if sources.epochs.state === 'loading'}
 			<div aria-busy="true" class="space-y-3">
