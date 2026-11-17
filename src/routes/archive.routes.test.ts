@@ -43,18 +43,14 @@ test.each([...routes.map((route) => `${site}/${route}`), 'src/routes/arc72'])(
 );
 
 // A prerendered page is written out as a static file, and the host serves a static file before any
-// server hook runs, so a prerendered redirect source would never redirect in production. Every route
-// that the redirect table sends elsewhere and that still has files on disk must be rendered on request.
-test.each(['what_is_voi', 'ecosystem/[...category]', 'accounts', 'accounts/auth'])(
-	'the redirect source %s is not prerendered',
-	(route) => {
-		for (const file of ['+page.ts', '+page.server.ts']) {
-			const path = `${site}/${route}/${file}`;
-			if (!existsSync(path)) continue;
-			expect(readFileSync(path, 'utf8')).not.toMatch(/export\s+const\s+prerender\s*=\s*true/);
-		}
-	}
-);
+// server hook runs, so a prerendered redirect source would never redirect in production. The redirect
+// sources below therefore keep no route files at all; the redirect table in hooks.server.ts serves them.
+test.each([
+	`${site}/what_is_voi`,
+	`${site}/ecosystem`,
+	`${site}/accounts`,
+	'src/routes/api/ecosystem'
+])('the redirect source %s has been removed', (path) => expect(existsSync(path)).toBe(false));
 
 function sourceFiles(directory: string): string[] {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -75,7 +71,9 @@ test('source links use the new destinations', () => {
 			readFileSync(path, 'utf8')
 				.split('\n')
 				.flatMap((line, i) =>
-					/href="\/(phase1|phase2|leaderboard|quests|reports|relays|arc72)/.test(line)
+					/href="\/(phase1|phase2|leaderboard|quests|reports|relays|arc72|accounts|what_is_voi|ecosystem)/.test(
+						line
+					)
 						? [`${path}:${i + 1}: ${line.trim()}`]
 						: []
 				)

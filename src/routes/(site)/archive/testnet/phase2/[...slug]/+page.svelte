@@ -202,17 +202,6 @@
 											Address NOT Registered
 										</div>
 										<div class="text-sm">For Phase 2</div>
-										<a class="text-blue-500 underline hover:text-blue-400 pointer" href="/accounts"
-											>Manage Account</a
-										>
-										<div class="absolute top-1 right-1">
-											<InfoButton noAbsolute={true}>
-												<div class="text-sm">
-													Register your addresses at the link above to be eligible for the Phase 2
-													Testnet Rewards.
-												</div>
-											</InfoButton>
-										</div>
 									{:else}
 										<div
 											class="text-xl font-semibold text-green-800 dark:text-green-300 text-center"
@@ -220,9 +209,6 @@
 											🎉 Address Registered 🎉
 										</div>
 										<div class="text-sm">For Phase 2</div>
-										<a class="text-blue-500 underline hover:text-blue-400 pointer" href="/accounts"
-											>Manage Account</a
-										>
 									{/if}
 								{:else}
 									<div class="text-xl font-semibold text-gray-800 dark:text-white text-center">
