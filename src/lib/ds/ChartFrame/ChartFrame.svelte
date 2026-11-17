@@ -97,7 +97,50 @@
 		y: yScale,
 		margin
 	});
-	let xTicks = $derived(tickValues(xScale, plotWidth));
+	// Tick labels use the tabular 11 px digits (about 6.6 px a character) and need 12 px between them.
+	const charWidth = 6.6;
+	let xGap = $derived(
+		Math.max(
+			44,
+			...xScale
+				.ticks(Math.max(1, Math.floor(plotWidth / 44)))
+				.map((value) => tickLabel(value).length * charWidth + 12)
+		)
+	);
+	let xTicks = $derived(tickValues(xScale, plotWidth, xGap));
+	// Edge labels are anchored at their end or start, which shifts their box towards a neighbour, so
+	// a tick whose rendered box comes within 12 px of the previous kept one is dropped.
+	let xTickLabels = $derived.by(() => {
+		const kept: {
+			value: (typeof xTicks)[number];
+			position: number;
+			anchor: 'start' | 'middle' | 'end';
+			left: number;
+			right: number;
+			label: string;
+		}[] = [];
+		for (const value of xTicks) {
+			const position = xScale.position(value) + xScale.bandwidth / 2;
+			const label = tickLabel(value);
+			const labelWidth = label.length * charWidth;
+			const anchor =
+				position + labelWidth / 2 > width - right
+					? 'end'
+					: position - labelWidth / 2 < 0
+						? 'start'
+						: 'middle';
+			const tickLeft =
+				anchor === 'end'
+					? position - labelWidth
+					: anchor === 'start'
+						? position
+						: position - labelWidth / 2;
+			const previous = kept[kept.length - 1];
+			if (previous && tickLeft < previous.right + 12) continue;
+			kept.push({ value, position, anchor, left: tickLeft, right: tickLeft + labelWidth, label });
+		}
+		return kept;
+	});
 	let yTicks = $derived(yScale.ticks(4));
 	let marks = $derived(
 		data.rows
@@ -244,14 +287,13 @@
 							class="fill-ink-muted num">{(y.format ?? compact)(value)}</text
 						>
 					{/each}
-					{#each xTicks as value (String(value))}
-						{@const position = xScale.position(value) + xScale.bandwidth / 2}
+					{#each xTickLabels as tick (String(tick.value))}
 						<text
-							x={position}
+							x={tick.position}
 							y={height - 8}
-							text-anchor={position > width - 32 ? 'end' : 'middle'}
+							text-anchor={tick.anchor}
 							font-size="11"
-							class="fill-ink-muted num">{tickLabel(value)}</text
+							class="fill-ink-muted num">{tick.label}</text
 						>
 					{/each}
 					{@render children(ctx)}
