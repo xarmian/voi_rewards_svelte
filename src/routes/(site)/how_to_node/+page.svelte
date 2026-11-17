@@ -36,8 +36,8 @@
 		<h1 class="text-display">Run a node</h1>
 		<p class="mt-4 text-lede">Set up. Estimate. Check.</p>
 		<p class="mt-4 text-body text-ink-muted">
-			Node Runners earn epoch rewards for the blocks they propose. Block proposals are a key part of
-			the Voi consensus mechanism.
+			Node Runners earn epoch rewards in proportion to the blocks they propose. Block proposals are
+			a key part of the Voi consensus mechanism.
 		</p>
 	</header>
 
