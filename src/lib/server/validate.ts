@@ -1,4 +1,5 @@
 import { ARC200_MAX_ROUND_WINDOW } from '$lib/wallet/arc200Export';
+import { ARC72_MAX_ROUND_WINDOW, ARC72_PAGE_LIMIT } from '$lib/wallet/arc72Export';
 export { ARC200_MAX_ROUND_WINDOW };
 
 function isIntegerString(value: string): boolean {
@@ -55,6 +56,13 @@ const mimirSchemas: Record<string, Record<string, ParamParser>> = {
 		p_user: parseAddress,
 		p_limit: (value) => parseInteger(value, 1, 100),
 		p_offset: (value) => parseInteger(value, 0, 100000)
+	},
+	get_arc72_transfers: {
+		user: parseAddress,
+		'min-round': (value) => parseInteger(value, 1),
+		'max-round': (value) => parseInteger(value, 1),
+		limit: (value) => parseInteger(value, ARC72_PAGE_LIMIT, ARC72_PAGE_LIMIT),
+		'next-token': (value) => parseInteger(value, 0, 0)
 	},
 	get_account_transactions_multi: {
 		from_addresses: parseAddressArray,
@@ -118,6 +126,12 @@ export function validateMimirParams(
 			Number(params.p_max_round) - Number(params.p_min_round) > ARC200_MAX_ROUND_WINDOW)
 	)
 		return { error: 'Invalid ARC-200 round window' };
+	if (
+		action === 'get_arc72_transfers' &&
+		(Number(params['min-round']) > Number(params['max-round']) ||
+			Number(params['max-round']) - Number(params['min-round']) > ARC72_MAX_ROUND_WINDOW)
+	)
+		return { error: 'Invalid ARC-72 round window' };
 	return { action, params };
 }
 

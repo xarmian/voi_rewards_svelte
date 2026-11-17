@@ -10,6 +10,17 @@ import {
 	type Arc200Metadata,
 	type Arc200Query
 } from '$lib/wallet/arc200Export';
+import {
+	ARC72_CAP_WARNING,
+	ARC72_MAX_ROUND_WINDOW,
+	ARC72_SOURCE_NOTE,
+	arc72CurrentRound,
+	assertArc72Bound,
+	mapArc72Transfer,
+	normalizeArc72Page,
+	selectArc72Window,
+	type Arc72Query
+} from '$lib/wallet/arc72Export';
 import { isValidAddress, ALGORAND_ZERO_ADDRESS_STRING, parseJSON, IntDecoding } from 'algosdk';
 import { algodIndexer } from '$lib/utils/algod';
 import {
@@ -288,11 +299,17 @@ export interface ExportResult {
 	arc200Assets: ReadonlyMap<bigint, Arc200Metadata>;
 	warnings: readonly string[];
 	arc200Scanned: number;
+	arc72Scanned: number;
 	dataResponses: number;
-	sourceScans: { indexer: readonly string[]; arc200: readonly string[] };
+	sourceScans: {
+		indexer: readonly string[];
+		arc200: readonly string[];
+		arc72: readonly string[];
+	};
 	boundary?:
 		| { source: 'indexer'; address: string; nextToken?: string }
-		| { source: 'arc200'; address: string; upperRound: bigint };
+		| { source: 'arc200'; address: string; upperRound: bigint }
+		| { source: 'arc72'; address: string; upperRound: bigint };
 	stakingContracts: ReadonlyMap<string, string>;
 	assets: ReadonlyMap<bigint, AssetMetadata>;
 	rows: readonly ExportRow[];
@@ -308,8 +325,9 @@ export interface ExportResult {
 	newestTimestamp?: number;
 }
 export interface ExportProgress {
-	phase: 'indexer' | 'arc200';
+	phase: 'indexer' | 'arc200' | 'arc72';
 	arc200Scanned: number;
+	arc72Scanned: number;
 	dataResponses: number;
 	assetsResolved: number;
 	resolvingAssetId?: bigint;
@@ -322,6 +340,7 @@ export interface ExportProgress {
 }
 export interface ExportDependencies {
 	readArc200Page(query: Arc200Query, signal: AbortSignal): Promise<unknown>;
+	readArc72Page(query: Arc72Query, signal: AbortSignal): Promise<unknown>;
 	readArc200Metadata(id: bigint, signal: AbortSignal): Promise<unknown>;
 	stakingContracts?: ReadonlyMap<string, string>;
 	readAsset(id: bigint, signal: AbortSignal): Promise<unknown>;
@@ -382,7 +401,16 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	const assets = new Map<bigint, AssetMetadata>();
 	const arc200Assets = new Map<bigint, Arc200Metadata>();
 	const arcRequested = options.assets.mode === 'all' && options.types.includes('asset-transfer');
-	let phase: 'indexer' | 'arc200' = 'indexer';
+	const nftRequested = options.types.includes('nft-transfer');
+	// NFT transfers come only from Mimir, so an NFT-only run has no per-account indexer leg.
+	const indexerRequested = options.types.some((type) => type !== 'nft-transfer');
+	let phase: 'indexer' | 'arc200' | 'arc72' =
+		indexerRequested || arcRequested ? 'indexer' : 'arc72';
+	let nftAccountIndex = 0,
+		arc72Scanned = 0;
+	// The NFT window resumes from here on retry: its upper round and its span in rounds.
+	let nftUpper: bigint | undefined;
+	let nftSpan = BigInt(ARC72_MAX_ROUND_WINDOW);
 	let arcAccountIndex = 0,
 		arc200Scanned = 0,
 		occurrence = 0,
@@ -416,10 +444,15 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				assetsResolved: assets.size + arc200Assets.size,
 				phase,
 				arc200Scanned,
+				arc72Scanned,
 				dataResponses,
 				resolvingAssetId,
 				account: Math.min(
-					(phase === 'indexer' ? accountIndex : arcAccountIndex) + 1,
+					(phase === 'indexer'
+						? accountIndex
+						: phase === 'arc200'
+							? arcAccountIndex
+							: nftAccountIndex) + 1,
 					accounts.size
 				),
 				accounts: accounts.size,
@@ -430,10 +463,14 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			});
 	}
 	function result(): ExportResult {
-		const indexer = options.addresses.slice(0, accountIndex);
+		const indexer = indexerRequested ? options.addresses.slice(0, accountIndex) : [];
 		const arc200 = options.addresses.slice(0, arcAccountIndex);
-		const completedAddresses = indexer.filter(
-			(address) => !arcRequested || arc200.includes(address)
+		const arc72 = options.addresses.slice(0, nftAccountIndex);
+		const completedAddresses = options.addresses.filter(
+			(address) =>
+				(!indexerRequested || indexer.includes(address)) &&
+				(!arcRequested || arc200.includes(address)) &&
+				(!nftRequested || arc72.includes(address))
 		);
 		const rawIds = [
 			...new Set(
@@ -445,6 +482,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			)
 		].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 		const warnings = arcRequested ? [ARC200_SOURCE_WARNING] : [];
+		if (nftRequested) warnings.push(ARC72_SOURCE_NOTE);
 		if (rawIds.length)
 			warnings.push(
 				`ARC-200 amounts exported as raw units for contract IDs: ${rawIds.join(', ')}. Indexed decimals are unavailable.`
@@ -453,20 +491,29 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			arc200Assets: new Map(arc200Assets),
 			warnings,
 			arc200Scanned,
+			arc72Scanned,
 			dataResponses,
-			sourceScans: { indexer, arc200 },
+			sourceScans: { indexer, arc200, arc72 },
 			boundary:
 				phase === 'indexer'
 					? accountIndex < options.addresses.length
 						? { source: 'indexer', address: options.addresses[accountIndex], nextToken: cursor }
 						: undefined
-					: arcAccountIndex < options.addresses.length
-						? {
-								source: 'arc200',
-								address: options.addresses[arcAccountIndex],
-								upperRound: upperRound ?? snapshotRound
-							}
-						: undefined,
+					: phase === 'arc200'
+						? arcAccountIndex < options.addresses.length
+							? {
+									source: 'arc200',
+									address: options.addresses[arcAccountIndex],
+									upperRound: upperRound ?? snapshotRound
+								}
+							: undefined
+						: nftAccountIndex < options.addresses.length
+							? {
+									source: 'arc72',
+									address: options.addresses[nftAccountIndex],
+									upperRound: nftUpper ?? snapshotRound
+								}
+							: undefined,
 			assets: new Map(assets),
 			stakingContracts: new Map(stakingContracts),
 			rows: [...rows].sort(compareRows),
@@ -475,7 +522,9 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			reason:
 				status === 'partial-cap' && arcRequested && phase === 'arc200'
 					? `${reason} ${ARC200_CAP_WARNING}`
-					: reason,
+					: status === 'partial-cap' && phase === 'arc72'
+						? `${reason} ${ARC72_CAP_WARNING}`
+						: reason,
 			pages,
 			scanned,
 			completedAddresses,
@@ -584,7 +633,13 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 		try {
 			return normalize();
 		} catch (error) {
-			throw new SchemaError(error instanceof Error ? error.message : 'Invalid ARC-200 response.');
+			throw new SchemaError(
+				error instanceof Error
+					? error.message
+					: phase === 'arc72'
+						? 'Invalid NFT response.'
+						: 'Invalid ARC-200 response.'
+			);
 		}
 	}
 	function atCap(): boolean {
@@ -592,6 +647,40 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 		status = 'partial-cap';
 		reason = 'Export cap reached; narrow the dates or select fewer accounts.';
 		return true;
+	}
+	// One padded lower round L, shared by the ARC-200 and NFT legs: null when no activity is in
+	// range, 'cap' when the response cap stops the run first.
+	async function ensureLowerRound(): Promise<bigint | null | 'cap'> {
+		if (lowerRound !== undefined) return lowerRound;
+		if (options.allDates) return (lowerRound = 1n);
+		if (atCap()) return 'cap';
+		// algorand/indexer 748ac4048cf8893c4faf0c1d3b31bcbe67b0165d,
+		// idb/postgres/postgres.go:501-516,589-598,724-729: without an address,
+		// txn_participation is not joined and ORDER BY t.round, t.intra is ascending.
+		// afterTime selects rounds at or after the first round with realtime > T.
+		const page = validatePage(
+			await request((signal) =>
+				deps.readPage(
+					{
+						afterTime: new Date(options.startTime! * 1000).toISOString(),
+						limit: 1,
+						maxRound: snapshotRound
+					},
+					signal
+				)
+			)
+		);
+		if (page.transactions.length > 1) throw new SchemaError('Invalid date lower-bound response.');
+		const first = page.transactions[0];
+		if (first === undefined) lowerRound = null;
+		else {
+			const round = positive(object(first).confirmedRound);
+			if (round > snapshotRound) throw new SchemaError('Date lower bound exceeds the snapshot.');
+			lowerRound = round > 1000n ? round - 1000n : 1n;
+		}
+		dataResponses++;
+		pages++;
+		return lowerRound;
 	}
 	async function execute(): Promise<ExportResult> {
 		retryEligible = false;
@@ -601,7 +690,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				snapshotRound = positive(
 					await request((signal) => deps.bootstrap(options.addresses[0], signal))
 				);
-			while (accountIndex < options.addresses.length) {
+			while (indexerRequested && accountIndex < options.addresses.length) {
 				controller.signal.throwIfAborted();
 				if (dataResponses >= maxPages || rows.length >= maxRows) {
 					status = 'partial-cap';
@@ -681,48 +770,17 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			}
 			if (arcRequested) {
 				phase = 'arc200';
+				progress();
 				schema(() => assertArc200Bound(snapshotRound));
-				if (lowerRound === undefined) {
-					if (options.allDates) lowerRound = 1n;
-					else {
-						if (atCap()) return result();
-						// algorand/indexer 748ac4048cf8893c4faf0c1d3b31bcbe67b0165d,
-						// idb/postgres/postgres.go:501-516,589-598,724-729: without an address,
-						// txn_participation is not joined and ORDER BY t.round, t.intra is ascending.
-						// afterTime selects rounds at or after the first round with realtime > T.
-						const page = validatePage(
-							await request((signal) =>
-								deps.readPage(
-									{
-										afterTime: new Date(options.startTime! * 1000).toISOString(),
-										limit: 1,
-										maxRound: snapshotRound
-									},
-									signal
-								)
-							)
-						);
-						if (page.transactions.length > 1)
-							throw new SchemaError('Invalid date lower-bound response.');
-						const first = page.transactions[0];
-						if (first === undefined) lowerRound = null;
-						else {
-							const round = positive(object(first).confirmedRound);
-							if (round > snapshotRound)
-								throw new SchemaError('Date lower bound exceeds the snapshot.');
-							lowerRound = round > 1000n ? round - 1000n : 1n;
-						}
-						dataResponses++;
-						pages++;
-					}
-				}
-				if (lowerRound === null) arcAccountIndex = options.addresses.length;
-				while (arcAccountIndex < options.addresses.length && lowerRound !== null) {
+				const lower = await ensureLowerRound();
+				if (lower === 'cap') return result();
+				if (lower === null) arcAccountIndex = options.addresses.length;
+				while (arcAccountIndex < options.addresses.length && lower !== null) {
 					controller.signal.throwIfAborted();
 					upperRound ??= snapshotRound;
 					if (windowLower === undefined) {
 						const candidate = upperRound - BigInt(ARC200_MAX_ROUND_WINDOW - 1);
-						windowLower = candidate > lowerRound ? candidate : lowerRound;
+						windowLower = candidate > lower ? candidate : lower;
 					}
 					if (atCap()) return result();
 					const address = options.addresses[arcAccountIndex];
@@ -786,7 +844,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 					else {
 						upperRound = windowLower - 1n;
 						windowLower = undefined;
-						if (upperRound < lowerRound) {
+						if (upperRound < lower) {
 							arcAccountIndex++;
 							upperRound = undefined;
 						}
@@ -794,8 +852,86 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 					progress();
 				}
 			}
-			status = arcRequested ? 'partial-source' : 'complete-indexed';
-			reason = arcRequested ? 'ARC-200 history completeness is unverified.' : '';
+			if (nftRequested) {
+				phase = 'arc72';
+				progress();
+				schema(() => assertArc72Bound(snapshotRound));
+				const lower = await ensureLowerRound();
+				if (lower === 'cap') return result();
+				if (lower === null) nftAccountIndex = options.addresses.length;
+				while (nftAccountIndex < options.addresses.length && lower !== null) {
+					controller.signal.throwIfAborted();
+					nftUpper ??= snapshotRound;
+					const candidate = nftUpper - nftSpan + 1n;
+					const minRound = candidate > lower ? candidate : lower;
+					if (atCap()) return result();
+					const address = options.addresses[nftAccountIndex];
+					const query = { address, minRound, maxRound: nftUpper };
+					progress();
+					// A source behind the snapshot would silently omit the newest rounds, so it is retried.
+					const raw = await request(
+						async (signal) => {
+							const value = await deps.readArc72Page(query, signal);
+							const current = arc72CurrentRound(value);
+							if (current !== undefined && current < snapshotRound)
+								throw new Error('NFT source is behind the snapshot round; retry shortly.');
+							return value;
+						},
+						{ retrySyntaxError: false }
+					);
+					const page = schema(() => normalizeArc72Page(raw, query, isValidAddress));
+					dataResponses++;
+					arc72Scanned += page.transfers.length;
+					const window = schema(() => selectArc72Window(page, query));
+					if (window.kind === 'split') {
+						// Halve the window actually queried, so a clamped window is never re-read unchanged.
+						nftSpan = (query.maxRound - query.minRound + 1n) / 2n;
+						progress();
+						continue;
+					}
+					if (window.kind === 'cap') {
+						status = 'partial-cap';
+						reason = `NFT round ${window.round} has more than 1,000 transfers for this account; this round and older NFT history for this account were not included.`;
+						return result();
+					}
+					const stagedRows = window.accepted
+						.map((transfer) => mapArc72Transfer(transfer, address))
+						.filter((row) => matchesFilters(row, options));
+					if (rows.length + stagedRows.length > maxRows) {
+						status = 'partial-cap';
+						reason =
+							'The next page exceeds the row cap; none of that page was retained. Narrow the dates.';
+						return result();
+					}
+					controller.signal.throwIfAborted();
+					rows.push(...stagedRows);
+					for (const row of stagedRows) {
+						oldestTimestamp = Math.min(oldestTimestamp ?? row.timestamp, row.timestamp);
+						newestTimestamp = Math.max(newestTimestamp ?? row.timestamp, row.timestamp);
+					}
+					pages++;
+					nftUpper = minRound - 1n;
+					const doubled = nftSpan * 2n;
+					nftSpan =
+						doubled < BigInt(ARC72_MAX_ROUND_WINDOW) ? doubled : BigInt(ARC72_MAX_ROUND_WINDOW);
+					if (nftUpper < lower) {
+						nftAccountIndex++;
+						nftUpper = undefined;
+						nftSpan = BigInt(ARC72_MAX_ROUND_WINDOW);
+					}
+					progress();
+				}
+			}
+			// ARC-200 and NFT rows come from Mimir records whose completeness is not proven.
+			status = arcRequested || nftRequested ? 'partial-source' : 'complete-indexed';
+			reason =
+				arcRequested && nftRequested
+					? 'ARC-200 and NFT history completeness is unverified.'
+					: arcRequested
+						? 'ARC-200 history completeness is unverified.'
+						: nftRequested
+							? 'NFT history completeness is unverified.'
+							: '';
 		} catch (error) {
 			if (cancelled || disposed) {
 				status = 'partial-cancelled';

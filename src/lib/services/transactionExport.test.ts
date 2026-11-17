@@ -15,6 +15,7 @@ import {
 	type ExportQuery
 } from '../wallet/transactionExport';
 import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '../rewards/blockRewardConstants';
+import { ARC72_CAP_WARNING, ARC72_SOURCE_NOTE, type Arc72Query } from '../wallet/arc72Export';
 
 const raw = (id = 'ROOT', changes: Record<string, unknown> = {}) => ({
 	id,
@@ -64,6 +65,7 @@ function setup(
 		bootstrap: vi.fn(async () => 100n),
 		readPage,
 		readArc200Page: vi.fn(async () => []),
+		readArc72Page: vi.fn(async () => nftPage([])),
 		readArc200Metadata: vi.fn(async (id) => arcMetadata(id)),
 		readAsset: vi.fn(async (id) => metadata(id)),
 		rewardSenders: new Set(),
@@ -1327,4 +1329,418 @@ it('uses the same SDK reader without an address for the date lower-bound search'
 	expect(builder.limit).toHaveBeenCalledWith(1);
 	expect(builder.maxRound).toHaveBeenCalledWith(3000n);
 	expect(builder.do).toHaveBeenCalledWith(undefined, { signal });
+});
+
+const nftRecord = (changes: Record<string, unknown> = {}) => ({
+	contractId: '5',
+	tokenId: '7',
+	fromAddr: A,
+	toAddr: B,
+	round: 100,
+	timestamp: 1704067200,
+	transactionId: 'TX',
+	note: null,
+	...changes
+});
+function nftPage(transfers: unknown[], changes: Record<string, unknown> = {}) {
+	return {
+		transfers,
+		'next-token': null,
+		'total-count': transfers.length,
+		'current-round': 1000000000,
+		...changes
+	};
+}
+function nftSetup(changes: Partial<ExportDependencies> = {}, input: Partial<ExportInput> = {}) {
+	return setup(
+		[],
+		{ readPage: vi.fn(async () => ({ transactions: [] })), ...changes },
+		{ addresses: [A], types: ['payment', 'nft-transfer'], ...input }
+	);
+}
+const windows = (fn: unknown) =>
+	vi
+		.mocked(fn as ExportDependencies['readArc72Page'])
+		.mock.calls.map(([q]) => [q.minRound, q.maxRound]);
+describe('NFT export phase', () => {
+	it('makes no NFT request and adds no NFT disclosure when the type is not selected', async () => {
+		const { run, deps } = nftSetup({}, { types: ['payment', 'asset-transfer'] });
+		const result = await run.start();
+		expect(deps.readArc72Page).not.toHaveBeenCalled();
+		expect(result).toMatchObject({
+			status: 'complete-indexed',
+			warnings: [],
+			arc72Scanned: 0,
+			completedAddresses: [A],
+			sourceScans: { indexer: [A], arc200: [], arc72: [] }
+		});
+	});
+	it('runs the NFT leg whatever the asset choice, with no ARC-200 reads, and ends partial-source', async () => {
+		for (const assets of [{ mode: 'native' }, { mode: 'asset', id: '9' }] as const) {
+			const readArc72Page = vi.fn(async () => nftPage([nftRecord()]));
+			const { run, deps } = nftSetup({ readArc72Page }, { assets });
+			const result = await run.start();
+			expect(deps.readArc200Page).not.toHaveBeenCalled();
+			expect(readArc72Page).toHaveBeenCalledTimes(1);
+			expect(readArc72Page).toHaveBeenCalledWith(
+				{ address: A, minRound: 1n, maxRound: 100n },
+				expect.any(AbortSignal)
+			);
+			expect(result).toMatchObject({
+				status: 'partial-source',
+				reason: 'NFT history completeness is unverified.',
+				arc72Scanned: 1,
+				completedAddresses: [A],
+				sourceScans: { arc72: [A] }
+			});
+			expect(result.warnings).toContain(ARC72_SOURCE_NOTE);
+			expect(result.rows).toMatchObject([
+				{
+					assetKind: 'arc72',
+					type: 'nft-transfer',
+					direction: 'out',
+					assetId: 5n,
+					nftTokenId: 7n,
+					nftEvent: 'transfer'
+				}
+			]);
+		}
+	});
+	it('splits an oversize window without keeping its rows and re-doubles the span after each success', async () => {
+		const readArc72Page = vi.fn(async (q: Arc72Query) =>
+			q.maxRound === 2000000n && q.minRound < 1750001n
+				? nftPage([nftRecord({ round: Number(q.maxRound) })], { 'total-count': 1001 })
+				: q.minRound === 1250001n
+					? nftPage([nftRecord({ round: 1600000 })])
+					: nftPage([])
+		);
+		const { run } = nftSetup({ bootstrap: async () => 2000000n, readArc72Page });
+		const result = await run.start();
+		expect(windows(readArc72Page)).toEqual([
+			[1000001n, 2000000n],
+			[1500001n, 2000000n],
+			[1750001n, 2000000n],
+			[1250001n, 1750000n],
+			[250001n, 1250000n],
+			[1n, 250000n]
+		]);
+		expect(result.status).toBe('partial-source');
+		expect(result.rows.map((r) => r.round)).toEqual([1600000n]);
+		expect(result.arc72Scanned).toBe(3);
+	});
+	it.each([
+		['a short page', nftPage([nftRecord()], { 'total-count': 2 })],
+		['a page with a next token', nftPage([nftRecord()], { 'next-token': '1000' })]
+	])('rolls back %s as a retryable error and retries the same window', async (_, bad) => {
+		const readArc72Page = vi
+			.fn()
+			.mockResolvedValueOnce(nftPage([nftRecord({ round: 200000 })]))
+			.mockResolvedValueOnce(bad)
+			.mockResolvedValue(nftPage([nftRecord({ round: 1 })]));
+		const { run } = nftSetup(
+			{ bootstrap: async () => 1000100n, readArc72Page },
+			{ addresses: [A] }
+		);
+		const failed = await run.start();
+		expect(failed).toMatchObject({
+			status: 'partial-error',
+			canRetry: true,
+			boundary: { source: 'arc72', address: A, upperRound: 100n },
+			unfinishedAddresses: [A]
+		});
+		expect(failed.reason).toMatch(/total count/);
+		expect(failed.rows.map((r) => r.round)).toEqual([200000n]);
+		const result = await run.retry();
+		expect(result.status).toBe('partial-source');
+		expect(result.rows.map((r) => r.round)).toEqual([1n, 200000n]);
+		expect(windows(readArc72Page)).toEqual([
+			[101n, 1000100n],
+			[1n, 100n],
+			[1n, 100n]
+		]);
+	});
+	it('ends the NFT leg at a dense round without keeping any of that page', async () => {
+		const readArc72Page = vi.fn(async (q: Arc72Query) =>
+			q.minRound <= 2n && q.maxRound >= 2n
+				? nftPage([nftRecord({ round: 2 })], { 'total-count': 1001, 'current-round': 4 })
+				: nftPage([nftRecord({ round: 3 })], { 'current-round': 4 })
+		);
+		const { run, deps } = nftSetup({ bootstrap: async () => 4n, readArc72Page });
+		const result = await run.start();
+		expect(windows(readArc72Page)).toEqual([
+			[1n, 4n],
+			[3n, 4n],
+			[1n, 2n],
+			[2n, 2n]
+		]);
+		expect(result).toMatchObject({
+			status: 'partial-cap',
+			canRetry: false,
+			unfinishedAddresses: [A],
+			boundary: { source: 'arc72', address: A, upperRound: 2n }
+		});
+		expect(result.rows.map((r) => r.round)).toEqual([3n]);
+		expect(result.reason).toContain('NFT round 2 has more than 1,000 transfers');
+		expect(result.reason).toContain(ARC72_CAP_WARNING);
+		expect(deps.readArc200Page).not.toHaveBeenCalled();
+	});
+	it('counts every NFT response against the shared response cap', async () => {
+		const { run, deps } = nftSetup({ bootstrap: async () => 500000000n, maxPages: 5 });
+		const result = await run.start();
+		expect(deps.readArc72Page).toHaveBeenCalledTimes(4);
+		expect(result).toMatchObject({
+			status: 'partial-cap',
+			dataResponses: 5,
+			unfinishedAddresses: [A]
+		});
+		expect(result.reason).toContain(ARC72_CAP_WARNING);
+	});
+	it('retains none of an NFT window that exceeds the row cap', async () => {
+		const readArc72Page = vi.fn(async () => nftPage([nftRecord(), nftRecord()]));
+		const { run } = nftSetup({ readArc72Page, maxRows: 1 });
+		expect(await run.start()).toMatchObject({ status: 'partial-cap', rows: [] });
+	});
+	it('auto-retries while the NFT source is behind the snapshot round', async () => {
+		const readArc72Page = vi
+			.fn()
+			.mockResolvedValueOnce(nftPage([], { 'current-round': 99 }))
+			.mockResolvedValue(nftPage([nftRecord()]));
+		const { run } = nftSetup({ readArc72Page });
+		const result = await run.start();
+		expect(readArc72Page).toHaveBeenCalledTimes(2);
+		expect(result.status).toBe('partial-source');
+		expect(result.rows).toHaveLength(1);
+	});
+	it('fails retryably, never with a short export, when the NFT source stays behind', async () => {
+		const readArc72Page = vi.fn(async () => nftPage([nftRecord()], { 'current-round': 99 }));
+		const { run } = nftSetup({ readArc72Page });
+		const result = await run.start();
+		expect(readArc72Page).toHaveBeenCalledTimes(4);
+		expect(result).toMatchObject({ status: 'partial-error', canRetry: true, rows: [] });
+		expect(result.reason).toMatch(/behind the snapshot round/);
+	});
+	it.each([
+		[
+			'with ARC-200',
+			{ assets: { mode: 'all' }, types: ['asset-transfer', 'nft-transfer'] },
+			'ARC-200 and NFT history completeness is unverified.'
+		],
+		['without ARC-200', { types: ['nft-transfer'] }, 'NFT history completeness is unverified.']
+	] as const)('shares one date lower-bound request %s', async (_, input, reason) => {
+		const readPage = vi.fn(async (q: ExportQuery) => ({
+			transactions: q.address ? [] : [raw('FIRST', { confirmedRound: 1501000n })]
+		}));
+		const { run, deps } = nftSetup(
+			{
+				bootstrap: async () => 3000000n,
+				readPage,
+				readArc72Page: vi.fn(async () => nftPage([], { 'current-round': 3000000 }))
+			},
+			{ allDates: false, from: '2024-01-01', through: '2024-01-02', addresses: [A, B], ...input }
+		);
+		const result = await run.start();
+		expect(readPage.mock.calls.filter(([q]) => !q.address)).toHaveLength(1);
+		expect(windows(deps.readArc72Page)).toEqual([
+			[2000001n, 3000000n],
+			[1500000n, 2000000n],
+			[2000001n, 3000000n],
+			[1500000n, 2000000n]
+		]);
+		expect(result.completedAddresses).toEqual([A, B]);
+		expect(result.sourceScans.arc72).toEqual([A, B]);
+		expect(result).toMatchObject({ status: 'partial-source', reason });
+	});
+	it('skips the NFT leg for every account when the date lower-bound search is empty', async () => {
+		const { run, deps } = nftSetup(
+			{},
+			{ allDates: false, from: '2024-01-01', through: '2024-01-01', addresses: [A, B] }
+		);
+		expect(await run.start()).toMatchObject({
+			status: 'partial-source',
+			completedAddresses: [A, B],
+			rows: []
+		});
+		expect(deps.readArc72Page).not.toHaveBeenCalled();
+	});
+	it('keeps each selected account its own side of a transfer between them', async () => {
+		const { run } = nftSetup(
+			{ readArc72Page: vi.fn(async () => nftPage([nftRecord()])) },
+			{ addresses: [A, B] }
+		);
+		const result = await run.start();
+		expect(result.rows.map((r) => [r.account, r.direction])).toEqual([
+			[A, 'out'],
+			[B, 'in']
+		]);
+	});
+	it('keeps identical transfers that one window returns as distinct source rows', async () => {
+		const { run } = nftSetup({
+			readArc72Page: vi.fn(async () => nftPage([nftRecord(), nftRecord()]))
+		});
+		const result = await run.start();
+		expect(result.status).toBe('partial-source');
+		expect(result.rows).toHaveLength(2);
+	});
+	it('skips the per-account indexer reads for an NFT-only run and still exports NFT rows', async () => {
+		const readPage = vi.fn(async (q: ExportQuery) => ({
+			transactions: q.address ? [raw('NATIVE')] : [raw('FIRST', { confirmedRound: 50n })]
+		}));
+		const progress = vi.fn();
+		const { run, deps } = nftSetup(
+			{
+				readPage,
+				readArc72Page: vi.fn(async () => nftPage([nftRecord()])),
+				onProgress: progress
+			},
+			{
+				types: ['nft-transfer'],
+				allDates: false,
+				from: '2024-01-01',
+				through: '2024-01-02',
+				addresses: [A, B]
+			}
+		);
+		const result = await run.start();
+		expect(deps.bootstrap).toHaveBeenCalledTimes(1);
+		expect(readPage.mock.calls.filter(([q]) => q.address !== undefined)).toEqual([]);
+		expect(readPage.mock.calls.filter(([q]) => q.address === undefined)).toHaveLength(1);
+		expect(windows(deps.readArc72Page)).toEqual([
+			[1n, 100n],
+			[1n, 100n]
+		]);
+		expect(result).toMatchObject({
+			status: 'partial-source',
+			snapshotRound: 100n,
+			pages: 3,
+			scanned: 0,
+			arc72Scanned: 2,
+			dataResponses: 3,
+			completedAddresses: [A, B],
+			unfinishedAddresses: [],
+			sourceScans: { indexer: [], arc200: [], arc72: [A, B] },
+			boundary: undefined
+		});
+		expect(result.rows.map((r) => [r.type, r.account])).toEqual([
+			['nft-transfer', A],
+			['nft-transfer', B]
+		]);
+		for (const [event] of progress.mock.calls)
+			expect(event.account).toBeLessThanOrEqual(event.accounts);
+		// Bootstrap, the lower-bound search and every window are all reported as the NFT phase.
+		expect(progress.mock.calls.length).toBeGreaterThan(2);
+		expect(progress.mock.calls.map(([event]) => event.phase)).toEqual(
+			progress.mock.calls.map(() => 'arc72')
+		);
+		expect(progress.mock.calls.at(-1)![0]).toMatchObject({
+			phase: 'arc72',
+			account: 2,
+			accounts: 2
+		});
+	});
+	it('reports an NFT boundary, not an indexer one, when an NFT-only run fails', async () => {
+		const readPage = vi.fn(async (q: ExportQuery) => ({
+			transactions: q.address ? [raw('NATIVE')] : []
+		}));
+		const readArc72Page = vi
+			.fn()
+			.mockResolvedValueOnce(nftPage([nftRecord()]))
+			.mockRejectedValue(new Error('NFT read failed'));
+		const { run } = nftSetup(
+			{ readPage, readArc72Page, sleep: async () => {} },
+			{ types: ['nft-transfer'], addresses: [A, B] }
+		);
+		const result = await run.start();
+		expect(readPage.mock.calls.filter(([q]) => q.address !== undefined)).toEqual([]);
+		expect(result).toMatchObject({
+			status: 'partial-error',
+			canRetry: true,
+			completedAddresses: [A],
+			unfinishedAddresses: [B],
+			sourceScans: { indexer: [], arc200: [], arc72: [A] },
+			boundary: { source: 'arc72', address: B, upperRound: 100n }
+		});
+	});
+	it('still reads the indexer for every account when NFT transfers are mixed with another type', async () => {
+		const readPage = vi.fn<ExportDependencies['readPage']>(async () => ({ transactions: [] }));
+		const { run } = nftSetup(
+			{ readPage, readArc72Page: vi.fn(async () => nftPage([])) },
+			{ types: ['fee', 'nft-transfer'], addresses: [A, B] }
+		);
+		const result = await run.start();
+		expect(readPage.mock.calls.map(([q]) => q.address)).toEqual([A, B]);
+		expect(result.unfinishedAddresses).toEqual([]);
+		expect(result).toMatchObject({
+			status: 'partial-source',
+			pages: 4,
+			completedAddresses: [A, B],
+			sourceScans: { indexer: [A, B], arc72: [A, B] }
+		});
+	});
+	it('starts a mixed run in the indexer phase and reports the NFT phase before its lower-bound search', async () => {
+		const progress = vi.fn();
+		const phaseAtLowerBound: string[] = [];
+		const readPage = vi.fn<ExportDependencies['readPage']>(async (q) => {
+			if (!q.address) phaseAtLowerBound.push(progress.mock.calls.at(-1)![0].phase);
+			return { transactions: q.address ? [] : [raw('FIRST', { confirmedRound: 50n })] };
+		});
+		const { run } = nftSetup(
+			{ readPage, onProgress: progress },
+			{
+				types: ['fee', 'nft-transfer'],
+				allDates: false,
+				from: '2024-01-01',
+				through: '2024-01-02'
+			}
+		);
+		await run.start();
+		expect(progress.mock.calls[0][0].phase).toBe('indexer');
+		expect(phaseAtLowerBound).toEqual(['arc72']);
+	});
+	it('names NFT, not ARC-200, when an NFT record fails validation', async () => {
+		const { run } = nftSetup(
+			{ readArc72Page: vi.fn(async () => nftPage([nftRecord({ contractId: '0' })])) },
+			{ types: ['nft-transfer'] }
+		);
+		const result = await run.start();
+		expect(result).toMatchObject({
+			status: 'partial-error',
+			reason: 'ARC-72 NFT contract IDs and round bounds must be positive safe integers.'
+		});
+		expect(result.reason).not.toMatch(/ARC-200/);
+	});
+	it('falls back to an NFT reason for a non-Error schema failure in the NFT phase', async () => {
+		const body = {
+			get transfers(): unknown {
+				throw 'unreadable';
+			},
+			'next-token': null,
+			'total-count': 0,
+			'current-round': 1000000000
+		};
+		const { run } = nftSetup(
+			{ readArc72Page: vi.fn(async () => body) },
+			{ types: ['nft-transfer'] }
+		);
+		expect(await run.start()).toMatchObject({
+			status: 'partial-error',
+			reason: 'Invalid NFT response.'
+		});
+	});
+	it('keeps the ARC-200 reason for a non-Error schema failure in the ARC-200 phase', async () => {
+		const body: unknown[] = [];
+		Object.defineProperty(body, 0, {
+			get() {
+				throw 'unreadable';
+			},
+			enumerable: true
+		});
+		const { run } = nftSetup(
+			{ readArc200Page: vi.fn(async () => body) },
+			{ assets: { mode: 'all' }, types: ['asset-transfer', 'nft-transfer'] }
+		);
+		expect(await run.start()).toMatchObject({
+			status: 'partial-error',
+			reason: 'Invalid ARC-200 response.'
+		});
+	});
 });

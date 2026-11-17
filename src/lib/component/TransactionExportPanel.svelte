@@ -2,6 +2,8 @@
 	import { untrack } from 'svelte';
 	import { createArc200Reader } from '$lib/services/arc200Export';
 	import { ARC200_SOURCE_WARNING, ARC200_CAP_WARNING } from '$lib/wallet/arc200Export';
+	import { createArc72Reader } from '$lib/services/arc72Export';
+	import { ARC72_SOURCE_NOTE, ARC72_CAP_WARNING } from '$lib/wallet/arc72Export';
 	import { Button, Card, InlineAlert, StatusPill } from '$lib/ds';
 	import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import {
@@ -66,6 +68,7 @@
 		},
 		{ value: 'protocol-reward', label: 'Legacy protocol rewards' },
 		{ value: 'asset-transfer', label: 'Asset transfers' },
+		{ value: 'nft-transfer', label: 'NFT transfers' },
 		{ value: 'close-out', label: 'Close-outs' },
 		{ value: 'fee', label: 'Fees' }
 	];
@@ -100,16 +103,18 @@
 				: ''
 	);
 	const scope = $derived(
-		frozen?.assets.mode === 'asset'
-			? `Asset ${frozen.assets.id} (ASA/VSA)`
-			: frozen?.assets.mode === 'all'
-				? 'VOI and all assets (ASA/VSA + ARC-200)'
-				: 'VOI only'
+		frozen?.types.length === 1 && frozen.types[0] === 'nft-transfer'
+			? 'NFT transfers only'
+			: (frozen?.assets.mode === 'asset'
+					? `Asset ${frozen.assets.id} (ASA/VSA)`
+					: frozen?.assets.mode === 'all'
+						? 'VOI and all assets (ASA/VSA + ARC-200)'
+						: 'VOI only') + (frozen?.types.includes('nft-transfer') ? ' + NFT transfers' : '')
 	);
 	const statusText = $derived(
 		busy
 			? progress
-				? `${progress.phase === 'arc200' ? 'ARC-200' : 'Native and ASA/VSA'} · ${progress.resolvingAssetId !== undefined ? `Resolving ${progress.phase === 'arc200' ? 'ARC-200 contract' : 'asset'} ${progress.resolvingAssetId} · ${progress.assetsResolved} asset/token definitions loaded · ` : ''}Account ${progress.account} of ${progress.accounts} · ${progress.dataResponses} data pages · ${progress.scanned + progress.arc200Scanned} records scanned · ${progress.rows} rows${progress.retrySeconds ? ` · Retrying in ${progress.retrySeconds} seconds` : ''}`
+				? `${progress.phase === 'arc72' ? 'NFT (ARC-72)' : progress.phase === 'arc200' ? 'ARC-200' : 'Native and ASA/VSA'} · ${progress.resolvingAssetId !== undefined ? `Resolving ${progress.phase === 'arc200' ? 'ARC-200 contract' : 'asset'} ${progress.resolvingAssetId} · ${progress.assetsResolved} asset/token definitions loaded · ` : ''}Account ${progress.account} of ${progress.accounts} · ${progress.dataResponses} data pages · ${progress.scanned + progress.arc200Scanned + progress.arc72Scanned} records scanned · ${progress.rows} rows${progress.retrySeconds ? ` · Retrying in ${progress.retrySeconds} seconds` : ''}`
 				: 'Capturing the indexed round…'
 			: result
 				? `${result.rows.length} rows · ${scope} · ${result.status === 'complete-indexed' ? 'Complete through the captured indexed round' : result.reason}`
@@ -180,6 +185,7 @@
 		run = createExportRun(options, {
 			...createIndexerReader(),
 			...createArc200Reader(),
+			...createArc72Reader(),
 			rewardSenders: new Set(REWARDS_ADDRESSES),
 			stakingContracts: buildStakingContractMap(stakingContracts, stakingContractsAvailable),
 			onProgress: (value) => {
@@ -240,12 +246,14 @@
 					Export wallet activity
 				</h2>
 				<p>
-					Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts. All assets
-					includes ARC-200. LP positions and valuations are excluded.
+					Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts, and NFT
+					(ARC-72) transfers when selected. All assets includes ARC-200. LP positions and valuations
+					are excluded.
 				</p>
 				<p class="text-sm text-ink-muted">
 					Up to 200 data pages, 100,000 rows or 200 asset/token definitions. ARC-200 scanning stops
 					if a round fills a 100-record window. Dates are UTC. {ARC200_CAP_WARNING}
+					{ARC72_CAP_WARNING}
 				</p>
 			</div>
 			<fieldset
@@ -340,7 +348,8 @@
 					that applied it. The Staking contract column marks transfers to and from the staking
 					contracts this wallet owns now, as this site knows them. Contracts it owned earlier are
 					not marked unless you add their address. ARC-200 transfer records use Asset transfers.
-					Type/date filters may not reduce ARC-200 scanning time.
+					Type/date filters may not reduce ARC-200 scanning time. {ARC72_SOURCE_NOTE} The Assets choice
+					does not apply to NFT transfers.
 				</p>
 				{#if !stakingContractsAvailable}
 					<InlineAlert
@@ -418,7 +427,7 @@
 						/>{/if}
 					{#each result.warnings as warning}<InlineAlert tone="warn" message={warning} />{/each}
 					{#if result.status === 'partial-source' && !result.rows.length}<p>
-							No matching rows returned; ARC-200 history completeness is unverified.
+							No matching rows returned. {result.reason}
 						</p>{/if}
 					{#if result.status === 'complete-indexed' && !result.rows.length}<p>
 							No matching indexed activity for these options.
@@ -430,7 +439,9 @@
 							: 'Snapshot round not captured'}
 					</p>
 					<p>
-						{result.dataResponses} data pages · {result.scanned + result.arc200Scanned} records scanned
+						{result.dataResponses} data pages · {result.scanned +
+							result.arc200Scanned +
+							result.arc72Scanned} records scanned
 					</p>
 					{#if result.oldestTimestamp !== undefined && result.newestTimestamp !== undefined}<p>
 							Included timestamps: {new Date(result.oldestTimestamp * 1000).toISOString()} to {new Date(
@@ -441,7 +452,8 @@
 					<p>Accounts scanned: {result.completedAddresses.join(', ') || 'None'}</p>
 					<p>
 						Native and ASA/VSA accounts scanned: {result.sourceScans.indexer.length} · ARC-200 accounts
-						scanned: {result.sourceScans.arc200.length}
+						scanned: {result.sourceScans.arc200.length} · NFT accounts scanned: {result.sourceScans
+							.arc72.length}
 					</p>
 					{#if result.unfinishedAddresses.length}<p>
 							Unfinished addresses: {result.unfinishedAddresses.join(', ')}
@@ -449,9 +461,11 @@
 						<p>
 							Current account boundary: {result.boundary?.source === 'arc200'
 								? `ARC-200 at or before round ${result.boundary.upperRound}`
-								: result.boundary?.nextToken
-									? `Native and ASA/VSA after cursor ${result.boundary.nextToken}`
-									: 'before the first page'}.
+								: result.boundary?.source === 'arc72'
+									? `NFT at or before round ${result.boundary.upperRound}`
+									: result.boundary?.nextToken
+										? `Native and ASA/VSA after cursor ${result.boundary.nextToken}`
+										: 'before the first page'}.
 						</p>{/if}
 				{/if}
 			</div>

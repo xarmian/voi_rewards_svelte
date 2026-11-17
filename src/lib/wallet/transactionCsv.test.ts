@@ -3,7 +3,8 @@ import { csvCell, protectText, serializeCsv, exportFilename } from './transactio
 import { mapTransaction, normalizeOptions, type ExportRow } from './transactionExport';
 
 const header =
-	'"Timestamp (UTC)","Account","Tx ID","Inner path","Transaction type","Type","Direction","From","To","Asset","Amount","Fee (VOI)","Round","Group ID","Application ID","Note","Snapshot round","Export status","Asset ID","Asset unit","Asset name","Asset decimals","Staking contract"\r\n';
+	'"Timestamp (UTC)","Account","Tx ID","Inner path","Transaction type","Type","Direction","From","To","Asset","Amount","Fee (VOI)","Round","Group ID","Application ID","Note","Snapshot round","Export status","Asset ID","Asset unit","Asset name","Asset decimals","Staking contract","NFT token ID","NFT event"\r\n';
+const STAKING = 22;
 const row: ExportRow = {
 	assetKind: 'native',
 	assetId: null,
@@ -34,7 +35,7 @@ const context = {
 it('writes exact RFC 4180 bytes with one header, quoted cells and final CRLF', () => {
 	expect(serializeCsv([row], context)).toBe(
 		header +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","payment","in","A","B","VOI","9007199254.740993","0","9007199254740993","","","Hi,""世界""\r\nnext","9007199254740999","complete-indexed","","VOI","VOI (native)","6",""\r\n'
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","payment","in","A","B","VOI","9007199254.740993","0","9007199254740993","","","Hi,""世界""\r\nnext","9007199254740999","complete-indexed","","VOI","VOI (native)","6","","",""\r\n'
 	);
 	expect(serializeCsv([], context)).toBe(header);
 	expect(csvCell('a,"b"')).toBe('"a,""b"""');
@@ -133,13 +134,13 @@ it('writes a literal mixed-asset golden with exact scales and native fees', () =
 	);
 	expect(csv).toBe(
 		header +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","90071992.54740993","0","9007199254740993","","","","9007199254740999","complete-indexed","9007199254740995","EIGHT","Eight","8",""\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","9007199254740993","0","9007199254740993","","","","9007199254740999","complete-indexed","2","","","0",""\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","123.45","0","9007199254740993","","","","9007199254740999","complete-indexed","3","FOUR","Four","4",""\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","0.0000000000000000001","0","9007199254740993","","","","9007199254740999","complete-indexed","4","NINETEEN","Nineteen","19",""\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","9007199254740993","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6",""\r\n'
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","90071992.54740993","0","9007199254740993","","","","9007199254740999","complete-indexed","9007199254740995","EIGHT","Eight","8","","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","9007199254740993","0","9007199254740993","","","","9007199254740999","complete-indexed","2","","","0","","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","123.45","0","9007199254740993","","","","9007199254740999","complete-indexed","3","FOUR","Four","4","","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","axfer","asset-transfer","in","A","B","ASA/VSA","0.0000000000000000001","0","9007199254740993","","","","9007199254740999","complete-indexed","4","NINETEEN","Nineteen","19","","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","9007199254740993","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6","","",""\r\n'
 	);
-	expect(csv.split('\r\n')[0].split(',')).toHaveLength(23);
+	expect(csv.split('\r\n')[0].split(',')).toHaveLength(25);
 	expect(csv).not.toMatch(/\d[eE][+-]\d/);
 });
 it.each([
@@ -173,7 +174,7 @@ const contracts = new Map([
 ]);
 function stakingCell(exportRow: ExportRow, stakingContracts = contracts) {
 	const csv = serializeCsv([{ ...exportRow, note: '' }], { ...context, stakingContracts });
-	return csv.split('\r\n')[1].split(',').at(-1);
+	return csv.split('\r\n')[1].split(',')[STAKING];
 }
 it.each([
 	['outgoing', 'B', 'CONTRACT', 'out', '9007199254740993'],
@@ -261,13 +262,13 @@ it('marks asset transfers, close-outs and fees using their own serialized endpoi
 			.trimEnd()
 			.split('\r\n')
 			.slice(1)
-			.map((line) => line.split(',').at(-1))
+			.map((line) => line.split(',')[STAKING])
 	).toEqual(['""', '"9007199254740993"', '"12"']);
 	expect(stakingCell({ ...row, type: 'asset-transfer', from: 'CONTRACT' })).toBe(
 		'"9007199254740993"'
 	);
 });
-it('keeps all 23 columns and empty staking cells when contracts are unavailable', () => {
+it('keeps all 25 columns and empty staking cells when contracts are unavailable', () => {
 	const rows = (
 		[
 			'payment',
@@ -280,11 +281,12 @@ it('keeps all 23 columns and empty staking cells when contracts are unavailable'
 		] as const
 	).map((type) => ({ ...row, type, from: 'CONTRACT', note: '' }));
 	const lines = serializeCsv(rows, context).trimEnd().split('\r\n');
-	expect(lines[0].split(',')).toHaveLength(23);
-	expect(lines[0].split(',').at(-1)).toBe('"Staking contract"');
+	expect(lines[0].split(',')).toHaveLength(25);
+	expect(lines[0].split(',')[STAKING]).toBe('"Staking contract"');
+	expect(lines[0].split(',').slice(-2)).toEqual(['"NFT token ID"', '"NFT event"']);
 	for (const line of lines.slice(1)) {
-		expect(line.split(',')).toHaveLength(23);
-		expect(line.split(',').at(-1)).toBe('""');
+		expect(line.split(',')).toHaveLength(25);
+		expect(line.split(',').slice(STAKING)).toEqual(['""', '""', '""']);
 	}
 });
 it('quotes staking IDs as plain decimal digits without spreadsheet formula prefixes', () => {
@@ -331,13 +333,13 @@ it('writes a literal ARC golden with raw units, duplicate records, independent n
 	);
 	expect(csv).toBe(
 		header +
-			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","1","","","","9007199254740999","partial-source","","VOI","VOI (native)","6","12"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200 (raw units)","9007199254740993","0","1","","3","\'=1","9007199254740999","partial-source","3","","","","12"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","0.009007199254740993","0","1","","2","\'=1","9007199254740999","partial-source","2","","","18","12"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12"\r\n' +
-			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12"\r\n'
+			'"1970-01-01T00:00:00.000Z","B","ROOT","","pay","fee","fee","A","B","VOI","0","0.001","1","","","","9007199254740999","partial-source","","VOI","VOI (native)","6","12","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200 (raw units)","9007199254740993","0","1","","3","\'=1","9007199254740999","partial-source","3","","","","12","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","0.009007199254740993","0","1","","2","\'=1","9007199254740999","partial-source","2","","","18","12","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12","",""\r\n' +
+			'"1970-01-01T00:00:00.000Z","B","","","appl","asset-transfer","in","A","B","ARC-200","9007199254740993","0","1","","1","\'=1","9007199254740999","partial-source","1","\'=UNIT","Token","0","12","",""\r\n'
 	);
-	expect(csv.split('\r\n')[0].split(',')).toHaveLength(23);
+	expect(csv.split('\r\n')[0].split(',')).toHaveLength(25);
 });
 
 it('writes a legacy protocol reward as an incoming native credit with no sender', () => {
@@ -364,6 +366,83 @@ it('writes a legacy protocol reward as an incoming native credit with no sender'
 	);
 	expect(csv).toBe(
 		header +
-			'"1970-01-01T00:00:00.000Z","R","KO34YPCDK4WOQCYK7MXHFULLVPUO5Q2NSEFM3CVHNSMWUTFAQA4A","","pay","protocol-reward","in","","R","VOI","44.048243","0","8325339","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6",""\r\n'
+			'"1970-01-01T00:00:00.000Z","R","KO34YPCDK4WOQCYK7MXHFULLVPUO5Q2NSEFM3CVHNSMWUTFAQA4A","","pay","protocol-reward","in","","R","VOI","44.048243","0","8325339","","","","9007199254740999","complete-indexed","","VOI","VOI (native)","6","","",""\r\n'
 	);
+});
+
+const MAX_TOKEN = (1n << 256n) - 1n;
+const nft: ExportRow = {
+	...row,
+	assetKind: 'arc72',
+	assetId: 5n,
+	applicationId: 5n,
+	nftTokenId: MAX_TOKEN,
+	nftEvent: 'transfer',
+	transactionType: 'appl',
+	type: 'nft-transfer',
+	amount: 1n,
+	round: 1n,
+	txId: 'T1',
+	note: ''
+};
+it('writes a literal NFT golden for incoming, mint, burn and self rows without asset metadata', () => {
+	const csv = serializeCsv(
+		[
+			{ ...nft, txId: 'T4', from: 'B', to: 'B', direction: 'self', nftTokenId: 0n },
+			{ ...nft, txId: 'T3', from: 'B', to: 'Z', direction: 'out', nftEvent: 'burn' },
+			{ ...nft, txId: 'T2', from: 'Z', nftEvent: 'mint', note: '=x' },
+			nft
+		],
+		{ ...context, stakingContracts: new Map([['A', '12']]) }
+	);
+	const tail = '"9007199254740999","complete-indexed","5","","","0"';
+	expect(csv).toBe(
+		header +
+			`"1970-01-01T00:00:00.000Z","B","T1","","appl","nft-transfer","in","A","B","ARC-72 NFT","1","0","1","","5","",${tail},"12","${MAX_TOKEN}","transfer"\r\n` +
+			`"1970-01-01T00:00:00.000Z","B","T2","","appl","nft-transfer","in","Z","B","ARC-72 NFT","1","0","1","","5","'=x",${tail},"","${MAX_TOKEN}","mint"\r\n` +
+			`"1970-01-01T00:00:00.000Z","B","T3","","appl","nft-transfer","out","B","Z","ARC-72 NFT","1","0","1","","5","",${tail},"","${MAX_TOKEN}","burn"\r\n` +
+			`"1970-01-01T00:00:00.000Z","B","T4","","appl","nft-transfer","self","B","B","ARC-72 NFT","1","0","1","","5","",${tail},"","0","transfer"\r\n`
+	);
+	for (const line of csv.trimEnd().split('\r\n')) expect(line.split(',')).toHaveLength(25);
+});
+it.each([
+	{ nftTokenId: undefined },
+	{ nftTokenId: 1n << 256n },
+	{ nftTokenId: -1n },
+	{ nftEvent: undefined },
+	{ nftEvent: 'swap' },
+	{ assetId: null },
+	{ assetId: 0n }
+])('refuses an NFT row with an invalid contract, token ID or event %o', (changes) => {
+	expect(() => serializeCsv([{ ...nft, ...changes } as ExportRow], context)).toThrow(/NFT/);
+});
+it('adds -with-nfts to the filename only when NFT transfers are selected', () => {
+	const base = { pageAddress: 'ABCDEFGHXYZ', addresses: ['A'], allDates: true };
+	const name = (types: ('fee' | 'nft-transfer')[], mode: 'native' | 'all') =>
+		exportFilename(
+			normalizeOptions({ ...base, types, assets: { mode } }, '2024-12-31', () => true),
+			{
+				...context,
+				pageAddress: base.pageAddress
+			}
+		);
+	expect(name(['fee', 'nft-transfer'], 'native')).toBe(
+		'voi-native-only-activity-with-nfts-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
+	);
+	expect(name(['fee', 'nft-transfer'], 'all')).toBe(
+		'voi-all-assets-activity-with-nfts-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
+	);
+	expect(name(['fee'], 'native')).toBe(
+		'voi-native-only-activity-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
+	);
+});
+it('names an NFT-only export for NFT transfers whatever the asset choice', () => {
+	const base = { pageAddress: 'ABCDEFGHXYZ', addresses: ['A'], allDates: true };
+	for (const assets of [{ mode: 'native' }, { mode: 'all' }, { mode: 'asset', id: '9' }] as const)
+		expect(
+			exportFilename(
+				normalizeOptions({ ...base, types: ['nft-transfer'], assets }, '2024-12-31', () => true),
+				{ ...context, pageAddress: base.pageAddress }
+			)
+		).toBe('voi-nft-transfers-activity-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv');
 });

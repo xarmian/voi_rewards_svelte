@@ -31,7 +31,9 @@ const columns = [
 	'Asset unit',
 	'Asset name',
 	'Asset decimals',
-	'Staking contract'
+	'Staking contract',
+	'NFT token ID',
+	'NFT event'
 ];
 export function protectText(value: string): string {
 	let first = '';
@@ -65,11 +67,25 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 	const snapshotRound = numeric(context.snapshotRound);
 	const records = [...rows].sort(compareRows).map((row) => {
 		const arc = row.assetKind === 'arc200';
+		const nft = row.assetKind === 'arc72';
+		// An NFT row carries its contract and token itself; there is no metadata to look up.
+		if (
+			nft &&
+			(typeof row.assetId !== 'bigint' ||
+				row.assetId < 1n ||
+				row.assetId > 18446744073709551615n ||
+				typeof row.nftTokenId !== 'bigint' ||
+				row.nftTokenId < 0n ||
+				row.nftTokenId >= 1n << 256n ||
+				!['mint', 'burn', 'transfer'].includes(row.nftEvent!))
+		)
+			throw new Error('NFT row is missing a valid contract ID, token ID or event.');
 		const metadata =
-			row.assetId === null
+			row.assetId === null || nft
 				? undefined
 				: (arc ? context.arc200Assets : context.assets).get(row.assetId);
 		if (
+			!nft &&
 			row.assetId !== null &&
 			(typeof row.assetId !== 'bigint' ||
 				row.assetId < 1n ||
@@ -103,14 +119,16 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 			protectText(row.direction),
 			protectText(row.from),
 			protectText(row.to),
-			arc
-				? metadata?.decimals === null
-					? 'ARC-200 (raw units)'
-					: 'ARC-200'
-				: metadata
-					? 'ASA/VSA'
-					: 'VOI',
-			numeric(row.amount, metadata?.decimals ?? (arc ? 0 : 6)),
+			nft
+				? 'ARC-72 NFT'
+				: arc
+					? metadata?.decimals === null
+						? 'ARC-200 (raw units)'
+						: 'ARC-200'
+					: metadata
+						? 'ASA/VSA'
+						: 'VOI',
+			numeric(row.amount, metadata?.decimals ?? (arc || nft ? 0 : 6)),
 			numeric(row.fee, 6),
 			numeric(row.round),
 			protectText(row.group),
@@ -119,10 +137,12 @@ export function serializeCsv(rows: readonly ExportRow[], context: Context): stri
 			snapshotRound,
 			context.status,
 			row.assetId === null ? '' : numeric(row.assetId),
-			protectText(metadata?.unitName ?? 'VOI'),
-			protectText(metadata?.name ?? 'VOI (native)'),
-			arc && metadata?.decimals === null ? '' : String(metadata?.decimals ?? 6),
-			stakingIds.map((id) => numeric(id)).join(' ')
+			nft ? '' : protectText(metadata?.unitName ?? 'VOI'),
+			nft ? '' : protectText(metadata?.name ?? 'VOI (native)'),
+			nft ? '0' : arc && metadata?.decimals === null ? '' : String(metadata?.decimals ?? 6),
+			stakingIds.map((id) => numeric(id)).join(' '),
+			nft ? numeric(row.nftTokenId!) : '',
+			nft ? row.nftEvent! : ''
 		];
 	});
 	return [columns, ...records].map((record) => record.map(csvCell).join(',') + '\r\n').join('');
@@ -137,11 +157,14 @@ export function exportFilename(
 		!/^(all-dates|\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2})$/.test(range)
 	)
 		throw new Error('Invalid filename parameters.');
-	const prefix =
-		options.assets.mode === 'asset'
+	const nftOnly = options.types.length === 1 && options.types[0] === 'nft-transfer';
+	const prefix = nftOnly
+		? 'voi-nft-transfers-activity'
+		: options.assets.mode === 'asset'
 			? `voi-asset-${numeric(options.assets.id)}-activity`
 			: options.assets.mode === 'all'
 				? 'voi-all-assets-activity'
 				: 'voi-native-only-activity';
-	return `${prefix}-${context.pageAddress.slice(0, 8)}-${range}-${options.addresses.length}accounts-r${numeric(context.snapshotRound)}${context.status === 'complete-indexed' ? '' : '-partial'}.csv`;
+	const nfts = !nftOnly && options.types.includes('nft-transfer') ? '-with-nfts' : '';
+	return `${prefix}${nfts}-${context.pageAddress.slice(0, 8)}-${range}-${options.addresses.length}accounts-r${numeric(context.snapshotRound)}${context.status === 'complete-indexed' ? '' : '-partial'}.csv`;
 }
