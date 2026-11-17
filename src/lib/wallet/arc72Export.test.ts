@@ -6,6 +6,7 @@ import {
 	ARC72_SOURCE_NOTE,
 	ARC72_CAP_WARNING,
 	arc72CurrentRound,
+	assertArc72Bound,
 	assertArc72Query,
 	mapArc72Transfer,
 	normalizeArc72Page,
@@ -51,6 +52,15 @@ describe('ARC-72 constants', () => {
 		])
 			expect(() => assertArc72Query(bad)).toThrow();
 		expect(() => assertArc72Query({ ...query, maxRound: 1000001n })).not.toThrow();
+	});
+	it('bounds NFT IDs and rounds like ARC-200 but names NFT in its message', () => {
+		const message = 'ARC-72 NFT contract IDs and round bounds must be positive safe integers.';
+		expect(() => assertArc72Bound(1n)).not.toThrow();
+		expect(() => assertArc72Bound(BigInt(Number.MAX_SAFE_INTEGER))).not.toThrow();
+		for (const bad of [0n, -1n, BigInt(Number.MAX_SAFE_INTEGER) + 1n])
+			expect(() => assertArc72Bound(bad)).toThrow(message);
+		expect(() => assertArc72Query({ ...query, minRound: 0n })).toThrow(message);
+		expect(() => page([transfer({ contractId: '0' })])).toThrow(message);
 	});
 });
 

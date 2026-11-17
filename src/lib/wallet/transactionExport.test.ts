@@ -652,6 +652,23 @@ describe('ARC-72 NFT rows', () => {
 			'payment'
 		]);
 	});
+	it.each(['', ' ', 'x', '0'])(
+		'accepts an NFT-only selection with asset ID %j and normalizes it to native',
+		(id) => {
+			const result = options({ assets: { mode: 'asset', id }, types: ['nft-transfer'] });
+			expect(result.assets).toEqual({ mode: 'native' });
+			expect(Object.isFrozen(result.assets)).toBe(true);
+		}
+	);
+	it.each([
+		[['payment']],
+		[['nft-transfer', 'payment']],
+		[['asset-transfer', 'nft-transfer']]
+	] as const)('still refuses a blank asset ID for %j', (types) => {
+		expect(() => options({ assets: { mode: 'asset', id: '' }, types: [...types] })).toThrow(
+			'Enter an asset ID from 1 to 18446744073709551615.'
+		);
+	});
 	it('ignores the asset choice but keeps the type filter and the half-open UTC day', () => {
 		for (const assets of [{ mode: 'native' }, { mode: 'all' }, { mode: 'asset', id: '1' }] as const)
 			expect(matchesFilters(nft, options({ assets, types: ['nft-transfer'] }))).toBe(true);
