@@ -79,7 +79,7 @@ it('shows labelled asset choices without the ARC source warning for the native d
 		html.indexOf('Asset transfers')
 	);
 	for (const copy of [
-		'Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts. All assets includes ARC-200. LP positions and valuations are excluded.',
+		'Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts, and NFT (ARC-72) transfers when selected. All assets includes ARC-200. LP positions and valuations are excluded.',
 		'When Fees is selected, all VOI fees paid by selected accounts are included, regardless of asset.',
 		'Up to 200 data pages, 100,000 rows or 200 asset/token definitions.',
 		'ARC-200 scanning stops if a round fills a 100-record window.',

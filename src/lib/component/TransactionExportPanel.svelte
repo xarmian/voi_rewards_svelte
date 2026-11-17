@@ -244,8 +244,9 @@
 					Export wallet activity
 				</h2>
 				<p>
-					Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts. All assets
-					includes ARC-200. LP positions and valuations are excluded.
+					Export native VOI, ASA/VSA and ARC-200 transfer records for selected accounts, and NFT
+					(ARC-72) transfers when selected. All assets includes ARC-200. LP positions and valuations
+					are excluded.
 				</p>
 				<p class="text-sm text-ink-muted">
 					Up to 200 data pages, 100,000 rows or 200 asset/token definitions. ARC-200 scanning stops
