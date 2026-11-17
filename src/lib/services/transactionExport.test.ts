@@ -1359,10 +1359,9 @@ function nftSetup(changes: Partial<ExportDependencies> = {}, input: Partial<Expo
 	);
 }
 const windows = (fn: unknown) =>
-	vi.mocked(fn as ExportDependencies['readArc72Page']).mock.calls.map(([q]) => [
-		q.minRound,
-		q.maxRound
-	]);
+	vi
+		.mocked(fn as ExportDependencies['readArc72Page'])
+		.mock.calls.map(([q]) => [q.minRound, q.maxRound]);
 describe('NFT export phase', () => {
 	it('makes no NFT request and adds no NFT disclosure when the type is not selected', async () => {
 		const { run, deps } = nftSetup({}, { types: ['payment', 'asset-transfer'] });
@@ -1431,37 +1430,34 @@ describe('NFT export phase', () => {
 	it.each([
 		['a short page', nftPage([nftRecord()], { 'total-count': 2 })],
 		['a page with a next token', nftPage([nftRecord()], { 'next-token': '1000' })]
-	])(
-		'rolls back %s as a retryable error and retries the same window',
-		async (_, bad) => {
-			const readArc72Page = vi
-				.fn()
-				.mockResolvedValueOnce(nftPage([nftRecord({ round: 200000 })]))
-				.mockResolvedValueOnce(bad)
-				.mockResolvedValue(nftPage([nftRecord({ round: 1 })]));
-			const { run } = nftSetup(
-				{ bootstrap: async () => 1000100n, readArc72Page },
-				{ addresses: [A] }
-			);
-			const failed = await run.start();
-			expect(failed).toMatchObject({
-				status: 'partial-error',
-				canRetry: true,
-				boundary: { source: 'arc72', address: A, upperRound: 100n },
-				unfinishedAddresses: [A]
-			});
-			expect(failed.reason).toMatch(/total count/);
-			expect(failed.rows.map((r) => r.round)).toEqual([200000n]);
-			const result = await run.retry();
-			expect(result.status).toBe('complete-indexed');
-			expect(result.rows.map((r) => r.round)).toEqual([1n, 200000n]);
-			expect(windows(readArc72Page)).toEqual([
-				[101n, 1000100n],
-				[1n, 100n],
-				[1n, 100n]
-			]);
-		}
-	);
+	])('rolls back %s as a retryable error and retries the same window', async (_, bad) => {
+		const readArc72Page = vi
+			.fn()
+			.mockResolvedValueOnce(nftPage([nftRecord({ round: 200000 })]))
+			.mockResolvedValueOnce(bad)
+			.mockResolvedValue(nftPage([nftRecord({ round: 1 })]));
+		const { run } = nftSetup(
+			{ bootstrap: async () => 1000100n, readArc72Page },
+			{ addresses: [A] }
+		);
+		const failed = await run.start();
+		expect(failed).toMatchObject({
+			status: 'partial-error',
+			canRetry: true,
+			boundary: { source: 'arc72', address: A, upperRound: 100n },
+			unfinishedAddresses: [A]
+		});
+		expect(failed.reason).toMatch(/total count/);
+		expect(failed.rows.map((r) => r.round)).toEqual([200000n]);
+		const result = await run.retry();
+		expect(result.status).toBe('complete-indexed');
+		expect(result.rows.map((r) => r.round)).toEqual([1n, 200000n]);
+		expect(windows(readArc72Page)).toEqual([
+			[101n, 1000100n],
+			[1n, 100n],
+			[1n, 100n]
+		]);
+	});
 	it('ends the NFT leg at a dense round without keeping any of that page', async () => {
 		const readArc72Page = vi.fn(async (q: Arc72Query) =>
 			q.minRound <= 2n && q.maxRound >= 2n

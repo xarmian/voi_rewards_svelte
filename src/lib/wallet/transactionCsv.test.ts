@@ -419,10 +419,13 @@ it.each([
 it('adds -with-nfts to the filename only when NFT transfers are selected', () => {
 	const base = { pageAddress: 'ABCDEFGHXYZ', addresses: ['A'], allDates: true };
 	const name = (types: ('fee' | 'nft-transfer')[], mode: 'native' | 'all') =>
-		exportFilename(normalizeOptions({ ...base, types, assets: { mode } }, '2024-12-31', () => true), {
-			...context,
-			pageAddress: base.pageAddress
-		});
+		exportFilename(
+			normalizeOptions({ ...base, types, assets: { mode } }, '2024-12-31', () => true),
+			{
+				...context,
+				pageAddress: base.pageAddress
+			}
+		);
 	expect(name(['fee', 'nft-transfer'], 'native')).toBe(
 		'voi-native-only-activity-with-nfts-ABCDEFGH-all-dates-1accounts-r9007199254740999.csv'
 	);

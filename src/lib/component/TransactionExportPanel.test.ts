@@ -249,9 +249,9 @@ it('offers legacy protocol rewards, checked by default, and explains where they 
 
 it('offers NFT transfers after Asset transfers, unchecked by default, and explains them', () => {
 	const html = drawPanel();
-	expect(
-		html.match(/<input[^>]*value="nft-transfer"[^>]*>(?:<!---->)?([^<]*)<\/label>/)?.[1]
-	).toBe('NFT transfers');
+	expect(html.match(/<input[^>]*value="nft-transfer"[^>]*>(?:<!---->)?([^<]*)<\/label>/)?.[1]).toBe(
+		'NFT transfers'
+	);
 	expect(html).not.toMatch(/<input[^>]*value="nft-transfer"[^>]*checked/);
 	expect(html.indexOf('value="asset-transfer"')).toBeLessThan(html.indexOf('value="nft-transfer"'));
 	expect(html.indexOf('value="nft-transfer"')).toBeLessThan(html.indexOf('value="close-out"'));

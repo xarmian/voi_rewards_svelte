@@ -653,11 +653,7 @@ describe('ARC-72 NFT rows', () => {
 		]);
 	});
 	it('ignores the asset choice but keeps the type filter and the half-open UTC day', () => {
-		for (const assets of [
-			{ mode: 'native' },
-			{ mode: 'all' },
-			{ mode: 'asset', id: '1' }
-		] as const)
+		for (const assets of [{ mode: 'native' }, { mode: 'all' }, { mode: 'asset', id: '1' }] as const)
 			expect(matchesFilters(nft, options({ assets, types: ['nft-transfer'] }))).toBe(true);
 		expect(matchesFilters(nft, options({ types: ['payment', 'asset-transfer'] }))).toBe(false);
 		expect(
