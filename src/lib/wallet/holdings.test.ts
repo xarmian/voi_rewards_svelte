@@ -508,7 +508,9 @@ it('a non-LP token is never unissued', () => {
 it.each([
 	['missing', undefined],
 	['NaN', Number.NaN],
-	['negative', -1]
+	['negative', -1],
+	// An unread Nomadex supply arrives as Number('') === 0, not as a real empty pool.
+	['zero (an unread supply)', 0]
 ])('an LP balance is not unissued when the supply is %s', (_, totalSupply) => {
 	const [row] = deriveHoldingsRows([
 		lpToken({ balance: 1.157920892373162e71, poolInfo: escrowPool(totalSupply) })
