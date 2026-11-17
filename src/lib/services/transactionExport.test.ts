@@ -1424,7 +1424,7 @@ describe('NFT export phase', () => {
 			[250001n, 1250000n],
 			[1n, 250000n]
 		]);
-		expect(result.status).toBe('complete-indexed');
+		expect(result.status).toBe('partial-source');
 		expect(result.rows.map((r) => r.round)).toEqual([1600000n]);
 		expect(result.arc72Scanned).toBe(3);
 	});
@@ -1451,7 +1451,7 @@ describe('NFT export phase', () => {
 		expect(failed.reason).toMatch(/total count/);
 		expect(failed.rows.map((r) => r.round)).toEqual([200000n]);
 		const result = await run.retry();
-		expect(result.status).toBe('complete-indexed');
+		expect(result.status).toBe('partial-source');
 		expect(result.rows.map((r) => r.round)).toEqual([1n, 200000n]);
 		expect(windows(readArc72Page)).toEqual([
 			[101n, 1000100n],
@@ -1508,7 +1508,7 @@ describe('NFT export phase', () => {
 		const { run } = nftSetup({ readArc72Page });
 		const result = await run.start();
 		expect(readArc72Page).toHaveBeenCalledTimes(2);
-		expect(result.status).toBe('complete-indexed');
+		expect(result.status).toBe('partial-source');
 		expect(result.rows).toHaveLength(1);
 	});
 	it('fails retryably, never with a short export, when the NFT source stays behind', async () => {
@@ -1556,7 +1556,7 @@ describe('NFT export phase', () => {
 			{ allDates: false, from: '2024-01-01', through: '2024-01-01', addresses: [A, B] }
 		);
 		expect(await run.start()).toMatchObject({
-			status: 'complete-indexed',
+			status: 'partial-source',
 			completedAddresses: [A, B],
 			rows: []
 		});
@@ -1578,7 +1578,7 @@ describe('NFT export phase', () => {
 			readArc72Page: vi.fn(async () => nftPage([nftRecord(), nftRecord()]))
 		});
 		const result = await run.start();
-		expect(result.status).toBe('complete-indexed');
+		expect(result.status).toBe('partial-source');
 		expect(result.rows).toHaveLength(2);
 	});
 	it('skips the per-account indexer reads for an NFT-only run and still exports NFT rows', async () => {
@@ -1609,7 +1609,7 @@ describe('NFT export phase', () => {
 			[1n, 100n]
 		]);
 		expect(result).toMatchObject({
-			status: 'complete-indexed',
+			status: 'partial-source',
 			snapshotRound: 100n,
 			pages: 3,
 			scanned: 0,
@@ -1670,7 +1670,7 @@ describe('NFT export phase', () => {
 		expect(readPage.mock.calls.map(([q]) => q.address)).toEqual([A, B]);
 		expect(result.unfinishedAddresses).toEqual([]);
 		expect(result).toMatchObject({
-			status: 'complete-indexed',
+			status: 'partial-source',
 			pages: 4,
 			completedAddresses: [A, B],
 			sourceScans: { indexer: [A, B], arc72: [A, B] }

@@ -427,7 +427,7 @@
 						/>{/if}
 					{#each result.warnings as warning}<InlineAlert tone="warn" message={warning} />{/each}
 					{#if result.status === 'partial-source' && !result.rows.length}<p>
-							No matching rows returned; ARC-200 history completeness is unverified.
+							No matching rows returned. {result.reason}
 						</p>{/if}
 					{#if result.status === 'complete-indexed' && !result.rows.length}<p>
 							No matching indexed activity for these options.

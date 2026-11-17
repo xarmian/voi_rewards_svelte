@@ -922,8 +922,16 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 					progress();
 				}
 			}
-			status = arcRequested ? 'partial-source' : 'complete-indexed';
-			reason = arcRequested ? 'ARC-200 history completeness is unverified.' : '';
+			// ARC-200 and NFT rows come from Mimir records whose completeness is not proven.
+			status = arcRequested || nftRequested ? 'partial-source' : 'complete-indexed';
+			reason =
+				arcRequested && nftRequested
+					? 'ARC-200 and NFT history completeness is unverified.'
+					: arcRequested
+						? 'ARC-200 history completeness is unverified.'
+						: nftRequested
+							? 'NFT history completeness is unverified.'
+							: '';
 		} catch (error) {
 			if (cancelled || disposed) {
 				status = 'partial-cancelled';
