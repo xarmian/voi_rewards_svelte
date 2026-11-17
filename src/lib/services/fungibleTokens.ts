@@ -242,8 +242,26 @@ export async function fetchFungibleTokens(
 			// Nomadex uses live reserves; other tokens prefer the API's USD value.
 			let tokenValue = 0;
 			let tokenUsdValue: number | null = 0;
+			// Read the pool's outstanding LP supply once; an unreadable supply is unknown.
+			let lpSupply: string | undefined;
+			if (pool) {
+				try {
+					lpSupply = pool.supply;
+				} catch {
+					lpSupply = undefined;
+				}
+			}
+			// A balance above the outstanding supply (a pool escrow's unissued LP) is not a share,
+			// whichever price source would value it. Not missing data, so it doesn't mark partial.
+			const notAShare =
+				lpSupply !== undefined &&
+				/^\d+$/.test(asset.balance) &&
+				/^\d+$/.test(lpSupply) &&
+				BigInt(asset.balance) > BigInt(lpSupply);
 
-			if (
+			if (notAShare) {
+				tokenUsdValue = null;
+			} else if (
 				pool?.provider !== 'nomadex' &&
 				asset.usdValue != null &&
 				asset.usdValue !== 'null' &&
@@ -271,21 +289,16 @@ export async function fetchFungibleTokens(
 				const poolValue =
 					pool.provider === 'nomadex' && Number(asset.balance) === 0
 						? 0
-						: calculateTokenValueFromPool(asset, pool);
-				if (poolValue === NOT_A_SHARE) {
-					// Not missing data: the row is unvalued (zero placeholder) without marking partial.
-					tokenUsdValue = null;
+						: calculateTokenValueFromPool(asset, pool, lpSupply);
+				if (poolValue === null || !Number.isFinite(poolValue)) {
+					partial = true;
 				} else {
-					if (poolValue === null || !Number.isFinite(poolValue)) {
-						partial = true;
-					} else {
-						tokenValue = poolValue;
-					}
-
-					// Calculate USD value for LP tokens
-					// TASK-91: without a VOI price the USD value is unknown (null, shown as unavailable), not $0.
-					tokenUsdValue = voiPriceUSD > 0 ? tokenValue * voiPriceUSD : null;
+					tokenValue = poolValue;
 				}
+
+				// Calculate USD value for LP tokens
+				// TASK-91: without a VOI price the USD value is unknown (null, shown as unavailable), not $0.
+				tokenUsdValue = voiPriceUSD > 0 ? tokenValue * voiPriceUSD : null;
 			} else if (asset.assetType === 'asa' && asset.contractId === 302190) {
 				// Special handling for aUSDC - 1:1 with USD
 				const usdcAmount = Number(asset.balance) / Math.pow(10, asset.decimals);
@@ -516,28 +529,20 @@ export async function fetchFungibleTokens(
 	}
 }
 
-const NOT_A_SHARE = 'not-a-share';
-
+// `supply` is the caller's single read of pool.supply; undefined means it couldn't be read.
 function calculateTokenValueFromPool(
 	asset: UnifiedAssetBalance,
-	pool: PoolInfo
-): number | null | typeof NOT_A_SHARE {
+	pool: PoolInfo,
+	supply: string | undefined
+): number | null {
 	try {
-		const supply = pool.supply;
+		if (supply === undefined) return null;
 		// Unknown live reserves or supply must not produce a Nomadex valuation.
 		if (
 			pool.provider === 'nomadex' &&
 			![pool.poolBalA, pool.poolBalB, supply].every((value) => /^\d+$/.test(value))
 		) {
 			return null;
-		}
-		// A balance above the outstanding supply (a pool escrow's unissued LP) is not a share.
-		if (
-			/^\d+$/.test(asset.balance) &&
-			/^\d+$/.test(supply) &&
-			BigInt(asset.balance) > BigInt(supply)
-		) {
-			return NOT_A_SHARE;
 		}
 		// For LP tokens, calculate value based on user's share of the pool
 		const userLpBalance = Number(asset.balance) / Math.pow(10, asset.decimals);
