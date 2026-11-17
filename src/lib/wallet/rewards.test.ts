@@ -177,6 +177,20 @@ it('keeps historical eligible stake in VOI and the epoch 61/62 denominator', asy
 		completedEpoch({ ...snapshot, total_blocks: undefined }, 61, address, 1400)
 	).toThrow();
 });
+it('treats an empty proposers array as an epoch with no proposed blocks', () => {
+	const snapshot = {
+		total_blocks: 120,
+		proposers: [] as unknown,
+		start_date: epochRange(62).start.toISOString(),
+		end_date: epochRange(62).end.toISOString()
+	};
+	expect(completedEpoch(snapshot, 62, address, 1400)).toMatchObject({
+		blocks: 0,
+		networkBlocks: 120
+	});
+	expect(() => completedEpoch({ ...snapshot, proposers: [5] }, 62, address, 1400)).toThrow();
+	expect(() => completedEpoch({ ...snapshot, proposers: null }, 62, address, 1400)).toThrow();
+});
 it('uses live counts and suppresses early projections', () => {
 	const raw = {
 		num_blocks: 120,
@@ -249,6 +263,34 @@ it('loads completed snapshots and current live rows rather than the lagging snap
 	const result = await loadRewardEpochs(address, true);
 	expect(result.map((e) => e.blocks)).toEqual([12, 42]);
 	expect(dataTable.fetchData).toHaveBeenCalledWith('live', true);
+});
+it('loads every completed epoch when one snapshot has an empty proposers array', async () => {
+	vi.mocked(dataTable.fetchDateRanges).mockResolvedValue([
+		{ epoch: 62, id: 'first', desc: '' },
+		{ epoch: 63, id: 'second', desc: '' },
+		{ epoch: 64, id: 'live', desc: '' }
+	]);
+	vi.mocked(dataTable.fetchData).mockResolvedValue({
+		num_blocks: 120,
+		max_timestamp: new Date(epochRange(64).start.getTime() + 86400000).toISOString(),
+		data: [{ proposer: address, block_count: 42 }]
+	});
+	vi.stubGlobal('fetch', async () =>
+		Response.json({
+			snapshots: [62, 63].map((e) => ({
+				start_date: epochRange(e).start.toISOString(),
+				end_date: epochRange(e).end.toISOString(),
+				total_blocks: 120,
+				proposers: e === 62 ? [] : { PAGE: 12 }
+			}))
+		})
+	);
+	const result = await loadRewardEpochs(address, true);
+	expect(result.map((e) => [e.epoch, e.blocks])).toEqual([
+		[62, 0],
+		[63, 12],
+		[64, 42]
+	]);
 });
 it('rejects malformed daily records instead of claiming empty data', async () => {
 	vi.stubGlobal('fetch', async () => Response.json({ '2026-11-07': null }));
