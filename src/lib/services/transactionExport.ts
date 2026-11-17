@@ -416,6 +416,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 		occurrence = 0,
 		dataResponses = 0;
 	let lowerRound: bigint | null | undefined;
+	let dateUpperRound: bigint | undefined;
 	let upperRound: bigint | undefined;
 	let windowLower: bigint | undefined;
 	let resolvingAssetId: bigint | undefined;
@@ -506,14 +507,14 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 							? {
 									source: 'arc200',
 									address: options.addresses[arcAccountIndex],
-									upperRound: upperRound ?? snapshotRound
+									upperRound: upperRound ?? dateUpperRound ?? snapshotRound
 								}
 							: undefined
 						: nftAccountIndex < options.addresses.length
 							? {
 									source: 'arc72',
 									address: options.addresses[nftAccountIndex],
-									upperRound: nftUpper ?? snapshotRound
+									upperRound: nftUpper ?? dateUpperRound ?? snapshotRound
 								}
 							: undefined,
 			assets: new Map(assets),
@@ -687,6 +688,42 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 		pages++;
 		return lowerRound;
 	}
+	// One padded upper round U, shared by both legs, so a past period is not walked down from the
+	// tip: the first round at or after the exclusive end, plus padding, clamped to the snapshot.
+	// Called only after a non-null lower round; 'cap' when the response cap stops the run first.
+	async function ensureUpperRound(lower: bigint): Promise<bigint | 'cap'> {
+		if (dateUpperRound !== undefined) return dateUpperRound;
+		if (options.allDates) return (dateUpperRound = snapshotRound);
+		if (atCap()) return 'cap';
+		// The search is ascending like the lower bound's, so beforeTime would return the earliest
+		// transaction on chain; afterTime at the end returns the first round past the period.
+		const page = validatePage(
+			await request((signal) =>
+				deps.readPage(
+					{
+						afterTime: new Date(options.endTime! * 1000).toISOString(),
+						limit: 1,
+						maxRound: snapshotRound
+					},
+					signal
+				)
+			)
+		);
+		if (page.transactions.length > 1) throw new SchemaError('Invalid date upper-bound response.');
+		const first = page.transactions[0];
+		let upper = snapshotRound;
+		if (first !== undefined) {
+			const round = positive(object(first).confirmedRound);
+			if (round > snapshotRound) throw new SchemaError('Date upper bound exceeds the snapshot.');
+			// Block timestamps are not strictly monotone, so the bound is padded like the lower one.
+			if (round + 1000n < snapshotRound) upper = round + 1000n;
+		}
+		if (upper < lower) throw new SchemaError('Date upper bound precedes the lower bound.');
+		dateUpperRound = upper;
+		dataResponses++;
+		pages++;
+		return dateUpperRound;
+	}
 	async function execute(): Promise<ExportResult> {
 		retryEligible = false;
 		try {
@@ -783,9 +820,11 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				const lower = await ensureLowerRound();
 				if (lower === 'cap') return result();
 				if (lower === null) arcAccountIndex = options.addresses.length;
-				while (arcAccountIndex < options.addresses.length && lower !== null) {
+				const upper = lower === null ? null : await ensureUpperRound(lower);
+				if (upper === 'cap') return result();
+				while (arcAccountIndex < options.addresses.length && lower !== null && upper !== null) {
 					controller.signal.throwIfAborted();
-					upperRound ??= snapshotRound;
+					upperRound ??= upper;
 					if (windowLower === undefined) {
 						const candidate = upperRound - BigInt(ARC200_MAX_ROUND_WINDOW - 1);
 						windowLower = candidate > lower ? candidate : lower;
@@ -870,9 +909,11 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				const lower = await ensureLowerRound();
 				if (lower === 'cap') return result();
 				if (lower === null) nftAccountIndex = options.addresses.length;
-				while (nftAccountIndex < options.addresses.length && lower !== null) {
+				const upper = lower === null ? null : await ensureUpperRound(lower);
+				if (upper === 'cap') return result();
+				while (nftAccountIndex < options.addresses.length && lower !== null && upper !== null) {
 					controller.signal.throwIfAborted();
-					nftUpper ??= snapshotRound;
+					nftUpper ??= upper;
 					const candidate = nftUpper - nftSpan + 1n;
 					const minRound = candidate > lower ? candidate : lower;
 					if (atCap()) return result();
