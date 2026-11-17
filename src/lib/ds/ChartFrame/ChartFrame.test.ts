@@ -162,6 +162,18 @@ function xTickTexts(html: string) {
 		label: m[2]
 	}));
 }
+function tickExtents(ticks: ReturnType<typeof xTickTexts>) {
+	return ticks.map((tick) => {
+		const labelWidth = tick.label.length * 6.6;
+		const left =
+			tick.anchor === 'end'
+				? tick.x - labelWidth
+				: tick.anchor === 'start'
+					? tick.x
+					: tick.x - labelWidth / 2;
+		return { ...tick, left, right: left + labelWidth };
+	});
+}
 test('long date band labels are spaced to their width and stay inside the svg', () => {
 	const days = Array.from({ length: 30 }, (_, i) =>
 		new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10)
@@ -180,12 +192,55 @@ test('long date band labels are spaced to their width and stay inside the svg', 
 	assert.ok(ticks.length > 1);
 	for (let i = 1; i < ticks.length; i++)
 		assert.ok(ticks[i].x - ticks[i - 1].x >= 10 * 6.6 + 12 - 1e-8, `${ticks[i].label} too close`);
-	for (const tick of ticks) {
-		const labelWidth = tick.label.length * 6.6;
-		if (tick.anchor === 'middle') {
-			assert.ok(tick.x - labelWidth / 2 >= 0, `${tick.label} spills left`);
-			assert.ok(tick.x + labelWidth / 2 <= svgWidth, `${tick.label} spills right`);
-		}
+	for (const tick of tickExtents(ticks)) {
+		assert.ok(tick.left >= 0, `${tick.label} spills left`);
+		assert.ok(tick.right <= svgWidth, `${tick.label} spills right`);
+	}
+});
+test('an edge-anchored date label never overlaps its neighbour', () => {
+	// At the default 640 px width both lengths put the last spaced tick within half a label of the
+	// plot's right edge, so it is end-anchored and its box reaches back towards the previous label.
+	// With 29 days that box would overlap its neighbour, so the last tick is dropped; with 9 days the
+	// gap is wide enough and the end-anchored label is kept.
+	for (const [length, collides] of [
+		[29, true],
+		[9, false]
+	] as const) {
+		const days = Array.from({ length }, (_, i) =>
+			new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10)
+		);
+		const plotWidth = 640 - 48 - 16;
+		const scale = makeX({ kind: 'band', values: days }, [48, 48 + plotWidth]);
+		const spaced = tickValues(scale, plotWidth, 10 * 6.6 + 12);
+		const centre = (value: (typeof spaced)[number]) => scale.position(value) + scale.bandwidth / 2;
+		const last = centre(spaced[spaced.length - 1]);
+		assert.ok(last + (10 * 6.6) / 2 > 640 - 16, `${length}: last tick is end-anchored`);
+		assert.equal(
+			last - 10 * 6.6 < centre(spaced[spaced.length - 2]) + (10 * 6.6) / 2 + 12,
+			collides,
+			`${length}: end-anchored box ${collides ? 'reaches' : 'clears'} its neighbour`
+		);
+		const html = render(ChartFrame, {
+			props: {
+				...props,
+				annotations: [],
+				data: { ...data, rows: days.map((d) => [d, 1, 1]) },
+				x: { kind: 'band', values: days },
+				children: createRawSnippet<[ChartContext]>(() => ({ render: () => '<g></g>' }))
+			}
+		}).body;
+		const ticks = tickExtents(xTickTexts(html));
+		assert.deepEqual(
+			ticks.map((tick) => tick.label),
+			(collides ? spaced.slice(0, -1) : spaced).map(String),
+			`${length}: ${collides ? 'only the last tick is dropped' : 'every spaced tick is kept'}`
+		);
+		if (!collides) assert.equal(ticks[ticks.length - 1].anchor, 'end');
+		for (let i = 1; i < ticks.length; i++)
+			assert.ok(
+				ticks[i].left - ticks[i - 1].right >= 12 - 1e-8,
+				`${ticks[i - 1].label} and ${ticks[i].label} overlap`
+			);
 	}
 });
 test('short band labels keep the 44 px tick count on a desktop width', () => {
