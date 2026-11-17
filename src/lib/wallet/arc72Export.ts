@@ -1,4 +1,3 @@
-import { assertArc200Bound } from './arc200Export';
 import type { ExportRow } from './transactionExport';
 
 // Shared by the proxy validator and the browser reader without a server-only import.
@@ -53,9 +52,14 @@ function nullableText(value: unknown): string {
 	if (typeof value !== 'string') throw new Error('Invalid ARC-72 text field.');
 	return value;
 }
+// The same numeric bound as ARC-200, with a message that names the NFT source.
+export function assertArc72Bound(value: bigint): void {
+	if (typeof value !== 'bigint' || value < 1n || value > BigInt(Number.MAX_SAFE_INTEGER))
+		throw new Error('ARC-72 NFT contract IDs and round bounds must be positive safe integers.');
+}
 export function assertArc72Query(query: Arc72Query): void {
-	assertArc200Bound(query.minRound);
-	assertArc200Bound(query.maxRound);
+	assertArc72Bound(query.minRound);
+	assertArc72Bound(query.maxRound);
 	if (
 		query.minRound > query.maxRound ||
 		query.maxRound - query.minRound > BigInt(ARC72_MAX_ROUND_WINDOW)
@@ -74,7 +78,7 @@ function normalizeTransfer(
 ): Arc72Transfer {
 	const row = object(raw);
 	const contractId = decimal(row.contractId, 'contract ID');
-	assertArc200Bound(contractId);
+	assertArc72Bound(contractId);
 	const tokenId = decimal(row.tokenId, 'token ID');
 	if (tokenId >= 1n << 256n) throw new Error('ARC-72 token ID exceeds uint256.');
 	const { fromAddr: from, toAddr: to } = row;

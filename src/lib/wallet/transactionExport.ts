@@ -141,7 +141,10 @@ export function normalizeOptions(
 	if (!types.length || types.some((t) => !activityTypes.includes(t)))
 		throw new OptionsError('types', 'Select at least one activity type.');
 	let assets: AssetSelection;
-	if (input.assets.mode === 'asset') {
+	// The asset choice does not apply to NFT transfers, so an NFT-only selection ignores it.
+	if (types.length === 1 && types[0] === 'nft-transfer') {
+		assets = { mode: 'native' };
+	} else if (input.assets.mode === 'asset') {
 		const id = input.assets.id.trim();
 		if (!/^\d+$/.test(id) || BigInt(id) < 1n || BigInt(id) > 18446744073709551615n)
 			throw new OptionsError('assets', 'Enter an asset ID from 1 to 18446744073709551615.');

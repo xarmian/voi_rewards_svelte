@@ -15,6 +15,7 @@ import {
 	ARC72_MAX_ROUND_WINDOW,
 	ARC72_SOURCE_NOTE,
 	arc72CurrentRound,
+	assertArc72Bound,
 	mapArc72Transfer,
 	normalizeArc72Page,
 	selectArc72Window,
@@ -403,7 +404,8 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 	const nftRequested = options.types.includes('nft-transfer');
 	// NFT transfers come only from Mimir, so an NFT-only run has no per-account indexer leg.
 	const indexerRequested = options.types.some((type) => type !== 'nft-transfer');
-	let phase: 'indexer' | 'arc200' | 'arc72' = 'indexer';
+	let phase: 'indexer' | 'arc200' | 'arc72' =
+		indexerRequested || arcRequested ? 'indexer' : 'arc72';
 	let nftAccountIndex = 0,
 		arc72Scanned = 0;
 	// The NFT window resumes from here on retry: its upper round and its span in rounds.
@@ -461,12 +463,14 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			});
 	}
 	function result(): ExportResult {
-		const indexer = options.addresses.slice(0, accountIndex);
+		const indexer = indexerRequested ? options.addresses.slice(0, accountIndex) : [];
 		const arc200 = options.addresses.slice(0, arcAccountIndex);
 		const arc72 = options.addresses.slice(0, nftAccountIndex);
-		const completedAddresses = indexer.filter(
+		const completedAddresses = options.addresses.filter(
 			(address) =>
-				(!arcRequested || arc200.includes(address)) && (!nftRequested || arc72.includes(address))
+				(!indexerRequested || indexer.includes(address)) &&
+				(!arcRequested || arc200.includes(address)) &&
+				(!nftRequested || arc72.includes(address))
 		);
 		const rawIds = [
 			...new Set(
@@ -629,7 +633,13 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 		try {
 			return normalize();
 		} catch (error) {
-			throw new SchemaError(error instanceof Error ? error.message : 'Invalid ARC-200 response.');
+			throw new SchemaError(
+				error instanceof Error
+					? error.message
+					: phase === 'arc72'
+						? 'Invalid NFT response.'
+						: 'Invalid ARC-200 response.'
+			);
 		}
 	}
 	function atCap(): boolean {
@@ -680,8 +690,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 				snapshotRound = positive(
 					await request((signal) => deps.bootstrap(options.addresses[0], signal))
 				);
-			if (!indexerRequested) accountIndex = options.addresses.length;
-			while (accountIndex < options.addresses.length) {
+			while (indexerRequested && accountIndex < options.addresses.length) {
 				controller.signal.throwIfAborted();
 				if (dataResponses >= maxPages || rows.length >= maxRows) {
 					status = 'partial-cap';
@@ -761,6 +770,7 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			}
 			if (arcRequested) {
 				phase = 'arc200';
+				progress();
 				schema(() => assertArc200Bound(snapshotRound));
 				const lower = await ensureLowerRound();
 				if (lower === 'cap') return result();
@@ -844,7 +854,8 @@ export function createExportRun(options: ExportOptions, deps: ExportDependencies
 			}
 			if (nftRequested) {
 				phase = 'arc72';
-				schema(() => assertArc200Bound(snapshotRound));
+				progress();
+				schema(() => assertArc72Bound(snapshotRound));
 				const lower = await ensureLowerRound();
 				if (lower === 'cap') return result();
 				if (lower === null) nftAccountIndex = options.addresses.length;
