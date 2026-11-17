@@ -351,7 +351,13 @@ describe('fetchTokenTransfers', () => {
 		['0', 2, '0'],
 		[200, 2, '2'],
 		[123456789, 4, '12345.6789'],
-		['1.5', 2, (Number('1.5') / Math.pow(10, 2)).toString()]
+		['1.5', 2, (Number('1.5') / Math.pow(10, 2)).toString()],
+		[' 42 ', 1, '4.2'],
+		['', 2, (Number('') / Math.pow(10, 2)).toString()],
+		[null, 2, (Number(null) / Math.pow(10, 2)).toString()],
+		[2 ** 60, 0, (2 ** 60).toString()],
+		['200', 2.5, (Number('200') / Math.pow(10, 2.5)).toString()],
+		['200', -1, (Number('200') / Math.pow(10, -1)).toString()]
 	] as const)(
 		'scales ARC200 amount %j at %i decimals to %s',
 		async (amount, decimals, expected) => {
