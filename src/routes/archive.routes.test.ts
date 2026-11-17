@@ -37,20 +37,19 @@ test('the archive hub links all six programmes', () => {
 	for (const route of routes) expect(source).toContain(`/archive/testnet/${route}`);
 });
 
-test.each([...routes.map((route) => `${site}/${route}`), 'src/routes/arc72'])(
-	'%s has been removed',
-	(path) => expect(existsSync(path)).toBe(false)
-);
+test.each([
+	...routes.map((route) => `${site}/${route}`),
+	'src/routes/arc72',
+	'src/routes/api/ecosystem'
+])('%s has been removed', (path) => expect(existsSync(path)).toBe(false));
 
 // A prerendered page is written out as a static file, and the host serves a static file before any
 // server hook runs, so a prerendered redirect source would never redirect in production. The redirect
 // sources below therefore keep no route files at all; the redirect table in hooks.server.ts serves them.
-test.each([
-	`${site}/what_is_voi`,
-	`${site}/ecosystem`,
-	`${site}/accounts`,
-	'src/routes/api/ecosystem'
-])('the redirect source %s has been removed', (path) => expect(existsSync(path)).toBe(false));
+test.each([`${site}/what_is_voi`, `${site}/ecosystem`, `${site}/accounts`])(
+	'the redirect source %s has been removed',
+	(path) => expect(existsSync(path)).toBe(false)
+);
 
 function sourceFiles(directory: string): string[] {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
