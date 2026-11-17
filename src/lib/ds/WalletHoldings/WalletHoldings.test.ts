@@ -535,3 +535,27 @@ it('an unknown quantity reads Unavailable without a token symbol', () => {
 	}).body;
 	expect(html).not.toMatch(/Unavailable\s+TOK/);
 });
+it('an LP balance above the outstanding supply reads Unissued supply, with the exact figure on hover', () => {
+	const ordinary = population.find((t) => t.id === 'lp')!;
+	const escrow = {
+		...ordinary,
+		id: 'escrow',
+		name: 'Escrow pair',
+		balance: 1.157920892373162e71,
+		poolInfo: { ...ordinary.poolInfo!, totalSupply: 1e12 }
+	};
+	const html = render(WalletHoldings, {
+		props: { pageAddress: 'Y', account, tokens: [ordinary, escrow], tokenState: 'ready' }
+	}).body;
+	const lpCell = (name: string) => {
+		const row = html.match(new RegExp(`<tr[^>]*>(?:(?!</tr>)[^])*?${name}[^]*?</tr>`))?.[0];
+		expect(row, name).toBeDefined();
+		return [...row!.matchAll(/<td\b[^>]*>([^]*?)<\/td>/g)][2][1];
+	};
+	const escrowCell = lpCell('Escrow pair');
+	expect(escrowCell.replace(/<[^>]*>/g, '').trim()).toBe('Unissued supply');
+	expect(escrowCell).toContain('title="≈ 1.157920892373162e+65 A/B"');
+	const ordinaryCell = lpCell('Pool pair');
+	expect(ordinaryCell.replace(/<[^>]*>/g, '').trim()).toBe('1 A/B');
+	expect(ordinaryCell).toContain('title="1"');
+});
