@@ -25,6 +25,11 @@ interface UnifiedAssetsResponse {
 	'current-round': number;
 }
 
+// A pool's outstanding LP supply, or null when it was not read (an unread Nomadex supply stays '').
+function knownSupply(supply: string): number | null {
+	return /^\d+$/.test(supply) ? Number(supply) : null;
+}
+
 // An LP side's display info. The pool's own decimals win over the holder's balances,
 // which only cover tokens the holder also holds (TASK-97).
 function getTokenInfo(
@@ -354,7 +359,7 @@ export async function fetchFungibleTokens(
 						tokBSymbol: tokenBInfo.symbol,
 						tokABalance: pool.poolBalA,
 						tokBBalance: pool.poolBalB,
-						totalSupply: Number(pool.supply),
+						totalSupply: knownSupply(pool.supply),
 						poolId: pool.poolId,
 						apr: pool.apr ?? 0,
 						tokADecimals: tokenAInfo.decimals,
@@ -486,7 +491,7 @@ export async function fetchFungibleTokens(
 									tokBSymbol: tokenBInfo.symbol,
 									tokABalance: pool.poolBalA,
 									tokBBalance: pool.poolBalB,
-									totalSupply: Number(pool.supply),
+									totalSupply: knownSupply(pool.supply),
 									poolId: pool.poolId,
 									apr: pool.apr ?? 0,
 									tokADecimals: tokenAInfo.decimals,

@@ -559,3 +559,33 @@ it('an LP balance above the outstanding supply reads Unissued supply, with the e
 	expect(ordinaryCell.replace(/<[^>]*>/g, '').trim()).toBe('1 A/B');
 	expect(ordinaryCell).toContain('title="1"');
 });
+it('an LP balance above a known zero supply reads Unissued supply; an unread supply shows the quantity', () => {
+	const ordinary = population.find((t) => t.id === 'lp')!;
+	const balance = 1.157920892373162e71;
+	const empty = {
+		...ordinary,
+		id: 'empty',
+		name: 'Empty pair',
+		balance,
+		poolInfo: { ...ordinary.poolInfo!, totalSupply: 0 }
+	};
+	const unread = {
+		...ordinary,
+		id: 'unread',
+		name: 'Unread pair',
+		balance,
+		poolInfo: { ...ordinary.poolInfo!, totalSupply: null }
+	};
+	const html = render(WalletHoldings, {
+		props: { pageAddress: 'Y', account, tokens: [empty, unread], tokenState: 'ready' }
+	}).body;
+	const lpCell = (name: string) => {
+		const row = html.match(new RegExp(`<tr[^>]*>(?:(?!</tr>)[^])*?${name}[^]*?</tr>`))?.[0];
+		expect(row, name).toBeDefined();
+		return [...row!.matchAll(/<td\b[^>]*>([^]*?)<\/td>/g)][2][1].replace(/<[^>]*>/g, '').trim();
+	};
+	expect(lpCell('Empty pair')).toBe('Unissued supply');
+	const unreadCell = lpCell('Unread pair');
+	expect(unreadCell).not.toBe('Unissued supply');
+	expect(unreadCell).toContain('A/B');
+});

@@ -492,6 +492,13 @@ it('an LP balance above the outstanding supply is marked unissued, with its quan
 	expect(row.quantity).toBe(balance / 1e6);
 	expect(row.underlying).toBeNull();
 });
+it('an LP balance above a known zero supply is marked unissued, without underlying amounts', () => {
+	const balance = 1.157920892373162e71;
+	const [row] = deriveHoldingsRows([lpToken({ balance, decimals: 6, poolInfo: escrowPool(0) })]).lp;
+	expect(row.unissued).toBe(true);
+	expect(row.quantity).toBe(balance / 1e6);
+	expect(row.underlying).toBeNull();
+});
 it.each([
 	['equals the supply', 1e12, 1e12],
 	['is below the supply', 5e11, 1e12]
@@ -509,8 +516,7 @@ it.each([
 	['missing', undefined],
 	['NaN', Number.NaN],
 	['negative', -1],
-	// An unread Nomadex supply arrives as Number('') === 0, not as a real empty pool.
-	['zero (an unread supply)', 0]
+	['null (an unread supply)', null]
 ])('an LP balance is not unissued when the supply is %s', (_, totalSupply) => {
 	const [row] = deriveHoldingsRows([
 		lpToken({ balance: 1.157920892373162e71, poolInfo: escrowPool(totalSupply) })

@@ -23,7 +23,8 @@ export interface FungibleTokenType {
 		tokBSymbol?: string;
 		tokABalance?: string;
 		tokBBalance?: string;
-		totalSupply?: number;
+		// Outstanding LP supply in base units; null when the supply was not read.
+		totalSupply?: number | null;
 		poolId?: string;
 		apr?: number;
 		tokADecimals?: number;
@@ -79,7 +80,8 @@ export interface LPToken extends FungibleTokenType {
 		tokBBalance: string;
 		tokAType?: string;
 		tokBType?: string;
-		totalSupply: number;
+		// Outstanding LP supply in base units; null when the supply was not read.
+		totalSupply: number | null;
 		poolId: string;
 		apr: number;
 		tokADecimals: number;

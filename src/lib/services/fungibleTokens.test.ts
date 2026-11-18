@@ -423,7 +423,7 @@ test('failed LP supply read cannot value otherwise complete live reserves', asyn
 	const result = await fetchFungibleTokens('wallet', 0, { getLiquidityPools, fetch: fetchFn });
 	assert.equal(result.partial, true);
 	assert.equal(result.tokens[0].value, 0);
-	assert.equal(result.tokens[0].poolInfo?.totalSupply, 0);
+	assert.equal(result.tokens[0].poolInfo?.totalSupply, null);
 });
 
 test('ARC200/ARC200 pools keep a zero TVL and value despite live reserves', async () => {
@@ -512,6 +512,34 @@ test('an LP balance above the pool supply is not a share and has no valuation', 
 		)
 	});
 	const lp = result.tokens.find((token) => token.id === '395509');
+	assert.equal(lp?.value, 0);
+	assert.equal(lp?.usdValue, null);
+	assert.equal(result.partial, false);
+});
+
+test('a pool reporting a real zero supply keeps a known zero totalSupply', async () => {
+	// The escrow holds the whole unissued LP balance, so nothing is outstanding.
+	const pool: PoolInfo = {
+		poolId: '395509',
+		tokAId: '390001',
+		tokBId: '395510',
+		poolBalA: '1000000',
+		poolBalB: '1000000',
+		supply: '0',
+		tvl: 20,
+		provider: 'humble'
+	};
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [pool],
+		fetch: heldFetch(
+			heldLp(
+				'115792089237316195423570985008687907853269984665640564039456888639078782910954',
+				395509
+			)
+		)
+	});
+	const lp = result.tokens.find((token) => token.id === '395509');
+	assert.equal(lp?.poolInfo?.totalSupply, 0);
 	assert.equal(lp?.value, 0);
 	assert.equal(lp?.usdValue, null);
 	assert.equal(result.partial, false);
