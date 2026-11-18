@@ -310,66 +310,70 @@
 		</p>
 	</Card>
 	<Card title="Tokens" span={{ lg: 12, md: 2 }} actions={tokenControls}>
-		{#if partial}<InlineAlert
-				tone="warn"
-				message="Some pool or approval details are unavailable"
-				onretry={onretryTokens}
-			/>{/if}
-		{#if tokenState === 'stale'}<InlineAlert
-				tone="warn"
-				message="Refresh failed. Showing the last loaded token balances."
-				onretry={onretryTokens}
-			/>{/if}
-		{#if tokenState === 'error'}<InlineAlert
-				message={`Token balances unavailable${tokenError ? ': ' + tokenError : ''}`}
-				onretry={onretryTokens}
-			/>
-		{:else}<DataTable
-				{columns}
-				rows={tokenRows}
-				rowKey={(r) => r.key}
-				rowName={(r) => r.token.name}
-				caption={!tokensExpanded && display.rows.tokens.length > tokenRows.length
-					? 'Page address token holdings. Until all tokens are shown, sorting reorders only the rows shown.'
-					: 'Page address token holdings'}
-				id="ds-holdings-tokens"
-				density="compact"
-				bind:sort={tokenSort}
-				limit={tokensExpanded ? undefined : Math.max(10, tokenRows.length)}
-				moreLabel={(n) => `Show ${n} more tokens`}
-				{detail}
-				state={tableState}
-				{asOf}
-				emptyText={tokens.some((t) => !t.poolInfo) && !showDust
-					? 'No tokens above the dust threshold. Show dust.'
-					: 'No tokens in this account'}
-			/>{/if}
-		{#if !tokensExpanded && display.rows.tokens.length > tokenRows.length}
-			<Button variant="ghost" onclick={() => (tokensExpanded = true)}
-				>Show {display.rows.tokens.length - tokenRows.length} more tokens</Button
-			>
-		{/if}
-		<div class="mt-4 min-w-0">{@render claims?.()}</div>
+		<div tabindex="-1" class="focus:outline-none">
+			{#if partial}<InlineAlert
+					tone="warn"
+					message="Some pool or approval details are unavailable"
+					onretry={onretryTokens}
+				/>{/if}
+			{#if tokenState === 'stale'}<InlineAlert
+					tone="warn"
+					message="Refresh failed. Showing the last loaded token balances."
+					onretry={onretryTokens}
+				/>{/if}
+			{#if tokenState === 'error'}<InlineAlert
+					message={`Token balances unavailable${tokenError ? ': ' + tokenError : ''}`}
+					onretry={onretryTokens}
+				/>
+			{:else}<DataTable
+					{columns}
+					rows={tokenRows}
+					rowKey={(r) => r.key}
+					rowName={(r) => r.token.name}
+					caption={!tokensExpanded && display.rows.tokens.length > tokenRows.length
+						? 'Page address token holdings. Until all tokens are shown, sorting reorders only the rows shown.'
+						: 'Page address token holdings'}
+					id="ds-holdings-tokens"
+					density="compact"
+					bind:sort={tokenSort}
+					limit={tokensExpanded ? undefined : Math.max(10, tokenRows.length)}
+					moreLabel={(n) => `Show ${n} more tokens`}
+					{detail}
+					state={tableState}
+					{asOf}
+					emptyText={tokens.some((t) => !t.poolInfo) && !showDust
+						? 'No tokens above the dust threshold. Show dust.'
+						: 'No tokens in this account'}
+				/>{/if}
+			{#if !tokensExpanded && display.rows.tokens.length > tokenRows.length}
+				<Button variant="ghost" onclick={() => (tokensExpanded = true)}
+					>Show {display.rows.tokens.length - tokenRows.length} more tokens</Button
+				>
+			{/if}
+			<div class="mt-4 min-w-0">{@render claims?.()}</div>
+		</div>
 	</Card>
 	<Card title="Liquidity positions" span={{ lg: 12, md: 2 }}>
-		{#if tokenState === 'error'}<InlineAlert
-				message="Token balances unavailable"
-				onretry={onretryTokens}
-			/>
-		{:else}<DataTable
-				columns={lpColumns}
-				rows={display.rows.lp}
-				rowKey={(r) => r.key}
-				rowName={(r) => r.token.name}
-				caption="Page address liquidity positions"
-				id="ds-holdings-lp"
-				density="compact"
-				bind:sort={lpSort}
-				{detail}
-				state={tableState}
-				{asOf}
-				emptyText="No liquidity positions"
-			/>{/if}
+		<div tabindex="-1" class="focus:outline-none">
+			{#if tokenState === 'error'}<InlineAlert
+					message="Token balances unavailable"
+					onretry={onretryTokens}
+				/>
+			{:else}<DataTable
+					columns={lpColumns}
+					rows={display.rows.lp}
+					rowKey={(r) => r.key}
+					rowName={(r) => r.token.name}
+					caption="Page address liquidity positions"
+					id="ds-holdings-lp"
+					density="compact"
+					bind:sort={lpSort}
+					{detail}
+					state={tableState}
+					{asOf}
+					emptyText="No liquidity positions"
+				/>{/if}
+		</div>
 	</Card>
 	<WalletNfts
 		{pageAddress}
