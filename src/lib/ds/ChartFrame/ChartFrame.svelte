@@ -29,6 +29,7 @@
 	import Card from '../Card/Card.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import { compact } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 	import { slug } from '../slug';
 	import { makeX, makeY, tickValues } from '../charts/scales';
 	import { timeTickLabels } from '../charts/timeTicks';
@@ -216,16 +217,8 @@
 		hovered = null;
 		clear();
 	});
-	// Retry swaps the alert for the loading placeholder. Keep keyboard focus inside the card by moving it to
-	// the plot container first, so it is not dropped to the document body when the Retry button unmounts.
-	const retry = $derived(
-		onretry
-			? () => {
-					container?.focus();
-					onretry();
-				}
-			: undefined
-	);
+	// Retry swaps the alert for the loading placeholder; keep keyboard focus on the plot container.
+	const retry = $derived(retryKeepingFocus(() => container, onretry));
 </script>
 
 <Card {title} {headingLevel} {actions} id={`${id}-title`}>

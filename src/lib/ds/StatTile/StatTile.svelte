@@ -3,6 +3,7 @@
 	import { ago, comma, compact, MISSING, pct } from '../format';
 	import type { DataState } from '../types';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
+	import { retryKeepingFocus } from '../retryFocus';
 	import Sparkline from '../Sparkline/Sparkline.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
 	let {
@@ -34,6 +35,7 @@
 		asOf?: Date | number | string;
 	} = $props();
 	let linked = $derived(Boolean(href) && state !== 'loading' && state !== 'error');
+	let tile: HTMLElement | undefined;
 	let shownValue = $derived(state === 'empty' ? MISSING : value);
 	let hasValue = $derived(shownValue !== MISSING);
 	let finiteTrend = $derived(trend?.filter(Number.isFinite) ?? []);
@@ -45,13 +47,17 @@
 	let changeDirection = $derived(changePercent === pct(0) ? 0 : (change?.value ?? 0) > 0 ? 1 : -1);
 </script>
 
+<!-- Retry swaps the alert for the loading placeholder. Neither state is linked, so the tile is a plain
+	div then and keeps focus as a tabindex="-1" region; a linked tile is left as an ordinary link. -->
 <svelte:element
 	this={linked ? 'a' : 'div'}
+	bind:this={tile}
 	href={linked ? href : undefined}
+	tabindex={linked ? undefined : -1}
 	aria-busy={state === 'loading' ? 'true' : undefined}
 	class="block min-w-0 rounded-card border border-line bg-surface p-card text-ink shadow-card {linked
 		? 'hover:ring-2 hover:ring-accent focus-visible:ring-2 focus-visible:ring-accent'
-		: ''}"
+		: 'focus:outline-none'}"
 >
 	<div class="mb-3 flex min-h-7 items-center gap-2 text-label text-ink-muted">
 		{#if icon}<span
@@ -69,7 +75,10 @@
 				></div>{:else if progress}<div class="h-2 rounded-full bg-grid"></div>{/if}
 		</div>
 	{:else if state === 'error'}
-		<InlineAlert message="Unable to load {label}." {onretry} />
+		<InlineAlert
+			message="Unable to load {label}."
+			onretry={retryKeepingFocus(() => tile, onretry)}
+		/>
 	{:else}
 		<!-- The sr-only space before the unit preserves the existing visual margin. -->
 		<p class="num break-words text-stat">

@@ -2,6 +2,7 @@
 	import Card from '$lib/ds/Card/Card.svelte';
 	import InlineAlert from '$lib/ds/InlineAlert/InlineAlert.svelte';
 	import { comma as num } from '$lib/ds/format';
+	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import { freshnessText, type EpochResource } from './series';
 	let {
 		resource,
@@ -10,10 +11,7 @@
 	}: { resource: EpochResource | null; loading: boolean; onretry: () => void } = $props();
 	let region: HTMLDivElement | undefined = $state();
 	// Retry swaps its alert for the loading placeholder: move focus to the region first so it is not dropped.
-	const retry = () => {
-		region?.focus();
-		onretry();
-	};
+	const retry = $derived(retryKeepingFocus(() => region, onretry));
 	const split = $derived(resource?.current?.split);
 	const splitRows = $derived(
 		split

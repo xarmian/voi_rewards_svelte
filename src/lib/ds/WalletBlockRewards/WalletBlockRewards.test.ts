@@ -240,12 +240,16 @@ describe('WalletBlockRewards', () => {
 		expect(html).not.toContain('Account is offline.');
 		expect(html).toContain('Unable to load Chance of a real-time block reward · next 24 hours.');
 		const lookups = alerts.filter((a) => a.onretry === onretrylookup);
-		expect(lookups.map((a) => a.message)).toEqual([
-			UNKNOWN_REGISTRATION,
-			'Unable to load Chance of a real-time block reward · next 24 hours.'
-		]);
+		expect(lookups.map((a) => a.message)).toEqual([UNKNOWN_REGISTRATION]);
 		lookups[0].onretry!();
 		expect(onretrylookup).toHaveBeenCalledTimes(1);
+		// The tile wraps its retry to keep focus in the tile; it still runs the lookup retry.
+		alerts
+			.find(
+				(a) => a.message === 'Unable to load Chance of a real-time block reward · next 24 hours.'
+			)
+			?.onretry?.();
+		expect(onretrylookup).toHaveBeenCalledTimes(2);
 		const registered = draw({}, { ownerLookup: 'unavailable', onretrylookup });
 		expect(registered).toContain(UNKNOWN_REGISTRATION);
 		expect(registered).not.toContain('Registered for real-time block rewards');
