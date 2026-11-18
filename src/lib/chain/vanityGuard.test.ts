@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { decideVanityStart, hasThirdPartyScript } from './vanityGuard';
+import { decideVanityStart, hasThirdPartyScript, mnemonicAtRisk } from './vanityGuard';
 
 test.each([
 	[false, false, 'proceed'],
@@ -28,3 +28,15 @@ test.each([
 	);
 	if (dataLayer === undefined) expect(querySelectorAll).toHaveBeenCalledWith('script[src]');
 });
+
+test.each([
+	[false, false, false],
+	[false, true, false],
+	[true, false, true],
+	[true, true, false]
+] as const)(
+	'hasResult=%s, rekeyConfirmed=%s puts the mnemonic at risk: %s',
+	(hasResult, rekeyConfirmed, expected) => {
+		expect(mnemonicAtRisk({ hasResult, rekeyConfirmed })).toBe(expected);
+	}
+);

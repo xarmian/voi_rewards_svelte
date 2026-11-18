@@ -18,3 +18,7 @@ export function decideVanityStart(input: {
 	if (!input.thirdParty) return 'proceed';
 	return input.alreadyReloaded ? 'blocked' : 'reload';
 }
+
+export function mnemonicAtRisk(input: { hasResult: boolean; rekeyConfirmed: boolean }): boolean {
+	return input.hasResult && !input.rekeyConfirmed;
+}
