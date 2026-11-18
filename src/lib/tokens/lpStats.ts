@@ -34,12 +34,20 @@ function toBaseUnits(value: string, decimals: number): bigint | null {
 	return sign ? -units : units;
 }
 
-// Base units as a whole-token string with exactly `decimals` fraction digits, as toFixed prints.
+// A plain decimal string without trailing fraction zeros or a bare trailing point, as the
+// amount column prints; exponent form (toFixed at 1e21 and above) passes through unchanged.
+function trimFraction(value: string): string {
+	if (!value.includes('.') || /e/i.test(value)) return value;
+	const trimmed = value.replace(/0+$/, '').replace(/\.$/, '');
+	return trimmed === '-0' ? '0' : trimmed;
+}
+
+// Base units as a whole-token string at `decimals`, without trailing fraction zeros.
 function formatBaseUnits(units: bigint, decimals: number): string {
 	const sign = units < 0n ? '-' : '';
 	const digits = (units < 0n ? -units : units).toString().padStart(decimals + 1, '0');
 	if (decimals === 0) return sign + digits;
-	return `${sign}${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`;
+	return trimFraction(`${sign}${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`);
 }
 
 function startBalanceUnits(token: FungibleTokenType | LPToken): bigint | null {
@@ -105,7 +113,7 @@ export function calculateRunningBalance(
 		}
 	}
 
-	return runningBalance.toFixed(token.decimals);
+	return trimFraction(runningBalance.toFixed(token.decimals));
 }
 
 export function formatChange(
@@ -117,7 +125,7 @@ export function formatChange(
 	const units = toBaseUnits(String(transfer.amount), token.decimals);
 	const formatted =
 		units === null
-			? Number(transfer.amount).toFixed(token.decimals)
+			? trimFraction(Number(transfer.amount).toFixed(token.decimals))
 			: formatBaseUnits(units, token.decimals);
 	if (transfer.type === 'fee') {
 		return `-${formatted}`; // Fees are always negative
