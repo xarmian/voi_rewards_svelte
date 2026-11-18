@@ -589,3 +589,17 @@ it('an LP balance above a known zero supply reads Unissued supply; an unread sup
 	expect(unreadCell).not.toBe('Unissued supply');
 	expect(unreadCell).toContain('A/B');
 });
+
+it('Refresh tokens stays focusable while tokens load, so keyboard activation keeps focus on it', () => {
+	const refresh = (tokenState: 'loading' | 'ready') =>
+		render(WalletHoldings, {
+			props: { pageAddress: 'Y', account, tokens: [token], tokenState, onretryTokens: () => {} }
+		}).body.match(/<button\b[^>]*>(?:(?!<\/button>)[^])*?Refresh tokens/)?.[0];
+	const loading = refresh('loading');
+	expect(loading).toBeDefined();
+	expect(loading).not.toMatch(/\sdisabled(?=[\s=>])/);
+	expect(loading).toMatch(/aria-disabled="true"/);
+	const ready = refresh('ready');
+	expect(ready).toBeDefined();
+	expect(ready).not.toMatch(/\sdisabled(?=[\s=>])|aria-disabled/);
+});
