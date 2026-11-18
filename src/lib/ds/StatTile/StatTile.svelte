@@ -50,7 +50,10 @@
 		if (!carryFocus) return;
 		carryFocus = false;
 		void tick().then(() => {
-			if (tile && !tile.contains(document.activeElement)) tile.focus({ preventScroll: true });
+			// Only recover focus the swap dropped; leave it alone if something else placed it.
+			const active = document.activeElement;
+			if (tile && (active === null || active === document.body))
+				tile.focus({ preventScroll: true });
 		});
 	});
 	let shownValue = $derived(state === 'empty' ? MISSING : value);
