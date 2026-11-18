@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import { ago, comma, compact, MISSING, pct } from '../format';
 	import type { DataState } from '../types';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
@@ -35,7 +35,24 @@
 		asOf?: Date | number | string;
 	} = $props();
 	let linked = $derived(Boolean(href) && state !== 'loading' && state !== 'error');
+	// Not $state: the `state` prop shadows the rune in this component. The element is only read in
+	// handlers and after tick().
 	let tile: HTMLElement | undefined;
+	// When a retried tile loads and becomes a link, the focused div is replaced by a new element;
+	// carry focus over to the link instead of dropping it to the document.
+	let carryFocus = false;
+	$effect.pre(() => {
+		void linked;
+		carryFocus = Boolean(tile?.contains(document.activeElement));
+	});
+	$effect(() => {
+		void linked;
+		if (!carryFocus) return;
+		carryFocus = false;
+		void tick().then(() => {
+			if (tile && !tile.contains(document.activeElement)) tile.focus({ preventScroll: true });
+		});
+	});
 	let shownValue = $derived(state === 'empty' ? MISSING : value);
 	let hasValue = $derived(shownValue !== MISSING);
 	let finiteTrend = $derived(trend?.filter(Number.isFinite) ?? []);
@@ -48,7 +65,8 @@
 </script>
 
 <!-- Retry swaps the alert for the loading placeholder. Neither state is linked, so the tile is a plain
-	div then and keeps focus as a tabindex="-1" region; a linked tile is left as an ordinary link. -->
+	div then and keeps focus as a tabindex="-1" region; a linked tile is left as an ordinary link, and
+	takes focus over from the div when a retry loads it (see carryFocus). -->
 <svelte:element
 	this={linked ? 'a' : 'div'}
 	bind:this={tile}
