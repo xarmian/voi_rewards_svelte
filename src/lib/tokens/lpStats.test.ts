@@ -151,8 +151,8 @@ describe('LP statistics', () => {
 		const fee: Transfer = { ...sent, type: 'fee', amount: '0.01' };
 		const transfers = [transfer, sent, fee];
 		expect(calculateRunningBalance(3, token, transfers, 'wallet')).toBe('1.11');
-		expect(formatChange(transfer, token, 'wallet')).toBe('+0.20');
-		expect(formatChange(sent, token, 'wallet')).toBe('-0.30');
+		expect(formatChange(transfer, token, 'wallet')).toBe('+0.2');
+		expect(formatChange(sent, token, 'wallet')).toBe('-0.3');
 		expect(formatChange(fee, token, 'wallet')).toBe('-0.01');
 	});
 
@@ -162,13 +162,13 @@ describe('LP statistics', () => {
 			'+9007199254740993'
 		);
 	});
-	it('formats 18-decimal amounts exactly with fixed fraction digits', () => {
+	it('formats 18-decimal amounts exactly, trimming trailing fraction zeros', () => {
 		const wei = { ...token, decimals: 18 };
 		const sent = { ...transfer, from: 'wallet', to: 'other' };
 		expect(formatChange({ ...transfer, amount: '1234567.123456789012345678' }, wei, 'wallet')).toBe(
 			'+1234567.123456789012345678'
 		);
-		expect(formatChange({ ...sent, amount: '0.5' }, wei, 'wallet')).toBe('-0.500000000000000000');
+		expect(formatChange({ ...sent, amount: '0.5' }, wei, 'wallet')).toBe('-0.5');
 	});
 	it('reverses a newer amount from a balance above 2^53 in base units', () => {
 		const whole = {
@@ -185,26 +185,47 @@ describe('LP statistics', () => {
 		const wei = { ...token, decimals: 18, balance: 1e18, balanceRaw: '1000000000000000000' };
 		const transfers = [{ ...transfer, amount: '0.1' }, transfer];
 		expect((1 - 0.1).toFixed(18)).not.toBe('0.900000000000000000');
-		expect(calculateRunningBalance(1, wei, transfers, 'wallet')).toBe('0.900000000000000000');
+		expect(calculateRunningBalance(1, wei, transfers, 'wallet')).toBe('0.9');
 	});
 	it('keeps the number path for an amount in exponent form', () => {
 		const eight = { ...token, decimals: 8, balance: 100000000 };
 		const odd = { ...transfer, amount: '1e-7' };
 		expect(() => formatChange(odd, eight, 'wallet')).not.toThrow();
-		expect(formatChange(odd, eight, 'wallet')).toBe(`+${Number('1e-7').toFixed(8)}`);
-		expect(calculateRunningBalance(1, eight, [odd, transfer], 'wallet')).toBe(
-			(100000000 / 1e8 - Number('1e-7')).toFixed(8)
-		);
+		expect(formatChange(odd, eight, 'wallet')).toBe('+0.0000001');
+		expect(calculateRunningBalance(1, eight, [odd, transfer], 'wallet')).toBe('0.9999999');
 	});
 	it('formats zero, negative and 0-decimal values without a trailing point', () => {
 		const whole = { ...token, decimals: 0, balance: 0, balanceRaw: '0' };
 		const other = { ...transfer, to: 'someone' };
 		expect(formatChange({ ...transfer, amount: '0' }, whole, 'wallet')).toBe('+0');
 		expect(formatChange({ ...other, amount: '-5' }, whole, 'wallet')).toBe('-5');
-		expect(formatChange({ ...other, amount: '-0.5' }, token, 'wallet')).toBe('-0.50');
+		expect(formatChange({ ...other, amount: '-0.5' }, token, 'wallet')).toBe('-0.5');
 		expect(formatChange({ ...transfer, amount: '7' }, whole, 'wallet')).toBe('+7');
 		expect(
 			calculateRunningBalance(1, whole, [{ ...transfer, amount: '1' }, transfer], 'wallet')
 		).toBe('-1');
+	});
+	it('prints whole-number amounts and balances without a point', () => {
+		const six = { ...token, decimals: 6, balance: 1500000 };
+		expect(formatChange({ ...transfer, amount: '3' }, token, 'wallet')).toBe('+3');
+		expect(formatChange({ ...transfer, amount: '3.00' }, token, 'wallet')).toBe('+3');
+		expect(
+			calculateRunningBalance(1, six, [{ ...transfer, amount: '0.5' }, transfer], 'wallet')
+		).toBe('1');
+	});
+	it('passes the number path exponent form at 1e21 and above through unchanged', () => {
+		const huge = { ...token, decimals: 6, balance: 1e27 };
+		const odd = { ...transfer, amount: '1e-7' };
+		expect((1e21).toFixed(6)).toBe('1e+21');
+		expect(formatChange({ ...transfer, amount: '1e21' }, huge, 'wallet')).toBe('+1e+21');
+		expect(calculateRunningBalance(1, huge, [odd, transfer], 'wallet')).toBe('1e+21');
+	});
+	it('never prints a negative zero from the number path', () => {
+		const empty = { ...token, balance: 0 };
+		const tiny = { ...transfer, amount: '1e-9' };
+		const other = { ...transfer, to: 'someone' };
+		expect((0 - 1e-9).toFixed(2)).toBe('-0.00');
+		expect(calculateRunningBalance(1, empty, [tiny, transfer], 'wallet')).toBe('0');
+		expect(formatChange({ ...other, amount: '-1e-9' }, token, 'wallet')).toBe('0');
 	});
 });
