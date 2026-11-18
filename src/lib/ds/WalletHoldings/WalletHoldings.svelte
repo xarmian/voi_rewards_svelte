@@ -238,8 +238,14 @@
 {/snippet}
 {#snippet tokenControls()}
 	<div class="flex flex-wrap items-center gap-2">
-		<Button variant="soft" onclick={onretryTokens} disabled={tokenState === 'loading'}
-			>Refresh tokens</Button
+		<!-- aria-disabled, not disabled: disabling the focused button would drop keyboard focus to the body. -->
+		<Button
+			variant="soft"
+			aria-disabled={tokenState === 'loading' || undefined}
+			class={tokenState === 'loading' ? 'cursor-not-allowed opacity-50' : ''}
+			onclick={() => {
+				if (tokenState !== 'loading') onretryTokens?.();
+			}}>Refresh tokens</Button
 		>
 		{#if !showDust}
 			<Button variant="soft" onclick={() => (showDust = tokensExpanded = true)}>Show dust</Button>
