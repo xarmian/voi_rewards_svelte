@@ -110,49 +110,55 @@
 		{#if feed.receivedAt !== null}{filteredProjects.length} projects{/if}
 	</p>
 
-	{#if feed.status === 'stale'}
-		<InlineAlert
-			tone="warn"
-			message={`Stale · Retrieved ${receivedLabel}. The latest refresh failed.`}
-			onretry={loadProjects}
-		/>
-	{/if}
+	<div tabindex="-1" class="space-y-6 focus:outline-none">
+		{#if feed.status === 'stale'}
+			<InlineAlert
+				tone="warn"
+				message={`Stale · Retrieved ${receivedLabel}. The latest refresh failed.`}
+				onretry={loadProjects}
+			/>
+		{/if}
 
-	{#if view === 'loading'}
-		<div role="status" class="text-body text-ink-muted">Loading projects</div>
-		<div aria-hidden="true" class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-3">
-			{#each [1, 2, 3] as skeleton (skeleton)}
-				<Card>
-					<div class="h-10 w-10 rounded-ds-sm bg-surface-2"></div>
-					<div class="mt-4 h-5 w-2/3 rounded-ds-sm bg-surface-2"></div>
-					<div class="mt-3 h-16 rounded-ds-sm bg-surface-2"></div>
-				</Card>
-			{/each}
-		</div>
-	{:else if view === 'error'}
-		<InlineAlert message="Couldn't load the directory" onretry={loadProjects} retryLabel="Retry" />
-	{:else if view === 'empty'}
-		<p class="text-h2">No projects are listed yet</p>
-	{:else if view === 'no-match'}
-		<div class="space-y-3">
-			<h2 class="text-h2">No matching projects</h2>
-			<p class="text-body text-ink-muted">
-				{#if searchTerm}Search: “{searchTerm}”{/if}
-				{#if searchTerm && selectedCategory !== 'All'}·{/if}
-				{#if selectedCategory !== 'All'}Category: {selectedCategory}{/if}
-			</p>
-			<Button
-				href="/directory"
-				variant="soft"
-				data-sveltekit-noscroll
-				onclick={() => (searchTerm = '')}>Clear filters</Button
-			>
-		</div>
-	{:else}
-		<div class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-3">
-			{#each filteredProjects as project, i (projectKeys[i])}
-				<ProjectCard {project} categoryHref={categoryHref(project.category)} />
-			{/each}
-		</div>
-	{/if}
+		{#if view === 'loading'}
+			<div role="status" class="text-body text-ink-muted">Loading projects</div>
+			<div aria-hidden="true" class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-3">
+				{#each [1, 2, 3] as skeleton (skeleton)}
+					<Card>
+						<div class="h-10 w-10 rounded-ds-sm bg-surface-2"></div>
+						<div class="mt-4 h-5 w-2/3 rounded-ds-sm bg-surface-2"></div>
+						<div class="mt-3 h-16 rounded-ds-sm bg-surface-2"></div>
+					</Card>
+				{/each}
+			</div>
+		{:else if view === 'error'}
+			<InlineAlert
+				message="Couldn't load the directory"
+				onretry={loadProjects}
+				retryLabel="Retry"
+			/>
+		{:else if view === 'empty'}
+			<p class="text-h2">No projects are listed yet</p>
+		{:else if view === 'no-match'}
+			<div class="space-y-3">
+				<h2 class="text-h2">No matching projects</h2>
+				<p class="text-body text-ink-muted">
+					{#if searchTerm}Search: “{searchTerm}”{/if}
+					{#if searchTerm && selectedCategory !== 'All'}·{/if}
+					{#if selectedCategory !== 'All'}Category: {selectedCategory}{/if}
+				</p>
+				<Button
+					href="/directory"
+					variant="soft"
+					data-sveltekit-noscroll
+					onclick={() => (searchTerm = '')}>Clear filters</Button
+				>
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-3">
+				{#each filteredProjects as project, i (projectKeys[i])}
+					<ProjectCard {project} categoryHref={categoryHref(project.category)} />
+				{/each}
+			</div>
+		{/if}
+	</div>
 </div>

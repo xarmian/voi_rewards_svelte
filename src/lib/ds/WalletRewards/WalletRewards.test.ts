@@ -672,11 +672,16 @@ describe('Block rewards card', () => {
 		expect(tile(html, 'Today (UTC)')).toMatch(/^Today \(UTC\) 2 VOI 1 block reward /);
 		const lookups = alerts.filter((alert) => alert.onretry === onretrylookup);
 		expect(lookups.map((alert) => alert.message)).toEqual([
-			'Real-time block reward registration status unavailable',
-			'Unable to load Chance of a real-time block reward · next 24 hours.',
-			'Unable to load Next 7 days.'
+			'Real-time block reward registration status unavailable'
 		]);
 		lookups[0].onretry!();
 		expect(onretrylookup).toHaveBeenCalledTimes(1);
+		// The tiles wrap their retry to keep focus in the tile; each still runs the lookup retry.
+		for (const message of [
+			'Unable to load Chance of a real-time block reward · next 24 hours.',
+			'Unable to load Next 7 days.'
+		])
+			alerts.find((alert) => alert.message === message)?.onretry?.();
+		expect(onretrylookup).toHaveBeenCalledTimes(3);
 	});
 });

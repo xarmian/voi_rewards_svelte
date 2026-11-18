@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import { ago, comma, compact, MISSING, pct } from '../format';
 	import type { DataState } from '../types';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
+	import { retryKeepingFocus } from '../retryFocus';
 	import Sparkline from '../Sparkline/Sparkline.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
 	let {
@@ -34,6 +35,27 @@
 		asOf?: Date | number | string;
 	} = $props();
 	let linked = $derived(Boolean(href) && state !== 'loading' && state !== 'error');
+	// Not $state: the `state` prop shadows the rune in this component. The element is only read in
+	// handlers and after tick().
+	let tile: HTMLElement | undefined;
+	// When a retried tile loads and becomes a link, the focused div is replaced by a new element;
+	// carry focus over to the link instead of dropping it to the document.
+	let carryFocus = false;
+	$effect.pre(() => {
+		void linked;
+		carryFocus = Boolean(tile?.contains(document.activeElement));
+	});
+	$effect(() => {
+		void linked;
+		if (!carryFocus) return;
+		carryFocus = false;
+		void tick().then(() => {
+			// Only recover focus the swap dropped; leave it alone if something else placed it.
+			const active = document.activeElement;
+			if (tile && (active === null || active === document.body))
+				tile.focus({ preventScroll: true });
+		});
+	});
 	let shownValue = $derived(state === 'empty' ? MISSING : value);
 	let hasValue = $derived(shownValue !== MISSING);
 	let finiteTrend = $derived(trend?.filter(Number.isFinite) ?? []);
@@ -45,13 +67,18 @@
 	let changeDirection = $derived(changePercent === pct(0) ? 0 : (change?.value ?? 0) > 0 ? 1 : -1);
 </script>
 
+<!-- Retry swaps the alert for the loading placeholder. Neither state is linked, so the tile is a plain
+	div then and keeps focus as a tabindex="-1" region; a linked tile is left as an ordinary link, and
+	takes focus over from the div when a retry loads it (see carryFocus). -->
 <svelte:element
 	this={linked ? 'a' : 'div'}
+	bind:this={tile}
 	href={linked ? href : undefined}
+	tabindex={linked ? undefined : -1}
 	aria-busy={state === 'loading' ? 'true' : undefined}
 	class="block min-w-0 rounded-card border border-line bg-surface p-card text-ink shadow-card {linked
 		? 'hover:ring-2 hover:ring-accent focus-visible:ring-2 focus-visible:ring-accent'
-		: ''}"
+		: 'focus:outline-none'}"
 >
 	<div class="mb-3 flex min-h-7 items-center gap-2 text-label text-ink-muted">
 		{#if icon}<span
@@ -69,7 +96,10 @@
 				></div>{:else if progress}<div class="h-2 rounded-full bg-grid"></div>{/if}
 		</div>
 	{:else if state === 'error'}
-		<InlineAlert message="Unable to load {label}." {onretry} />
+		<InlineAlert
+			message="Unable to load {label}."
+			onretry={retryKeepingFocus(() => tile, onretry)}
+		/>
 	{:else}
 		<!-- The sr-only space before the unit preserves the existing visual margin. -->
 		<p class="num break-words text-stat">

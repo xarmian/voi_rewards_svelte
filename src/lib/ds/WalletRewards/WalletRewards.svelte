@@ -12,6 +12,7 @@
 	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
 	import RealtimeTestingBadge from '../RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { comma, compact, MISSING, pct, shortAddr } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 	import type { Column } from '../DataTable/types';
 	import type { DataState } from '../types';
 	import { annotationsFor } from '$lib/data/chartEvents';
@@ -96,6 +97,10 @@
 	let clock = $state(new Date());
 	let at = $derived(now ?? clock);
 	let sources = $state(createRewardsState());
+	// Retries swap alerts for loading states or clear them; these stable regions keep focus in place.
+	let epochsRegion: HTMLDivElement | undefined = $state();
+	let dailyRegion: HTMLDivElement | undefined = $state();
+	let blockRegion: HTMLDivElement | undefined = $state();
 	const readers = {
 		epochs: createReadSource(loadRewardEpochs, (result) => (sources.epochs = result)),
 		payouts: createReadSource(loadPayouts, (result) => (sources.payouts = result)),
@@ -459,12 +464,16 @@
 		data-block-reward-tx={row.txid}
 		>{shortAddr(row.txid)}<span class="sr-only"> (opens in a new tab)</span></a
 	>{/snippet}
-{#snippet warning(source: keyof RewardsState, message: string)}
+{#snippet warning(
+	source: keyof RewardsState,
+	message: string,
+	region: () => HTMLElement | undefined
+)}
 	{#if sources[source].state === 'error' || sources[source].error}
 		<InlineAlert
 			{message}
 			tone={sources[source].value !== undefined ? 'warn' : 'danger'}
-			onretry={() => void retry(source)}
+			onretry={retryKeepingFocus(region, () => void retry(source))}
 		/>
 	{/if}
 	{#if sources[source].state === 'stale'}<p class="text-label text-warn">
@@ -541,59 +550,68 @@
 	<Card title="Rewards by epoch">
 		{#snippet actions()}<Button variant="soft" onclick={() => refresh()}>Refresh rewards</Button
 			>{/snippet}
-		<p class="mb-3 text-label text-ink-muted">
-			Rewards received by {shortAddr(pageAddress)}. Open a contract to see its rewards.
-		</p>
-		<p class="mb-3 text-label text-ink-muted">
-			Expected using current online balance; historical account stake is unavailable.
-		</p>
-		{@render warning('epochs', 'Reward history unavailable')}
-		{@render warning('payouts', 'Recorded epoch rewards unavailable')}
-		{@render warning('account', 'Current account balance unavailable')}
-		{@render warning('eligible', 'Historical eligible stake unavailable')}
-		{@render warning('supply', 'Current eligible stake unavailable')}
-		{#if sources.payouts.value?.complete === false}<InlineAlert
-				tone="warn"
-				message="Recorded epoch rewards incomplete. Reward attribution unavailable."
-				onretry={() => void retry('payouts')}
-			/>{/if}
-		{#if missingMessage}<InlineAlert
-				tone="warn"
-				message={missingMessage}
-				onretry={() => void retry('epochs')}
-			/>{/if}
-		{#if sources.epochs.state === 'loading'}
-			<div aria-busy="true" class="space-y-3">
-				<p class="sr-only">Loading rewards by epoch…</p>
-				{#each Array.from({ length: 8 }, (_, index) => index) as index (index)}<div
-						class="h-9 rounded-ds-xs bg-grid"
-					></div>{/each}
-			</div>
-		{:else}
-			<DataTable
-				{columns}
-				{rows}
-				rowKey={(row) => String(row.epoch)}
-				rowName={(row) => `epoch ${row.epoch}`}
-				caption={`Rewards by epoch for ${pageAddress}; estimates and actual rewards in VOI`}
-				id="wallet-reward-epochs"
-				density="compact"
-				sort={{ key: 'epoch', dir: 'desc' }}
-				limit={15}
-				moreLabel={(hidden) => `See ${hidden} more epochs`}
-				expandable
-				{detail}
-				state={sources.epochs.state}
-				asOf={sources.epochs.asOf}
-				onretry={() => void retry('epochs')}
-				emptyText="No reward history returned for this address"
-			/>
-		{/if}
+		<div bind:this={epochsRegion} tabindex="-1" class="focus:outline-none">
+			<p class="mb-3 text-label text-ink-muted">
+				Rewards received by {shortAddr(pageAddress)}. Open a contract to see its rewards.
+			</p>
+			<p class="mb-3 text-label text-ink-muted">
+				Expected using current online balance; historical account stake is unavailable.
+			</p>
+			{@render warning('epochs', 'Reward history unavailable', () => epochsRegion)}
+			{@render warning('payouts', 'Recorded epoch rewards unavailable', () => epochsRegion)}
+			{@render warning('account', 'Current account balance unavailable', () => epochsRegion)}
+			{@render warning('eligible', 'Historical eligible stake unavailable', () => epochsRegion)}
+			{@render warning('supply', 'Current eligible stake unavailable', () => epochsRegion)}
+			{#if sources.payouts.value?.complete === false}<InlineAlert
+					tone="warn"
+					message="Recorded epoch rewards incomplete. Reward attribution unavailable."
+					onretry={() => void retry('payouts')}
+				/>{/if}
+			{#if missingMessage}<InlineAlert
+					tone="warn"
+					message={missingMessage}
+					onretry={() => void retry('epochs')}
+				/>{/if}
+			{#if sources.epochs.state === 'loading'}
+				<div aria-busy="true" class="space-y-3">
+					<p class="sr-only">Loading rewards by epoch…</p>
+					{#each Array.from({ length: 8 }, (_, index) => index) as index (index)}<div
+							class="h-9 rounded-ds-xs bg-grid"
+						></div>{/each}
+				</div>
+			{:else}
+				<DataTable
+					{columns}
+					{rows}
+					rowKey={(row) => String(row.epoch)}
+					rowName={(row) => `epoch ${row.epoch}`}
+					caption={`Rewards by epoch for ${pageAddress}; estimates and actual rewards in VOI`}
+					id="wallet-reward-epochs"
+					density="compact"
+					sort={{ key: 'epoch', dir: 'desc' }}
+					limit={15}
+					moreLabel={(hidden) => `See ${hidden} more epochs`}
+					expandable
+					{detail}
+					state={sources.epochs.state}
+					asOf={sources.epochs.asOf}
+					onretry={retryKeepingFocus(
+						() => epochsRegion,
+						() => void retry('epochs')
+					)}
+					emptyText="No reward history returned for this address"
+				/>
+			{/if}
+		</div>
 	</Card>
 	<div class="grid min-w-0 gap-bento lg:grid-cols-12">
-		<div class="min-w-0 space-y-3 lg:col-span-8">
-			{@render warning('daily', 'Daily proposals unavailable')}
-			{@render warning('dailyStake', 'Expected proposals unavailable')}
+		<div
+			bind:this={dailyRegion}
+			tabindex="-1"
+			class="min-w-0 space-y-3 focus:outline-none lg:col-span-8"
+		>
+			{@render warning('daily', 'Daily proposals unavailable', () => dailyRegion)}
+			{@render warning('dailyStake', 'Expected proposals unavailable', () => dailyRegion)}
 			{#if expectedMissing && sources.dailyStake.state !== 'error'}<InlineAlert
 					tone="warn"
 					message="Expected proposals unavailable. Actual blocks remain visible."
@@ -682,7 +700,7 @@
 					>Refresh real-time block rewards</Button
 				>
 			</div>{/snippet}
-		<div class="min-w-0 space-y-4">
+		<div bind:this={blockRegion} tabindex="-1" class="min-w-0 space-y-4 focus:outline-none">
 			<div class="space-y-2">
 				{#if contractUnknown}
 					<InlineAlert
@@ -705,7 +723,10 @@
 				{:else if statusSource.state === 'error'}
 					<InlineAlert
 						message="Real-time block reward registration status unavailable"
-						onretry={() => void retryBlock('status')}
+						onretry={retryKeepingFocus(
+							() => blockRegion,
+							() => void retryBlock('status')
+						)}
 					/>
 				{:else}
 					<div aria-busy="true" class="h-7 w-56 max-w-full rounded-ds-xs bg-grid">
@@ -719,7 +740,10 @@
 				<InlineAlert
 					tone="warn"
 					message={BLOCK_REWARDS_UNKNOWN_TEXT}
-					onretry={() => void retryBlock('funding')}
+					onretry={retryKeepingFocus(
+						() => blockRegion,
+						() => void retryBlock('funding')
+					)}
 				/>
 			{/if}
 			{#if lag !== null && lag > BLOCK_REWARD_LAG_ALERT_ROUNDS}
@@ -820,7 +844,10 @@
 				{#if blockSources.recent.state === 'stale' && blockSources.recent.error}<InlineAlert
 						tone="warn"
 						message="Recent real-time block rewards did not refresh. Older real-time block rewards load after a successful refresh."
-						onretry={() => void retryBlock('recent')}
+						onretry={retryKeepingFocus(
+							() => blockRegion,
+							() => void retryBlock('recent')
+						)}
 					/>{/if}
 				{#if pages.state === 'error'}<InlineAlert
 						tone="warn"

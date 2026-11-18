@@ -243,3 +243,8 @@ test('a per-row action predicate omits the unavailable row trigger while retaini
 	assert.ok(contentText(body).includes('Beta'));
 	assert.equal((html({ rowActions }).match(/aria-haspopup="menu"/g) ?? []).length, 2);
 });
+
+test('on error the table stays a programmatic focus target beside the alert so Retry keeps focus', () => {
+	const markup = html({ state: 'error', onretry: () => {} });
+	assert.match(markup, /<table[^>]*tabindex="-1"[^>]*>[\s\S]*<\/table>[\s\S]*role="alert"/);
+});

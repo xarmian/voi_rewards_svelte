@@ -32,7 +32,7 @@ test('balance rendering delegates the raw account state and its real retry to th
 	expect(source).toContain('onretryAccount={retryAccountDetails}');
 	expect(presenter).toContain("account.status === 'unavailable'");
 	expect(presenter).toContain('VOI balance unavailable');
-	expect(presenter).toContain('onretry={onretryAccount}');
+	expect(presenter).toContain('onretry={retryKeepingFocus(() => accountRegion, onretryAccount)}');
 	expect(display).toMatch(/account.status === 'loaded' \? account.value.balance \/ 1e6 : null/);
 });
 

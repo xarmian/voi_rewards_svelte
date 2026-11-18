@@ -5,6 +5,7 @@
 	import { ago } from '../format';
 	import { slug } from '../slug';
 	import type { DataState } from '../types';
+	import { retryKeepingFocus } from '../retryFocus';
 	import RowMenu from './RowMenu.svelte';
 	import { tableId, detailsId } from './ids';
 	import { rowKeys } from '../../utils/rowKeys';
@@ -190,11 +191,14 @@
 	<p class="mb-2 text-label text-warn"><span aria-hidden="true">!</span> as of {ago(asOf)}</p>
 {/if}
 {#if dataState === 'loading'}<p class="sr-only">Loading {caption}…</p>{/if}
+<!-- The table stays mounted when Retry swaps the alert for loading rows, so it takes focus as a
+	tabindex="-1" region instead of a wrapper that would change the caller's spacing. -->
 <table
 	bind:this={table}
 	id={resolvedId}
+	tabindex="-1"
 	aria-busy={dataState === 'loading' ? 'true' : undefined}
-	class="w-full text-sm text-ink"
+	class="w-full text-sm text-ink focus:outline-none"
 >
 	<caption class={captionHidden ? 'sr-only' : 'pb-3 text-start text-label text-ink-muted'}
 		>{caption}</caption
@@ -387,5 +391,8 @@
 		{/if}
 	{/if}
 </table>
-{#if dataState === 'error'}<InlineAlert message="Unable to load {caption}." {onretry} />{/if}
+{#if dataState === 'error'}<InlineAlert
+		message="Unable to load {caption}."
+		onretry={retryKeepingFocus(() => table, onretry)}
+	/>{/if}
 <p class="sr-only" aria-live="polite">{announcement}</p>

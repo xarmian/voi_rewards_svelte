@@ -2,6 +2,7 @@
 	import { ago, compact } from '../format';
 	import type { DataState } from '../types';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
+	import { retryKeepingFocus } from '../retryFocus';
 	import { sparklinePath } from './geometry';
 	let {
 		values,
@@ -41,12 +42,23 @@
 	});
 </script>
 
-<div bind:this={container} class="min-w-0" aria-busy={dataState === 'loading' ? 'true' : undefined}>
+<!-- Retry swaps the alert for the loading placeholder; the container keeps focus so it is not dropped.
+	It is only focusable when there is a Retry, so a trend inside a linked tile does not take the click focus. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
+	bind:this={container}
+	class="min-w-0 focus:outline-none"
+	tabindex={onretry ? -1 : undefined}
+	aria-busy={dataState === 'loading' ? 'true' : undefined}
+>
 	{#if dataState === 'loading'}
 		<span class="sr-only">Loading {label}…</span>
 		<div aria-hidden="true" class="w-full rounded-ds-xs bg-grid" style:height={`${height}px`}></div>
 	{:else if dataState === 'error'}
-		<InlineAlert message="Unable to load {label}." {onretry} />
+		<InlineAlert
+			message="Unable to load {label}."
+			onretry={retryKeepingFocus(() => container, onretry)}
+		/>
 	{:else if dataState === 'empty' || finiteValues.length === 0}
 		<p class="flex items-center text-sm text-ink-muted" style:min-height={`${height}px`}>No data</p>
 	{:else}

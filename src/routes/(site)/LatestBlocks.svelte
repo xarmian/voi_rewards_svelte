@@ -65,33 +65,35 @@
 		label={paused ? 'Paused' : 'Live'}
 	/>{/snippet}
 <Card title="Latest blocks" {actions}>
-	{#if latestState.blocks === null && latestState.error}
-		<InlineAlert message="Unable to load latest blocks." onretry={retry} />
-	{:else if latestState.blocks === null}
-		<div aria-busy="true">
-			<p class="sr-only">Loading latest blocks…</p>
-			<ul aria-label="Latest blocks" class="space-y-3">
-				{#each [0, 1, 2, 3, 4] as row (row)}<li
-						aria-hidden="true"
-						class="h-8 rounded-ds-xs bg-surface-2"
-					></li>{/each}
+	<div tabindex="-1" class="focus:outline-none">
+		{#if latestState.blocks === null && latestState.error}
+			<InlineAlert message="Unable to load latest blocks." onretry={retry} />
+		{:else if latestState.blocks === null}
+			<div aria-busy="true">
+				<p class="sr-only">Loading latest blocks…</p>
+				<ul aria-label="Latest blocks" class="space-y-3">
+					{#each [0, 1, 2, 3, 4] as row (row)}<li
+							aria-hidden="true"
+							class="h-8 rounded-ds-xs bg-surface-2"
+						></li>{/each}
+				</ul>
+			</div>
+		{:else}
+			<ul aria-label="Latest blocks">
+				{#each latestState.blocks as block (block.block)}
+					<li
+						class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line py-2.5 text-sm last:border-b-0"
+					>
+						<Chip label={`#${comma(block.block)}`} />
+						<a href="/wallet/{block.proposer}" class="min-w-0 flex-1 break-all text-accent"
+							>{names[block.proposer] ?? shortAddr(block.proposer)}</a
+						>
+						<time datetime={block.timestamp} class="text-label text-ink-muted"
+							>{ago(block.timestamp, clock)}</time
+						>
+					</li>
+				{/each}
 			</ul>
-		</div>
-	{:else}
-		<ul aria-label="Latest blocks">
-			{#each latestState.blocks as block (block.block)}
-				<li
-					class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line py-2.5 text-sm last:border-b-0"
-				>
-					<Chip label={`#${comma(block.block)}`} />
-					<a href="/wallet/{block.proposer}" class="min-w-0 flex-1 break-all text-accent"
-						>{names[block.proposer] ?? shortAddr(block.proposer)}</a
-					>
-					<time datetime={block.timestamp} class="text-label text-ink-muted"
-						>{ago(block.timestamp, clock)}</time
-					>
-				</li>
-			{/each}
-		</ul>
-	{/if}
+		{/if}
+	</div>
 </Card>

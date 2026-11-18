@@ -3,12 +3,14 @@
 	import { Card, ChartFrame, InlineAlert, LineChart, SearchBox, StatTile } from '$lib/ds';
 	import { ago, comma, MISSING, pct } from '$lib/ds/format';
 	import { annotationsFor } from '$lib/data/chartEvents';
+	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import { accountsDetail, headlineValues, onlineStakeTile, priceTile } from '$lib/home/headline';
 	import type { DashboardData } from '$lib/server/home';
 	let { data }: { data: DashboardData } = $props();
 	const retry = () => {
 		void invalidateAll();
 	};
+	let aprRegion: HTMLDivElement | undefined = $state();
 	let headline = $derived(data.headline.state === 'error' ? undefined : data.headline.value);
 	let figures = $derived(headlineValues(headline));
 	let history = $derived(data.aprHistory.state === 'error' ? [] : data.aprHistory.value);
@@ -50,40 +52,46 @@
 		span={{ lg: 5, md: 2 }}
 		title={headline ? `Staking APR · epoch ${headline.epoch}` : 'Staking APR'}
 	>
-		{#if data.headline.state === 'error'}
-			<InlineAlert message={data.headline.message} onretry={retry} />
-		{:else}
-			<p class="num text-hero-num">{figures.apr}</p>
-			<p class="mt-2 text-label text-on-hero-muted">
-				1M VOI online earns ≈ {figures.perMillion} VOI this epoch
-			</p>
-			{#if headline?.prevApr !== null && headline?.prevApr !== undefined}
+		<!-- Retry swaps the alert for the figures once the data reloads; the region keeps focus in the card. -->
+		<div bind:this={aprRegion} tabindex="-1" class="focus:outline-none">
+			{#if data.headline.state === 'error'}
+				<InlineAlert
+					message={data.headline.message}
+					onretry={retryKeepingFocus(() => aprRegion, retry)}
+				/>
+			{:else}
+				<p class="num text-hero-num">{figures.apr}</p>
 				<p class="mt-2 text-label text-on-hero-muted">
-					Previous epoch: {pct(headline.prevApr)} APR
+					1M VOI online earns ≈ {figures.perMillion} VOI this epoch
 				</p>
-			{/if}
-			{#if progress !== undefined}
-				<div
-					role="progressbar"
-					aria-valuenow={progress}
-					aria-valuemin="0"
-					aria-valuemax="7"
-					aria-label="Epoch progress"
-					class="mt-4 h-2 rounded-full bg-on-hero-surface"
-				>
+				{#if headline?.prevApr !== null && headline?.prevApr !== undefined}
+					<p class="mt-2 text-label text-on-hero-muted">
+						Previous epoch: {pct(headline.prevApr)} APR
+					</p>
+				{/if}
+				{#if progress !== undefined}
 					<div
-						class="h-full rounded-full bg-on-hero"
-						style:width={`${(progress / 7) * 100}%`}
-					></div>
-				</div>
+						role="progressbar"
+						aria-valuenow={progress}
+						aria-valuemin="0"
+						aria-valuemax="7"
+						aria-label="Epoch progress"
+						class="mt-4 h-2 rounded-full bg-on-hero-surface"
+					>
+						<div
+							class="h-full rounded-full bg-on-hero"
+							style:width={`${(progress / 7) * 100}%`}
+						></div>
+					</div>
+				{/if}
+				<p class="mt-2 text-label text-on-hero-muted">
+					Day {figures.elapsedDays} of 7 · {figures.pool} VOI pool · {headline?.rangeLabel}
+				</p>
+				{#if data.headline.state === 'stale'}<p class="mt-2 text-label text-on-hero-muted">
+						As of {ago(data.headline.asOf)}
+					</p>{/if}
 			{/if}
-			<p class="mt-2 text-label text-on-hero-muted">
-				Day {figures.elapsedDays} of 7 · {figures.pool} VOI pool · {headline?.rangeLabel}
-			</p>
-			{#if data.headline.state === 'stale'}<p class="mt-2 text-label text-on-hero-muted">
-					As of {ago(data.headline.asOf)}
-				</p>{/if}
-		{/if}
+		</div>
 	</Card>
 	<div class="min-w-0 md:col-span-2 lg:col-span-7">
 		<ChartFrame

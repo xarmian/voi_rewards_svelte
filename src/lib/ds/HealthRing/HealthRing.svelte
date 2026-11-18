@@ -3,6 +3,7 @@
 	import { ago, comma } from '../format';
 	import type { DataState } from '../types';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
+	import { retryKeepingFocus } from '../retryFocus';
 	import { ringArc } from './geometry';
 	let {
 		value,
@@ -24,6 +25,7 @@
 	const strokes = { ok: 'stroke-ok', warn: 'stroke-warn', danger: 'stroke-danger' };
 	let geometry = $derived(ringArc(value, total));
 	let shownValue = $derived(Math.min(Math.max(0, total), Math.max(0, value)));
+	let region: HTMLDivElement | undefined = $state();
 	let starting = $state(false);
 	let animating = $state(false);
 	onMount(() => {
@@ -48,12 +50,21 @@
 	});
 </script>
 
-<div class="min-w-0" aria-busy={dataState === 'loading' ? 'true' : undefined}>
+<!-- Retry swaps the alert for the loading placeholder; the region keeps focus so it is not dropped. -->
+<div
+	bind:this={region}
+	class="min-w-0 focus:outline-none"
+	tabindex="-1"
+	aria-busy={dataState === 'loading' ? 'true' : undefined}
+>
 	{#if dataState === 'loading'}
 		<span class="sr-only">Loading {label}…</span>
 		<div aria-hidden="true" class="h-[110px] w-[110px] rounded-full bg-grid"></div>
 	{:else if dataState === 'error'}
-		<InlineAlert message="Unable to load {label}." {onretry} />
+		<InlineAlert
+			message="Unable to load {label}."
+			onretry={retryKeepingFocus(() => region, onretry)}
+		/>
 	{:else if dataState === 'empty'}
 		<p class="flex min-h-[110px] items-center text-sm text-ink-muted">No data</p>
 	{:else if total <= 0}

@@ -20,6 +20,7 @@
 	import CopyButton from '../CopyButton/CopyButton.svelte';
 	import WalletNfts from '../WalletNfts/WalletNfts.svelte';
 	import { usd } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 
 	let {
 		scopeLabel = 'Account and listed contracts',
@@ -68,6 +69,7 @@
 		onnfts?: () => void;
 		onretryNfts?: () => void;
 	} = $props();
+	let accountRegion: HTMLDivElement | undefined = $state();
 	let showDust = $state(false);
 	let tokensExpanded = $state(false);
 	let tokenSort = $state<SortState>({ key: 'value', dir: 'desc' });
@@ -250,10 +252,13 @@
 
 <div class="grid min-w-0 grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-12">
 	<Card title="Holdings" span={{ lg: 12, md: 2 }} actions={nativeControls}>
-		{#if account.status === 'unavailable'}<InlineAlert
-				message="VOI balance unavailable"
-				onretry={onretryAccount}
-			/>{/if}
+		<!-- Retry reloads the account and removes the alert; this stable region keeps focus in the card. -->
+		<div bind:this={accountRegion} tabindex="-1" class="focus:outline-none">
+			{#if account.status === 'unavailable'}<InlineAlert
+					message="VOI balance unavailable"
+					onretry={retryKeepingFocus(() => accountRegion, onretryAccount)}
+				/>{/if}
+		</div>
 		{#if account.status === 'loaded'}<p class="mt-3 text-sm text-ink-muted">
 				Minimum balance: {account.value.minBalance / 1e6} VOI.
 			</p>{/if}
@@ -305,66 +310,70 @@
 		</p>
 	</Card>
 	<Card title="Tokens" span={{ lg: 12, md: 2 }} actions={tokenControls}>
-		{#if partial}<InlineAlert
-				tone="warn"
-				message="Some pool or approval details are unavailable"
-				onretry={onretryTokens}
-			/>{/if}
-		{#if tokenState === 'stale'}<InlineAlert
-				tone="warn"
-				message="Refresh failed. Showing the last loaded token balances."
-				onretry={onretryTokens}
-			/>{/if}
-		{#if tokenState === 'error'}<InlineAlert
-				message={`Token balances unavailable${tokenError ? ': ' + tokenError : ''}`}
-				onretry={onretryTokens}
-			/>
-		{:else}<DataTable
-				{columns}
-				rows={tokenRows}
-				rowKey={(r) => r.key}
-				rowName={(r) => r.token.name}
-				caption={!tokensExpanded && display.rows.tokens.length > tokenRows.length
-					? 'Page address token holdings. Until all tokens are shown, sorting reorders only the rows shown.'
-					: 'Page address token holdings'}
-				id="ds-holdings-tokens"
-				density="compact"
-				bind:sort={tokenSort}
-				limit={tokensExpanded ? undefined : Math.max(10, tokenRows.length)}
-				moreLabel={(n) => `Show ${n} more tokens`}
-				{detail}
-				state={tableState}
-				{asOf}
-				emptyText={tokens.some((t) => !t.poolInfo) && !showDust
-					? 'No tokens above the dust threshold. Show dust.'
-					: 'No tokens in this account'}
-			/>{/if}
-		{#if !tokensExpanded && display.rows.tokens.length > tokenRows.length}
-			<Button variant="ghost" onclick={() => (tokensExpanded = true)}
-				>Show {display.rows.tokens.length - tokenRows.length} more tokens</Button
-			>
-		{/if}
-		<div class="mt-4 min-w-0">{@render claims?.()}</div>
+		<div tabindex="-1" class="focus:outline-none">
+			{#if partial}<InlineAlert
+					tone="warn"
+					message="Some pool or approval details are unavailable"
+					onretry={onretryTokens}
+				/>{/if}
+			{#if tokenState === 'stale'}<InlineAlert
+					tone="warn"
+					message="Refresh failed. Showing the last loaded token balances."
+					onretry={onretryTokens}
+				/>{/if}
+			{#if tokenState === 'error'}<InlineAlert
+					message={`Token balances unavailable${tokenError ? ': ' + tokenError : ''}`}
+					onretry={onretryTokens}
+				/>
+			{:else}<DataTable
+					{columns}
+					rows={tokenRows}
+					rowKey={(r) => r.key}
+					rowName={(r) => r.token.name}
+					caption={!tokensExpanded && display.rows.tokens.length > tokenRows.length
+						? 'Page address token holdings. Until all tokens are shown, sorting reorders only the rows shown.'
+						: 'Page address token holdings'}
+					id="ds-holdings-tokens"
+					density="compact"
+					bind:sort={tokenSort}
+					limit={tokensExpanded ? undefined : Math.max(10, tokenRows.length)}
+					moreLabel={(n) => `Show ${n} more tokens`}
+					{detail}
+					state={tableState}
+					{asOf}
+					emptyText={tokens.some((t) => !t.poolInfo) && !showDust
+						? 'No tokens above the dust threshold. Show dust.'
+						: 'No tokens in this account'}
+				/>{/if}
+			{#if !tokensExpanded && display.rows.tokens.length > tokenRows.length}
+				<Button variant="ghost" onclick={() => (tokensExpanded = true)}
+					>Show {display.rows.tokens.length - tokenRows.length} more tokens</Button
+				>
+			{/if}
+			<div class="mt-4 min-w-0">{@render claims?.()}</div>
+		</div>
 	</Card>
 	<Card title="Liquidity positions" span={{ lg: 12, md: 2 }}>
-		{#if tokenState === 'error'}<InlineAlert
-				message="Token balances unavailable"
-				onretry={onretryTokens}
-			/>
-		{:else}<DataTable
-				columns={lpColumns}
-				rows={display.rows.lp}
-				rowKey={(r) => r.key}
-				rowName={(r) => r.token.name}
-				caption="Page address liquidity positions"
-				id="ds-holdings-lp"
-				density="compact"
-				bind:sort={lpSort}
-				{detail}
-				state={tableState}
-				{asOf}
-				emptyText="No liquidity positions"
-			/>{/if}
+		<div tabindex="-1" class="focus:outline-none">
+			{#if tokenState === 'error'}<InlineAlert
+					message="Token balances unavailable"
+					onretry={onretryTokens}
+				/>
+			{:else}<DataTable
+					columns={lpColumns}
+					rows={display.rows.lp}
+					rowKey={(r) => r.key}
+					rowName={(r) => r.token.name}
+					caption="Page address liquidity positions"
+					id="ds-holdings-lp"
+					density="compact"
+					bind:sort={lpSort}
+					{detail}
+					state={tableState}
+					{asOf}
+					emptyText="No liquidity positions"
+				/>{/if}
+		</div>
 	</Card>
 	<WalletNfts
 		{pageAddress}
