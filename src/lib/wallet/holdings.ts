@@ -127,13 +127,9 @@ export function deriveHoldingsRows(
 				: null;
 		let underlying: HoldingsRow['underlying'] = null;
 		const pool = token.poolInfo;
-		// A zero supply is how an unread supply arrives (Number('')), so it decides nothing.
+		// An unread supply is null and decides nothing; a known zero supply means nothing is issued.
 		const unissued =
-			!!pool &&
-			valid &&
-			nonnegative(pool.totalSupply) &&
-			pool.totalSupply > 0 &&
-			token.balance > pool.totalSupply;
+			!!pool && valid && nonnegative(pool.totalSupply) && token.balance > pool.totalSupply;
 		if (
 			pool &&
 			valid &&

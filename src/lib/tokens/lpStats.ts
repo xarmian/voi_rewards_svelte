@@ -264,7 +264,8 @@ export function calculateLPStatistics(
 export function calculateUserPoolShare(token: FungibleTokenType | LPToken): number {
 	if (!isLPToken(token) || !token.poolInfo) return 0;
 	const balance = Number(token.balance);
-	const totalSupply = Number(token.poolInfo.totalSupply);
+	// An unread supply (null) gives no share.
+	const totalSupply = Number(token.poolInfo.totalSupply ?? 0);
 	return totalSupply > 0 && balance > 0 ? balance / totalSupply : 0;
 }
 
