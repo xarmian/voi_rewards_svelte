@@ -143,6 +143,15 @@ export async function searchNFDomains(query: string): Promise<NFDSearchResult[]>
 }
 
 /**
+ * The search result for exactly `name`, or null. A prefix search can rank another NFD first, so a
+ * name already known (from a reverse lookup) must be matched by name, never taken as `results[0]`.
+ */
+export function exactNFD<T extends { name: string }>(name: string, results: T[]): T | null {
+	const wanted = name.toLowerCase();
+	return results.find((result) => result.name.toLowerCase() === wanted) ?? null;
+}
+
+/**
  * The address an NFD receives funds at: the account its holder designated for deposits, falling back
  * to the owner only when that is empty or not a valid address. Every input that takes an NFD as a
  * recipient must resolve it here, so none picks `owner` by accident. A typed address never goes
