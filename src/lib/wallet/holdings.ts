@@ -39,6 +39,8 @@ export type HoldingsRow = {
 	valueLabel: string;
 	usd: number | null;
 	underlying: { symbol: string; amount: number }[] | null;
+	/** An LP balance above the pool's outstanding supply: the pool's own unissued tokens, not a share. */
+	unissued: boolean;
 };
 
 const nonnegative = (n: unknown): n is number =>
@@ -125,6 +127,13 @@ export function deriveHoldingsRows(
 				: null;
 		let underlying: HoldingsRow['underlying'] = null;
 		const pool = token.poolInfo;
+		// A zero supply is how an unread supply arrives (Number('')), so it decides nothing.
+		const unissued =
+			!!pool &&
+			valid &&
+			nonnegative(pool.totalSupply) &&
+			pool.totalSupply > 0 &&
+			token.balance > pool.totalSupply;
 		if (
 			pool &&
 			valid &&
@@ -156,7 +165,8 @@ export function deriveHoldingsRows(
 			value,
 			valueLabel: value === null ? 'Unavailable' : `${holdingsAmount(value)} VOI`,
 			usd,
-			underlying
+			underlying,
+			unissued
 		});
 	}
 	return {

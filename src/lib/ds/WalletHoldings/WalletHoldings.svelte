@@ -175,8 +175,13 @@
 		title={row.token.name}
 		data-holdings-token-id={`${typeof row.token.id}:${row.token.id}`}>{row.token.name}</span
 	>{/snippet}
-{#snippet quantity(row: HoldingsRow)}<span title={holdingsExactQuantity(row.token)}
-		>{holdingsAmount(row.quantity)}{row.quantity === null ? '' : ` ${row.token.symbol}`}</span
+{#snippet quantity(row: HoldingsRow)}<span
+		title={row.unissued
+			? `${holdingsExactQuantity(row.token)} ${row.token.symbol}`
+			: holdingsExactQuantity(row.token)}
+		>{row.unissued
+			? 'Unissued supply'
+			: `${holdingsAmount(row.quantity)}${row.quantity === null ? '' : ` ${row.token.symbol}`}`}</span
 	>{/snippet}
 {#snippet value(row: HoldingsRow)}<span
 		title={row.value === null ? 'Unavailable' : `${row.value} VOI equivalent`}
