@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { beforeNavigate } from '$app/navigation';
+	import type { BeforeNavigate } from '@sveltejs/kit';
 	import { Web3Wallet } from 'avm-wallet-svelte';
 	import {
 		signTransactions,
@@ -11,7 +13,7 @@
 	import { Button, Card, CopyButton, InlineAlert, StatusPill } from '$lib/ds';
 	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
 	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
-	import { hasThirdPartyScript, decideVanityStart } from '$lib/chain/vanityGuard';
+	import { hasThirdPartyScript, decideVanityStart, mnemonicAtRisk } from '$lib/chain/vanityGuard';
 	import { buildPayment } from '$lib/chain/txBuilders';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { PUBLIC_WALLETCONNECT_PROJECT_ID as wcProjectId } from '$env/static/public';
@@ -521,6 +523,26 @@
 			isRekeying = false;
 		}
 	}
+
+	const LEAVE_WARNING =
+		"Your vanity address's recovery phrase is only on this page. If you leave before saving it (or before the rekey is confirmed), it is lost for good. Leave anyway?";
+
+	// Warn before leaving while the generated key is the only way into the vanity address.
+	function guardLeave(navigation: BeforeNavigate) {
+		const atRisk = mnemonicAtRisk({
+			hasResult: result !== null,
+			rekeyConfirmed: rekeyTxnStatus === 'success'
+		});
+		if (!atRisk) return;
+		// For an unload, cancelling makes the browser show its own leave prompt.
+		if (navigation.type === 'leave') {
+			navigation.cancel();
+			return;
+		}
+		if (!confirm(LEAVE_WARNING)) navigation.cancel();
+	}
+
+	beforeNavigate(guardLeave);
 
 	onMount(() => {
 		const thirdParty = hasThirdPartyScript(
