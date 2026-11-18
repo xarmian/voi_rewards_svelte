@@ -12,6 +12,7 @@
 		type Column
 	} from '$lib/ds';
 	import { createReadSource, type Source } from '$lib/wallet/read';
+	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import {
 		loadCalculatorInputs,
 		loadCalculatorBalance,
@@ -284,6 +285,11 @@
 		if (customPrice != null) customPrice = Math.max(0, customPrice * (1 + percentChange));
 	}
 
+	// Retries clear their alerts or swap them for loading; these sections keep focus in place.
+	let stakeSection: HTMLElement | undefined;
+	let costSection: HTMLElement | undefined;
+	let estimateSection: HTMLElement | undefined;
+
 	const networkReader = createReadSource(loadCalculatorInputs, (result) => {
 		networkSource = result;
 		isLoading = result.state === 'loading';
@@ -421,7 +427,12 @@
 
 <div class="min-w-0 space-y-6 text-body text-ink">
 	<div class="grid min-w-0 gap-bento lg:grid-cols-2">
-		<section aria-label="Your stake" class="min-w-0 space-y-4">
+		<section
+			bind:this={stakeSection}
+			aria-label="Your stake"
+			tabindex="-1"
+			class="min-w-0 space-y-4 focus:outline-none"
+		>
 			<h2 class="text-h2">Your stake</h2>
 			{#if walletAddress}
 				<p class="text-label text-ink-muted">Prefilled from this address; editable estimate.</p>
@@ -438,7 +449,10 @@
 					</p>{/if}
 				{#if balanceSource.error}<InlineAlert
 						message="Wallet balance unavailable"
-						onretry={() => void balanceReader.load(walletAddress!, true)}
+						onretry={retryKeepingFocus(
+							() => stakeSection,
+							() => void balanceReader.load(walletAddress!, true)
+						)}
 					/>{/if}
 				{#if walletBalance === 0}<p class="text-label text-ink-muted">
 						This address has no VOI; enter an amount to explore.
@@ -556,12 +570,20 @@
 				</div>
 			</div>
 		</section>
-		<section aria-label="Cost and price" class="min-w-0 space-y-4">
+		<section
+			bind:this={costSection}
+			aria-label="Cost and price"
+			tabindex="-1"
+			class="min-w-0 space-y-4 focus:outline-none"
+		>
 			<h2 class="text-h2">Cost and price</h2>
 			<div class="space-y-6">
 				{#if priceSource.error && !useCustomPrice}<InlineAlert
 						message="Market price unavailable. VOI estimates remain available."
-						onretry={() => void priceReader.load(walletAddress ?? '', true)}
+						onretry={retryKeepingFocus(
+							() => costSection,
+							() => void priceReader.load(walletAddress ?? '', true)
+						)}
 					/>{/if}
 				<div>
 					<label for="monthly-node-cost" class="mb-2 block text-label text-ink-muted"
@@ -647,23 +669,34 @@
 		</section>
 	</div>
 
-	<section aria-labelledby="estimated-rewards-heading" class="space-y-4">
+	<section
+		bind:this={estimateSection}
+		aria-labelledby="estimated-rewards-heading"
+		tabindex="-1"
+		class="space-y-4 focus:outline-none"
+	>
 		{#if networkSource.state === 'stale'}<p class="text-label text-warn">
 				As of {new Date(networkSource.asOf).toUTCString()}
 			</p>
 			{#if networkSource.error}<InlineAlert
 					tone="warn"
 					message="Refresh failed; showing the last loaded calculator inputs."
-					onretry={() => void loadData()}
+					onretry={retryKeepingFocus(
+						() => estimateSection,
+						() => void loadData()
+					)}
 				/>{/if}{/if}
 		<h2 id="estimated-rewards-heading" class="text-h2">Your estimated rewards</h2>
 		{#if state === 'unavailable'}
 			<InlineAlert
 				message={[loadError, stakeError, nodeCostError, priceError].filter(Boolean).join(' ') ||
 					'Error loading data. Please try again later.'}
-				onretry={loadError || (!stakeError && !nodeCostError && !priceError)
-					? () => void loadData()
-					: undefined}
+				onretry={retryKeepingFocus(
+					() => estimateSection,
+					loadError || (!stakeError && !nodeCostError && !priceError)
+						? () => void loadData()
+						: undefined
+				)}
 			/>
 		{/if}
 		<div class="grid gap-bento md:grid-cols-3">

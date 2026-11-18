@@ -20,6 +20,7 @@
 	import CopyButton from '../CopyButton/CopyButton.svelte';
 	import WalletNfts from '../WalletNfts/WalletNfts.svelte';
 	import { usd } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 
 	let {
 		scopeLabel = 'Account and listed contracts',
@@ -68,6 +69,7 @@
 		onnfts?: () => void;
 		onretryNfts?: () => void;
 	} = $props();
+	let accountRegion: HTMLDivElement | undefined = $state();
 	let showDust = $state(false);
 	let tokensExpanded = $state(false);
 	let tokenSort = $state<SortState>({ key: 'value', dir: 'desc' });
@@ -250,10 +252,13 @@
 
 <div class="grid min-w-0 grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-12">
 	<Card title="Holdings" span={{ lg: 12, md: 2 }} actions={nativeControls}>
-		{#if account.status === 'unavailable'}<InlineAlert
-				message="VOI balance unavailable"
-				onretry={onretryAccount}
-			/>{/if}
+		<!-- Retry reloads the account and removes the alert; this stable region keeps focus in the card. -->
+		<div bind:this={accountRegion} tabindex="-1" class="focus:outline-none">
+			{#if account.status === 'unavailable'}<InlineAlert
+					message="VOI balance unavailable"
+					onretry={retryKeepingFocus(() => accountRegion, onretryAccount)}
+				/>{/if}
+		</div>
 		{#if account.status === 'loaded'}<p class="mt-3 text-sm text-ink-muted">
 				Minimum balance: {account.value.minBalance / 1e6} VOI.
 			</p>{/if}

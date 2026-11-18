@@ -8,6 +8,7 @@
 	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
 	import RealtimeTestingBadge from '../RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { compact, MISSING } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 	import type { DataState } from '../types';
 	import { createReadSource } from '$lib/wallet/read';
 	import {
@@ -50,6 +51,7 @@
 	let clock = $state(new Date());
 	let at = $derived(now ?? clock);
 	let sources = $state(createBlockRewardsState());
+	let region: HTMLDivElement | undefined = $state();
 	const readers = {
 		status: createReadSource(
 			(address, force) => loadBlockRewardStatus(address, { isContract, force }),
@@ -153,7 +155,8 @@
 				>Refresh real-time block rewards</Button
 			>
 		</div>{/snippet}
-	<div class="min-w-0 space-y-4">
+	<!-- Status and funding retries swap their alerts for loading; the region keeps focus in the card. -->
+	<div bind:this={region} tabindex="-1" class="min-w-0 space-y-4 focus:outline-none">
 		<div class="space-y-2">
 			{#if contractUnknown}
 				<InlineAlert
@@ -172,7 +175,10 @@
 			{:else if statusSource.state === 'error'}
 				<InlineAlert
 					message="Real-time block reward registration status unavailable"
-					onretry={() => void retry('status')}
+					onretry={retryKeepingFocus(
+						() => region,
+						() => void retry('status')
+					)}
 				/>
 			{:else}
 				<div aria-busy="true" class="h-7 w-56 max-w-full rounded-ds-xs bg-grid">
@@ -186,7 +192,10 @@
 			<InlineAlert
 				tone="warn"
 				message={BLOCK_REWARDS_UNKNOWN_TEXT}
-				onretry={() => void retry('funding')}
+				onretry={retryKeepingFocus(
+					() => region,
+					() => void retry('funding')
+				)}
 			/>
 		{/if}
 		{#if lag !== null && lag > BLOCK_REWARD_LAG_ALERT_ROUNDS}

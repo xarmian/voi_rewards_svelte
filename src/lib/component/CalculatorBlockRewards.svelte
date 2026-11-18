@@ -4,6 +4,7 @@
 	import BlockRewardsPausedAlert from '$lib/ds/BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
 	import RealtimeTestingBadge from '$lib/ds/RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { compact, usd } from '$lib/ds/format';
+	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import { createReadSource } from '$lib/wallet/read';
 	import { loadBlockRewardFunding, loadNetworkBlockRewardsDaily } from '$lib/wallet/blockRewards';
 	import { chanceText, weekForecastText } from '$lib/wallet/blockRewardsCard';
@@ -25,6 +26,7 @@
 	const HEADING = `Estimated ${REALTIME_BLOCK_REWARDS_TITLE.toLowerCase()}`;
 	const KEY = 'calculator';
 	let sources = $state(createCalculatorBlockRewardsState());
+	let region: HTMLElement | undefined = $state();
 	const readers = {
 		funding: createReadSource(
 			() => loadBlockRewardFunding(),
@@ -81,7 +83,13 @@
 	}
 </script>
 
-<section aria-labelledby="estimated-block-rewards-heading" class="space-y-4">
+<!-- Retry swaps the alert for loading tiles; the section keeps focus so it is not dropped. -->
+<section
+	bind:this={region}
+	aria-labelledby="estimated-block-rewards-heading"
+	tabindex="-1"
+	class="space-y-4 focus:outline-none"
+>
 	<div class="flex min-w-0 flex-wrap items-center gap-2">
 		<h2 id="estimated-block-rewards-heading" class="text-h2">{HEADING}</h2>
 		<RealtimeTestingBadge />
@@ -91,7 +99,10 @@
 		<p class="text-body text-ink-muted">{OUT_OF_RANGE_TEXT}</p>
 	{:else}
 		{#if inputs.kind === 'error'}
-			<InlineAlert message="Real-time block reward estimates are unavailable." onretry={retry} />
+			<InlineAlert
+				message="Real-time block reward estimates are unavailable."
+				onretry={retryKeepingFocus(() => region, retry)}
+			/>
 		{/if}
 		<div class="grid gap-bento md:grid-cols-3">
 			{#each periods as period (period.label)}

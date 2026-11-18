@@ -7,6 +7,7 @@
 	import BlockRewardsPausedAlert from '$lib/ds/BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
 	import RealtimeTestingBadge from '$lib/ds/RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { MISSING } from '$lib/ds/format';
+	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import type { DataState } from '$lib/ds/types';
 	import { createReadSource } from '$lib/wallet/read';
 	import { loadBlockRewardFunding, loadNetworkBlockRewardsDaily } from '$lib/wallet/blockRewards';
@@ -23,6 +24,7 @@
 	let { now }: { now?: Date } = $props();
 	const SPARKLINE_LABEL = 'Daily real-time block rewards, last 7 complete UTC days (VOI)';
 	let sources = $state(createHomeBlockRewardsState());
+	let region: HTMLDivElement | undefined = $state();
 	const readers = {
 		// Thirty days, as on the wallet and analytics views, so all share one cached read.
 		network: createReadSource(
@@ -76,14 +78,18 @@
 				>Refresh real-time block rewards</Button
 			>
 		</div>{/snippet}
-	<div class="min-w-0 space-y-4">
+	<!-- A funding retry removes the alert while it loads; the region keeps focus in the card. -->
+	<div bind:this={region} tabindex="-1" class="min-w-0 space-y-4 focus:outline-none">
 		{#if fundingPaused}
 			<BlockRewardsPausedAlert />
 		{:else if fundingUnknown}
 			<InlineAlert
 				tone="warn"
 				message={BLOCK_REWARDS_UNKNOWN_TEXT}
-				onretry={() => void retry('funding')}
+				onretry={retryKeepingFocus(
+					() => region,
+					() => void retry('funding')
+				)}
 			/>
 		{/if}
 		<div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">

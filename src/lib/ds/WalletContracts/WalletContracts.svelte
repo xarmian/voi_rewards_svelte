@@ -13,6 +13,7 @@
 	import CopyButton from '../CopyButton/CopyButton.svelte';
 	import type { SortState } from '../DataTable';
 	import { comma, compact, shortAddr } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 
 	let {
 		contracts,
@@ -35,6 +36,7 @@
 		asOf?: string;
 		onrefresh?: () => Promise<void> | void;
 	} = $props();
+	let region: HTMLDivElement | undefined = $state();
 	const sorted = $derived(
 		contracts
 			.slice()
@@ -382,40 +384,43 @@
 			<Button variant="soft" size="sm" onclick={onrefresh}>Refresh</Button>
 		</div>
 	{/if}
-	{#if mode === 'full' && dataState === 'loading' && contracts.length === 0}
-		<div aria-busy="true" class="space-y-2">
-			<span class="sr-only">Loading lock contracts…</span>
-			{#each [0, 1, 2, 3, 4, 5, 6] as index (index)}<div
-					data-contract-skeleton
-					aria-hidden="true"
-					class="h-8 rounded-ds-xs bg-grid"
-				></div>{/each}
-		</div>
-	{:else}
-		<div aria-busy={refreshing ? 'true' : undefined}>
-			<DataTable
-				{columns}
-				rows={sorted}
-				rowKey={(row) => String(row.contractId)}
-				rowName={(row) => `contract #${row.contractId}`}
-				caption="Lock contracts: balances in VOI"
-				captionHidden
-				density="compact"
-				state={refreshing ? 'ready' : dataState}
-				{asOf}
-				onretry={onrefresh}
-				limit={mode === 'full' ? undefined : limit}
-				bind:sort
-				detail={mode === 'full' ? detail : undefined}
-				moreLabel={(hidden) =>
-					`Show ${hidden} more not-staking contracts (${compact(hiddenBalance, 1)} VOI)`}
-				rowActions={mode === 'overview' && hasActions ? actions : undefined}
-				rowHasActions={rowCanAct}
-				expandable={mode === 'full' || !hasActions}
-				emptyText="No lock contracts for this account."
-			/>
-		</div>
-	{/if}
+	<!-- In full mode a retry with no rows swaps the table for skeleton rows; this region keeps focus. -->
+	<div bind:this={region} tabindex="-1" class="focus:outline-none">
+		{#if mode === 'full' && dataState === 'loading' && contracts.length === 0}
+			<div aria-busy="true" class="space-y-2">
+				<span class="sr-only">Loading lock contracts…</span>
+				{#each [0, 1, 2, 3, 4, 5, 6] as index (index)}<div
+						data-contract-skeleton
+						aria-hidden="true"
+						class="h-8 rounded-ds-xs bg-grid"
+					></div>{/each}
+			</div>
+		{:else}
+			<div aria-busy={refreshing ? 'true' : undefined}>
+				<DataTable
+					{columns}
+					rows={sorted}
+					rowKey={(row) => String(row.contractId)}
+					rowName={(row) => `contract #${row.contractId}`}
+					caption="Lock contracts: balances in VOI"
+					captionHidden
+					density="compact"
+					state={refreshing ? 'ready' : dataState}
+					{asOf}
+					onretry={retryKeepingFocus(() => region, onrefresh)}
+					limit={mode === 'full' ? undefined : limit}
+					bind:sort
+					detail={mode === 'full' ? detail : undefined}
+					moreLabel={(hidden) =>
+						`Show ${hidden} more not-staking contracts (${compact(hiddenBalance, 1)} VOI)`}
+					rowActions={mode === 'overview' && hasActions ? actions : undefined}
+					rowHasActions={rowCanAct}
+					expandable={mode === 'full' || !hasActions}
+					emptyText="No lock contracts for this account."
+				/>
+			</div>
+		{/if}
+	</div>
 	{#if actionError}<InlineAlert message={actionError} />{/if}
 </Card>
 

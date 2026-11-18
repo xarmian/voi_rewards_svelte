@@ -15,6 +15,7 @@
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import WalletContracts from '../WalletContracts/WalletContracts.svelte';
 	import { comma, compact } from '../format';
+	import { retryKeepingFocus } from '../retryFocus';
 	let {
 		contracts,
 		current,
@@ -37,6 +38,9 @@
 		now?: number;
 	} = $props();
 	const failed = $derived(contractSet === 'unavailable' || state === 'error');
+	let unlocks: HTMLDivElement | undefined;
+	// Retry swaps the unlocks card for the loading chart; the wrapper keeps focus in place.
+	const retryUnlocks = $derived(retryKeepingFocus(() => unlocks, onrefresh));
 	const totals = $derived(summarizeContracts(contracts));
 	const timeline = $derived(buildVestingTimeline(contracts, now));
 	const amount = (n: number | null) =>
@@ -101,7 +105,11 @@
 			{asOf}
 		/>
 	</div>
-	<div class="min-w-0 md:col-span-2 lg:col-span-12">
+	<div
+		bind:this={unlocks}
+		tabindex="-1"
+		class="min-w-0 focus:outline-none md:col-span-2 lg:col-span-12"
+	>
 		{#if state === 'loading' || (!failed && timeline.complete && timeline.events.length > 0)}
 			<ChartFrame
 				title="Scheduled unlocks"
@@ -129,11 +137,11 @@
 				<p class="mb-3 text-sm text-ink-muted">
 					Contract schedule; not a guarantee of withdrawable balance.
 				</p>
-				{#if failed}<InlineAlert message="Lock contracts unavailable." onretry={onrefresh} />
+				{#if failed}<InlineAlert message="Lock contracts unavailable." onretry={retryUnlocks} />
 				{:else if !timeline.complete}<InlineAlert
 						tone="warn"
 						message={`Schedule unavailable for ${timeline.unavailable.map((id) => `contract #${id}`).join(', ')}; the schedule is incomplete.`}
-						onretry={onrefresh}
+						onretry={retryUnlocks}
 					/>
 				{:else}<p class="flex h-60 items-center justify-center text-sm text-ink-muted">
 						No scheduled unlocks

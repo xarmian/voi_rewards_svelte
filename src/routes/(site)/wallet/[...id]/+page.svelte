@@ -27,6 +27,7 @@
 		comma
 	} from '$lib/ds';
 	import { WALLET_TABS } from '$lib/ds/Tabs/hash';
+	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import type { DataState } from '$lib/ds';
 	import { createWalletRouteSync } from '$lib/wallet/routeSync.svelte';
 	import { createWalletIdentity } from '$lib/wallet/identity.svelte';
@@ -521,7 +522,10 @@
 							<InlineAlert
 								tone="warn"
 								message="Refresh failed; showing the last loaded contracts."
-								onretry={ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)}
+								onretry={retryKeepingFocus(
+									() => panel,
+									ownerLookup === 'unavailable' ? refresh : () => updateContracts(true)
+								)}
 							/>
 						</div>{/if}
 				{:else if tabs.current === 'calculator'}
@@ -579,7 +583,7 @@
 							message={refreshFailed
 								? 'Refresh failed; showing the last loaded wallet data.'
 								: 'Wallet data is more than five minutes old.'}
-							onretry={refresh}
+							onretry={retryKeepingFocus(() => panel, refresh)}
 						/>
 					</div>{/if}
 			{/key}{/if}

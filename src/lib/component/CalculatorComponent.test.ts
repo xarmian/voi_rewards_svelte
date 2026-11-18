@@ -56,7 +56,10 @@ it('retains standalone schedule and CSV shape', () => {
 });
 it('mounts the block reward estimates after the epoch rewards section', () => {
 	const markup = source.split('</script>').slice(1).join('</script>');
-	const epoch = markup.indexOf('<section aria-labelledby="estimated-rewards-heading"');
+	const epoch = markup.lastIndexOf(
+		'<section',
+		markup.indexOf('aria-labelledby="estimated-rewards-heading"')
+	);
 	expect(epoch).toBeGreaterThan(0);
 	const epochEnd = markup.indexOf('</section>', epoch);
 	const mount = markup.indexOf('<CalculatorBlockRewards');

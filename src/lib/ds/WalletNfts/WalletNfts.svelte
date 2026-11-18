@@ -5,6 +5,7 @@
 	import Card from '../Card/Card.svelte';
 	import Button from '../Button/Button.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
+	import { retryKeepingFocus } from '../retryFocus';
 	let {
 		pageAddress,
 		tokens,
@@ -23,6 +24,9 @@
 		onretry?: () => void;
 	} = $props();
 	let expanded = $state(false);
+	let grid: HTMLDivElement | undefined = $state();
+	// Retry clears the stale alert or swaps the error for loading; the grid keeps focus in the card.
+	const retry = $derived(retryKeepingFocus(() => grid, onretry));
 	let limit = $state(12);
 	let address = $state<string>();
 	$effect(() => {
@@ -58,11 +62,16 @@
 			: ''}</Button
 	>
 	{#if expanded}
-		<div id="wallet-nfts-grid" class="mt-4 min-w-0">
+		<div
+			bind:this={grid}
+			id="wallet-nfts-grid"
+			tabindex="-1"
+			class="mt-4 min-w-0 focus:outline-none"
+		>
 			{#if dataState === 'stale'}<InlineAlert
 					tone="warn"
 					message="NFT refresh failed. Showing the last retrieved ownership."
-					{onretry}
+					onretry={retry}
 				/>{/if}
 			{#if dataState === 'loading' && !tokens}<div
 					aria-busy="true"
@@ -73,7 +82,10 @@
 							class="aspect-square rounded-ds-sm bg-grid"
 						></div>{/each}
 				</div>
-			{:else if dataState === 'error'}<InlineAlert message="NFT ownership unavailable" {onretry} />
+			{:else if dataState === 'error'}<InlineAlert
+					message="NFT ownership unavailable"
+					onretry={retry}
+				/>
 			{:else if tokens}
 				{#if partial}<InlineAlert
 						tone="warn"
