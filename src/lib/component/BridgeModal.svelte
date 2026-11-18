@@ -16,7 +16,7 @@
 	import QRCode from 'qrcode';
 	import algosdk from 'algosdk';
 	import { onMount } from 'svelte';
-	import { getNFD, nfdReceiveAddress, searchNFDomains } from '$lib/utils/nfd';
+	import { exactNFD, getNFD, nfdReceiveAddress, searchNFDomains } from '$lib/utils/nfd';
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
@@ -306,15 +306,14 @@
 					const names = await getNFD([input]);
 					if (!isCurrent()) return;
 					if (names.length > 0) {
-						const results = await searchNFDomains(names[0].replacementValue);
+						const name = names[0].replacementValue;
+						const match = exactNFD(name, await searchNFDomains(name));
 						if (!isCurrent()) return;
-						resolvedName = results[0]
-							? {
-									name: results[0].name,
-									address: input,
-									avatar: getAvatarUrl(results[0]) || undefined
-								}
-							: null;
+						resolvedName = {
+							name,
+							address: input,
+							avatar: (match && getAvatarUrl(match)) || undefined
+						};
 					}
 				} else {
 					const names = await getEnvoiNames([input]);
@@ -938,14 +937,13 @@
 			// Try to resolve NFD for this address
 			const nfdResults = await getNFD([input]);
 			if (nfdResults.length > 0) {
-				const searchResult = await searchNFDomains(nfdResults[0].replacementValue);
-				algorandSourceResolvedName = searchResult[0]
-					? {
-							name: searchResult[0].name,
-							address: searchResult[0].owner,
-							avatar: getAvatarUrl(searchResult[0]) || undefined
-						}
-					: null;
+				const name = nfdResults[0].replacementValue;
+				const match = exactNFD(name, await searchNFDomains(name));
+				algorandSourceResolvedName = {
+					name,
+					address: input,
+					avatar: (match && getAvatarUrl(match)) || undefined
+				};
 			} else {
 				algorandSourceResolvedName = null;
 			}
