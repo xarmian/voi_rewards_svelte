@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { vi } from 'vitest';
-import { participatePayment } from '$lib/chain/keyreg';
+import { MIN_KEYREG_FEE, participatePayment } from '$lib/chain/keyreg';
 import { pageAccountState, signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 export function handlerSource(component: string, names: string[]) {
 	const source = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
@@ -115,6 +115,7 @@ export function signingHarness(component: string, name: string, captured = 'X') 
 		signAndSendTransactions: io,
 		sendWalletKeyreg: io,
 		participatePayment,
+		MIN_KEYREG_FEE,
 		payIncentiveFee: false,
 		contractCanPay: false
 	});

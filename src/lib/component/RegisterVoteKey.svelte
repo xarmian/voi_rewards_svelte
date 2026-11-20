@@ -252,8 +252,12 @@
 		}
 		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
 		transactionStatus = 'building';
+		// Fixed at the click: a paste, or the mount-time check resolving during the awaits below,
+		// must not turn the 2 VOI on after the fresh check was skipped.
+		const payment = participatePayment(payIncentiveFee, contractCanPay);
 		// The mount-time check may be stale; never send the 2 VOI without a fresh capable read.
-		if (payIncentiveFee) {
+		// (An upgrade between this read and confirmation cannot be caught from the client.)
+		if (payment !== MIN_KEYREG_FEE) {
 			const fresh = await contractIncentiveOf(
 				async () =>
 					(await algodClient.getApplicationByID(Number(contractId)).do()).params?.approvalProgram
@@ -324,7 +328,7 @@
 						new Uint8Array(Buffer.from(stateProofKey, 'base64'))
 					)
 				).obj,
-				payment: participatePayment(payIncentiveFee, contractCanPay)
+				payment
 			};
 
 			ci.setFee(1000);
@@ -566,7 +570,7 @@
 			<button
 				on:click={handlePasteAll}
 				class="px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors flex items-center gap-2"
-				disabled={isLoading}
+				disabled={isLoading || transactionStatus !== 'idle'}
 			>
 				{#if isLoading}
 					<i class="fas fa-spinner fa-spin"></i>
@@ -761,7 +765,7 @@
 				<button
 					on:click={handlePasteAll}
 					class="px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors flex items-center gap-2"
-					disabled={isLoading}
+					disabled={isLoading || transactionStatus !== 'idle'}
 				>
 					{#if isLoading}
 						<i class="fas fa-spinner fa-spin"></i>

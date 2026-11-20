@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
-import { incentiveFromUri, participatePayment } from '$lib/chain/keyreg';
+import { incentiveFromUri, MIN_KEYREG_FEE, participatePayment } from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { expect, test, vi } from 'vitest';
 
@@ -79,6 +79,7 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 				signAndSendTransactions,
 				onSuccess: vi.fn(),
 				participatePayment,
+				MIN_KEYREG_FEE,
 				payIncentiveFee: false,
 				contractCanPay: false
 			});
@@ -157,6 +158,7 @@ function stakingSendHarness(
 		signAndSendTransactions,
 		onSuccess: vi.fn(),
 		participatePayment,
+		MIN_KEYREG_FEE,
 		contractIncentiveOf,
 		contractIncentive: flags.contractCanPay ? 'capable' : 'incapable',
 		...flags
@@ -165,6 +167,7 @@ function stakingSendHarness(
 	return {
 		context,
 		contractIncentiveOf,
+		participate,
 		sends: [CONTRACT, participate, custom, setExtraTxns, signAndSendTransactions],
 		setExtraTxns,
 		run: () => runInContext(`${name}()`, context)
@@ -212,8 +215,34 @@ test('going offline always pays the minimum', async () => {
 });
 
 test('only registration uses participatePayment; going offline keeps the fixed minimum', () => {
-	expect(source.match(/payment: participatePayment\(/g)).toHaveLength(1);
+	expect(source.match(/participatePayment\(payIncentiveFee, contractCanPay\)/g)).toHaveLength(2);
+	expect(source).toMatch(
+		/const payment = participatePayment\(payIncentiveFee, contractCanPay\);[^]*?\n\t\t\t\tpayment\n\t\t\t\};/
+	);
 	expect(source.match(/payment: 1000/g)).toHaveLength(1);
+});
+
+// The payment is fixed at the click. A paste, or the mount-time check resolving, can turn the
+// opt-in on while the group is being built; that must not send 2 VOI that skipped the fresh check.
+test('turning the opt-in on during the build does not change the payment or skip the check', async () => {
+	const harness = stakingSendHarness('registerStakingContractVoteKey', {
+		payIncentiveFee: false,
+		contractCanPay: false
+	});
+	harness.participate.mockImplementationOnce(async () => {
+		harness.context.payIncentiveFee = true;
+		harness.context.contractCanPay = true;
+		harness.context.contractIncentive = 'capable';
+		return { obj: {} };
+	});
+	await harness.run();
+	expect(harness.contractIncentiveOf).not.toHaveBeenCalled();
+	expect(harness.setExtraTxns.mock.calls[0][0][0].payment).toBe(1000);
+});
+
+test('both Paste buttons are disabled while a transaction is in progress', () => {
+	expect(source.match(/disabled=\{isLoading \|\| transactionStatus !== 'idle'\}/g)).toHaveLength(2);
+	expect(source.match(/disabled=\{isLoading\}/g)).toBeNull();
 });
 
 // The mount-time program check can be stale by submit (an upgrade, or a check that resolved
