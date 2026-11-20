@@ -365,6 +365,7 @@ function applyPasted(state: {
 	contractIncentive: string;
 	pastedUriFee: number | null;
 	payIncentiveFee: boolean;
+	isStakingContract?: boolean;
 }) {
 	const body = source.match(/function applyPastedIncentive\([^]*?\n\t\}/)?.[0];
 	expect(body).toBeDefined();
@@ -428,5 +429,55 @@ test('a partkeyinfo paste leaves the opt-in alone', () => {
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+});
+
+// A URI's fee can select the opt-in but never clears a tick: a minimum-fee URI pasted after the
+// user ticked "Pay 2 VOI" leaves the choice as it is.
+test('a pasted minimum-fee URI keeps a ticked opt-in on a capable contract', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: true
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+});
+
+test('ticking then pasting a minimum-fee URI still sends the 2 VOI go-online fee', async () => {
+	const pasted = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: true
+	});
+	expect(pasted.payIncentiveFee).toBe(true);
+	const harness = stakingSendHarness(
+		'registerStakingContractVoteKey',
+		{ payIncentiveFee: pasted.payIncentiveFee, contractCanPay: true },
+		'capable'
+	);
+	await harness.run();
+	expect(harness.context.error).toBeNull();
+	expect(harness.setExtraTxns.mock.calls[0][0][0].payment).toBe(2_000_000);
+});
+
+test('a pasted minimum-fee URI keeps a ticked opt-in on a plain account', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: true,
+		isStakingContract: false
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+});
+
+test('a pasted minimum-fee URI leaves an unticked opt-in off', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: false
+	});
+	expect(context.payIncentiveFee).toBe(false);
 	expect(context.incentiveNotice).toBeNull();
 });
