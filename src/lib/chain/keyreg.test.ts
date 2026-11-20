@@ -16,6 +16,7 @@ import {
 	keyregSubmitError,
 	EXPIRING_SOON_SECONDS,
 	mayHaveLanded,
+	ONCHAIN_KEYREG_MIN_ROUNDS_LEFT,
 	onChainKeyregOffer,
 	parseKeyregInput,
 	participatePayment,
@@ -719,8 +720,24 @@ describe('onChainKeyregOffer', () => {
 	});
 
 	it('offers keys that end this round', () => {
-		const result = offer(onChain({ round: BigInt(keys.lastRound) }));
-		expect(result).toMatchObject({ kind: 'offer', roundsLeft: 0, expiringSoon: true });
+		expect(offer(onChain({ round: BigInt(keys.lastRound) }))).toEqual({ kind: 'none' });
+	});
+
+	it('offers keys only with more than the minimum rounds left', () => {
+		expect(ONCHAIN_KEYREG_MIN_ROUNDS_LEFT).toBe(1000);
+		const left = (rounds: number) => offer(onChain({ round: BigInt(keys.lastRound - rounds) }));
+		expect(left(ONCHAIN_KEYREG_MIN_ROUNDS_LEFT)).toEqual({ kind: 'none' });
+		expect(left(ONCHAIN_KEYREG_MIN_ROUNDS_LEFT + 1)).toMatchObject({
+			kind: 'offer',
+			roundsLeft: ONCHAIN_KEYREG_MIN_ROUNDS_LEFT + 1,
+			expiringSoon: true
+		});
+	});
+
+	it('offers keys valid from the next round at the latest', () => {
+		const from = (first: number) => offer(onChain({}, { voteFirstValid: BigInt(first) }));
+		expect(from(round + 1)).toMatchObject({ kind: 'offer', keys: { firstRound: round + 1 } });
+		expect(from(round + 2)).toEqual({ kind: 'none' });
 	});
 
 	it.each(['checking', 'incapable', 'unverified'] as const)(

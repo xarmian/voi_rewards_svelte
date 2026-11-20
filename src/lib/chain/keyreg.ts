@@ -228,6 +228,10 @@ function base64UrlKey(value: string, bytes: number): string | null {
 // Keys ending sooner than this (at the fallback block time) make a 2 VOI re-registration a poor deal.
 export const EXPIRING_SOON_SECONDS = 30 * 24 * 60 * 60;
 
+// Keys must outlast the current round by more than this (about 47 minutes at the fallback block
+// time), so the keyreg is still valid after signing and confirmation.
+export const ONCHAIN_KEYREG_MIN_ROUNDS_LEFT = 1000;
+
 type Whole = number | bigint;
 
 // The fields of algod's account record the on-chain offer reads.
@@ -253,8 +257,9 @@ const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
 
 // An account online without the go-online fee can become incentive eligible by re-registering the
 // keys already on chain with the 2 VOI fee: the same keys keep it online with no gap. No offer for
-// an account that is offline, already eligible, or has keys that are expired, incomplete or out of
-// range, nor for a staking contract not known to pay the fee (including while that is checked).
+// an account that is offline, already eligible, or has keys that are incomplete, out of range,
+// registered ahead (valid only after the next round) or ending within
+// ONCHAIN_KEYREG_MIN_ROUNDS_LEFT rounds, nor for a staking contract not known to pay the fee (including while that is checked).
 export function onChainKeyregOffer(
 	address: string,
 	account: OnChainAccount,
@@ -275,7 +280,8 @@ export function onChainKeyregOffer(
 	if (round === null || firstRound === null || lastRound === null || keyDilution === null) {
 		return NO_OFFER;
 	}
-	if (keyDilution === 0 || lastRound < firstRound || lastRound < round) return NO_OFFER;
+	if (keyDilution === 0 || lastRound < firstRound || firstRound > round + 1) return NO_OFFER;
+	if (lastRound <= round + ONCHAIN_KEYREG_MIN_ROUNDS_LEFT) return NO_OFFER;
 	const roundsLeft = lastRound - round;
 	return {
 		kind: 'offer',
