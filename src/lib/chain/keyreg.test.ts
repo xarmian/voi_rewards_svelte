@@ -1,15 +1,23 @@
 import * as algosdk from 'algosdk';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	buildWalletKeyregTxn,
+	contractIncentiveOf,
+	contractKeyregCost,
 	incentiveFromUri,
 	incentiveKeyregFee,
+	INCENTIVE_CAPABLE_PROGRAM_HASHES,
+	isIncentiveCapableProgram,
 	isKeyregUri,
 	keyregAccount,
 	keyregFee,
 	keyregSubmitError,
 	mayHaveLanded,
 	parseKeyregInput,
+	participatePayment,
+	programHash,
 	KeyregUnconfirmedError,
 	sendWalletKeyreg
 } from './keyreg';
@@ -483,7 +491,8 @@ describe('incentive opt-in (TASK-68)', () => {
 		expect(incentiveFromUri(null, false)).toBe(false);
 	});
 
-	it('never pre-selects for a staking contract', () => {
+	it('pre-selects for an account that can pay and never for one that cannot', () => {
+		expect(incentiveFromUri(2000000, false)).toBe(true);
 		expect(incentiveFromUri(2000000, true)).toBe(false);
 	});
 
@@ -501,6 +510,84 @@ describe('incentive opt-in (TASK-68)', () => {
 			buildWalletKeyregTxn({ params, sender: address, ...keys, fee: incentiveKeyregFee(on) });
 		expect(build(true).fee).toBe(2000000n);
 		expect(build(false).fee).toBe(1000n);
+	});
+});
+
+// A staking contract can pay the go-online fee only when its approval program is one known to use
+// the participate payment as the inner keyreg fee; an older one would keep the 2 VOI and register
+// at the minimum fee, so the gate fails closed.
+describe('staking contract incentive fee', () => {
+	// App 37575's upgraded approval program, as algod returns it (base64 of the raw bytes).
+	const capableProgram = new Uint8Array(
+		Buffer.from(
+			readFileSync(
+				new URL('./fixtures/staking-37575-approval.b64', import.meta.url),
+				'utf8'
+			).trim(),
+			'base64'
+		)
+	);
+
+	it('hashes a program as lowercase hex sha256', async () => {
+		expect(await programHash(new Uint8Array())).toBe(
+			'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+		);
+		const program = new Uint8Array([0x0a, 0x20, 0x01, 0x01, 0x31, 0x18, 0xff]);
+		expect(await programHash(program)).toBe(createHash('sha256').update(program).digest('hex'));
+	});
+
+	it('lists the hash of the real upgraded program', async () => {
+		expect(capableProgram.length).toBeGreaterThan(0);
+		expect(INCENTIVE_CAPABLE_PROGRAM_HASHES.has(await programHash(capableProgram))).toBe(true);
+	});
+
+	it('knows only the upgraded program as incentive capable', async () => {
+		expect(isIncentiveCapableProgram(await programHash(capableProgram))).toBe(true);
+		expect(
+			isIncentiveCapableProgram('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+		).toBe(false);
+		expect(isIncentiveCapableProgram(null)).toBe(false);
+	});
+
+	it('reads a capable program as capable and any other program as incapable', async () => {
+		expect(await contractIncentiveOf(async () => capableProgram)).toBe('capable');
+		const other = capableProgram.slice();
+		other[other.length - 1] ^= 1;
+		expect(await contractIncentiveOf(async () => other)).toBe('incapable');
+		expect(await contractIncentiveOf(async () => new Uint8Array([0x0a, 0x81, 0x01]))).toBe(
+			'incapable'
+		);
+	});
+
+	it('fails closed to unverified when the program cannot be read', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			expect(await contractIncentiveOf(() => Promise.reject(new Error('algod down')))).toBe(
+				'unverified'
+			);
+			expect(
+				await contractIncentiveOf(() => {
+					throw new Error('sync throw');
+				})
+			).toBe('unverified');
+			expect(await contractIncentiveOf(async () => undefined)).toBe('unverified');
+			expect(await contractIncentiveOf(async () => null)).toBe('unverified');
+			expect(await contractIncentiveOf(async () => new Uint8Array())).toBe('unverified');
+		} finally {
+			consoleError.mockRestore();
+		}
+	});
+
+	it('pays the go-online fee only when the user opts in and the contract can pay', () => {
+		expect(participatePayment(true, true)).toBe(2_000_000);
+		expect(participatePayment(true, false)).toBe(1000);
+		expect(participatePayment(false, true)).toBe(1000);
+		expect(participatePayment(false, false)).toBe(1000);
+	});
+
+	it('costs the payment plus the payment and app call fees', () => {
+		expect(contractKeyregCost(1000)).toBe(3000);
+		expect(contractKeyregCost(2_000_000)).toBe(2_002_000);
 	});
 });
 
