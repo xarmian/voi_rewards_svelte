@@ -249,10 +249,46 @@ export function keyregAccount(opts: {
 	return opts.walletAddress;
 }
 
-// The incentive opt-in (TASK-68): a pasted URI asking for the go-online fee pre-selects it.
-// Staking contracts never can: participate hard-codes the inner keyreg fee to the minimum.
-export function incentiveFromUri(fee: number | null, isStakingContract: boolean): boolean {
-	return !isStakingContract && fee !== null && fee >= INCENTIVE_KEYREG_FEE;
+// The incentive opt-in (TASK-68): a pasted URI asking for the go-online fee pre-selects it,
+// unless the account cannot pay it: a staking contract whose program is not known to be
+// incentive capable (see INCENTIVE_CAPABLE_PROGRAM_HASHES).
+export function incentiveFromUri(fee: number | null, accountCannotPay: boolean): boolean {
+	return !accountCannotPay && fee !== null && fee >= INCENTIVE_KEYREG_FEE;
+}
+
+// sha256 (lowercase hex of the raw approval program bytes) of staking contract programs whose
+// participate method asserts the preceding payment is at least the minimum fee and uses that
+// payment's amount as the inner keyreg's Fee, so a 2 VOI payment makes the contract account
+// incentive eligible. Older programs may accept the overpayment yet still register at the minimum
+// fee, losing the 2 VOI, so a program not listed here fails closed.
+export const INCENTIVE_CAPABLE_PROGRAM_HASHES: ReadonlySet<string> = new Set([
+	// App 37575 after its upgrade.
+	'efbc30f6299ec52ef82437c3403557f3a0b8b386b021d6fe0f29835d3326b439'
+]);
+
+export async function programHash(program: Uint8Array): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(program));
+	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function isIncentiveCapableProgram(hash: string | null): boolean {
+	return hash !== null && INCENTIVE_CAPABLE_PROGRAM_HASHES.has(hash);
+}
+
+// The payment that precedes participate; a capable contract uses it as the inner keyreg fee.
+export function participatePayment(payIncentiveFee: boolean, contractCanPay: boolean): number {
+	return payIncentiveFee && contractCanPay ? INCENTIVE_KEYREG_FEE : MIN_KEYREG_FEE;
+}
+
+// Outer fees of the participate group as ulujs (arccjs CONTRACT.custom) builds it: the extra
+// txn's `payment` becomes a payment to the contract with a flat 1000 fee, followed by the
+// participate app call at ci.setFee(1000). No other txns are expected (the code signs txns[1]
+// as the app call).
+const PARTICIPATE_GROUP_FEES = 2 * MIN_KEYREG_FEE;
+
+// What the wallet pays for a staking contract keyreg, in microVOI: the payment plus the group fees.
+export function contractKeyregCost(payment: number): number {
+	return payment + PARTICIPATE_GROUP_FEES;
 }
 
 // The fee the opt-in selects; null is the network minimum (see keyregFee).
