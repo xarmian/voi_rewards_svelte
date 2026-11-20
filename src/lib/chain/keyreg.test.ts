@@ -14,13 +14,21 @@ import {
 	keyregAccount,
 	keyregFee,
 	keyregSubmitError,
+	EXPIRING_SOON_SECONDS,
 	mayHaveLanded,
+	ONCHAIN_KEYREG_MIN_ROUNDS_LEFT,
+	onChainKeyregOffer,
 	parseKeyregInput,
 	participatePayment,
 	programHash,
 	KeyregUnconfirmedError,
 	sendWalletKeyreg
 } from './keyreg';
+import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
+import {
+	BLOCK_REWARD_MAX_MICROVOI,
+	BLOCK_REWARD_MIN_MICROVOI
+} from '$lib/rewards/blockRewardConstants';
 
 const address = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 const voteBytes = Buffer.from(Array.from({ length: 32 }, (_, i) => 255 - i));
@@ -643,5 +651,154 @@ describe('sendWalletKeyreg with the library submission error', () => {
 			]
 		});
 		expect(mayHaveLanded(error)).toBe(true);
+	});
+});
+
+describe('onChainKeyregOffer', () => {
+	const round = 5_000_000;
+	const onChain = (
+		changes: Record<string, unknown> = {},
+		participation: Record<string, unknown> = {}
+	) => ({
+		status: 'Online',
+		incentiveEligible: false,
+		amount: 100_000_000_000n,
+		round: BigInt(round),
+		participation: {
+			voteParticipationKey: new Uint8Array(voteBytes),
+			selectionParticipationKey: new Uint8Array(selectionBytes),
+			stateProofKey: new Uint8Array(stateProofBytes),
+			voteFirstValid: BigInt(keys.firstRound),
+			voteLastValid: BigInt(keys.lastRound),
+			voteKeyDilution: BigInt(keys.keyDilution),
+			...participation
+		},
+		...changes
+	});
+	const balanceRange = { min: BLOCK_REWARD_MIN_MICROVOI, max: BLOCK_REWARD_MAX_MICROVOI };
+	const account = {
+		isStakingContract: false,
+		contractIncentive: 'checking' as const,
+		balanceRange
+	};
+	const offer = (
+		input: ReturnType<typeof onChain>,
+		opts: Parameters<typeof onChainKeyregOffer>[2] = account
+	) => onChainKeyregOffer(address, input, opts);
+
+	it('offers the on-chain keys as the form holds them', () => {
+		expect(offer(onChain())).toEqual({
+			kind: 'offer',
+			keys: { ...keys, parentAddress: address },
+			roundsLeft: keys.lastRound - round,
+			expiringSoon: false,
+			balanceInRange: true
+		});
+		expect(keys.votingKey).toMatch(/=$/);
+		expect(keys.stateProofKey).toMatch(/==$/);
+	});
+
+	it('accepts plain numbers as well as bigints', () => {
+		const result = offer(
+			onChain(
+				{ round },
+				{
+					voteFirstValid: keys.firstRound,
+					voteLastValid: keys.lastRound,
+					voteKeyDilution: keys.keyDilution
+				}
+			)
+		);
+		expect(result).toEqual(offer(onChain()));
+	});
+
+	it.each([
+		['offline', onChain({ status: 'Offline' })],
+		['not participating', onChain({ status: 'NotParticipating' })],
+		['already eligible', onChain({ incentiveEligible: true })],
+		['no participation', onChain({ participation: undefined })],
+		['no state proof key', onChain({}, { stateProofKey: undefined })],
+		['an empty state proof key', onChain({}, { stateProofKey: new Uint8Array(0) })],
+		['a short voting key', onChain({}, { voteParticipationKey: new Uint8Array(31) })],
+		['expired keys', onChain({ round: BigInt(keys.lastRound + 1) })],
+		['zero key dilution', onChain({}, { voteKeyDilution: 0n })],
+		['an unsafe last round', onChain({}, { voteLastValid: 2n ** 53n })],
+		['an unsafe first round', onChain({}, { voteFirstValid: 2n ** 60n })],
+		['an unsafe key dilution', onChain({}, { voteKeyDilution: 2n ** 64n - 1n })],
+		['an unsafe round', onChain({ round: 2n ** 53n + 1n })]
+	])('offers nothing for %s', (_, input) => {
+		expect(offer(input)).toEqual({ kind: 'none' });
+	});
+
+	it('offers nothing for keys that end this round', () => {
+		expect(offer(onChain({ round: BigInt(keys.lastRound) }))).toEqual({ kind: 'none' });
+	});
+
+	it('offers keys only with more than the minimum rounds left', () => {
+		expect(ONCHAIN_KEYREG_MIN_ROUNDS_LEFT).toBe(1000);
+		const left = (rounds: number) => offer(onChain({ round: BigInt(keys.lastRound - rounds) }));
+		expect(left(ONCHAIN_KEYREG_MIN_ROUNDS_LEFT)).toEqual({ kind: 'none' });
+		expect(left(ONCHAIN_KEYREG_MIN_ROUNDS_LEFT + 1)).toMatchObject({
+			kind: 'offer',
+			roundsLeft: ONCHAIN_KEYREG_MIN_ROUNDS_LEFT + 1,
+			expiringSoon: true
+		});
+	});
+
+	it('offers keys valid from the next round at the latest', () => {
+		const from = (first: number) => offer(onChain({}, { voteFirstValid: BigInt(first) }));
+		expect(from(round + 1)).toMatchObject({ kind: 'offer', keys: { firstRound: round + 1 } });
+		expect(from(round + 2)).toEqual({ kind: 'none' });
+	});
+
+	it.each(['checking', 'incapable', 'unverified'] as const)(
+		'offers nothing to a staking contract that is %s',
+		(contractIncentive) => {
+			expect(
+				offer(onChain(), { isStakingContract: true, contractIncentive, balanceRange })
+			).toEqual({
+				kind: 'none'
+			});
+		}
+	);
+
+	it('offers a capable staking contract its keys', () => {
+		expect(
+			offer(onChain(), { isStakingContract: true, contractIncentive: 'capable', balanceRange })
+		).toMatchObject({ kind: 'offer', keys: { ...keys, parentAddress: address } });
+	});
+
+	it('marks keys ending within 30 days at the fallback block time as expiring soon', () => {
+		expect(EXPIRING_SOON_SECONDS).toBe(30 * 24 * 60 * 60);
+		const boundary = EXPIRING_SOON_SECONDS / FALLBACK_BLOCK_TIME;
+		const under = Math.floor(boundary);
+		const over = Math.ceil(boundary);
+		expect(under).toBeLessThan(boundary);
+		const at = (left: number) => offer(onChain({ round: BigInt(keys.lastRound - left) }));
+		expect(at(under)).toMatchObject({ roundsLeft: under, expiringSoon: true });
+		expect(at(over)).toMatchObject({ roundsLeft: over, expiringSoon: false });
+	});
+
+	// Eligibility persists, but block rewards are paid only inside the balance range: still offered.
+	it.each([
+		['below the range', BLOCK_REWARD_MIN_MICROVOI - 1, false],
+		['at the minimum', BLOCK_REWARD_MIN_MICROVOI, true],
+		['inside the range', 100_000_000_000, true],
+		['at the maximum', BLOCK_REWARD_MAX_MICROVOI, true],
+		['above the range', BLOCK_REWARD_MAX_MICROVOI + 1, false]
+	])('offers an account %s and marks whether its balance is in range', (_, amount, inRange) => {
+		for (const value of [amount, BigInt(amount)]) {
+			expect(offer(onChain({ amount: value }))).toMatchObject({
+				kind: 'offer',
+				balanceInRange: inRange
+			});
+		}
+	});
+
+	it('does not mark an unknown balance out of range', () => {
+		expect(offer(onChain({ amount: undefined }))).toMatchObject({
+			kind: 'offer',
+			balanceInRange: true
+		});
 	});
 });

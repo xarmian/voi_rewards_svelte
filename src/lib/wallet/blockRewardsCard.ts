@@ -9,6 +9,7 @@ import {
 	type NetworkBlockRewardDay
 } from './blockRewards';
 import { boundedRead, type Source } from './read';
+import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
 
 export type BlockRewardsState = {
 	status: Source<BlockRewardStatus & { balance: number }>;
@@ -32,8 +33,7 @@ export function createBlockRewardsState(): BlockRewardsState {
 	};
 }
 
-/** Block time used when the recent network pace is unavailable. */
-export const FALLBACK_BLOCK_TIME = 2.8;
+export { FALLBACK_BLOCK_TIME };
 
 type Total = { count: number; amount: number };
 

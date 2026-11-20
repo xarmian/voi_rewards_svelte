@@ -18,6 +18,7 @@
 		contractIncentiveOf,
 		contractKeyregCost,
 		type ContractIncentive,
+		INCENTIVE_KEYREG_FEE,
 		incentiveFromUri,
 		incentiveKeyregFee,
 		keyregAccount,
@@ -26,13 +27,29 @@
 		keyregSendFailure,
 		keyregSubmitError,
 		MIN_KEYREG_FEE,
+		onChainKeyregOffer,
+		type OnChainAccount,
+		type OnChainKeyregOffer,
+		type ParsedKeys,
 		parseKeyregInput,
 		participatePayment,
 		sendWalletKeyreg
 	} from '$lib/chain/keyreg';
+	import {
+		activeKeyregLock,
+		KEYREG_LOCKED_MESSAGE,
+		lockKeyreg,
+		RECHECK_FAILED_MESSAGE,
+		type KeyregLock
+	} from '$lib/chain/keyregLock';
+	import {
+		BLOCK_REWARD_MAX_MICROVOI,
+		BLOCK_REWARD_MIN_MICROVOI
+	} from '$lib/rewards/blockRewardConstants';
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
+	import OnChainEligibilityPanel from './OnChainEligibilityPanel.svelte';
 	import { onMount } from 'svelte';
 
 	$: accountState = pageAccountState(pageAddress, $connectedWallets);
@@ -79,8 +96,45 @@
 	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
-	// From algod; eligibility survives later keyregs and going offline, but not suspension.
-	let alreadyEligible = false;
+	// The keyreg account's record from algod and the account it was read for: read at mount and
+	// replaced by each one-click fresh read. For display only: the one-click reads again at the click.
+	let accountRecord: { account: string; info: OnChainAccount } | null = null;
+	// Eligibility survives later keyregs and going offline, but not suspension.
+	$: alreadyEligible = accountRecord?.info.incentiveEligible === true;
+	const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
+	$: onChainOffer = displayedOffer(
+		accountRecord,
+		currentAccount,
+		isStakingContract,
+		contractIncentive
+	);
+	// A keyreg that may still land (see keyregLock), as last read or set here: while it is active
+	// the one-click sends nothing and the panel links it instead of the button.
+	let shownLock: KeyregLock | null = null;
+	const BALANCE_RANGE = { min: BLOCK_REWARD_MIN_MICROVOI, max: BLOCK_REWARD_MAX_MICROVOI };
+
+	// The offer the panel shows: none for a record read for another account than the current one.
+	function displayedOffer(
+		record: { account: string; info: OnChainAccount } | null,
+		account: string,
+		isStakingContract: boolean,
+		contractIncentive: ContractIncentive
+	): OnChainKeyregOffer {
+		if (record === null || record.account !== account) return NO_OFFER;
+		return onChainKeyregOffer(account, record.info, {
+			isStakingContract,
+			contractIncentive,
+			balanceRange: BALANCE_RANGE
+		});
+	}
+
+	// The lock the panel shows: none for a lock on another account than the current one.
+	function displayedLock(lock: KeyregLock | null, account: string): KeyregLock | null {
+		return lock !== null && lock.account === account ? lock : null;
+	}
+
+	// What the one-click sends instead of the form: the keys read from chain and the 2 VOI choice.
+	type FixedSend = { onChainKeys: ParsedKeys; payIncentiveFee: boolean };
 	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
 	let minFee = MIN_KEYREG_FEE;
 
@@ -99,14 +153,50 @@
 			// A URI pasted while the check ran gets its fee applied now.
 			applyPastedIncentive();
 		}
+		await loadAccountRecord();
+	});
+
+	// The keyreg account's record for the offer, and any lock on it at the record's round. False
+	// when the read failed (the record and lock shown are left as they were).
+	async function loadAccountRecord() {
 		try {
 			// The keyreg account: the contract's application address for a staking contract.
-			const info = await algodClient.accountInformation(currentAccount).exclude('all').do();
-			alreadyEligible = info.incentiveEligible === true;
+			const account = currentAccount;
+			accountRecord = {
+				account,
+				info: await algodClient.accountInformation(account).exclude('all').do()
+			};
+			shownLock = activeKeyregLock(account, accountRecord.info.round);
+			return true;
 		} catch (err) {
 			console.error('Error loading account eligibility:', err);
+			return false;
 		}
-	});
+	}
+
+	// True while the lock line's Check again re-reads the account.
+	let rechecking = false;
+
+	// The lock line's Check again: re-read the record, which drops a lock past its last valid round,
+	// so the button comes back without reopening the modal. Sends nothing. It replaces or clears only
+	// the messages it owns (the lock refusal and its own failed read), and none once another action
+	// has started, so a warning from a paste or a send is never lost.
+	async function recheckLock() {
+		if (transactionStatus !== 'idle' || isLoading || rechecking) return;
+		rechecking = true;
+		try {
+			const read = await loadAccountRecord();
+			const owned =
+				error === null || error === KEYREG_LOCKED_MESSAGE || error === RECHECK_FAILED_MESSAGE;
+			if (transactionStatus !== 'idle' || !owned) return;
+			if (!read) error = RECHECK_FAILED_MESSAGE;
+			else if (error === RECHECK_FAILED_MESSAGE) error = null;
+			// The earlier keyreg can no longer land: the refusal about it no longer applies.
+			else if (displayedLock(shownLock, currentAccount) === null) error = null;
+		} finally {
+			rechecking = false;
+		}
+	}
 
 	const nodeInstructions = {
 		'voi-swarm': {
@@ -239,7 +329,8 @@
 		}
 	}
 
-	async function registerStakingContractVoteKey() {
+	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
+	async function registerStakingContractVoteKey(fixed: FixedSend | null = null) {
 		console.log('Registering staking contract vote key');
 		const signer = signerOrError();
 		if (!signer) return;
@@ -252,20 +343,33 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// The keyreg account (the contract's application address), for the lock.
+		const account = currentAccount;
 		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
 		transactionStatus = 'building';
 		// Fixed at the click: a paste, or the mount-time check resolving during the awaits below,
 		// must not turn the 2 VOI on after the fresh check was skipped.
-		const payment = participatePayment(payIncentiveFee, contractCanPay);
+		const payment = participatePayment(
+			fixed ? fixed.payIncentiveFee : payIncentiveFee,
+			contractCanPay
+		);
 		// The keys on screen at the click, for the same reason: a paste or edit during the awaits
 		// below must not change what is registered.
+		const entered = fixed?.onChainKeys ?? {
+			votingKey,
+			selectionKey,
+			stateProofKey,
+			firstRound,
+			lastRound,
+			keyDilution
+		};
 		const keys = {
-			votingKey: new Uint8Array(Buffer.from(votingKey, 'base64')),
-			selectionKey: new Uint8Array(Buffer.from(selectionKey, 'base64')),
-			firstRound: Number(firstRound),
-			lastRound: Number(lastRound),
-			keyDilution: Number(keyDilution),
-			stateProofKey: new Uint8Array(Buffer.from(stateProofKey, 'base64'))
+			votingKey: new Uint8Array(Buffer.from(entered.votingKey, 'base64')),
+			selectionKey: new Uint8Array(Buffer.from(entered.selectionKey, 'base64')),
+			firstRound: Number(entered.firstRound),
+			lastRound: Number(entered.lastRound),
+			keyDilution: Number(entered.keyDilution),
+			stateProofKey: new Uint8Array(Buffer.from(entered.stateProofKey, 'base64'))
 		};
 		// The mount-time check may be stale; never send the 2 VOI without a fresh capable read.
 		// (An upgrade between this read and confirmation cannot be caught from the client.)
@@ -277,14 +381,22 @@
 			if (fresh !== 'capable') {
 				// A failed read may be transient: keep the option available so a retry rechecks.
 				if (fresh === 'incapable') contractIncentive = fresh;
-				payIncentiveFee = false;
-				error =
-					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
+				// The one-click leaves the form alone.
+				if (!fixed) payIncentiveFee = false;
+				// The one-click does not use the form's fee option, so its message does not point there;
+				// an incapable contract loses the offer, so only an unverified read invites a retry.
+				error = !fixed
+					? "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again."
+					: fresh === 'incapable'
+						? "This contract's version can't pay the incentive fee, so nothing was sent."
+						: "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Try again.";
 				transactionStatus = 'idle';
 				return;
 			}
 		}
 
+		// The participate app call, once built: its last valid round ends the lock.
+		let sent: algosdk.Transaction | null = null;
 		try {
 			const ctcInfo = Number(contractId);
 
@@ -355,6 +467,7 @@
 			);
 
 			const txid = txns[1].txID();
+			sent = txns[1];
 
 			transactionStatus = 'submitting';
 
@@ -370,34 +483,53 @@
 				transactionId = txid;
 				onSuccess?.(true);
 			} else {
+				// No result says neither that it was sent nor that it wasn't: it may land.
+				shownLock = lockKeyreg(account, txid, sent.lastValid);
 				error = 'Failed to register vote key';
 				transactionStatus = 'idle';
 			}
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(account, sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
 		}
 	}
 
-	async function registerWalletVoteKey() {
+	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
+	async function registerWalletVoteKey(fixed: FixedSend | null = null) {
 		const signer = signerOrError();
 		if (!signer) return;
+		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
-			const params = await algodClient.getTransactionParams().do();
-
-			const tx = buildWalletKeyregTxn({
-				params,
-				sender: walletAddress,
+			// The keys and fee at the click: an edit during the await below must not change them.
+			const keys = fixed?.onChainKeys ?? {
 				votingKey,
 				selectionKey,
 				stateProofKey,
 				firstRound: Number(firstRound),
 				lastRound: Number(lastRound),
-				keyDilution: Number(keyDilution),
-				fee: incentiveKeyregFee(payIncentiveFee)
+				keyDilution: Number(keyDilution)
+			};
+			const fee = incentiveKeyregFee(fixed ? fixed.payIncentiveFee : payIncentiveFee);
+			const params = await algodClient.getTransactionParams().do();
+
+			const tx = buildWalletKeyregTxn({
+				params,
+				sender: walletAddress,
+				votingKey: keys.votingKey,
+				selectionKey: keys.selectionKey,
+				stateProofKey: keys.stateProofKey,
+				firstRound: keys.firstRound,
+				lastRound: keys.lastRound,
+				keyDilution: keys.keyDilution,
+				fee
 			});
+			sent = tx;
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
@@ -414,20 +546,83 @@
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(sent.sender.toString(), sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
 		}
+	}
+
+	// One click for an account online without the incentive fee: re-register the keys on chain,
+	// read fresh now (never the mount record), with the 2 VOI fee. Same keys, so no offline gap.
+	async function registerOnChainKeys() {
+		if (transactionStatus !== 'idle' || isLoading) return;
+		error = null;
+		if (!canSignTransactions || pageAddress !== (parentWalletAddress ?? walletAddress)) {
+			error = wrongSignerMessage();
+			return;
+		}
+		// Leave 'idle' before the first await, so a second click cannot start a second registration.
+		transactionStatus = 'building';
+		const account = currentAccount;
+		let offer: OnChainKeyregOffer;
+		let lock: KeyregLock | null;
+		try {
+			const info = await algodClient.accountInformation(account).exclude('all').do();
+			// The panel shows the fresh record: it hides when this is no longer an offer.
+			accountRecord = { account, info };
+			lock = activeKeyregLock(account, info.round);
+			shownLock = lock;
+			offer = onChainKeyregOffer(account, info, {
+				isStakingContract,
+				contractIncentive,
+				balanceRange: BALANCE_RANGE
+			});
+		} catch (err) {
+			console.error('Error reading the account registration:', err);
+			error =
+				"Couldn't read this account's registration from the network, so nothing was sent. Try again.";
+			transactionStatus = 'idle';
+			return;
+		}
+		// An earlier keyreg for this account may still land: a second could register twice.
+		if (lock !== null) {
+			error = KEYREG_LOCKED_MESSAGE;
+			transactionStatus = 'idle';
+			return;
+		}
+		// contractCanPay decides the participate payment, so it must agree with the offer.
+		if (
+			offer.kind !== 'offer' ||
+			account !== currentAccount ||
+			(isStakingContract && !contractCanPay)
+		) {
+			error =
+				'These keys can no longer be made eligible (the account may already be eligible, be offline, or its keys may have expired or changed), so nothing was sent.';
+			transactionStatus = 'idle';
+			return;
+		}
+		// The form is left as it is: everything sent comes from here.
+		const fixed: FixedSend = { onChainKeys: offer.keys, payIncentiveFee: true };
+		if (parentWalletAddress === null) await registerWalletVoteKey(fixed);
+		else await registerStakingContractVoteKey(fixed);
+		// A registration refused before it started building (the signer checks) leaves 'building'.
+		if (transactionStatus === 'building') transactionStatus = 'idle';
 	}
 
 	async function goOfflineWalletVoteKey() {
 		error = null;
 		const signer = signerOrError();
 		if (!signer) return;
+		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
 
 			// Going offline is a key registration with no keys (never nonParticipation; see TASK-78)
 			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
+			sent = tx;
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
@@ -444,6 +639,10 @@
 		} catch (err) {
 			console.error('Error going offline:', err);
 			error = err instanceof Error ? err.message : 'Failed to go offline';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(sent.sender.toString(), sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
 		}
 	}
@@ -462,7 +661,11 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// The keyreg account (the contract's application address), for the lock.
+		const account = currentAccount;
 
+		// The participate app call, once built: its last valid round ends the lock.
+		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			const ctcInfo = Number(contractId);
@@ -534,6 +737,7 @@
 			);
 
 			const txid = txns[1].txID();
+			sent = txns[1];
 
 			transactionStatus = 'submitting';
 
@@ -549,12 +753,18 @@
 				transactionId = txid;
 				onSuccess?.(true);
 			} else {
+				// No result says neither that it was sent nor that it wasn't: it may land.
+				shownLock = lockKeyreg(account, txid, sent.lastValid);
 				error = 'Failed to go offline';
 				transactionStatus = 'idle';
 			}
 		} catch (err) {
 			console.error('Error going offline:', err);
 			error = err instanceof Error ? err.message : 'Failed to go offline';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(account, sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
 		}
 	}
@@ -607,6 +817,21 @@
 			<i class="fas fa-exclamation-triangle"></i>
 			<span>{error}</span>
 		</div>
+	{/if}
+
+	{#if onChainOffer.kind === 'offer' && transactionStatus !== 'success'}
+		<OnChainEligibilityPanel
+			offer={onChainOffer}
+			cost={isStakingContract
+				? contractKeyregCost(INCENTIVE_KEYREG_FEE) / 1e6
+				: walletKeyregFee(INCENTIVE_KEYREG_FEE, minFee) / 1e6}
+			canRegister={canSignTransactions && pageAddress === (parentWalletAddress ?? walletAddress)}
+			disabled={transactionStatus !== 'idle' || isLoading}
+			onRegister={registerOnChainKeys}
+			unconfirmed={displayedLock(shownLock, currentAccount)}
+			onRecheck={recheckLock}
+			{rechecking}
+		/>
 	{/if}
 
 	<div class="space-y-8">
