@@ -10,6 +10,7 @@
 		canRegister,
 		disabled,
 		onRegister,
+		unconfirmed = null,
 		now = Date.now()
 	}: {
 		offer: Extract<OnChainKeyregOffer, { kind: 'offer' }>;
@@ -18,6 +19,8 @@
 		canRegister: boolean;
 		disabled: boolean;
 		onRegister: () => void;
+		// Set after a one-click send that may have landed: the button is not offered again.
+		unconfirmed?: { txid: string | null } | null;
 		now?: number;
 	} = $props();
 
@@ -52,7 +55,22 @@
 			consider generating new keys and registering them with the 2 VOI option below.
 		</p>
 	{/if}
-	{#if canRegister}
+	{#if unconfirmed}
+		<p class="mt-3 text-sm text-amber-700 dark:text-amber-300">
+			Your last re-registration may have gone through. Check the transaction in the explorer before
+			trying again.
+			{#if unconfirmed.txid}
+				<a
+					href={`https://block.voi.network/explorer/transaction/${unconfirmed.txid}`}
+					class="underline text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					View in Explorer
+				</a>
+			{/if}
+		</p>
+	{:else if canRegister}
 		<div class="mt-3 flex justify-end">
 			<button
 				type="button"

@@ -215,9 +215,10 @@ test('going offline always pays the minimum', async () => {
 });
 
 test('only registration uses participatePayment; going offline keeps the fixed minimum', () => {
-	expect(source.match(/participatePayment\(payIncentiveFee, contractCanPay\)/g)).toHaveLength(2);
+	expect(source.match(/participatePayment\(/g)).toHaveLength(2);
+	expect(source).toMatch(/participatePayment\(payIncentiveFee, contractCanPay\)/);
 	expect(source).toMatch(
-		/const payment = participatePayment\(payIncentiveFee, contractCanPay\);[^]*?\n\t\t\t\tpayment\n\t\t\t\};/
+		/const payment = participatePayment\(\s*fixed \? fixed\.payIncentiveFee : payIncentiveFee,\s*contractCanPay\s*\);[^]*?\n\t\t\t\tpayment\n\t\t\t\};/
 	);
 	expect(source.match(/payment: 1000/g)).toHaveLength(1);
 });

@@ -82,6 +82,8 @@ function harness(opts: {
 			return body;
 		})
 		.join('\n');
+	// The offer the panel shows; extracted when present, so the send tests run without it.
+	const displayed = source.match(/function displayedOffer\([^]*?\n\t\}/)?.[0] ?? '';
 	const contract = opts.contract ?? false;
 	const reads = [...(opts.reads ?? [record()])];
 	const accountInformation = vi.fn(() => ({
@@ -158,9 +160,12 @@ function harness(opts: {
 		keyregSendFailure,
 		participatePayment,
 		contractIncentiveOf,
-		MIN_KEYREG_FEE
+		MIN_KEYREG_FEE,
+		NO_OFFER: { kind: 'none' },
+		accountRecord: null,
+		onChainUnconfirmed: null
 	});
-	runInContext(ts.transpileModule(functions, {}).outputText, context);
+	runInContext(ts.transpileModule(`${functions}\n${displayed}`, {}).outputText, context);
 	return {
 		context,
 		accountInformation,
@@ -170,7 +175,13 @@ function harness(opts: {
 		setExtraTxns,
 		contractIncentiveOf,
 		sends: [CONTRACT, participate, custom, setExtraTxns, signAndSendTransactions],
-		run: () => runInContext('registerOnChainKeys()', context) as Promise<void>
+		run: () => runInContext('registerOnChainKeys()', context) as Promise<void>,
+		// The offer the panel shows from the record the component holds now.
+		shown: () =>
+			runInContext(
+				'displayedOffer(accountRecord, currentAccount, isStakingContract, contractIncentive)',
+				context
+			)
 	};
 }
 
@@ -203,32 +214,45 @@ describe('re-registering the on-chain keys', () => {
 		expect(h.context.transactionStatus).toBe('success');
 	});
 
-	test('the click fills the form from chain and resets the paste state', async () => {
+	test('the click leaves the form, the fee option and the paste state untouched', async () => {
 		const h = harness({});
+		const before = {
+			votingKey: 'FORM VOTE',
+			selectionKey: 'FORM SELECTION',
+			stateProofKey: 'FORM STATE PROOF',
+			firstRound: '11',
+			lastRound: '22',
+			keyDilution: '33',
+			payIncentiveFee: false,
+			keyregPasteAccount: 'SOMEONE',
+			pastedUriFee: 1000,
+			incentiveNotice: 'old notice'
+		};
+		Object.assign(h.context, before);
 		await h.run();
-		expect({
-			votingKey: h.context.votingKey,
-			selectionKey: h.context.selectionKey,
-			stateProofKey: h.context.stateProofKey,
-			firstRound: h.context.firstRound,
-			lastRound: h.context.lastRound,
-			keyDilution: h.context.keyDilution,
-			payIncentiveFee: h.context.payIncentiveFee,
-			keyregPasteAccount: h.context.keyregPasteAccount,
-			pastedUriFee: h.context.pastedUriFee,
-			incentiveNotice: h.context.incentiveNotice
-		}).toEqual({
-			votingKey: Buffer.from(vote).toString('base64'),
-			selectionKey: Buffer.from(selection).toString('base64'),
-			stateProofKey: Buffer.from(stateProof).toString('base64'),
-			firstRound: '4000000',
-			lastRound: '9000000',
-			keyDilution: '2237',
-			payIncentiveFee: true,
-			keyregPasteAccount: null,
-			pastedUriFee: null,
-			incentiveNotice: null
-		});
+		expect(sentWalletTxn(h).fee).toBe(2_000_000n);
+		expect(Object.fromEntries(Object.keys(before).map((key) => [key, h.context[key]]))).toEqual(
+			before
+		);
+	});
+
+	test('a failed one-click send leaves the form untouched', async () => {
+		const h = harness({ contract: true });
+		h.context.payIncentiveFee = true;
+		h.context.votingKey = 'FORM VOTE';
+		h.contractIncentiveOf.mockResolvedValueOnce('unverified');
+		await h.run();
+		expect(h.context.error).toMatch(/nothing was sent/);
+		expect(h.context.payIncentiveFee).toBe(true);
+		expect(h.context.votingKey).toBe('FORM VOTE');
+	});
+
+	test('a contract sends the 2 VOI payment even with the form fee option off', async () => {
+		const h = harness({ contract: true });
+		h.context.payIncentiveFee = false;
+		await h.run();
+		expect(h.contractIncentiveOf).toHaveBeenCalledOnce();
+		expect(h.setExtraTxns.mock.calls[0][0][0].payment).toBe(2_000_000);
 	});
 
 	test('an edit to the form while the registration builds does not change what is sent', async () => {
@@ -355,6 +379,116 @@ describe('re-registering the on-chain keys', () => {
 	});
 });
 
+describe('a one-click send that may have landed', () => {
+	test('an unconfirmed send is not offered again and keeps its txid', async () => {
+		const h = harness({});
+		h.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('timeout'));
+		await h.run();
+		const tx = sentWalletTxn(h);
+		expect(h.context.error).toMatch(/not confirmed/);
+		expect(h.context.transactionStatus).toBe('idle');
+		expect(h.context.onChainUnconfirmed).toEqual({ txid: tx.txID() });
+		await h.run();
+		expect(h.accountInformation).toHaveBeenCalledOnce();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+	});
+
+	test('a contract send that fails after the wallet was asked is not offered again', async () => {
+		const h = harness({ contract: true });
+		h.signAndSendTransactions.mockRejectedValueOnce(new Error('network error'));
+		await h.run();
+		expect(h.context.error).toBe('network error');
+		expect(h.context.onChainUnconfirmed).toEqual({ txid: 'tx' });
+		await h.run();
+		expect(h.accountInformation).toHaveBeenCalledOnce();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+	});
+
+	test('a contract send the wallet returned nothing for is not offered again', async () => {
+		const h = harness({ contract: true });
+		h.signAndSendTransactions.mockResolvedValueOnce(undefined);
+		await h.run();
+		expect(h.context.error).toBe('Failed to register vote key');
+		expect(h.context.onChainUnconfirmed).toEqual({ txid: 'tx' });
+	});
+
+	test('a wallet send the wallet refused to sign is not offered again', async () => {
+		const h = harness({});
+		h.signAndSendTransactions.mockRejectedValueOnce(new Error('User rejected'));
+		await h.run();
+		expect(h.context.onChainUnconfirmed).toEqual({ txid: sentWalletTxn(h).txID() });
+		await h.run();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+	});
+
+	test('a failure before signing keeps the one-click available', async () => {
+		const h = harness({});
+		h.getTransactionParams.mockImplementationOnce(() => ({
+			do: async () => {
+				throw new Error('algod down');
+			}
+		}));
+		await h.run();
+		expect(h.context.error).toBe('algod down');
+		expect(h.context.onChainUnconfirmed).toBeNull();
+		await h.run();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+		expect(h.context.transactionStatus).toBe('success');
+	});
+
+	test.each([
+		['an unreadable account', { reads: [new Error('algod down')] }],
+		['a refused fresh read', { reads: [record({ incentiveEligible: true })] }],
+		['a refused contract check', { contract: true, recheck: 'unverified' }]
+	])('%s keeps the one-click available', async (_, opts) => {
+		const h = harness(opts);
+		await h.run();
+		expect(h.context.error).toMatch(/nothing was sent/);
+		expect(h.context.onChainUnconfirmed).toBeNull();
+	});
+
+	test('a signer refused before the send keeps the one-click available', async () => {
+		const h = harness({ contract: true });
+		h.context.capturePageSigner = () => ({ address: 'SOMEONE ELSE' });
+		await h.run();
+		expect(h.context.onChainUnconfirmed).toBeNull();
+	});
+});
+
+describe('the displayed offer', () => {
+	test('a fresh read that refuses hides the panel', async () => {
+		const fresh = record({ incentiveEligible: true });
+		const h = harness({ reads: [fresh] });
+		h.context.accountRecord = { account: WALLET, info: record() };
+		expect(h.shown()).toMatchObject({ kind: 'offer' });
+		await h.run();
+		expect(h.context.accountRecord).toEqual({ account: WALLET, info: fresh });
+		expect(h.shown()).toEqual({ kind: 'none' });
+	});
+
+	test('a fresh read with a different end round updates the shown offer', async () => {
+		const fresh = record({}, { voteLastValid: 7_000_000n });
+		const h = harness({ reads: [fresh] });
+		h.context.accountRecord = { account: WALLET, info: record() };
+		await h.run();
+		expect(h.shown()).toMatchObject({
+			kind: 'offer',
+			keys: { lastRound: 7_000_000 },
+			roundsLeft: 7_000_000 - ROUND
+		});
+	});
+
+	test('a record read for another account offers nothing', () => {
+		const h = harness({});
+		h.context.accountRecord = { account: OWNER, info: record() };
+		expect(h.shown()).toEqual({ kind: 'none' });
+		h.context.accountRecord = { account: WALLET, info: record() };
+		expect(h.shown()).toMatchObject({ kind: 'offer' });
+		h.context.accountRecord = null;
+		expect(h.shown()).toEqual({ kind: 'none' });
+	});
+});
+
 describe('the eligibility panel', () => {
 	const offer = (roundsLeft: number) => {
 		const result = onChainKeyregOffer(
@@ -407,6 +541,22 @@ describe('the eligibility panel', () => {
 		expect(html({ disabled: true })).toMatch(/<button[^>]*\sdisabled(?:=|[\s>])/);
 	});
 
+	test('after a send that may have landed, links the transaction and shows no button', () => {
+		const body = html({ unconfirmed: { txid: 'TXID123' } });
+		expect(body).not.toContain('<button');
+		expect(body).toContain(
+			'Your last re-registration may have gone through. Check the transaction in the explorer before trying again.'
+		);
+		expect(body).toContain('href="https://block.voi.network/explorer/transaction/TXID123"');
+	});
+
+	test('after a send that may have landed without a known txid, still shows no button', () => {
+		const body = html({ unconfirmed: { txid: null } });
+		expect(body).not.toContain('<button');
+		expect(body).toContain('Check the transaction in the explorer before trying again.');
+		expect(body).not.toContain('href=');
+	});
+
 	test('shows the text without a button for an account that cannot sign here', () => {
 		const body = html({ canRegister: false });
 		expect(body).toContain('Make your current registration eligible');
@@ -427,7 +577,7 @@ describe('the eligibility panel', () => {
 describe('the modal wiring', () => {
 	test('the panel shows only for an offer from the mount read, and hides after success', () => {
 		expect(source).toMatch(
-			/\$: onChainOffer =\s*accountRecord === null\s*\? NO_OFFER\s*: onChainKeyregOffer\(currentAccount, accountRecord, \{ isStakingContract, contractIncentive \}\);/
+			/\$: onChainOffer = displayedOffer\(\s*accountRecord,\s*currentAccount,\s*isStakingContract,\s*contractIncentive\s*\);/
 		);
 		expect(source).toMatch(
 			/\{#if onChainOffer\.kind === 'offer' && transactionStatus !== 'success'\}\s*<OnChainEligibilityPanel/
@@ -441,6 +591,7 @@ describe('the modal wiring', () => {
 		);
 		expect(panel).toContain("disabled={transactionStatus !== 'idle' || isLoading}");
 		expect(panel).toContain('onRegister={registerOnChainKeys}');
+		expect(panel).toContain('unconfirmed={onChainUnconfirmed}');
 		expect(panel).toMatch(
 			/cost=\{isStakingContract\s*\? contractKeyregCost\(INCENTIVE_KEYREG_FEE\) \/ 1e6\s*: walletKeyregFee\(INCENTIVE_KEYREG_FEE, minFee\) \/ 1e6\}/
 		);
@@ -448,8 +599,10 @@ describe('the modal wiring', () => {
 
 	test('the mount read keeps the account record for the offer', () => {
 		expect(source).toMatch(
-			/accountRecord = await algodClient\.accountInformation\(currentAccount\)\.exclude\('all'\)\.do\(\);/
+			/const account = currentAccount;\s*accountRecord = \{\s*account,\s*info: await algodClient\.accountInformation\(account\)\.exclude\('all'\)\.do\(\)\s*\};/
 		);
-		expect(source).toMatch(/\$: alreadyEligible = accountRecord\?\.incentiveEligible === true;/);
+		expect(source).toMatch(
+			/\$: alreadyEligible = accountRecord\?\.info\.incentiveEligible === true;/
+		);
 	});
 });

@@ -85,16 +85,37 @@
 	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
-	// The keyreg account's record from algod at mount, for display only: the one-click
-	// re-registration reads the account again at the click.
-	let accountRecord: OnChainAccount | null = null;
+	// The keyreg account's record from algod and the account it was read for: read at mount and
+	// replaced by each one-click fresh read. For display only: the one-click reads again at the click.
+	let accountRecord: { account: string; info: OnChainAccount } | null = null;
 	// Eligibility survives later keyregs and going offline, but not suspension.
-	$: alreadyEligible = accountRecord?.incentiveEligible === true;
+	$: alreadyEligible = accountRecord?.info.incentiveEligible === true;
 	const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
-	$: onChainOffer =
-		accountRecord === null
-			? NO_OFFER
-			: onChainKeyregOffer(currentAccount, accountRecord, { isStakingContract, contractIncentive });
+	$: onChainOffer = displayedOffer(
+		accountRecord,
+		currentAccount,
+		isStakingContract,
+		contractIncentive
+	);
+	// Set when a one-click send failed after the wallet was asked to sign: it may have landed, so
+	// the one-click is not offered again in this modal session (the txid, when known, is linked).
+	let onChainUnconfirmed: { txid: string | null } | null = null;
+
+	// The offer the panel shows: none for a record read for another account than the current one.
+	function displayedOffer(
+		record: { account: string; info: OnChainAccount } | null,
+		account: string,
+		isStakingContract: boolean,
+		contractIncentive: ContractIncentive
+	): OnChainKeyregOffer {
+		if (record === null || record.account !== account) return NO_OFFER;
+		return onChainKeyregOffer(account, record.info, { isStakingContract, contractIncentive });
+	}
+
+	// What the one-click sends instead of the form: the keys read from chain and the 2 VOI choice.
+	type FixedSend = { onChainKeys: ParsedKeys; payIncentiveFee: boolean };
+	// A send that failed after the wallet was asked to sign, so it may have landed; null otherwise.
+	type UncertainSend = { txid: string | null } | null;
 	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
 	let minFee = MIN_KEYREG_FEE;
 
@@ -115,7 +136,11 @@
 		}
 		try {
 			// The keyreg account: the contract's application address for a staking contract.
-			accountRecord = await algodClient.accountInformation(currentAccount).exclude('all').do();
+			const account = currentAccount;
+			accountRecord = {
+				account,
+				info: await algodClient.accountInformation(account).exclude('all').do()
+			};
 		} catch (err) {
 			console.error('Error loading account eligibility:', err);
 		}
@@ -252,25 +277,30 @@
 		}
 	}
 
-	// fixed.onChainKeys: keys read from chain by registerOnChainKeys, sent instead of the form.
-	async function registerStakingContractVoteKey(fixed: { onChainKeys?: ParsedKeys } | null = null) {
+	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
+	async function registerStakingContractVoteKey(
+		fixed: FixedSend | null = null
+	): Promise<UncertainSend> {
 		console.log('Registering staking contract vote key');
 		const signer = signerOrError();
-		if (!signer) return;
+		if (!signer) return null;
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
-			return;
+			return null;
 		}
 		if (!signerMatchesAccount(signer, parentWalletAddress)) {
 			error = wrongSignerMessage();
-			return;
+			return null;
 		}
 		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
 		transactionStatus = 'building';
 		// Fixed at the click: a paste, or the mount-time check resolving during the awaits below,
 		// must not turn the 2 VOI on after the fresh check was skipped.
-		const payment = participatePayment(payIncentiveFee, contractCanPay);
+		const payment = participatePayment(
+			fixed ? fixed.payIncentiveFee : payIncentiveFee,
+			contractCanPay
+		);
 		// The keys on screen at the click, for the same reason: a paste or edit during the awaits
 		// below must not change what is registered.
 		const entered = fixed?.onChainKeys ?? {
@@ -299,14 +329,16 @@
 			if (fresh !== 'capable') {
 				// A failed read may be transient: keep the option available so a retry rechecks.
 				if (fresh === 'incapable') contractIncentive = fresh;
-				payIncentiveFee = false;
+				// The one-click leaves the form alone.
+				if (!fixed) payIncentiveFee = false;
 				error =
 					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
 				transactionStatus = 'idle';
-				return;
+				return null;
 			}
 		}
 
+		let sentTxid: string | null = null;
 		try {
 			const ctcInfo = Number(contractId);
 
@@ -377,6 +409,7 @@
 			);
 
 			const txid = txns[1].txID();
+			sentTxid = txid;
 
 			transactionStatus = 'submitting';
 
@@ -391,21 +424,26 @@
 				transactionStatus = 'success';
 				transactionId = txid;
 				onSuccess?.(true);
-			} else {
-				error = 'Failed to register vote key';
-				transactionStatus = 'idle';
+				return null;
 			}
+			error = 'Failed to register vote key';
+			transactionStatus = 'idle';
+			return { txid };
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
+			// Failed after the wallet was asked to sign: it may have landed.
+			const uncertain = transactionStatus !== 'building';
 			transactionStatus = 'idle';
+			return uncertain ? { txid: sentTxid } : null;
 		}
 	}
 
-	// fixed.onChainKeys: keys read from chain by registerOnChainKeys, sent instead of the form.
-	async function registerWalletVoteKey(fixed: { onChainKeys?: ParsedKeys } | null = null) {
+	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
+	async function registerWalletVoteKey(fixed: FixedSend | null = null): Promise<UncertainSend> {
 		const signer = signerOrError();
-		if (!signer) return;
+		if (!signer) return null;
+		let sentTxid: string | null = null;
 		try {
 			transactionStatus = 'building';
 			// The keys and fee at the click: an edit during the await below must not change them.
@@ -417,7 +455,7 @@
 				lastRound: Number(lastRound),
 				keyDilution: Number(keyDilution)
 			};
-			const fee = incentiveKeyregFee(payIncentiveFee);
+			const fee = incentiveKeyregFee(fixed ? fixed.payIncentiveFee : payIncentiveFee);
 			const params = await algodClient.getTransactionParams().do();
 
 			const tx = buildWalletKeyregTxn({
@@ -431,6 +469,7 @@
 				keyDilution: keys.keyDilution,
 				fee
 			});
+			sentTxid = tx.txID();
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
@@ -444,17 +483,21 @@
 			transactionId = txid;
 			transactionStatus = 'success';
 			onSuccess?.(true);
+			return null;
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
+			// Failed after the wallet was asked to sign: it may have landed.
+			const uncertain = transactionStatus !== 'building';
 			transactionStatus = 'idle';
+			return uncertain ? { txid: sentTxid } : null;
 		}
 	}
 
 	// One click for an account online without the incentive fee: re-register the keys on chain,
 	// read fresh now (never the mount record), with the 2 VOI fee. Same keys, so no offline gap.
 	async function registerOnChainKeys() {
-		if (transactionStatus !== 'idle' || isLoading) return;
+		if (transactionStatus !== 'idle' || isLoading || onChainUnconfirmed !== null) return;
 		error = null;
 		if (!canSignTransactions || pageAddress !== (parentWalletAddress ?? walletAddress)) {
 			error = wrongSignerMessage();
@@ -466,6 +509,8 @@
 		let offer: OnChainKeyregOffer;
 		try {
 			const info = await algodClient.accountInformation(account).exclude('all').do();
+			// The panel shows the fresh record: it hides when this is no longer an offer.
+			accountRecord = { account, info };
 			offer = onChainKeyregOffer(account, info, { isStakingContract, contractIncentive });
 		} catch (err) {
 			console.error('Error reading the account registration:', err);
@@ -485,22 +530,13 @@
 			transactionStatus = 'idle';
 			return;
 		}
-		const keys = offer.keys;
-		firstRound = String(keys.firstRound);
-		lastRound = String(keys.lastRound);
-		keyDilution = String(keys.keyDilution);
-		selectionKey = keys.selectionKey;
-		votingKey = keys.votingKey;
-		stateProofKey = keys.stateProofKey;
-		payIncentiveFee = true;
-		keyregPasteAccount = null;
-		pastedUriFee = null;
-		incentiveNotice = null;
-		if (parentWalletAddress === null) {
-			await registerWalletVoteKey({ onChainKeys: keys });
-		} else {
-			await registerStakingContractVoteKey({ onChainKeys: keys });
-		}
+		// The form is left as it is: everything sent comes from here.
+		const fixed: FixedSend = { onChainKeys: offer.keys, payIncentiveFee: true };
+		const uncertain =
+			parentWalletAddress === null
+				? await registerWalletVoteKey(fixed)
+				: await registerStakingContractVoteKey(fixed);
+		if (uncertain !== null) onChainUnconfirmed = uncertain;
 		// A registration refused before it started building (the signer checks) leaves 'building'.
 		if (transactionStatus === 'building') transactionStatus = 'idle';
 	}
@@ -705,6 +741,7 @@
 			canRegister={canSignTransactions && pageAddress === (parentWalletAddress ?? walletAddress)}
 			disabled={transactionStatus !== 'idle' || isLoading}
 			onRegister={registerOnChainKeys}
+			unconfirmed={onChainUnconfirmed}
 		/>
 	{/if}
 
