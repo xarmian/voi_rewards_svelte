@@ -249,8 +249,8 @@
 		}
 	}
 
-	// Applies the pasted URI's fee to the opt-in. Only a URI that carries a fee sets it;
-	// partkeyinfo leaves the user's choice. While a staking contract's program is still being
+	// Applies the pasted URI's fee to the opt-in. A URI fee can select the opt-in but never
+	// clears the user's choice: a minimum-fee URI, like partkeyinfo, leaves it as it is. While a staking contract's program is still being
 	// checked nothing changes yet: the mount-time check calls this again once it resolves.
 	function applyPastedIncentive() {
 		const asksForFee = pastedUriFee !== null && incentiveFromUri(pastedUriFee, false);
@@ -262,8 +262,8 @@
 		}
 		// Not the reactive accountCannotPay: it lags a contractIncentive set in the same tick.
 		const cannotPay = isStakingContract && contractIncentive !== 'capable';
-		if (pastedUriFee !== null) {
-			payIncentiveFee = incentiveFromUri(pastedUriFee, cannotPay);
+		if (pastedUriFee !== null && incentiveFromUri(pastedUriFee, cannotPay)) {
+			payIncentiveFee = true;
 		}
 		incentiveNotice =
 			cannotPay && asksForFee
