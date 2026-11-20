@@ -261,10 +261,52 @@ test.each(['incapable', 'unverified'])(
 		for (const call of harness.sends) expect(call).not.toHaveBeenCalled();
 		expect(harness.context.error).toMatch(/nothing was sent/);
 		expect(harness.context.payIncentiveFee).toBe(false);
-		expect(harness.context.contractIncentive).toBe(recheck);
+		// A failed read may be transient, so it leaves the option available for a rechecked retry.
+		expect(harness.context.contractIncentive).toBe(
+			recheck === 'incapable' ? 'incapable' : 'capable'
+		);
 		expect(harness.context.transactionStatus).toBe('idle');
 	}
 );
+
+test('keys pasted or edited during the fresh check do not change what is registered', async () => {
+	const harness = stakingSendHarness('registerStakingContractVoteKey', {
+		payIncentiveFee: true,
+		contractCanPay: true
+	});
+	Object.assign(harness.context, {
+		votingKey: 'AQ==',
+		selectionKey: 'Ag==',
+		stateProofKey: 'Aw==',
+		firstRound: '10',
+		lastRound: '20',
+		keyDilution: '5'
+	});
+	harness.contractIncentiveOf.mockImplementationOnce(async () => {
+		Object.assign(harness.context, {
+			votingKey: 'CQ==',
+			selectionKey: 'CQ==',
+			stateProofKey: 'CQ==',
+			firstRound: '90',
+			lastRound: '99',
+			keyDilution: '9'
+		});
+		return 'capable';
+	});
+	await harness.run();
+	const args = harness.participate.mock.calls[0];
+	expect(
+		args.map((arg: unknown) => (typeof arg === 'number' ? arg : Array.from(arg as Uint8Array)))
+	).toEqual([[1], [2], 10, 20, 5, [3]]);
+	expect(harness.setExtraTxns.mock.calls[0][0][0].payment).toBe(2_000_000);
+});
+
+test('Register waits for a paste in progress, so a late paste cannot swap the keys', () => {
+	expect(source).toMatch(
+		/async function handleSubmit\(\) \{\n\t\t\/\/[^\n]*\n\t\tif \(isLoading\) return;/
+	);
+	expect(source).toMatch(/disabled=\{transactionStatus !== 'idle' \|\|\s*isLoading \|\|/);
+});
 
 test('the submit button is blocked while the fresh check runs, so a second click cannot send twice', async () => {
 	const harness = stakingSendHarness('registerStakingContractVoteKey', {

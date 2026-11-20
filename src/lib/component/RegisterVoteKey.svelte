@@ -184,6 +184,8 @@
 	}
 
 	async function handleSubmit() {
+		// A paste still reading the clipboard would overwrite the keys mid-send.
+		if (isLoading) return;
 		error = null;
 		console.log('Submitting participation key details');
 
@@ -255,6 +257,16 @@
 		// Fixed at the click: a paste, or the mount-time check resolving during the awaits below,
 		// must not turn the 2 VOI on after the fresh check was skipped.
 		const payment = participatePayment(payIncentiveFee, contractCanPay);
+		// The keys on screen at the click, for the same reason: a paste or edit during the awaits
+		// below must not change what is registered.
+		const keys = {
+			votingKey: new Uint8Array(Buffer.from(votingKey, 'base64')),
+			selectionKey: new Uint8Array(Buffer.from(selectionKey, 'base64')),
+			firstRound: Number(firstRound),
+			lastRound: Number(lastRound),
+			keyDilution: Number(keyDilution),
+			stateProofKey: new Uint8Array(Buffer.from(stateProofKey, 'base64'))
+		};
 		// The mount-time check may be stale; never send the 2 VOI without a fresh capable read.
 		// (An upgrade between this read and confirmation cannot be caught from the client.)
 		if (payment !== MIN_KEYREG_FEE) {
@@ -263,7 +275,8 @@
 					(await algodClient.getApplicationByID(Number(contractId)).do()).params?.approvalProgram
 			);
 			if (fresh !== 'capable') {
-				contractIncentive = fresh;
+				// A failed read may be transient: keep the option available so a retry rechecks.
+				if (fresh === 'incapable') contractIncentive = fresh;
 				payIncentiveFee = false;
 				error =
 					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
@@ -320,12 +333,12 @@
 			const txnO = {
 				...(
 					await builder.wnt.participate(
-						new Uint8Array(Buffer.from(votingKey, 'base64')),
-						new Uint8Array(Buffer.from(selectionKey, 'base64')),
-						Number(firstRound),
-						Number(lastRound),
-						Number(keyDilution),
-						new Uint8Array(Buffer.from(stateProofKey, 'base64'))
+						keys.votingKey,
+						keys.selectionKey,
+						keys.firstRound,
+						keys.lastRound,
+						keys.keyDilution,
+						keys.stateProofKey
 					)
 				).obj,
 				payment
@@ -898,6 +911,7 @@
 						on:click={handleSubmit}
 						class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
 						disabled={transactionStatus !== 'idle' ||
+							isLoading ||
 							!firstRound ||
 							!lastRound ||
 							!keyDilution ||
