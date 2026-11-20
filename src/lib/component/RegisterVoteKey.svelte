@@ -35,7 +35,13 @@
 		participatePayment,
 		sendWalletKeyreg
 	} from '$lib/chain/keyreg';
-	import { activeKeyregLock, lockKeyreg, type KeyregLock } from '$lib/chain/keyregLock';
+	import {
+		activeKeyregLock,
+		KEYREG_LOCKED_MESSAGE,
+		lockKeyreg,
+		RECHECK_FAILED_MESSAGE,
+		type KeyregLock
+	} from '$lib/chain/keyregLock';
 	import {
 		BLOCK_REWARD_MAX_MICROVOI,
 		BLOCK_REWARD_MIN_MICROVOI
@@ -172,17 +178,21 @@
 	let rechecking = false;
 
 	// The lock line's Check again: re-read the record, which drops a lock past its last valid round,
-	// so the button comes back without reopening the modal. Sends nothing.
+	// so the button comes back without reopening the modal. Sends nothing. It replaces or clears only
+	// the messages it owns (the lock refusal and its own failed read), and none once another action
+	// has started, so a warning from a paste or a send is never lost.
 	async function recheckLock() {
 		if (transactionStatus !== 'idle' || isLoading || rechecking) return;
 		rechecking = true;
 		try {
-			if (!(await loadAccountRecord())) {
-				error = "Couldn't read this account from the network. Try again.";
-			} else if (displayedLock(shownLock, currentAccount) === null) {
-				// The earlier keyreg can no longer land: a message about it no longer applies.
-				error = null;
-			}
+			const read = await loadAccountRecord();
+			const owned =
+				error === null || error === KEYREG_LOCKED_MESSAGE || error === RECHECK_FAILED_MESSAGE;
+			if (transactionStatus !== 'idle' || !owned) return;
+			if (!read) error = RECHECK_FAILED_MESSAGE;
+			else if (error === RECHECK_FAILED_MESSAGE) error = null;
+			// The earlier keyreg can no longer land: the refusal about it no longer applies.
+			else if (displayedLock(shownLock, currentAccount) === null) error = null;
 		} finally {
 			rechecking = false;
 		}
@@ -578,8 +588,7 @@
 		}
 		// An earlier keyreg for this account may still land: a second could register twice.
 		if (lock !== null) {
-			error =
-				'An earlier registration for this account may still go through, so nothing was sent. Check it in the explorer before trying again.';
+			error = KEYREG_LOCKED_MESSAGE;
 			transactionStatus = 'idle';
 			return;
 		}

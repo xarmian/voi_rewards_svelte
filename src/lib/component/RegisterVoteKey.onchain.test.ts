@@ -16,7 +16,13 @@ import {
 } from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
-import { activeKeyregLock, lockKeyreg, resetKeyregLocks } from '$lib/chain/keyregLock';
+import {
+	activeKeyregLock,
+	KEYREG_LOCKED_MESSAGE,
+	lockKeyreg,
+	RECHECK_FAILED_MESSAGE,
+	resetKeyregLocks
+} from '$lib/chain/keyregLock';
 import {
 	BLOCK_REWARD_MAX_MICROVOI,
 	BLOCK_REWARD_MIN_MICROVOI
@@ -190,6 +196,8 @@ function harness(opts: {
 		BALANCE_RANGE,
 		lockKeyreg,
 		activeKeyregLock,
+		KEYREG_LOCKED_MESSAGE,
+		RECHECK_FAILED_MESSAGE,
 		accountRecord: null,
 		shownLock: null,
 		rechecking: false
@@ -700,6 +708,43 @@ describe('the one-click while a keyreg may still land', () => {
 		expect(h.shownLock()).toMatchObject({ txid: 'OLD' });
 		expect(h.context.error).toMatch(/Couldn't read this account/);
 		expect(h.context.rechecking).toBe(false);
+	});
+
+	test('checking again leaves a message from another action alone, whatever the read', async () => {
+		const other = 'Warning: The address in the pasted partkeyinfo does not match the account';
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const ended = harness({ reads: [record({ round: BigInt(LAST_VALID + 1) })] });
+		ended.context.error = other;
+		await ended.call('recheckLock');
+		expect(ended.shownLock()).toBeNull();
+		expect(ended.context.error).toBe(other);
+
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const failed = harness({ reads: [new Error('algod down')] });
+		failed.context.error = other;
+		await failed.call('recheckLock');
+		expect(failed.context.error).toBe(other);
+	});
+
+	test('a successful check after a failed one drops the read-failure message', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [new Error('algod down'), record({ round: BigInt(LAST_VALID) })] });
+		await h.call('recheckLock');
+		expect(h.context.error).toBe(RECHECK_FAILED_MESSAGE);
+		await h.call('recheckLock');
+		expect(h.shownLock()).toMatchObject({ txid: 'OLD' });
+		expect(h.context.error).toBeNull();
+	});
+
+	test('a check that returns after a send started leaves the message alone', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [record({ round: BigInt(LAST_VALID + 1) })] });
+		h.context.error = KEYREG_LOCKED_MESSAGE;
+		const check = h.call('recheckLock');
+		// A form send starts while the read is in flight.
+		h.context.transactionStatus = 'building';
+		await check;
+		expect(h.context.error).toBe(KEYREG_LOCKED_MESSAGE);
 	});
 
 	test('checking again does nothing while a transaction is in progress', async () => {
