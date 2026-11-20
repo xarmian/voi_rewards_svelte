@@ -250,6 +250,8 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
+		transactionStatus = 'building';
 		// The mount-time check may be stale; never send the 2 VOI without a fresh capable read.
 		if (payIncentiveFee) {
 			const fresh = await contractIncentiveOf(
@@ -261,12 +263,12 @@
 				payIncentiveFee = false;
 				error =
 					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
+				transactionStatus = 'idle';
 				return;
 			}
 		}
 
 		try {
-			transactionStatus = 'building';
 			const ctcInfo = Number(contractId);
 
 			const schema = {

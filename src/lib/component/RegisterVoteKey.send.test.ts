@@ -237,6 +237,26 @@ test.each(['incapable', 'unverified'])(
 	}
 );
 
+test('the submit button is blocked while the fresh check runs, so a second click cannot send twice', async () => {
+	const harness = stakingSendHarness('registerStakingContractVoteKey', {
+		payIncentiveFee: true,
+		contractCanPay: true
+	});
+	let resolveCheck: (value: string) => void = () => {};
+	harness.contractIncentiveOf.mockReturnValueOnce(
+		new Promise((resolve) => {
+			resolveCheck = resolve;
+		})
+	);
+	const running = harness.run();
+	await Promise.resolve();
+	expect(harness.contractIncentiveOf).toHaveBeenCalledOnce();
+	expect(harness.context.transactionStatus).toBe('building');
+	resolveCheck('capable');
+	await running;
+	expect(harness.context.transactionStatus).toBe('success');
+});
+
 test('an opted-in registration re-checks the program once and pays 2 VOI when still capable', async () => {
 	const harness = stakingSendHarness('registerStakingContractVoteKey', {
 		payIncentiveFee: true,
