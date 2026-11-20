@@ -14,13 +14,16 @@ import {
 	keyregAccount,
 	keyregFee,
 	keyregSubmitError,
+	EXPIRING_SOON_SECONDS,
 	mayHaveLanded,
+	onChainKeyregOffer,
 	parseKeyregInput,
 	participatePayment,
 	programHash,
 	KeyregUnconfirmedError,
 	sendWalletKeyreg
 } from './keyreg';
+import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
 
 const address = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 const voteBytes = Buffer.from(Array.from({ length: 32 }, (_, i) => 255 - i));
@@ -643,5 +646,106 @@ describe('sendWalletKeyreg with the library submission error', () => {
 			]
 		});
 		expect(mayHaveLanded(error)).toBe(true);
+	});
+});
+
+describe('onChainKeyregOffer', () => {
+	const round = 5_000_000;
+	const onChain = (
+		changes: Record<string, unknown> = {},
+		participation: Record<string, unknown> = {}
+	) => ({
+		status: 'Online',
+		incentiveEligible: false,
+		round: BigInt(round),
+		participation: {
+			voteParticipationKey: new Uint8Array(voteBytes),
+			selectionParticipationKey: new Uint8Array(selectionBytes),
+			stateProofKey: new Uint8Array(stateProofBytes),
+			voteFirstValid: BigInt(keys.firstRound),
+			voteLastValid: BigInt(keys.lastRound),
+			voteKeyDilution: BigInt(keys.keyDilution),
+			...participation
+		},
+		...changes
+	});
+	const account = { isStakingContract: false, contractIncentive: 'checking' as const };
+	const offer = (
+		input: ReturnType<typeof onChain>,
+		opts: Parameters<typeof onChainKeyregOffer>[2] = account
+	) => onChainKeyregOffer(address, input, opts);
+
+	it('offers the on-chain keys as the form holds them', () => {
+		expect(offer(onChain())).toEqual({
+			kind: 'offer',
+			keys: { ...keys, parentAddress: address },
+			roundsLeft: keys.lastRound - round,
+			expiringSoon: false
+		});
+		expect(keys.votingKey).toMatch(/=$/);
+		expect(keys.stateProofKey).toMatch(/==$/);
+	});
+
+	it('accepts plain numbers as well as bigints', () => {
+		const result = offer(
+			onChain(
+				{ round },
+				{
+					voteFirstValid: keys.firstRound,
+					voteLastValid: keys.lastRound,
+					voteKeyDilution: keys.keyDilution
+				}
+			)
+		);
+		expect(result).toEqual(offer(onChain()));
+	});
+
+	it.each([
+		['offline', onChain({ status: 'Offline' })],
+		['not participating', onChain({ status: 'NotParticipating' })],
+		['already eligible', onChain({ incentiveEligible: true })],
+		['no participation', onChain({ participation: undefined })],
+		['no state proof key', onChain({}, { stateProofKey: undefined })],
+		['an empty state proof key', onChain({}, { stateProofKey: new Uint8Array(0) })],
+		['a short voting key', onChain({}, { voteParticipationKey: new Uint8Array(31) })],
+		['expired keys', onChain({ round: BigInt(keys.lastRound + 1) })],
+		['zero key dilution', onChain({}, { voteKeyDilution: 0n })],
+		['an unsafe last round', onChain({}, { voteLastValid: 2n ** 53n })],
+		['an unsafe first round', onChain({}, { voteFirstValid: 2n ** 60n })],
+		['an unsafe key dilution', onChain({}, { voteKeyDilution: 2n ** 64n - 1n })],
+		['an unsafe round', onChain({ round: 2n ** 53n + 1n })]
+	])('offers nothing for %s', (_, input) => {
+		expect(offer(input)).toEqual({ kind: 'none' });
+	});
+
+	it('offers keys that end this round', () => {
+		const result = offer(onChain({ round: BigInt(keys.lastRound) }));
+		expect(result).toMatchObject({ kind: 'offer', roundsLeft: 0, expiringSoon: true });
+	});
+
+	it.each(['checking', 'incapable', 'unverified'] as const)(
+		'offers nothing to a staking contract that is %s',
+		(contractIncentive) => {
+			expect(offer(onChain(), { isStakingContract: true, contractIncentive })).toEqual({
+				kind: 'none'
+			});
+		}
+	);
+
+	it('offers a capable staking contract its keys', () => {
+		expect(
+			offer(onChain(), { isStakingContract: true, contractIncentive: 'capable' })
+		).toMatchObject({ kind: 'offer', keys: { ...keys, parentAddress: address } });
+	});
+
+	it('marks keys ending within 30 days at the fallback block time as expiring soon', () => {
+		expect(EXPIRING_SOON_SECONDS).toBe(30 * 24 * 60 * 60);
+		const boundary = EXPIRING_SOON_SECONDS / FALLBACK_BLOCK_TIME;
+		const under = Math.floor(boundary);
+		const over = Math.ceil(boundary);
+		expect(under).toBeLessThan(boundary);
+		const at = (left: number) => offer(onChain({ round: BigInt(keys.lastRound - left) }));
+		expect(at(under)).toMatchObject({ roundsLeft: under, expiringSoon: true });
+		expect(at(over)).toMatchObject({ roundsLeft: over, expiringSoon: false });
 	});
 });
