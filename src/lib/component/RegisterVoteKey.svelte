@@ -4,7 +4,6 @@
 		signerMatchesAccount,
 		wrongSignerMessage
 	} from '$lib/chain/signerGate';
-	import { fade } from 'svelte/transition';
 	import Modal from './ui/Modal.svelte';
 	import {
 		signAndSendTransactions,
@@ -34,10 +33,8 @@
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
-	import { goto } from '$app/navigation';
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 
-	const dispatch = createEventDispatcher();
 	$: accountState = pageAccountState(pageAddress, $connectedWallets);
 	$: canSignTransactions = accountState.state === 'yours';
 
@@ -518,9 +515,6 @@
 		return `${address.slice(0, 4)}...${address.slice(-4)}`;
 	}
 
-	function handleGenerateKey() {
-		handlePasteAll();
-	}
 	function sanitizeNumberInput(event, setter) {
 		const cleaned = event.target.value.replace(/,/g, '');
 		setter(cleaned);
