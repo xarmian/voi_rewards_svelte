@@ -71,8 +71,8 @@
 	{/if}
 	{#if unconfirmed}
 		<p class="mt-3 text-sm text-amber-700 dark:text-amber-300">
-			Your last re-registration may have gone through. Check the transaction in the explorer before
-			trying again.
+			An earlier registration for this account may still go through. Check the transaction in the
+			explorer before trying again.
 			<a
 				href={`https://block.voi.network/explorer/transaction/${unconfirmed.txid}`}
 				class="underline text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"

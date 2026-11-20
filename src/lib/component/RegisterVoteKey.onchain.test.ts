@@ -590,7 +590,7 @@ describe('the one-click while a keyreg may still land', () => {
 			}
 		}).body.replace(/\s+/g, ' ');
 		expect(body).not.toContain('<button');
-		expect(body).toContain('may have gone through');
+		expect(body).toContain('may still go through');
 		expect(body).toContain(`href="https://block.voi.network/explorer/transaction/${txid}"`);
 
 		await reopened.run();
@@ -757,7 +757,7 @@ describe('the eligibility panel', () => {
 		const body = html({ unconfirmed: { txid: 'TXID123' } });
 		expect(body).not.toContain('<button');
 		expect(body).toContain(
-			'Your last re-registration may have gone through. Check the transaction in the explorer before trying again.'
+			'An earlier registration for this account may still go through. Check the transaction in the explorer before trying again.'
 		);
 		expect(body).toContain('href="https://block.voi.network/explorer/transaction/TXID123"');
 	});
