@@ -15,10 +15,11 @@
 	import { algodClient } from '$lib/utils/algod';
 	import {
 		buildWalletKeyregTxn,
+		contractIncentiveOf,
 		contractKeyregCost,
+		type ContractIncentive,
 		incentiveFromUri,
 		incentiveKeyregFee,
-		isIncentiveCapableProgram,
 		keyregAccount,
 		keyregFee as walletKeyregFee,
 		isKeyregUri,
@@ -27,7 +28,6 @@
 		MIN_KEYREG_FEE,
 		parseKeyregInput,
 		participatePayment,
-		programHash,
 		sendWalletKeyreg
 	} from '$lib/chain/keyreg';
 	import { abi, CONTRACT } from 'ulujs';
@@ -70,10 +70,13 @@
 	// to use the participate payment as the inner keyreg fee; anything else fails closed.
 	let payIncentiveFee = false;
 	// Staking contracts only: whether the on-chain program is known incentive capable.
-	let contractIncentive: 'checking' | 'capable' | 'incapable' = 'checking';
+	let contractIncentive: ContractIncentive = 'checking';
 	$: contractCanPay = isStakingContract && contractIncentive === 'capable';
 	$: accountCannotPay = isStakingContract && !contractCanPay;
-	$: if (contractIncentive === 'incapable') payIncentiveFee = false;
+	$: if (contractIncentive === 'incapable' || contractIncentive === 'unverified')
+		payIncentiveFee = false;
+	// The fee the last successful paste asked for: the URI's fee, or null for partkeyinfo.
+	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
 	// From algod; eligibility survives later keyregs and going offline, but not suspension.
@@ -89,17 +92,12 @@
 			console.error('Error loading transaction params:', err);
 		}
 		if (isStakingContract) {
-			try {
-				const app = await algodClient.getApplicationByID(Number(contractId)).do();
-				const program = app.params?.approvalProgram;
-				if (!program) throw new Error('Application has no approval program');
-				contractIncentive = isIncentiveCapableProgram(await programHash(program))
-					? 'capable'
-					: 'incapable';
-			} catch (err) {
-				console.error('Error checking staking contract program:', err);
-				contractIncentive = 'incapable';
-			}
+			contractIncentive = await contractIncentiveOf(
+				async () =>
+					(await algodClient.getApplicationByID(Number(contractId)).do()).params?.approvalProgram
+			);
+			// A URI pasted while the check ran gets its fee applied now.
+			applyPastedIncentive();
 		}
 		try {
 			// The keyreg account: the contract's application address for a staking contract.
@@ -141,14 +139,8 @@
 				selectionKey = parsed.selectionKey;
 				votingKey = parsed.votingKey;
 				stateProofKey = parsed.stateProofKey;
-				// Only a URI that carries a fee sets the opt-in; partkeyinfo leaves the user's choice.
-				if (result.fee !== null) {
-					payIncentiveFee = incentiveFromUri(result.fee, accountCannotPay);
-				}
-				incentiveNotice =
-					accountCannotPay && incentiveFromUri(result.fee, false)
-						? 'This URI asks for the 2 VOI incentive fee, which this staking contract cannot pay. It will register with the normal fee.'
-						: null;
+				pastedUriFee = result.fee;
+				applyPastedIncentive();
 				keyregPasteAccount = isKeyregUri(text) ? account : null;
 
 				// partkeyinfo only (a URI for another account is rejected above)
@@ -165,6 +157,30 @@
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	// Applies the pasted URI's fee to the opt-in. Only a URI that carries a fee sets it;
+	// partkeyinfo leaves the user's choice. While a staking contract's program is still being
+	// checked nothing changes yet: the mount-time check calls this again once it resolves.
+	function applyPastedIncentive() {
+		const asksForFee = pastedUriFee !== null && incentiveFromUri(pastedUriFee, false);
+		if (isStakingContract && contractIncentive === 'checking') {
+			incentiveNotice = asksForFee
+				? 'This URI asks for the 2 VOI incentive fee. The fee choice will apply once the contract is checked.'
+				: null;
+			return;
+		}
+		// Not the reactive accountCannotPay: it lags a contractIncentive set in the same tick.
+		const cannotPay = isStakingContract && contractIncentive !== 'capable';
+		if (pastedUriFee !== null) {
+			payIncentiveFee = incentiveFromUri(pastedUriFee, cannotPay);
+		}
+		incentiveNotice =
+			cannotPay && asksForFee
+				? contractIncentive === 'unverified'
+					? "This URI asks for the 2 VOI incentive fee, but this contract's version couldn't be verified to pay it. It will register with the normal fee."
+					: 'This URI asks for the 2 VOI incentive fee, which this staking contract cannot pay. It will register with the normal fee.'
+				: null;
 	}
 
 	async function handleSubmit() {
@@ -233,6 +249,20 @@
 		if (!signerMatchesAccount(signer, parentWalletAddress)) {
 			error = wrongSignerMessage();
 			return;
+		}
+		// The mount-time check may be stale; never send the 2 VOI without a fresh capable read.
+		if (payIncentiveFee) {
+			const fresh = await contractIncentiveOf(
+				async () =>
+					(await algodClient.getApplicationByID(Number(contractId)).do()).params?.approvalProgram
+			);
+			if (fresh !== 'capable') {
+				contractIncentive = fresh;
+				payIncentiveFee = false;
+				error =
+					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
+				return;
+			}
 		}
 
 		try {
@@ -762,6 +792,9 @@
 				<p id="incentive-fee-help" class="mt-1 ml-7 text-xs text-gray-600 dark:text-gray-400">
 					{#if isStakingContract && contractIncentive === 'checking'}
 						Checking whether this contract can pay the incentive fee…
+					{:else if isStakingContract && contractIncentive === 'unverified'}
+						Couldn't verify this contract's version, so it registers keys with the normal 0.001 VOI
+						fee.
 					{:else if isStakingContract && !contractCanPay}
 						Not available for this staking contract: this contract's version registers keys with the
 						normal 0.001 VOI fee.
