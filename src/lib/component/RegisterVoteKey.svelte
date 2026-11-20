@@ -18,6 +18,7 @@
 		contractIncentiveOf,
 		contractKeyregCost,
 		type ContractIncentive,
+		INCENTIVE_KEYREG_FEE,
 		incentiveFromUri,
 		incentiveKeyregFee,
 		keyregAccount,
@@ -26,6 +27,10 @@
 		keyregSendFailure,
 		keyregSubmitError,
 		MIN_KEYREG_FEE,
+		onChainKeyregOffer,
+		type OnChainAccount,
+		type OnChainKeyregOffer,
+		type ParsedKeys,
 		parseKeyregInput,
 		participatePayment,
 		sendWalletKeyreg
@@ -33,6 +38,7 @@
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
+	import OnChainEligibilityPanel from './OnChainEligibilityPanel.svelte';
 	import { onMount } from 'svelte';
 
 	$: accountState = pageAccountState(pageAddress, $connectedWallets);
@@ -79,8 +85,16 @@
 	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
-	// From algod; eligibility survives later keyregs and going offline, but not suspension.
-	let alreadyEligible = false;
+	// The keyreg account's record from algod at mount, for display only: the one-click
+	// re-registration reads the account again at the click.
+	let accountRecord: OnChainAccount | null = null;
+	// Eligibility survives later keyregs and going offline, but not suspension.
+	$: alreadyEligible = accountRecord?.incentiveEligible === true;
+	const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
+	$: onChainOffer =
+		accountRecord === null
+			? NO_OFFER
+			: onChainKeyregOffer(currentAccount, accountRecord, { isStakingContract, contractIncentive });
 	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
 	let minFee = MIN_KEYREG_FEE;
 
@@ -101,8 +115,7 @@
 		}
 		try {
 			// The keyreg account: the contract's application address for a staking contract.
-			const info = await algodClient.accountInformation(currentAccount).exclude('all').do();
-			alreadyEligible = info.incentiveEligible === true;
+			accountRecord = await algodClient.accountInformation(currentAccount).exclude('all').do();
 		} catch (err) {
 			console.error('Error loading account eligibility:', err);
 		}
@@ -239,7 +252,8 @@
 		}
 	}
 
-	async function registerStakingContractVoteKey() {
+	// fixed.onChainKeys: keys read from chain by registerOnChainKeys, sent instead of the form.
+	async function registerStakingContractVoteKey(fixed: { onChainKeys?: ParsedKeys } | null = null) {
 		console.log('Registering staking contract vote key');
 		const signer = signerOrError();
 		if (!signer) return;
@@ -259,13 +273,21 @@
 		const payment = participatePayment(payIncentiveFee, contractCanPay);
 		// The keys on screen at the click, for the same reason: a paste or edit during the awaits
 		// below must not change what is registered.
+		const entered = fixed?.onChainKeys ?? {
+			votingKey,
+			selectionKey,
+			stateProofKey,
+			firstRound,
+			lastRound,
+			keyDilution
+		};
 		const keys = {
-			votingKey: new Uint8Array(Buffer.from(votingKey, 'base64')),
-			selectionKey: new Uint8Array(Buffer.from(selectionKey, 'base64')),
-			firstRound: Number(firstRound),
-			lastRound: Number(lastRound),
-			keyDilution: Number(keyDilution),
-			stateProofKey: new Uint8Array(Buffer.from(stateProofKey, 'base64'))
+			votingKey: new Uint8Array(Buffer.from(entered.votingKey, 'base64')),
+			selectionKey: new Uint8Array(Buffer.from(entered.selectionKey, 'base64')),
+			firstRound: Number(entered.firstRound),
+			lastRound: Number(entered.lastRound),
+			keyDilution: Number(entered.keyDilution),
+			stateProofKey: new Uint8Array(Buffer.from(entered.stateProofKey, 'base64'))
 		};
 		// The mount-time check may be stale; never send the 2 VOI without a fresh capable read.
 		// (An upgrade between this read and confirmation cannot be caught from the client.)
@@ -380,23 +402,34 @@
 		}
 	}
 
-	async function registerWalletVoteKey() {
+	// fixed.onChainKeys: keys read from chain by registerOnChainKeys, sent instead of the form.
+	async function registerWalletVoteKey(fixed: { onChainKeys?: ParsedKeys } | null = null) {
 		const signer = signerOrError();
 		if (!signer) return;
 		try {
 			transactionStatus = 'building';
-			const params = await algodClient.getTransactionParams().do();
-
-			const tx = buildWalletKeyregTxn({
-				params,
-				sender: walletAddress,
+			// The keys and fee at the click: an edit during the await below must not change them.
+			const keys = fixed?.onChainKeys ?? {
 				votingKey,
 				selectionKey,
 				stateProofKey,
 				firstRound: Number(firstRound),
 				lastRound: Number(lastRound),
-				keyDilution: Number(keyDilution),
-				fee: incentiveKeyregFee(payIncentiveFee)
+				keyDilution: Number(keyDilution)
+			};
+			const fee = incentiveKeyregFee(payIncentiveFee);
+			const params = await algodClient.getTransactionParams().do();
+
+			const tx = buildWalletKeyregTxn({
+				params,
+				sender: walletAddress,
+				votingKey: keys.votingKey,
+				selectionKey: keys.selectionKey,
+				stateProofKey: keys.stateProofKey,
+				firstRound: keys.firstRound,
+				lastRound: keys.lastRound,
+				keyDilution: keys.keyDilution,
+				fee
 			});
 
 			transactionStatus = 'signing';
@@ -416,6 +449,60 @@
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
 			transactionStatus = 'idle';
 		}
+	}
+
+	// One click for an account online without the incentive fee: re-register the keys on chain,
+	// read fresh now (never the mount record), with the 2 VOI fee. Same keys, so no offline gap.
+	async function registerOnChainKeys() {
+		if (transactionStatus !== 'idle' || isLoading) return;
+		error = null;
+		if (!canSignTransactions || pageAddress !== (parentWalletAddress ?? walletAddress)) {
+			error = wrongSignerMessage();
+			return;
+		}
+		// Leave 'idle' before the first await, so a second click cannot start a second registration.
+		transactionStatus = 'building';
+		const account = currentAccount;
+		let offer: OnChainKeyregOffer;
+		try {
+			const info = await algodClient.accountInformation(account).exclude('all').do();
+			offer = onChainKeyregOffer(account, info, { isStakingContract, contractIncentive });
+		} catch (err) {
+			console.error('Error reading the account registration:', err);
+			error =
+				"Couldn't read this account's registration from the network, so nothing was sent. Try again.";
+			transactionStatus = 'idle';
+			return;
+		}
+		// contractCanPay decides the participate payment, so it must agree with the offer.
+		if (
+			offer.kind !== 'offer' ||
+			account !== currentAccount ||
+			(isStakingContract && !contractCanPay)
+		) {
+			error =
+				'These keys can no longer be made eligible (the account may already be eligible, be offline, or its keys may have expired or changed), so nothing was sent.';
+			transactionStatus = 'idle';
+			return;
+		}
+		const keys = offer.keys;
+		firstRound = String(keys.firstRound);
+		lastRound = String(keys.lastRound);
+		keyDilution = String(keys.keyDilution);
+		selectionKey = keys.selectionKey;
+		votingKey = keys.votingKey;
+		stateProofKey = keys.stateProofKey;
+		payIncentiveFee = true;
+		keyregPasteAccount = null;
+		pastedUriFee = null;
+		incentiveNotice = null;
+		if (parentWalletAddress === null) {
+			await registerWalletVoteKey({ onChainKeys: keys });
+		} else {
+			await registerStakingContractVoteKey({ onChainKeys: keys });
+		}
+		// A registration refused before it started building (the signer checks) leaves 'building'.
+		if (transactionStatus === 'building') transactionStatus = 'idle';
 	}
 
 	async function goOfflineWalletVoteKey() {
@@ -607,6 +694,18 @@
 			<i class="fas fa-exclamation-triangle"></i>
 			<span>{error}</span>
 		</div>
+	{/if}
+
+	{#if onChainOffer.kind === 'offer' && transactionStatus !== 'success'}
+		<OnChainEligibilityPanel
+			offer={onChainOffer}
+			cost={isStakingContract
+				? contractKeyregCost(INCENTIVE_KEYREG_FEE) / 1e6
+				: walletKeyregFee(INCENTIVE_KEYREG_FEE, minFee) / 1e6}
+			canRegister={canSignTransactions && pageAddress === (parentWalletAddress ?? walletAddress)}
+			disabled={transactionStatus !== 'idle' || isLoading}
+			onRegister={registerOnChainKeys}
+		/>
 	{/if}
 
 	<div class="space-y-8">

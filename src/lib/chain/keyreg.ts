@@ -1,4 +1,5 @@
 import * as algosdk from 'algosdk';
+import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
 
 // Keyreg input parsing and plain-account keyreg construction (TASK-67).
 // Accepts `goal account partkeyinfo` output or an ARC-90 keyreg URI, as emitted by
@@ -222,6 +223,86 @@ function base64UrlKey(value: string, bytes: number): string | null {
 	const decoded = Buffer.from(padded, 'base64');
 	if (decoded.length !== bytes || decoded.toString('base64') !== padded) return null;
 	return padded;
+}
+
+// Keys ending sooner than this (at the fallback block time) make a 2 VOI re-registration a poor deal.
+export const EXPIRING_SOON_SECONDS = 30 * 24 * 60 * 60;
+
+type Whole = number | bigint;
+
+// The fields of algod's account record the on-chain offer reads.
+export interface OnChainAccount {
+	status?: string;
+	incentiveEligible?: boolean;
+	round?: Whole;
+	participation?: {
+		voteParticipationKey?: Uint8Array;
+		selectionParticipationKey?: Uint8Array;
+		stateProofKey?: Uint8Array;
+		voteFirstValid?: Whole;
+		voteLastValid?: Whole;
+		voteKeyDilution?: Whole;
+	};
+}
+
+export type OnChainKeyregOffer =
+	| { kind: 'none' }
+	| { kind: 'offer'; keys: ParsedKeys; roundsLeft: number; expiringSoon: boolean };
+
+const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
+
+// An account online without the go-online fee can become incentive eligible by re-registering the
+// keys already on chain with the 2 VOI fee: the same keys keep it online with no gap. No offer for
+// an account that is offline, already eligible, or has keys that are expired, incomplete or out of
+// range, nor for a staking contract not known to pay the fee (including while that is checked).
+export function onChainKeyregOffer(
+	address: string,
+	account: OnChainAccount,
+	opts: { isStakingContract: boolean; contractIncentive: ContractIncentive }
+): OnChainKeyregOffer {
+	if (opts.isStakingContract && opts.contractIncentive !== 'capable') return NO_OFFER;
+	if (account.status !== 'Online' || account.incentiveEligible === true) return NO_OFFER;
+	const part = account.participation;
+	if (!part) return NO_OFFER;
+	const votingKey = keyBase64(part.voteParticipationKey, 32);
+	const selectionKey = keyBase64(part.selectionParticipationKey, 32);
+	const stateProofKey = keyBase64(part.stateProofKey, 64);
+	if (votingKey === null || selectionKey === null || stateProofKey === null) return NO_OFFER;
+	const round = safeWhole(account.round);
+	const firstRound = safeWhole(part.voteFirstValid);
+	const lastRound = safeWhole(part.voteLastValid);
+	const keyDilution = safeWhole(part.voteKeyDilution);
+	if (round === null || firstRound === null || lastRound === null || keyDilution === null) {
+		return NO_OFFER;
+	}
+	if (keyDilution === 0 || lastRound < firstRound || lastRound < round) return NO_OFFER;
+	const roundsLeft = lastRound - round;
+	return {
+		kind: 'offer',
+		keys: {
+			parentAddress: address,
+			firstRound,
+			lastRound,
+			keyDilution,
+			selectionKey,
+			votingKey,
+			stateProofKey
+		},
+		roundsLeft,
+		expiringSoon: roundsLeft * FALLBACK_BLOCK_TIME < EXPIRING_SOON_SECONDS
+	};
+}
+
+function safeWhole(value: Whole | undefined): number | null {
+	if (value === undefined) return null;
+	const n = Number(value);
+	return Number.isSafeInteger(n) && n >= 0 ? n : null;
+}
+
+// Raw key bytes -> the padded standard base64 partkeyinfo prints, or null unless exactly `bytes`.
+function keyBase64(key: Uint8Array | undefined, bytes: number): string | null {
+	if (!key || key.length !== bytes) return null;
+	return Buffer.from(key).toString('base64');
 }
 
 type KeyregParams = Omit<algosdk.SuggestedParams, 'minFee'> & { minFee?: number | bigint };
