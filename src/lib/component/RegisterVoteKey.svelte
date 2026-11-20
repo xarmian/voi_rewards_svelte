@@ -250,8 +250,9 @@
 	}
 
 	// Applies the pasted URI's fee to the opt-in. A URI fee can select the opt-in but never
-	// clears the user's choice: a minimum-fee URI, like partkeyinfo, leaves it as it is. While a staking contract's program is still being
-	// checked nothing changes yet: the mount-time check calls this again once it resolves.
+	// clears the user's choice: a minimum-fee URI, like partkeyinfo, leaves it as it is. While a
+	// staking contract's program is still being checked nothing changes yet: the mount-time check
+	// calls this again once it resolves.
 	function applyPastedIncentive() {
 		const asksForFee = pastedUriFee !== null && incentiveFromUri(pastedUriFee, false);
 		if (isStakingContract && contractIncentive === 'checking') {
