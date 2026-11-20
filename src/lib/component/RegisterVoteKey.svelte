@@ -35,6 +35,11 @@
 		participatePayment,
 		sendWalletKeyreg
 	} from '$lib/chain/keyreg';
+	import { activeKeyregLock, lockKeyreg, type KeyregLock } from '$lib/chain/keyregLock';
+	import {
+		BLOCK_REWARD_MAX_MICROVOI,
+		BLOCK_REWARD_MIN_MICROVOI
+	} from '$lib/rewards/blockRewardConstants';
 	import { abi, CONTRACT } from 'ulujs';
 	import VoiSwarmInstructions from './node-instructions/VoiSwarmInstructions.svelte';
 	import FuncInstructions from './node-instructions/FuncInstructions.svelte';
@@ -97,9 +102,10 @@
 		isStakingContract,
 		contractIncentive
 	);
-	// Set when a one-click send failed after the wallet was asked to sign: it may have landed, so
-	// the one-click is not offered again in this modal session (the txid, when known, is linked).
-	let onChainUnconfirmed: { txid: string | null } | null = null;
+	// A keyreg that may still land (see keyregLock), as last read or set here: while it is active
+	// the one-click sends nothing and the panel links it instead of the button.
+	let shownLock: KeyregLock | null = null;
+	const BALANCE_RANGE = { min: BLOCK_REWARD_MIN_MICROVOI, max: BLOCK_REWARD_MAX_MICROVOI };
 
 	// The offer the panel shows: none for a record read for another account than the current one.
 	function displayedOffer(
@@ -109,13 +115,20 @@
 		contractIncentive: ContractIncentive
 	): OnChainKeyregOffer {
 		if (record === null || record.account !== account) return NO_OFFER;
-		return onChainKeyregOffer(account, record.info, { isStakingContract, contractIncentive });
+		return onChainKeyregOffer(account, record.info, {
+			isStakingContract,
+			contractIncentive,
+			balanceRange: BALANCE_RANGE
+		});
+	}
+
+	// The lock the panel shows: none for a lock on another account than the current one.
+	function displayedLock(lock: KeyregLock | null, account: string): KeyregLock | null {
+		return lock !== null && lock.account === account ? lock : null;
 	}
 
 	// What the one-click sends instead of the form: the keys read from chain and the 2 VOI choice.
 	type FixedSend = { onChainKeys: ParsedKeys; payIncentiveFee: boolean };
-	// A send that failed after the wallet was asked to sign, so it may have landed; null otherwise.
-	type UncertainSend = { txid: string | null } | null;
 	// Network minimum fee, for the cost line; 1000 until params load or if they fail.
 	let minFee = MIN_KEYREG_FEE;
 
@@ -134,6 +147,11 @@
 			// A URI pasted while the check ran gets its fee applied now.
 			applyPastedIncentive();
 		}
+		await loadAccountRecord();
+	});
+
+	// The keyreg account's record for the offer, and any lock on it at the record's round.
+	async function loadAccountRecord() {
 		try {
 			// The keyreg account: the contract's application address for a staking contract.
 			const account = currentAccount;
@@ -141,10 +159,11 @@
 				account,
 				info: await algodClient.accountInformation(account).exclude('all').do()
 			};
+			shownLock = activeKeyregLock(account, accountRecord.info.round);
 		} catch (err) {
 			console.error('Error loading account eligibility:', err);
 		}
-	});
+	}
 
 	const nodeInstructions = {
 		'voi-swarm': {
@@ -278,21 +297,21 @@
 	}
 
 	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
-	async function registerStakingContractVoteKey(
-		fixed: FixedSend | null = null
-	): Promise<UncertainSend> {
+	async function registerStakingContractVoteKey(fixed: FixedSend | null = null) {
 		console.log('Registering staking contract vote key');
 		const signer = signerOrError();
-		if (!signer) return null;
+		if (!signer) return;
 
 		if (!parentWalletAddress || !contractId) {
 			error = 'Missing parent wallet address or contract ID';
-			return null;
+			return;
 		}
 		if (!signerMatchesAccount(signer, parentWalletAddress)) {
 			error = wrongSignerMessage();
-			return null;
+			return;
 		}
+		// The keyreg account (the contract's application address), for the lock.
+		const account = currentAccount;
 		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
 		transactionStatus = 'building';
 		// Fixed at the click: a paste, or the mount-time check resolving during the awaits below,
@@ -334,11 +353,12 @@
 				error =
 					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
 				transactionStatus = 'idle';
-				return null;
+				return;
 			}
 		}
 
-		let sentTxid: string | null = null;
+		// The participate app call, once built: its last valid round ends the lock.
+		let sent: algosdk.Transaction | null = null;
 		try {
 			const ctcInfo = Number(contractId);
 
@@ -409,7 +429,7 @@
 			);
 
 			const txid = txns[1].txID();
-			sentTxid = txid;
+			sent = txns[1];
 
 			transactionStatus = 'submitting';
 
@@ -424,26 +444,28 @@
 				transactionStatus = 'success';
 				transactionId = txid;
 				onSuccess?.(true);
-				return null;
+			} else {
+				// No result says neither that it was sent nor that it wasn't: it may land.
+				shownLock = lockKeyreg(account, txid, sent.lastValid);
+				error = 'Failed to register vote key';
+				transactionStatus = 'idle';
 			}
-			error = 'Failed to register vote key';
-			transactionStatus = 'idle';
-			return { txid };
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
-			// Failed after the wallet was asked to sign: it may have landed.
-			const uncertain = transactionStatus !== 'building';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(account, sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
-			return uncertain ? { txid: sentTxid } : null;
 		}
 	}
 
 	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
-	async function registerWalletVoteKey(fixed: FixedSend | null = null): Promise<UncertainSend> {
+	async function registerWalletVoteKey(fixed: FixedSend | null = null) {
 		const signer = signerOrError();
-		if (!signer) return null;
-		let sentTxid: string | null = null;
+		if (!signer) return;
+		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			// The keys and fee at the click: an edit during the await below must not change them.
@@ -469,7 +491,7 @@
 				keyDilution: keys.keyDilution,
 				fee
 			});
-			sentTxid = tx.txID();
+			sent = tx;
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
@@ -483,21 +505,21 @@
 			transactionId = txid;
 			transactionStatus = 'success';
 			onSuccess?.(true);
-			return null;
 		} catch (err) {
 			console.error('Error registering vote key:', err);
 			error = err instanceof Error ? err.message : 'Failed to register vote key';
-			// Failed after the wallet was asked to sign: it may have landed.
-			const uncertain = transactionStatus !== 'building';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(sent.sender.toString(), sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
-			return uncertain ? { txid: sentTxid } : null;
 		}
 	}
 
 	// One click for an account online without the incentive fee: re-register the keys on chain,
 	// read fresh now (never the mount record), with the 2 VOI fee. Same keys, so no offline gap.
 	async function registerOnChainKeys() {
-		if (transactionStatus !== 'idle' || isLoading || onChainUnconfirmed !== null) return;
+		if (transactionStatus !== 'idle' || isLoading) return;
 		error = null;
 		if (!canSignTransactions || pageAddress !== (parentWalletAddress ?? walletAddress)) {
 			error = wrongSignerMessage();
@@ -507,15 +529,29 @@
 		transactionStatus = 'building';
 		const account = currentAccount;
 		let offer: OnChainKeyregOffer;
+		let lock: KeyregLock | null;
 		try {
 			const info = await algodClient.accountInformation(account).exclude('all').do();
 			// The panel shows the fresh record: it hides when this is no longer an offer.
 			accountRecord = { account, info };
-			offer = onChainKeyregOffer(account, info, { isStakingContract, contractIncentive });
+			lock = activeKeyregLock(account, info.round);
+			shownLock = lock;
+			offer = onChainKeyregOffer(account, info, {
+				isStakingContract,
+				contractIncentive,
+				balanceRange: BALANCE_RANGE
+			});
 		} catch (err) {
 			console.error('Error reading the account registration:', err);
 			error =
 				"Couldn't read this account's registration from the network, so nothing was sent. Try again.";
+			transactionStatus = 'idle';
+			return;
+		}
+		// An earlier keyreg for this account may still land: a second could register twice.
+		if (lock !== null) {
+			error =
+				'An earlier registration for this account may still go through, so nothing was sent. Check it in the explorer before trying again.';
 			transactionStatus = 'idle';
 			return;
 		}
@@ -532,11 +568,8 @@
 		}
 		// The form is left as it is: everything sent comes from here.
 		const fixed: FixedSend = { onChainKeys: offer.keys, payIncentiveFee: true };
-		const uncertain =
-			parentWalletAddress === null
-				? await registerWalletVoteKey(fixed)
-				: await registerStakingContractVoteKey(fixed);
-		if (uncertain !== null) onChainUnconfirmed = uncertain;
+		if (parentWalletAddress === null) await registerWalletVoteKey(fixed);
+		else await registerStakingContractVoteKey(fixed);
 		// A registration refused before it started building (the signer checks) leaves 'building'.
 		if (transactionStatus === 'building') transactionStatus = 'idle';
 	}
@@ -545,12 +578,14 @@
 		error = null;
 		const signer = signerOrError();
 		if (!signer) return;
+		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
 
 			// Going offline is a key registration with no keys (never nonParticipation; see TASK-78)
 			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
+			sent = tx;
 
 			transactionStatus = 'signing';
 			const txid = await sendWalletKeyreg(tx, {
@@ -567,6 +602,10 @@
 		} catch (err) {
 			console.error('Error going offline:', err);
 			error = err instanceof Error ? err.message : 'Failed to go offline';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(sent.sender.toString(), sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
 		}
 	}
@@ -585,7 +624,11 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// The keyreg account (the contract's application address), for the lock.
+		const account = currentAccount;
 
+		// The participate app call, once built: its last valid round ends the lock.
+		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			const ctcInfo = Number(contractId);
@@ -657,6 +700,7 @@
 			);
 
 			const txid = txns[1].txID();
+			sent = txns[1];
 
 			transactionStatus = 'submitting';
 
@@ -672,12 +716,18 @@
 				transactionId = txid;
 				onSuccess?.(true);
 			} else {
+				// No result says neither that it was sent nor that it wasn't: it may land.
+				shownLock = lockKeyreg(account, txid, sent.lastValid);
 				error = 'Failed to go offline';
 				transactionStatus = 'idle';
 			}
 		} catch (err) {
 			console.error('Error going offline:', err);
 			error = err instanceof Error ? err.message : 'Failed to go offline';
+			// Sent but not confirmed: it may land. By name: the harnesses run this without imports.
+			if ((err as { name?: unknown } | null)?.name === 'KeyregUnconfirmedError' && sent) {
+				shownLock = lockKeyreg(account, sent.txID(), sent.lastValid);
+			}
 			transactionStatus = 'idle';
 		}
 	}
@@ -741,7 +791,7 @@
 			canRegister={canSignTransactions && pageAddress === (parentWalletAddress ?? walletAddress)}
 			disabled={transactionStatus !== 'idle' || isLoading}
 			onRegister={registerOnChainKeys}
-			unconfirmed={onChainUnconfirmed}
+			unconfirmed={displayedLock(shownLock, currentAccount)}
 		/>
 	{/if}
 

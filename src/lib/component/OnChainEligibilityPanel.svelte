@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { OnChainKeyregOffer } from '$lib/chain/keyreg';
 	import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
+	import {
+		BLOCK_REWARD_MAX_MICROVOI,
+		BLOCK_REWARD_MIN_MICROVOI
+	} from '$lib/rewards/blockRewardConstants';
 
 	// Offers an account that is online without the incentive fee a one-click re-registration of
 	// the keys already on chain with the 2 VOI fee. The button runs only where the account can sign.
@@ -19,8 +23,8 @@
 		canRegister: boolean;
 		disabled: boolean;
 		onRegister: () => void;
-		// Set after a one-click send that may have landed: the button is not offered again.
-		unconfirmed?: { txid: string | null } | null;
+		// A keyreg for this account that may still land: the button is not offered until it can't.
+		unconfirmed?: { txid: string } | null;
 		now?: number;
 	} = $props();
 
@@ -29,6 +33,8 @@
 		new Date(now + secondsLeft * 1000).toLocaleDateString(undefined, { dateStyle: 'medium' })
 	);
 	let daysLeft = $derived(Math.round(secondsLeft / 86_400));
+	// The site's VOI formatting for the block reward range, as in the block reward status.
+	const voi = (micro: number) => (micro / 1e6).toLocaleString('en-US');
 </script>
 
 <section
@@ -55,20 +61,26 @@
 			consider generating new keys and registering them with the 2 VOI option below.
 		</p>
 	{/if}
+	{#if !offer.balanceInRange}
+		<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+			This account's balance is outside the {voi(BLOCK_REWARD_MIN_MICROVOI)}–{voi(
+				BLOCK_REWARD_MAX_MICROVOI
+			)} VOI range, so it won't earn real-time block rewards until its balance is in range. The eligibility
+			you pay for now stays.
+		</p>
+	{/if}
 	{#if unconfirmed}
 		<p class="mt-3 text-sm text-amber-700 dark:text-amber-300">
 			Your last re-registration may have gone through. Check the transaction in the explorer before
 			trying again.
-			{#if unconfirmed.txid}
-				<a
-					href={`https://block.voi.network/explorer/transaction/${unconfirmed.txid}`}
-					class="underline text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					View in Explorer
-				</a>
-			{/if}
+			<a
+				href={`https://block.voi.network/explorer/transaction/${unconfirmed.txid}`}
+				class="underline text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				View in Explorer
+			</a>
 		</p>
 	{:else if canRegister}
 		<div class="mt-3 flex justify-end">

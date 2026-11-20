@@ -238,6 +238,7 @@ type Whole = number | bigint;
 export interface OnChainAccount {
 	status?: string;
 	incentiveEligible?: boolean;
+	amount?: Whole;
 	round?: Whole;
 	participation?: {
 		voteParticipationKey?: Uint8Array;
@@ -251,7 +252,14 @@ export interface OnChainAccount {
 
 export type OnChainKeyregOffer =
 	| { kind: 'none' }
-	| { kind: 'offer'; keys: ParsedKeys; roundsLeft: number; expiringSoon: boolean };
+	| {
+			kind: 'offer';
+			keys: ParsedKeys;
+			roundsLeft: number;
+			expiringSoon: boolean;
+			// Eligibility persists, but real-time block rewards are paid only inside the range.
+			balanceInRange: boolean;
+	  };
 
 const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
 
@@ -260,10 +268,16 @@ const NO_OFFER: OnChainKeyregOffer = { kind: 'none' };
 // an account that is offline, already eligible, or has keys that are incomplete, out of range,
 // registered ahead (valid only after the next round) or ending within
 // ONCHAIN_KEYREG_MIN_ROUNDS_LEFT rounds, nor for a staking contract not known to pay the fee (including while that is checked).
+// balanceRange: the block reward balance range in microVOI, passed in because the rewards
+// constants import this module. An unknown balance is not marked out of range.
 export function onChainKeyregOffer(
 	address: string,
 	account: OnChainAccount,
-	opts: { isStakingContract: boolean; contractIncentive: ContractIncentive }
+	opts: {
+		isStakingContract: boolean;
+		contractIncentive: ContractIncentive;
+		balanceRange: { min: number; max: number };
+	}
 ): OnChainKeyregOffer {
 	if (opts.isStakingContract && opts.contractIncentive !== 'capable') return NO_OFFER;
 	if (account.status !== 'Online' || account.incentiveEligible === true) return NO_OFFER;
@@ -295,7 +309,11 @@ export function onChainKeyregOffer(
 			stateProofKey
 		},
 		roundsLeft,
-		expiringSoon: roundsLeft * FALLBACK_BLOCK_TIME < EXPIRING_SOON_SECONDS
+		expiringSoon: roundsLeft * FALLBACK_BLOCK_TIME < EXPIRING_SOON_SECONDS,
+		balanceInRange:
+			account.amount === undefined ||
+			(BigInt(account.amount) >= BigInt(opts.balanceRange.min) &&
+				BigInt(account.amount) <= BigInt(opts.balanceRange.max))
 	};
 }
 
