@@ -150,7 +150,8 @@
 		await loadAccountRecord();
 	});
 
-	// The keyreg account's record for the offer, and any lock on it at the record's round.
+	// The keyreg account's record for the offer, and any lock on it at the record's round. False
+	// when the read failed (the record and lock shown are left as they were).
 	async function loadAccountRecord() {
 		try {
 			// The keyreg account: the contract's application address for a staking contract.
@@ -160,8 +161,10 @@
 				info: await algodClient.accountInformation(account).exclude('all').do()
 			};
 			shownLock = activeKeyregLock(account, accountRecord.info.round);
+			return true;
 		} catch (err) {
 			console.error('Error loading account eligibility:', err);
+			return false;
 		}
 	}
 
@@ -174,7 +177,12 @@
 		if (transactionStatus !== 'idle' || isLoading || rechecking) return;
 		rechecking = true;
 		try {
-			await loadAccountRecord();
+			if (!(await loadAccountRecord())) {
+				error = "Couldn't read this account from the network. Try again.";
+			} else if (displayedLock(shownLock, currentAccount) === null) {
+				// The earlier keyreg can no longer land: a message about it no longer applies.
+				error = null;
+			}
 		} finally {
 			rechecking = false;
 		}
@@ -365,10 +373,13 @@
 				if (fresh === 'incapable') contractIncentive = fresh;
 				// The one-click leaves the form alone.
 				if (!fixed) payIncentiveFee = false;
-				// The one-click does not use the form's fee option, so its message does not point there.
-				error = fixed
-					? "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Try again."
-					: "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
+				// The one-click does not use the form's fee option, so its message does not point there;
+				// an incapable contract loses the offer, so only an unverified read invites a retry.
+				error = !fixed
+					? "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again."
+					: fresh === 'incapable'
+						? "This contract's version can't pay the incentive fee, so nothing was sent."
+						: "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Try again.";
 				transactionStatus = 'idle';
 				return;
 			}

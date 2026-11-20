@@ -338,7 +338,18 @@ describe('re-registering the on-chain keys', () => {
 		expect(h.context.error).toMatch(/nothing was sent/);
 		// The one-click does not use the form's fee option, so its message does not point there.
 		expect(h.context.error).not.toMatch(/fee option/);
+		// An incapable contract loses the offer, so the message does not invite a retry.
+		expect(h.context.error).toMatch(/can't pay the incentive fee/);
+		expect(h.context.error).not.toMatch(/Try again/);
 		expect(h.context.transactionStatus).toBe('idle');
+	});
+
+	test('a contract whose fresh program read cannot be verified invites a retry', async () => {
+		const h = harness({ contract: true, recheck: 'unverified' });
+		await h.run();
+		for (const call of h.sends) expect(call).not.toHaveBeenCalled();
+		expect(h.context.error).toMatch(/could not be confirmed[^]*nothing was sent\. Try again\./);
+		expect(h.context.error).not.toMatch(/fee option/);
 	});
 
 	test.each(['checking', 'incapable', 'unverified'])(
@@ -659,6 +670,38 @@ describe('the one-click while a keyreg may still land', () => {
 		for (const call of h.sends) expect(call).not.toHaveBeenCalled();
 	});
 
+	test('checking again clears the refusal message once the lock has ended', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({
+			reads: [record({ round: BigInt(LAST_VALID) }), record({ round: BigInt(LAST_VALID + 1) })]
+		});
+		await h.run();
+		expect(h.context.error).toMatch(LOCKED);
+		await h.call('recheckLock');
+		expect(h.shownLock()).toBeNull();
+		expect(h.context.error).toBeNull();
+	});
+
+	test('checking again at or before the last valid round keeps the lock and the message', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [record({ round: BigInt(LAST_VALID) })] });
+		await h.run();
+		await h.call('recheckLock');
+		expect(h.shownLock()).toMatchObject({ txid: 'OLD' });
+		expect(h.context.error).toMatch(LOCKED);
+		expect(h.signAndSendTransactions).not.toHaveBeenCalled();
+	});
+
+	test('a check that cannot read the account says so and keeps the lock', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [record({ round: BigInt(LAST_VALID) }), new Error('algod down')] });
+		await h.mount();
+		await h.call('recheckLock');
+		expect(h.shownLock()).toMatchObject({ txid: 'OLD' });
+		expect(h.context.error).toMatch(/Couldn't read this account/);
+		expect(h.context.rechecking).toBe(false);
+	});
+
 	test('checking again does nothing while a transaction is in progress', async () => {
 		lockKeyreg(WALLET, 'OLD', LAST_VALID);
 		const h = harness({ reads: [record({ round: BigInt(LAST_VALID + 1) })] });
@@ -755,9 +798,9 @@ describe('the eligibility panel', () => {
 		const body = html({ unconfirmed: { txid: 'TXID123' }, onRecheck: vi.fn() });
 		expect(body).toContain('Check again');
 		expect(body).not.toContain('Pay 2 VOI and re-register');
-		expect(
-			html({ unconfirmed: { txid: 'TXID123' }, onRecheck: vi.fn(), rechecking: true })
-		).toMatch(/<button[^>]*disabled[^>]*>[^]*Check again/);
+		const busy = html({ unconfirmed: { txid: 'TXID123' }, onRecheck: vi.fn(), rechecking: true });
+		expect(busy).toMatch(/<button[^>]*disabled[^>]*>[^]*Check again/);
+		expect(busy).toMatch(/<button[^>]*aria-busy="true"/);
 	});
 
 	test('explains the re-registration and shows the key end and the button', () => {
