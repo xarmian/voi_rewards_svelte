@@ -25,6 +25,10 @@ import {
 	sendWalletKeyreg
 } from './keyreg';
 import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
+import {
+	BLOCK_REWARD_MAX_MICROVOI,
+	BLOCK_REWARD_MIN_MICROVOI
+} from '$lib/rewards/blockRewardConstants';
 
 const address = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 const voteBytes = Buffer.from(Array.from({ length: 32 }, (_, i) => 255 - i));
@@ -658,6 +662,7 @@ describe('onChainKeyregOffer', () => {
 	) => ({
 		status: 'Online',
 		incentiveEligible: false,
+		amount: 100_000_000_000n,
 		round: BigInt(round),
 		participation: {
 			voteParticipationKey: new Uint8Array(voteBytes),
@@ -670,7 +675,12 @@ describe('onChainKeyregOffer', () => {
 		},
 		...changes
 	});
-	const account = { isStakingContract: false, contractIncentive: 'checking' as const };
+	const balanceRange = { min: BLOCK_REWARD_MIN_MICROVOI, max: BLOCK_REWARD_MAX_MICROVOI };
+	const account = {
+		isStakingContract: false,
+		contractIncentive: 'checking' as const,
+		balanceRange
+	};
 	const offer = (
 		input: ReturnType<typeof onChain>,
 		opts: Parameters<typeof onChainKeyregOffer>[2] = account
@@ -681,7 +691,8 @@ describe('onChainKeyregOffer', () => {
 			kind: 'offer',
 			keys: { ...keys, parentAddress: address },
 			roundsLeft: keys.lastRound - round,
-			expiringSoon: false
+			expiringSoon: false,
+			balanceInRange: true
 		});
 		expect(keys.votingKey).toMatch(/=$/);
 		expect(keys.stateProofKey).toMatch(/==$/);
@@ -743,7 +754,9 @@ describe('onChainKeyregOffer', () => {
 	it.each(['checking', 'incapable', 'unverified'] as const)(
 		'offers nothing to a staking contract that is %s',
 		(contractIncentive) => {
-			expect(offer(onChain(), { isStakingContract: true, contractIncentive })).toEqual({
+			expect(
+				offer(onChain(), { isStakingContract: true, contractIncentive, balanceRange })
+			).toEqual({
 				kind: 'none'
 			});
 		}
@@ -751,7 +764,7 @@ describe('onChainKeyregOffer', () => {
 
 	it('offers a capable staking contract its keys', () => {
 		expect(
-			offer(onChain(), { isStakingContract: true, contractIncentive: 'capable' })
+			offer(onChain(), { isStakingContract: true, contractIncentive: 'capable', balanceRange })
 		).toMatchObject({ kind: 'offer', keys: { ...keys, parentAddress: address } });
 	});
 
@@ -764,5 +777,28 @@ describe('onChainKeyregOffer', () => {
 		const at = (left: number) => offer(onChain({ round: BigInt(keys.lastRound - left) }));
 		expect(at(under)).toMatchObject({ roundsLeft: under, expiringSoon: true });
 		expect(at(over)).toMatchObject({ roundsLeft: over, expiringSoon: false });
+	});
+
+	// Eligibility persists, but block rewards are paid only inside the balance range: still offered.
+	it.each([
+		['below the range', BLOCK_REWARD_MIN_MICROVOI - 1, false],
+		['at the minimum', BLOCK_REWARD_MIN_MICROVOI, true],
+		['inside the range', 100_000_000_000, true],
+		['at the maximum', BLOCK_REWARD_MAX_MICROVOI, true],
+		['above the range', BLOCK_REWARD_MAX_MICROVOI + 1, false]
+	])('offers an account %s and marks whether its balance is in range', (_, amount, inRange) => {
+		for (const value of [amount, BigInt(amount)]) {
+			expect(offer(onChain({ amount: value }))).toMatchObject({
+				kind: 'offer',
+				balanceInRange: inRange
+			});
+		}
+	});
+
+	it('does not mark an unknown balance out of range', () => {
+		expect(offer(onChain({ amount: undefined }))).toMatchObject({
+			kind: 'offer',
+			balanceInRange: true
+		});
 	});
 });

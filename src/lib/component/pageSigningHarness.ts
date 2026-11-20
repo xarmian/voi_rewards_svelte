@@ -36,6 +36,7 @@ export function signingHarness(component: string, name: string, captured = 'X') 
 		accountAddress: 'Y',
 		pageAddress: 'Y',
 		walletAddress: 'Y',
+		currentAccount: 'Y',
 		walletId: 'Y',
 		parentWalletAddress: name.includes('StakingContract') ? 'Y' : null,
 		contractId: 1,

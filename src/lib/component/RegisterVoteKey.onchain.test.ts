@@ -16,7 +16,12 @@ import {
 } from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
-import { describe, expect, test, vi } from 'vitest';
+import { activeKeyregLock, lockKeyreg, resetKeyregLocks } from '$lib/chain/keyregLock';
+import {
+	BLOCK_REWARD_MAX_MICROVOI,
+	BLOCK_REWARD_MIN_MICROVOI
+} from '$lib/rewards/blockRewardConstants';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import Panel from './OnChainEligibilityPanel.svelte';
 
 // One click for an account that is online without the incentive fee: re-register the keys already
@@ -32,6 +37,19 @@ const ROUND = 5_000_000;
 const vote = Uint8Array.from({ length: 32 }, (_, i) => 255 - i);
 const selection = Uint8Array.from({ length: 32 }, (_, i) => 160 + i);
 const stateProof = Uint8Array.from({ length: 64 }, (_, i) => 192 + i);
+const BALANCE_RANGE = { min: BLOCK_REWARD_MIN_MICROVOI, max: BLOCK_REWARD_MAX_MICROVOI };
+// The last valid round of every transaction these tests build.
+const LAST_VALID = 5_001_000;
+
+// Locks are module state shared by every harness, as by every modal mount.
+beforeEach(() => resetKeyregLocks());
+
+// What the library throws for a group it submitted but could not confirm.
+const unconfirmedSubmission = () =>
+	Object.assign(new Error('confirmation timed out'), {
+		code: 'SIGNER_SUBMISSION_FAILED',
+		groups: [{ state: 'submitted-unconfirmed' }]
+	});
 
 function record(
 	changes: Record<string, unknown> = {},
@@ -40,6 +58,7 @@ function record(
 	return {
 		status: 'Online',
 		incentiveEligible: false,
+		amount: 100_000_000_000n,
 		round: BigInt(ROUND),
 		participation: {
 			voteParticipationKey: vote,
@@ -59,7 +78,7 @@ const params = {
 	minFee: 1000n,
 	flatFee: false,
 	firstValid: 5_000_000n,
-	lastValid: 5_001_000n,
+	lastValid: BigInt(LAST_VALID),
 	genesisID: 'voimain-v1.0',
 	genesisHash: new Uint8Array(32).fill(1)
 };
@@ -74,7 +93,10 @@ function harness(opts: {
 		'signerOrError',
 		'registerWalletVoteKey',
 		'registerStakingContractVoteKey',
-		'registerOnChainKeys'
+		'registerOnChainKeys',
+		'goOfflineWalletVoteKey',
+		'goOfflineStakingContractVoteKey',
+		'loadAccountRecord'
 	]
 		.map((fn) => {
 			const body = source.match(new RegExp(`(?:async )?function ${fn}\\([^]*?\\n\\t\\}`))?.[0];
@@ -83,7 +105,9 @@ function harness(opts: {
 		})
 		.join('\n');
 	// The offer the panel shows; extracted when present, so the send tests run without it.
-	const displayed = source.match(/function displayedOffer\([^]*?\n\t\}/)?.[0] ?? '';
+	const displayed = ['displayedOffer', 'displayedLock']
+		.map((fn) => source.match(new RegExp(`function ${fn}\\([^]*?\\n\\t\\}`))?.[0] ?? '')
+		.join('\n');
 	const contract = opts.contract ?? false;
 	const reads = [...(opts.reads ?? [record()])];
 	const accountInformation = vi.fn(() => ({
@@ -139,7 +163,7 @@ function harness(opts: {
 		algodClient: { accountInformation, getTransactionParams },
 		algosdk: {
 			waitForConfirmation: vi.fn().mockResolvedValue({}),
-			decodeUnsignedTransaction: () => ({ txID: () => 'tx' })
+			decodeUnsignedTransaction: () => ({ txID: () => 'tx', lastValid: BigInt(LAST_VALID) })
 		},
 		votingKey: '',
 		selectionKey: '',
@@ -162,8 +186,11 @@ function harness(opts: {
 		contractIncentiveOf,
 		MIN_KEYREG_FEE,
 		NO_OFFER: { kind: 'none' },
+		BALANCE_RANGE,
+		lockKeyreg,
+		activeKeyregLock,
 		accountRecord: null,
-		onChainUnconfirmed: null
+		shownLock: null
 	});
 	runInContext(ts.transpileModule(`${functions}\n${displayed}`, {}).outputText, context);
 	return {
@@ -176,12 +203,17 @@ function harness(opts: {
 		contractIncentiveOf,
 		sends: [CONTRACT, participate, custom, setExtraTxns, signAndSendTransactions],
 		run: () => runInContext('registerOnChainKeys()', context) as Promise<void>,
+		call: (name: string) => runInContext(`${name}()`, context) as Promise<void>,
+		// The mount read of the keyreg account's record.
+		mount: () => runInContext('loadAccountRecord()', context) as Promise<void>,
 		// The offer the panel shows from the record the component holds now.
 		shown: () =>
 			runInContext(
 				'displayedOffer(accountRecord, currentAccount, isStakingContract, contractIncentive)',
 				context
-			)
+			),
+		// The lock the panel is given.
+		shownLock: () => runInContext('displayedLock(shownLock, currentAccount)', context)
 	};
 }
 
@@ -379,46 +411,109 @@ describe('re-registering the on-chain keys', () => {
 	});
 });
 
-describe('a one-click send that may have landed', () => {
-	test('an unconfirmed send is not offered again and keeps its txid', async () => {
+// The manual form holding the keys that are on chain, as partkeyinfo prints them.
+function fillForm(h: ReturnType<typeof harness>) {
+	Object.assign(h.context, {
+		votingKey: Buffer.from(vote).toString('base64'),
+		selectionKey: Buffer.from(selection).toString('base64'),
+		stateProofKey: Buffer.from(stateProof).toString('base64'),
+		firstRound: '4000000',
+		lastRound: '9000000',
+		keyDilution: '2237'
+	});
+}
+
+const lockOf = (account: string) => activeKeyregLock(account, ROUND);
+
+describe('every keyreg send that may have landed locks its account', () => {
+	// Manual registration runs the same send functions handleSubmit calls, with the form filled.
+	test.each([
+		['manual registration', 'registerWalletVoteKey'],
+		['one-click', 'registerOnChainKeys'],
+		['go offline', 'goOfflineWalletVoteKey']
+	])('%s from a wallet: a send not confirmed in time', async (_, name) => {
 		const h = harness({});
+		fillForm(h);
 		h.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('timeout'));
-		await h.run();
+		await h.call(name);
 		const tx = sentWalletTxn(h);
 		expect(h.context.error).toMatch(/not confirmed/);
-		expect(h.context.transactionStatus).toBe('idle');
-		expect(h.context.onChainUnconfirmed).toEqual({ txid: tx.txID() });
-		await h.run();
-		expect(h.accountInformation).toHaveBeenCalledOnce();
-		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+		const lock = { account: WALLET, txid: tx.txID(), lastValid: LAST_VALID };
+		expect(lockOf(WALLET)).toEqual(lock);
+		expect(h.shownLock()).toEqual(lock);
 	});
 
-	test('a contract send that fails after the wallet was asked is not offered again', async () => {
-		const h = harness({ contract: true });
-		h.signAndSendTransactions.mockRejectedValueOnce(new Error('network error'));
-		await h.run();
-		expect(h.context.error).toBe('network error');
-		expect(h.context.onChainUnconfirmed).toEqual({ txid: 'tx' });
-		await h.run();
-		expect(h.accountInformation).toHaveBeenCalledOnce();
-		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+	test.each([
+		['manual registration', 'registerStakingContractVoteKey'],
+		['one-click', 'registerOnChainKeys'],
+		['go offline', 'goOfflineStakingContractVoteKey']
+	])('%s from a staking contract', async (_, name) => {
+		for (const outcome of ['unconfirmed', 'no result'] as const) {
+			resetKeyregLocks();
+			const h = harness({ contract: true });
+			fillForm(h);
+			if (outcome === 'unconfirmed')
+				h.signAndSendTransactions.mockRejectedValueOnce(unconfirmedSubmission());
+			else h.signAndSendTransactions.mockResolvedValueOnce(undefined);
+			await h.call(name);
+			expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+			const lock = { account: CONTRACT_ACCOUNT, txid: 'tx', lastValid: LAST_VALID };
+			expect(lockOf(CONTRACT_ACCOUNT), outcome).toEqual(lock);
+			expect(h.shownLock(), outcome).toEqual(lock);
+		}
 	});
 
-	test('a contract send the wallet returned nothing for is not offered again', async () => {
-		const h = harness({ contract: true });
-		h.signAndSendTransactions.mockResolvedValueOnce(undefined);
-		await h.run();
-		expect(h.context.error).toBe('Failed to register vote key');
-		expect(h.context.onChainUnconfirmed).toEqual({ txid: 'tx' });
+	test.each([
+		'registerWalletVoteKey',
+		'registerStakingContractVoteKey',
+		'goOfflineWalletVoteKey',
+		'goOfflineStakingContractVoteKey'
+	])('%s sets the lock in the send path itself', (name) => {
+		const body = source.match(new RegExp(`async function ${name}\\([^]*?\\n\\t\\}`))?.[0] ?? '';
+		expect(body).toMatch(/shownLock = lockKeyreg\(/);
+	});
+});
+
+describe('a failure that cannot have landed does not lock', () => {
+	test.each([
+		['a wallet rejection', () => new Error('User rejected')],
+		[
+			'a library error that sent nothing',
+			() =>
+				Object.assign(new Error('rejected'), {
+					code: 'SIGNER_SUBMISSION_FAILED',
+					groups: [{ state: 'not-sent' }]
+				})
+		]
+	])('%s keeps the one-click available', async (_, failure) => {
+		for (const contract of [false, true]) {
+			resetKeyregLocks();
+			const h = harness({ contract });
+			h.signAndSendTransactions.mockRejectedValueOnce(failure());
+			await h.run();
+			expect(h.context.error).toBe(failure().message);
+			expect(lockOf(contract ? CONTRACT_ACCOUNT : WALLET)).toBeNull();
+			expect(h.shownLock()).toBeNull();
+			await h.run();
+			expect(h.signAndSendTransactions).toHaveBeenCalledTimes(2);
+			expect(h.context.transactionStatus).toBe('success');
+		}
 	});
 
-	test('a wallet send the wallet refused to sign is not offered again', async () => {
-		const h = harness({});
+	test.each([
+		'registerWalletVoteKey',
+		'registerStakingContractVoteKey',
+		'goOfflineWalletVoteKey',
+		'goOfflineStakingContractVoteKey'
+	])('a wallet rejection in %s does not lock', async (name) => {
+		const h = harness({ contract: name.includes('StakingContract') });
+		fillForm(h);
 		h.signAndSendTransactions.mockRejectedValueOnce(new Error('User rejected'));
-		await h.run();
-		expect(h.context.onChainUnconfirmed).toEqual({ txid: sentWalletTxn(h).txID() });
-		await h.run();
+		await h.call(name);
 		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+		expect(h.context.error).toBe('User rejected');
+		expect(lockOf(WALLET)).toBeNull();
+		expect(lockOf(CONTRACT_ACCOUNT)).toBeNull();
 	});
 
 	test('a failure before signing keeps the one-click available', async () => {
@@ -430,7 +525,7 @@ describe('a one-click send that may have landed', () => {
 		}));
 		await h.run();
 		expect(h.context.error).toBe('algod down');
-		expect(h.context.onChainUnconfirmed).toBeNull();
+		expect(lockOf(WALLET)).toBeNull();
 		await h.run();
 		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
 		expect(h.context.transactionStatus).toBe('success');
@@ -444,14 +539,131 @@ describe('a one-click send that may have landed', () => {
 		const h = harness(opts);
 		await h.run();
 		expect(h.context.error).toMatch(/nothing was sent/);
-		expect(h.context.onChainUnconfirmed).toBeNull();
+		expect(lockOf(WALLET)).toBeNull();
+		expect(lockOf(CONTRACT_ACCOUNT)).toBeNull();
 	});
 
 	test('a signer refused before the send keeps the one-click available', async () => {
 		const h = harness({ contract: true });
 		h.context.capturePageSigner = () => ({ address: 'SOMEONE ELSE' });
 		await h.run();
-		expect(h.context.onChainUnconfirmed).toBeNull();
+		expect(lockOf(CONTRACT_ACCOUNT)).toBeNull();
+	});
+});
+
+describe('the one-click while a keyreg may still land', () => {
+	const LOCKED = /may still go through, so nothing was sent/;
+
+	test('a manual registration that timed out blocks the one-click', async () => {
+		const h = harness({});
+		fillForm(h);
+		h.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('timeout'));
+		await h.call('registerWalletVoteKey');
+		const txid = sentWalletTxn(h).txID();
+		await h.run();
+		expect(h.accountInformation).toHaveBeenCalledOnce();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+		expect(h.getTransactionParams).toHaveBeenCalledOnce();
+		expect(h.context.error).toMatch(LOCKED);
+		expect(h.context.transactionStatus).toBe('idle');
+		expect(h.shownLock()).toMatchObject({ txid });
+	});
+
+	test('a one-click that timed out blocks it again after the modal is reopened', async () => {
+		const first = harness({});
+		first.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('timeout'));
+		await first.run();
+		const txid = sentWalletTxn(first).txID();
+
+		const reopened = harness({});
+		await reopened.mount();
+		expect(reopened.shown()).toMatchObject({ kind: 'offer' });
+		expect(reopened.shownLock()).toEqual({ account: WALLET, txid, lastValid: LAST_VALID });
+		const body = render(Panel, {
+			props: {
+				offer: reopened.shown(),
+				cost: 2,
+				canRegister: true,
+				disabled: false,
+				onRegister: vi.fn(),
+				unconfirmed: reopened.shownLock()
+			}
+		}).body.replace(/\s+/g, ' ');
+		expect(body).not.toContain('<button');
+		expect(body).toContain('may have gone through');
+		expect(body).toContain(`href="https://block.voi.network/explorer/transaction/${txid}"`);
+
+		await reopened.run();
+		expect(reopened.signAndSendTransactions).not.toHaveBeenCalled();
+		expect(reopened.getTransactionParams).not.toHaveBeenCalled();
+		expect(reopened.context.error).toMatch(LOCKED);
+	});
+
+	test('a contract one-click with no result blocks it again after the modal is reopened', async () => {
+		const first = harness({ contract: true });
+		first.signAndSendTransactions.mockResolvedValueOnce(undefined);
+		await first.run();
+		const reopened = harness({ contract: true });
+		await reopened.mount();
+		expect(reopened.shownLock()).toMatchObject({ txid: 'tx' });
+		await reopened.run();
+		for (const call of reopened.sends) expect(call).not.toHaveBeenCalled();
+		expect(reopened.context.error).toMatch(LOCKED);
+	});
+
+	test('a lock holds through its last valid round and clears after it', async () => {
+		const first = harness({});
+		first.context.algosdk.waitForConfirmation.mockRejectedValueOnce(new Error('timeout'));
+		await first.run();
+
+		const atLast = harness({ reads: [record({ round: BigInt(LAST_VALID) })] });
+		await atLast.mount();
+		expect(atLast.shownLock()).not.toBeNull();
+		await atLast.run();
+		expect(atLast.signAndSendTransactions).not.toHaveBeenCalled();
+
+		const after = harness({ reads: [record({ round: BigInt(LAST_VALID + 1) })] });
+		await after.mount();
+		expect(after.shownLock()).toBeNull();
+		await after.run();
+		expect(after.context.error).toBeNull();
+		expect(after.signAndSendTransactions).toHaveBeenCalledOnce();
+		expect(after.context.transactionStatus).toBe('success');
+	});
+
+	test('a lock clears at the fresh read once its round has passed', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [record(), record({ round: BigInt(LAST_VALID + 1) })] });
+		await h.mount();
+		expect(h.shownLock()).toMatchObject({ txid: 'OLD' });
+		await h.run();
+		expect(h.shownLock()).toBeNull();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+	});
+
+	test("another account's lock does not block the one-click", async () => {
+		lockKeyreg(OWNER, 'OTHER', LAST_VALID);
+		const h = harness({});
+		await h.mount();
+		expect(h.shownLock()).toBeNull();
+		await h.run();
+		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
+	});
+
+	test('the lock is shown only for the account it was read for', () => {
+		const h = harness({});
+		h.context.shownLock = { account: OWNER, txid: 'OTHER', lastValid: LAST_VALID };
+		expect(h.shownLock()).toBeNull();
+		h.context.shownLock = { account: WALLET, txid: 'MINE', lastValid: LAST_VALID };
+		expect(h.shownLock()).toMatchObject({ txid: 'MINE' });
+	});
+
+	test('a mount read that fails shows no lock and no offer', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [new Error('algod down')] });
+		await h.mount();
+		expect(h.shown()).toEqual({ kind: 'none' });
+		expect(h.shownLock()).toBeNull();
 	});
 });
 
@@ -490,11 +702,11 @@ describe('the displayed offer', () => {
 });
 
 describe('the eligibility panel', () => {
-	const offer = (roundsLeft: number) => {
+	const offer = (roundsLeft: number, amount = 100_000_000_000n) => {
 		const result = onChainKeyregOffer(
 			WALLET,
-			record({}, { voteLastValid: BigInt(ROUND + roundsLeft) }),
-			{ isStakingContract: false, contractIncentive: 'checking' }
+			record({ amount }, { voteLastValid: BigInt(ROUND + roundsLeft) }),
+			{ isStakingContract: false, contractIncentive: 'checking', balanceRange: BALANCE_RANGE }
 		);
 		if (result.kind !== 'offer') throw new Error('expected an offer');
 		return result;
@@ -550,17 +762,33 @@ describe('the eligibility panel', () => {
 		expect(body).toContain('href="https://block.voi.network/explorer/transaction/TXID123"');
 	});
 
-	test('after a send that may have landed without a known txid, still shows no button', () => {
-		const body = html({ unconfirmed: { txid: null } });
-		expect(body).not.toContain('<button');
-		expect(body).toContain('Check the transaction in the explorer before trying again.');
-		expect(body).not.toContain('href=');
-	});
-
 	test('shows the text without a button for an account that cannot sign here', () => {
 		const body = html({ canRegister: false });
 		expect(body).toContain('Make your current registration eligible');
 		expect(body).not.toContain('<button');
+	});
+
+	const RANGE_NOTE =
+		"This account's balance is outside the 30,000–70,000,000 VOI range, so it won't earn real-time block rewards until its balance is in range. The eligibility you pay for now stays.";
+
+	test.each([
+		['below', BigInt(BLOCK_REWARD_MIN_MICROVOI - 1)],
+		['above', BigInt(BLOCK_REWARD_MAX_MICROVOI + 1)]
+	])('notes a balance %s the block reward range and keeps the button', (_, amount) => {
+		const body = html({ offer: offer(4_000_000, amount) });
+		expect(body).toContain(RANGE_NOTE);
+		expect(body).toMatch(/<button[^>]*>[^]*Pay 2 VOI and re-register/);
+		expect(body).not.toMatch(/<button[^>]*\sdisabled(?:=|[\s>])/);
+	});
+
+	test('adds no range note for a balance inside the range', () => {
+		for (const amount of [
+			BigInt(BLOCK_REWARD_MIN_MICROVOI),
+			100_000_000_000n,
+			BigInt(BLOCK_REWARD_MAX_MICROVOI)
+		]) {
+			expect(html({ offer: offer(4_000_000, amount) })).not.toContain('outside the');
+		}
 	});
 
 	test('warns about keys ending soon and keeps the button available', () => {
@@ -591,10 +819,25 @@ describe('the modal wiring', () => {
 		);
 		expect(panel).toContain("disabled={transactionStatus !== 'idle' || isLoading}");
 		expect(panel).toContain('onRegister={registerOnChainKeys}');
-		expect(panel).toContain('unconfirmed={onChainUnconfirmed}');
+		expect(panel).toContain('unconfirmed={displayedLock(shownLock, currentAccount)}');
 		expect(panel).toMatch(
 			/cost=\{isStakingContract\s*\? contractKeyregCost\(INCENTIVE_KEYREG_FEE\) \/ 1e6\s*: walletKeyregFee\(INCENTIVE_KEYREG_FEE, minFee\) \/ 1e6\}/
 		);
+	});
+
+	test('the mount reads the account record and its lock', () => {
+		expect(source).toMatch(
+			/onMount\(async \(\) => \{[^]*?\n\t\tawait loadAccountRecord\(\);\n\t\}\);/
+		);
+	});
+
+	test('the offer is computed with the block reward balance range', () => {
+		expect(source).toMatch(
+			/const BALANCE_RANGE = \{ min: BLOCK_REWARD_MIN_MICROVOI, max: BLOCK_REWARD_MAX_MICROVOI \};/
+		);
+		const calls = source.match(/onChainKeyregOffer\([^)]*\)/g) ?? [];
+		expect(calls).toHaveLength(2);
+		for (const call of calls) expect(call).toContain('balanceRange: BALANCE_RANGE');
 	});
 
 	test('the mount read keeps the account record for the offer', () => {
