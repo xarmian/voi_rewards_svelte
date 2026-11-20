@@ -58,7 +58,10 @@
 			x={latest.x - 6}
 			y={Math.max(ctx.margin.top + 12, latest.y - 8)}
 			text-anchor="end"
-			class="num fill-ink text-label"
+			paint-order="stroke"
+			stroke-width="4"
+			stroke-linejoin="round"
+			class="num fill-ink stroke-surface text-label"
 			font-weight="700">{format(latest.value)}</text
 		>{/if}
 {/if}
