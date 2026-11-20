@@ -275,6 +275,29 @@ export function isIncentiveCapableProgram(hash: string | null): boolean {
 	return hash !== null && INCENTIVE_CAPABLE_PROGRAM_HASHES.has(hash);
 }
 
+// Whether a staking contract can pay the go-online fee: 'checking' until the program is read,
+// then 'capable' only for an allowlisted program. 'unverified' (the read failed or returned no
+// program) fails closed exactly like 'incapable'.
+export type ContractIncentive = 'checking' | 'capable' | 'incapable' | 'unverified';
+
+// Reads the contract's approval program and classifies it. Never throws: any failure is
+// 'unverified', so callers can never treat an unread program as capable.
+export async function contractIncentiveOf(
+	readProgram: () => Promise<Uint8Array | undefined | null>
+): Promise<'capable' | 'incapable' | 'unverified'> {
+	try {
+		const program = await readProgram();
+		if (!program || program.length === 0) {
+			console.error('Error checking staking contract program: no approval program');
+			return 'unverified';
+		}
+		return isIncentiveCapableProgram(await programHash(program)) ? 'capable' : 'incapable';
+	} catch (err) {
+		console.error('Error checking staking contract program:', err);
+		return 'unverified';
+	}
+}
+
 // The payment that precedes participate; a capable contract uses it as the inner keyreg fee.
 export function participatePayment(payIncentiveFee: boolean, contractCanPay: boolean): number {
 	return payIncentiveFee && contractCanPay ? INCENTIVE_KEYREG_FEE : MIN_KEYREG_FEE;
