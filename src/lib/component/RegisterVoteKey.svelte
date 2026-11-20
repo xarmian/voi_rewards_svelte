@@ -165,6 +165,21 @@
 		}
 	}
 
+	// True while the lock line's Check again re-reads the account.
+	let rechecking = false;
+
+	// The lock line's Check again: re-read the record, which drops a lock past its last valid round,
+	// so the button comes back without reopening the modal. Sends nothing.
+	async function recheckLock() {
+		if (transactionStatus !== 'idle' || isLoading || rechecking) return;
+		rechecking = true;
+		try {
+			await loadAccountRecord();
+		} finally {
+			rechecking = false;
+		}
+	}
+
 	const nodeInstructions = {
 		'voi-swarm': {
 			title: 'Voi Swarm Node',
@@ -350,8 +365,10 @@
 				if (fresh === 'incapable') contractIncentive = fresh;
 				// The one-click leaves the form alone.
 				if (!fixed) payIncentiveFee = false;
-				error =
-					"This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
+				// The one-click does not use the form's fee option, so its message does not point there.
+				error = fixed
+					? "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Try again."
+					: "This contract's version could not be confirmed to pay the incentive fee, so nothing was sent. Review the fee option and try again.";
 				transactionStatus = 'idle';
 				return;
 			}
@@ -792,6 +809,8 @@
 			disabled={transactionStatus !== 'idle' || isLoading}
 			onRegister={registerOnChainKeys}
 			unconfirmed={displayedLock(shownLock, currentAccount)}
+			onRecheck={recheckLock}
+			{rechecking}
 		/>
 	{/if}
 

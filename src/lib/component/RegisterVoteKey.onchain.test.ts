@@ -96,7 +96,8 @@ function harness(opts: {
 		'registerOnChainKeys',
 		'goOfflineWalletVoteKey',
 		'goOfflineStakingContractVoteKey',
-		'loadAccountRecord'
+		'loadAccountRecord',
+		'recheckLock'
 	]
 		.map((fn) => {
 			const body = source.match(new RegExp(`(?:async )?function ${fn}\\([^]*?\\n\\t\\}`))?.[0];
@@ -190,7 +191,8 @@ function harness(opts: {
 		lockKeyreg,
 		activeKeyregLock,
 		accountRecord: null,
-		shownLock: null
+		shownLock: null,
+		rechecking: false
 	});
 	runInContext(ts.transpileModule(`${functions}\n${displayed}`, {}).outputText, context);
 	return {
@@ -334,6 +336,8 @@ describe('re-registering the on-chain keys', () => {
 		await h.run();
 		for (const call of h.sends) expect(call).not.toHaveBeenCalled();
 		expect(h.context.error).toMatch(/nothing was sent/);
+		// The one-click does not use the form's fee option, so its message does not point there.
+		expect(h.context.error).not.toMatch(/fee option/);
 		expect(h.context.transactionStatus).toBe('idle');
 	});
 
@@ -641,6 +645,28 @@ describe('the one-click while a keyreg may still land', () => {
 		expect(h.signAndSendTransactions).toHaveBeenCalledOnce();
 	});
 
+	test('checking again after the last valid round clears the lock without reopening', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({
+			reads: [record({ round: BigInt(LAST_VALID) }), record({ round: BigInt(LAST_VALID + 1) })]
+		});
+		await h.mount();
+		expect(h.shownLock()).toMatchObject({ txid: 'OLD' });
+		await h.call('recheckLock');
+		expect(h.shownLock()).toBeNull();
+		expect(h.shown()).toMatchObject({ kind: 'offer' });
+		expect(h.context.rechecking).toBe(false);
+		for (const call of h.sends) expect(call).not.toHaveBeenCalled();
+	});
+
+	test('checking again does nothing while a transaction is in progress', async () => {
+		lockKeyreg(WALLET, 'OLD', LAST_VALID);
+		const h = harness({ reads: [record({ round: BigInt(LAST_VALID + 1) })] });
+		h.context.transactionStatus = 'signing';
+		await h.call('recheckLock');
+		expect(h.accountInformation).not.toHaveBeenCalled();
+	});
+
 	test("another account's lock does not block the one-click", async () => {
 		lockKeyreg(OWNER, 'OTHER', LAST_VALID);
 		const h = harness({});
@@ -724,6 +750,15 @@ describe('the eligibility panel', () => {
 				...props
 			}
 		}).body.replace(/\s+/g, ' ');
+
+	test('offers Check again on the lock line, instead of the button, when given a recheck', () => {
+		const body = html({ unconfirmed: { txid: 'TXID123' }, onRecheck: vi.fn() });
+		expect(body).toContain('Check again');
+		expect(body).not.toContain('Pay 2 VOI and re-register');
+		expect(
+			html({ unconfirmed: { txid: 'TXID123' }, onRecheck: vi.fn(), rechecking: true })
+		).toMatch(/<button[^>]*disabled[^>]*>[^]*Check again/);
+	});
 
 	test('explains the re-registration and shows the key end and the button', () => {
 		const body = html({});
@@ -820,6 +855,8 @@ describe('the modal wiring', () => {
 		expect(panel).toContain("disabled={transactionStatus !== 'idle' || isLoading}");
 		expect(panel).toContain('onRegister={registerOnChainKeys}');
 		expect(panel).toContain('unconfirmed={displayedLock(shownLock, currentAccount)}');
+		expect(panel).toContain('onRecheck={recheckLock}');
+		expect(panel).toContain('{rechecking}');
 		expect(panel).toMatch(
 			/cost=\{isStakingContract\s*\? contractKeyregCost\(INCENTIVE_KEYREG_FEE\) \/ 1e6\s*: walletKeyregFee\(INCENTIVE_KEYREG_FEE, minFee\) \/ 1e6\}/
 		);

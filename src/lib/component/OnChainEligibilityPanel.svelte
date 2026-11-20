@@ -15,6 +15,8 @@
 		disabled,
 		onRegister,
 		unconfirmed = null,
+		onRecheck = undefined,
+		rechecking = false,
 		now = Date.now()
 	}: {
 		offer: Extract<OnChainKeyregOffer, { kind: 'offer' }>;
@@ -25,6 +27,9 @@
 		onRegister: () => void;
 		// A keyreg for this account that may still land: the button is not offered until it can't.
 		unconfirmed?: { txid: string } | null;
+		// Re-reads the account, which ends a lock past its last valid round; offered on the lock line.
+		onRecheck?: () => void;
+		rechecking?: boolean;
 		now?: number;
 	} = $props();
 
@@ -82,6 +87,20 @@
 				View in Explorer
 			</a>
 		</p>
+		{#if onRecheck}
+			<div class="mt-3 flex justify-end">
+				<button
+					type="button"
+					onclick={onRecheck}
+					disabled={disabled || rechecking}
+					class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					<i class="fas {rechecking ? 'fa-spinner fa-spin' : 'fa-rotate-right'}" aria-hidden="true"
+					></i>
+					<span>Check again</span>
+				</button>
+			</div>
+		{/if}
 	{:else if canRegister}
 		<div class="mt-3 flex justify-end">
 			<button

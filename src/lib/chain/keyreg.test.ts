@@ -730,7 +730,7 @@ describe('onChainKeyregOffer', () => {
 		expect(offer(input)).toEqual({ kind: 'none' });
 	});
 
-	it('offers keys that end this round', () => {
+	it('offers nothing for keys that end this round', () => {
 		expect(offer(onChain({ round: BigInt(keys.lastRound) }))).toEqual({ kind: 'none' });
 	});
 
