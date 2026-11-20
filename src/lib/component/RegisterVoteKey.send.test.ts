@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
+import { participatePayment } from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { expect, test, vi } from 'vitest';
 
@@ -76,7 +77,10 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 				algosdk: { decodeUnsignedTransaction: () => ({ txID: () => 'tx' }) },
 				signTransactions,
 				signAndSendTransactions,
-				onSuccess: vi.fn()
+				onSuccess: vi.fn(),
+				participatePayment,
+				payIncentiveFee: false,
+				contractCanPay: false
 			});
 			runInContext(ts.transpileModule(functions, {}).outputText, context);
 			await runInContext(`${name}()`, context);
@@ -102,3 +106,91 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 		}
 	}
 );
+
+// The participate payment becomes the contract's inner keyreg fee, so registering pays the 2 VOI
+// go-online fee only when the user opted in and the contract's program is known to use it. Going
+// offline always pays the minimum.
+async function extraTxnPayment(
+	name: string,
+	flags: { payIncentiveFee: boolean; contractCanPay: boolean }
+) {
+	const functions = ['signerOrError', name]
+		.map((fn) => source.match(new RegExp(`(?:async )?function ${fn}\\([^]*?\\n\\t\\}`))?.[0])
+		.join('\n');
+	const setExtraTxns = vi.fn();
+	const CONTRACT = vi.fn(function () {
+		return {
+			participate: vi.fn().mockResolvedValue({ obj: {} }),
+			custom: vi.fn().mockResolvedValue({ txns: ['txn1', 'txn2'] }),
+			setFee: vi.fn(),
+			setEnableGroupResourceSharing: vi.fn(),
+			setExtraTxns
+		};
+	});
+	const context = createContext({
+		canSignTransactions: true,
+		capturePageSigner: () => ({ address: 'Z' }),
+		signerMatchesAccount,
+		wrongSignerMessage,
+		pageAddress: 'Z',
+		walletAddress: 'CONTRACT',
+		parentWalletAddress: 'Z',
+		contractId: 1,
+		error: null,
+		transactionStatus: 'idle',
+		CONTRACT,
+		abi: { custom: {} },
+		algodClient: {},
+		Buffer,
+		votingKey: '',
+		selectionKey: '',
+		stateProofKey: '',
+		firstRound: 1,
+		lastRound: 2,
+		keyDilution: 1,
+		algosdk: { decodeUnsignedTransaction: () => ({ txID: () => 'tx' }) },
+		signAndSendTransactions: vi.fn().mockResolvedValue(true),
+		onSuccess: vi.fn(),
+		participatePayment,
+		...flags
+	});
+	runInContext(ts.transpileModule(functions, {}).outputText, context);
+	await runInContext(`${name}()`, context);
+	expect(context.error).toBeNull();
+	expect(setExtraTxns).toHaveBeenCalledOnce();
+	const [txns] = setExtraTxns.mock.calls[0];
+	expect(txns).toHaveLength(1);
+	return txns[0].payment;
+}
+
+test('registering pays the 2 VOI go-online fee when opted in and the contract can pay', async () => {
+	expect(
+		await extraTxnPayment('registerStakingContractVoteKey', {
+			payIncentiveFee: true,
+			contractCanPay: true
+		})
+	).toBe(2_000_000);
+});
+
+test('registering pays the minimum when the contract cannot pay, even if opted in', async () => {
+	expect(
+		await extraTxnPayment('registerStakingContractVoteKey', {
+			payIncentiveFee: true,
+			contractCanPay: false
+		})
+	).toBe(1000);
+});
+
+test('going offline always pays the minimum', async () => {
+	expect(
+		await extraTxnPayment('goOfflineStakingContractVoteKey', {
+			payIncentiveFee: true,
+			contractCanPay: true
+		})
+	).toBe(1000);
+});
+
+test('only registration uses participatePayment; going offline keeps the fixed minimum', () => {
+	expect(source.match(/payment: participatePayment\(/g)).toHaveLength(1);
+	expect(source.match(/payment: 1000/g)).toHaveLength(1);
+});
