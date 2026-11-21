@@ -207,7 +207,7 @@ test('an epoch list shorter than a year still gives finite results', () => {
 
 test('the component assigns every model field to the variable of the same name', () => {
 	const source = readFileSync(
-		new URL('../component/CalculatorComponent.svelte', import.meta.url),
+		new URL('../epochRewards/calculator/EpochEstimate.svelte', import.meta.url),
 		'utf8'
 	);
 	// yearlyProfit is not shown anywhere, so the component does not keep it.
@@ -222,7 +222,7 @@ test('the component assigns every model field to the variable of the same name',
 
 test('the calculator component delegates reward math to the model', () => {
 	const source = readFileSync(
-		new URL('../component/CalculatorComponent.svelte', import.meta.url),
+		new URL('../epochRewards/calculator/EpochEstimate.svelte', import.meta.url),
 		'utf8'
 	);
 	expect(source).toMatch(

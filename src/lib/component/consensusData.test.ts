@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'vitest';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
+import { projectEpochRewards } from '$lib/epochRewards/node';
 
 // Exercise the component scripts with controlled dependencies, without a browser or live APIs.
 function componentScript(name: string, dependencies: Record<string, unknown>) {
@@ -31,33 +32,64 @@ function componentScript(name: string, dependencies: Record<string, unknown>) {
 }
 
 const supply = { 'online-money': 1_000_000 };
-const dates = [{ id: 'latest', epoch: 62 }];
+const epochRewards = { rewardStake: 1_000_000, epochRewards: [10] };
 
-for (const [label, epochData, dateRanges, reward] of [
-	['undefined epoch data', undefined, dates, 10],
-	['an epoch error body', { error: 'unavailable' }, dates, 10],
-	['empty dates', { blacklist_balance_total: 0 }, [], 10],
-	['a missing epoch', { blacklist_balance_total: 0 }, [{ id: 'latest' }], 10],
-	['non-finite rewards', { blacklist_balance_total: 0 }, dates, NaN]
-] as const) {
-	test(`node reports ${label} as an error and stops loading`, async () => {
-		const run = componentScript('NodeComponent', {
-			getSupplyInfo: async () => supply,
-			dataTable: {
-				fetchDateRanges: async () => dateRanges,
-				fetchData: async () => epochData
-			},
-			getTokensByEpoch: async () => reward,
-			getAccountInfo: async () => ({ amount: 100 }),
-			getConsensusInfo: async () => ({ total_blocks: 1 })
-		});
-		await run('walletId = "A"; fetchNodeData()');
-		assert.equal(run('loading'), false);
-		assert.equal(run('consensusError'), true);
+test('node reports no epoch rewards as an error and stops loading', async () => {
+	const run = componentScript('NodeComponent', {
+		EPOCH_REWARDS_ENABLED: true,
+		getSupplyInfo: async () => supply,
+		loadNodeEpochRewards: async () => null,
+		projectEpochRewards,
+		getAccountInfo: async () => ({ amount: 100 }),
+		getConsensusInfo: async () => ({ total_blocks: 1 })
 	});
-}
+	await run('walletId = "A"; fetchNodeData()');
+	assert.equal(run('loading'), false);
+	assert.equal(run('consensusError'), true);
+});
 
-const stages = ['supply', 'dates', 'epoch', 'rewards', 'account', 'consensus'] as const;
+test('node reports a failed epoch read as an error, logs it and stops loading', async () => {
+	const logged: unknown[][] = [];
+	const run = componentScript('NodeComponent', {
+		console: { log() {}, error: (...args: unknown[]) => void logged.push(args) },
+		EPOCH_REWARDS_ENABLED: true,
+		getSupplyInfo: async () => supply,
+		loadNodeEpochRewards: async () => {
+			throw new Error('proposers API down');
+		},
+		projectEpochRewards,
+		getAccountInfo: async () => ({ amount: 100 }),
+		getConsensusInfo: async () => ({ total_blocks: 1 })
+	});
+	await run('walletId = "A"; fetchNodeData()');
+	assert.equal(run('loading'), false);
+	assert.equal(run('consensusError'), true);
+	assert.equal(logged.length, 1);
+	assert.equal(logged[0][0], 'Failed to fetch node data:');
+});
+
+test('the epoch read sees wallet A as superseded once wallet B starts', async () => {
+	const checks: (() => boolean)[] = [];
+	const run = componentScript('NodeComponent', {
+		EPOCH_REWARDS_ENABLED: true,
+		getSupplyInfo: async () => supply,
+		loadNodeEpochRewards: async (_supply: unknown, stale: () => boolean) => {
+			checks.push(stale);
+			return epochRewards;
+		},
+		projectEpochRewards,
+		getAccountInfo: async () => ({ amount: 100 }),
+		getConsensusInfo: async () => ({ total_blocks: 1 })
+	});
+	await run('walletId = "A"; fetchNodeData()');
+	assert.equal(checks.length, 1);
+	assert.equal(checks[0](), false);
+	await run('walletId = "B"; fetchNodeData()');
+	assert.equal(checks[0](), true);
+	assert.equal(checks[1](), false);
+});
+
+const stages = ['supply', 'epochRewards', 'account', 'consensus'] as const;
 for (const stage of stages) {
 	for (const fails of [false, true]) {
 		test(`a late wallet A ${stage} ${fails ? 'failure' : 'result'} cannot overwrite wallet B`, async () => {
@@ -73,12 +105,10 @@ for (const stage of stages) {
 				return Promise.resolve(value);
 			};
 			const run = componentScript('NodeComponent', {
+				EPOCH_REWARDS_ENABLED: true,
 				getSupplyInfo: () => result('supply', supply),
-				dataTable: {
-					fetchDateRanges: () => result('dates', dates),
-					fetchData: () => result('epoch', { blacklist_balance_total: 0 })
-				},
-				getTokensByEpoch: () => result('rewards', 10),
+				loadNodeEpochRewards: () => result('epochRewards', epochRewards),
+				projectEpochRewards,
 				getAccountInfo: (wallet: string) =>
 					result('account', { amount: wallet === 'B' ? 200 : 100 }),
 				getConsensusInfo: (wallet: string) =>
@@ -92,9 +122,7 @@ for (const stage of stages) {
 				pending.resolve(
 					{
 						supply,
-						dates,
-						epoch: { blacklist_balance_total: 0 },
-						rewards: 10,
+						epochRewards,
 						account: { amount: 100 },
 						consensus: { total_blocks: 1 }
 					}[stage]

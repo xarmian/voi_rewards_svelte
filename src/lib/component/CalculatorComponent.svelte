@@ -1,38 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Button,
-		Card,
-		Chip,
-		DataTable,
-		InlineAlert,
-		StatTile,
-		Tabs,
-		compact,
-		type Column
-	} from '$lib/ds';
+	import { Button, Chip, InlineAlert, Tabs } from '$lib/ds';
 	import { createReadSource, type Source } from '$lib/wallet/read';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
-	import {
-		loadCalculatorInputs,
-		loadCalculatorBalance,
-		loadCalculatorPrice
-	} from '$lib/wallet/calculator';
-	import { getTokensByEpoch } from '$lib/utils';
+	import { loadCalculatorBalance, loadCalculatorPrice } from '$lib/wallet/calculator';
+	import { epochCalculator } from '$lib/epochRewards/client';
+	import { EpochEstimate, EpochNodeCost, EpochSchedule } from '$lib/epochRewards/components';
 	import { voiPrice } from '$lib/stores/price';
-	import { estimateRewards } from '$lib/rewards/calculatorModel';
-	import {
-		availability,
-		breakEvenTile,
-		isPriceStale,
-		priceLabel,
-		resultsState,
-		profitPercentageText,
-		validateCustomPrice,
-		validateNodeCost,
-		validateStake
-	} from './calculatorView';
-	import { buildScheduleCsv, scheduleRows, type ScheduleRow } from './calculatorSchedule';
+	import { isPriceStale, priceLabel, validateCustomPrice, validateStake } from './calculatorView';
 	import CalculatorBlockRewards from './CalculatorBlockRewards.svelte';
 
 	export let walletAddress: string | undefined = undefined;
@@ -40,34 +15,15 @@
 	export let primaryAccountInfo: unknown | undefined = undefined;
 
 	let nodeCost: number | undefined = 10;
-	const isPercentageBased = false;
-	const costPercentage = 10;
 	let calculationAmount: number | undefined = 0;
 	let calculationAmountUSD: number | undefined = 10;
 	let walletBalance: number | null = null;
 	let prefilled = false;
 	let loadedAddress: string | undefined;
-	let networkSource: Source<Awaited<ReturnType<typeof loadCalculatorInputs>>> = {
-		state: 'loading'
-	};
 	let balanceSource: Source<number> = { state: 'loading' };
 	let priceSource: Source<number> = { state: 'loading' };
-	let supply: { 'online-money': number } | null = null;
-	let isLoading = true;
-	let loadError = '';
-	let rewardStake = 0;
-	let epochRewards: number[] = [];
-	let estimate: ReturnType<typeof calculateRewards> = null;
-	let tileState: 'loading' | 'ready' = 'loading';
 	let mounted = false;
 	let now = new Date();
-
-	const EPOCH_START_DATE = new Date('2024-10-30');
-	let isRewardScheduleVisible = false;
-	let isPastEpochsVisible = false;
-	let epochSchedule: ScheduleRow[] = [];
-	let pastEpochSchedule: ScheduleRow[] = [];
-	let isDownloadingCSV = false;
 
 	let customPrice: number | null | undefined = null;
 	let useCustomPrice = false;
@@ -86,7 +42,6 @@
 	$: hasPrice = Number.isFinite(effectivePrice) && effectivePrice > 0;
 	$: if (!hasPrice) inputMode = 'voi';
 	$: stakeError = validateStake(inputMode === 'usd' ? calculationAmountUSD : calculationAmount);
-	$: nodeCostError = validateNodeCost(nodeCost);
 	$: priceError = useCustomPrice ? validateCustomPrice(customPrice) : null;
 	$: if (hasPrice) syncPrice(effectivePrice, prefilled, stakeEdited);
 
@@ -108,41 +63,6 @@
 		syncPrice();
 	}
 
-	// Explicit dependencies ensure every input and data change replaces the previous estimate.
-	$: estimate =
-		isLoading ||
-		loadError ||
-		stakeError ||
-		nodeCostError ||
-		priceError ||
-		!Number.isFinite(Number(supply?.['online-money'])) ||
-		!Number.isFinite(rewardStake) ||
-		epochRewards.length === 0 ||
-		!epochRewards.every(Number.isFinite)
-			? null
-			: calculateRewards({
-					stake: Number(calculationAmount),
-					price: effectivePrice,
-					onlineMoney: Number(supply?.['online-money']),
-					rewardStake,
-					epochRewards,
-					nodeCost: Number(nodeCost),
-					isPercentageBased,
-					costPercentage
-				});
-	$: state = resultsState({
-		isLoading: isLoading && !stakeError && !nodeCostError && !priceError,
-		loadFailed: Boolean(loadError),
-		hasEstimate: estimate !== null
-	});
-	$: figures = availability({ hasEstimate: estimate !== null, effectivePrice });
-	$: shownBreakEven = breakEvenTile({
-		hasEstimate: estimate !== null,
-		effectivePrice,
-		reached: estimate?.breakEvenReached ?? false,
-		threshold: estimate?.profitabilityThreshold ?? 0
-	});
-	$: tileState = state === 'loading' ? 'loading' : 'ready';
 	$: shownPriceLabel = priceLabel({
 		useCustomPrice,
 		customPrice,
@@ -150,74 +70,6 @@
 		error: priceSource.error ?? $voiPrice.error
 	});
 	$: stalePrice = !useCustomPrice && isPriceStale($voiPrice.lastUpdated, now);
-	$: visibleRows = isPastEpochsVisible ? [...pastEpochSchedule, ...epochSchedule] : epochSchedule;
-
-	// Preserve the existing field assignments checked by the calculator wiring guard.
-	function calculateRewards(input: Parameters<typeof estimateRewards>[0]) {
-		const estimate = estimateRewards(input);
-		if (estimate === null) return null;
-		let expectedWeeklyBlocks: number;
-		let expectedMonthlyBlocks: number;
-		let expectedYearlyBlocks: number;
-		let apr: number;
-		let apy: number;
-		let profitabilityThreshold: number;
-		let breakEvenReached: boolean;
-		let weeklyReward: number;
-		let weeklyRewardUSD: number;
-		let monthlyReward: number;
-		let monthlyRewardUSD: number;
-		let monthlyProfit: number;
-		let monthlyProfitPercentage: number;
-		let yearlyReward: number;
-		let yearlyRewardUSD: number;
-		let yearlyProfitPercentage: number;
-		let balanceAfterWeek: number;
-		let balanceAfterMonth: number;
-		let balanceAfterYear: number;
-
-		expectedWeeklyBlocks = estimate.expectedWeeklyBlocks;
-		expectedMonthlyBlocks = estimate.expectedMonthlyBlocks;
-		expectedYearlyBlocks = estimate.expectedYearlyBlocks;
-		apr = estimate.apr;
-		apy = estimate.apy;
-		profitabilityThreshold = estimate.profitabilityThreshold;
-		breakEvenReached = estimate.breakEvenReached;
-		weeklyReward = estimate.weeklyReward;
-		weeklyRewardUSD = estimate.weeklyRewardUSD;
-		monthlyReward = estimate.monthlyReward;
-		monthlyRewardUSD = estimate.monthlyRewardUSD;
-		monthlyProfit = estimate.monthlyProfit;
-		monthlyProfitPercentage = estimate.monthlyProfitPercentage;
-		yearlyReward = estimate.yearlyReward;
-		yearlyRewardUSD = estimate.yearlyRewardUSD;
-		yearlyProfitPercentage = estimate.yearlyProfitPercentage;
-		balanceAfterWeek = estimate.balanceAfterWeek;
-		balanceAfterMonth = estimate.balanceAfterMonth;
-		balanceAfterYear = estimate.balanceAfterYear;
-
-		return {
-			expectedWeeklyBlocks,
-			expectedMonthlyBlocks,
-			expectedYearlyBlocks,
-			apr,
-			apy,
-			profitabilityThreshold,
-			breakEvenReached,
-			weeklyReward,
-			weeklyRewardUSD,
-			monthlyReward,
-			monthlyRewardUSD,
-			monthlyProfit,
-			monthlyProfitPercentage,
-			yearlyReward,
-			yearlyRewardUSD,
-			yearlyProfitPercentage,
-			balanceAfterWeek,
-			balanceAfterMonth,
-			balanceAfterYear
-		};
-	}
 
 	function handleUnitChange(mode: 'usd' | 'voi') {
 		if (
@@ -288,40 +140,8 @@
 	// Retries clear their alerts or swap them for loading; these sections keep focus in place.
 	let stakeSection: HTMLElement | undefined;
 	let costSection: HTMLElement | undefined;
-	let estimateSection: HTMLElement | undefined;
 
-	const networkReader = createReadSource(loadCalculatorInputs, (result) => {
-		networkSource = result;
-		isLoading = result.state === 'loading';
-		loadError = result.state === 'error' ? 'Calculator inputs unavailable' : '';
-		if (result.value) {
-			supply = { 'online-money': result.value.onlineMoney };
-			rewardStake = result.value.rewardStake;
-			epochRewards = result.value.epochRewards;
-			const date = new Date();
-			epochSchedule = scheduleRows(
-				epochRewards,
-				result.value.currentEpochNumber,
-				EPOCH_START_DATE,
-				date
-			);
-			const past = result.value.pastEpochRewards;
-			pastEpochSchedule = scheduleRows(
-				past,
-				result.value.currentEpochNumber - past.length,
-				EPOCH_START_DATE,
-				date
-			)
-				.slice(0, past.length)
-				.map((row) => ({ ...row, isCurrent: false }));
-		} else {
-			supply = null;
-			rewardStake = 0;
-			epochRewards = [];
-			epochSchedule = [];
-			pastEpochSchedule = [];
-		}
-	});
+	const epochCalc = epochCalculator();
 	const balanceReader = createReadSource(loadCalculatorBalance, (result) => {
 		balanceSource = result;
 		if (result.value !== undefined) applyBalance(result.value);
@@ -329,9 +149,6 @@
 	const priceReader = createReadSource(loadCalculatorPrice, (result) => {
 		priceSource = result;
 	});
-	async function loadData() {
-		await networkReader.load(walletAddress ?? '', true);
-	}
 	function changeAddress(address: string | undefined) {
 		loadedAddress = address;
 		balanceReader.dispose();
@@ -343,7 +160,7 @@
 			calculationAmountUSD = 0;
 			inputMode = 'voi';
 		}
-		void networkReader.load(address ?? '');
+		void epochCalc?.load(address ?? '');
 		if (address) void balanceReader.load(address);
 		void priceReader.load(address ?? '');
 	}
@@ -353,7 +170,7 @@
 		const timer = setInterval(() => (now = new Date()), 30000);
 		return () => {
 			clearInterval(timer);
-			networkReader.dispose();
+			epochCalc?.dispose();
 			balanceReader.dispose();
 			priceReader.dispose();
 		};
@@ -368,62 +185,7 @@
 			maximumFractionDigits: maxDecimals
 		}).format(value);
 	}
-
-	function formatDate(date: Date): string {
-		return (
-			date.toLocaleDateString('en-US', {
-				month: 'short',
-				day: 'numeric',
-				year: 'numeric',
-				timeZone: 'UTC'
-			}) + ' UTC'
-		);
-	}
-
-	async function downloadEpochScheduleCSV() {
-		isDownloadingCSV = true;
-		try {
-			const amounts: number[] = [];
-			for (let epoch = 0; epoch < 20 * 52; epoch++) {
-				amounts.push(await getTokensByEpoch(epoch + 1));
-			}
-			const csvContent = buildScheduleCsv(amounts, EPOCH_START_DATE);
-			const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-			const link = document.createElement('a');
-			const url = URL.createObjectURL(blob);
-			link.setAttribute('href', url);
-			link.setAttribute(
-				'download',
-				`epoch-schedule-${EPOCH_START_DATE.toISOString().split('T')[0]}.csv`
-			);
-			link.style.visibility = 'hidden';
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
-			URL.revokeObjectURL(url);
-		} catch (error) {
-			console.error('Error generating CSV:', error);
-			alert('Failed to generate CSV. Please try again.');
-		} finally {
-			isDownloadingCSV = false;
-		}
-	}
 </script>
-
-{#snippet epochCell(row: ScheduleRow)}
-	<div class="flex flex-wrap items-center gap-2">
-		<span>{row.epochNumber + 1}</span>
-		{#if row.isCurrent}<Chip label="Current" />{/if}
-	</div>
-{/snippet}
-{#snippet dateCell(row: ScheduleRow)}
-	<span class="whitespace-normal">{formatDate(row.startDate)} - {formatDate(row.endDate)}</span>
-{/snippet}
-{#snippet poolCell(row: ScheduleRow)}
-	<span class="break-words"
-		>{row.rewardPool.toLocaleString(undefined, { maximumFractionDigits: 0 })} VOI</span
-	>
-{/snippet}
 
 <div class="min-w-0 space-y-6 text-body text-ink">
 	<div class="grid min-w-0 gap-bento lg:grid-cols-2">
@@ -572,11 +334,11 @@
 		</section>
 		<section
 			bind:this={costSection}
-			aria-label="Cost and price"
+			aria-label={epochCalc ? 'Cost and price' : 'Price'}
 			tabindex="-1"
 			class="min-w-0 space-y-4 focus:outline-none"
 		>
-			<h2 class="text-h2">Cost and price</h2>
+			<h2 class="text-h2">{epochCalc ? 'Cost and price' : 'Price'}</h2>
 			<div class="space-y-6">
 				{#if priceSource.error && !useCustomPrice}<InlineAlert
 						message="Market price unavailable. VOI estimates remain available."
@@ -585,41 +347,12 @@
 							() => void priceReader.load(walletAddress ?? '', true)
 						)}
 					/>{/if}
-				<div>
-					<label for="monthly-node-cost" class="mb-2 block text-label text-ink-muted"
-						>Monthly node cost (USD)</label
-					>
-					<div class="flex min-w-0 items-center gap-2">
-						<Button
-							variant="soft"
-							aria-label="Decrease monthly node cost"
-							onclick={() => (nodeCost = Math.max(0, Number(nodeCost || 0) - 1))}>−</Button
-						>
-						<input
-							id="monthly-node-cost"
-							type="number"
-							min="0"
-							step="1"
-							bind:value={nodeCost}
-							aria-invalid={Boolean(nodeCostError)}
-							aria-describedby={nodeCostError ? 'node-cost-error' : undefined}
-							class="block w-full min-w-0 rounded-ds-sm border border-edge bg-surface px-3 py-2 text-ink flex-1"
-						/>
-						<Button
-							variant="soft"
-							aria-label="Increase monthly node cost"
-							onclick={() => (nodeCost = Number(nodeCost || 0) + 1)}>+</Button
-						>
-					</div>
-					{#if nodeCostError}<p
-							id="node-cost-error"
-							role="alert"
-							class="mt-2 text-label text-danger"
-						>
-							{nodeCostError}
-						</p>{/if}
-				</div>
-				<div class="space-y-3 border-t border-line pt-4">
+				{#if epochCalc}<EpochNodeCost bind:cost={nodeCost} />{/if}
+				<div
+					class="space-y-3 {epochCalc || (priceSource.error && !useCustomPrice)
+						? 'border-t border-line pt-4'
+						: ''}"
+				>
 					<div class="flex flex-wrap items-center gap-2">
 						{#if useCustomPrice}
 							<label for="custom-price" class="text-label text-ink-muted">Your price</label>
@@ -669,180 +402,21 @@
 		</section>
 	</div>
 
-	<section
-		bind:this={estimateSection}
-		aria-labelledby="estimated-rewards-heading"
-		tabindex="-1"
-		class="space-y-4 focus:outline-none"
-	>
-		{#if networkSource.state === 'stale'}<p class="text-label text-warn">
-				As of {new Date(networkSource.asOf).toUTCString()}
-			</p>
-			{#if networkSource.error}<InlineAlert
-					tone="warn"
-					message="Refresh failed; showing the last loaded calculator inputs."
-					onretry={retryKeepingFocus(
-						() => estimateSection,
-						() => void loadData()
-					)}
-				/>{/if}{/if}
-		<h2 id="estimated-rewards-heading" class="text-h2">Your estimated rewards</h2>
-		{#if state === 'unavailable'}
-			<InlineAlert
-				message={[loadError, stakeError, nodeCostError, priceError].filter(Boolean).join(' ') ||
-					'Error loading data. Please try again later.'}
-				onretry={retryKeepingFocus(
-					() => estimateSection,
-					loadError || (!stakeError && !nodeCostError && !priceError)
-						? () => void loadData()
-						: undefined
-				)}
-			/>
-		{/if}
-		<div class="grid gap-bento md:grid-cols-3">
-			<StatTile
-				label="Weekly"
-				value={figures.voiEstimates && estimate ? compact(estimate.weeklyReward, 1) : 'Unavailable'}
-				unit={figures.voiEstimates ? 'VOI' : undefined}
-				detail={figures.usdFigures && estimate
-					? formatUSD(estimate.weeklyRewardUSD)
-					: figures.voiEstimates
-						? 'Unavailable without a price'
-						: undefined}
-				state={tileState}
-			/>
-			<div class="min-w-0 rounded-card ring-2 ring-accent">
-				<StatTile
-					label="Monthly"
-					value={figures.voiEstimates && estimate
-						? compact(estimate.monthlyReward, 1)
-						: 'Unavailable'}
-					unit={figures.voiEstimates ? 'VOI' : undefined}
-					detail={figures.usdFigures && estimate
-						? formatUSD(estimate.monthlyRewardUSD)
-						: figures.voiEstimates
-							? 'Unavailable without a price'
-							: undefined}
-					state={tileState}
-				/>
-			</div>
-			<StatTile
-				label="Yearly"
-				value={figures.voiEstimates && estimate ? compact(estimate.yearlyReward, 1) : 'Unavailable'}
-				unit={figures.voiEstimates ? 'VOI' : undefined}
-				detail={figures.usdFigures && estimate
-					? formatUSD(estimate.yearlyRewardUSD)
-					: figures.voiEstimates
-						? 'Unavailable without a price'
-						: undefined}
-				state={tileState}
-			/>
-		</div>
-		<div class="grid gap-bento sm:grid-cols-2">
-			<StatTile
-				label="APR"
-				value={figures.voiEstimates && estimate ? `${estimate.apr.toFixed(2)}%` : 'Unavailable'}
-				state={tileState}
-			/>
-			<StatTile
-				label="APY"
-				value={figures.voiEstimates && estimate ? `${estimate.apy.toFixed(2)}%` : 'Unavailable'}
-				state={tileState}
-			/>
-			<StatTile
-				label="Monthly profit"
-				value={figures.usdFigures && estimate ? formatUSD(estimate.monthlyProfit) : 'Unavailable'}
-				detail={figures.usdFigures && estimate
-					? profitPercentageText(
-							Number(nodeCost),
-							estimate.monthlyProfitPercentage,
-							estimate.yearlyProfitPercentage
-						)
-					: figures.voiEstimates
-						? 'Unavailable without a price'
-						: undefined}
-				state={tileState}
-			/>
-			<div class="min-w-0 space-y-3">
-				<StatTile
-					label="Break-even stake"
-					value={shownBreakEven.value}
-					unit={shownBreakEven.unit}
-					detail={shownBreakEven.detail}
-					state={tileState}
-				/>
-				{#if shownBreakEven.showUseButton}<Button
-						variant="ghost"
-						size="sm"
-						onclick={() => estimate && setFixedAmount(estimate.profitabilityThreshold)}
-						>Use break-even stake</Button
-					>{/if}
-			</div>
-		</div>
-		{#if figures.usdFigures && estimate && estimate.monthlyProfit < 0}<p
-				class="text-body text-ink-muted"
-			>
-				At this stake the estimated monthly rewards are below your monthly node cost.
-			</p>{/if}
-		<div
-			class="space-y-2 rounded-card border border-line bg-surface-2 p-card text-label text-ink-muted"
-		>
-			<p>* Calculations assume current network conditions and weekly compounding of rewards.</p>
-			<p>* Actual rewards and rates may vary based on network participation and other factors.</p>
-			<p>* This tool is for entertainment purposes only. It is not financial advice.</p>
-			<p>
-				{#if $voiPrice.lastUpdated}Data as of {$voiPrice.lastUpdated.toLocaleString('en-US', {
-						timeZone: 'UTC',
-						timeZoneName: 'short'
-					})} (market price).{:else}Market price timestamp unavailable.{/if}
-			</p>
-		</div>
-	</section>
+	{#if epochCalc}<EpochEstimate
+			calc={epochCalc}
+			{calculationAmount}
+			{effectivePrice}
+			{nodeCost}
+			{stakeError}
+			{priceError}
+			onusestake={setFixedAmount}
+		/>{/if}
 	<CalculatorBlockRewards
 		stake={stakeError ? null : Number(calculationAmount)}
 		price={hasPrice ? effectivePrice : null}
 	/>
 
-	<Card>
-		<div class="flex flex-wrap items-center justify-between gap-3">
-			<Button
-				variant="ghost"
-				aria-expanded={isRewardScheduleVisible}
-				aria-controls="reward-schedule"
-				onclick={() => (isRewardScheduleVisible = !isRewardScheduleVisible)}
-				>{isRewardScheduleVisible ? '▴' : '▾'} View Reward Schedule</Button
-			>
-			<Button
-				variant="soft"
-				disabled={isDownloadingCSV}
-				onclick={() => void downloadEpochScheduleCSV()}
-				>{isDownloadingCSV ? 'Generating...' : 'Download CSV'}</Button
-			>
-		</div>
-		<div id="reward-schedule" hidden={!isRewardScheduleVisible} class="mt-4 min-w-0">
-			{#if pastEpochSchedule.length > 0}<Button
-					variant="ghost"
-					size="sm"
-					aria-pressed={isPastEpochsVisible}
-					onclick={() => (isPastEpochsVisible = !isPastEpochsVisible)}>Previous epochs</Button
-				>{/if}
-			<DataTable
-				columns={[
-					{ key: 'epochNumber', header: 'Epoch', priority: 1, cell: epochCell },
-					{ key: 'dates', header: 'Date range', priority: 2, cell: dateCell },
-					{ key: 'rewardPool', header: 'Reward pool', priority: 1, numeric: true, cell: poolCell }
-				] satisfies Column<ScheduleRow>[]}
-				rows={visibleRows}
-				rowKey={(row) => String(row.epochNumber)}
-				caption="Epoch reward schedule"
-				density="compact"
-				expandable
-				rowName={(row) => `epoch ${row.epochNumber + 1}`}
-				state={isLoading ? 'loading' : loadError || !epochSchedule.length ? 'error' : 'ready'}
-				onretry={() => void loadData()}
-			/>
-		</div>
-	</Card>
+	{#if epochCalc}<EpochSchedule calc={epochCalc} />{/if}
 
 	<div class="flex flex-wrap gap-x-6 gap-y-3 text-label">
 		<a href="/how_to_node#guides" class="text-accent underline underline-offset-4"

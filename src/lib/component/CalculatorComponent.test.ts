@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
-import { buildScheduleCsv, scheduleRows } from './calculatorSchedule';
+import { buildScheduleCsv, scheduleRows } from '$lib/epochRewards/calculator/schedule';
 const source = readFileSync(new URL('./CalculatorComponent.svelte', import.meta.url), 'utf8');
 function harness() {
 	const ast = ts.createSourceFile(
@@ -56,15 +56,12 @@ it('retains standalone schedule and CSV shape', () => {
 });
 it('mounts the block reward estimates after the epoch rewards section', () => {
 	const markup = source.split('</script>').slice(1).join('</script>');
-	const epoch = markup.lastIndexOf(
-		'<section',
-		markup.indexOf('aria-labelledby="estimated-rewards-heading"')
-	);
+	const epoch = markup.indexOf('{#if epochCalc}<EpochEstimate');
 	expect(epoch).toBeGreaterThan(0);
-	const epochEnd = markup.indexOf('</section>', epoch);
+	const epochEnd = markup.indexOf('{/if}', epoch);
 	const mount = markup.indexOf('<CalculatorBlockRewards');
 	expect(mount).toBeGreaterThan(epochEnd);
-	expect(markup.slice(epochEnd + '</section>'.length, mount).trim()).toBe('');
+	expect(markup.slice(epochEnd + '{/if}'.length, mount).trim()).toBe('');
 	expect(markup.slice(mount, markup.indexOf('/>', mount) + 2)).toBe(
 		'<CalculatorBlockRewards\n\t\tstake={stakeError ? null : Number(calculationAmount)}\n\t\tprice={hasPrice ? effectivePrice : null}\n\t/>'
 	);
