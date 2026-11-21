@@ -116,7 +116,6 @@ const PENDING = {
 		'src/lib/component/NodeComponent.svelte',
 		'src/lib/component/PortfolioComponent.svelte',
 		'src/lib/component/TransactionExportPanel.svelte',
-		'src/lib/ds/WalletOverview/WalletOverview.svelte',
 		'src/lib/network/model.ts',
 		'src/lib/utils.ts',
 		'src/lib/wallet/calculator.ts'

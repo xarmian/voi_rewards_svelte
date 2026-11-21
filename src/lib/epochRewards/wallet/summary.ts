@@ -1,4 +1,5 @@
 import type { WalletAccount } from '$lib/wallet/summary';
+import { EPOCH_REWARDS_ENABLED } from '../config';
 
 export type WalletEpoch = {
 	epoch: number;
@@ -112,4 +113,24 @@ export function summarizeWalletEpochs({
 				? completed.reduce((total, epoch) => total + (epoch.blocks ?? 0), 0) / expectedHistory
 				: null
 	};
+}
+
+const WALLET_EPOCH_KEYS = [
+	'tooEarly',
+	'current',
+	'history',
+	'earnedHistory',
+	'historyRatio'
+] as const;
+
+/**
+ * The wallet summary with its epoch half, for the epoch cards; null when epoch rewards
+ * are off. It is the summary itself, not a copy.
+ */
+export function walletEpochView<T extends Partial<WalletEpochSummary>>(
+	summary: T
+): (T & WalletEpochSummary) | null {
+	if (!EPOCH_REWARDS_ENABLED || WALLET_EPOCH_KEYS.some((key) => summary[key] === undefined))
+		return null;
+	return summary as T & WalletEpochSummary;
 }

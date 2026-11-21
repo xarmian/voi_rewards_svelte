@@ -1,4 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
+import { render } from 'svelte/server';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -46,7 +47,13 @@ vi.mock('../../stores/dataTable', () => ({
 		fetchData: mocks.rows
 	}
 }));
+vi.mock('$lib/component/RegisterVoteKey.svelte', () => ({ default: () => {} }));
+vi.mock('$lib/component/WithdrawModal.svelte', () => ({ default: () => {} }));
 import { loadWallet } from '$lib/wallet/load';
+import { summarizeWallet, type WalletContract } from '$lib/wallet/summary';
+import WalletOverview from '$lib/ds/WalletOverview/WalletOverview.svelte';
+import WalletContracts from '$lib/ds/WalletContracts/WalletContracts.svelte';
+import WalletRewards from '$lib/ds/WalletRewards/WalletRewards.svelte';
 
 beforeEach(() => {
 	order.length = 0;
@@ -153,4 +160,100 @@ test('the rewards readers start in order and Refresh rewards refreshes all seven
 		'loadDailyStake',
 		'loadRewardSupply'
 	]);
+});
+
+const now = Date.parse('2026-10-25T00:00:00Z');
+const contract: WalletContract = {
+	address: 'ESCROW',
+	contractId: 7,
+	balance: 10000,
+	minBalance: 0.1,
+	isParticipating: true,
+	round: 100,
+	voteLastValid: 300000,
+	details: null
+};
+const current = {
+	epoch: 104,
+	networkBlocks: 100000,
+	onlineStake: 1e6,
+	pool: 2000000,
+	progress: 0.5,
+	blocks: { ESCROW: 1234 }
+};
+const titles = (html: string) =>
+	[...html.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map(
+		(match) => match[1]
+	);
+const span = (html: string, title: string) =>
+	html
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.split('<section')
+		.find((part) => part.includes(`>${title}</h2>`))
+		?.match(/class="([^"]*)"/)?.[1];
+
+test('the Overview keeps its epoch card and chart under their titles, in order', () => {
+	const summary = summarizeWallet({
+		owner: null,
+		contracts: [contract],
+		current,
+		history: [{ ...current, epoch: 103, progress: 1 }],
+		state: 'ready',
+		now,
+		tokens: { state: 'ready', lp: 0, other: 0, lpCount: 0, tokenCount: 0 }
+	});
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts: [contract],
+			current,
+			historyState: 'ready',
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now
+		}
+	}).body;
+	expect(titles(html).slice(0, 4)).toEqual([
+		'Node health',
+		'This epoch so far',
+		'Blocks vs expected',
+		'Holdings'
+	]);
+	expect(span(html, 'Node health')).toContain('lg:col-span-5');
+	expect(span(html, 'This epoch so far')).toContain('lg:col-span-7');
+	expect(span(html, 'Holdings')).toContain('lg:col-span-4');
+	expect(html).toContain('aria-label="Epoch 104 elapsed"');
+	expect(html).toContain('aria-roledescription="chart"');
+});
+
+test('the Contracts table keeps its blocks-this-epoch column', () => {
+	const html = render(WalletContracts, {
+		props: {
+			contracts: [contract],
+			current,
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			state: 'ready'
+		}
+	}).body;
+	expect(html).toContain('Blocks this epoch');
+	expect(html).toContain('1,234');
+});
+
+test('the Rewards tab keeps the epoch table, then daily and payouts side by side', () => {
+	const html = render(WalletRewards, {
+		props: { pageAddress: 'Y', now: new Date('2026-11-07T12:00:00Z') }
+	}).body;
+	const order = [
+		'Rewards by epoch',
+		'Refresh rewards',
+		'Daily proposals',
+		'Recorded epoch rewards'
+	];
+	const at = order.map((label) => html.indexOf(label));
+	expect(at.every((index) => index >= 0)).toBe(true);
+	expect(at).toEqual([...at].sort((a, b) => a - b));
+	expect(html).toMatch(/class="[^"]*lg:col-span-8[^"]*"/);
+	expect(html).toMatch(/class="[^"]*lg:col-span-4[^"]*"/);
+	expect(html).not.toContain('lg:col-span-12');
 });

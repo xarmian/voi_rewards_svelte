@@ -1,4 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
+import { render } from 'svelte/server';
 
 // The switch-off wallet: no epoch read starts and no epoch figure is returned.
 // The flag is a getter so one case can compare against the switch-on summary.
@@ -39,9 +40,19 @@ vi.mock('$lib/utils', () => ({ getTokensByEpoch: mocks.pool }));
 vi.mock('../../stores/dataTable', () => ({
 	dataTable: { fetchDateRanges: mocks.dates, fetchData: mocks.rows }
 }));
+vi.mock('$lib/component/RegisterVoteKey.svelte', () => ({ default: () => {} }));
+vi.mock('$lib/component/WithdrawModal.svelte', () => ({ default: () => {} }));
+vi.mock('$lib/epochRewards/client', async (original) => {
+	const actual = await original<typeof import('$lib/epochRewards/client')>();
+	return { ...actual, createEpochRewardsState: vi.fn(actual.createEpochRewardsState) };
+});
 import { loadWallet } from '$lib/wallet/load';
 import { summarizeWallet } from '$lib/wallet/summary';
-import type { WalletAccount } from '$lib/wallet/summary';
+import type { WalletAccount, WalletContract } from '$lib/wallet/summary';
+import { createEpochRewardsState, epochRewardReaders } from '$lib/epochRewards/client';
+import WalletOverview from '$lib/ds/WalletOverview/WalletOverview.svelte';
+import WalletContracts from '$lib/ds/WalletContracts/WalletContracts.svelte';
+import WalletRewards from '$lib/ds/WalletRewards/WalletRewards.svelte';
 
 beforeEach(() => {
 	flag.on = false;
@@ -118,4 +129,95 @@ test('the wallet summary has no epoch keys and the same health and holdings', ()
 	);
 	for (const [key, value] of Object.entries(off))
 		expect(value, key).toEqual(on[key as keyof typeof on]);
+});
+
+const now = Date.parse('2026-10-25T00:00:00Z');
+const contract: WalletContract = {
+	address: 'ESCROW',
+	contractId: 7,
+	balance: 10000,
+	minBalance: 0.1,
+	isParticipating: true,
+	round: 100,
+	voteLastValid: 300000,
+	details: null
+};
+const text = (html: string) =>
+	html
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ');
+/** Each titled card's class list and the text after its title. */
+function cards(html: string) {
+	return html
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.split('<section')
+		.slice(1)
+		.map((part) => {
+			const title = part.match(/<h2[^>]*>([^<]*)<\/h2>/)?.[1] ?? '';
+			const body = text(part.split('</h2>').slice(1).join('</h2>').split('</section>')[0]);
+			return { title, classes: part.match(/class="([^"]*)"/)?.[1] ?? '', body: body.trim() };
+		});
+}
+
+test('the Overview has no epoch card or chart, and Node health widens beside Holdings', () => {
+	const summary = summarizeWallet({
+		owner: null,
+		contracts: [contract],
+		current: null,
+		history: [],
+		state: 'ready',
+		now,
+		tokens: { state: 'ready', lp: 0, other: 0, lpCount: 0, tokenCount: 0 }
+	});
+	const html = render(WalletOverview, {
+		props: {
+			summary,
+			contracts: [contract],
+			current: null,
+			historyState: 'ready',
+			pageAddress: 'OWNER',
+			accountState: { state: 'read-only' },
+			now
+		}
+	}).body;
+	expect(text(html)).not.toMatch(/epoch/i);
+	expect(html).not.toContain('This epoch so far');
+	expect(html).not.toContain('Blocks vs expected');
+	const shown = cards(html);
+	expect(shown.find((card) => card.title === 'Node health')?.classes).toContain('lg:col-span-8');
+	expect(shown.find((card) => card.title === 'Holdings')?.classes).toContain('lg:col-span-4');
+	for (const card of shown) expect(card.body, card.title).not.toBe('');
+});
+
+test('the Contracts table has no blocks-this-epoch column or detail', () => {
+	for (const mode of ['overview', 'full'] as const) {
+		const html = render(WalletContracts, {
+			props: {
+				contracts: [contract],
+				current: null,
+				pageAddress: 'OWNER',
+				accountState: { state: 'read-only' },
+				state: 'ready',
+				mode
+			}
+		}).body;
+		expect(html, mode).not.toContain('Blocks this epoch');
+	}
+});
+
+test('the Rewards tab has no epoch table, payouts chart or epoch refresh, and its daily chart is full width', () => {
+	const html = render(WalletRewards, {
+		props: { pageAddress: 'Y', now: new Date('2026-11-07T12:00:00Z') }
+	}).body;
+	for (const gone of ['Rewards by epoch', 'Recorded epoch rewards', 'Refresh rewards'])
+		expect(html).not.toContain(gone);
+	expect(html).toContain('Daily proposals');
+	expect(html).toMatch(/class="[^"]*lg:col-span-12[^"]*"/);
+	expect(html).not.toContain('lg:col-span-8');
+	expect(createEpochRewardsState).not.toHaveBeenCalled();
+});
+
+test('no epoch reader is made without the epoch sources', () => {
+	expect(epochRewardReaders(null)).toBeNull();
 });

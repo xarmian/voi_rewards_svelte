@@ -2,8 +2,8 @@
 // It pulls in the client rewards cache, so the layout and header never import it;
 // they use index.ts.
 export { startWalletEpochs } from './wallet/load';
-export { createEpochRewardsState } from './wallet/state.svelte';
-export { summarizeWalletEpochs } from './wallet/summary';
+export { createEpochRewardsState, epochRewardReaders } from './wallet/state.svelte';
+export { summarizeWalletEpochs, walletEpochView } from './wallet/summary';
 export type { EpochSummary, WalletEpoch, WalletEpochSummary } from './wallet/summary';
 export {
 	cumulativePayouts,

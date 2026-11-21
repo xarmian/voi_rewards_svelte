@@ -1,5 +1,8 @@
 <script lang="ts">
-	import type { WalletSummary, WalletContract, WalletEpoch } from '$lib/wallet/summary';
+	import type { WalletSummary, WalletContract } from '$lib/wallet/summary';
+	import type { WalletEpoch } from '$lib/epochRewards';
+	import { walletEpochView } from '$lib/epochRewards/client';
+	import { WalletEpochCard, WalletEpochChart } from '$lib/epochRewards/components';
 	import type { PageAccountState } from '$lib/chain/signerGate';
 	import type { DataState } from '../types';
 	import Card from '../Card/Card.svelte';
@@ -8,14 +11,11 @@
 	import StatusPill from '../StatusPill/StatusPill.svelte';
 	import BlockRewardStatusPill from '../BlockRewardStatusPill/BlockRewardStatusPill.svelte';
 	import Button from '../Button/Button.svelte';
-	import ChartFrame from '../ChartFrame/ChartFrame.svelte';
-	import BarsVsExpected from '../charts/BarsVsExpected.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import Chip from '../Chip/Chip.svelte';
 	import WalletContracts from '../WalletContracts/WalletContracts.svelte';
 	import WalletBlockRewards from '../WalletBlockRewards/WalletBlockRewards.svelte';
-	import { annotationsFor } from '$lib/data/chartEvents';
-	import { ago, comma, compact, pct, usd } from '../format';
+	import { ago, comma, compact, usd } from '../format';
 	import { retryKeepingFocus } from '../retryFocus';
 
 	let {
@@ -50,29 +50,12 @@
 	const loading = $derived(summary.state === 'loading');
 	const failed = $derived(summary.state === 'error');
 	const stakingUnavailable = $derived(summary.contractSet === 'unavailable');
+	// The epoch card and chart, or null when epoch rewards are off.
+	const epoch = $derived(walletEpochView(summary));
 	// A refresh swaps each card's alert for its loading state; these stable regions keep focus in the card.
 	let healthRegion: HTMLDivElement | undefined = $state();
-	let epochRegion: HTMLDivElement | undefined = $state();
 	let holdingsRegion: HTMLDivElement | undefined = $state();
 	let unlocksRegion: HTMLDivElement | undefined = $state();
-	const bars = $derived(
-		summary.history.map((epoch) => ({
-			x: epoch.epoch,
-			value: epoch.blocks ?? NaN,
-			expected: epoch.expected ?? NaN
-		}))
-	);
-	const chartState = $derived(
-		loading
-			? 'loading'
-			: failed || stakingUnavailable
-				? 'error'
-				: historyState === 'error'
-					? 'error'
-					: summary.history.length
-						? summary.state
-						: 'empty'
-	);
 	const date = (value: string | number) =>
 		new Intl.DateTimeFormat('en-US', {
 			month: 'short',
@@ -158,7 +141,7 @@
 {/snippet}
 
 <div class="grid min-w-0 grid-cols-1 gap-bento md:grid-cols-2 lg:grid-cols-12">
-	<Card title="Node health" span={{ lg: 5 }} actions={healthStatus}>
+	<Card title="Node health" span={{ lg: epoch ? 5 : 8 }} actions={healthStatus}>
 		<div bind:this={healthRegion} tabindex="-1" class="focus:outline-none">
 			{#if !loading && (failed || stakingUnavailable)}<InlineAlert
 					message="Node health unavailable."
@@ -235,144 +218,8 @@
 			{/if}
 		</div>
 	</Card>
-	<Card title="This epoch so far" variant="hero" span={{ lg: 7 }}>
-		<div bind:this={epochRegion} tabindex="-1" class="focus:outline-none">
-			{#if loading}
-				<div aria-busy="true" class="space-y-4 py-3">
-					<span class="sr-only">Loading this epoch…</span>
-					<div aria-hidden="true" class="h-14 rounded bg-on-hero-surface"></div>
-					<div aria-hidden="true" class="h-6 rounded bg-on-hero-surface"></div>
-				</div>
-			{:else if failed || stakingUnavailable}<InlineAlert
-					message="This epoch unavailable. Earned rewards and luck unavailable."
-					onretry={retryKeepingFocus(() => epochRegion, onrefresh)}
-				/>
-			{:else}
-				<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-					<strong class="text-hero-num" title={String(summary.current.reward ?? '')}
-						>{summary.current.reward === null ? '—' : `≈ ${compact(summary.current.reward, 1)}`}
-						<span class="text-h2">VOI</span></strong
-					>
-					<span class="text-on-hero-muted"
-						>{summary.current.reward !== null && price !== null
-							? usd(summary.current.reward * price)
-							: 'USD unavailable'}</span
-					>
-				</p>
-				<p class="mt-2 text-sm text-on-hero-muted">
-					{comma(summary.current.blocks)} blocks · {pct(
-						summary.current.share === null ? null : summary.current.share * 100
-					)} of the network · {pct(
-						summary.current.ratio === null ? null : summary.current.ratio * 100,
-						0
-					)} of expected
-				</p>
-				{#if summary.tooEarly}<p class="mt-2 text-label">
-						Too early to project rewards: fewer than 50 expected blocks.
-					</p>{/if}
-				<div
-					class="my-4 h-2 rounded-full bg-on-hero-surface"
-					role="progressbar"
-					aria-label={`Epoch ${summary.current.epoch} elapsed`}
-					aria-valuemin="0"
-					aria-valuemax="100"
-					aria-valuenow={Math.round(summary.current.progress * 100)}
-				>
-					<div
-						class="h-full rounded-full bg-on-hero"
-						style:width={`${summary.current.progress * 100}%`}
-					></div>
-				</div>
-				<dl class="grid grid-cols-2 gap-4 text-label sm:grid-cols-3">
-					<div>
-						<dt class="text-on-hero-muted">Staked online</dt>
-						<dd class="text-h2">{compact(summary.stakedOnline)} VOI</dd>
-					</div>
-					<div>
-						<dt class="text-on-hero-muted">Earned, {summary.history.length || 12} epochs</dt>
-						<dd class="text-h2">
-							{historyState === 'error' ? 'Unavailable' : `≈ ${compact(summary.earnedHistory)} VOI`}
-						</dd>
-					</div>
-					<div>
-						<dt class="text-on-hero-muted">{summary.history.length || 12}-epoch luck</dt>
-						<dd class="text-h2">
-							{historyState === 'error'
-								? 'Unavailable'
-								: pct(summary.historyRatio === null ? null : summary.historyRatio * 100, 0)}
-						</dd>
-					</div>
-				</dl>
-				<details class="mt-4 text-label">
-					<summary class="cursor-pointer">View current epoch data</summary>
-					<dl class="mt-2 grid grid-cols-1 gap-2">
-						<div>
-							<dt>Produced · live epoch rows</dt>
-							<dd>{comma(summary.current.blocks)} blocks</dd>
-						</div>
-						<div>
-							<dt>
-								Expected · live network blocks × algod online balance ÷ eligible stake (algod supply
-								minus excluded stake)
-							</dt>
-							<dd>
-								{comma(summary.current.expected, 2)} blocks = {comma(current?.networkBlocks)} × {comma(
-									summary.stakedOnline,
-									6
-								)} ÷ {comma(current?.onlineStake, 6)}
-							</dd>
-						</div>
-						<div>
-							<dt>Reward estimate · epoch pool ÷ projected network blocks × produced</dt>
-							<dd>
-								{comma(summary.current.reward, 6)} VOI; pool {comma(current?.pool)} VOI. This is an estimate,
-								not a recorded reward.
-							</dd>
-						</div>
-					</dl>
-				</details>
-			{/if}
-		</div>
-	</Card>
-	<div class="min-w-0 lg:col-span-8">
-		<ChartFrame
-			title="Blocks vs expected"
-			summary="Blocks produced and expected over the last 12 complete epochs. Expected uses current online balances as an approximation of historical stake."
-			state={chartState}
-			{asOf}
-			onretry={onrefresh}
-			legend={[
-				{ label: 'Produced', swatch: 'fill' },
-				{ label: '>115% of expected', swatch: 'hi' },
-				{ label: 'Expected', swatch: 'expected' }
-			]}
-			annotations={annotationsFor('blocksVsExpected', 'epoch')}
-			x={{ kind: 'band', values: bars.map((bar) => bar.x) }}
-			y={{
-				domain: [
-					0,
-					Math.max(
-						1,
-						...bars.flatMap((bar) => [bar.value, Number.isFinite(bar.expected) ? bar.expected : 0])
-					) * 1.2
-				]
-			}}
-			data={{
-				columns: ['Epoch', 'Produced', 'Expected', 'Luck', 'Est. reward (VOI)'],
-				rows: summary.history.map((epoch) => [
-					epoch.epoch,
-					epoch.blocks ?? 'Unavailable',
-					epoch.expected ?? 'Unavailable',
-					pct(epoch.ratio === null ? null : epoch.ratio * 100),
-					epoch.reward ?? 'Unavailable'
-				]),
-				caption:
-					'Produced: proposers API epoch rows. Expected = network blocks × current online balances (algod) ÷ eligible online stake (epoch-detail); historical stake is approximate. Reward = epoch pool (getTokensByEpoch) × block share. Luck = produced ÷ expected. Complete epochs only; the current card uses live rows.'
-			}}
-		>
-			{#snippet children(ctx)}<BarsVsExpected {ctx} {bars} />{/snippet}
-		</ChartFrame>
-	</div>
+	{#if epoch}<WalletEpochCard summary={epoch} {current} {historyState} {price} {onrefresh} />
+		<WalletEpochChart summary={epoch} {historyState} {asOf} {onrefresh} />{/if}
 	<Card title="Holdings" span={{ lg: 4 }}>
 		<div bind:this={holdingsRegion} tabindex="-1" class="focus:outline-none">
 			{#if loading}{@render skeleton('holdings')}

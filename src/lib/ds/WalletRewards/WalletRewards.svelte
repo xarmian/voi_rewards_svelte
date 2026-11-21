@@ -4,42 +4,28 @@
 	import Button from '../Button/Button.svelte';
 	import DataTable from '../DataTable/DataTable.svelte';
 	import ChartFrame from '../ChartFrame/ChartFrame.svelte';
-	import StatusPill from '../StatusPill/StatusPill.svelte';
 	import BlockRewardStatusPill from '../BlockRewardStatusPill/BlockRewardStatusPill.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import BarsVsExpected from '../charts/BarsVsExpected.svelte';
-	import LineChart from '../charts/LineChart.svelte';
 	import StatTile from '../StatTile/StatTile.svelte';
 	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
 	import RealtimeTestingBadge from '../RealtimeTestingBadge/RealtimeTestingBadge.svelte';
-	import { comma, compact, MISSING, pct, shortAddr } from '../format';
+	import { comma, compact, MISSING, shortAddr } from '../format';
 	import { retryKeepingFocus } from '../retryFocus';
 	import type { Column } from '../DataTable/types';
 	import type { DataState } from '../types';
 	import { annotationsFor } from '$lib/data/chartEvents';
-	import { epochRange } from '$lib/epochRewards';
 	import { createReadSource } from '$lib/wallet/read';
 	import {
 		createRewardsState,
 		loadDailyProposals,
 		loadRewardAccount,
 		loadDailyStake,
-		dailyProposals,
-		type RewardsState
+		dailyProposals
 	} from '$lib/wallet/rewards';
-	import {
-		createEpochRewardsState,
-		loadRewardEpochs,
-		loadPayouts,
-		loadEligibleStakes,
-		loadRewardSupply,
-		mergeRewardRows,
-		missingEpochsMessage,
-		cumulativePayouts,
-		recordedPayouts,
-		type EpochRewardsState,
-		type WalletRewardRow as RewardRow
-	} from '$lib/epochRewards/client';
+	import { EPOCH_REWARDS_ENABLED } from '$lib/epochRewards';
+	import { createEpochRewardsState, epochRewardReaders } from '$lib/epochRewards/client';
+	import { WalletEpochPayouts, WalletEpochRewards } from '$lib/epochRewards/components';
 	import {
 		BLOCK_REWARD_LAG_ALERT_ROUNDS,
 		loadBlockRewardFunding,
@@ -104,34 +90,36 @@
 	} = $props();
 	let clock = $state(new Date());
 	let at = $derived(now ?? clock);
-	type Sources = RewardsState & EpochRewardsState;
-	let sources: Sources = $state({ ...createRewardsState(), ...createEpochRewardsState() });
+	let sources = $state(createRewardsState());
+	type DailyKey = 'daily' | 'account' | 'dailyStake';
+	// The epoch sources and their readers, or null when epoch rewards are off.
+	const epoch = EPOCH_REWARDS_ENABLED ? createEpochRewardsState() : null;
+	const epochReaders = epochRewardReaders(epoch);
 	// Retries swap alerts for loading states or clear them; these stable regions keep focus in place.
-	let epochsRegion: HTMLDivElement | undefined = $state();
 	let dailyRegion: HTMLDivElement | undefined = $state();
 	let blockRegion: HTMLDivElement | undefined = $state();
+	// Today's start order: epochs, payouts, daily, account, eligible, dailyStake, supply.
 	const readers = {
-		epochs: createReadSource(loadRewardEpochs, (result) => (sources.epochs = result)),
-		payouts: createReadSource(loadPayouts, (result) => (sources.payouts = result)),
+		...(epochReaders && { epochs: epochReaders.epochs, payouts: epochReaders.payouts }),
 		daily: createReadSource(loadDailyProposals, (result) => (sources.daily = result)),
 		account: createReadSource(loadRewardAccount, (result) => (sources.account = result)),
-		eligible: createReadSource(loadEligibleStakes, (result) => (sources.eligible = result)),
+		...(epochReaders && { eligible: epochReaders.eligible }),
 		dailyStake: createReadSource(loadDailyStake, (result) => (sources.dailyStake = result)),
-		supply: createReadSource(loadRewardSupply, (result) => (sources.supply = result))
+		...(epochReaders && { supply: epochReaders.supply })
 	};
-	function retry(source: keyof Sources) {
-		return readers[source].load(pageAddress, true);
+	function retry(source: keyof typeof readers) {
+		return readers[source]?.load(pageAddress, true);
 	}
 	function refresh(address = pageAddress) {
-		for (const reader of Object.values(readers)) void reader.load(address, true);
+		for (const reader of Object.values(readers)) void reader?.load(address, true);
 	}
 	$effect(() => {
 		const address = pageAddress;
 		untrack(() => {
-			for (const reader of Object.values(readers)) void reader.load(address);
+			for (const reader of Object.values(readers)) void reader?.load(address);
 		});
 		return () => {
-			for (const reader of Object.values(readers)) reader.dispose();
+			for (const reader of Object.values(readers)) reader?.dispose();
 		};
 	});
 	let blockSources = $state(createBlockRewardsState());
@@ -200,17 +188,6 @@
 		const timer = setInterval(() => (clock = new Date()), 30000);
 		return () => clearInterval(timer);
 	});
-	let rows = $derived(
-		mergeRewardRows(
-			sources.epochs.value ?? [],
-			sources.payouts,
-			at.getTime(),
-			sources.account.value,
-			sources.eligible.value,
-			sources.supply.value
-		)
-	);
-	let missingMessage = $derived(missingEpochsMessage(sources.epochs.value ?? []));
 	let days = $derived(
 		dailyProposals(
 			sources.daily.value ?? {},
@@ -224,8 +201,6 @@
 			!sources.dailyStake.value ||
 			days.some((day) => day.actual !== null && day.expected === null)
 	);
-	let recorded = $derived(sources.payouts.value ? recordedPayouts(sources.payouts.value) : []);
-	let cumulative = $derived(sources.payouts.value ? cumulativePayouts(sources.payouts.value) : []);
 	let dailyData = $derived({
 		columns: ['UTC date', 'Produced blocks', 'Expected approximation', 'State'],
 		rows: days.map((day) => [
@@ -237,24 +212,9 @@
 		caption:
 			'Proposals API; expected = current account balance / daily average online stake × (86400 / 2.8). Omitted dates are unavailable, not zero.'
 	});
-	let payoutData = $derived({
-		columns: ['UTC receipt', 'Transaction ID', 'Amount VOI', 'Running VOI'],
-		rows: recorded.map((payment) => [
-			payment.timestamp,
-			payment.txid,
-			payment.amount,
-			payment.running
-		]),
-		caption:
-			sources.payouts.value?.complete === false
-				? 'Known recorded payments subtotal; incomplete. Line withheld until Retry succeeds.'
-				: 'Cumulative recorded payments; missing or unreturned payments are not included. Source: get_account_transactions_multi.'
-	});
 	let dailyMax = $derived(
 		Math.max(1, ...days.flatMap((day) => [day.actual ?? 0, day.expected ?? 0])) * 1.2
 	);
-	let payoutMax = $derived(Math.max(1, ...cumulative.map((payment) => payment.running)) * 1.1);
-	const SNAPSHOT_MISSING = 'Not yet available';
 	function amount(value: number | null) {
 		return value === null
 			? 'Unavailable'
@@ -262,60 +222,6 @@
 				? '<0.01 VOI'
 				: `${compact(value, 2)} VOI`;
 	}
-	let columns: Column<RewardRow>[] = $derived([
-		{
-			key: 'epoch',
-			header: 'Epoch',
-			priority: 1,
-			numeric: true,
-			sortable: true,
-			sortValue: (row) => row.epoch
-		},
-		{
-			key: 'blocks',
-			header: 'Blocks / Expected',
-			priority: 2,
-			numeric: true,
-			sortable: true,
-			sortValue: (row) => (row.missing ? null : row.blocks),
-			cell: blocksCell
-		},
-		{
-			key: 'ratio',
-			header: 'Luck',
-			priority: 3,
-			numeric: true,
-			sortable: true,
-			sortValue: (row) => row.ratio,
-			cell: luckCell
-		},
-		{
-			key: 'estimate',
-			header: 'Est. reward',
-			priority: 2,
-			numeric: true,
-			sortable: true,
-			sortValue: (row) => row.estimate,
-			cell: estimateCell
-		},
-		{
-			key: 'actual',
-			header: 'Actual reward',
-			priority: 1,
-			numeric: true,
-			sortable: true,
-			sortValue: (row) => row.actual,
-			cell: payoutCell
-		},
-		{
-			key: 'status',
-			header: 'Status',
-			priority: 1,
-			sortable: true,
-			sortValue: (row) => row.status,
-			cell: statusCell
-		}
-	]);
 	let statusSource = $derived(currentStatus(blockSources.status, isContract));
 	let blockStatus = $derived(statusSource.value);
 	let contract = $derived(blockRewardContract(isContract, ownerLookup));
@@ -474,7 +380,7 @@
 		data-block-reward-tx={row.txid}
 		>{shortAddr(row.txid)}<span class="sr-only"> (opens in a new tab)</span></a
 	>{/snippet}
-{#snippet warning(source: keyof Sources, message: string, region: () => HTMLElement | undefined)}
+{#snippet warning(source: DailyKey, message: string, region: () => HTMLElement | undefined)}
 	{#if sources[source].state === 'error' || sources[source].error}
 		<InlineAlert
 			{message}
@@ -488,133 +394,20 @@
 				: ''}
 		</p>{/if}
 {/snippet}
-{#snippet blocksCell(row: RewardRow)}{#if row.missing}{SNAPSHOT_MISSING}{:else}<span
-			title={`${row.blocks} / ${row.expected ?? 'Unavailable'}`}
-			>{comma(row.blocks)} / {row.expected === null ? 'Unavailable' : comma(row.expected, 1)}</span
-		>{/if}{/snippet}
-{#snippet luckCell(row: RewardRow)}{row.missing
-		? SNAPSHOT_MISSING
-		: row.ratio === null
-			? 'Unavailable'
-			: pct(row.ratio * 100)}{/snippet}
-{#snippet estimateCell(row: RewardRow)}{#if row.missing}{SNAPSHOT_MISSING}{:else}<span
-			title={String(row.estimate ?? 'Unavailable')}
-			>{row.tooEarly ? 'Too early to project' : amount(row.estimate)}</span
-		>{/if}{/snippet}
-{#snippet payoutCell(row: RewardRow)}
-	<span
-		class="break-words"
-		title={row.actual === null ? row.explanation || row.payoutText : `${row.actual} VOI`}
-		>{row.actual === null ? row.payoutText : amount(row.actual)}</span
-	>
-{/snippet}
-{#snippet statusCell(row: RewardRow)}{#if row.status}<StatusPill
-			tone={row.tone}
-			label={row.status}
-		/>{:else}<span class="text-ink-muted">—</span>{/if}{/snippet}
-{#snippet detail(row: RewardRow)}
-	<div class="space-y-2 break-words text-label">
-		<p>{epochRange(row.epoch).label} (UTC)</p>
-		{#if row.missing}<p>
-				Epoch snapshot not yet available. Produced and expected blocks will appear once it is
-				published.
-			</p>
-			<p>
-				Actual: {row.actual === null ? row.payoutText : `${comma(row.actual, 2)} VOI`}
-			</p>{:else}<p>
-				Produced: {comma(row.blocks)} · Expected: {row.expected === null
-					? 'Unavailable'
-					: comma(row.expected, 2)} · Luck: {row.ratio === null
-					? 'Unavailable'
-					: pct(row.ratio * 100)}
-			</p>
-			<p title={String(row.estimate ?? 'Unavailable')}>
-				Estimated reward: {row.tooEarly ? 'Too early to project' : amount(row.estimate)} · Actual: {row.actual ===
-				null
-					? row.payoutText
-					: `${comma(row.actual, 2)} VOI`}
-			</p>{/if}
-		{#if row.explanation}<p>{row.explanation}</p>{/if}
-		{#if row.blocks > 0 || row.missing}<p>
-				Matched by receipt date in the following week: {epochRange(
-					row.epoch + 1
-				).start.toISOString()} inclusive to {epochRange(row.epoch + 2).start.toISOString()} exclusive.
-			</p>{/if}
-		{#each row.payments as payment (payment.txid)}
-			<a
-				class="block break-all text-accent underline"
-				href={`https://block.voi.network/explorer/transaction/${encodeURIComponent(payment.txid)}`}
-				target="_blank"
-				rel="noopener noreferrer"
-				>{payment.txid} · {payment.amount} VOI<span class="sr-only"> (opens in a new tab)</span></a
-			>
-		{/each}
-	</div>
-{/snippet}
-
 <div class="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-	<Card title="Rewards by epoch">
-		{#snippet actions()}<Button variant="soft" onclick={() => refresh()}>Refresh rewards</Button
-			>{/snippet}
-		<div bind:this={epochsRegion} tabindex="-1" class="focus:outline-none">
-			<p class="mb-3 text-label text-ink-muted">
-				Rewards received by {shortAddr(pageAddress)}. Open a contract to see its rewards.
-			</p>
-			<p class="mb-3 text-label text-ink-muted">
-				Expected using current online balance; historical account stake is unavailable.
-			</p>
-			{@render warning('epochs', 'Reward history unavailable', () => epochsRegion)}
-			{@render warning('payouts', 'Recorded epoch rewards unavailable', () => epochsRegion)}
-			{@render warning('account', 'Current account balance unavailable', () => epochsRegion)}
-			{@render warning('eligible', 'Historical eligible stake unavailable', () => epochsRegion)}
-			{@render warning('supply', 'Current eligible stake unavailable', () => epochsRegion)}
-			{#if sources.payouts.value?.complete === false}<InlineAlert
-					tone="warn"
-					message="Recorded epoch rewards incomplete. Reward attribution unavailable."
-					onretry={() => void retry('payouts')}
-				/>{/if}
-			{#if missingMessage}<InlineAlert
-					tone="warn"
-					message={missingMessage}
-					onretry={() => void retry('epochs')}
-				/>{/if}
-			{#if sources.epochs.state === 'loading'}
-				<div aria-busy="true" class="space-y-3">
-					<p class="sr-only">Loading rewards by epoch…</p>
-					{#each Array.from({ length: 8 }, (_, index) => index) as index (index)}<div
-							class="h-9 rounded-ds-xs bg-grid"
-						></div>{/each}
-				</div>
-			{:else}
-				<DataTable
-					{columns}
-					{rows}
-					rowKey={(row) => String(row.epoch)}
-					rowName={(row) => `epoch ${row.epoch}`}
-					caption={`Rewards by epoch for ${pageAddress}; estimates and actual rewards in VOI`}
-					id="wallet-reward-epochs"
-					density="compact"
-					sort={{ key: 'epoch', dir: 'desc' }}
-					limit={15}
-					moreLabel={(hidden) => `See ${hidden} more epochs`}
-					expandable
-					{detail}
-					state={sources.epochs.state}
-					asOf={sources.epochs.asOf}
-					onretry={retryKeepingFocus(
-						() => epochsRegion,
-						() => void retry('epochs')
-					)}
-					emptyText="No reward history returned for this address"
-				/>
-			{/if}
-		</div>
-	</Card>
+	{#if epoch}<WalletEpochRewards
+			{epoch}
+			account={sources.account}
+			{pageAddress}
+			{at}
+			{retry}
+			onrefresh={() => refresh()}
+		/>{/if}
 	<div class="grid min-w-0 gap-bento lg:grid-cols-12">
 		<div
 			bind:this={dailyRegion}
 			tabindex="-1"
-			class="min-w-0 space-y-3 focus:outline-none lg:col-span-8"
+			class="min-w-0 space-y-3 focus:outline-none {epoch ? 'lg:col-span-8' : 'lg:col-span-12'}"
 		>
 			{@render warning('daily', 'Daily proposals unavailable', () => dailyRegion)}
 			{@render warning('dailyStake', 'Expected proposals unavailable', () => dailyRegion)}
@@ -663,42 +456,8 @@
 					/>{/snippet}
 			</ChartFrame>
 		</div>
-		<div class="min-w-0 space-y-3 lg:col-span-4">
-			{#if sources.payouts.value?.complete && !recorded.length}<p class="text-label text-ink-muted">
-					No recorded epoch rewards returned.
-				</p>{/if}
-			<ChartFrame
-				title="Recorded epoch rewards"
-				summary="Cumulative recorded VOI payments, matched rewards senders and this recipient"
-				data={payoutData}
-				state={sources.payouts.value?.complete === false
-					? 'error'
-					: sources.payouts.value && !recorded.length
-						? 'empty'
-						: sources.payouts.state}
-				onretry={() => void retry('payouts')}
-				asOf={sources.payouts.asOf}
-				x={{
-					kind: 'time',
-					domain: [
-						new Date(recorded[0]?.timestamp ?? at.getTime() - 86400000),
-						new Date(Math.max(at.getTime(), Date.parse(recorded.at(-1)?.timestamp ?? '') || 0))
-					]
-				}}
-				y={{ domain: [0, payoutMax] }}
-				height={240}
-			>
-				{#snippet children(ctx)}<LineChart
-						{ctx}
-						points={cumulative.map((payment) => ({
-							x: new Date(payment.timestamp),
-							y: payment.running
-						}))}
-						area={false}
-						tone="accent"
-					/>{/snippet}
-			</ChartFrame>
-		</div>
+		<!-- history slot: regate on EPOCH_HISTORY_VIEWABLE when a snapshot source exists -->
+		{#if epoch}<WalletEpochPayouts {epoch} {at} {retry} />{/if}
 	</div>
 	<Card title={REALTIME_BLOCK_REWARDS_TITLE}>
 		{#snippet actions()}<div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
