@@ -63,9 +63,17 @@ export default defineConfig(
 			'no-restricted-imports': [
 				'error',
 				{
-					paths: [
+					paths: ['$lib/ds', '$lib/ds/index', '$lib/ds/index.ts', '$lib/ds/index.js'].map(
+						(name) => ({
+							name,
+							message:
+								'Import from the component module ($lib/ds/<Name>) so unused design-system code tree-shakes.'
+						})
+					),
+					patterns: [
 						{
-							name: '$lib/ds',
+							// Relative spellings of the barrel from outside src/lib/ds.
+							regex: '^(\\.\\.?/)+(lib/)?ds(/index(\\.[jt]s)?)?$',
 							message:
 								'Import from the component module ($lib/ds/<Name>) so unused design-system code tree-shakes.'
 						}
