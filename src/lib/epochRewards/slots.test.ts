@@ -3,7 +3,9 @@ import { createRawSnippet } from 'svelte';
 import { render } from 'svelte/server';
 import { readable } from 'svelte/store';
 import type { ChainStatus } from '$lib/stores/chainStatus';
+import { config } from '$lib/config';
 import { epochAt, headerEpoch, liveEpoch } from '$lib/epochRewards';
+import { loadHome } from '$lib/server/home';
 import Layout from '../../routes/(site)/+layout.svelte';
 
 // The switch-on state, unmocked: each epoch slot is filled as before.
@@ -41,4 +43,35 @@ test('the header epoch needs a ready headline; the live clock follows the calend
 	expect(headerEpoch(undefined)).toBeUndefined();
 	const now = new Date('2026-10-25T02:38:00Z');
 	expect(liveEpoch(now)).toBe(epochAt(now));
+});
+
+test('the home load starts its reads and orders its payload as before', async () => {
+	const now = new Date('2026-10-25T02:38:00Z');
+	const fetcher = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+	void loadHome(new URL('https://voirewards.com/?epoch=103'), fetcher, now);
+	expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
+		config.proposalApiBaseUrl,
+		`${config.proposalApiBaseUrl}?start=2026-10-21&end=2026-10-27`,
+		`${config.proposalApiBaseUrl}?start=2026-10-14&end=2026-10-20`,
+		'/api/epochs',
+		`${config.proposalApiBaseUrl}?action=online-stake-history`,
+		'/api/markets?token=VOI',
+		'/api/mimir?action=get_online_account_count'
+	]);
+	const failing = vi.fn<typeof fetch>(async () => new Response(null, { status: 503 }));
+	const data = await loadHome(new URL('https://voirewards.com/'), failing, now);
+	expect(Object.keys(data)).toEqual([
+		'page',
+		'chrome',
+		'currentEpoch',
+		'rewardsEpoch',
+		'markets',
+		'headline',
+		'rewards',
+		'aprHistory',
+		'currentStake',
+		'onlineStake',
+		'price',
+		'onlineCount'
+	]);
 });

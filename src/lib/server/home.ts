@@ -1,55 +1,35 @@
 import { config } from '$lib/config';
-import { blocksForEpoch, epochAt, epochRange, type Epoch, type Headline } from '$lib/epochRewards';
-import { deriveHeadline } from '$lib/epochRewards/headline';
+import { EPOCH_REWARDS_ENABLED, type EpochHomeData, type EpochResponse } from '$lib/epochRewards';
+import { startEpochHome } from '$lib/epochRewards/home.server';
 import { finite } from '$lib/home/headline';
-import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
-import type { RewardParams } from '../../stores/dataTable';
-import type { EpochResponse } from '$lib/epochRewards';
 import { marketsSummary, topMarkets, type Markets } from '$lib/home/markets';
-import { readEpoch } from '$lib/ds/EpochStepper/url';
 import { fetchWithTimeout } from './fetchWithTimeout';
+import {
+	CRITICAL_TIMEOUT_MS,
+	STAKE_TIMEOUT_MS,
+	STREAM_TIMEOUT_MS,
+	failure,
+	list,
+	ready,
+	record,
+	type Loaded
+} from './loaded';
 
-export const CRITICAL_TIMEOUT_MS = 4000;
-export const STREAM_TIMEOUT_MS = 5000;
-// The stake history upstream routinely takes 3.6-4.3 s; it is streamed, so a longer deadline blocks nothing.
-export const STAKE_TIMEOUT_MS = 8000;
-
-export type Loaded<T> =
-	| { state: 'ready'; value: T }
-	| { state: 'stale'; value: T; asOf: string }
-	| { state: 'error'; message: string };
+export { CRITICAL_TIMEOUT_MS, STAKE_TIMEOUT_MS, STREAM_TIMEOUT_MS, type Loaded };
 export type Price = { price: number; change24h: number | null; mcap: number | null };
-export type DashboardData = {
+type HomeBase = {
 	page: 'dashboard';
 	chrome: 'hero';
-	headline: Loaded<Headline>;
-	aprHistory: Loaded<{ epoch: number; apr: number; wallets: number | null }[]>;
-	/** The selected epoch's live online stake (epoch-detail), the value /analytics shows. */
-	currentStake: Loaded<number | null>;
 	onlineStake: Promise<Loaded<{ date: string; stake: number }[]>>;
-	currentEpoch: number;
-	rewardsEpoch: number;
-	rewards: Loaded<{ rangeId: string; data: EpochResponse; params: RewardParams }>;
 	markets: Promise<Loaded<Markets>>;
 	price: Promise<Loaded<Price>>;
 	onlineCount: Promise<Loaded<number>>;
 };
+// The epoch fields are absent when epoch rewards are switched off; the page still reads
+// them unguarded, so the type keeps them required until it does.
+export type DashboardData = HomeBase & EpochHomeData;
 export type HomeData = DashboardData;
 export type RewardRows = EpochResponse;
-const ready = <T>(value: T): Loaded<T> => ({ state: 'ready', value });
-const failure = (message: string): { state: 'error'; message: string } => ({
-	state: 'error',
-	message
-});
-const record = (value: unknown): Record<string, unknown> => {
-	if (!value || typeof value !== 'object' || Array.isArray(value))
-		throw new Error('Invalid response');
-	return value as Record<string, unknown>;
-};
-const list = (value: unknown): unknown[] => {
-	if (!Array.isArray(value)) throw new Error('Invalid list');
-	return value;
-};
 
 export async function loadHome(
 	url: URL,
@@ -80,61 +60,8 @@ export async function loadHome(
 			return failure('Data is temporarily unavailable. Please retry.');
 		}
 	}
-	const requestedEpoch = epochAt(now);
-	const rowRequests = new Map<number, Promise<Loaded<RewardRows>>>();
-	const fetchRows = (
-		epoch: number,
-		timeoutMs = CRITICAL_TIMEOUT_MS
-	): Promise<Loaded<RewardRows>> => {
-		const existing = rowRequests.get(epoch);
-		if (existing) return existing;
-		if (timeoutMs <= 0) return Promise.resolve(failure('Unable to load epoch rewards.'));
-		const range = epochRange(epoch);
-		const request = read(
-			`${config.proposalApiBaseUrl}?start=${range.start.toISOString().slice(0, 10)}&end=${range.end.toISOString().slice(0, 10)}`,
-			(value) => {
-				const rows = record(value);
-				list(rows.data);
-				if (finite(rows.num_blocks) === null) throw new Error('Missing blocks');
-				return rows as RewardRows;
-			},
-			timeoutMs
-		);
-		rowRequests.set(epoch, request);
-		return request;
-	};
-	// Start all independent critical reads before awaiting any of them.
-	const basePromise = read(config.proposalApiBaseUrl, (value) => {
-		const timestamp = record(value).max_timestamp;
-		if (
-			typeof timestamp !== 'string' ||
-			!Number.isFinite(Date.parse(timestamp)) ||
-			epochAt(new Date(timestamp)) < 1
-		)
-			throw new Error('Invalid timestamp');
-		return timestamp;
-	});
-	const rowsPromise = fetchRows(requestedEpoch);
-	// Start a shared-link epoch alongside the headline reads, within the same deadline.
-	void fetchRows(readEpoch(url, 1, requestedEpoch));
-	const previousRowsPromise =
-		now.getTime() - epochRange(requestedEpoch).start.getTime() < 24 * 60 * 60 * 1000
-			? fetchRows(requestedEpoch - 1)
-			: undefined;
-	const epochsPromise = read('/api/epochs', (value) =>
-		list(record(value).epochs).map((value) => {
-			const row = record(value);
-			const epoch = finite(row.epoch_number);
-			if (epoch === null) throw new Error('Missing epoch');
-			return {
-				epoch_number: epoch,
-				apr: finite(row.apr),
-				online_stake: finite(row.online_stake),
-				eligible_online_stake: finite(row.eligible_online_stake),
-				participating_wallets: finite(row.participating_wallets)
-			} satisfies Epoch;
-		})
-	);
+	// The epoch reads start first, as they always have; with epoch rewards off there are none.
+	const epoch = EPOCH_REWARDS_ENABLED ? startEpochHome({ url, now, startedAt, read }) : undefined;
 	const onlineStake = read(
 		`${config.proposalApiBaseUrl}?action=online-stake-history`,
 		(value) => {
@@ -206,106 +133,21 @@ export async function loadHome(
 		},
 		STREAM_TIMEOUT_MS
 	);
-	// A boundary correction depends only on the base read, not on the speculative rows.
-	const selectedPromise = basePromise.then(async (base) => {
-		const epoch =
-			base.state === 'error'
-				? requestedEpoch
-				: Math.min(requestedEpoch, epochAt(new Date(base.value)));
-		const selectedRows =
-			epoch === requestedEpoch
-				? rowsPromise
-				: epoch === requestedEpoch - 1 && previousRowsPromise
-					? previousRowsPromise
-					: fetchRows(epoch, CRITICAL_TIMEOUT_MS - (Date.now() - startedAt));
-		return { epoch, rows: await selectedRows };
-	});
-	const rewardsPromise = basePromise.then(async (base) => {
-		const current =
-			base.state === 'error'
-				? requestedEpoch
-				: Math.min(requestedEpoch, epochAt(new Date(base.value)));
-		const epoch = readEpoch(url, 1, current);
-		return { epoch, rows: await fetchRows(epoch, CRITICAL_TIMEOUT_MS - (Date.now() - startedAt)) };
-	});
-	const [base, selected, epochs, selectedRewards] = await Promise.all([
-		basePromise,
-		selectedPromise,
-		epochsPromise,
-		rewardsPromise
-	]);
-	const { epoch, rows } = selected;
-	let rewards: DashboardData['rewards'] = failure('Unable to load epoch rewards.');
-	if (base.state !== 'error' && selectedRewards.rows.state !== 'error') {
-		const range = epochRange(selectedRewards.epoch);
-		const pool = await getTokensByEpoch(selectedRewards.epoch);
-		const blocks = blocksForEpoch(selectedRewards.epoch, selectedRewards.rows.value);
-		const projection = extrapolateRewardPerBlock(blocks, pool, range.id);
-		rewards = ready({
-			rangeId: range.id,
-			data: selectedRewards.rows.value,
-			// getTokensByEpoch is async; carry the arithmetic inputs for synchronous SSR.
-			params: {
-				block_reward_pool: pool,
-				total_blocks: blocks,
-				reward_per_block: projection.projectedRewardPerBlock,
-				total_blocks_projected: projection.projectedTotalBlocks
-			}
-		});
-	}
-	let headline: DashboardData['headline'] = failure('Unable to load the epoch headline.');
-	if (base.state !== 'error' && rows.state !== 'error') {
-		const range = epochRange(epoch);
-		const pool = await getTokensByEpoch(epoch);
-		const blocks = blocksForEpoch(epoch, rows.value);
-		const projection = extrapolateRewardPerBlock(blocks, pool, range.id);
-		if (epochs.state !== 'error' && epochs.value.some((row) => row.epoch_number === epoch)) {
-			headline = ready(
-				deriveHeadline(
-					{
-						epoch,
-						epochs: epochs.value,
-						pool,
-						blocks,
-						maxTimestamp: base.value,
-						projection
-					},
-					now
-				)
-			);
-		}
-	}
-	const aprHistory: DashboardData['aprHistory'] =
-		epochs.state === 'error'
-			? epochs
-			: ready(
-					epochs.value
-						.filter((row) => row.epoch_number <= epoch)
-						.sort((a, b) => a.epoch_number - b.epoch_number)
-						.slice(-26)
-						.map((row) => ({
-							epoch: row.epoch_number,
-							apr: row.apr ?? NaN,
-							wallets: row.participating_wallets
-						}))
-				);
-	// Depends on /api/epochs alone, so a base or rows failure does not hide it.
-	const currentStake: DashboardData['currentStake'] =
-		epochs.state === 'error'
-			? epochs
-			: ready(epochs.value.find((row) => row.epoch_number === epoch)?.online_stake ?? null);
+	const loaded = await epoch;
+	// The page payload keeps its key order, so the serialized page is unchanged.
 	return {
 		page: 'dashboard',
 		chrome: 'hero',
-		currentEpoch: epoch,
-		rewardsEpoch: selectedRewards.epoch,
+		...(loaded && { currentEpoch: loaded.currentEpoch, rewardsEpoch: loaded.rewardsEpoch }),
 		markets,
-		headline,
-		rewards,
-		aprHistory,
-		currentStake,
+		...(loaded && {
+			headline: loaded.headline,
+			rewards: loaded.rewards,
+			aprHistory: loaded.aprHistory,
+			currentStake: loaded.currentStake
+		}),
 		onlineStake,
 		price,
 		onlineCount
-	};
+	} as HomeData;
 }

@@ -70,7 +70,6 @@ function internals(text: string): string[] {
 
 /** 1b: these files move into the module (or onto its components), and these imports go with them. */
 const DEEP_1B: Record<string, string[]> = {
-	'src/lib/server/home.ts': ['headline', 'table'],
 	'src/routes/(site)/HomeTop.svelte': ['headline'],
 	'src/routes/(site)/HomeRewards.svelte': ['headline', 'table', 'balance']
 };
@@ -117,7 +116,7 @@ const homeSurfaces = (path: string) =>
  */
 const PENDING = {
 	// 1b: the home epoch load and the rewards table move into the module.
-	'1b': ['src/lib/server/home.ts', 'src/routes/(site)/HomeRewards.svelte'],
+	'1b': ['src/routes/(site)/HomeRewards.svelte'],
 	// PR 2: wallet, calculator, node and analytics surfaces.
 	'PR 2': [
 		'src/lib/component/CalculatorComponent.svelte',
