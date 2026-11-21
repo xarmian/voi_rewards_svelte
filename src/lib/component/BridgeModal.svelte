@@ -911,11 +911,6 @@
 		resolvedName = null;
 	}
 
-	function getInitials(text: string): string {
-		if (!text) return '';
-		return text.charAt(0).toUpperCase();
-	}
-
 	onMount(() => {
 		document.addEventListener('click', handleClickOutside);
 		return () => {
@@ -1557,29 +1552,11 @@
 															class:dark:bg-gray-700={i === selectedSourceSearchIndex}
 															on:click={() => selectSourceSearchResult(result)}
 														>
-															<div
-																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-															>
-																{#if 'owner' in result && getAvatarUrl(result)}
-																	<img
-																		src={getAvatarUrl(result)}
-																		alt="Avatar"
-																		class="w-full h-full object-cover"
-																		on:error={(e) => {
-																			const target = e.currentTarget as HTMLImageElement;
-																			target.style.display = 'none';
-																			(target.nextElementSibling as HTMLDivElement).style.display =
-																				'flex';
-																		}}
-																	/>
-																{:else}
-																	<div
-																		class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
-																	>
-																		{getInitials(result.name)}
-																	</div>
-																{/if}
-															</div>
+															<NameAvatar
+																name={result.name}
+																avatar={'owner' in result ? getAvatarUrl(result) : null}
+																size="md"
+															/>
 															<div class="min-w-0 flex-1">
 																<div class="font-medium text-gray-900 dark:text-white truncate">
 																	{result.name}
@@ -1599,28 +1576,10 @@
 
 									{#if algorandSourceResolvedName}
 										<div class="mt-2 flex items-center space-x-2">
-											<div
-												class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-											>
-												{#if algorandSourceResolvedName.avatar}
-													<img
-														src={algorandSourceResolvedName.avatar}
-														alt="Avatar"
-														class="w-full h-full object-cover"
-														on:error={(e) => {
-															const target = e.currentTarget as HTMLImageElement;
-															target.style.display = 'none';
-															(target.nextElementSibling as HTMLDivElement).style.display = 'flex';
-														}}
-													/>
-												{:else}
-													<div
-														class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium"
-													>
-														{getInitials(algorandSourceResolvedName.name)}
-													</div>
-												{/if}
-											</div>
+											<NameAvatar
+												name={algorandSourceResolvedName.name}
+												avatar={algorandSourceResolvedName.avatar}
+											/>
 											<p class="text-sm text-gray-500 dark:text-gray-400">
 												{algorandSourceResolvedName.name}
 											</p>
@@ -1731,29 +1690,11 @@
 															class:dark:bg-gray-700={i === selectedSearchIndex}
 															on:click={() => selectSearchResult(result)}
 														>
-															<div
-																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-															>
-																{#if ('owner' in result && getAvatarUrl(result)) || ('avatar' in result && result.avatar)}
-																	<img
-																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
-																		alt="Avatar"
-																		class="w-full h-full object-cover"
-																		on:error={(e) => {
-																			const target = e.currentTarget as HTMLImageElement;
-																			target.style.display = 'none';
-																			(target.nextElementSibling as HTMLDivElement).style.display =
-																				'flex';
-																		}}
-																	/>
-																{:else}
-																	<div
-																		class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
-																	>
-																		{getInitials('owner' in result ? result.name : result.name)}
-																	</div>
-																{/if}
-															</div>
+															<NameAvatar
+																name={result.name}
+																avatar={'owner' in result ? getAvatarUrl(result) : result.avatar}
+																size="md"
+															/>
 															<div class="min-w-0 flex-1">
 																<div class="font-medium text-gray-900 dark:text-white truncate">
 																	{result.name}
@@ -1942,29 +1883,11 @@
 															class:dark:bg-gray-700={i === selectedSearchIndex}
 															on:click={() => selectSearchResult(result)}
 														>
-															<div
-																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
-															>
-																{#if ('owner' in result && getAvatarUrl(result)) || ('avatar' in result && result.avatar)}
-																	<img
-																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
-																		alt="Avatar"
-																		class="w-full h-full object-cover"
-																		on:error={(e) => {
-																			const target = e.currentTarget as HTMLImageElement;
-																			target.style.display = 'none';
-																			(target.nextElementSibling as HTMLDivElement).style.display =
-																				'flex';
-																		}}
-																	/>
-																{:else}
-																	<div
-																		class="w-full h-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium"
-																	>
-																		{getInitials('owner' in result ? result.name : result.name)}
-																	</div>
-																{/if}
-															</div>
+															<NameAvatar
+																name={result.name}
+																avatar={'owner' in result ? getAvatarUrl(result) : result.avatar}
+																size="md"
+															/>
 															<div class="min-w-0 flex-1">
 																<div class="font-medium text-gray-900 dark:text-white truncate">
 																	{result.name}

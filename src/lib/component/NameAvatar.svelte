@@ -1,5 +1,14 @@
 <script lang="ts">
-	let { name, avatar }: { name: string; avatar?: string | null } = $props();
+	let {
+		name,
+		avatar,
+		size = 'sm'
+	}: { name: string; avatar?: string | null; size?: 'sm' | 'md' } = $props();
+	const sizeClasses = {
+		sm: 'h-6 w-6 text-xs',
+		md: 'h-8 w-8 text-base'
+	};
+	let sizeClass = $derived(sizeClasses[size]);
 	let broken = $state(false);
 	$effect(() => {
 		void avatar;
@@ -8,7 +17,7 @@
 </script>
 
 <span
-	class="inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-700 text-xs font-medium text-white"
+	class="inline-flex {sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-700 font-medium text-white"
 	data-testid="name-avatar"
 >
 	{#if avatar && !broken}
