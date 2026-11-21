@@ -100,6 +100,7 @@ describe('heartbeatHealth', () => {
 			lastHeartbeat: 98_000,
 			amount: 1e12,
 			onlineStake: 1e15,
+			eligible: true,
 			...overrides
 		});
 
@@ -118,7 +119,8 @@ describe('heartbeatHealth', () => {
 				lastProposed: 95_000n,
 				lastHeartbeat: undefined,
 				amount: 1_000_000_000_000n,
-				onlineStake: 1e15
+				onlineStake: 1e15,
+				eligible: true
 			})
 		).toMatchObject({ silentRounds: 5000, lastHeartbeatSeconds: null, overdue: false });
 	});
@@ -152,5 +154,12 @@ describe('heartbeatHealth', () => {
 		const health = read({ onlineStake: null, lastProposed: 1, lastHeartbeat: undefined });
 		expect(health).toMatchObject({ overdue: null, overdueAfter: null, silentRounds: 99_999 });
 		expect(health?.lastProposedSeconds).toBeCloseTo(99_999 * 2.8);
+	});
+
+	it('never reads overdue for an account without the incentive fee, which cannot be suspended', () => {
+		const health = read({ eligible: false, lastProposed: 1, lastHeartbeat: undefined });
+		expect(health).toMatchObject({ silentRounds: 99_999, overdue: false });
+		expect(read({ eligible: false, onlineStake: null })?.overdue).toBe(false);
+		expect(read({ lastProposed: 1, lastHeartbeat: undefined })?.overdue).toBe(true);
 	});
 });

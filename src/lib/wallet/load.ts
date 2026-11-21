@@ -5,7 +5,6 @@ import { decodeLockContractState } from '$lib/chain/lockContract';
 import { globalStateEntries } from '$lib/chain/algodShapes';
 import { getAccountInfo, getSupplyInfo, requireAccountInfo } from '$lib/stores/accounts';
 import { contractIncentiveOf } from '$lib/chain/keyreg';
-import { readOnlineStake } from '$lib/rewards/blockRewardChain';
 import { getLockContractsByOwner } from '$lib/services/lockvest';
 import { fetchFungibleTokens } from '$lib/services/accounts';
 import { fetchVoiPrice, voiPrice } from '$lib/stores/price';
@@ -289,8 +288,8 @@ export async function loadWallet(
 	]);
 	if (!supply || !dates.length) throw new Error('Wallet network data unavailable');
 	const stake = (supply['online-money'] - supply['blacklisted-money']) / 1e6;
-	// Heartbeat staleness needs total online stake; without it the ages show with no verdict.
-	const onlineStake = bounded(readOnlineStake()).catch(() => null);
+	// Heartbeat staleness needs total online stake: algod's onlineMoney, already in the supply read.
+	const onlineStake = finite(supply['online-money']);
 	async function readAccount(address: string, contractId = 0): Promise<WalletAccount> {
 		const account = await bounded(getAccountInfo(address, force));
 		if (!account) throw new Error('Account data unavailable');
@@ -314,7 +313,8 @@ export async function loadWallet(
 					lastProposed: account.lastProposed,
 					lastHeartbeat: account.lastHeartbeat,
 					amount: account.amount,
-					onlineStake: await onlineStake
+					onlineStake,
+					eligible: account.incentiveEligible === true
 				})
 			}
 		};

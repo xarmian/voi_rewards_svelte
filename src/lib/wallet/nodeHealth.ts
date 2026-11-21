@@ -27,7 +27,10 @@ export type Heartbeat = {
 	silentRounds: number;
 	/** Rounds of silence after which the account reads overdue; null without online stake. */
 	overdueAfter: number | null;
-	/** null when online stake was unavailable, so no verdict is given. */
+	/**
+	 * Always false for an account without the incentive fee: only incentive-eligible accounts are
+	 * suspended for absence. Otherwise null when online stake was unavailable, so no verdict is given.
+	 */
 	overdue: boolean | null;
 };
 
@@ -79,6 +82,8 @@ export function heartbeatHealth(input: {
 	lastHeartbeat?: Whole;
 	amount: Whole;
 	onlineStake: number | null;
+	/** The account's incentiveEligible flag. */
+	eligible: boolean;
 }): Heartbeat | null {
 	const current = round(input.round);
 	const proposed = round(input.lastProposed);
@@ -93,6 +98,6 @@ export function heartbeatHealth(input: {
 		lastHeartbeatSeconds: age(heartbeat),
 		silentRounds,
 		overdueAfter,
-		overdue: overdueAfter === null ? null : silentRounds > overdueAfter
+		overdue: !input.eligible ? false : overdueAfter === null ? null : silentRounds > overdueAfter
 	};
 }

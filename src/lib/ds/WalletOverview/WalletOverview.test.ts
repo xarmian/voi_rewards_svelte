@@ -452,6 +452,16 @@ describe('node health eligibility and heartbeat', () => {
 		expect(text).not.toContain('Heartbeat overdue');
 	});
 
+	it('says there are no online accounts instead of a missing record when none is online', () => {
+		const offline = ownerAccount({
+			isParticipating: false,
+			health: { eligibility: eligibility(['offline']), heartbeat: null }
+		});
+		const { text } = draw(offline, []);
+		expect(text).toContain('No online accounts.');
+		expect(text).not.toContain('No proposal or heartbeat on record');
+	});
+
 	it('flags suspended accounts as dangerous', () => {
 		const taken = contract({
 			isParticipating: false,

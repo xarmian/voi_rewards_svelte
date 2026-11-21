@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
 	app: vi.fn(),
 	consensus: vi.fn(),
 	onlineStake: vi.fn(),
-	incentive: vi.fn()
+	incentive: vi.fn(),
+	supply: vi.fn()
 }));
 vi.mock('$lib/rewards/blockRewardChain', () => ({ readOnlineStake: mocks.onlineStake }));
 vi.mock('$lib/chain/keyreg', async (original) => ({
@@ -27,11 +28,7 @@ vi.mock('$lib/stores/accounts', () => ({
 	getAccountInfo: mocks.account,
 	requireAccountInfo: mocks.account,
 	getConsensusInfo: mocks.consensus,
-	getSupplyInfo: async () => ({
-		'current-round': 100,
-		'online-money': 1e12,
-		'blacklisted-money': 0
-	})
+	getSupplyInfo: () => mocks.supply()
 }));
 vi.mock('$lib/services/lockvest', () => ({ getLockContractsByOwner: mocks.locks }));
 vi.mock('$lib/services/accounts', () => ({ fetchFungibleTokens: mocks.tokens }));
@@ -52,6 +49,11 @@ import { summarizeWallet } from './summary';
 
 beforeEach(() => {
 	mocks.consensus.mockReset();
+	mocks.supply.mockReset().mockResolvedValue({
+		'current-round': 100,
+		'online-money': 1e12,
+		'blacklisted-money': 0
+	});
 	mocks.onlineStake.mockReset().mockResolvedValue(1e15);
 	mocks.incentive.mockReset().mockResolvedValue('incapable');
 	mocks.app
@@ -296,8 +298,16 @@ describe('node health reads', () => {
 		participation: { voteLastValid: 10_000_000 }
 	};
 
+	const onlineMoney = (amount: number) =>
+		mocks.supply.mockResolvedValue({
+			'current-round': 100,
+			'online-money': amount,
+			'blacklisted-money': 0
+		});
+
 	it('gives the owner eligibility and heartbeat health from its account record', async () => {
 		mocks.account.mockResolvedValue(eligibleOwner);
+		onlineMoney(1e15);
 		const data = await loadWallet('OWNER', 'OWNER');
 		expect(data.owner.health?.eligibility?.status).toEqual({ registered: true, reasons: [] });
 		expect(data.owner.health?.heartbeat).toMatchObject({
@@ -305,14 +315,23 @@ describe('node health reads', () => {
 			overdueAfter: 10_000,
 			overdue: false
 		});
-		expect(mocks.onlineStake).toHaveBeenCalledTimes(1);
 	});
 
-	it('shows heartbeat ages with no verdict when online stake is unavailable', async () => {
+	it('takes online stake from the supply read it already makes, with no second request', async () => {
 		mocks.account.mockResolvedValue(eligibleOwner);
-		mocks.onlineStake.mockRejectedValue(new Error('down'));
-		const data = await loadWallet('OWNER', 'OWNER');
-		expect(data.owner.health?.heartbeat).toMatchObject({ silentRounds: 1000, overdue: null });
+		onlineMoney(1e15);
+		await loadWallet('OWNER', 'OWNER');
+		expect(mocks.onlineStake).not.toHaveBeenCalled();
+		expect(mocks.supply).toHaveBeenCalledTimes(1);
+	});
+
+	it('gives an account without the incentive fee no overdue verdict, since it cannot be suspended', async () => {
+		const silent = { ...eligibleOwner, lastProposed: 1, lastHeartbeat: 1 };
+		onlineMoney(1e15);
+		mocks.account.mockResolvedValue({ ...silent, incentiveEligible: false });
+		expect((await loadWallet('OWNER', 'OWNER')).owner.health?.heartbeat?.overdue).toBe(false);
+		mocks.account.mockResolvedValue(silent);
+		expect((await loadWallet('OWNER', 'OWNER', true)).owner.health?.heartbeat?.overdue).toBe(true);
 	});
 
 	it('carries contract eligibility from the program it already read', async () => {

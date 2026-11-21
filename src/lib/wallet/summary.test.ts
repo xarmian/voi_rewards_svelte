@@ -306,7 +306,7 @@ describe('node health', () => {
 			health: health({ heartbeat: heartbeat({ silentRounds: 900 }) })
 		};
 		const result = summarize([online('C0'), quiet], epoch, online('OWNER'));
-		expect(result.heartbeat.oldest?.silentRounds).toBe(900);
+		expect(result.heartbeat.shown?.silentRounds).toBe(900);
 		expect(result.heartbeat.tone).toBe('ok');
 		expect(result.heartbeat.overdueCount).toBe(0);
 		expect(result.healthTone).toBe('ok');
@@ -321,6 +321,23 @@ describe('node health', () => {
 		expect(result.heartbeat.overdueCount).toBe(1);
 		expect(result.heartbeat.tone).toBe('warn');
 		expect(result.healthTone).toBe('warn');
+	});
+
+	it('shows the most overdue account, against its own window, when any is overdue', () => {
+		// Large account: 1,200 silent against a 1,000 window (overdue). Small: 5,000 against 50,000.
+		const large = {
+			...online('C1'),
+			health: health({
+				heartbeat: heartbeat({ silentRounds: 1200, overdueAfter: 1000, overdue: true })
+			})
+		};
+		const small = {
+			...online('C2'),
+			health: health({ heartbeat: heartbeat({ silentRounds: 5000, overdueAfter: 50_000 }) })
+		};
+		const result = summarize([small, large], epoch, online('OWNER'));
+		expect(result.heartbeat.overdueCount).toBe(1);
+		expect(result.heartbeat.shown?.silentRounds).toBe(1200);
 	});
 
 	it('gives no verdict when online stake was unavailable', () => {
@@ -392,5 +409,11 @@ describe('node health', () => {
 			now: 0
 		});
 		expect(result.eligibilityRows).toEqual([{ address: 'C1', contractId: 1, eligibility: null }]);
+	});
+
+	it('lists a contract supplied twice once', () => {
+		const c1 = { ...online('C1'), contractId: 1 };
+		const result = summarize([c1, { ...c1 }], epoch, owner);
+		expect(result.eligibilityRows.map((row) => row.address)).toEqual(['OWNER', 'C1']);
 	});
 });

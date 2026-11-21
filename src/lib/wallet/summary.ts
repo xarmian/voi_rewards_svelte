@@ -91,8 +91,11 @@ export type WalletSummary = {
 	keyTone: Tone;
 	heartbeat: {
 		tone: Tone;
-		/** The online account silent longest. */
-		oldest: Heartbeat | null;
+		/**
+		 * The account whose ages the card shows: when any is overdue, the most overdue against its own
+		 * window; otherwise the online account silent longest.
+		 */
+		shown: Heartbeat | null;
 		overdueCount: number;
 		/** Online accounts with no proposal or heartbeat on record. */
 		unknownCount: number;
@@ -164,7 +167,13 @@ export function summarizeWallet({
 		(oldest, beat) => (oldest === null || beat.silentRounds > oldest.silentRounds ? beat : oldest),
 		null
 	);
-	const overdueCount = heartbeats.filter((beat) => beat.overdue === true).length;
+	const overdue = heartbeats.filter((beat) => beat.overdue === true);
+	const overdueCount = overdue.length;
+	// Each account's window scales with 1/stake, so the longest silence need not be the overdue one.
+	const lateness = (beat: Heartbeat) => beat.silentRounds / (beat.overdueAfter ?? Infinity);
+	const shownHeartbeat = overdueCount
+		? overdue.reduce((most, beat) => (lateness(beat) > lateness(most) ? beat : most))
+		: oldestHeartbeat;
 	const heartbeatTone: Tone =
 		oldestHeartbeat === null
 			? 'neutral'
@@ -187,7 +196,8 @@ export function summarizeWallet({
 					}
 				]
 			: []),
-		...contracts
+		// Keyed by address in the card, so a contract listed twice appears once.
+		...[...new Map(contracts.map((account) => [account.address, account])).values()]
 			.filter((account) => account.isParticipating || suspendedOf(account))
 			.map((account) => ({
 				address: account.address,
@@ -334,7 +344,7 @@ export function summarizeWallet({
 		keyTone,
 		heartbeat: {
 			tone: heartbeatTone,
-			oldest: oldestHeartbeat,
+			shown: shownHeartbeat,
 			overdueCount,
 			unknownCount: online.length - heartbeats.length
 		},

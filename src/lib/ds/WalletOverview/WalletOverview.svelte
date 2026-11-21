@@ -89,20 +89,22 @@
 		return seconds === null ? missing : `${label} ${ago(now - seconds * 1000, now)}`;
 	}
 	const heartbeatAges = $derived(
-		heartbeat.oldest
-			? `${seen('Last proposed', 'No proposal on record', heartbeat.oldest.lastProposedSeconds)} · ${seen('last heartbeat', 'no heartbeat on record', heartbeat.oldest.lastHeartbeatSeconds)}`
+		heartbeat.shown
+			? `${seen('Last proposed', 'No proposal on record', heartbeat.shown.lastProposedSeconds)} · ${seen('last heartbeat', 'no heartbeat on record', heartbeat.shown.lastHeartbeatSeconds)}`
 			: null
 	);
 	const heartbeatDetail = $derived(
 		[
 			heartbeat.overdueCount > 0
 				? `${heartbeatAges} · ${plural(heartbeat.overdueCount, 'online account')} silent longer than expected. The node may be suspended soon if it stays silent.`
-				: heartbeat.oldest && heartbeat.tone === 'neutral'
+				: heartbeat.shown && heartbeat.tone === 'neutral'
 					? 'Online stake unavailable, so staleness is not checked.'
-					: heartbeat.oldest
+					: heartbeat.shown
 						? 'Longest silence among online accounts'
-						: 'No proposal or heartbeat on record for online accounts.',
-			heartbeat.oldest && heartbeat.unknownCount > 0
+						: heartbeat.unknownCount > 0
+							? 'No proposal or heartbeat on record for online accounts.'
+							: 'No online accounts.',
+			heartbeat.shown && heartbeat.unknownCount > 0
 				? `${comma(heartbeat.unknownCount)} with no proposal or heartbeat on record`
 				: ''
 		]
