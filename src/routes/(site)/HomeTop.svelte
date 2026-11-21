@@ -13,6 +13,8 @@
 	let epoch = $derived(epochHomeData(data));
 	// Without the epoch tiles, the three remaining tiles share the row.
 	let tileSpan = $derived(epoch ? 'lg:col-span-3' : 'lg:col-span-4');
+	// In the two-column tablet grid, the last of three tiles takes the full row.
+	let priceSpan = $derived(epoch ? 'md:col-span-1' : 'md:col-span-2');
 </script>
 
 <div
@@ -73,7 +75,7 @@
 			{/await}
 		</div>
 	{/if}
-	<div class="grid min-w-0 md:col-span-1 {tileSpan}">
+	<div class="grid min-w-0 {priceSpan} {tileSpan}">
 		{#await data.price}
 			<StatTile label="VOI price" icon="$" value={MISSING} state="loading" />
 		{:then price}

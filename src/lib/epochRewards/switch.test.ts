@@ -116,7 +116,11 @@ test('the home page shows the non-epoch tiles and cards, with no empty slot left
 	expect(html).toMatch(
 		/class="min-w-0 lg:col-span-12 md:col-span-2 grid md:grid-cols-2 gap-bento"/
 	);
-	expect(html.match(/class="grid min-w-0 md:col-span-1 lg:col-span-4"/g)).toHaveLength(3);
+	expect(html.match(/class="grid min-w-0 md:col-span-\d lg:col-span-4"/g)).toHaveLength(3);
+	// Each grid row fills: at lg the spans total 12 of 12 columns; at md, 2 + 2 of 2 + 2.
+	const spans = [...html.matchAll(/class="grid min-w-0 md:col-span-(\d) lg:col-span-(\d+)"/g)];
+	expect(spans.reduce((sum, [, , lg]) => sum + Number(lg), 0)).toBe(12);
+	expect(spans.reduce((sum, [, md]) => sum + Number(md), 0) % 2).toBe(0);
 	expect(html).not.toContain('lg:col-span-3');
 	expect(html).not.toMatch(/<section\b[^>]*>\s*<\/section>/);
 	expect(html).not.toMatch(/<(div|section)\b[^>]*\bp-card\b[^>]*>\s*<\/\1>/);
