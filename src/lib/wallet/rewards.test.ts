@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { epochRange } from '$lib/epochs';
+import { epochRange } from '$lib/epochRewards';
 import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 import {
 	validatePayouts,

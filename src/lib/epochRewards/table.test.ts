@@ -11,7 +11,7 @@ import {
 	showAfterFavouritesChange,
 	totalBlocksFor,
 	type EpochResponse
-} from './rewards';
+} from './table';
 
 const addr = 'QKCTN6IX3TFNGN6LXSBNQQERXZUUXNDRTQWDTQBMHBZOTXLYJCEABU6ZX4';
 const response: EpochResponse = {

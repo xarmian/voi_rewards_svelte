@@ -113,7 +113,7 @@ it.each(['data', 'dates'])(
 
 it('builds legacy ids, descriptions and epoch numbers matching every epoch range', async () => {
 	const { buildDateRanges } = await import('./dataTable');
-	const { epochRange } = await import('$lib/epochs');
+	const { epochRange } = await import('$lib/epochRewards');
 	const dates = buildDateRanges(new Date('2026-10-25T02:38:00Z'));
 	expect(dates).toHaveLength(104);
 	expect(dates[0]).toEqual({ id: '20241030-20241105', desc: '2024-10-30 to 2024-11-05', epoch: 1 });

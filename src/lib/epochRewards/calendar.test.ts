@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { epochAt, epochRange } from './epochs';
+import { epochAt, epochRange } from './calendar';
 
 for (const [date, epoch] of [
 	['2026-10-24', 104],

@@ -1,7 +1,7 @@
 import { render } from 'svelte/server';
 import WalletOverview from '$lib/ds/WalletOverview/WalletOverview.svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { epochRange } from '$lib/epochs';
+import { epochRange } from '$lib/epochRewards';
 const mocks = vi.hoisted(() => ({
 	rows: vi.fn(),
 	account: vi.fn(),

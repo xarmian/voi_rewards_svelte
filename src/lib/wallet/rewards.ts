@@ -1,6 +1,6 @@
 import { config } from '$lib/config';
-import { epochRange } from '$lib/epochs';
-import { blocksForEpoch, finite } from '$lib/home/headline';
+import { blocksForEpoch, epochRange } from '$lib/epochRewards';
+import { finite } from '$lib/home/headline';
 import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 import { requireAccountInfo, getSupplyInfo, onlineStakeStore } from '$lib/stores/accounts';
 import { getTokensByEpoch } from '$lib/utils';

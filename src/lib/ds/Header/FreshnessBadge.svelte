@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { chainStatus, freshness } from '$lib/stores/chainStatus';
-	import { epochAt } from '$lib/epochs';
+	import { liveEpoch } from '$lib/epochRewards';
 	import { badgeText } from './badge';
 	let { variant, epoch }: { variant: 'hero' | 'bar'; epoch?: number } = $props();
 	let clientEpoch: number | undefined = $state();
 	onMount(() => {
-		clientEpoch = epochAt(new Date());
+		clientEpoch = liveEpoch(new Date());
 	});
 	const status = $derived(
 		freshness($chainStatus, $chainStatus.checkedAt ?? $chainStatus.startedAt ?? 0)

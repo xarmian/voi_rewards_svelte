@@ -4,7 +4,8 @@
 	import { ago, comma, MISSING, pct } from '$lib/ds/format';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
-	import { accountsDetail, headlineValues, onlineStakeTile, priceTile } from '$lib/home/headline';
+	import { accountsDetail, headlineValues } from '$lib/epochRewards/headline';
+	import { onlineStakeTile, priceTile } from '$lib/home/headline';
 	import type { DashboardData } from '$lib/server/home';
 	let { data }: { data: DashboardData } = $props();
 	const retry = () => {
