@@ -21,21 +21,25 @@
 	import { createReadSource } from '$lib/wallet/read';
 	import {
 		createRewardsState,
-		loadRewardEpochs,
-		loadPayouts,
 		loadDailyProposals,
 		loadRewardAccount,
-		loadEligibleStakes,
 		loadDailyStake,
+		dailyProposals,
+		type RewardsState
+	} from '$lib/wallet/rewards';
+	import {
+		createEpochRewardsState,
+		loadRewardEpochs,
+		loadPayouts,
+		loadEligibleStakes,
 		loadRewardSupply,
 		mergeRewardRows,
 		missingEpochsMessage,
-		dailyProposals,
 		cumulativePayouts,
 		recordedPayouts,
-		type RewardRow,
-		type RewardsState
-	} from '$lib/wallet/rewards';
+		type EpochRewardsState,
+		type WalletRewardRow as RewardRow
+	} from '$lib/epochRewards/client';
 	import {
 		BLOCK_REWARD_LAG_ALERT_ROUNDS,
 		loadBlockRewardFunding,
@@ -100,7 +104,8 @@
 	} = $props();
 	let clock = $state(new Date());
 	let at = $derived(now ?? clock);
-	let sources = $state(createRewardsState());
+	type Sources = RewardsState & EpochRewardsState;
+	let sources: Sources = $state({ ...createRewardsState(), ...createEpochRewardsState() });
 	// Retries swap alerts for loading states or clear them; these stable regions keep focus in place.
 	let epochsRegion: HTMLDivElement | undefined = $state();
 	let dailyRegion: HTMLDivElement | undefined = $state();
@@ -114,7 +119,7 @@
 		dailyStake: createReadSource(loadDailyStake, (result) => (sources.dailyStake = result)),
 		supply: createReadSource(loadRewardSupply, (result) => (sources.supply = result))
 	};
-	function retry(source: keyof RewardsState) {
+	function retry(source: keyof Sources) {
 		return readers[source].load(pageAddress, true);
 	}
 	function refresh(address = pageAddress) {
@@ -469,11 +474,7 @@
 		data-block-reward-tx={row.txid}
 		>{shortAddr(row.txid)}<span class="sr-only"> (opens in a new tab)</span></a
 	>{/snippet}
-{#snippet warning(
-	source: keyof RewardsState,
-	message: string,
-	region: () => HTMLElement | undefined
-)}
+{#snippet warning(source: keyof Sources, message: string, region: () => HTMLElement | undefined)}
 	{#if sources[source].state === 'error' || sources[source].error}
 		<InlineAlert
 			{message}

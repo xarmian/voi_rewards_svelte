@@ -9,6 +9,8 @@ export type { Epoch, Headline } from './headline';
 export type { EpochResponse, RewardRow } from './table';
 export type { EpochHistorySource } from './source';
 export type { EpochHomeData } from './home.server';
+export type { EpochSummary, WalletEpoch, WalletEpochSummary } from './wallet/summary';
+export type { EpochRewardsState } from './wallet/rewards';
 
 /** The epoch the clock is in, or undefined when epoch rewards are off. */
 export function liveEpoch(date: Date): number | undefined {

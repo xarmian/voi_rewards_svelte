@@ -17,6 +17,21 @@ export async function boundedRead<T>(request: Promise<T>): Promise<T> {
 	}
 }
 
+/** The wallet load's bound: the same 15 seconds, with the wallet's own timeout message. */
+export async function bounded<T>(request: Promise<T>): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			request,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => reject(new Error('Wallet data request timed out')), 15000);
+			})
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 /** One browser-owned source; old addresses and retries cannot publish late results. */
 export function createReadSource<T>(
 	read: (address: string, force: boolean) => Promise<T>,

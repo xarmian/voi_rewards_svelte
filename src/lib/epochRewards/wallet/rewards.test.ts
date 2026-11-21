@@ -5,27 +5,26 @@ import {
 	validatePayouts,
 	mergeRewardRows,
 	cumulativePayouts,
-	dailyProposals,
 	completedEpoch,
 	liveEpoch,
 	loadPayouts,
 	loadRewardEpochs,
-	loadDailyProposals,
 	loadEligibleStakes,
 	missingEpochsMessage,
 	type RewardEpoch
 } from './rewards';
-import { createReadSource, type Source } from './read';
+import { dailyProposals, loadDailyProposals } from '$lib/wallet/rewards';
+import { createReadSource, type Source } from '$lib/wallet/read';
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: vi.fn(async () => 1400) }));
 vi.mock('$lib/stores/accounts', () => ({
 	getSupplyInfo: vi.fn(),
 	requireAccountInfo: vi.fn(),
 	onlineStakeStore: { getData: vi.fn(), refresh: vi.fn() }
 }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('../../../stores/dataTable', () => ({
 	dataTable: { fetchDateRanges: vi.fn(), fetchData: vi.fn() }
 }));
-import { dataTable } from '../../stores/dataTable';
+import { dataTable } from '../../../stores/dataTable';
 const address = 'PAGE';
 const now = epochRange(66).start.getTime();
 const epoch: RewardEpoch = {

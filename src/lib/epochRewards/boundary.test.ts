@@ -76,9 +76,10 @@ test('code outside the module reaches epoch rewards only through its public entr
 				violations.push(`${path}: ${spec} moved into $lib/epochRewards`);
 			if (!spec.startsWith('$lib/epochRewards/')) continue;
 			const entry = spec.slice('$lib/epochRewards/'.length);
-			if (entry === 'components') continue;
+			if (entry === 'components' || entry === 'client') continue;
 			if (entry === 'home.server' && path.startsWith('src/lib/server/')) continue;
-			if (entry === 'config' && isTest(path)) continue;
+			// Tests mock and fixture whichever module file they exercise.
+			if (isTest(path)) continue;
 			violations.push(`${path}: ${spec}`);
 		}
 	expect(violations).toEqual([]);
@@ -118,9 +119,7 @@ const PENDING = {
 		'src/lib/ds/WalletOverview/WalletOverview.svelte',
 		'src/lib/network/model.ts',
 		'src/lib/utils.ts',
-		'src/lib/wallet/calculator.ts',
-		'src/lib/wallet/load.ts',
-		'src/lib/wallet/rewards.ts'
+		'src/lib/wallet/calculator.ts'
 	],
 	// PR 2 decides: the TestNet archive keeps its own reward pools.
 	archive: [
@@ -146,11 +145,30 @@ test('the set of files still reaching epoch internals only shrinks', () => {
 
 test('the public entry pulls in neither the history source nor the server half', () => {
 	// index.ts is in the layout chunk (the header badge): the live source brings the
-	// client rewards cache, and home.server is server-only. Types are erased, so they may pass.
+	// client rewards cache (so does client.ts), and home.server is server-only. Types are
+	// erased, so they may pass.
 	const index = readFileSync(join(root, moduleDir, 'index.ts'), 'utf8');
 	const values = [...index.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?from\s*'([^']+)'/gm)].map(
 		(match) => match[1]
 	);
-	expect(values.filter((spec) => /^\.\/(source|home\.server)$/.test(spec))).toEqual([]);
+	expect(
+		values.filter((spec) => /^\.\/(source|home\.server|client)$|stores\/dataTable/.test(spec))
+	).toEqual([]);
 	expect(values).toContain('./calendar');
+});
+
+test('the layout and header import only the public entry, never the client one', () => {
+	const chrome = outside.filter(
+		({ path }) =>
+			!isTest(path) &&
+			(path === 'src/routes/(site)/+layout.svelte' || path.startsWith('src/lib/ds/Header/'))
+	);
+	expect(chrome.length).toBeGreaterThan(0);
+	const reached = chrome.flatMap(({ path, text }) =>
+		specifiers(text)
+			.map((raw) => normalize(path, raw))
+			.filter((spec) => spec.startsWith('$lib/epochRewards/'))
+			.map((spec) => `${path}: ${spec}`)
+	);
+	expect(reached).toEqual([]);
 });
