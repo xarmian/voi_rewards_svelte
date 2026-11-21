@@ -2,7 +2,7 @@
 	import { onMount, untrack } from 'svelte';
 	import Card from '../Card/Card.svelte';
 	import Button from '../Button/Button.svelte';
-	import StatusPill from '../StatusPill/StatusPill.svelte';
+	import BlockRewardStatusPill from '../BlockRewardStatusPill/BlockRewardStatusPill.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import StatTile from '../StatTile/StatTile.svelte';
 	import BlockRewardsPausedAlert from '../BlockRewardsPausedAlert/BlockRewardsPausedAlert.svelte';
@@ -37,12 +37,15 @@
 	let {
 		pageAddress,
 		isContract = false,
+		contractId = null,
 		ownerLookup = 'ok',
 		onretrylookup,
 		now
 	}: {
 		pageAddress: string;
 		isContract?: boolean;
+		/** The staking contract's application id, so its program can be checked; null when unknown. */
+		contractId?: number | null;
 		/** 'unavailable' when the page could not tell whether this address is a staking contract. */
 		ownerLookup?: 'ok' | 'unavailable';
 		onretrylookup?: () => void;
@@ -54,7 +57,7 @@
 	let region: HTMLDivElement | undefined = $state();
 	const readers = {
 		status: createReadSource(
-			(address, force) => loadBlockRewardStatus(address, { isContract, force }),
+			(address, force) => loadBlockRewardStatus(address, { isContract, contractId, force }),
 			(result) => (sources.status = result)
 		),
 		funding: createReadSource(
@@ -89,6 +92,7 @@
 	$effect(() => {
 		const address = pageAddress;
 		void isContract;
+		void contractId;
 		untrack(() => {
 			for (const reader of Object.values(readers)) void reader.load(address);
 		});
@@ -164,14 +168,7 @@
 					onretry={onretrylookup}
 				/>
 			{:else if status}
-				{#if status.registered}
-					<StatusPill tone="ok" label="Registered for real-time block rewards" />
-				{:else}
-					<StatusPill tone="warn" label="Not registered for real-time block rewards" />
-					<ul class="space-y-1 text-sm [overflow-wrap:anywhere]">
-						{#each status.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
-					</ul>
-				{/if}
+				<BlockRewardStatusPill {status} />
 			{:else if statusSource.state === 'error'}
 				<InlineAlert
 					message="Real-time block reward registration status unavailable"

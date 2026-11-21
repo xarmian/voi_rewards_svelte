@@ -1,18 +1,19 @@
 import { comma, compact, pct } from '$lib/ds/format';
 import { forecastBlockRewards, networkPace, type Forecast } from '$lib/rewards/blockRewardForecast';
-import type { BlockRewardFunding, BlockRewardStatus } from '$lib/rewards/blockRewardStatus';
+import type { BlockRewardFunding } from '$lib/rewards/blockRewardStatus';
 import {
 	BLOCK_REWARD_PAGE_SIZE,
 	loadBlockRewards,
 	type BlockReward,
 	type BlockRewardDay,
+	type BlockRewardStatusRead,
 	type NetworkBlockRewardDay
 } from './blockRewards';
 import { boundedRead, type Source } from './read';
 import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
 
 export type BlockRewardsState = {
-	status: Source<BlockRewardStatus & { balance: number }>;
+	status: Source<BlockRewardStatusRead>;
 	funding: Source<{ funding: BlockRewardFunding; bonus: number | null }>;
 	daily: Source<BlockRewardDay[]>;
 	network: Source<NetworkBlockRewardDay[]>;
@@ -115,18 +116,18 @@ export function blockRewardForecast(
 }
 
 /**
- * The status source as it stands for the current contract classification. A status carries
- * the contract reason exactly when it was read for a contract, so a value read for the other
- * classification (kept while the reader reloads, or after that reload failed) is not shown:
- * it reads as loading, or as the reload's error.
+ * The status source as it stands for the current contract classification. Each read records
+ * the classification it was made for, so a value read for the other classification (kept while
+ * the reader reloads, or after that reload failed) is not shown: it reads as loading, or as the
+ * reload's error.
  */
-export function currentStatus<T extends BlockRewardStatus>(
+export function currentStatus<T extends { isContract: boolean }>(
 	source: Source<T>,
 	isContract: boolean
 ): Source<T> {
 	const value = source.value;
 	if (value === undefined) return source;
-	if (value.reasons.some((reason) => reason.code === 'contract') === isContract) return source;
+	if (value.isContract === isContract) return source;
 	return source.error ? { state: 'error', error: source.error } : { state: 'loading' };
 }
 

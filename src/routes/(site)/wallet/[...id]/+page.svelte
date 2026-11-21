@@ -46,6 +46,7 @@
 		data: {
 			walletId: string | null;
 			parentWalletId: string | null;
+			contractId?: number | null;
 			ownerLookup?: 'ok' | 'unavailable';
 			hash?: string;
 		};
@@ -503,6 +504,7 @@
 					<WalletRewards
 						pageAddress={walletId}
 						isContract={!!parentWalletId}
+						contractId={data.contractId ?? null}
 						{ownerLookup}
 						onretrylookup={refresh}
 					/>

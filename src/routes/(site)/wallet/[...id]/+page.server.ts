@@ -8,6 +8,7 @@ export const load = (async ({ params, depends, url, fetch }) => {
 	depends('wallet:id');
 
 	let parentWalletId: string | null = null;
+	let contractId: number | null = null;
 	let ownerLookup: 'ok' | 'unavailable' = 'ok';
 	if (params.id) {
 		const [first, ...segments] = params.id.split('/');
@@ -30,11 +31,12 @@ export const load = (async ({ params, depends, url, fetch }) => {
 		try {
 			const contract = await getLockContractByAddress(params.id);
 			parentWalletId = contract?.global_owner ?? null;
+			contractId = Number.isSafeInteger(contract?.contractId) ? contract!.contractId : null;
 		} catch (error) {
 			console.error('Lockvest lookup failed:', error);
 			ownerLookup = 'unavailable';
 		}
 	}
 
-	return { parentWalletId, ownerLookup };
+	return { parentWalletId, contractId, ownerLookup };
 }) satisfies PageServerLoad;

@@ -24,6 +24,20 @@ vi.mock('../../stores/dataTable', () => ({
 	dataTable: { fetchDateRanges: vi.fn(), fetchData: vi.fn() }
 }));
 vi.mock('$lib/rewards/blockRewardChain', () => ({ readBonus: vi.fn(), readFeeSink: vi.fn() }));
+const program = vi.hoisted(() => ({
+	read: vi.fn(),
+	incentive: vi.fn()
+}));
+vi.mock('$lib/utils/algod', () => ({
+	algodClient: { getApplicationByID: (id: number) => ({ do: () => program.read(id) }) }
+}));
+vi.mock('$lib/chain/keyreg', async (original) => ({
+	...(await original<typeof import('$lib/chain/keyreg')>()),
+	contractIncentiveOf: async (read: () => Promise<unknown>) => {
+		await read();
+		return program.incentive();
+	}
+}));
 
 const address = 'PAGE';
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -271,21 +285,60 @@ describe('mimirLagRounds', () => {
 });
 
 describe('loadBlockRewardStatus', () => {
-	it('passes force and evaluates the account', async () => {
-		vi.mocked(requireAccountInfo).mockResolvedValue({
-			status: 'Online',
-			incentiveEligible: true,
-			amount: 50_000_000_000n,
-			round: 100n,
-			participation: { voteLastValid: 200n }
-		} as never);
-		await expect(
-			loadBlockRewardStatus(address, { isContract: false, force: true })
-		).resolves.toEqual({ registered: true, reasons: [], balance: 50_000_000_000 });
-		expect(requireAccountInfo).toHaveBeenCalledWith(address, { force: true });
+	const eligible = {
+		status: 'Online',
+		incentiveEligible: true,
+		amount: 50_000_000_000n,
+		round: 100n,
+		participation: { voteLastValid: 200n }
+	};
+	beforeEach(() => {
+		program.read
+			.mockReset()
+			.mockResolvedValue({ params: { approvalProgram: new Uint8Array([1]) } });
+		program.incentive.mockReset();
 	});
 
-	it('reports reasons for a contract', async () => {
+	it('passes force and evaluates the account without reading a program', async () => {
+		vi.mocked(requireAccountInfo).mockResolvedValue(eligible as never);
+		await expect(
+			loadBlockRewardStatus(address, { isContract: false, force: true })
+		).resolves.toEqual({
+			registered: true,
+			reasons: [],
+			balance: 50_000_000_000,
+			isContract: false
+		});
+		expect(requireAccountInfo).toHaveBeenCalledWith(address, { force: true });
+		expect(program.read).not.toHaveBeenCalled();
+	});
+
+	it('registers a capable contract that is online and eligible', async () => {
+		vi.mocked(requireAccountInfo).mockResolvedValue(eligible as never);
+		program.incentive.mockResolvedValue('capable');
+		await expect(
+			loadBlockRewardStatus(address, { isContract: true, contractId: 7 })
+		).resolves.toEqual({
+			registered: true,
+			reasons: [],
+			balance: 50_000_000_000,
+			isContract: true
+		});
+		expect(program.read).toHaveBeenCalledWith(7);
+	});
+
+	it.each(['incapable', 'unverified'])(
+		'reports the contract reason for a %s program',
+		async (incentive) => {
+			vi.mocked(requireAccountInfo).mockResolvedValue(eligible as never);
+			program.incentive.mockResolvedValue(incentive);
+			const status = await loadBlockRewardStatus(address, { isContract: true, contractId: 7 });
+			expect(status.registered).toBe(false);
+			expect(status.reasons.map((reason) => reason.code)).toEqual(['contract']);
+		}
+	);
+
+	it('reads a contract with no known id as incapable', async () => {
 		vi.mocked(requireAccountInfo).mockResolvedValue({
 			status: 'Offline',
 			amount: 50_000_000_000n,
@@ -293,7 +346,9 @@ describe('loadBlockRewardStatus', () => {
 		} as never);
 		const status = await loadBlockRewardStatus(address, { isContract: true });
 		expect(status.reasons.map((reason) => reason.code)).toEqual(['contract', 'offline']);
+		expect(status.isContract).toBe(true);
 		expect(requireAccountInfo).toHaveBeenCalledWith(address, { force: false });
+		expect(program.read).not.toHaveBeenCalled();
 	});
 });
 
