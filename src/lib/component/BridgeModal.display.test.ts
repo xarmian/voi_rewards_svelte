@@ -24,7 +24,7 @@ test('the avatar sits with the name inside the input and is not repeated under i
 			)
 		);
 	}
-	expect(source.match(/<NameAvatar/g)).toHaveLength(4);
+	expect(source.match(/<NameAvatar/g)).toHaveLength(8);
 });
 
 test('a typed address gets one row with the avatar and name, and never when a name was picked', () => {
