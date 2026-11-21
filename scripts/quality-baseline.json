@@ -40,12 +40,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/Project.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/QuestComponent.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
@@ -238,30 +232,6 @@
 			"svelte:export_let_unused": {
 				"errors": 0,
 				"warnings": 2
-			}
-		},
-		"src/lib/component/Project.svelte": {
-			"ts:2339": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:2538": {
-				"errors": 11,
-				"warnings": 0
-			},
-			"ts:7006": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:7053": {
-				"errors": 6,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ProjectBox.svelte": {
-			"ts:7053": {
-				"errors": 2,
-				"warnings": 0
 			}
 		},
 		"src/lib/component/RegisterVoteKey.svelte": {

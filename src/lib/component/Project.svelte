@@ -334,14 +334,14 @@
 	}
 
 	function calculateChubsHoldPoints(data: TransferData) {
-		const balances = {};
+		const balances: Record<string, number> = {};
 		const weeklyMinBalances = {} as Record<
 			string,
 			Record<string, { balance: number; wasZero: boolean }>
 		>;
 
 		// Helper function to get the Monday of the week for a given date
-		const getMonday = (d) => {
+		const getMonday = (d: Date) => {
 			const inputDate = new Date(d); // Convert input to Date object if not already
 			inputDate.setUTCHours(0, 0, 0, 0); // Set to 0:00 UTC
 			const dayOfWeek = inputDate.getDay(); // Get the day of the week (0-6)
@@ -370,7 +370,7 @@
 		//let latestDate = new Date(data.transfers[0].timestamp * 1000);
 		let latestDate = new Date();
 		latestDate.setUTCHours(0, 0, 0, 0);
-		const addresses = new Set();
+		const addresses = new Set<string>();
 
 		data.transfers.forEach((transfer) => {
 			const date = new Date(transfer.timestamp * 1000);
@@ -461,8 +461,8 @@
 		// for each wallet, calculate the number of weeks where the balance did not drop to zero
 		const walletPoints = new Map();
 		result.slice(0, -1).forEach(({ accounts }) => {
-			accounts.forEach(({ address, balance, wasZero }) => {
-				if (balance > 0 && !wasZero) {
+			accounts.forEach(({ address, balance }) => {
+				if (balance > 0) {
 					walletPoints.set(address, (walletPoints.get(address) || 0) + 1);
 				}
 			});
@@ -686,7 +686,7 @@
 </div>
 <div class="flex flex-col justify-center text-[#41137E]">
 	<div class="flex flex-wrap justify-around p-4">
-		{#each localProject.quests as quest, i}
+		{#each localProject.quests as quest}
 			<div
 				class="{quest.name != 'run_a_node'
 					? 'w-full sm:w-1/2 md:w-1/3'
