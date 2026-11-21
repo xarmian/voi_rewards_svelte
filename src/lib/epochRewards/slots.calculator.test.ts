@@ -102,6 +102,7 @@ test('the epoch cost field, estimate and schedule render under their old titles'
 	])
 		expect(shown).toContain(title);
 	expect(html).toContain('aria-label="Cost and price"');
+	expect(html).toContain('class="space-y-3 border-t border-line pt-4"');
 	const clean = html.replace(/<!--[\s\S]*?-->/g, '');
 	const estimate = clean.indexOf('aria-labelledby="estimated-rewards-heading"');
 	const blocks = clean.indexOf('aria-labelledby="estimated-block-rewards-heading"');

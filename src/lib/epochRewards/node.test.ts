@@ -31,9 +31,30 @@ for (const [label, epochData, dateRanges, reward] of [
 	});
 }
 
-test('a failed read is no result, not a throw', async () => {
+test('a failed read rejects, so the panel handles it with its other reads', async () => {
 	mocks.rows.mockRejectedValue(new Error('proposers API down'));
-	expect(await loadNodeEpochRewards(supply)).toBeNull();
+	await expect(loadNodeEpochRewards(supply)).rejects.toThrow('proposers API down');
+});
+
+test('a superseded request stops after the date ranges, before the epoch row', async () => {
+	let stale = false;
+	mocks.dates.mockImplementation(async () => {
+		stale = true;
+		return dates;
+	});
+	expect(await loadNodeEpochRewards(supply, () => stale)).toBeNull();
+	expect(mocks.rows).not.toHaveBeenCalled();
+	expect(mocks.pool).not.toHaveBeenCalled();
+});
+
+test('a superseded request stops after the epoch row, before the pools', async () => {
+	let stale = false;
+	mocks.rows.mockImplementation(async () => {
+		stale = true;
+		return { blacklist_balance_total: 0 };
+	});
+	expect(await loadNodeEpochRewards(supply, () => stale)).toBeNull();
+	expect(mocks.pool).not.toHaveBeenCalled();
 });
 
 test('reads the latest epoch row, then a year of pools from that epoch', async () => {

@@ -348,7 +348,11 @@
 						)}
 					/>{/if}
 				{#if epochCalc}<EpochNodeCost bind:cost={nodeCost} />{/if}
-				<div class="space-y-3 border-t border-line pt-4">
+				<div
+					class="space-y-3 {epochCalc || (priceSource.error && !useCustomPrice)
+						? 'border-t border-line pt-4'
+						: ''}"
+				>
 					<div class="flex flex-wrap items-center gap-2">
 						{#if useCustomPrice}
 							<label for="custom-price" class="text-label text-ink-muted">Your price</label>

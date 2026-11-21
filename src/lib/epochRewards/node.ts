@@ -8,39 +8,40 @@ export type NodeEpochRewards = { rewardStake: number; epochRewards: number[] };
 
 /**
  * The latest epoch's blacklist row, then the next year's pools from that epoch, read in
- * the order the node panel read them. Null when any read fails or returns unusable data.
+ * the order the node panel read them. Null when a read returns unusable data, or as soon as
+ * `stale()` says the panel has moved on (the next read is then never started). A read that
+ * throws rejects, so the panel reports it with its other reads.
  */
-export async function loadNodeEpochRewards(supply: {
-	'online-money': number | bigint;
-}): Promise<NodeEpochRewards | null> {
-	try {
-		const dates = await dataTable.fetchDateRanges();
-		if (
-			!Array.isArray(dates) ||
-			dates.length === 0 ||
-			!Number.isFinite(dates[dates.length - 1]?.epoch)
-		)
-			return null;
-		const latestEpoch = dates[dates.length - 1];
-		const currentEpoch = latestEpoch.epoch;
-		const epochData = await dataTable.fetchData(latestEpoch.id);
-		if (!epochData || !Number.isFinite(Number(epochData.blacklist_balance_total))) return null;
-
-		// Fetch next year's worth of epoch rewards
-		const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) =>
-			getTokensByEpoch(currentEpoch + i)
-		);
-		const rewards = await Promise.all(epochPromises);
-		if (rewards.some((reward) => !Number.isFinite(reward))) return null;
-
-		return {
-			rewardStake: Number(supply['online-money']) - Number(epochData.blacklist_balance_total),
-			epochRewards: rewards
-		};
-	} catch (error) {
-		console.error('Failed to fetch node epoch rewards:', error);
+export async function loadNodeEpochRewards(
+	supply: { 'online-money': number | bigint },
+	stale: () => boolean = () => false
+): Promise<NodeEpochRewards | null> {
+	const dates = await dataTable.fetchDateRanges();
+	if (stale()) return null;
+	if (
+		!Array.isArray(dates) ||
+		dates.length === 0 ||
+		!Number.isFinite(dates[dates.length - 1]?.epoch)
+	)
 		return null;
-	}
+	const latestEpoch = dates[dates.length - 1];
+	const currentEpoch = latestEpoch.epoch;
+	const epochData = await dataTable.fetchData(latestEpoch.id);
+	if (stale()) return null;
+	if (!epochData || !Number.isFinite(Number(epochData.blacklist_balance_total))) return null;
+
+	// Fetch next year's worth of epoch rewards
+	const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) =>
+		getTokensByEpoch(currentEpoch + i)
+	);
+	const rewards = await Promise.all(epochPromises);
+	if (stale()) return null;
+	if (rewards.some((reward) => !Number.isFinite(reward))) return null;
+
+	return {
+		rewardStake: Number(supply['online-money']) - Number(epochData.blacklist_balance_total),
+		epochRewards: rewards
+	};
 }
 
 /** The account's share of the pools over a day, a week and a month, in VOI. */

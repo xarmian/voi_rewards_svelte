@@ -48,6 +48,27 @@ test('node reports no epoch rewards as an error and stops loading', async () => 
 	assert.equal(run('consensusError'), true);
 });
 
+test('the epoch read sees wallet A as superseded once wallet B starts', async () => {
+	const checks: (() => boolean)[] = [];
+	const run = componentScript('NodeComponent', {
+		EPOCH_REWARDS_ENABLED: true,
+		getSupplyInfo: async () => supply,
+		loadNodeEpochRewards: async (_supply: unknown, stale: () => boolean) => {
+			checks.push(stale);
+			return epochRewards;
+		},
+		projectEpochRewards,
+		getAccountInfo: async () => ({ amount: 100 }),
+		getConsensusInfo: async () => ({ total_blocks: 1 })
+	});
+	await run('walletId = "A"; fetchNodeData()');
+	assert.equal(checks.length, 1);
+	assert.equal(checks[0](), false);
+	await run('walletId = "B"; fetchNodeData()');
+	assert.equal(checks[0](), true);
+	assert.equal(checks[1](), false);
+});
+
 const stages = ['supply', 'epochRewards', 'account', 'consensus'] as const;
 for (const stage of stages) {
 	for (const fails of [false, true]) {

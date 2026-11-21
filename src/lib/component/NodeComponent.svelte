@@ -72,7 +72,7 @@
 			}
 
 			if (EPOCH_REWARDS_ENABLED) {
-				const epochResult = await loadNodeEpochRewards(supply);
+				const epochResult = await loadNodeEpochRewards(supply, () => requestId !== nodeRequestId);
 				if (requestId !== nodeRequestId) return;
 				if (!epochResult) {
 					consensusError = true;

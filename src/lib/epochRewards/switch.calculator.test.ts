@@ -79,6 +79,8 @@ test('the calculator shows the stake, price and real-time block rewards, and no 
 		expect(html).toMatch(/<h2 class="text-h2">Price<\/h2>/);
 		for (const control of ['Custom', 'Refresh price']) expect(shown).toContain(control);
 		expect(html).toContain('id="estimated-block-rewards-heading"');
+		// With no node cost field or price alert above it, the price block opens without a rule.
+		expect(html).not.toContain('class="space-y-3 border-t border-line pt-4"');
 	}
 });
 
