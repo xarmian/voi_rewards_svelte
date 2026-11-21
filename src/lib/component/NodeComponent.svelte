@@ -223,9 +223,13 @@
 							>
 							<span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
 								{expectedBlocksPerDay.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-								<span class="text-gray-600 dark:text-gray-400 ml-2">
-									~{estimatedRewardsPerDay.toLocaleString(undefined, { maximumFractionDigits: 2 })} VOI
-								</span>
+								{#if EPOCH_REWARDS_ENABLED}
+									<span class="text-gray-600 dark:text-gray-400 ml-2">
+										~{estimatedRewardsPerDay.toLocaleString(undefined, {
+											maximumFractionDigits: 2
+										})} VOI
+									</span>
+								{/if}
 							</span>
 						</p>
 						<p
@@ -236,10 +240,14 @@
 							>
 							<span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
 								{expectedBlocksPerWeek.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-								<span class="text-gray-600 dark:text-gray-400 ml-2">
-									~{estimatedRewardsPerWeek.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-									VOI
-								</span>
+								{#if EPOCH_REWARDS_ENABLED}
+									<span class="text-gray-600 dark:text-gray-400 ml-2">
+										~{estimatedRewardsPerWeek.toLocaleString(undefined, {
+											maximumFractionDigits: 2
+										})}
+										VOI
+									</span>
+								{/if}
 							</span>
 						</p>
 						<p class="flex justify-between items-center py-2">
@@ -248,21 +256,25 @@
 							>
 							<span class="text-gray-800 dark:text-gray-200 flex flex-col items-end">
 								{expectedBlocksPerMonth.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-								<span class="text-gray-600 dark:text-gray-400 ml-2">
-									~{estimatedRewardsPerMonth.toLocaleString(undefined, {
-										maximumFractionDigits: 2
-									})} VOI
-								</span>
+								{#if EPOCH_REWARDS_ENABLED}
+									<span class="text-gray-600 dark:text-gray-400 ml-2">
+										~{estimatedRewardsPerMonth.toLocaleString(undefined, {
+											maximumFractionDigits: 2
+										})} VOI
+									</span>
+								{/if}
 							</span>
 						</p>
-						<p
-							class="justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700"
-						>
-							<span class="font-medium text-gray-600 dark:text-gray-400">Approx APR:</span>
-							<span class="text-gray-800 dark:text-gray-200"
-								>{((estimatedRewardsPerWeek / balance) * 1e6 * 52 * 100).toFixed(2)}%</span
+						{#if EPOCH_REWARDS_ENABLED}
+							<p
+								class="justify-between items-center py-2 border-t border-gray-200 dark:border-gray-700"
 							>
-						</p>
+								<span class="font-medium text-gray-600 dark:text-gray-400">Approx APR:</span>
+								<span class="text-gray-800 dark:text-gray-200"
+									>{((estimatedRewardsPerWeek / balance) * 1e6 * 52 * 100).toFixed(2)}%</span
+								>
+							</p>
+						{/if}
 					{/if}
 				</div>
 			{/if}

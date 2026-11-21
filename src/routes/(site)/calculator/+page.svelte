@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CalculatorComponent from '$lib/component/CalculatorComponent.svelte';
+	import { EPOCH_REWARDS_ENABLED } from '$lib/epochRewards';
 </script>
 
 <div class="container-page space-y-8 py-8 text-ink md:py-12">
@@ -9,7 +10,9 @@
 		>
 		<h1 class="mt-4 text-display">Calculator</h1>
 		<p class="mt-4 text-body text-ink-muted">
-			Estimate your node rewards and costs at your chosen stake and VOI price.
+			{EPOCH_REWARDS_ENABLED
+				? 'Estimate your node rewards and costs at your chosen stake and VOI price.'
+				: 'Estimate your real-time block rewards at your chosen stake and VOI price.'}
 		</p>
 	</header>
 	<CalculatorComponent />

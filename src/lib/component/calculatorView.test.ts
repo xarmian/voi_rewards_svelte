@@ -49,7 +49,15 @@ test('price freshness uses only a real timestamp and becomes stale after fifteen
 	expect(isPriceStale(new Date(now.getTime() - PRICE_STALE_MS - 1), now)).toBe(true);
 });
 
-const source = readFileSync(new URL('./CalculatorComponent.svelte', import.meta.url), 'utf8');
+// The calculator's markup is split between the component and the epoch module's slots.
+const source = [
+	'./CalculatorComponent.svelte',
+	'../epochRewards/calculator/EpochEstimate.svelte',
+	'../epochRewards/calculator/EpochSchedule.svelte',
+	'../epochRewards/calculator/EpochNodeCost.svelte'
+]
+	.map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
+	.join('\n');
 test('shared calculator uses the design system, original model and view helpers', () => {
 	for (const module of ['$lib/ds', '$lib/rewards/calculatorModel', './calculatorView']) {
 		expect(source).toContain(`from '${module}'`);
@@ -80,7 +88,7 @@ test('calculator removes recommendations, legacy palette and whole-component loa
 });
 
 test('the component delegates the break-even tile and button condition to the pure helper', () => {
-	expect(source).toMatch(/\$:\s*shownBreakEven\s*=\s*breakEvenTile\(/);
+	expect(source).toMatch(/shownBreakEven\s*=\s*\$derived\(\s*breakEvenTile\(/);
 	for (const field of ['value', 'unit', 'detail']) {
 		expect(source).toContain(`${field}={shownBreakEven.${field}}`);
 	}
