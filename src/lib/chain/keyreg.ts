@@ -424,6 +424,19 @@ export function incentiveKeyregFee(payIncentiveFee: boolean): number | null {
 	return payIncentiveFee ? INCENTIVE_KEYREG_FEE : null;
 }
 
+// A pasted URI's fee never clears the opt-in, so the box can stay ticked against a URI asking
+// for less. Derived from the tick itself, so it shows exactly while the two disagree, whatever
+// later changes the box.
+export function keptTickNotice(
+	pasteAsksLess: boolean,
+	payIncentiveFee: boolean,
+	accountCannotPay: boolean
+): string | null {
+	return pasteAsksLess && payIncentiveFee && !accountCannotPay
+		? 'This URI asks for less than the 2 VOI incentive fee. The 2 VOI incentive option is still selected: untick it to pay the normal fee.'
+		: null;
+}
+
 // The flat fee a wallet keyreg carries: the URI fee, raised to the network minimum.
 export function keyregFee(
 	fee: number | null | undefined,

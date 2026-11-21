@@ -26,6 +26,7 @@
 		isKeyregUri,
 		keyregSendFailure,
 		keyregSubmitError,
+		keptTickNotice,
 		MIN_KEYREG_FEE,
 		onChainKeyregOffer,
 		type OnChainAccount,
@@ -96,6 +97,9 @@
 	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
+	// Whether the last paste was a URI asking for less than the 2 VOI fee.
+	let pasteAsksLess = false;
+	$: keptTickText = keptTickNotice(pasteAsksLess, payIncentiveFee, accountCannotPay);
 	// The keyreg account's record from algod and the account it was read for: read at mount and
 	// replaced by each one-click fresh read. For display only: the one-click reads again at the click.
 	let accountRecord: { account: string; info: OnChainAccount } | null = null;
@@ -255,6 +259,8 @@
 	// calls this again once it resolves.
 	function applyPastedIncentive() {
 		const asksForFee = pastedUriFee !== null && incentiveFromUri(pastedUriFee, false);
+		// Feeds keptTickNotice, which shows only while the box is ticked against this URI.
+		pasteAsksLess = pastedUriFee !== null && !asksForFee;
 		if (isStakingContract && contractIncentive === 'checking') {
 			incentiveNotice = asksForFee
 				? 'This URI asks for the 2 VOI incentive fee. The fee choice will apply once the contract is checked.'
@@ -266,15 +272,11 @@
 		if (pastedUriFee !== null && incentiveFromUri(pastedUriFee, cannotPay)) {
 			payIncentiveFee = true;
 		}
-		// Say when a kept tick is more than the URI asks for, so the box and the URI never disagree.
-		incentiveNotice = cannotPay
-			? asksForFee
+		incentiveNotice =
+			cannotPay && asksForFee
 				? contractIncentive === 'unverified'
 					? "This URI asks for the 2 VOI incentive fee, but this contract's version couldn't be verified to pay it. It will register with the normal fee."
 					: 'This URI asks for the 2 VOI incentive fee, which this staking contract cannot pay. It will register with the normal fee.'
-				: null
-			: pastedUriFee !== null && !asksForFee && payIncentiveFee
-				? 'This URI asks for less than the 2 VOI incentive fee. The 2 VOI incentive option is still selected: untick it to pay the normal fee.'
 				: null;
 	}
 
@@ -389,11 +391,8 @@
 			if (fresh !== 'capable') {
 				// A failed read may be transient: keep the option available so a retry rechecks.
 				if (fresh === 'incapable') contractIncentive = fresh;
-				// The one-click leaves the form alone. The form's notice goes with the tick it described.
-				if (!fixed) {
-					payIncentiveFee = false;
-					incentiveNotice = null;
-				}
+				// The one-click leaves the form alone.
+				if (!fixed) payIncentiveFee = false;
 				// The one-click does not use the form's fee option, so its message does not point there;
 				// an incapable contract loses the offer, so only an unverified read invites a retry.
 				error = !fixed
@@ -1036,7 +1035,6 @@
 					<input
 						type="checkbox"
 						bind:checked={payIncentiveFee}
-						on:change={() => (incentiveNotice = null)}
 						disabled={accountCannotPay || transactionStatus !== 'idle'}
 						aria-describedby="incentive-fee-help"
 						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
@@ -1069,6 +1067,9 @@
 				</p>
 				{#if incentiveNotice}
 					<p class="mt-1 ml-7 text-xs text-amber-700 dark:text-amber-300">{incentiveNotice}</p>
+				{/if}
+				{#if keptTickText}
+					<p class="mt-1 ml-7 text-xs text-amber-700 dark:text-amber-300">{keptTickText}</p>
 				{/if}
 			</div>
 		</div>

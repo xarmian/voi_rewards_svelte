@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
-import { incentiveFromUri, MIN_KEYREG_FEE, participatePayment } from '$lib/chain/keyreg';
+import {
+	incentiveFromUri,
+	keptTickNotice,
+	MIN_KEYREG_FEE,
+	participatePayment
+} from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { expect, test, vi } from 'vitest';
 
@@ -259,14 +264,11 @@ test.each(['incapable', 'unverified'])(
 			{ payIncentiveFee: true, contractCanPay: true },
 			recheck
 		);
-		// A kept-tick notice from an earlier paste describes a tick this check clears.
-		harness.context.incentiveNotice = 'The 2 VOI incentive option is still selected.';
 		await harness.run();
 		expect(harness.contractIncentiveOf).toHaveBeenCalledOnce();
 		for (const call of harness.sends) expect(call).not.toHaveBeenCalled();
 		expect(harness.context.error).toMatch(/nothing was sent/);
 		expect(harness.context.payIncentiveFee).toBe(false);
-		expect(harness.context.incentiveNotice).toBeNull();
 		// A failed read may be transient, so it leaves the option available for a rechecked retry.
 		expect(harness.context.contractIncentive).toBe(
 			recheck === 'incapable' ? 'incapable' : 'capable'
@@ -369,6 +371,7 @@ function applyPasted(state: {
 	pastedUriFee: number | null;
 	payIncentiveFee: boolean;
 	isStakingContract?: boolean;
+	pasteAsksLess?: boolean;
 }) {
 	const body = source.match(/function applyPastedIncentive\([^]*?\n\t\}/)?.[0];
 	expect(body).toBeDefined();
@@ -378,6 +381,7 @@ function applyPasted(state: {
 		accountCannotPay: true,
 		incentiveFromUri,
 		incentiveNotice: null,
+		pasteAsksLess: false,
 		...state
 	});
 	runInContext(ts.transpileModule(body!, {}).outputText, context);
@@ -444,7 +448,8 @@ test('a pasted minimum-fee URI keeps a ticked opt-in on a capable contract, with
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.incentiveNotice).toMatch(/still selected/);
+	expect(context.pasteAsksLess).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
 });
 
 test('ticking then pasting a minimum-fee URI still sends the 2 VOI go-online fee', async () => {
@@ -473,7 +478,8 @@ test('a pasted minimum-fee URI keeps a ticked opt-in on a plain account, with a 
 		isStakingContract: false
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.incentiveNotice).toMatch(/still selected/);
+	expect(context.pasteAsksLess).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
 });
 
 test('a pasted 2 VOI fee selects the opt-in on a plain account', () => {
@@ -494,13 +500,36 @@ test('a pasted fee just under 2 VOI keeps a ticked opt-in, with a notice', () =>
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.incentiveNotice).toMatch(/still selected/);
+	expect(context.pasteAsksLess).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
 });
 
-test('changing the opt-in clears the paste notice', () => {
+// The kept-tick notice is derived from the tick, so whatever clears the box (the user, the
+// submit-time recheck, the one-click's incapable read) clears the notice with it.
+test('the kept-tick notice shows only while the box is ticked against a URI asking for less', () => {
+	expect(keptTickNotice(true, true, false)).toMatch(/still selected/);
+	expect(keptTickNotice(true, false, false)).toBeNull();
+	expect(keptTickNotice(true, true, true)).toBeNull();
+	expect(keptTickNotice(false, true, false)).toBeNull();
+});
+
+test('the component derives the kept-tick notice from the live tick and renders it', () => {
 	expect(source).toMatch(
-		/bind:checked=\{payIncentiveFee\}\s*on:change=\{\(\) => \(incentiveNotice = null\)\}/
+		/\$: keptTickText = keptTickNotice\(pasteAsksLess, payIncentiveFee, accountCannotPay\);/
 	);
+	expect(source).toMatch(/\{#if keptTickText\}[^]*?\{keptTickText\}/);
+});
+
+test('a later 2 VOI URI or partkeyinfo paste ends the kept-tick state', () => {
+	for (const pastedUriFee of [2_000_000, null]) {
+		const context = applyPasted({
+			contractIncentive: 'capable',
+			pastedUriFee,
+			payIncentiveFee: true,
+			pasteAsksLess: true
+		});
+		expect(context.pasteAsksLess).toBe(false);
+	}
 });
 
 // While a staking contract's program is being checked, a pasted 2 VOI fee is deferred, so a
