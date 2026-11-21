@@ -31,7 +31,6 @@
 	let prefix = '';
 	let suffix = '';
 	let isGenerating = false;
-	let progress = 0;
 	let attempts = 0;
 	let result: { address: string; mnemonic: string } | null = null;
 	let error: string | null = null;
@@ -173,7 +172,6 @@
 		// Reset state
 		isGenerating = true;
 		attempts = 0;
-		progress = 0;
 		result = null;
 		plan = null;
 		reviewOpen = false;
@@ -204,7 +202,6 @@
 
 				if (data.type === 'progress') {
 					attempts = data.attempts;
-					progress = (attempts / maxAttempts) * 100;
 					lastAddressCheckedByWorker = data.lastAddressChecked; // Update displayed last address
 					updateStats();
 				} else if (data.type === 'result') {

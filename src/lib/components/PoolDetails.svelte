@@ -34,11 +34,6 @@
 	}
 
 	// Format numbers
-	const formatCurrency = (num: number | null | undefined): string => {
-		if (num === null || num === undefined || num === 0) return '-';
-		return `$${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-	};
-
 	const formatNumber = (num: number | null | undefined, decimals: number = 0): string => {
 		if (num === null || num === undefined) return '-';
 		return num.toLocaleString('en-US', {
@@ -56,11 +51,6 @@
 	const formatPercentage = (num: number | null | undefined): string => {
 		if (num === null || num === undefined) return '-';
 		return `${num.toFixed(2)}%`;
-	};
-
-	const formatAddress = (address: string): string => {
-		if (!address || address.length < 10) return address;
-		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	};
 </script>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TwitterSolid, DiscordSolid } from 'flowbite-svelte-icons';
+	import { TwitterSolid } from 'flowbite-svelte-icons';
 	import { A } from 'flowbite-svelte';
 </script>
 

@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { Badge, Card, Spinner } from 'flowbite-svelte';
-	import { config } from '../config';
+	import { Spinner } from 'flowbite-svelte';
 	import InfoButton from './ui/InfoButton.svelte';
 	import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
-	import type { Account } from '$lib/stores/accounts';
+	import type { Account, ConsensusDetails, SupplyInfo } from '$lib/stores/accounts';
 	import { onMount } from 'svelte';
 	import { EPOCH_REWARDS_ENABLED } from '$lib/epochRewards';
 	import { loadNodeEpochRewards, projectEpochRewards } from '$lib/epochRewards/client';
@@ -25,18 +24,16 @@
 		accountInfo && voteLastValid !== undefined
 			? (Number(voteLastValid) - Number(accountInfo.round)) * 2.8
 			: 0;
-	let supply: any;
+	let supply: SupplyInfo | null | undefined;
 	let showRegisterVoteKey = false;
 	let consensusError = false;
-	$: estimatedBlocks = 0;
 	$: balance = 0;
-	$: apiData = {} as any;
+	$: apiData = {} as Partial<ConsensusDetails> | undefined;
 
 	$: averageBlockTime = 0;
 	$: expectedBlocksPerDay = 0;
 	$: expectedBlocksPerWeek = 0;
 	$: expectedBlocksPerMonth = 0;
-	$: voiPerBlock = 0;
 	$: estimatedRewardsPerDay = 0;
 	$: estimatedRewardsPerWeek = 0;
 	$: estimatedRewardsPerMonth = 0;

@@ -54,15 +54,8 @@
 		groupedProjects = sortedGroupedProjects;
 	});
 
-	let isDropdownOpen: boolean = false;
 	let groupedProjects: { [key: string]: IProject[] } = {};
 	let sortedGroupedProjects: { [key: string]: IProject[] } = {};
-
-	let selectedProject: IProject | undefined = undefined;
-
-	$: {
-		selectedProject = projects.find((project) => project.id == selectedTab);
-	}
 </script>
 
 <div class="flex flex-wrap sm:justify-center mx-auto sm:w-3/4 {selectedTab ? 'blur-sm' : ''}">

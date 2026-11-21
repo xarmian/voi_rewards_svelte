@@ -23,7 +23,6 @@
 	let isFullyVested = false;
 
 	let countdown: string = '';
-	let countdownInterval: number;
 
 	function formatDuration(seconds: number): string {
 		// Convert to milliseconds and only show in months, rounded
@@ -41,44 +40,6 @@
 			minute: '2-digit',
 			timeZoneName: 'short'
 		}).format(date);
-	}
-
-	function formatCountdown(targetDate: Date | null): string {
-		if (!targetDate) return '';
-
-		const now = new Date();
-		const diff = targetDate.getTime() - now.getTime();
-
-		if (diff <= 0) return 'Vesting now';
-
-		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-		const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-		const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-		const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-		const parts = [];
-		if (days > 0) parts.push(`${days}d`);
-		if (hours > 0) parts.push(`${hours}h`);
-		parts.push(`${minutes}m`);
-		parts.push(`${seconds}s`);
-
-		return parts.join(' ');
-	}
-
-	function startCountdown() {
-		stopCountdown();
-		if (nextVestingDate) {
-			countdown = formatCountdown(nextVestingDate);
-			countdownInterval = window.setInterval(() => {
-				countdown = formatCountdown(nextVestingDate);
-			}, 1000);
-		}
-	}
-
-	function stopCountdown() {
-		if (countdownInterval) {
-			clearInterval(countdownInterval);
-		}
 	}
 
 	async function loadStakingContract() {
@@ -143,11 +104,6 @@
 					// Full vesting time includes lockup and minimum vesting delay
 					const fullVestingTime = lockupPeriod + vestingDelay;
 
-					const vestingPeriod =
-						Number(contractData.global_distribution_count) *
-						Number(contractData.global_distribution_seconds);
-
-					const totalPeriod = fullVestingTime + vestingPeriod;
 					const elapsedTime = now - fundingTime;
 					const totalBalance = Number(contractData.global_total);
 

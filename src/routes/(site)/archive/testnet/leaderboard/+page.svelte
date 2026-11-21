@@ -4,7 +4,6 @@
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { VRPhase2 } from '$lib/supabase';
 	import type { PageData } from './$types';
-	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 	import Time from 'svelte-time/Time.svelte';
 
 	export let data: PageData;
