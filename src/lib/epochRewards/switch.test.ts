@@ -4,9 +4,11 @@ import { render } from 'svelte/server';
 import { readable } from 'svelte/store';
 import type { ChainStatus } from '$lib/stores/chainStatus';
 import { config } from '$lib/config';
-import { headerEpoch, liveEpoch } from '$lib/epochRewards';
+import { epochHomeData, headerEpoch, liveEpoch } from '$lib/epochRewards';
 import { loadHome } from '$lib/server/home';
 import Layout from '../../routes/(site)/+layout.svelte';
+import Page from '../../routes/(site)/+page.svelte';
+import { homeData } from './home/fixture';
 
 // The switch-off state: every epoch surface must disappear, nothing else.
 // The badge's own clock epoch is set in onMount, which server rendering never runs, so
@@ -32,7 +34,7 @@ vi.mock('$lib/stores/chainStatus', async (importOriginal) => ({
 vi.mock('$app/state', () => ({
 	page: { url: new URL('https://example.com/'), data: ready }
 }));
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 
 test('the home layout passes no epoch to the header badge', () => {
 	const children = createRawSnippet(() => ({ render: () => '<p>Page content</p>' }));
@@ -41,8 +43,9 @@ test('the home layout passes no epoch to the header badge', () => {
 	expect(html).not.toContain('Epoch');
 });
 
-test('the header and the live clock report no epoch', () => {
+test('the header, the live clock and the home page get no epoch', () => {
 	expect(headerEpoch(ready)).toBeUndefined();
+	expect(epochHomeData(homeData(true))).toBeNull();
 	expect(liveEpoch(new Date('2026-10-25T02:38:00Z'))).toBeUndefined();
 });
 
@@ -89,4 +92,37 @@ test('the home load skips every epoch read and returns no epoch fields', async (
 	])
 		expect(data).not.toHaveProperty(key);
 	expect(await data.onlineCount).toEqual({ state: 'ready', value: 152 });
+});
+
+test('the home page shows the non-epoch tiles and cards, with no empty slot left behind', () => {
+	const html = render(Page, { props: { data: homeData(false) } }).body.replace(
+		/<!--[\s\S]*?-->/g,
+		''
+	);
+	expect(html.match(/<h1\b/g)).toHaveLength(1);
+	expect(html).toContain('role="search"');
+	for (const text of ['Online stake', 'Online accounts', 'VOI price']) expect(html).toContain(text);
+	for (const text of [
+		'Staking APR',
+		'APR by epoch',
+		'Staking currently earns',
+		"Who's earning",
+		'Blocks this epoch',
+		'Earning accounts',
+		'Epoch'
+	])
+		expect(html).not.toContain(text);
+	// The side cards take the full width; the three tiles share the row.
+	expect(html).toMatch(
+		/class="min-w-0 lg:col-span-12 md:col-span-2 grid md:grid-cols-2 gap-bento"/
+	);
+	expect(html.match(/class="grid min-w-0 md:col-span-1 lg:col-span-4"/g)).toHaveLength(3);
+	expect(html).not.toContain('lg:col-span-3');
+	expect(html).not.toMatch(/<section\b[^>]*>\s*<\/section>/);
+	expect(html).not.toMatch(/<(div|section)\b[^>]*\bp-card\b[^>]*>\s*<\/\1>/);
+	// No hero card is left in the overlap row.
+	expect(html).not.toContain('p-card shadow-card on-hero');
+	expect(html).toContain('Real-time block rewards');
+	expect(html).toContain('Latest blocks');
+	expect(html.indexOf('Real-time block rewards')).toBeLessThan(html.indexOf('Latest blocks'));
 });

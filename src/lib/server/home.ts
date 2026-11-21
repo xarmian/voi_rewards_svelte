@@ -25,9 +25,8 @@ type HomeBase = {
 	price: Promise<Loaded<Price>>;
 	onlineCount: Promise<Loaded<number>>;
 };
-// The epoch fields are absent when epoch rewards are switched off; the page still reads
-// them unguarded, so the type keeps them required until it does.
-export type DashboardData = HomeBase & EpochHomeData;
+/** The epoch fields are absent when epoch rewards are switched off. */
+export type DashboardData = HomeBase & Partial<EpochHomeData>;
 export type HomeData = DashboardData;
 export type RewardRows = EpochResponse;
 
@@ -149,5 +148,5 @@ export async function loadHome(
 		onlineStake,
 		price,
 		onlineCount
-	} as HomeData;
+	};
 }
