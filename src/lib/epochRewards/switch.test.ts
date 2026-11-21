@@ -4,10 +4,11 @@ import { render } from 'svelte/server';
 import { readable } from 'svelte/store';
 import type { ChainStatus } from '$lib/stores/chainStatus';
 import { headerEpoch, liveEpoch } from '$lib/epochRewards';
-import FreshnessBadge from '$lib/ds/Header/FreshnessBadge.svelte';
 import Layout from '../../routes/(site)/+layout.svelte';
 
 // The switch-off state: every epoch surface must disappear, nothing else.
+// The badge's own clock epoch is set in onMount, which server rendering never runs, so
+// it is covered through liveEpoch below rather than by rendering the badge.
 vi.mock('$lib/epochRewards/config', () => ({ EPOCH_REWARDS_ENABLED: false }));
 const { live, ready } = vi.hoisted(() => {
 	const minute = 60_000;
@@ -30,12 +31,6 @@ vi.mock('$app/state', () => ({
 	page: { url: new URL('https://example.com/'), data: ready }
 }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-
-test('the hero badge shows the block, never an epoch', () => {
-	const body = render(FreshnessBadge, { props: { variant: 'hero' } }).body;
-	expect(body).toContain('Block 5 live');
-	expect(body).not.toContain('Epoch');
-});
 
 test('the home layout passes no epoch to the header badge', () => {
 	const children = createRawSnippet(() => ({ render: () => '<p>Page content</p>' }));

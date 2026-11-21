@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
 const root = new URL('../../../', import.meta.url).pathname;
@@ -25,6 +25,31 @@ function specifiers(text: string): string[] {
 		...text.matchAll(/\bvi\.(?:mock|doMock)\(\s*(['"])([^'"]+)\1/g)
 	].map((match) => match[2]);
 }
+
+/** A relative specifier that lands in the module, rewritten as its `$lib/epochRewards` form. */
+function normalize(path: string, spec: string): string {
+	if (!spec.startsWith('.')) return spec;
+	const target = relative(root, resolve(root, dirname(path), spec)).replace(
+		/\.(ts|js|svelte)$/,
+		''
+	);
+	if (target === moduleDir.slice(0, -1) || target === `${moduleDir}index`)
+		return '$lib/epochRewards';
+	return target.startsWith(moduleDir)
+		? `$lib/epochRewards/${target.slice(moduleDir.length)}`
+		: spec;
+}
+
+test('relative imports into the module are checked like $lib ones', () => {
+	expect(normalize('src/lib/home/x.ts', '../epochRewards/headline')).toBe(
+		'$lib/epochRewards/headline'
+	);
+	expect(normalize('src/routes/(site)/x.svelte', '../../lib/epochRewards')).toBe(
+		'$lib/epochRewards'
+	);
+	expect(normalize('src/lib/home/x.ts', '../epochRewards/index.ts')).toBe('$lib/epochRewards');
+	expect(normalize('src/lib/home/x.ts', './headline')).toBe('./headline');
+});
 
 /** The epoch-rewards internals that only the module may reach. */
 function internals(text: string): string[] {
@@ -53,7 +78,7 @@ const DEEP_1B: Record<string, string[]> = {
 test('code outside the module reaches epoch rewards only through its public entries', () => {
 	const violations: string[] = [];
 	for (const { path, text } of outside)
-		for (const spec of specifiers(text)) {
+		for (const spec of specifiers(text).map((raw) => normalize(path, raw))) {
 			if (/^\$lib\/(epochs|home\/rewards|home\/balance)$/.test(spec))
 				violations.push(`${path}: ${spec} moved into $lib/epochRewards`);
 			if (!spec.startsWith('$lib/epochRewards/')) continue;
