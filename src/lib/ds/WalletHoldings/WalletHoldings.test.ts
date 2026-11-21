@@ -333,15 +333,12 @@ it.each(['refreshTokens', 'initializePortfolio'])(
 			tokensError: null,
 			tokensPartial: false,
 			isLoadingTokens: false,
-			isLoadingLPTokens: false,
-			isLoadingPortfolio: false,
 			lastTokenPrice: 0,
 			tokensPrice: 0,
 			$voiPrice: { price: 1 },
 			holdingsTokenLoader: vi.fn(() => read.promise),
 			fetchAccountDetails: vi.fn(async () => {}),
 			fetchVoiPrice: vi.fn(async () => {}),
-			recomputeTotals: vi.fn(),
 			console: { error: vi.fn() }
 		});
 		const run = (code: string) =>
