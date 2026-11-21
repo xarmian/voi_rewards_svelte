@@ -48,6 +48,26 @@ test('node reports no epoch rewards as an error and stops loading', async () => 
 	assert.equal(run('consensusError'), true);
 });
 
+test('node reports a failed epoch read as an error, logs it and stops loading', async () => {
+	const logged: unknown[][] = [];
+	const run = componentScript('NodeComponent', {
+		console: { log() {}, error: (...args: unknown[]) => void logged.push(args) },
+		EPOCH_REWARDS_ENABLED: true,
+		getSupplyInfo: async () => supply,
+		loadNodeEpochRewards: async () => {
+			throw new Error('proposers API down');
+		},
+		projectEpochRewards,
+		getAccountInfo: async () => ({ amount: 100 }),
+		getConsensusInfo: async () => ({ total_blocks: 1 })
+	});
+	await run('walletId = "A"; fetchNodeData()');
+	assert.equal(run('loading'), false);
+	assert.equal(run('consensusError'), true);
+	assert.equal(logged.length, 1);
+	assert.equal(logged[0][0], 'Failed to fetch node data:');
+});
+
 test('the epoch read sees wallet A as superseded once wallet B starts', async () => {
 	const checks: (() => boolean)[] = [];
 	const run = componentScript('NodeComponent', {
