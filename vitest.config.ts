@@ -4,8 +4,11 @@ import viteConfig from './vite.config';
 
 // Vitest matches testTransformMode globs against absolute paths without picomatch's dot
 // option, so a bare `**` never crosses a hidden directory above the checkout. Anchor them
-// at the root, escaped so glob characters in the checkout path match literally.
-const root = fileURLToPath(new URL('.', import.meta.url)).replace(/[\\*?[\]{}()!+@|]/g, '\\$&');
+// at the root, with Vite's forward slashes, escaped so glob characters in the path match
+// literally.
+const root = fileURLToPath(new URL('.', import.meta.url))
+	.replaceAll('\\', '/')
+	.replace(/[*?[\]{}()!+@|]/g, '\\$&');
 
 export default mergeConfig(
 	viteConfig,
