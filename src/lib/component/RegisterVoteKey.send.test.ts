@@ -259,11 +259,14 @@ test.each(['incapable', 'unverified'])(
 			{ payIncentiveFee: true, contractCanPay: true },
 			recheck
 		);
+		// A kept-tick notice from an earlier paste describes a tick this check clears.
+		harness.context.incentiveNotice = 'The 2 VOI incentive option is still selected.';
 		await harness.run();
 		expect(harness.contractIncentiveOf).toHaveBeenCalledOnce();
 		for (const call of harness.sends) expect(call).not.toHaveBeenCalled();
 		expect(harness.context.error).toMatch(/nothing was sent/);
 		expect(harness.context.payIncentiveFee).toBe(false);
+		expect(harness.context.incentiveNotice).toBeNull();
 		// A failed read may be transient, so it leaves the option available for a rechecked retry.
 		expect(harness.context.contractIncentive).toBe(
 			recheck === 'incapable' ? 'incapable' : 'capable'
