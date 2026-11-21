@@ -1,6 +1,6 @@
 <script lang="ts">
-	import WalletHoldings from './WalletHoldings.svelte';
-	import { tokens } from './fixtures';
+	import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';
+	import { tokens } from '$lib/ds/WalletHoldings/fixtures';
 	const presenterOnly = new URL(location.href).searchParams.get('case') === 'address-identity';
 	import PortfolioComponent from '$lib/component/PortfolioComponent.svelte';
 	import { connectedWallets } from '$lib/chain/wallet.svelte';

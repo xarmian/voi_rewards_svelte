@@ -85,7 +85,7 @@ try {
 						res.end(
 							await vite.transformIndexHtml(
 								'/__holdings',
-								`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="fixture"></div><script type="module">import {mount} from 'svelte'; import Fixture from '/src/lib/ds/WalletHoldings/HoldingsFixture.svelte'; import '/src/app.css'; mount(Fixture,{target:document.getElementById('fixture')});</script></body></html>`
+								`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="fixture"></div><script type="module">import {mount} from 'svelte'; import Fixture from '/scripts/fixtures/HoldingsFixture.svelte'; import '/src/app.css'; mount(Fixture,{target:document.getElementById('fixture')});</script></body></html>`
 							)
 						);
 					});
@@ -153,6 +153,14 @@ try {
 			pending.set(key, { yes, no });
 			ws.send(JSON.stringify({ id: key, method, params }));
 		});
+	// A navigation can tear down a paused request before we answer it; Chromium then
+	// reports Invalid InterceptionId. That is expected. Any other error is recorded so
+	// the next wait() fails the run with it.
+	const answerPaused = (method, params) =>
+		send(method, params).catch((error) => {
+			if (error?.code === -32602 && error?.message === 'Invalid InterceptionId.') return;
+			errors.push({ method, error });
+		});
 	ws.onmessage = ({ data }) => {
 		const msg = JSON.parse(data);
 		if (msg.id) {
@@ -168,8 +176,8 @@ try {
 				nftReads++;
 				pendingNft = requestId;
 			} else if (new URL(request.url).hostname === '127.0.0.1')
-				void send('Fetch.continueRequest', { requestId });
-			else void send('Fetch.fulfillRequest', { requestId, responseCode: 503, body: '' });
+				void answerPaused('Fetch.continueRequest', { requestId });
+			else void answerPaused('Fetch.fulfillRequest', { requestId, responseCode: 503, body: '' });
 		}
 	};
 	const evaluate = async (expression) => {
