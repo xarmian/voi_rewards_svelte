@@ -55,8 +55,8 @@
 		<h2 class="text-2xl font-semibold mb-4">Analytics</h2>
 		<p>
 			We use Google Analytics on most pages of this Site to measure traffic and understand how the
-			Site is used. Google Analytics sets cookies and collects information about your visit, such
-			as the pages you view, your browser and device type, and the referring site.
+			Site is used. Google Analytics sets cookies and collects information about your visit, such as
+			the pages you view, your browser and device type, and the referring site.
 		</p>
 	</section>
 

@@ -346,7 +346,6 @@ test('round zero still represents a swap, and null balances become zero', () => 
 	assert.deepEqual(tokenTvlMetrics([agg], [0, 302190]), { totalTvl: 0, poolCount: 1 });
 });
 
-
 test('token metrics are null when aggregates are unavailable', () => {
 	assert.deepEqual(aggregateHelpers.tokenMetricsOrUnavailable(null, [0]), {
 		volume: { volume24h: null, volume7d: null, volume30d: null },
