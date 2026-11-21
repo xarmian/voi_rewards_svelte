@@ -36,7 +36,9 @@ export const load: PageLoad = async ({ fetch, url }) => {
 			tokenInfo = imgJson?.info ?? null;
 			ogImageUrl = imgJson?.info?.imageUrl || null;
 			tokenSymbolResolved = imgJson?.info?.symbol || 'VOI';
-		} catch {}
+		} catch {
+			// Token info is optional: the page keeps the numeric id and the VOI defaults.
+		}
 	} else {
 		// Symbol provided - resolve to tokenId via token-info
 		tokenSymbolResolved = (rawToken || 'VOI').toUpperCase();
@@ -48,7 +50,9 @@ export const load: PageLoad = async ({ fetch, url }) => {
 			ogImageUrl = imgJson?.info?.imageUrl || null;
 			tokenIdResolved = imgJson?.info?.tokenId ?? 0;
 			tokenSymbolResolved = imgJson?.info?.symbol || tokenSymbolResolved;
-		} catch {}
+		} catch {
+			// Token info is optional: an unresolved symbol falls back to token id 0.
+		}
 		marketDataPromise = fetchJson(`/api/markets?tokenId=${tokenIdResolved}`);
 		tokenAnalyticsPromise = fetchTokenAnalytics(tokenIdResolved);
 	}
@@ -61,14 +65,16 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	]);
 
 	// Fallback: if no markets found, provide token pairs for the UI to list selectable pools
-	let tokenPairs: any[] = [];
+	let tokenPairs: unknown[] = [];
 	if (!marketData?.marketData || marketData.marketData.length === 0) {
 		try {
 			const pairsJson = await fetchJson(
 				`/api/token-pairs?tokenSymbol=${encodeURIComponent(tokenSymbolResolved)}&limit=50`
 			);
 			tokenPairs = pairsJson?.pairs || [];
-		} catch {}
+		} catch {
+			// The fallback pair list is optional: the page renders without it.
+		}
 	}
 
 	// Compose page OG/Twitter metadata used by +layout.svelte

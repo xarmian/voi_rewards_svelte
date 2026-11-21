@@ -62,7 +62,7 @@ export function convertVOItoOHLCV(
 		let open = price;
 		let high = price;
 		let low = price;
-		let close = price;
+		const close = price;
 
 		if (prev) {
 			open = prev.value;
@@ -120,6 +120,7 @@ export function createVOITokenPair() {
  * Determines if a token should use VOI price-history data or MIMIR OHLCV data.
  * VOI now uses MIMIR OHLCV data like other tokens.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- callers pass the token; every token gets the same answer today
 export function shouldUseVOIData(token: string): boolean {
 	return false; // VOI now uses OHLCV from MIMIR like other tokens
 }
@@ -127,6 +128,7 @@ export function shouldUseVOIData(token: string): boolean {
 /**
  * Gets the appropriate chart type for a token
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- callers pass the token; every token gets the same answer today
 export function getDefaultChartType(token: string): 'candlestick' | 'line' {
 	return 'candlestick'; // All tokens default to candlestick
 }
@@ -134,6 +136,7 @@ export function getDefaultChartType(token: string): 'candlestick' | 'line' {
 /**
  * Gets the appropriate resolution for a token
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- callers pass the token; every token gets the same answer today
 export function getDefaultResolution(token: string): Resolution {
 	return '1h'; // All tokens default to 1h resolution
 }

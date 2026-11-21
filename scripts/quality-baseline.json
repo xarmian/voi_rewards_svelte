@@ -143,14 +143,6 @@
 			}
 		},
 		"src/lib/components/OHLCVChart.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 5,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
-				"warnings": 0
-			},
 			"svelte/valid-compile": {
 				"errors": 1,
 				"warnings": 0
@@ -174,15 +166,7 @@
 		},
 		"src/lib/components/TokenMetricsBar.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 6,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"no-unreachable": {
-				"errors": 1,
+				"errors": 2,
 				"warnings": 0
 			}
 		},
@@ -219,26 +203,6 @@
 		"src/lib/server/markets/sources.ts": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/utils/chart-adapters.ts": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"prefer-const": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/utils/vestige.ts": {
-			"@typescript-eslint/no-empty-object-type": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
 				"warnings": 0
 			}
 		},
@@ -314,25 +278,7 @@
 		},
 		"src/routes/(site)/markets/+page.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-expressions": {
 				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 11,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/markets/+page.ts": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"no-empty": {
-				"errors": 3,
 				"warnings": 0
 			}
 		},

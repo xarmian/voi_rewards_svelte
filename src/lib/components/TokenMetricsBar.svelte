@@ -1,22 +1,29 @@
 <script lang="ts">
-	import { Card } from 'flowbite-svelte';
 	import type { UniqueToken } from '../../routes/api/tokens/+server';
-	import type { TokenPair } from '$lib/types/ohlcv.types';
+	import type { OHLCVData, TokenPair } from '$lib/types/ohlcv.types';
+	import type { MarketDataState } from '$lib/markets/marketDataLoader';
+
+	// The fields read from /api/pool-analytics (PoolAnalytics in its server route).
+	type PoolAnalytics = {
+		volume: { volume24h: number | null; volume7d: number | null };
+		liquidity: { totalTvlUsd: number | null };
+		metrics: { swapCount24h: number | null; uniqueTraders24h: number | null };
+	};
 
 	export let selectedToken: UniqueToken | null = null;
 	export let selectedPool: TokenPair | null = null;
 	export let marketData: any[] = [];
-	export let aggregates: any = {};
-	export let circulatingSupply: any = {};
+	export let aggregates: Partial<MarketDataState['aggregates']> = {};
+	export let circulatingSupply: Partial<NonNullable<MarketDataState['circulatingSupply']>> | null =
+		{};
 	export let weightedAveragePrice: number = 0;
-	export let ohlcvData: any[] = [];
+	export let ohlcvData: OHLCVData[] = [];
 	export let displayInUSD: boolean = true;
 	export let quoteSymbol: string | null = null; // Effective quote symbol for displayed prices
 
 	// Token analytics data from our new API
 	let tokenAnalytics: any = null;
-	let poolAnalytics: any = null;
-	let analyticsLoading = false;
+	let poolAnalytics: PoolAnalytics | null = null;
 
 	// Token supply data (legacy - now included in token analytics)
 	let tokenSupplyData: { tokenId: number; totalSupply: number }[] = [];
@@ -35,7 +42,6 @@
 
 	// Fetch token analytics from new API
 	async function fetchTokenAnalytics(tokenId: number) {
-		analyticsLoading = true;
 		try {
 			const response = await fetch(`/api/token-analytics?tokenId=${tokenId}`);
 			const data = await response.json();
@@ -49,8 +55,6 @@
 		} catch (error) {
 			console.error('Failed to fetch token analytics:', error);
 			tokenAnalytics = null;
-		} finally {
-			analyticsLoading = false;
 		}
 	}
 
@@ -70,24 +74,6 @@
 		} catch (error) {
 			console.error('Failed to fetch pool analytics:', error);
 			poolAnalytics = null;
-		}
-	}
-
-	async function fetchTokenSupply(tokenId: number) {
-		console.log('Fetching supply for token ID:', tokenId);
-		try {
-			const response = await fetch(`/api/token-supply?tokenIds=${tokenId}`);
-			const data = await response.json();
-			console.log('Supply API response:', data);
-			if (!data.error) {
-				tokenSupplyData = data.supplies || [];
-				console.log('Token supply data set to:', tokenSupplyData);
-			} else {
-				console.error('Supply API error:', data.error);
-			}
-		} catch (error) {
-			console.error('Failed to fetch token supply:', error);
-			tokenSupplyData = [];
 		}
 	}
 
@@ -227,8 +213,6 @@
 				poolCount: tokenAnalytics?.tvl?.poolCount || tokenPools.length
 			};
 		}
-
-		return null;
 	})();
 
 	// Format numbers
