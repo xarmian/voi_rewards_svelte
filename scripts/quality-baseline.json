@@ -40,12 +40,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/QuestComponent.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/RecipientRow.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 2,
@@ -135,35 +129,7 @@
 			}
 		},
 		"src/routes/(site)/archive/testnet/phase1/+page.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			},
 			"svelte/valid-compile": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/phase2/[...slug]/+page.svelte": {
-			"@typescript-eslint/ban-ts-comment": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 4,
-				"warnings": 0
-			},
-			"svelte/valid-compile": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/quests/QuestsPage.svelte": {
-			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0
 			}
@@ -256,16 +222,6 @@
 			"svelte:a11y_consider_explicit_label": {
 				"errors": 0,
 				"warnings": 1
-			}
-		},
-		"src/routes/(site)/archive/testnet/phase2/[...slug]/+page.svelte": {
-			"css:unknownAtRules": {
-				"errors": 0,
-				"warnings": 2
-			},
-			"svelte:css_unused_selector": {
-				"errors": 0,
-				"warnings": 4
 			}
 		}
 	}

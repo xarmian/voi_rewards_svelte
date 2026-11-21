@@ -142,7 +142,7 @@
 			</div>
 
 			<div class="flex flex-wrap place-content-center pt-8">
-				{#each filteredProjects as project, i}
+				{#each filteredProjects as project}
 					<div
 						class="project flex p-2 flex-col bg-gray-100 dark:bg-gray-800 sm:w-[20rem] rounded-lg w-[343px] h-[540px] m-1 sm:m-4"
 					>

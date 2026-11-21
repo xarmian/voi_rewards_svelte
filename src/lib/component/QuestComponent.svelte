@@ -66,7 +66,7 @@
 					{category}
 				</h2>
 				<div class="flex flex-row flex-wrap">
-					{#each projects as project, i}
+					{#each projects as project}
 						<ProjectBox bind:selectedTab {leaderboardData} {project}></ProjectBox>
 					{/each}
 				</div>
