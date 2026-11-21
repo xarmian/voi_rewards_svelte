@@ -60,16 +60,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/PortfolioComponent.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 8,
-				"warnings": 0
-			},
-			"no-case-declarations": {
-				"errors": 6,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/PortfolioSectionNFT.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 3,

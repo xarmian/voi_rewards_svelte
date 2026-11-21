@@ -334,7 +334,13 @@ export function createHoldingsTokenLoader(fetchTokens: FetchTokens = fetchFungib
 	};
 }
 
-const nftOwnership = new Map<string, NFTToken[]>();
+export const NFT_CACHE_TTL_MS = 5 * 60_000;
+export const NFT_CACHE_MAX = 20;
+const nftOwnership = new Map<string, { tokens: NFTToken[]; at: number }>();
+/** Newest read per address (bounded by in-flight reads); only it writes the cache. Values come from
+ *  one module-wide sequence, so a read older than a settled-and-cleared entry can never match again. */
+const nftGeneration = new Map<string, number>();
+let nftReadSequence = 0;
 export const nftUrl = (contractId: string, tokenId: string) =>
 	`https://nftnavigator.xyz/collection/${contractId}/token/${tokenId}`;
 export function nftImage(image: string, metadataURI?: string) {
@@ -346,40 +352,61 @@ export function nftImage(image: string, metadataURI?: string) {
 
 export async function loadWalletNfts(address: string, force = false): Promise<NFTToken[]> {
 	if (!browser || !address) throw new Error('A browser wallet address is required');
-	if (!force && nftOwnership.has(address)) return nftOwnership.get(address)!;
-	const result = await bounded(
-		(async () => {
-			const url = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/nft-indexer/v1/tokens');
-			url.searchParams.set('owner', address);
-			const response = await fetch(url);
-			if (!response.ok) throw new Error('NFT ownership unavailable');
-			const data = await response.json();
-			if (
-				!Array.isArray(data.tokens) ||
-				data.tokens.some((t: NFTToken) => t.contractId == null || t.tokenId == null)
-			)
-				throw new Error('Invalid NFT ownership response');
-			return data.tokens.map((raw: NFTToken) => {
-				let metadata: NFTToken['metadata'];
-				try {
-					metadata = typeof raw.metadata === 'string' ? JSON.parse(raw.metadata) : raw.metadata;
-				} catch {
-					/* ownership is independent of metadata */
-				}
-				return {
-					contractId: String(raw.contractId),
-					tokenId: String(raw.tokenId),
-					owner: raw.owner,
-					metadataURI: raw.metadataURI,
-					name: typeof metadata?.name === 'string' ? metadata.name : `NFT #${raw.tokenId}`,
-					imageUrl: typeof metadata?.image === 'string' ? metadata.image : '',
-					metadata
-				};
-			}) as NFTToken[];
-		})(),
-		'NFT ownership'
-	);
-	nftOwnership.set(address, result);
+	if (!force) {
+		const cached = nftOwnership.get(address);
+		if (cached && Date.now() - cached.at < NFT_CACHE_TTL_MS) return cached.tokens;
+		if (cached) nftOwnership.delete(address);
+	}
+	const request = ++nftReadSequence;
+	nftGeneration.set(address, request);
+	const newest = () => nftGeneration.get(address) === request;
+	let result: NFTToken[];
+	try {
+		result = await bounded(
+			(async () => {
+				const url = new URL('https://voi-mainnet-mimirapi.nftnavigator.xyz/nft-indexer/v1/tokens');
+				url.searchParams.set('owner', address);
+				const response = await fetch(url);
+				if (!response.ok) throw new Error('NFT ownership unavailable');
+				const data = await response.json();
+				if (
+					!Array.isArray(data.tokens) ||
+					data.tokens.some((t: NFTToken) => t.contractId == null || t.tokenId == null)
+				)
+					throw new Error('Invalid NFT ownership response');
+				return data.tokens.map((raw: NFTToken) => {
+					let metadata: NFTToken['metadata'];
+					try {
+						metadata = typeof raw.metadata === 'string' ? JSON.parse(raw.metadata) : raw.metadata;
+					} catch {
+						/* ownership is independent of metadata */
+					}
+					return {
+						contractId: String(raw.contractId),
+						tokenId: String(raw.tokenId),
+						owner: raw.owner,
+						metadataURI: raw.metadataURI,
+						name: typeof metadata?.name === 'string' ? metadata.name : `NFT #${raw.tokenId}`,
+						imageUrl: typeof metadata?.image === 'string' ? metadata.image : '',
+						metadata
+					};
+				}) as NFTToken[];
+			})(),
+			'NFT ownership'
+		);
+	} catch (error) {
+		if (newest()) nftGeneration.delete(address);
+		throw error;
+	}
+	if (newest()) {
+		nftGeneration.delete(address);
+		nftOwnership.delete(address);
+		nftOwnership.set(address, { tokens: result, at: Date.now() });
+		if (nftOwnership.size > NFT_CACHE_MAX) {
+			const oldest = nftOwnership.keys().next().value;
+			if (oldest !== undefined) nftOwnership.delete(oldest);
+		}
+	}
 	return result;
 }
 

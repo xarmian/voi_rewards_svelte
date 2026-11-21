@@ -1,12 +1,11 @@
 <script lang="ts">
-	/* eslint-disable @typescript-eslint/no-unused-vars -- Retain the frozen legacy controller declarations while migrating its presentation. */
 	import {
 		pageAccountState,
 		signerMatchesAccount,
 		wrongSignerMessage
 	} from '$lib/chain/signerGate';
 	import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
-	import { loadAccountDetails, totalRewardsMicroVoi } from '$lib/portfolio/accountDetails';
+	import { loadAccountDetails } from '$lib/portfolio/accountDetails';
 	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
 	import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';
 	import {
@@ -21,22 +20,14 @@
 	import type { NFTToken } from '$lib/types/assets';
 	import FungibleToken from './FungibleToken.svelte';
 	import ClaimableTokenCard from './ClaimableTokenCard.svelte';
-	import type { FungibleTokenType, ASAToken, LPToken, TokenApproval } from '$lib/types/assets';
+	import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { getEnvoiNames } from '$lib/utils/envoi';
-	import { getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
+	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
-	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
 	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
-	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
-	import { fade } from 'svelte/transition';
-	import ConsensusDetails from './ConsensusDetails.svelte';
-	import StakingComponent from './ui/StakingComponent.svelte';
-
-	import { arc200TransferFrom } from '$lib/utils/arc200';
 	import algosdk from 'algosdk';
 	export let parentWalletAddress: string | null = null;
 	export let walletAddress: string | undefined = undefined;
@@ -90,69 +81,46 @@
 	}
 
 	let accountPart: Part<AccountSnapshot> | { status: 'loading' } = { status: 'loading' };
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the account load, whose creation-date read is pinned by tests
 	let createdAtPart: Part<number> | { status: 'loading' } = { status: 'loading' };
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the account load, whose rewards read is pinned by tests
 	let rewardsPart: Part<RewardsTransaction[]> | { status: 'loading' } = { status: 'loading' };
 	$: accountBalance = accountPart.status === 'loaded' ? accountPart.value.balance : 0;
 	let loadGeneration = 0;
-	let accountCreationDate: string | null = null;
-	let accountCreationDateDays: number | null = null;
-	let totalRewards: number = 0;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the Envoi lookup, which is pinned by tests
 	let envoiName: string | null = null;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the Envoi lookup, which is pinned by tests
 	let envoiAvatar: string | undefined = undefined;
-	let rewardsHistory: any[] = [];
-	let asaDetails: any[] = [];
-	let totalValue: number = 0;
-	let totalUsdValue = 0;
 	// TASK-108: the totals are 0 until the first recomputeTotals and partial until the first token list lands,
 	// and a token list fetched before the price landed has no VOI-derived USD until its re-fetch settles; all of
 	// that is loading, not $0 or unavailable. A failed re-fetch leaves those values unavailable.
 	let totalsReady = false;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- pinned by the progressive-loading tests
 	$: totalsIncomplete = accountPart.status === 'unavailable';
 	let tokensPrice = 0;
 	$: usdPending =
 		!$voiPrice.error &&
 		($voiPrice.price <= 0 || (isLoadingTokens && fungibleTokens.length > 0 && tokensPrice <= 0));
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- pinned by the progressive-loading tests
 	$: totalsPending =
 		accountPart.status === 'loading' ||
 		!totalsReady ||
 		(isLoadingTokens && fungibleTokens.length === 0);
 
-	let asaTokens: ASAToken[] = [];
-
 	// Placeholder data for fungible tokens
 	let fungibleTokens: FungibleTokenType[] = [];
 
-	let showZeroBalances = false;
-
-	// Add these to your existing type definitions and variables
-	type TokenSortOption = {
-		id: 'name' | 'type' | 'balance' | 'value';
-		label: string;
-	};
-
-	const tokenSortOptions: TokenSortOption[] = [
-		{ id: 'value', label: 'Value' },
-		{ id: 'name', label: 'Name' },
-		{ id: 'type', label: 'Type' },
-		{ id: 'balance', label: 'Balance' }
-	];
-
-	let selectedTokenSort: TokenSortOption['id'] = 'value';
-	let tokenSortDirection: 'asc' | 'desc' = 'desc';
-	let tokenSearchQuery = '';
-	let selectedTokenType: 'all' | 'vsa' | 'arc200' = 'all';
 	let showSendVoiModal = false;
 	let sendVoiBalance = 0;
 	let lastInitializedWallet: string | undefined;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the refresh handlers, which stay unchanged
 	let isLoadingPortfolio = false;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the refresh handlers, which stay unchanged
 	let isLoadingLPTokens = false;
 	let isLoadingTokens = false;
 	let tokensError: string | null = null;
 	let tokensPartial = false;
 	let lastTokenPrice = 0;
-	let isLoadingNFTs = false;
-	let voteKeyExpiry: number | undefined;
-	let voteKeyExpiryDate: Date | undefined;
 	let showVoiTransfersModal = false;
 	let showBridgeModal = false;
 	let SendTokenModal: typeof import('./SendTokenModal.svelte').default | null = null;
@@ -168,30 +136,6 @@
 	}> = [];
 	let isExpandingClaimableSection = false;
 	let showClaimableSection = false;
-
-	const LoadingOverlay = ({ height = 'h-full' }: { height?: string }) => `
-        <div class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center ${height}">
-            <div class="flex flex-col items-center gap-3">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400"></div>
-                <span class="text-sm text-gray-600 dark:text-gray-300">Refreshing...</span>
-            </div>
-        </div>
-    `;
-
-	async function handleEpochsClick(event: MouseEvent) {
-		event.preventDefault();
-		const targetPath = `/wallet/${walletAddress}`;
-
-		// If we're already on the wallet page, just update the hash
-		if ($page.url.pathname === targetPath) {
-			window.location.hash = 'epochs';
-			// Ensure the epochs section is scrolled into view
-			document.getElementById('epochs')?.scrollIntoView({ behavior: 'smooth' });
-		} else {
-			// Navigate to the wallet page with the epochs hash
-			await goto(`${targetPath}#epochs`);
-		}
-	}
 
 	function handleTokenSent() {
 		refreshPortfolio();
@@ -247,8 +191,6 @@
 			totalsReady = false;
 			tokensError = null;
 			tokensPartial = false;
-			totalValue = 0;
-			totalUsdValue = 0;
 			initializePortfolio();
 		}
 	}
@@ -263,25 +205,6 @@
 	}
 
 	function recomputeTotals() {
-		const voiBalance = accountPart.status === 'loaded' ? accountPart.value.balance / 1e6 : 0;
-		// Recalculate total value
-		totalValue =
-			fungibleTokens.reduce((acc, token) => acc + token.value, 0) +
-			asaDetails.reduce((acc, asa) => acc + (asa.value || 0), 0) +
-			voiBalance;
-
-		// Calculate total USD value separately
-		totalUsdValue =
-			fungibleTokens.reduce((acc, token) => acc + (token.usdValue || 0), 0) +
-			asaDetails.reduce((acc, asa) => {
-				// For ASA tokens, calculate USD value if it's aUSDC
-				if (asa.id === 302190) {
-					return acc + asa.amount / Math.pow(10, asa.decimals || 6);
-				}
-				return acc;
-			}, 0) +
-			// Add VOI balance USD value if VOI price is available
-			($voiPrice.price > 0 ? voiBalance * $voiPrice.price : 0);
 		totalsReady = true;
 	}
 
@@ -367,13 +290,6 @@
 		}
 	}
 
-	function handleIconError(event: Event) {
-		const img = event.target as HTMLImageElement;
-		if (img) {
-			img.style.display = 'none';
-		}
-	}
-
 	async function fetchRewardsHistory(address: string): Promise<RewardsTransaction[]> {
 		// Fetch all rewards transactions
 		const rewardsPromises = REWARDS_ADDRESSES.map((sender) =>
@@ -397,8 +313,6 @@
 		accountPart = { status: 'loading' };
 		createdAtPart = { status: 'loading' };
 		rewardsPart = { status: 'loading' };
-		voteKeyExpiry = undefined;
-		voteKeyExpiryDate = undefined;
 		if (totalsReady) recomputeTotals();
 
 		const envoiLoading = (async () => {
@@ -433,29 +347,11 @@
 					if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
 					if (part === 'account') {
 						accountPart = result;
-						if (accountPart.status === 'loaded') {
-							const account = accountPart.value;
-							if (account.status === 'Online' && account.voteLastValid !== undefined) {
-								voteKeyExpiry = (account.voteLastValid - account.round) * 3.3; // 3.3 seconds per block
-								voteKeyExpiryDate = new Date(Date.now() + voteKeyExpiry * 1000);
-							}
-						}
 						if (totalsReady) recomputeTotals();
 					} else if (part === 'createdAt') {
 						createdAtPart = result;
-						if (createdAtPart.status === 'loaded') {
-							accountCreationDate = new Date(createdAtPart.value * 1000).toLocaleDateString();
-							accountCreationDateDays = Math.floor(
-								(new Date().getTime() - new Date(accountCreationDate).getTime()) /
-									(1000 * 60 * 60 * 24)
-							);
-						}
 					} else {
 						rewardsPart = result;
-						if (rewardsPart.status === 'loaded') {
-							rewardsHistory = rewardsPart.value;
-							totalRewards = totalRewardsMicroVoi(rewardsHistory);
-						}
 					}
 				}
 			}
@@ -465,110 +361,6 @@
 
 	function retryAccountDetails() {
 		return fetchAccountDetails(true);
-	}
-
-	function formatNumber(value: number | undefined, decimals: number = 6): string {
-		if (value === undefined || !isFinite(value)) return '0';
-
-		try {
-			if (BigInt(value) >= BigInt(10_000_000_000_000_000_000_000_000_000_000)) {
-				return 'Unlimited';
-			}
-		} catch (err) {
-			// silent fail
-		}
-
-		return value.toLocaleString('en-US', {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: decimals
-		});
-	}
-
-	function getTokenType(token: any): 'vsa' | 'arc200' {
-		return 'assetId' in token ? 'vsa' : 'arc200';
-	}
-
-	// The sort and filter state are parameters, not closure reads: a legacy-mode template
-	// re-runs only on the variables its expression names (svelte >=5.34.4; TASK-38 trail).
-	function sortTokens(
-		tokens: any[],
-		selectedTokenSort: string,
-		tokenSortDirection: 'asc' | 'desc'
-	): any[] {
-		return [...tokens].sort((a, b) => {
-			const aDetails = asaDetails.find((d) => d.id === a.assetId);
-			const bDetails = asaDetails.find((d) => d.id === b.assetId);
-
-			let comparison = 0;
-			switch (selectedTokenSort) {
-				case 'name':
-					const aName = aDetails?.name || a.name || '';
-					const bName = bDetails?.name || b.name || '';
-					comparison = aName.localeCompare(bName);
-					break;
-				case 'type':
-					comparison = getTokenType(a).localeCompare(getTokenType(b));
-					break;
-				case 'balance':
-					const aBalance =
-						(aDetails?.amount || a.balance || 0) /
-						Math.pow(10, aDetails?.decimals || a.decimals || 0);
-					const bBalance =
-						(bDetails?.amount || b.balance || 0) /
-						Math.pow(10, bDetails?.decimals || b.decimals || 0);
-					comparison = aBalance - bBalance;
-					break;
-				case 'value':
-					const aValue = aDetails?.value || a.value || 0;
-					const bValue = bDetails?.value || b.value || 0;
-					comparison = aValue - bValue;
-					break;
-			}
-			return tokenSortDirection === 'asc' ? comparison : -comparison;
-		});
-	}
-
-	function filterTokens(tokens: any[], selectedTokenType: string, tokenSearchQuery: string): any[] {
-		return tokens.filter((token) => {
-			const details = asaDetails.find((d) => d.id === token.assetId);
-			const name = (details?.name || token.name || '').toLowerCase();
-			const id = (details?.id || token.id || '').toString();
-			const type = getTokenType(token);
-
-			// Type filter
-			if (selectedTokenType !== 'all' && type !== selectedTokenType) {
-				return false;
-			}
-
-			// Search query filter
-			if (tokenSearchQuery) {
-				const query = tokenSearchQuery.toLowerCase();
-				return name.includes(query) || id.includes(query);
-			}
-
-			return true;
-		});
-	}
-
-	$: showZeroBalancesCondition = (token: any) => {
-		if (showZeroBalances) return true;
-
-		// For tokens with approvals (incoming or outgoing), always show them
-		if (token.approvals?.length > 0 || token.outgoingApprovals?.length > 0) return true;
-
-		// For tokens with value, check if value exceeds threshold
-		const details = asaDetails.find((d) => d.id === token.assetId);
-		return details
-			? details?.value
-				? details?.value > 0.1
-				: details?.amount / Math.pow(10, details?.decimals || 0) > 0.01
-			: token?.value
-				? token?.value > 0.1
-				: token?.balance / Math.pow(10, token?.decimals || 0) > 0.01;
-	};
-
-	function isLPToken(token: FungibleTokenType | LPToken) {
-		return 'poolInfo' in token && token.poolInfo !== undefined;
 	}
 
 	// Calculate claimable tokens summary
@@ -834,23 +626,8 @@
 		}
 	}
 
-	function handleClaimableTokenViewDetails(event: CustomEvent) {
-		const { tokenId } = event.detail;
-
-		// Find the token card and scroll to it
-		const tokenCard = document.querySelector(`[data-token-id="${tokenId}"]`);
-		if (tokenCard) {
-			tokenCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-			// Add a highlight effect
-			tokenCard.classList.add('ring-2', 'ring-yellow-400', 'ring-opacity-50');
-			setTimeout(() => {
-				tokenCard.classList.remove('ring-2', 'ring-yellow-400', 'ring-opacity-50');
-			}, 3000);
-		}
-	}
-
 	function handleTokenClaimed(event: CustomEvent) {
-		const { tokenId, success, error } = event.detail;
+		const { success, error } = event.detail;
 
 		if (success) {
 			// Refresh the portfolio to update the claimable tokens list

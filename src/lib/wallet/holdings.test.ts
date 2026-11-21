@@ -232,6 +232,51 @@ it('ownership survives malformed metadata and independently failed collection/en
 	expect(enriched.partial).toBe(true);
 });
 
+const nftResponse = (tokenId: string) =>
+	new Response(JSON.stringify({ tokens: [{ contractId: 1, tokenId, metadata: {} }] }));
+it('only the newest forced NFT read writes the ownership cache', async () => {
+	let resolveFirst!: (r: Response) => void;
+	let resolveSecond!: (r: Response) => void;
+	const fetcher = vi
+		.fn()
+		.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveFirst = resolve)))
+		.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveSecond = resolve)));
+	vi.stubGlobal('fetch', fetcher);
+	const first = loadWalletNfts('NFT_OVERLAP', true);
+	const second = loadWalletNfts('NFT_OVERLAP', true);
+	resolveSecond(nftResponse('2'));
+	expect((await second).map((t) => t.tokenId)).toEqual(['2']);
+	resolveFirst(nftResponse('1'));
+	expect((await first).map((t) => t.tokenId)).toEqual(['1']);
+	const cached = await loadWalletNfts('NFT_OVERLAP');
+	expect(cached.map((t) => t.tokenId)).toEqual(['2']);
+	expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('NFT ownership expires after five minutes', async () => {
+	vi.useFakeTimers({ toFake: ['Date'] });
+	vi.setSystemTime(0);
+	const fetcher = vi.fn().mockImplementation(async () => nftResponse('1'));
+	vi.stubGlobal('fetch', fetcher);
+	await loadWalletNfts('NFT_EXPIRY', true);
+	vi.setSystemTime(5 * 60_000 - 1);
+	await loadWalletNfts('NFT_EXPIRY');
+	expect(fetcher).toHaveBeenCalledTimes(1);
+	vi.setSystemTime(5 * 60_000 + 1);
+	await loadWalletNfts('NFT_EXPIRY');
+	expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('NFT ownership keeps at most twenty addresses', async () => {
+	const fetcher = vi.fn().mockImplementation(async () => nftResponse('1'));
+	vi.stubGlobal('fetch', fetcher);
+	const addresses = Array.from({ length: 21 }, (_, i) => `NFT_BOUND_${i}`);
+	for (const address of addresses) await loadWalletNfts(address, true);
+	expect(fetcher).toHaveBeenCalledTimes(21);
+	await loadWalletNfts(addresses[20]);
+	expect(fetcher).toHaveBeenCalledTimes(21);
+	await loadWalletNfts(addresses[0]);
+	expect(fetcher).toHaveBeenCalledTimes(22);
+});
+
 it.each([
 	{ ...split, pageAddress: 'C', contracts: [{ address: 'C', balance: 4, details: null }] },
 	{
@@ -324,7 +369,7 @@ it('a token read completing after 20 seconds still publishes', async () => {
 	expect(await published).toEqual({ value: result });
 });
 
-it('token identity survives pool discovery and provider changes', () => {
+it('row keys ignore pool discovery and provider changes', () => {
 	const key = (poolInfo?: FungibleTokenType['poolInfo']) =>
 		deriveHoldingsRows([token({ poolInfo })], { pageAddress: 'Y' }).all[0].key;
 	expect(key({ provider: 'humble' })).toBe(key());

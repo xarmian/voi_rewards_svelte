@@ -181,7 +181,7 @@ it('native signing controls require page membership while history remains visibl
 	expect(source).not.toContain('Connect wallet to');
 });
 
-it('top ten and dust never narrow the actual Claim All builder population', async () => {
+it('the Claim All summary and builder cover the whole claimable population', async () => {
 	const source = controller();
 	const summary = source.match(/\tfunction calculateClaimableTokensSummary\([^]*?\n\t\}/)![0];
 	const bulk = source.match(/\tasync function bulkClaimAllTokens\([^]*?\n\t\}/)![0];
