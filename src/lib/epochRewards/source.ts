@@ -32,6 +32,11 @@ export const liveEpochHistory: EpochHistorySource = {
 	}
 };
 
+/** Payload `{ snapshots: [...] }`: one wallet's completed epochs, for the rewards tab. */
+export function walletSummaryUrl(address: string): string {
+	return `${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${encodeURIComponent(address)}`;
+}
+
 /**
  * The source the home page reads. Module-internal on purpose: index.ts is in the layout
  * chunk and this pulls in the client rewards cache. A snapshot source swaps in here.

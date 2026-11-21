@@ -2,6 +2,14 @@ import type { DataState, Tone } from '$lib/ds/types';
 import type { ContractDetails } from '$lib/types';
 import { vestingStartTime } from './vesting';
 import type { AccountHealth, Eligibility, Heartbeat } from './nodeHealth';
+import {
+	EPOCH_REWARDS_ENABLED,
+	type WalletEpoch,
+	type WalletEpochSummary
+} from '$lib/epochRewards';
+import { summarizeWalletEpochs } from '$lib/epochRewards/client';
+
+export type { EpochSummary, WalletEpoch } from '$lib/epochRewards';
 
 export const BASE_MIN_BALANCE_VOI = 0.1;
 /**
@@ -38,23 +46,6 @@ export function isEmptyContract(account: WalletAccount): boolean {
 }
 
 export type WalletContract = WalletAccount & { details: ContractDetails | null };
-export type WalletEpoch = {
-	epoch: number;
-	networkBlocks: number;
-	onlineStake: number | null;
-	pool: number;
-	progress: number;
-	blocks: Record<string, number>;
-};
-export type EpochSummary = {
-	epoch: number;
-	blocks: number | null;
-	expected: number | null;
-	ratio: number | null;
-	reward: number | null;
-	share: number | null;
-	progress: number;
-};
 export type TokenValues = {
 	state: DataState;
 	lp: number;
@@ -76,7 +67,7 @@ export type EligibilityRow = {
 	contractId: number | null;
 	eligibility: Eligibility | null;
 };
-export type WalletSummary = {
+export type WalletSummaryBase = {
 	state: DataState;
 	ownerLookup?: 'ok' | 'unavailable';
 	contractCount: number;
@@ -104,11 +95,6 @@ export type WalletSummary = {
 	/** The owner, then each online or suspended contract. */
 	eligibilityRows: EligibilityRow[];
 	healthTone: 'ok' | 'warn' | 'danger';
-	tooEarly: boolean;
-	current: EpochSummary;
-	history: EpochSummary[];
-	earnedHistory: number | null;
-	historyRatio: number | null;
 	contractSet: 'ready' | 'unavailable';
 	contractsReady: boolean;
 	withdrawable: number | null;
@@ -116,6 +102,8 @@ export type WalletSummary = {
 	lockedByYear: { year: number; amount: number }[];
 	holdings: WalletHoldings;
 };
+/** The epoch fields are absent when epoch rewards are off. */
+export type WalletSummary = WalletSummaryBase & Partial<WalletEpochSummary>;
 
 export function summarizeWallet({
 	owner,
@@ -206,61 +194,6 @@ export function summarizeWallet({
 			}))
 	];
 
-	function metrics(epoch: WalletEpoch): EpochSummary {
-		if (contractSet === 'unavailable')
-			return {
-				epoch: epoch.epoch,
-				progress: epoch.progress,
-				blocks: null,
-				expected: null,
-				ratio: null,
-				reward: null,
-				share: null
-			};
-		const produced = accounts.reduce(
-			(total, account) => total + (epoch.blocks[account.address] ?? 0),
-			0
-		);
-		// DATA.md: network blocks × account stake ÷ eligible online stake. Historical account
-		// snapshots do not contain stake: current online balances are an explicitly labelled approximation.
-		const expected =
-			epoch.onlineStake !== null && epoch.onlineStake > 0
-				? (epoch.networkBlocks * stakedOnline) / epoch.onlineStake
-				: null;
-		const share = epoch.networkBlocks > 0 ? produced / epoch.networkBlocks : null;
-		const early = online.length > 0 && epoch.progress < 1 && (expected === null || expected < 50);
-		return {
-			epoch: epoch.epoch,
-			blocks: produced,
-			expected,
-			ratio: expected !== null && expected > 0 ? produced / expected : null,
-			// Same so-far estimate as the live rewards table: pool / projected network blocks × produced.
-			reward:
-				!early && share !== null && epoch.progress > 0
-					? (epoch.pool / Math.round(epoch.networkBlocks / epoch.progress)) * produced
-					: null,
-			share,
-			progress: epoch.progress
-		};
-	}
-	const completed = history
-		.filter((epoch) => epoch.progress === 1 && (!current || epoch.epoch < current.epoch))
-		.slice()
-		.sort((a, b) => a.epoch - b.epoch)
-		.slice(-12)
-		.map(metrics);
-	const expectedHistory = completed.reduce((total, epoch) => total + (epoch.expected ?? 0), 0);
-	const currentMetrics = current
-		? metrics(current)
-		: {
-				epoch: 0,
-				blocks: null,
-				expected: null,
-				ratio: null,
-				reward: null,
-				share: null,
-				progress: 0
-			};
 	const incompleteHealth =
 		online.some((account) => account.voteLastValid === null) || heartbeats.length !== online.length;
 	const contractsReady =
@@ -356,16 +289,8 @@ export function summarizeWallet({
 				: keyTone === 'warn' || heartbeatTone === 'warn' || idle.length > 0 || incompleteHealth
 					? 'warn'
 					: 'ok',
-		tooEarly: online.length > 0 && currentMetrics.expected !== null && currentMetrics.expected < 50,
-		current: currentMetrics,
-		history: completed,
-		earnedHistory:
-			completed.length && completed.every((epoch) => epoch.reward !== null)
-				? completed.reduce((total, epoch) => total + epoch.reward!, 0)
-				: null,
-		historyRatio:
-			completed.length && completed.every((epoch) => epoch.expected !== null) && expectedHistory > 0
-				? completed.reduce((total, epoch) => total + (epoch.blocks ?? 0), 0) / expectedHistory
-				: null
+		...(EPOCH_REWARDS_ENABLED
+			? summarizeWalletEpochs({ accounts, online, stakedOnline, contractSet, current, history })
+			: {})
 	};
 }

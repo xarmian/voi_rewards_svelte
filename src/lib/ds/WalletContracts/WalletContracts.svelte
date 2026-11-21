@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ContractDetails } from '$lib/types';
-	import type { WalletEpoch } from '$lib/wallet/summary';
+	import { EPOCH_REWARDS_ENABLED, type WalletEpoch } from '$lib/epochRewards';
 	import { summarizeContracts, type ContractRow } from '$lib/wallet/contracts';
 	import { type PageAccountState } from '$lib/chain/signerGate';
 	import type { Column } from '../DataTable';
@@ -154,12 +154,19 @@
 		showRegisterVoteKey = show;
 		if (!show) selectedContract = null;
 	}
+	const blocksColumn: Column<ContractRow> = {
+		key: 'blocks',
+		header: 'Blocks this epoch',
+		priority: 3,
+		numeric: true,
+		cell: blocksCell
+	};
 	const overviewColumns: Column<ContractRow>[] = [
 		{ key: 'contract', header: 'Contract', priority: 1, cell: addressCell },
 		{ key: 'status', header: 'Status', priority: 1, cell: statusCell },
 		{ key: 'balance', header: 'Balance', priority: 1, numeric: true, cell: balanceCell },
 		{ key: 'eligibility', header: 'Eligibility', priority: 1, cell: eligibilityCell },
-		{ key: 'blocks', header: 'Blocks this epoch', priority: 3, numeric: true, cell: blocksCell },
+		...(EPOCH_REWARDS_ENABLED ? [blocksColumn] : []),
 		{ key: 'key', header: 'Key expires', priority: 3, cell: keyCell },
 		{ key: 'next', header: 'Next unlock', priority: 3, cell: unlockCell }
 	];
@@ -347,10 +354,10 @@
 						<CopyButton text={row.details.owner} what="owner address" />{:else}Unavailable{/if}
 				</dd>
 			</div>
-			<div>
-				<dt class="text-ink-muted">Blocks this epoch</dt>
-				<dd>{@render blocksCell(row)}</dd>
-			</div>
+			{#if EPOCH_REWARDS_ENABLED}<div>
+					<dt class="text-ink-muted">Blocks this epoch</dt>
+					<dd>{@render blocksCell(row)}</dd>
+				</div>{/if}
 			<div>
 				<dt class="text-ink-muted">Funding date</dt>
 				<dd>

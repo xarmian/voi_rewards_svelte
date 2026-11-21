@@ -2,7 +2,12 @@ import { expect, test, vi } from 'vitest';
 import { config } from '$lib/config';
 import { epochRange } from './calendar';
 import { startEpochHome } from './home.server';
-import { epochHistory, liveEpochHistory, type EpochHistorySource } from './source';
+import {
+	epochHistory,
+	liveEpochHistory,
+	walletSummaryUrl,
+	type EpochHistorySource
+} from './source';
 import type { Loaded } from '$lib/server/loaded';
 
 const calls: string[] = [];
@@ -22,6 +27,12 @@ test('the live source keeps the URLs the home page fetches today', () => {
 	expect(liveEpochHistory.statsUrl()).toBe('/api/epochs');
 	expect(liveEpochHistory.rowsUrl(104)).toBe(
 		`${config.proposalApiBaseUrl}?start=2026-10-21&end=2026-10-27`
+	);
+});
+
+test('the wallet epoch summary URL is the one the rewards tab fetches today', () => {
+	expect(walletSummaryUrl('A B')).toBe(
+		`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=A%20B`
 	);
 });
 

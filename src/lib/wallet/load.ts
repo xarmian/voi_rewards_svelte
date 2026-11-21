@@ -8,13 +8,13 @@ import { contractIncentiveOf } from '$lib/chain/keyreg';
 import { getLockContractsByOwner } from '$lib/services/lockvest';
 import { fetchFungibleTokens } from '$lib/services/accounts';
 import { fetchVoiPrice, voiPrice } from '$lib/stores/price';
-import { dataTable, type DateRange } from '../../stores/dataTable';
-import { getTokensByEpoch } from '$lib/utils';
-import { blocksForEpoch, epochRange, type EpochResponse } from '$lib/epochRewards';
+import { EPOCH_REWARDS_ENABLED, type WalletEpoch } from '$lib/epochRewards';
+import { startWalletEpochs } from '$lib/epochRewards/client';
 import { finite } from '$lib/home/headline';
 import type { Account, ContractDetails } from '$lib/types';
 import type { DataState } from '$lib/ds/types';
-import type { WalletAccount, WalletContract, WalletEpoch, TokenValues } from './summary';
+import type { WalletAccount, WalletContract, TokenValues } from './summary';
+import { bounded } from './read';
 import { accountEligibility, heartbeatHealth } from './nodeHealth';
 
 export type LegacyAccount = Account & { contractId: number };
@@ -24,7 +24,8 @@ export type WalletSnapshot = {
 	contractSet: 'ready' | 'unavailable';
 	primary: LegacyAccount;
 	children: LegacyAccount[];
-	current: WalletEpoch;
+	/** null when epoch rewards are off. */
+	current: WalletEpoch | null;
 	history: WalletEpoch[];
 	historyState: DataState;
 	tokens: TokenValues;
@@ -170,19 +171,7 @@ export async function readContract(
 	};
 }
 
-export async function bounded<T>(request: Promise<T>): Promise<T> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	try {
-		return await Promise.race([
-			request,
-			new Promise<never>((_, reject) => {
-				timer = setTimeout(() => reject(new Error('Wallet data request timed out')), 15000);
-			})
-		]);
-	} finally {
-		clearTimeout(timer);
-	}
-}
+export { bounded };
 
 function legacy(account: WalletAccount, stake: number, pool: number): LegacyAccount {
 	const share = stake > 0 ? account.balance / stake : 0;
@@ -196,44 +185,6 @@ function legacy(account: WalletAccount, stake: number, pool: number): LegacyAcco
 		estimatedRewardsPerDay: (share * pool) / 7,
 		estimatedRewardsPerWeek: share * pool,
 		estimatedRewardsPerMonth: (share * pool * 30.44) / 7
-	};
-}
-
-async function readEpoch(
-	date: DateRange,
-	stake: number | null,
-	force: boolean
-): Promise<{ value: WalletEpoch; asOf: string }> {
-	const [raw, pool] = await Promise.all([
-		bounded(dataTable.fetchData(date.id, force)),
-		getTokensByEpoch(date.epoch)
-	]);
-	const rows = raw as EpochResponse;
-	if (!Array.isArray(rows?.data) || !Number.isFinite(blocksForEpoch(date.epoch, rows)))
-		throw new Error('Epoch rows unavailable');
-	const blocks: Record<string, number> = {};
-	for (const row of rows.data) {
-		const count = finite(row.block_count);
-		if (count === null || count < 0 || !row.proposer) throw new Error('Invalid proposer row');
-		blocks[row.proposer] = count;
-	}
-	const range = epochRange(date.epoch);
-	const asOf = rows.max_timestamp;
-	if (!asOf || !Number.isFinite(Date.parse(asOf))) throw new Error('Epoch timestamp unavailable');
-	const progress = Math.max(
-		0,
-		Math.min(1, (Date.parse(asOf) - range.start.getTime()) / (7 * 86400000))
-	);
-	return {
-		value: {
-			epoch: date.epoch,
-			networkBlocks: blocksForEpoch(date.epoch, rows),
-			onlineStake: stake,
-			pool,
-			progress,
-			blocks
-		},
-		asOf
 	};
 }
 
@@ -267,15 +218,7 @@ export async function loadWallet(
 	pageAddress: string,
 	force = false
 ): Promise<WalletSnapshot> {
-	const epochDetails = bounded(
-		fetch('/api/epochs').then(async (response) => {
-			if (!response.ok) throw new Error('Epoch stake unavailable');
-			const data: { epochs: { epoch_number: number; eligible_online_stake: number }[] } =
-				await response.json();
-			if (!Array.isArray(data.epochs)) throw new Error('Epoch stake unavailable');
-			return data.epochs;
-		})
-	).catch(() => []);
+	const epochs = EPOCH_REWARDS_ENABLED ? startWalletEpochs(force) : null;
 	const priceRequest = bounded(fetchVoiPrice(force)).catch(() => undefined);
 	const [supply, locks, dates] = await Promise.all([
 		bounded(getSupplyInfo()),
@@ -283,9 +226,10 @@ export async function loadWallet(
 			console.error('Lockvest lookup failed:', error);
 			return null;
 		}),
-		bounded(dataTable.fetchDateRanges(force))
+		epochs?.ranges() ?? null
 	]);
-	if (!supply || !dates.length) throw new Error('Wallet network data unavailable');
+	if (!supply || (dates !== null && !dates.length))
+		throw new Error('Wallet network data unavailable');
 	const stake = (supply['online-money'] - supply['blacklisted-money']) / 1e6;
 	// Heartbeat staleness needs total online stake: algod's onlineMoney, already in the supply read.
 	const onlineStake = finite(supply['online-money']);
@@ -318,12 +262,10 @@ export async function loadWallet(
 			}
 		};
 	}
-	const latest = dates[dates.length - 1];
-	const [owner, children, live, epochs] = await Promise.all([
+	const [owner, children, live] = await Promise.all([
 		readAccount(ownerAddress),
 		Promise.all((locks ?? []).map((lock) => readAccount(lock.contractAddress, lock.contractId))),
-		readEpoch(latest, stake, force),
-		epochDetails
+		dates && epochs ? epochs.live(dates, stake) : null
 	]);
 	const contracts = await Promise.all(
 		children.map(async (account): Promise<WalletContract> => {
@@ -341,19 +283,7 @@ export async function loadWallet(
 			? contracts
 			: contracts.filter((contract) => contract.address === pageAddress);
 	if (!viewOwner && !viewContracts.length) throw new Error('Contract account unavailable');
-	const historical = await Promise.allSettled(
-		dates.slice(-13, -1).map(async (date) => {
-			const stake = finite(
-				epochs.find((epoch) => epoch.epoch_number === date.epoch)?.eligible_online_stake
-			);
-			if (stake === null || stake <= 0) throw new Error('Historical stake unavailable');
-			// /api/epochs eligible_online_stake is already VOI, like account balances.
-			// Refresh only bypasses the live epoch cache; completed rows remain cached.
-			const result = await readEpoch(date, stake, false);
-			// The date range has ended; snapshots can stop before the final instant if there was no block then.
-			return { ...result.value, progress: 1 };
-		})
-	);
+	const history = dates && epochs ? await epochs.history(dates) : null;
 	await priceRequest;
 	const quote = get(voiPrice);
 	const price = !quote.error && quote.price > 0 ? quote.price : null;
@@ -362,15 +292,16 @@ export async function loadWallet(
 		owner,
 		contracts,
 		contractSet: locks === null ? 'unavailable' : 'ready',
-		primary: legacy(owner, stake, live.value.pool),
+		primary: legacy(owner, stake, live?.value.pool ?? 0),
 		children: children
-			.map((account) => legacy(account, stake, live.value.pool))
+			.map((account) => legacy(account, stake, live?.value.pool ?? 0))
 			.sort((a, b) => b.balance - a.balance),
-		current: live.value,
-		history: historical.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
-		historyState: historical.some((result) => result.status === 'rejected') ? 'error' : 'ready',
+		current: live?.value ?? null,
+		history: history?.history ?? [],
+		historyState: history?.state ?? 'ready',
 		tokens,
 		price,
-		asOf: live.asOf
+		// With epoch rewards off there are no epoch rows to date the data: it is as of this load.
+		asOf: live?.asOf ?? new Date().toISOString()
 	};
 }

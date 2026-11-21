@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageAccountState } from '$lib/chain/signerGate';
-	import type { WalletEpoch } from '$lib/wallet/summary';
+	import type { WalletEpoch } from '$lib/epochRewards';
 	import {
 		buildVestingTimeline,
 		scheduleDomain,

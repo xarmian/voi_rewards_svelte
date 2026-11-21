@@ -24,11 +24,16 @@ vi.mock('$lib/wallet/rewards', async (original) => ({
 	...(await original<typeof import('$lib/wallet/rewards')>()),
 	createRewardsState: vi.fn()
 }));
+vi.mock('$lib/epochRewards/client', async (original) => ({
+	...(await original<typeof import('$lib/epochRewards/client')>()),
+	createEpochRewardsState: () => createRewardsState()
+}));
 vi.mock('$lib/wallet/blockRewardsCard', async (original) => ({
 	...(await original<typeof import('$lib/wallet/blockRewardsCard')>()),
 	createBlockRewardsState: vi.fn()
 }));
-import { createRewardsState, validatePayouts } from '$lib/wallet/rewards';
+import { createRewardsState } from '$lib/wallet/rewards';
+import { validatePayouts } from '$lib/epochRewards/client';
 import { createBlockRewardsState, type BlockRewardsState } from '$lib/wallet/blockRewardsCard';
 import { BLOCK_REWARD_PAGE_SIZE, type BlockReward } from '$lib/wallet/blockRewards';
 import { BLOCK_REWARD_STATUS_TEXT, type BlockRewardReason } from '$lib/rewards/blockRewardStatus';
