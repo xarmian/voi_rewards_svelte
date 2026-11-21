@@ -446,6 +446,12 @@
 				"warnings": 0
 			}
 		},
+		"src/lib/component/RegisterVoteKey.svelte": {
+			"ts:7006": {
+				"errors": 5,
+				"warnings": 0
+			}
+		},
 		"src/lib/components/OHLCVChart.svelte": {
 			"svelte:element_invalid_self_closing_tag": {
 				"errors": 0,
