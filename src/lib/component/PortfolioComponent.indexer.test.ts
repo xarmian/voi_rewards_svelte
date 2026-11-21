@@ -61,13 +61,3 @@ test('the transfers modal labels an unavailable balance without reading token.ba
 		/this=\{TokenTransfersModal\}[\s\S]*?balanceUnavailable=\{accountPart\.status !== 'loaded'\}/
 	);
 });
-
-test('rewards history failures are not converted to an empty history', () => {
-	const history = source.match(
-		/async function fetchRewardsHistory\([^]*?(?=\n\tasync function)/
-	)?.[0];
-	expect(history, 'Keep an explicit rewards transaction lookup').toBeDefined();
-	expect(history, 'Let the loader settle history failures as unavailable, never []').not.toMatch(
-		/return\s*\[\s*\]/
-	);
-});

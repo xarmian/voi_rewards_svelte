@@ -4,9 +4,8 @@
 		signerMatchesAccount,
 		wrongSignerMessage
 	} from '$lib/chain/signerGate';
-	import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 	import { loadAccountDetails } from '$lib/portfolio/accountDetails';
-	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
+	import type { Part, AccountSnapshot } from '$lib/portfolio/accountDetails';
 	import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';
 	import {
 		createHoldingsTokenLoader,
@@ -22,7 +21,6 @@
 	import ClaimableTokenCard from './ClaimableTokenCard.svelte';
 	import type { FungibleTokenType, TokenApproval } from '$lib/types/assets';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
-	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
@@ -81,31 +79,12 @@
 	}
 
 	let accountPart: Part<AccountSnapshot> | { status: 'loading' } = { status: 'loading' };
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the account load, whose creation-date read is pinned by tests
-	let createdAtPart: Part<number> | { status: 'loading' } = { status: 'loading' };
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the account load, whose rewards read is pinned by tests
-	let rewardsPart: Part<RewardsTransaction[]> | { status: 'loading' } = { status: 'loading' };
 	$: accountBalance = accountPart.status === 'loaded' ? accountPart.value.balance : 0;
 	let loadGeneration = 0;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the Envoi lookup, which is pinned by tests
-	let envoiName: string | null = null;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the Envoi lookup, which is pinned by tests
-	let envoiAvatar: string | undefined = undefined;
-	// TASK-108: the totals are 0 until the first recomputeTotals and partial until the first token list lands,
-	// and a token list fetched before the price landed has no VOI-derived USD until its re-fetch settles; all of
-	// that is loading, not $0 or unavailable. A failed re-fetch leaves those values unavailable.
-	let totalsReady = false;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- pinned by the progressive-loading tests
-	$: totalsIncomplete = accountPart.status === 'unavailable';
 	let tokensPrice = 0;
 	$: usdPending =
 		!$voiPrice.error &&
 		($voiPrice.price <= 0 || (isLoadingTokens && fungibleTokens.length > 0 && tokensPrice <= 0));
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- pinned by the progressive-loading tests
-	$: totalsPending =
-		accountPart.status === 'loading' ||
-		!totalsReady ||
-		(isLoadingTokens && fungibleTokens.length === 0);
 
 	// Placeholder data for fungible tokens
 	let fungibleTokens: FungibleTokenType[] = [];
@@ -113,10 +92,6 @@
 	let showSendVoiModal = false;
 	let sendVoiBalance = 0;
 	let lastInitializedWallet: string | undefined;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the refresh handlers, which stay unchanged
-	let isLoadingPortfolio = false;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written by the refresh handlers, which stay unchanged
-	let isLoadingLPTokens = false;
 	let isLoadingTokens = false;
 	let tokensError: string | null = null;
 	let tokensPartial = false;
@@ -188,7 +163,6 @@
 			fungibleTokens = [];
 			lastTokenPrice = 0;
 			tokensPrice = 0;
-			totalsReady = false;
 			tokensError = null;
 			tokensPartial = false;
 			initializePortfolio();
@@ -204,19 +178,11 @@
 		refreshTokens();
 	}
 
-	function recomputeTotals() {
-		totalsReady = true;
-	}
-
 	async function refreshPortfolio() {
-		isLoadingPortfolio = true;
 		try {
 			await Promise.all([fetchAccountDetails(), fetchVoiPrice()]);
-			recomputeTotals();
 		} catch (error) {
 			console.error('Error refreshing portfolio:', error);
-		} finally {
-			isLoadingPortfolio = false;
 		}
 	}
 
@@ -224,7 +190,6 @@
 		const requestedWallet = walletAddress;
 		const tokenGeneration = ++tokenLoadGeneration;
 		isLoadingTokens = true;
-		isLoadingLPTokens = true;
 		lastTokenPrice = $voiPrice.price;
 		try {
 			const { tokens, partial } = await holdingsTokenLoader(requestedWallet, lastTokenPrice);
@@ -234,7 +199,6 @@
 			tokensPrice = lastTokenPrice;
 			tokensError = null;
 			tokensPartial = partial;
-			recomputeTotals();
 		} catch (error) {
 			if (walletAddress !== requestedWallet || tokenGeneration !== tokenLoadGeneration) return;
 			tokensError = error instanceof Error ? error.message : String(error);
@@ -242,7 +206,6 @@
 		} finally {
 			if (walletAddress === requestedWallet && tokenGeneration === tokenLoadGeneration) {
 				isLoadingTokens = false;
-				isLoadingLPTokens = false;
 			}
 		}
 	}
@@ -251,15 +214,12 @@
 		const requestedWallet = walletAddress;
 		try {
 			// First load essential account info
-			isLoadingPortfolio = true;
 			await Promise.all([fetchAccountDetails(), fetchVoiPrice()]);
 			if (walletAddress !== requestedWallet) return;
-			isLoadingPortfolio = false;
 
 			// Then load tokens in parallel
 			const tokenGeneration = ++tokenLoadGeneration;
 			isLoadingTokens = true;
-			isLoadingLPTokens = true;
 			lastTokenPrice = $voiPrice.price;
 			try {
 				const { tokens, partial } = await holdingsTokenLoader(requestedWallet, lastTokenPrice);
@@ -276,34 +236,12 @@
 			} finally {
 				if (walletAddress === requestedWallet && tokenGeneration === tokenLoadGeneration) {
 					isLoadingTokens = false;
-					isLoadingLPTokens = false;
 				}
 			}
-
-			// Calculate total value after all data is loaded
-			recomputeTotals();
 		} catch (error) {
 			if (walletAddress !== requestedWallet) return;
 			console.error('Error initializing portfolio:', error);
-		} finally {
-			if (walletAddress === requestedWallet) isLoadingPortfolio = false;
 		}
-	}
-
-	async function fetchRewardsHistory(address: string): Promise<RewardsTransaction[]> {
-		// Fetch all rewards transactions
-		const rewardsPromises = REWARDS_ADDRESSES.map((sender) =>
-			algodIndexer
-				.searchForTransactions()
-				.address(address)
-				.addressRole('receiver')
-				.beforeTime(new Date().toISOString())
-				.do()
-				.then((response) => response.transactions.filter((tx) => tx.sender === sender))
-		);
-
-		const allTransactions = await Promise.all(rewardsPromises);
-		return allTransactions.flat();
 	}
 
 	async function fetchAccountDetails(force = false) {
@@ -311,52 +249,17 @@
 		if (!walletAddress) return;
 		const requestedWallet = walletAddress;
 		accountPart = { status: 'loading' };
-		createdAtPart = { status: 'loading' };
-		rewardsPart = { status: 'loading' };
-		if (totalsReady) recomputeTotals();
-
-		const envoiLoading = (async () => {
-			// Fetch Envoi name
-			try {
-				const envoiResults = await getEnvoiNames([requestedWallet]);
-				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
-				envoiName = envoiResults.length > 0 ? envoiResults[0].name : null;
-				envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
-			} catch (err) {
-				console.error('Error fetching Envoi name:', err);
-			}
-		})();
 
 		await loadAccountDetails(
 			requestedWallet,
+			{ fetchAccount: (address) => requireAccountInfo(address, { force }) },
 			{
-				fetchAccount: (address) => requireAccountInfo(address, { force }),
-				lookupCreatedAt: async (address) => {
-					const info = await algodIndexer.lookupAccountByID(address).do();
-					const createdAtRound = info.account.createdAtRound;
-					if (createdAtRound === undefined) {
-						throw new Error('The indexer did not report when this account was created');
-					}
-					const block = await algodIndexer.lookupBlock(createdAtRound).do();
-					return Number(block.timestamp);
-				},
-				fetchRewardsTransactions: fetchRewardsHistory
-			},
-			{
-				onPart: (part, result) => {
+				onAccount: (result) => {
 					if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
-					if (part === 'account') {
-						accountPart = result;
-						if (totalsReady) recomputeTotals();
-					} else if (part === 'createdAt') {
-						createdAtPart = result;
-					} else {
-						rewardsPart = result;
-					}
+					accountPart = result;
 				}
 			}
 		);
-		await envoiLoading;
 	}
 
 	function retryAccountDetails() {
