@@ -17,9 +17,6 @@ export interface Account {
 	expectedBlocksPerDay: number;
 	expectedBlocksPerWeek: number;
 	expectedBlocksPerMonth: number;
-	estimatedRewardsPerDay: number;
-	estimatedRewardsPerWeek: number;
-	estimatedRewardsPerMonth: number;
 }
 
 export interface ContractDetails {
