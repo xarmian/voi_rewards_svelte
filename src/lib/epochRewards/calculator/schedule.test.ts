@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildScheduleCsv, scheduleRows } from './calculatorSchedule';
+import { buildScheduleCsv, scheduleRows } from './schedule';
 
 const startDate = new Date('2024-10-30T00:00:00Z');
 

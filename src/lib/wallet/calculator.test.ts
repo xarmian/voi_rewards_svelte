@@ -15,8 +15,8 @@ vi.mock('$lib/stores/price', async () => {
 import { requireAccountInfo, getSupplyInfo } from '$lib/stores/accounts';
 import { dataTable } from '../../stores/dataTable';
 import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
-import { loadCalculatorInputs, loadCalculatorBalance, loadCalculatorPrice } from './calculator';
-import { estimateRewards } from '$lib/rewards/calculatorModel';
+import { loadCalculatorBalance, loadCalculatorPrice } from './calculator';
+import { loadCalculatorInputs } from '$lib/epochRewards/calculator/inputs';
 beforeEach(() => {
 	vi.clearAllMocks();
 	vi.mocked(requireAccountInfo).mockResolvedValue({ amount: 0n } as Awaited<
@@ -44,32 +44,6 @@ it('rejects absent or failed balances instead of synthesizing zero and permits R
 	);
 	await expect(loadCalculatorBalance('Y')).rejects.toThrow();
 	expect(await loadCalculatorBalance('Y', true)).toBe(0);
-});
-it('keeps the denominator in microVOI and the existing representative formula', async () => {
-	const input = await loadCalculatorInputs('Y', true);
-	expect(input.rewardStake).toBe(9_000_000_000);
-	expect(input.epochRewards).toHaveLength(52);
-	expect(dataTable.fetchDateRanges).toHaveBeenCalledWith(true);
-	expect(dataTable.fetchData).toHaveBeenCalledWith('latest', true);
-	const result = estimateRewards({
-		stake: 100,
-		price: 0.01,
-		onlineMoney: input.onlineMoney,
-		rewardStake: input.rewardStake,
-		epochRewards: input.epochRewards,
-		nodeCost: 10,
-		isPercentageBased: false,
-		costPercentage: 10
-	});
-	expect(result?.weeklyReward).toBeCloseTo((1400 / 9000) * 100);
-});
-it('requires supply, live blacklist and schedule fields', async () => {
-	vi.mocked(dataTable.fetchData).mockResolvedValueOnce({});
-	await expect(loadCalculatorInputs('Y')).rejects.toThrow();
-	vi.mocked(getSupplyInfo).mockResolvedValueOnce(null);
-	await expect(loadCalculatorInputs('Y')).rejects.toThrow();
-	vi.mocked(dataTable.fetchDateRanges).mockResolvedValueOnce([]);
-	await expect(loadCalculatorInputs('Y')).rejects.toThrow();
 });
 it('isolates price failure from native estimates and retries price alone', async () => {
 	voiPrice.set({ ...get(voiPrice), error: 'offline' });

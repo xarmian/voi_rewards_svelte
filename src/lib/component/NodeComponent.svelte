@@ -6,8 +6,9 @@
 	import { getAccountInfo, getSupplyInfo, getConsensusInfo } from '$lib/stores/accounts';
 	import type { Account } from '$lib/stores/accounts';
 	import { onMount } from 'svelte';
-	import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
-	import { dataTable } from '../../stores/dataTable';
+	import { EPOCH_REWARDS_ENABLED } from '$lib/epochRewards';
+	import { loadNodeEpochRewards, projectEpochRewards } from '$lib/epochRewards/client';
+	import type { NodeEpochRewards } from '$lib/epochRewards/client';
 	import RegisterVoteKey from './RegisterVoteKey.svelte';
 	import { connectedWallets } from '$lib/chain/wallet.svelte';
 	import { pageAccountState } from '$lib/chain/signerGate';
@@ -40,10 +41,7 @@
 	$: estimatedRewardsPerWeek = 0;
 	$: estimatedRewardsPerMonth = 0;
 
-	let rewardStake = 0;
-	let currentEpoch: number;
-	let epochRewards: number[] = [];
-	const EPOCHS_PER_YEAR = 52;
+	let nodeEpoch: NodeEpochRewards = { rewardStake: 0, epochRewards: [] };
 	let nodeRequestId = 0;
 
 	// TASK-109: browser only. A server render must not write module-level stores or call upstream on every request.
@@ -73,39 +71,15 @@
 				return;
 			}
 
-			// Get latest epoch data
-			const dates = await dataTable.fetchDateRanges();
-			if (requestId !== nodeRequestId) return;
-			if (
-				!Array.isArray(dates) ||
-				dates.length === 0 ||
-				!Number.isFinite(dates[dates.length - 1]?.epoch)
-			) {
-				consensusError = true;
-				return;
+			if (EPOCH_REWARDS_ENABLED) {
+				const epochResult = await loadNodeEpochRewards(supply);
+				if (requestId !== nodeRequestId) return;
+				if (!epochResult) {
+					consensusError = true;
+					return;
+				}
+				nodeEpoch = epochResult;
 			}
-			const latestEpoch = dates[dates.length - 1];
-			currentEpoch = latestEpoch.epoch;
-			const epochData = await dataTable.fetchData(latestEpoch.id);
-			if (requestId !== nodeRequestId) return;
-			if (!epochData || !Number.isFinite(Number(epochData.blacklist_balance_total))) {
-				consensusError = true;
-				return;
-			}
-
-			// Fetch next year's worth of epoch rewards
-			const epochPromises = Array.from({ length: EPOCHS_PER_YEAR }, (_, i) =>
-				getTokensByEpoch(currentEpoch + i)
-			);
-			const rewards = await Promise.all(epochPromises);
-			if (requestId !== nodeRequestId) return;
-			if (rewards.some((reward) => !Number.isFinite(reward))) {
-				consensusError = true;
-				return;
-			}
-			epochRewards = rewards;
-
-			rewardStake = Number(supply['online-money']) - Number(epochData.blacklist_balance_total);
 
 			// Get account information with force refresh option
 			const accountResult = await getAccountInfo(requested, forceRefresh);
@@ -127,9 +101,16 @@
 			expectedBlocksPerMonth = calculateExpectedBlocks(30);
 
 			// Calculate estimated rewards using epoch rewards
-			estimatedRewardsPerDay = calculateRewardsForPeriod(1 / 7); // 1/7 of a week
-			estimatedRewardsPerWeek = calculateRewardsForPeriod(1);
-			estimatedRewardsPerMonth = calculateRewardsForPeriod(30.44 / 7); // ~4.33 weeks
+			if (EPOCH_REWARDS_ENABLED)
+				({
+					perDay: estimatedRewardsPerDay,
+					perWeek: estimatedRewardsPerWeek,
+					perMonth: estimatedRewardsPerMonth
+				} = projectEpochRewards({
+					onlineMoney: Number(supply?.['online-money']),
+					balance,
+					...nodeEpoch
+				}));
 		} catch (error) {
 			if (requestId !== nodeRequestId) return;
 			consensusError = true;
@@ -137,27 +118,6 @@
 		} finally {
 			if (requestId === nodeRequestId) loading = false;
 		}
-	}
-
-	function calculateRewardsForPeriod(epochCount: number): number {
-		if (!supply?.['online-money'] || balance <= 0 || !rewardStake) return 0;
-
-		const shareOfStake = balance / (rewardStake / 1e6);
-		let totalReward = 0;
-
-		// Handle the full epochs
-		const fullEpochs = Math.floor(epochCount);
-		for (let i = 0; i < fullEpochs && i < epochRewards.length; i++) {
-			totalReward += shareOfStake * epochRewards[i];
-		}
-
-		// Handle the partial epoch if there is one
-		const partialEpoch = epochCount - fullEpochs;
-		if (partialEpoch > 0 && fullEpochs < epochRewards.length) {
-			totalReward += shareOfStake * epochRewards[fullEpochs] * partialEpoch;
-		}
-
-		return totalReward / 1e6;
 	}
 
 	function calculateExpectedBlocks(days: number) {

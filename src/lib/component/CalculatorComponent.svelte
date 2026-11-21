@@ -13,26 +13,22 @@
 	} from '$lib/ds';
 	import { createReadSource, type Source } from '$lib/wallet/read';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
-	import {
-		loadCalculatorInputs,
-		loadCalculatorBalance,
-		loadCalculatorPrice
-	} from '$lib/wallet/calculator';
-	import { getTokensByEpoch } from '$lib/utils';
-	import { voiPrice } from '$lib/stores/price';
-	import { estimateRewards } from '$lib/rewards/calculatorModel';
+	import { loadCalculatorBalance, loadCalculatorPrice } from '$lib/wallet/calculator';
 	import {
 		availability,
 		breakEvenTile,
-		isPriceStale,
-		priceLabel,
-		resultsState,
+		buildScheduleCsv,
+		loadCalculatorInputs,
 		profitPercentageText,
-		validateCustomPrice,
+		resultsState,
+		scheduleRows,
 		validateNodeCost,
-		validateStake
-	} from './calculatorView';
-	import { buildScheduleCsv, scheduleRows, type ScheduleRow } from './calculatorSchedule';
+		type ScheduleRow
+	} from '$lib/epochRewards/client';
+	import { getTokensByEpoch } from '$lib/utils';
+	import { voiPrice } from '$lib/stores/price';
+	import { estimateRewards } from '$lib/rewards/calculatorModel';
+	import { isPriceStale, priceLabel, validateCustomPrice, validateStake } from './calculatorView';
 	import CalculatorBlockRewards from './CalculatorBlockRewards.svelte';
 
 	export let walletAddress: string | undefined = undefined;

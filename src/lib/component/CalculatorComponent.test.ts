@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
-import { buildScheduleCsv, scheduleRows } from './calculatorSchedule';
+import { buildScheduleCsv, scheduleRows } from '$lib/epochRewards/calculator/schedule';
 const source = readFileSync(new URL('./CalculatorComponent.svelte', import.meta.url), 'utf8');
 function harness() {
 	const ast = ts.createSourceFile(
