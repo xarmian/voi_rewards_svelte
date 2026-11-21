@@ -1,3 +1,16 @@
+import { safeAvatarUrl } from './avatarUrl';
+
+// The avatar is free text the record owner sets; keep it only when it is an allowlisted image URL, as its
+// parsed href. Other metadata is left as it came.
+function withSafeAvatar<T extends { metadata?: { avatar?: string } }>(result: T): T {
+	const metadata = result.metadata;
+	if (!metadata || typeof metadata !== 'object' || !('avatar' in metadata)) return result;
+	const avatar = safeAvatarUrl(metadata.avatar);
+	if (avatar === null) delete metadata.avatar;
+	else metadata.avatar = avatar;
+	return result;
+}
+
 interface EnvoiNameResult {
 	token_id?: string;
 	address: string;
@@ -35,12 +48,14 @@ export async function getEnvoiNames(addresses: string[]): Promise<EnvoiNameResul
 			.then((data: EnvoiNameResponse) => {
 				data.results.forEach((result) => {
 					if (result.name) {
-						aggregatedNames.push({
-							address: result.address,
-							name: result.name,
-							metadata: result.metadata,
-							cached: result.cached
-						});
+						aggregatedNames.push(
+							withSafeAvatar({
+								address: result.address,
+								name: result.name,
+								metadata: result.metadata,
+								cached: result.cached
+							})
+						);
 					}
 				});
 			})
@@ -112,7 +127,7 @@ export async function searchEnvoi(pattern: string): Promise<EnvoiSearchResult[]>
 		}
 
 		const data: { results: EnvoiSearchResult[] } = await response.json();
-		return data.results;
+		return data.results.map(withSafeAvatar);
 	} catch (error) {
 		console.error(`Error: ${(error as Error).message}`);
 		return [];
@@ -138,7 +153,7 @@ export async function resolveEnvoiToken(tokenIds: string[]): Promise<EnvoiNameRe
 					throw new Error('Failed to fetch token data');
 				}
 				const data: EnvoiNameResponse = await response.json();
-				return data.results;
+				return data.results.map(withSafeAvatar);
 			})
 		);
 

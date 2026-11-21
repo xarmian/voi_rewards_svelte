@@ -18,6 +18,7 @@
 	import { onMount } from 'svelte';
 	import { exactNFD, getNFD, nfdReceiveAddress, searchNFDomains } from '$lib/utils/nfd';
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
+	import { safeAvatarUrl } from '$lib/utils/avatarUrl';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { buildAssetTransfer, buildPayment } from '$lib/chain/txBuilders';
@@ -391,12 +392,12 @@
 	}
 
 	function getAvatarUrl(result: NFDResult): string | null {
-		if (!result.properties) return null;
-		// First try verified avatar, then userDefined avatar
-		if (result.properties.verified?.avatar) {
-			return result.properties.verified.avatar;
-		}
-		return result.properties.userDefined?.avatar || null;
+		// First try the verified avatar, then the userDefined one; an off-list verified avatar falls through.
+		return (
+			safeAvatarUrl(result.properties?.verified?.avatar) ??
+			safeAvatarUrl(result.properties?.userDefined?.avatar) ??
+			null
+		);
 	}
 
 	async function handleSubmit() {
