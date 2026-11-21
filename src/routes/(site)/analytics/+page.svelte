@@ -128,8 +128,7 @@
 				shareText(r.share),
 				num(r.voi, 2)
 			]),
-			caption:
-				'Daily real-time block rewards paid to block proposers in VOI, last 30 UTC days. Today (UTC) is in progress. Days before real-time block rewards started show 0. Epoch rewards are separate and not included.'
+			caption: `Daily real-time block rewards paid to block proposers in VOI, last 30 UTC days. Today (UTC) is in progress. Days before real-time block rewards started show 0.${epochs ? ' Epoch rewards are separate and not included.' : ''}`
 		}}
 		x={timeAxis(blockRows)}
 		y={{ domain: domain(blockRows.map((r) => r.voi)), format: compact }}

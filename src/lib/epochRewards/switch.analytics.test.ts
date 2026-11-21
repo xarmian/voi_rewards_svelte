@@ -95,10 +95,9 @@ test('the page shows the four network charts and no epoch figure', async () => {
 	expect(shown).not.toMatch(/\bAPR\b/);
 	expect(shown).not.toMatch(/stake split/i);
 	expect(shown).not.toContain('Follow rewards by epoch');
-	// The daily block rewards caption says epoch rewards are not in its figures; nothing else names one.
-	const caption = 'Epoch rewards are separate and not included.';
-	expect(shown).toContain(caption);
-	expect(shown.replaceAll(caption, '')).not.toMatch(/epoch/i);
+	// Nothing names an epoch, including the daily block rewards caption.
+	expect(shown).toContain('Days before real-time block rewards started show 0.');
+	expect(shown).not.toMatch(/epoch/i);
 	expect(page.head).toContain(
 		'content="Voi online stake, real-time block rewards, VOI price and transaction activity."'
 	);
