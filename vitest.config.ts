@@ -1,5 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, mergeConfig } from 'vitest/config';
 import viteConfig from './vite.config';
+
+// Vitest matches testTransformMode globs against absolute paths without picomatch's dot
+// option, so a bare `**` never crosses a hidden directory above the checkout. Anchor them
+// at the root, with Vite's forward slashes, escaped so glob characters in the path match
+// literally.
+const root = fileURLToPath(new URL('.', import.meta.url))
+	.replaceAll('\\', '/')
+	.replace(/[*?[\]{}()!+@|]/g, '\\$&');
 
 export default mergeConfig(
 	viteConfig,
@@ -25,7 +34,7 @@ export default mergeConfig(
 						name: 'runes',
 						include: ['src/**/*.svelte.test.ts'],
 						environment: 'node',
-						testTransformMode: { web: ['**/*.svelte.ts', '**/*.svelte.test.ts'] }
+						testTransformMode: { web: [`${root}**/*.svelte.ts`, `${root}**/*.svelte.test.ts`] }
 					}
 				}
 			]
