@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { Header, Footer, navCurrent } from '$lib/ds';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
+	import { headerEpoch } from '$lib/epochRewards';
 
 	let { children }: { children: Snippet } = $props();
 	const options = {};
@@ -10,11 +11,7 @@
 
 {#if page.data?.chrome === 'hero'}
 	<div class="absolute inset-x-0 top-0 z-10">
-		<Header
-			variant="hero"
-			current={navCurrent(page.url.pathname)}
-			epoch={page.data.headline?.state === 'ready' ? page.data.headline.value.epoch : undefined}
-		/>
+		<Header variant="hero" current={navCurrent(page.url.pathname)} epoch={headerEpoch(page.data)} />
 	</div>
 {:else}
 	<Header variant="bar" current={navCurrent(page.url.pathname)} />

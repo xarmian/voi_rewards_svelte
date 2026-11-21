@@ -62,7 +62,7 @@
 		},
 		"src/lib/component/PortfolioComponent.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 11,
+				"errors": 8,
 				"warnings": 0
 			},
 			"no-case-declarations": {

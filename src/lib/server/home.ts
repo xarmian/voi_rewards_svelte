@@ -1,9 +1,10 @@
 import { config } from '$lib/config';
-import { epochAt, epochRange } from '$lib/epochs';
-import { blocksForEpoch, deriveHeadline, finite, type Epoch } from '$lib/home/headline';
+import { blocksForEpoch, epochAt, epochRange, type Epoch, type Headline } from '$lib/epochRewards';
+import { deriveHeadline } from '$lib/epochRewards/headline';
+import { finite } from '$lib/home/headline';
 import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
 import type { RewardParams } from '../../stores/dataTable';
-import type { EpochResponse } from '$lib/home/rewards';
+import type { EpochResponse } from '$lib/epochRewards';
 import { marketsSummary, topMarkets, type Markets } from '$lib/home/markets';
 import { readEpoch } from '$lib/ds/EpochStepper/url';
 import { fetchWithTimeout } from './fetchWithTimeout';
@@ -17,20 +18,6 @@ export type Loaded<T> =
 	| { state: 'ready'; value: T }
 	| { state: 'stale'; value: T; asOf: string }
 	| { state: 'error'; message: string };
-export type Headline = {
-	epoch: number;
-	rangeId: string;
-	rangeLabel: string;
-	apr: number;
-	prevApr: number | null;
-	pool: number;
-	blocks: number;
-	projectedBlocks: number;
-	voiPerBlock: number;
-	perMillion: number;
-	elapsedDays: number;
-	earningAccounts: number | null;
-};
 export type Price = { price: number; change24h: number | null; mcap: number | null };
 export type DashboardData = {
 	page: 'dashboard';

@@ -17,7 +17,7 @@
 	import type { Column } from '../DataTable/types';
 	import type { DataState } from '../types';
 	import { annotationsFor } from '$lib/data/chartEvents';
-	import { epochRange } from '$lib/epochs';
+	import { epochRange } from '$lib/epochRewards';
 	import { createReadSource } from '$lib/wallet/read';
 	import {
 		createRewardsState,
