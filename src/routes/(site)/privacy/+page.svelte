@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
 	// Update the last modified date when the policy is updated
 	const lastUpdated = '2026-10-31';
 </script>
