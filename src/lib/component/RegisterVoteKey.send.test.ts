@@ -930,3 +930,12 @@ test.each(['registerWalletVoteKey', 'goOfflineWalletVoteKey'])(
 		expect(harness.context.transactionStatus).toBe('idle');
 	}
 );
+
+// The error shows once, in the footer: it stays in view beside the buttons while the body
+// scrolls, and a second copy at the top of the body crowds a phone screen.
+test('the error message renders once, in the footer', () => {
+	const markup = source.slice(source.indexOf('</script>'));
+	expect(markup.match(/<span>\{error\}<\/span>/g)).toHaveLength(1);
+	const footer = markup.slice(markup.indexOf('slot="footer"'));
+	expect(footer).toContain('<span>{error}</span>');
+});

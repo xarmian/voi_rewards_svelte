@@ -878,15 +878,6 @@
 		</div>
 	</div>
 
-	{#if error}
-		<div
-			class="mb-6 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md text-sm flex items-center gap-2"
-		>
-			<i class="fas fa-exclamation-triangle"></i>
-			<span>{error}</span>
-		</div>
-	{/if}
-
 	{#if onChainOffer.kind === 'offer' && transactionStatus !== 'success'}
 		<OnChainEligibilityPanel
 			offer={onChainOffer}
