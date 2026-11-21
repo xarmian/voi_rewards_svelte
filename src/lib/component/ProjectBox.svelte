@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { PLeaderboard } from '$lib/supabase.js';
+	import type { IProject } from '$lib/data/types';
 
-	export let project;
+	export let project: IProject & { column?: keyof PLeaderboard };
 	export let selectedTab = 0;
 	export let leaderboardData: PLeaderboard | undefined = undefined;
 </script>
