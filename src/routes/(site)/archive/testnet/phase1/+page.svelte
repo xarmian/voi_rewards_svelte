@@ -174,12 +174,13 @@
 			{#if selectedWallet}
 				<button
 					class="absolute top-0 right-0 border-gray-400 dark:border-gray-300 border hover:bg-gray-300 text-gray-400 dark:text-white w-8 h-8 rounded-full flex items-center justify-center"
+					aria-label="Clear selected wallet"
 					on:click={() => {
 						selectedWallet = null;
 						totalBalance = null;
 					}}
 				>
-					<i class="fas fa-times"></i>
+					<i class="fas fa-times" aria-hidden="true"></i>
 				</button>
 				<h1
 					class="text-2xl font-bold underline tracking-tight text-gray-900 dark:text-white flex flex-col place-items-center"
