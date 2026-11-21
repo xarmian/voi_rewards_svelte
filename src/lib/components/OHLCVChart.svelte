@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatChartTick, tickTimestamp } from '$lib/markets/chartTicks';
-	import type { Time, Range } from 'lightweight-charts';
+	import type { Time, Range, UTCTimestamp } from 'lightweight-charts';
 	import { onThemeChange } from '$lib/theme.svelte';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { chartTimestamp, describeOHLCV, displayedByTime } from '$lib/markets/chartDescription';
@@ -369,7 +369,7 @@
 			(mainSeries as ISeriesApi<'Candlestick'>).setData(renderedCandles);
 		} else {
 			const lineData: LineData[] = sortedData.map((item) => ({
-				time: item.time,
+				time: item.time as UTCTimestamp,
 				value: item.close
 			}));
 			(mainSeries as ISeriesApi<'Line'>).setData(lineData);

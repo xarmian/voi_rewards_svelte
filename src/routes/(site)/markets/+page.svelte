@@ -47,6 +47,7 @@
 		Resolution,
 		ChartSettings
 	} from '$lib/types/ohlcv.types';
+	import { DEFAULT_CHART_SETTINGS } from '$lib/types/ohlcv.types';
 	import {
 		convertVoiQuotedCandlesToUsd,
 		convertVoiQuotedVolumesToUsd,
@@ -90,7 +91,8 @@
 			symbol: resolvedToken.symbol || 'VOI',
 			decimals: resolvedToken.symbol === 'VOI' ? 6 : 0, // Will be updated by fetchTokenInfo
 			type: resolvedToken.symbol === 'VOI' ? 'VOI' : 'ARC200',
-			poolCount: 0 // Will be updated by fetchTokenInfo
+			poolCount: 0, // Will be updated by fetchTokenInfo
+			imageUrl: null
 		};
 		// Track that this token's data was loaded from the server
 		serverDataToken = resolvedToken.symbol || 'VOI';
@@ -355,7 +357,8 @@
 				symbol: 'VOI',
 				decimals: 6,
 				type: 'VOI',
-				poolCount: 0
+				poolCount: 0,
+				imageUrl: null
 			};
 			selectedPool = null;
 
@@ -568,6 +571,8 @@
 	let chartSettings: ChartSettings = {
 		chartType: 'line',
 		resolution: '1h',
+		autoRefresh: DEFAULT_CHART_SETTINGS.autoRefresh,
+		refreshInterval: DEFAULT_CHART_SETTINGS.refreshInterval,
 		showVolume: false,
 		theme: 'light'
 	};
@@ -897,7 +902,7 @@
 		chartSettings = { ...chartSettings, resolution: event.detail };
 		const tokenSymbol = selectedToken?.symbol || 'VOI';
 		if (shouldUseVOIData(tokenSymbol)) {
-			fetchUnifiedChartData(tokenSymbol, event.detail, selectedTradingPairId);
+			fetchUnifiedChartData(tokenSymbol, event.detail, selectedTradingPairId ?? undefined);
 		} else if (selectedPool) {
 			fetchUnifiedChartData(tokenSymbol, event.detail);
 		}

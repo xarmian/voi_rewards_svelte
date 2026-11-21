@@ -446,40 +446,10 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/RegisterVoteKey.svelte": {
-			"ts:7006": {
-				"errors": 5,
-				"warnings": 0
-			}
-		},
 		"src/lib/components/OHLCVChart.svelte": {
 			"svelte:element_invalid_self_closing_tag": {
 				"errors": 0,
 				"warnings": 1
-			},
-			"ts:2322": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/TokenMetricsBar.svelte": {
-			"ts:2345": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/TokenSelector.svelte": {
-			"ts:18047": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"ts:2339": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"ts:2345": {
-				"errors": 1,
-				"warnings": 0
 			}
 		},
 		"src/lib/epochRewards/home/HomeRewards.svelte": {
@@ -517,20 +487,6 @@
 			},
 			"ts:7053": {
 				"errors": 4,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/markets/+page.svelte": {
-			"ts:2345": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:2739": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:2741": {
-				"errors": 2,
 				"warnings": 0
 			}
 		}

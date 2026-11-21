@@ -102,7 +102,8 @@
 			symbol: 'VOI',
 			decimals: 6,
 			type: 'VOI' as const,
-			poolCount: 0
+			poolCount: 0,
+			imageUrl: null
 		};
 		dispatch('tokenSelect', voiToken);
 		searchQuery = '';
@@ -216,8 +217,10 @@
 											class="w-full h-full object-cover"
 											onerror={(e) => {
 												// Fallback to symbol if image fails to load
-												e.target.style.display = 'none';
-												e.target.nextElementSibling.style.display = 'flex';
+												const img = e.currentTarget as HTMLImageElement;
+												img.style.display = 'none';
+												const fallback = img.nextElementSibling as HTMLElement | null;
+												if (fallback) fallback.style.display = 'flex';
 											}}
 										/>
 										<div
