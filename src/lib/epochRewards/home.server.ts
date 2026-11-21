@@ -3,9 +3,10 @@ import { blocksForEpoch, deriveHeadline, type Epoch, type Headline } from './hea
 import { epochHistory, type EpochHistorySource } from './source';
 import type { EpochResponse } from './table';
 import { finite } from '$lib/home/headline';
-import { getTokensByEpoch, extrapolateRewardPerBlock } from '$lib/utils';
-import type { RewardParams } from '../../stores/dataTable';
-import { readEpoch } from '$lib/ds/EpochStepper/url';
+import { getTokensByEpoch } from '$lib/utils';
+import { extrapolateRewardPerBlock } from './pool';
+import type { RewardParams } from './dataTable';
+import { readEpoch } from './stepper/url';
 import { CRITICAL_TIMEOUT_MS, failure, list, ready, record, type Loaded } from '$lib/server/loaded';
 
 /** The home page's epoch-rewards fields, as the page payload carries them. */

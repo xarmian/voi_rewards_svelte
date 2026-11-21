@@ -1,14 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 vi.mock('$lib/stores/accounts', () => ({ requireAccountInfo: vi.fn(), getSupplyInfo: vi.fn() }));
-vi.mock('../../../stores/dataTable', () => ({
+vi.mock('../dataTable', () => ({
 	dataTable: { fetchDateRanges: vi.fn(), fetchData: vi.fn() }
 }));
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: vi.fn(async () => 1400) }));
 import { getSupplyInfo } from '$lib/stores/accounts';
-import { dataTable } from '../../../stores/dataTable';
+import { dataTable } from '../dataTable';
 import { getTokensByEpoch } from '$lib/utils';
 import { epochScheduleAmounts, loadCalculatorInputs } from './inputs';
-import { estimateRewards } from '$lib/rewards/calculatorModel';
+import { estimateRewards } from '$lib/epochRewards/calculator/model';
 beforeEach(() => {
 	vi.clearAllMocks();
 	vi.mocked(getSupplyInfo).mockResolvedValue({

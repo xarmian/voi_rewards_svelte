@@ -27,7 +27,7 @@ vi.mock('$lib/stores/price', async () => {
 	};
 });
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: mocks.pool }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('./dataTable', () => ({
 	dataTable: { fetchDateRanges: mocks.dates, fetchData: mocks.rows }
 }));
 vi.mock('$lib/epochRewards/calculator/inputs', async (original) => {
@@ -81,6 +81,27 @@ test('the calculator shows the stake, price and real-time block rewards, and no 
 		expect(html).toContain('id="estimated-block-rewards-heading"');
 		// With no node cost field or price alert above it, the price block opens without a rule.
 		expect(html).not.toContain('class="space-y-3 border-t border-line pt-4"');
+	}
+});
+
+test('the calculator keeps a disclaimer worded for the block rewards estimate', () => {
+	for (const walletAddress of [undefined, 'Y']) {
+		const html = render(CalculatorComponent, { props: { walletAddress } }).body;
+		const shown = text(html);
+		for (const line of [
+			'* Calculations assume current network conditions.',
+			'* Actual rewards may vary based on network participation and other factors.',
+			'* This tool is for entertainment purposes only. It is not financial advice.',
+			'Market price timestamp unavailable.'
+		])
+			expect(shown.split(line)).toHaveLength(2);
+		expect(shown).not.toContain('weekly compounding');
+		expect(shown).not.toContain('rates may vary');
+		// The disclaimer follows the block rewards estimate it qualifies.
+		const clean = html.replace(/<!--[\s\S]*?-->/g, '');
+		expect(clean.indexOf('* Calculations assume')).toBeGreaterThan(
+			clean.indexOf('aria-labelledby="estimated-block-rewards-heading"')
+		);
 	}
 });
 

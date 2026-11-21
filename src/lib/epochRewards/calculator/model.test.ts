@@ -5,7 +5,7 @@ import {
 	estimateRewards,
 	type Estimate,
 	type EstimateInput
-} from './calculatorModel';
+} from './model';
 
 const input: EstimateInput = {
 	stake: 1000,
@@ -206,10 +206,7 @@ test('an epoch list shorter than a year still gives finite results', () => {
 });
 
 test('the component assigns every model field to the variable of the same name', () => {
-	const source = readFileSync(
-		new URL('../epochRewards/calculator/EpochEstimate.svelte', import.meta.url),
-		'utf8'
-	);
+	const source = readFileSync(new URL('./EpochEstimate.svelte', import.meta.url), 'utf8');
 	// yearlyProfit is not shown anywhere, so the component does not keep it.
 	const expected = Object.keys(estimateRewards(input)!)
 		.filter((key) => key !== 'yearlyProfit')
@@ -221,12 +218,9 @@ test('the component assigns every model field to the variable of the same name',
 });
 
 test('the calculator component delegates reward math to the model', () => {
-	const source = readFileSync(
-		new URL('../epochRewards/calculator/EpochEstimate.svelte', import.meta.url),
-		'utf8'
-	);
+	const source = readFileSync(new URL('./EpochEstimate.svelte', import.meta.url), 'utf8');
 	expect(source).toMatch(
-		/import\s*\{\s*estimateRewards\s*\}\s*from\s*['"]\$lib\/rewards\/calculatorModel['"]/
+		/import\s*\{\s*estimateRewards\s*\}\s*from\s*['"]\$lib\/epochRewards\/calculator\/model['"]/
 	);
 	expect(source).toMatch(/\bestimateRewards\s*\(/);
 	expect(source).not.toContain('Binary search for threshold');

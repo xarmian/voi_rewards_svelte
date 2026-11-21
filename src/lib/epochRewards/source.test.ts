@@ -11,7 +11,7 @@ import {
 import type { Loaded } from '$lib/server/loaded';
 
 const calls: string[] = [];
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('./dataTable', () => ({
 	dataTable: {
 		clearCache: vi.fn(() => calls.push('clearCache')),
 		fetchData: vi.fn(async (id: string) => {

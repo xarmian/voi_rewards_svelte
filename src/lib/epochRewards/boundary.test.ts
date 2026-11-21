@@ -58,6 +58,7 @@ function internals(text: string): string[] {
 		for (const path of [
 			'stores/dataTable',
 			'rewards/calculateEpochRewards',
+			'rewards/calculatorModel',
 			'utils/epoch-utils',
 			'ds/EpochStepper'
 		])
@@ -106,23 +107,17 @@ const homeSurfaces = (path: string) =>
 	path.startsWith('src/lib/ds/Header/');
 
 /**
- * Files outside the module that still reach the internals. Each later change shrinks
- * this list; a new entry means new code bypassed the module.
+ * The only files outside the module that reach an epoch internal, for good: the emission
+ * formula's definition, and the frozen TestNet archive, which keeps its own reward pools.
+ * A new entry means new code bypassed the module.
  */
-const PENDING = {
-	// PR 2: wallet, calculator, node and analytics surfaces.
-	'PR 2': [
-		'src/lib/component/PortfolioComponent.svelte',
-		'src/lib/component/TransactionExportPanel.svelte',
-		'src/lib/network/model.ts',
-		'src/lib/utils.ts'
-	],
-	// PR 2 decides: the TestNet archive keeps its own reward pools.
-	archive: [
-		'src/routes/(site)/archive/testnet/relays/+page.svelte',
-		'src/routes/api/relay-rewards/+server.ts'
-	]
-};
+const ARCHIVE = [
+	'src/lib/utils.ts',
+	'src/routes/(site)/archive/testnet/relays/+page.svelte',
+	'src/routes/api/relay-rewards/+server.ts'
+];
+/** All the archive may use: the emission formula and the epoch clock. */
+const ARCHIVE_INTERNALS = ['getTokensByEpoch', 'utils/epoch-utils'];
 
 test('the home and header surfaces reach no epoch internals', () => {
 	const hits = outside
@@ -131,12 +126,26 @@ test('the home and header surfaces reach no epoch internals', () => {
 	expect(hits).toEqual([]);
 });
 
-test('the set of files still reaching epoch internals only shrinks', () => {
+test('only the emission formula and the TestNet archive reach epoch internals', () => {
 	const hits = outside
 		.filter(({ path, text }) => !isTest(path) && internals(text).length)
 		.map(({ path }) => path)
 		.sort();
-	expect(hits).toEqual(Object.values(PENDING).flat().sort());
+	expect(hits).toEqual(ARCHIVE);
+	for (const { path, text } of outside.filter(({ path }) => ARCHIVE.includes(path)))
+		expect(
+			internals(text).filter((hit) => !ARCHIVE_INTERNALS.includes(hit)),
+			path
+		).toEqual([]);
+});
+
+test('the shared barrels no longer export the moved epoch helpers', () => {
+	const utils = readFileSync(join(root, 'src/lib/utils.ts'), 'utf8');
+	expect(utils).not.toMatch(
+		/export\s+(?:async\s+)?(?:function|const)\s+extrapolateRewardPerBlock\b/
+	);
+	const ds = readFileSync(join(root, 'src/lib/ds/index.ts'), 'utf8');
+	expect(ds).not.toMatch(/\bEpochStepper\b/);
 });
 
 test('the public entry pulls in neither the history source nor the server half', () => {
@@ -148,7 +157,9 @@ test('the public entry pulls in neither the history source nor the server half',
 		(match) => match[1]
 	);
 	expect(
-		values.filter((spec) => /^\.\/(source|home\.server|client)$|stores\/dataTable/.test(spec))
+		values.filter((spec) =>
+			/^\.\/(source|home\.server|client|dataTable)$|stores\/dataTable/.test(spec)
+		)
 	).toEqual([]);
 	expect(values).toContain('./calendar');
 });

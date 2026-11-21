@@ -1,4 +1,4 @@
-import { dataTable, type DateRange } from '../../../stores/dataTable';
+import { dataTable, type DateRange } from '../dataTable';
 import { getTokensByEpoch } from '$lib/utils';
 import { finite } from '$lib/home/headline';
 import { bounded } from '$lib/wallet/read';

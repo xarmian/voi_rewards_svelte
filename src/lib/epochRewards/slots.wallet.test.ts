@@ -38,7 +38,7 @@ vi.mock('$lib/stores/price', async () => {
 	};
 });
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: async () => 2000000 }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('./dataTable', () => ({
 	dataTable: {
 		fetchDateRanges: async () => {
 			order.push('dates');

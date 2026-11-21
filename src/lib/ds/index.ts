@@ -17,7 +17,6 @@ export { glyphs } from './types';
 export type { DataState, Tone } from './types';
 export { DataTable } from './DataTable';
 export type { Column, SortState } from './DataTable';
-export { EpochStepper } from './EpochStepper';
 export { Tabs, createHashTabs } from './Tabs';
 export type { NavProps, SegmentedProps, HashTabsOptions } from './Tabs';
 export { SearchBox, createResolver } from './SearchBox';

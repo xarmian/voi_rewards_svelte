@@ -1,4 +1,4 @@
-import { BREAK_EVEN_SEARCH_LIMIT } from '$lib/rewards/calculatorModel';
+import { BREAK_EVEN_SEARCH_LIMIT } from './model';
 import { isNonnegative } from '$lib/component/calculatorView';
 
 export function resultsState({

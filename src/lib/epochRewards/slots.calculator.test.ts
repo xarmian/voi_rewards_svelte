@@ -27,7 +27,7 @@ vi.mock('$lib/stores/price', async () => {
 	};
 });
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: async () => 10 }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('./dataTable', () => ({
 	dataTable: {
 		fetchDateRanges: async () => {
 			order.push('dates');
@@ -110,6 +110,20 @@ test('the epoch cost field, estimate and schedule render under their old titles'
 	expect(estimate).toBeGreaterThan(clean.indexOf('Monthly node cost'));
 	expect(blocks).toBeGreaterThan(estimate);
 	expect(schedule).toBeGreaterThan(blocks);
+});
+
+test('the epoch estimate keeps its four disclaimer lines, once', () => {
+	for (const walletAddress of [undefined, 'Y']) {
+		const shown = text(render(CalculatorComponent, { props: { walletAddress } }).body);
+		for (const line of [
+			'* Calculations assume current network conditions and weekly compounding of rewards.',
+			'* Actual rewards and rates may vary based on network participation and other factors.',
+			'* This tool is for entertainment purposes only. It is not financial advice.',
+			'Market price timestamp unavailable.'
+		])
+			expect(shown.split(line)).toHaveLength(2);
+		expect(shown).not.toContain('* Calculations assume current network conditions. ');
+	}
 });
 
 test('the calculator page keeps its node rewards and costs subtitle', () => {

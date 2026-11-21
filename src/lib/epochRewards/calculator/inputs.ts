@@ -1,6 +1,6 @@
 import { getSupplyInfo } from '$lib/stores/accounts';
 import { getTokensByEpoch } from '$lib/utils';
-import { dataTable } from '../../../stores/dataTable';
+import { dataTable } from '../dataTable';
 import { getCurrentEpoch } from '$lib/utils/epoch-utils';
 import { boundedRead } from '$lib/wallet/read';
 

@@ -5,7 +5,7 @@
 		signerMatchesAccount,
 		wrongSignerMessage
 	} from '$lib/chain/signerGate';
-	import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+	import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 	import { loadAccountDetails, totalRewardsMicroVoi } from '$lib/portfolio/accountDetails';
 	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
 	import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';

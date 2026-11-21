@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ dates: vi.fn(), rows: vi.fn(), pool: vi.fn() }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('./dataTable', () => ({
 	dataTable: { fetchDateRanges: mocks.dates, fetchData: mocks.rows }
 }));
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: mocks.pool }));

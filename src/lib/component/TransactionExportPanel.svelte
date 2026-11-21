@@ -5,7 +5,7 @@
 	import { createArc72Reader } from '$lib/services/arc72Export';
 	import { ARC72_SOURCE_NOTE, ARC72_CAP_WARNING } from '$lib/wallet/arc72Export';
 	import { Button, Card, InlineAlert, StatusPill } from '$lib/ds';
-	import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+	import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 	import {
 		REALTIME_BLOCK_REWARDS_TESTING,
 		REALTIME_BLOCK_REWARDS_TITLE

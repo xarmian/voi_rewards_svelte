@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { Button, Card, Chip, DataTable, EpochStepper, Tabs, type Column } from '$lib/ds';
+	import { Button, Card, Chip, DataTable, Tabs, type Column } from '$lib/ds';
+	import EpochStepper from '../stepper/EpochStepper.svelte';
 	import type { SortState } from '$lib/ds/DataTable/types';
 	import { sortRows } from '$lib/ds/DataTable/sort';
 	import { MISSING, comma, pct, shortAddr, usd } from '$lib/ds/format';

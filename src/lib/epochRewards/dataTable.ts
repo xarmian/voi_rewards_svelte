@@ -215,4 +215,4 @@ export const currentData = derived(dataTable, ($dataTable) =>
 
 export const dateRanges = derived(dataTable, ($dataTable) => $dataTable.dateRanges);
 
-// Path: src/stores/dataTable.ts
+// Path: src/lib/epochRewards/dataTable.ts

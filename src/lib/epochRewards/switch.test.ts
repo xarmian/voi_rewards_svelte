@@ -134,3 +134,11 @@ test('the home page shows the non-epoch tiles and cards, with no empty slot left
 	expect(html).toContain('Latest blocks');
 	expect(html.indexOf('Real-time block rewards')).toBeLessThan(html.indexOf('Latest blocks'));
 });
+
+test('the design gallery leaves out the epoch stepper', async () => {
+	const { default: Gallery } = await import('../../routes/ds/+page.svelte');
+	const html = render(Gallery).body;
+	expect(html).toContain('id="gallery-card"');
+	expect(html).not.toContain('gallery-epoch-stepper');
+	expect(html).not.toContain('gallery-epoch-current');
+});

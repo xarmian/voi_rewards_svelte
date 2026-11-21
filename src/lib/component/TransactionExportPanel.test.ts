@@ -18,7 +18,7 @@ import * as arcExport from '$lib/wallet/arc200Export';
 import * as nftReader from '$lib/services/arc72Export';
 import * as nftExport from '$lib/wallet/arc72Export';
 import * as ds from '$lib/ds';
-import * as rewards from '$lib/rewards/calculateEpochRewards';
+import * as rewards from '$lib/chain/rewardSenders';
 import * as labels from '$lib/rewards/blockRewardLabels';
 import * as options from '$lib/wallet/transactionExport';
 import * as staking from '$lib/wallet/stakingContracts';
@@ -186,7 +186,7 @@ function renderSelection(
 		'$lib/services/arc72Export': nftReader,
 		'$lib/wallet/arc72Export': nftExport,
 		'$lib/ds': ds,
-		'$lib/rewards/calculateEpochRewards': rewards,
+		'$lib/chain/rewardSenders': rewards,
 		'$lib/rewards/blockRewardLabels': labels,
 		'$lib/wallet/transactionExport': options,
 		'$lib/wallet/stakingContracts': staking,

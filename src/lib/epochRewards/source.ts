@@ -1,5 +1,5 @@
 import { config } from '$lib/config';
-import { dataTable } from '../../stores/dataTable';
+import { dataTable } from './dataTable';
 import { epochRange } from './calendar';
 import type { EpochResponse } from './table';
 

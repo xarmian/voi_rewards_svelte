@@ -37,7 +37,7 @@ vi.mock('$lib/stores/price', async () => {
 	return { fetchVoiPrice: async () => {}, voiPrice: writable({ price: 0.001, error: null }) };
 });
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: async () => 2000000 }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('$lib/epochRewards/dataTable', () => ({
 	dataTable: {
 		fetchDateRanges: async () =>
 			Array.from({ length: 13 }, (_, i) => ({ epoch: 92 + i, id: epochRange(92 + i).id })),
@@ -200,8 +200,9 @@ it.each(['Offline', 'Online'])(
 );
 
 it('a forced load refreshes live rows and retains cached completed epochs', async () => {
-	const { dataTable: realTable } =
-		await vi.importActual<typeof import('../../stores/dataTable')>('../../stores/dataTable');
+	const { dataTable: realTable } = await vi.importActual<
+		typeof import('$lib/epochRewards/dataTable')
+	>('$lib/epochRewards/dataTable');
 	realTable.clearCache();
 	mocks.rows.mockImplementation(realTable.fetchData);
 	let rowRequests = 0;

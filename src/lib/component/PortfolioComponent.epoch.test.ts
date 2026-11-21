@@ -15,7 +15,7 @@ test('the unread epoch reward estimate and its fetches are gone', () => {
 	])
 		expect(source, `${dead} should be removed`).not.toContain(dead);
 	expect(source, 'Import only REWARDS_ADDRESSES from the rewards module').toContain(
-		"import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';"
+		"import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';"
 	);
 });
 
