@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
-import { incentiveFromUri, MIN_KEYREG_FEE, participatePayment } from '$lib/chain/keyreg';
+import {
+	incentiveFromUri,
+	keptTickNotice,
+	MIN_KEYREG_FEE,
+	participatePayment
+} from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { expect, test, vi } from 'vitest';
 
@@ -365,6 +370,8 @@ function applyPasted(state: {
 	contractIncentive: string;
 	pastedUriFee: number | null;
 	payIncentiveFee: boolean;
+	isStakingContract?: boolean;
+	keptByPaste?: boolean;
 }) {
 	const body = source.match(/function applyPastedIncentive\([^]*?\n\t\}/)?.[0];
 	expect(body).toBeDefined();
@@ -374,6 +381,7 @@ function applyPasted(state: {
 		accountCannotPay: true,
 		incentiveFromUri,
 		incentiveNotice: null,
+		keptByPaste: false,
 		...state
 	});
 	runInContext(ts.transpileModule(body!, {}).outputText, context);
@@ -428,5 +436,191 @@ test('a partkeyinfo paste leaves the opt-in alone', () => {
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+});
+
+// A URI's fee can select the opt-in but never clears a tick: a minimum-fee URI pasted after the
+// user ticked "Pay 2 VOI" leaves the choice as it is.
+test('a pasted minimum-fee URI keeps a ticked opt-in on a capable contract, with a notice', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: true
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.keptByPaste).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+	expect(keptTickNotice(context.keptByPaste, context.payIncentiveFee, false)).toMatch(
+		/still selected/
+	);
+});
+
+test('ticking then pasting a minimum-fee URI still sends the 2 VOI go-online fee', async () => {
+	const pasted = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: true
+	});
+	expect(pasted.payIncentiveFee).toBe(true);
+	const harness = stakingSendHarness(
+		'registerStakingContractVoteKey',
+		{ payIncentiveFee: pasted.payIncentiveFee, contractCanPay: true },
+		'capable'
+	);
+	await harness.run();
+	expect(harness.context.error).toBeNull();
+	expect(harness.setExtraTxns.mock.calls[0][0][0].payment).toBe(2_000_000);
+});
+
+// A plain account's contract check never runs, so its contractIncentive stays 'checking'.
+test('a pasted minimum-fee URI keeps a ticked opt-in on a plain account, with a notice', () => {
+	const context = applyPasted({
+		contractIncentive: 'checking',
+		pastedUriFee: 1000,
+		payIncentiveFee: true,
+		isStakingContract: false
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.keptByPaste).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+	expect(keptTickNotice(context.keptByPaste, context.payIncentiveFee, false)).toMatch(
+		/still selected/
+	);
+});
+
+test('a pasted 2 VOI fee selects the opt-in on a plain account', () => {
+	const context = applyPasted({
+		contractIncentive: 'checking',
+		pastedUriFee: 2_000_000,
+		payIncentiveFee: false,
+		isStakingContract: false
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+});
+
+test('a pasted fee just under 2 VOI keeps a ticked opt-in, with a notice', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1_999_999,
+		payIncentiveFee: true
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.keptByPaste).toBe(true);
+	expect(context.incentiveNotice).toBeNull();
+	expect(keptTickNotice(context.keptByPaste, context.payIncentiveFee, false)).toMatch(
+		/still selected/
+	);
+});
+
+// The kept-tick notice is derived from the tick, so whatever clears the box (the user, the
+// submit-time recheck, the one-click's incapable read) clears the notice with it.
+test('the kept-tick notice shows only while the box is ticked against a URI asking for less', () => {
+	expect(keptTickNotice(true, true, false)).toMatch(/still selected/);
+	expect(keptTickNotice(true, false, false)).toBeNull();
+	expect(keptTickNotice(true, true, true)).toBeNull();
+	expect(keptTickNotice(false, true, false)).toBeNull();
+});
+
+test('the component derives the kept-tick notice from the live tick, only while idle, and renders it', () => {
+	expect(source).toMatch(
+		/\$: keptTickText =\s*transactionStatus === 'idle'\s*\?\s*keptTickNotice\(keptByPaste, payIncentiveFee, accountCannotPay\)\s*:\s*null;/
+	);
+	expect(source).toMatch(/\{#if keptTickText\}[^]*?\{keptTickText\}/);
+});
+
+// The usual opt-in flow: paste the node's minimum-fee URI, then tick the box on purpose. That
+// tick is the user's choice, not one a paste kept, so no notice argues with it.
+test('ticking after a minimum-fee paste gets no kept-tick notice', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: false
+	});
+	expect(context.keptByPaste).toBe(false);
+	expect(keptTickNotice(context.keptByPaste, true, false)).toBeNull();
+});
+
+test('changing the box by hand ends the kept-tick state', () => {
+	expect(source).toMatch(
+		/bind:checked=\{payIncentiveFee\}\s*on:change=\{\(\) => \(keptByPaste = false\)\}/
+	);
+});
+
+test('a later 2 VOI URI or partkeyinfo paste ends the kept-tick state', () => {
+	for (const pastedUriFee of [2_000_000, null]) {
+		const context = applyPasted({
+			contractIncentive: 'capable',
+			pastedUriFee,
+			payIncentiveFee: true,
+			keptByPaste: true
+		});
+		expect(context.keptByPaste).toBe(false);
+	}
+});
+
+// While a staking contract's program is being checked, a pasted 2 VOI fee is deferred, so a
+// Register Key click would capture the minimum payment before the box ticks.
+test('Register Key is disabled while a staking contract is being checked', () => {
+	const button = source.match(/<button\s+on:click=\{handleSubmit\}[^]*?>/)?.[0];
+	expect(button).toBeDefined();
+	expect(button).toMatch(
+		/disabled=\{[^}]*isStakingContract && contractIncentive === 'checking'[^}]*\}/
+	);
+});
+
+function submitHarness(state: { isStakingContract: boolean; contractIncentive: string }) {
+	const body = source.match(/async function handleSubmit\([^]*?\n\t\}/)?.[0];
+	expect(body).toBeDefined();
+	const registerStakingContractVoteKey = vi.fn();
+	const registerWalletVoteKey = vi.fn();
+	const context = createContext({
+		console: { log: () => {} },
+		isLoading: false,
+		error: null,
+		firstRound: 1,
+		lastRound: 2,
+		keyDilution: 1,
+		selectionKey: 's',
+		votingKey: 'v',
+		stateProofKey: 'p',
+		keyregSubmitError: () => null,
+		keyregPasteAccount: null,
+		currentAccount: 'CONTRACT',
+		parentWalletAddress: state.isStakingContract ? 'Z' : null,
+		registerStakingContractVoteKey,
+		registerWalletVoteKey,
+		...state
+	});
+	runInContext(ts.transpileModule(body!, {}).outputText, context);
+	return {
+		registerStakingContractVoteKey,
+		registerWalletVoteKey,
+		run: () => runInContext('handleSubmit()', context)
+	};
+}
+
+test('handleSubmit sends nothing while a staking contract is being checked', async () => {
+	const checking = submitHarness({ isStakingContract: true, contractIncentive: 'checking' });
+	await checking.run();
+	expect(checking.registerStakingContractVoteKey).not.toHaveBeenCalled();
+	const capable = submitHarness({ isStakingContract: true, contractIncentive: 'capable' });
+	await capable.run();
+	expect(capable.registerStakingContractVoteKey).toHaveBeenCalledOnce();
+});
+
+test('handleSubmit still sends for a plain account, whose check stays at checking', async () => {
+	const plain = submitHarness({ isStakingContract: false, contractIncentive: 'checking' });
+	await plain.run();
+	expect(plain.registerWalletVoteKey).toHaveBeenCalledOnce();
+});
+
+test('a pasted minimum-fee URI leaves an unticked opt-in off', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: false
+	});
+	expect(context.payIncentiveFee).toBe(false);
 	expect(context.incentiveNotice).toBeNull();
 });

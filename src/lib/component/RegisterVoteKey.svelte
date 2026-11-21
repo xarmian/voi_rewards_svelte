@@ -26,6 +26,7 @@
 		isKeyregUri,
 		keyregSendFailure,
 		keyregSubmitError,
+		keptTickNotice,
 		MIN_KEYREG_FEE,
 		onChainKeyregOffer,
 		type OnChainAccount,
@@ -96,6 +97,13 @@
 	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
+	// Whether the last paste kept a tick the box already had against a URI asking for less than
+	// the 2 VOI fee. The user changing the box ends it, so a deliberate tick gets no notice.
+	let keptByPaste = false;
+	$: keptTickText =
+		transactionStatus === 'idle'
+			? keptTickNotice(keptByPaste, payIncentiveFee, accountCannotPay)
+			: null;
 	// The keyreg account's record from algod and the account it was read for: read at mount and
 	// replaced by each one-click fresh read. For display only: the one-click reads again at the click.
 	let accountRecord: { account: string; info: OnChainAccount } | null = null;
@@ -249,11 +257,14 @@
 		}
 	}
 
-	// Applies the pasted URI's fee to the opt-in. Only a URI that carries a fee sets it;
-	// partkeyinfo leaves the user's choice. While a staking contract's program is still being
-	// checked nothing changes yet: the mount-time check calls this again once it resolves.
+	// Applies the pasted URI's fee to the opt-in. A URI fee can select the opt-in but never
+	// clears the user's choice: a minimum-fee URI, like partkeyinfo, leaves it as it is. While a
+	// staking contract's program is still being checked nothing changes yet: the mount-time check
+	// calls this again once it resolves.
 	function applyPastedIncentive() {
 		const asksForFee = pastedUriFee !== null && incentiveFromUri(pastedUriFee, false);
+		// A tick the box already had, kept against a URI asking for less (feeds keptTickNotice).
+		keptByPaste = payIncentiveFee && pastedUriFee !== null && !asksForFee;
 		if (isStakingContract && contractIncentive === 'checking') {
 			incentiveNotice = asksForFee
 				? 'This URI asks for the 2 VOI incentive fee. The fee choice will apply once the contract is checked.'
@@ -262,8 +273,8 @@
 		}
 		// Not the reactive accountCannotPay: it lags a contractIncentive set in the same tick.
 		const cannotPay = isStakingContract && contractIncentive !== 'capable';
-		if (pastedUriFee !== null) {
-			payIncentiveFee = incentiveFromUri(pastedUriFee, cannotPay);
+		if (pastedUriFee !== null && incentiveFromUri(pastedUriFee, cannotPay)) {
+			payIncentiveFee = true;
 		}
 		incentiveNotice =
 			cannotPay && asksForFee
@@ -276,6 +287,9 @@
 	async function handleSubmit() {
 		// A paste still reading the clipboard would overwrite the keys mid-send.
 		if (isLoading) return;
+		// A 2 VOI fee pasted during the contract check applies once it resolves; a click now would
+		// capture the minimum payment. The button is disabled too; this covers a racing click.
+		if (isStakingContract && contractIncentive === 'checking') return;
 		error = null;
 		console.log('Submitting participation key details');
 
@@ -1025,6 +1039,7 @@
 					<input
 						type="checkbox"
 						bind:checked={payIncentiveFee}
+						on:change={() => (keptByPaste = false)}
 						disabled={accountCannotPay || transactionStatus !== 'idle'}
 						aria-describedby="incentive-fee-help"
 						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
@@ -1057,6 +1072,9 @@
 				</p>
 				{#if incentiveNotice}
 					<p class="mt-1 ml-7 text-xs text-amber-700 dark:text-amber-300">{incentiveNotice}</p>
+				{/if}
+				{#if keptTickText}
+					<p class="mt-1 ml-7 text-xs text-amber-700 dark:text-amber-300">{keptTickText}</p>
 				{/if}
 			</div>
 		</div>
@@ -1137,6 +1155,7 @@
 						class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
 						disabled={transactionStatus !== 'idle' ||
 							isLoading ||
+							(isStakingContract && contractIncentive === 'checking') ||
 							!firstRound ||
 							!lastRound ||
 							!keyDilution ||
