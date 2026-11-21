@@ -98,12 +98,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/PoolDetails.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/components/TokenMetricsBar.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 2,
