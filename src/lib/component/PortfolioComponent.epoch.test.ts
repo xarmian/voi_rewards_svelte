@@ -3,36 +3,30 @@ import { expect, test } from 'vitest';
 
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 
-function epochBlock() {
-	return source.match(/const epochLoading = \(async \(\) => \{[\s\S]*?\n\t\t\}\)\(\);/)?.[0] ?? '';
-}
+test('the unread epoch reward estimate and its fetches are gone', () => {
+	for (const dead of [
+		'currentEpochRewards',
+		'epochPart',
+		'epochData',
+		'epoch-summary',
+		'calculateEpochRewards(',
+		'dataTable',
+		'getTokensByEpoch'
+	])
+		expect(source, `${dead} should be removed`).not.toContain(dead);
+	expect(source, 'Import only REWARDS_ADDRESSES from the rewards module').toContain(
+		"import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';"
+	);
+});
 
-test('the epoch block has its own loading state, reset on every fetch', () => {
-	expect(source, 'Declare an epochPart state like the other parts').toMatch(/let epochPart\b/);
-	const fetchStart = source.match(
-		/async function fetchAccountDetails[\s\S]*?const epochLoading/
+test('the Envoi lookup still runs alongside the account load and is awaited', () => {
+	const fetchAccountDetails = source.match(
+		/async function fetchAccountDetails[\s\S]*?\n\t\}\n/
 	)?.[0];
-	expect(fetchStart, 'Reset epochPart to loading before the epoch block runs').toMatch(
-		/epochPart = \{ status: 'loading' \}/
+	expect(fetchAccountDetails).toMatch(/const envoiLoading = \(async \(\) => \{/);
+	expect(fetchAccountDetails).toContain('getEnvoiNames([requestedWallet])');
+	expect(fetchAccountDetails).toMatch(/await envoiLoading;/);
+	expect(fetchAccountDetails!.indexOf('getEnvoiNames(')).toBeLessThan(
+		fetchAccountDetails!.indexOf('await loadAccountDetails(')
 	);
-	expect(source, 'The currentEpochRewards value must not outlive a failed load').toMatch(
-		/epochPart = \{ status: 'loaded'/
-	);
-});
-
-test('an epoch failure marks the part unavailable instead of leaving a 0', () => {
-	const block = epochBlock();
-	expect(block, 'Keep the epoch block').toContain('Error calculating rewards');
-	expect(block, 'The catch must set the part unavailable').toMatch(
-		/catch \(err\)[\s\S]*epochPart = \{ status: 'unavailable'/
-	);
-	expect(block, 'A stale wallet or generation must not write the part').toMatch(
-		/generation !== loadGeneration \|\| walletAddress !== requestedWallet/
-	);
-});
-
-test('Holdings no longer presents the legacy reward figure; the Rewards tab remains separate', () => {
-	const template = source.split('</script>')[1];
-	expect(template).not.toContain('pendingRewards / 1e6 + currentEpochRewards');
-	expect(template).not.toContain('Rewards Overview');
 });

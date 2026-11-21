@@ -5,7 +5,7 @@
 		signerMatchesAccount,
 		wrongSignerMessage
 	} from '$lib/chain/signerGate';
-	import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+	import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
 	import { loadAccountDetails, totalRewardsMicroVoi } from '$lib/portfolio/accountDetails';
 	import type { Part, AccountSnapshot, RewardsTransaction } from '$lib/portfolio/accountDetails';
 	import WalletHoldings from '$lib/ds/WalletHoldings/WalletHoldings.svelte';
@@ -24,10 +24,7 @@
 	import type { FungibleTokenType, ASAToken, LPToken, TokenApproval } from '$lib/types/assets';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { getEnvoiNames } from '$lib/utils/envoi';
-	import { dataTable } from '../../stores/dataTable';
-	import { getTokensByEpoch, decodeGlobalState } from '$lib/utils';
-	import { getSupplyInfo, getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
-	import { config } from '$lib/config';
+	import { getConsensusInfo, requireAccountInfo } from '$lib/stores/accounts';
 	import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 	import CopyComponent from '$lib/component/ui/CopyComponent.svelte';
 	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
@@ -95,9 +92,6 @@
 	let accountPart: Part<AccountSnapshot> | { status: 'loading' } = { status: 'loading' };
 	let createdAtPart: Part<number> | { status: 'loading' } = { status: 'loading' };
 	let rewardsPart: Part<RewardsTransaction[]> | { status: 'loading' } = { status: 'loading' };
-	let epochPart: { status: 'loading' } | { status: 'loaded' } | { status: 'unavailable' } = {
-		status: 'loading'
-	};
 	$: accountBalance = accountPart.status === 'loaded' ? accountPart.value.balance : 0;
 	let loadGeneration = 0;
 	let accountCreationDate: string | null = null;
@@ -105,8 +99,6 @@
 	let totalRewards: number = 0;
 	let envoiName: string | null = null;
 	let envoiAvatar: string | undefined = undefined;
-	let epochData: any[] = [];
-	let currentEpochRewards: number = 0;
 	let rewardsHistory: any[] = [];
 	let asaDetails: any[] = [];
 	let totalValue: number = 0;
@@ -405,13 +397,11 @@
 		accountPart = { status: 'loading' };
 		createdAtPart = { status: 'loading' };
 		rewardsPart = { status: 'loading' };
-		epochPart = { status: 'loading' };
-		currentEpochRewards = 0;
 		voteKeyExpiry = undefined;
 		voteKeyExpiryDate = undefined;
 		if (totalsReady) recomputeTotals();
 
-		const epochLoading = (async () => {
+		const envoiLoading = (async () => {
 			// Fetch Envoi name
 			try {
 				const envoiResults = await getEnvoiNames([requestedWallet]);
@@ -420,63 +410,6 @@
 				envoiAvatar = envoiResults.length > 0 ? envoiResults[0].metadata.avatar : undefined;
 			} catch (err) {
 				console.error('Error fetching Envoi name:', err);
-			}
-
-			// Calculate rewards using epoch data
-			try {
-				const dates = await dataTable.fetchDateRanges();
-				const epochSummary = await fetch(
-					`${config.proposalApiBaseUrl}?action=epoch-summary&wallet=${requestedWallet}`
-				).then((r) => r.json());
-				const [supplyData] = await Promise.all([getSupplyInfo()]);
-
-				if (!supplyData) {
-					throw new Error('Failed to fetch supply data');
-				}
-
-				const epochPromises = dates.map(async (date: any) => {
-					const [startStr] = date.id.split('-');
-					const formattedDate = `${startStr.slice(0, 4)}-${startStr.slice(4, 6)}-${startStr.slice(6, 8)}T00:00:00Z`;
-					const snapshots = epochSummary.snapshots ? epochSummary.snapshots : epochSummary;
-
-					const epochData = snapshots.find((e: any) => e.start_date === formattedDate);
-					if (!epochData) return null;
-
-					const tokens = await getTokensByEpoch(date.epoch);
-					const { totalBlocksProduced, userBlocksProduced, expectedReward } = calculateEpochRewards(
-						epochData,
-						date.epoch,
-						epochData.proposers[requestedWallet],
-						tokens
-					);
-
-					return {
-						epoch: date.epoch,
-						startDate: new Date(epochData.start_date),
-						endDate: new Date(epochData.end_date),
-						expectedReward,
-						totalBlocksProduced,
-						userBlocksProduced
-					};
-				});
-
-				const loadedEpochData = (await Promise.all(epochPromises)).filter(
-					(data): data is NonNullable<typeof data> => data !== null
-				);
-				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
-				epochData = loadedEpochData;
-
-				// Calculate current epoch rewards
-				const now = new Date();
-				const currentEpoch = epochData.find(
-					(epoch) => now >= epoch.startDate && now <= epoch.endDate
-				);
-				currentEpochRewards = currentEpoch?.expectedReward ?? 0;
-				epochPart = { status: 'loaded' };
-			} catch (err) {
-				console.error('Error calculating rewards:', err);
-				if (generation !== loadGeneration || walletAddress !== requestedWallet) return;
-				epochPart = { status: 'unavailable' };
 			}
 		})();
 
@@ -527,7 +460,7 @@
 				}
 			}
 		);
-		await epochLoading;
+		await envoiLoading;
 	}
 
 	function retryAccountDetails() {
