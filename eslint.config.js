@@ -55,5 +55,23 @@ export default defineConfig(
 			'svelte/prefer-svelte-reactivity': 'off',
 			'svelte/require-each-key': 'off'
 		}
+	},
+	{
+		// The barrel re-exports every component; one import of it keeps them all in the bundle.
+		files: ['src/**/*.ts', 'src/**/*.js', 'src/**/*.svelte'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '$lib/ds',
+							message:
+								'Import from the component module ($lib/ds/<Name>) so unused design-system code tree-shakes.'
+						}
+					]
+				}
+			]
+		}
 	}
 );
