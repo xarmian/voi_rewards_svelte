@@ -274,7 +274,7 @@
 					: 'This URI asks for the 2 VOI incentive fee, which this staking contract cannot pay. It will register with the normal fee.'
 				: null
 			: pastedUriFee !== null && !asksForFee && payIncentiveFee
-				? 'This URI asks for the normal fee. The 2 VOI incentive option is still selected: untick it to pay the normal fee.'
+				? 'This URI asks for less than the 2 VOI incentive fee. The 2 VOI incentive option is still selected: untick it to pay the normal fee.'
 				: null;
 	}
 
@@ -389,8 +389,11 @@
 			if (fresh !== 'capable') {
 				// A failed read may be transient: keep the option available so a retry rechecks.
 				if (fresh === 'incapable') contractIncentive = fresh;
-				// The one-click leaves the form alone.
-				if (!fixed) payIncentiveFee = false;
+				// The one-click leaves the form alone. The form's notice goes with the tick it described.
+				if (!fixed) {
+					payIncentiveFee = false;
+					incentiveNotice = null;
+				}
 				// The one-click does not use the form's fee option, so its message does not point there;
 				// an incapable contract loses the offer, so only an unverified read invites a retry.
 				error = !fixed
