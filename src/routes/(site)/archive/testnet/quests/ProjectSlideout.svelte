@@ -2,7 +2,6 @@
 	import { browser } from '$app/environment';
 	import ProjectModal from './ProjectModal.svelte';
 	//import { fly } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
 	import type { IProject } from '$lib/data/types';
 
 	export let projectid: number | null = null;

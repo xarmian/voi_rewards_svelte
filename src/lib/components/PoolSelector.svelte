@@ -17,7 +17,7 @@
 	let searchQuery = '';
 	let searchResults: TokenPair[] = [];
 	let dropdownOpen = false;
-	let searchTimeout: NodeJS.Timeout;
+	let searchTimeout: ReturnType<typeof setTimeout>;
 
 	// Update search query when pool changes
 	$: if (selectedPool) {

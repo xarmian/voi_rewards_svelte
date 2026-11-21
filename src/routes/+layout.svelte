@@ -6,7 +6,6 @@
 	import lato900 from '@fontsource/lato/files/lato-latin-900-normal.woff2?url';
 	import { page } from '$app/stores';
 
-	import { dev } from '$app/environment';
 	// import { inject } from '@vercel/analytics';
 	// inject({ mode: dev ? 'development' : 'production' });
 	import { afterNavigate, invalidate } from '$app/navigation';
@@ -16,7 +15,6 @@
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
 	import { startLoading, stopLoading } from '$lib/stores/loadingStore';
 	import { navigating } from '$app/stores';
-	import { onDestroy } from 'svelte';
 
 	$: if ($navigating) {
 		startLoading();
@@ -50,7 +48,9 @@
 				}
 				return true;
 			}
-		} catch {}
+		} catch {
+			// Analytics is optional; a failure to load it must not break the page.
+		}
 		return false;
 	}
 

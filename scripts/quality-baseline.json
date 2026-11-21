@@ -24,16 +24,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/FungibleToken.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"no-loss-of-precision": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/ImportRecipientsModal.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 3,
@@ -44,43 +34,13 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/NodeComponent.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 5,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/OptOutModal.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0
 			}
 		},
-		"src/lib/component/PortfolioSectionNFT.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 3,
-				"warnings": 0
-			},
-			"no-case-declarations": {
-				"errors": 6,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/Project.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 4,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/QuestCard.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0
@@ -88,7 +48,7 @@
 		},
 		"src/lib/component/QuestComponent.svelte": {
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 3,
+				"errors": 1,
 				"warnings": 0
 			}
 		},
@@ -120,17 +80,7 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/ui/Share.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/ui/StakingComponent.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
-				"warnings": 0
-			},
 			"svelte/no-at-html-tags": {
 				"errors": 1,
 				"warnings": 0
@@ -150,16 +100,6 @@
 		},
 		"src/lib/components/PoolDetails.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/PoolSelector.svelte": {
-			"no-undef": {
 				"errors": 1,
 				"warnings": 0
 			}
@@ -206,24 +146,6 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/about/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/leaderboard/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/leaderboard/Leaderboard.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/routes/(site)/archive/testnet/phase1/+page.svelte": {
 			"@typescript-eslint/ban-ts-comment": {
 				"errors": 1,
@@ -252,25 +174,7 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/archive/testnet/quests/ProjectModal.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/quests/ProjectSlideout.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/routes/(site)/archive/testnet/quests/QuestsPage.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/relays/+page.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 1,
 				"warnings": 0
@@ -284,22 +188,6 @@
 		},
 		"src/routes/(site)/privacy/+page.svelte": {
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/vanity/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/+layout.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"no-empty": {
 				"errors": 1,
 				"warnings": 0
 			}
@@ -366,15 +254,11 @@
 		},
 		"src/lib/component/Project.svelte": {
 			"ts:2339": {
-				"errors": 3,
+				"errors": 1,
 				"warnings": 0
 			},
 			"ts:2538": {
 				"errors": 11,
-				"warnings": 0
-			},
-			"ts:2769": {
-				"errors": 1,
 				"warnings": 0
 			},
 			"ts:7006": {

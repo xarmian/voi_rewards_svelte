@@ -25,7 +25,7 @@
 	let allNftTokens: NFTToken[] = [];
 	let displayedNftTokens: NFTToken[] = [];
 	let totalPages = 0;
-	let collections: Map<string, any> = new Map();
+	let collections: Map<string, { totalSupply?: number; creator?: string }> = new Map();
 	let selectedSort = sortOptions[0].id;
 	let sortDirection: 'asc' | 'desc' = 'asc';
 	let isLoadingNFTs = false;
@@ -149,7 +149,7 @@
 
 			// Get unique contract IDs that we haven't fetched yet
 			const uniqueContractIds = [
-				...new Set(data.tokens.map((token: any) => token.contractId.toString()))
+				...new Set(data.tokens.map((token: NFTToken) => token.contractId.toString()))
 			] as string[];
 			const contractIdsToFetch = uniqueContractIds.filter((id) => !collections.has(id));
 
@@ -168,7 +168,7 @@
 				});
 			}
 
-			allNftTokens = data.tokens.map((token: any) => {
+			allNftTokens = data.tokens.map((token: NFTToken) => {
 				try {
 					let parsedMetadata = token.metadata;
 					if (typeof token.metadata === 'string') {
@@ -273,7 +273,7 @@
 				case 'name':
 					comparison = (a.name || '').localeCompare(b.name || '');
 					break;
-				case 'collection':
+				case 'collection': {
 					const collectionA = a.collection?.name || '';
 					const collectionB = b.collection?.name || '';
 					comparison = collectionA.localeCompare(collectionB);
@@ -282,7 +282,8 @@
 						comparison = parseInt(a.tokenId) - parseInt(b.tokenId);
 					}
 					break;
-				case 'tokenId':
+				}
+				case 'tokenId': {
 					// Try to parse as numbers if possible for natural sorting
 					const aNum = parseInt(a.tokenId);
 					const bNum = parseInt(b.tokenId);
@@ -292,11 +293,13 @@
 						comparison = a.tokenId.localeCompare(b.tokenId);
 					}
 					break;
-				case 'lastSalePrice':
+				}
+				case 'lastSalePrice': {
 					const priceA = a.lastSalePrice || 0;
 					const priceB = b.lastSalePrice || 0;
 					comparison = priceA - priceB;
 					break;
+				}
 			}
 			return sortDirection === 'asc' ? comparison : -comparison;
 		});

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import Project from '$lib/component/Project.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';

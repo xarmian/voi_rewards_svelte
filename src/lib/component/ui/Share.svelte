@@ -2,7 +2,6 @@
 	import { escapeHtml } from '$lib/utils/escapeHtml';
 	import { Button, Popover } from 'flowbite-svelte';
 	import { toast } from '@zerodevx/svelte-toast';
-	import { copy } from 'svelte-copy';
 	import CopyComponent from './CopyComponent.svelte';
 
 	export let url: string;

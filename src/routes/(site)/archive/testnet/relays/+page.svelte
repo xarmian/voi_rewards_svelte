@@ -4,7 +4,6 @@
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { PageData } from './$types';
 	import type { PeerRecord } from '$lib/types';
-	import { onMount } from 'svelte';
 	import { getTokensByEpoch } from '$lib/utils';
 	import { getCurrentEpoch } from '$lib/utils/epoch-utils';
 

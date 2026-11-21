@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { IProject, IQuest } from '$lib/data/types';
-	import BreadcrumbCustom from './ui/BreadcrumbCustom.svelte';
 	import InfoButton from './ui/InfoButton.svelte';
 
 	export let quest: IQuest;

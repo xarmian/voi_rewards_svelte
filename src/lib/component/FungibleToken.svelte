@@ -157,8 +157,8 @@
 	function formatLargeNumber(value: number | undefined, decimals: number = 6): string {
 		if (value === undefined || !isFinite(value)) return '0';
 
-		// Handle special case for max uint256
-		if (value === 115792089237316195423570985008687907853269984665640564039457584007913129639935) {
+		// Handle special case for max uint256. 2^256 - 1 has no exact double, so it is 2^256 here.
+		if (value === 2 ** 256) {
 			return 'Unlimited';
 		}
 
@@ -252,9 +252,9 @@
 			setTimeout(() => {
 				isExpanded = true;
 			}, 500);
-		} catch (error: any) {
+		} catch (error) {
 			console.error('Error claiming tokens:', error);
-			claimingError = error.message || 'Failed to claim tokens';
+			claimingError = (error as { message?: string }).message || 'Failed to claim tokens';
 		} finally {
 			setTimeout(() => {
 				claimingApproval = null;

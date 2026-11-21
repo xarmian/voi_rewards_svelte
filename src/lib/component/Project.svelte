@@ -3,7 +3,7 @@
 	import { requireAccountInfo } from '$lib/stores/accounts';
 	import QuestCard from './QuestCard.svelte';
 
-	import type { IProject, IQuest } from '$lib/data/types';
+	import type { IProject } from '$lib/data/types';
 	import { supabasePublicClient } from '$lib/supabase';
 	import InfoButton from './ui/InfoButton.svelte';
 	import WalletSearch from './WalletSearch.svelte';
@@ -335,7 +335,10 @@
 
 	function calculateChubsHoldPoints(data: TransferData) {
 		const balances = {};
-		const weeklyMinBalances = {} as any;
+		const weeklyMinBalances = {} as Record<
+			string,
+			Record<string, { balance: number; wasZero: boolean }>
+		>;
 
 		// Helper function to get the Monday of the week for a given date
 		const getMonday = (d) => {
@@ -457,7 +460,7 @@
 
 		// for each wallet, calculate the number of weeks where the balance did not drop to zero
 		const walletPoints = new Map();
-		result.slice(0, -1).forEach(({ accounts }, index) => {
+		result.slice(0, -1).forEach(({ accounts }) => {
 			accounts.forEach(({ address, balance, wasZero }) => {
 				if (balance > 0 && !wasZero) {
 					walletPoints.set(address, (walletPoints.get(address) || 0) + 1);
@@ -500,7 +503,7 @@
 		// Calculate points
 		const walletPoints: Map<string, number> = new Map();
 		walletWeeklyTransfers.forEach((v, key) => {
-			const [wallet, _] = key.split('-');
+			const [wallet] = key.split('-');
 			walletPoints.set(wallet, (walletPoints.get(wallet) || 0) + 1);
 		});
 

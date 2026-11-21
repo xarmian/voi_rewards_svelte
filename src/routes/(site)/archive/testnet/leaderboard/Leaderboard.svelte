@@ -2,7 +2,6 @@
 	import type { VRPhase2 } from '$lib/supabase';
 	import { onMount } from 'svelte';
 	export let data: VRPhase2[] = [];
-	let pointsData = [];
 
 	onMount(async () => {
 		/*const res = await fetch("https://arc72-idx.nautilus.sh/nft-indexer/v1/arc200/balances?contractId=51060671");
