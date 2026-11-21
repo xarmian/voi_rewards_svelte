@@ -56,13 +56,23 @@ describe('wallet server load', () => {
 
 	it('loads a valid address without resolving a name', async () => {
 		expect(isValidAddress(address)).toBe(true);
-		mocks.lockvest.mockResolvedValue({ global_owner: 'parent-wallet' });
+		mocks.lockvest.mockResolvedValue({ global_owner: 'parent-wallet', contractId: 37575 });
 
 		await expect(load(event(address))).resolves.toEqual({
 			parentWalletId: 'parent-wallet',
+			contractId: 37575,
 			ownerLookup: 'ok'
 		});
 		expect(mocks.lockvest).toHaveBeenCalledWith(address);
 		expect(mocks.resolveWalletName).not.toHaveBeenCalled();
+	});
+
+	it('returns no contract id for an ordinary account', async () => {
+		mocks.lockvest.mockResolvedValue(null);
+		await expect(load(event(address))).resolves.toEqual({
+			parentWalletId: null,
+			contractId: null,
+			ownerLookup: 'ok'
+		});
 	});
 });

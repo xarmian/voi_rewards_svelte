@@ -35,8 +35,6 @@ export function contractFixture(id = 1, changes: Partial<ContractDetails> = {}):
 		isParticipating: details.isParticipating,
 		round: 100,
 		voteLastValid: null,
-		lastVoteAt: null,
-		lastBlock: null,
 		details
 	};
 }

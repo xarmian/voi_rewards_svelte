@@ -183,7 +183,7 @@ it('server rendering performs no reads and keeps all loading footprints', () => 
 const PAUSED =
 	'Real-time block rewards are paused while they are in testing. Epoch rewards continue until testing is complete.';
 const CONTRACT_TEXT =
-	"Staking contracts don't earn real-time block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards.";
+	"This contract's program can't register for real-time block rewards yet. Epoch rewards continue until it is upgraded.";
 const GO_ONLINE = /<a[^>]*href="#overview"[^>]*>\s*Go online with the 2 VOI incentive fee\s*<\/a>/g;
 const reward = (round: number, overrides: Partial<BlockReward> = {}): BlockReward => ({
 	round,
@@ -212,7 +212,7 @@ const networkRows = (days = 8, end = '2026-11-07') =>
 	});
 function blockFixture(): BlockRewardsState {
 	return {
-		status: ready({ registered: true, reasons: [], balance: 100_000_000_000 }),
+		status: ready({ registered: true, reasons: [], balance: 100_000_000_000, isContract: false }),
 		funding: ready({ funding: 'funded' as const, bonus: 5_000_000 }),
 		daily: ready([
 			{ day: '2026-10-09', count: 1, amount: 1_000_000 },
@@ -282,6 +282,7 @@ describe('Real-time block rewards card labelling', () => {
 		ready({
 			registered: false,
 			balance,
+			isContract: codes.includes('contract'),
 			reasons: codes.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
 		});
 
@@ -346,6 +347,7 @@ describe('Block rewards card', () => {
 		ready({
 			registered: false,
 			balance,
+			isContract: codes.includes('contract'),
 			reasons: codes.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
 		});
 
@@ -428,6 +430,7 @@ describe('Block rewards card', () => {
 				status: ready({
 					registered: false,
 					balance: 100_000_000_000,
+					isContract: false,
 					reasons: [{ code: 'offline' as const, text: 'Account is offline.' }]
 				})
 			})
@@ -442,7 +445,12 @@ describe('Block rewards card', () => {
 	it('never shows a certain chance', () => {
 		const html = card(
 			drawBlock({
-				status: ready({ registered: true, reasons: [], balance: 70_000_000_000_000 }),
+				status: ready({
+					registered: true,
+					reasons: [],
+					balance: 70_000_000_000_000,
+					isContract: false
+				}),
 				onlineStake: ready(100_000_000_000_000)
 			})
 		);
@@ -472,7 +480,12 @@ describe('Block rewards card', () => {
 	it('says under one block reward when fewer than one is expected', () => {
 		const html = card(
 			drawBlock({
-				status: ready({ registered: true, reasons: [], balance: 30_000_000_000 }),
+				status: ready({
+					registered: true,
+					reasons: [],
+					balance: 30_000_000_000,
+					isContract: false
+				}),
 				onlineStake: ready(20_000_000_000_000_000)
 			})
 		);
@@ -607,7 +620,14 @@ describe('Block rewards card', () => {
 		const cases = {
 			'unregistered in range': drawBlock({ status: unregistered(['offline']) }),
 			'contract page': drawBlock(
-				{ status: ready({ registered: true, reasons: [], balance: 100_000_000_000 }) },
+				{
+					status: ready({
+						registered: true,
+						reasons: [],
+						balance: 100_000_000_000,
+						isContract: true
+					})
+				},
 				true
 			),
 			'below range': drawBlock({ status: unregistered(['below-range'], 1) })
@@ -625,7 +645,7 @@ describe('Block rewards card', () => {
 			...blockFixture(),
 			status: {
 				state: 'stale',
-				value: { registered: true, reasons: [], balance: 100_000_000_000 },
+				value: { registered: true, reasons: [], balance: 100_000_000_000, isContract: false },
 				asOf: 1
 			}
 		});

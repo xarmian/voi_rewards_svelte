@@ -3,12 +3,8 @@ import { vestingStartTime } from './vesting';
 import { algodClient } from '$lib/utils/algod';
 import { decodeLockContractState } from '$lib/chain/lockContract';
 import { globalStateEntries } from '$lib/chain/algodShapes';
-import {
-	getAccountInfo,
-	getConsensusInfo,
-	getSupplyInfo,
-	requireAccountInfo
-} from '$lib/stores/accounts';
+import { getAccountInfo, getSupplyInfo, requireAccountInfo } from '$lib/stores/accounts';
+import { contractIncentiveOf } from '$lib/chain/keyreg';
 import { getLockContractsByOwner } from '$lib/services/lockvest';
 import { fetchFungibleTokens } from '$lib/services/accounts';
 import { fetchVoiPrice, voiPrice } from '$lib/stores/price';
@@ -20,6 +16,7 @@ import type { EpochResponse } from '$lib/home/rewards';
 import type { Account, ContractDetails } from '$lib/types';
 import type { DataState } from '$lib/ds/types';
 import type { WalletAccount, WalletContract, WalletEpoch, TokenValues } from './summary';
+import { accountEligibility, heartbeatHealth } from './nodeHealth';
 
 export type LegacyAccount = Account & { contractId: number };
 export type WalletSnapshot = {
@@ -131,8 +128,8 @@ export async function readContract(
 		availableForWithdrawal = Math.max(0, currentBalance - lockedBalance - minimumBalance);
 	}
 
-	// Get consensus data
-	const consensusInfo = await getConsensusInfo(account.address, force);
+	// The program was read above; checking its hash makes no further request.
+	const incentive = await contractIncentiveOf(async () => appInfo.params?.approvalProgram);
 
 	return {
 		contractId: account.contractId,
@@ -161,10 +158,12 @@ export async function readContract(
 		vestingDelay: Number(decodedState.global_vesting_delay ?? 0),
 		periodSeconds: Number(decodedState.global_period_seconds ?? 0),
 		period: Number(decodedState.global_period ?? 0),
-		consensusDetails: consensusInfo,
+		eligibility: accountEligibility(account.address, accountInfo, incentive),
 		accountInfo: {
 			round: Number(accountInfo.round),
 			status: accountInfo.status,
+			incentiveEligible: accountInfo.incentiveEligible === true,
+			amount: currentBalance,
 			participation: accountInfo.participation
 				? { voteLastValid: Number(accountInfo.participation.voteLastValid) }
 				: undefined
@@ -289,11 +288,10 @@ export async function loadWallet(
 	]);
 	if (!supply || !dates.length) throw new Error('Wallet network data unavailable');
 	const stake = (supply['online-money'] - supply['blacklisted-money']) / 1e6;
+	// Heartbeat staleness needs total online stake: algod's onlineMoney, already in the supply read.
+	const onlineStake = finite(supply['online-money']);
 	async function readAccount(address: string, contractId = 0): Promise<WalletAccount> {
-		const [account, consensus] = await Promise.all([
-			bounded(getAccountInfo(address, force)),
-			bounded(getConsensusInfo(address, force)).catch(() => undefined)
-		]);
+		const account = await bounded(getAccountInfo(address, force));
 		if (!account) throw new Error('Account data unavailable');
 		const balance = Number(account.amount) / 1e6;
 		if (!Number.isFinite(balance)) throw new Error('Account balance unavailable');
@@ -307,14 +305,18 @@ export async function loadWallet(
 			voteLastValid: account.participation
 				? finite(Number(account.participation.voteLastValid))
 				: null,
-			lastVoteAt: consensus?.last_vote_timestamp ?? null,
-			lastBlock: consensus?.last_block ? consensus.last_block : null,
-			lastBlockAt:
-				consensus &&
-				'last_block_timestamp' in consensus &&
-				typeof consensus.last_block_timestamp === 'string'
-					? consensus.last_block_timestamp
-					: null
+			health: {
+				// A contract's eligibility needs its program; it comes from readContract below.
+				eligibility: contractId ? null : accountEligibility(address, account, null),
+				heartbeat: heartbeatHealth({
+					round: account.round ?? supply!['current-round'],
+					lastProposed: account.lastProposed,
+					lastHeartbeat: account.lastHeartbeat,
+					amount: account.amount,
+					onlineStake,
+					eligible: account.incentiveEligible === true
+				})
+			}
 		};
 	}
 	const latest = dates[dates.length - 1];
@@ -325,12 +327,14 @@ export async function loadWallet(
 		epochDetails
 	]);
 	const contracts = await Promise.all(
-		children.map(
-			async (account): Promise<WalletContract> => ({
+		children.map(async (account): Promise<WalletContract> => {
+			const details = await bounded(readContract(account, force)).catch(() => null);
+			return {
 				...account,
-				details: await bounded(readContract(account, force)).catch(() => null)
-			})
-		)
+				health: { heartbeat: null, ...account.health, eligibility: details?.eligibility ?? null },
+				details
+			};
+		})
 	);
 	const viewOwner = pageAddress === ownerAddress ? owner : null;
 	const viewContracts =

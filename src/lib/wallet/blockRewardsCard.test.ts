@@ -258,7 +258,7 @@ describe('blockRewardForecast', () => {
 	}));
 	const state = (overrides: Partial<BlockRewardsState> = {}): BlockRewardsState => ({
 		...createBlockRewardsState(),
-		status: ready({ registered: true, reasons: [], balance: 100_000_000_000 }),
+		status: ready({ registered: true, reasons: [], balance: 100_000_000_000, isContract: false }),
 		funding: ready({ funding: 'funded' as const, bonus: 5_000_000 }),
 		network: ready(networkRows, Date.parse('2026-11-07T11:59:00Z')),
 		onlineStake: ready(1_000_000_000_000_000),
@@ -317,19 +317,26 @@ describe('blockRewardContract', () => {
 
 describe('currentStatus', () => {
 	const contract = { code: 'contract' as const, text: 'c' };
-	const account = { registered: true, reasons: [], balance: 1 };
-	const contractStatus = { registered: false, reasons: [contract], balance: 1 };
+	const account = { registered: true, reasons: [], balance: 1, isContract: false };
+	const contractStatus = { registered: false, reasons: [contract], balance: 1, isContract: true };
+	// A capable contract registers like an account: its classification is the read's, not a reason.
+	const capable = { registered: true, reasons: [], balance: 1, isContract: true };
 	it('keeps a status read for the same classification', () => {
 		const ready = { state: 'ready' as const, value: account, asOf: 1 };
 		expect(currentStatus(ready, false)).toBe(ready);
 		const forContract = { state: 'stale' as const, value: contractStatus, asOf: 1 };
 		expect(currentStatus(forContract, true)).toBe(forContract);
+		const forCapable = { state: 'ready' as const, value: capable, asOf: 1 };
+		expect(currentStatus(forCapable, true)).toBe(forCapable);
 	});
 	it('reads as loading while a status for the other classification reloads', () => {
 		expect(currentStatus({ state: 'stale', value: account, asOf: 1 }, true)).toEqual({
 			state: 'loading'
 		});
 		expect(currentStatus({ state: 'ready', value: contractStatus, asOf: 1 }, false)).toEqual({
+			state: 'loading'
+		});
+		expect(currentStatus({ state: 'ready', value: capable, asOf: 1 }, false)).toEqual({
 			state: 'loading'
 		});
 	});

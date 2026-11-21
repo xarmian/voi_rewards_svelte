@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
 	BLOCK_REWARD_LOOKBACK_NOTE,
+	BLOCK_REWARD_NOT_REGISTERED_TEXT,
+	BLOCK_REWARD_REASON_SHORT,
 	BLOCK_REWARD_STATUS_TEXT,
 	BLOCK_REWARDS_PAUSED_TEXT,
 	BLOCK_REWARDS_UNKNOWN_TEXT,
+	blockRewardContractOf,
 	blockRewardFunding,
 	blockRewardStatus,
-	type BlockRewardAccount
+	type BlockRewardAccount,
+	type BlockRewardContract
 } from './blockRewardStatus';
 
 const account = (overrides: Partial<BlockRewardAccount> = {}): BlockRewardAccount => ({
@@ -17,24 +21,24 @@ const account = (overrides: Partial<BlockRewardAccount> = {}): BlockRewardAccoun
 	participation: { voteLastValid: 5000n },
 	...overrides
 });
-const codes = (value: BlockRewardAccount, isContract = false) =>
-	blockRewardStatus(value, { isContract }).reasons.map((reason) => reason.code);
+const codes = (value: BlockRewardAccount, contract: BlockRewardContract = null) =>
+	blockRewardStatus(value, { contract }).reasons.map((reason) => reason.code);
 
 describe('blockRewardStatus', () => {
 	it('registers an online, eligible, in-range account with live keys', () => {
-		expect(blockRewardStatus(account(), { isContract: false })).toEqual({
+		expect(blockRewardStatus(account(), { contract: null })).toEqual({
 			registered: true,
 			reasons: []
 		});
 	});
 
 	it('treats both balance bounds as inclusive', () => {
-		expect(blockRewardStatus(account({ amount: 30_000_000_000n }), { isContract: false })).toEqual({
+		expect(blockRewardStatus(account({ amount: 30_000_000_000n }), { contract: null })).toEqual({
 			registered: true,
 			reasons: []
 		});
 		expect(
-			blockRewardStatus(account({ amount: 70_000_000_000_000n }), { isContract: false }).registered
+			blockRewardStatus(account({ amount: 70_000_000_000_000n }), { contract: null }).registered
 		).toBe(true);
 		expect(codes(account({ amount: 29_999_999_999n }))).toEqual(['below-range']);
 		expect(codes(account({ amount: 70_000_000_000_001n }))).toEqual(['above-range']);
@@ -44,7 +48,7 @@ describe('blockRewardStatus', () => {
 		expect(
 			blockRewardStatus(
 				account({ amount: 30_000_000_000, round: 10, participation: { voteLastValid: 10 } }),
-				{ isContract: false }
+				{ contract: null }
 			).registered
 		).toBe(true);
 	});
@@ -87,19 +91,42 @@ describe('blockRewardStatus', () => {
 			)
 		).toEqual(['not-opted-in', 'keys-expired', 'below-range']);
 		expect(
-			codes(account({ status: 'Offline', incentiveEligible: false, amount: 1n }), true)
+			codes(account({ status: 'Offline', incentiveEligible: false, amount: 1n }), 'incapable')
 		).toEqual(['contract', 'suspended', 'below-range']);
 	});
 
-	it('never registers a contract', () => {
-		const status = blockRewardStatus(account(), { isContract: true });
+	it('never registers an incapable contract', () => {
+		const status = blockRewardStatus(account(), { contract: 'incapable' });
 		expect(status.registered).toBe(false);
 		expect(status.reasons).toEqual([{ code: 'contract', text: BLOCK_REWARD_STATUS_TEXT.contract }]);
 	});
 
+	it('evaluates a capable contract exactly like an account', () => {
+		expect(blockRewardStatus(account(), { contract: 'capable' })).toEqual({
+			registered: true,
+			reasons: []
+		});
+		for (const value of [
+			account({ incentiveEligible: false }),
+			account({ status: 'Offline', incentiveEligible: false }),
+			account({ participation: { voteLastValid: 10n } }),
+			account({ amount: 1n })
+		])
+			expect(codes(value, 'capable')).toEqual(codes(value, null));
+		expect(codes(account({ incentiveEligible: false }), 'capable')).toEqual(['not-opted-in']);
+	});
+
+	it('reads a contract of unknown capability as incapable', () => {
+		expect(blockRewardContractOf(null)).toBeNull();
+		expect(blockRewardContractOf('capable')).toBe('capable');
+		for (const incentive of ['checking', 'incapable', 'unverified'] as const)
+			expect(blockRewardContractOf(incentive)).toBe('incapable');
+		expect(codes(account(), blockRewardContractOf('unverified'))).toEqual(['contract']);
+	});
+
 	it('attaches the exact text to each reason', () => {
 		const status = blockRewardStatus(account({ incentiveEligible: false, amount: 1n }), {
-			isContract: false
+			contract: null
 		});
 		expect(status.reasons).toEqual([
 			{ code: 'not-opted-in', text: 'Online without the 2 VOI incentive fee.' },
@@ -122,7 +149,17 @@ describe('blockRewardStatus', () => {
 			'above-range':
 				'Balance above 70,000,000 VOI: no real-time block rewards while outside this range.',
 			contract:
-				"Staking contracts don't earn real-time block rewards yet. Contract upgrades are being worked on, and epoch rewards continue until contracts are upgraded to support real-time block rewards."
+				"This contract's program can't register for real-time block rewards yet. Epoch rewards continue until it is upgraded."
+		});
+		expect(BLOCK_REWARD_NOT_REGISTERED_TEXT).toBe('Not registered for real-time block rewards');
+		expect(BLOCK_REWARD_REASON_SHORT).toEqual({
+			contract: 'Contract not upgraded',
+			suspended: 'Suspended',
+			'not-opted-in': 'No incentive fee',
+			offline: 'Offline',
+			'keys-expired': 'Keys expired',
+			'below-range': 'Below 30,000 VOI',
+			'above-range': 'Above 70,000,000 VOI'
 		});
 		expect(BLOCK_REWARD_LOOKBACK_NOTE).toBe(
 			'Changes take effect after about 320 rounds (~15 minutes).'
@@ -136,6 +173,7 @@ describe('blockRewardStatus', () => {
 	it('contains no forbidden wording', () => {
 		for (const text of [
 			...Object.values(BLOCK_REWARD_STATUS_TEXT),
+			...Object.values(BLOCK_REWARD_REASON_SHORT),
 			BLOCK_REWARD_LOOKBACK_NOTE,
 			BLOCK_REWARDS_PAUSED_TEXT,
 			BLOCK_REWARDS_UNKNOWN_TEXT

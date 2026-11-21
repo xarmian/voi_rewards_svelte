@@ -17,6 +17,7 @@
 		Sparkline,
 		StatTile,
 		StatusPill,
+		BlockRewardStatusPill,
 		ThemeToggle,
 		ago,
 		comma,
@@ -44,6 +45,7 @@
 		sparklineTones,
 		states,
 		statusLabels,
+		blockRewardStatuses,
 		syntheticHealth,
 		tones,
 		wallet
@@ -454,6 +456,19 @@
 							{size}
 							onHero
 						/>{/each}{/each}
+			</div>
+		</section>
+
+		<section aria-labelledby="gallery-block-reward-status-pill">
+			<h2 id="gallery-block-reward-status-pill" class="mb-4 text-h2">BlockRewardStatusPill</h2>
+			<div class="grid gap-bento md:grid-cols-2">
+				{#each blockRewardStatuses as item (item.name)}<div
+						class="space-y-3 rounded-card bg-surface p-card"
+					>
+						<h3 class="text-label font-bold text-ink-muted">{item.name}</h3>
+						<div class="space-y-2"><BlockRewardStatusPill status={item.status} /></div>
+						<div class="max-w-[12rem]"><BlockRewardStatusPill status={item.status} compact /></div>
+					</div>{/each}
 			</div>
 		</section>
 

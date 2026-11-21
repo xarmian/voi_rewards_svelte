@@ -62,4 +62,7 @@ test('block reward surfaces receive the contract status and the owner lookup ret
 	const overview = source.match(/<WalletOverview\b[^>]*\/>/)?.[0] ?? '';
 	expect(overview).toMatch(/\bisContract=\{!!parentWalletId\}/);
 	expect(overview).toMatch(/\bonrefresh=\{refresh\}/);
+	// The contract id lets the status read check whether the contract's program is capable.
+	for (const surface of [rewards, overview])
+		expect(surface).toMatch(/\bcontractId=\{data\.contractId \?\? null\}/);
 });

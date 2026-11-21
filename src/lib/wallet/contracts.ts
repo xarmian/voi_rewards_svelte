@@ -49,8 +49,6 @@ export async function loadContracts(
 				isParticipating: false,
 				round: 0,
 				voteLastValid: null,
-				lastVoteAt: null,
-				lastBlock: null,
 				details: null
 			};
 			try {
@@ -63,9 +61,7 @@ export async function loadContracts(
 					balance: details.balance / 1e6,
 					isParticipating: details.isParticipating,
 					round: Number.isFinite(details.accountInfo?.round) ? details.accountInfo!.round : null,
-					voteLastValid: details.accountInfo?.participation?.voteLastValid ?? null,
-					lastVoteAt: details.consensusDetails?.last_vote_timestamp ?? null,
-					lastBlock: details.consensusDetails?.last_block ?? null
+					voteLastValid: details.accountInfo?.participation?.voteLastValid ?? null
 				};
 			} catch {
 				return { ...identity, balance: null, isParticipating: null, round: null };

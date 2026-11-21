@@ -1,6 +1,7 @@
 import type { DataState, Tone } from '$lib/ds/types';
 import type { ContractDetails } from '$lib/types';
 import { vestingStartTime } from './vesting';
+import type { AccountHealth, Eligibility, Heartbeat } from './nodeHealth';
 
 export const BASE_MIN_BALANCE_VOI = 0.1;
 /**
@@ -20,9 +21,8 @@ export type WalletAccount = {
 	isParticipating: boolean;
 	round: number;
 	voteLastValid: number | null;
-	lastVoteAt: string | null;
-	lastBlock: number | null;
-	lastBlockAt?: string | null;
+	/** Real-time block reward eligibility and heartbeat, from the algod account record. */
+	health?: AccountHealth | null;
 	details?: ContractDetails | null;
 };
 
@@ -70,6 +70,12 @@ export type WalletHoldings = TokenValues & {
 	total: number | null;
 	usd: number | null;
 };
+export type EligibilityRow = {
+	address: string;
+	/** null for the owner account. */
+	contractId: number | null;
+	eligibility: Eligibility | null;
+};
 export type WalletSummary = {
 	state: DataState;
 	ownerLookup?: 'ok' | 'unavailable';
@@ -83,10 +89,20 @@ export type WalletSummary = {
 	idleBalance: number;
 	keyDays: number | null;
 	keyTone: Tone;
-	oldestVoteAt: string | null;
-	voteTone: Tone;
-	lastBlock: number | null;
-	lastBlockAt: string | null;
+	heartbeat: {
+		tone: Tone;
+		/**
+		 * The account whose ages the card shows: when any is overdue, the most overdue against its own
+		 * window; otherwise the online account silent longest.
+		 */
+		shown: Heartbeat | null;
+		overdueCount: number;
+		/** Online accounts with no proposal or heartbeat on record. */
+		unknownCount: number;
+	};
+	suspendedCount: number;
+	/** The owner, then each online or suspended contract. */
+	eligibilityRows: EligibilityRow[];
 	healthTone: 'ok' | 'warn' | 'danger';
 	tooEarly: boolean;
 	current: EpochSummary;
@@ -144,16 +160,51 @@ export function summarizeWallet({
 				: firstExpiry < 30
 					? 'warn'
 					: 'ok';
-	const votes = online
-		.map((account) => account.lastVoteAt)
-		.filter((date): date is string => date !== null && Number.isFinite(Date.parse(date)));
-	const oldestVoteAt = votes.length ? votes.sort((a, b) => Date.parse(a) - Date.parse(b))[0] : null;
-	const voteAge = oldestVoteAt ? (now - Date.parse(oldestVoteAt)) / 1000 : null;
-	const voteTone: Tone =
-		voteAge === null ? 'neutral' : voteAge > 3600 ? 'danger' : voteAge > 600 ? 'warn' : 'ok';
-	const blocks = accounts.flatMap((account) =>
-		account.lastBlock === null ? [] : [account.lastBlock]
+	const heartbeats = online.flatMap((account) =>
+		account.health?.heartbeat ? [account.health.heartbeat] : []
 	);
+	const oldestHeartbeat = heartbeats.reduce<Heartbeat | null>(
+		(oldest, beat) => (oldest === null || beat.silentRounds > oldest.silentRounds ? beat : oldest),
+		null
+	);
+	const overdue = heartbeats.filter((beat) => beat.overdue === true);
+	const overdueCount = overdue.length;
+	// Each account's window scales with 1/stake, so the longest silence need not be the overdue one.
+	const lateness = (beat: Heartbeat) => beat.silentRounds / (beat.overdueAfter ?? Infinity);
+	const shownHeartbeat = overdueCount
+		? overdue.reduce((most, beat) => (lateness(beat) > lateness(most) ? beat : most))
+		: oldestHeartbeat;
+	const heartbeatTone: Tone =
+		oldestHeartbeat === null
+			? 'neutral'
+			: overdueCount > 0
+				? 'warn'
+				: heartbeats.some((beat) => beat.overdue === null)
+					? 'neutral'
+					: 'ok';
+	const suspendedOf = (account: WalletAccount) =>
+		!!account.health?.eligibility?.status.reasons.some((reason) => reason.code === 'suspended');
+	const suspendedCount = accounts.filter(suspendedOf).length;
+	const ownerRow = owner && !contracts.some((contract) => contract.address === owner.address);
+	const eligibilityRows: EligibilityRow[] = [
+		...(owner && ownerRow
+			? [
+					{
+						address: owner.address,
+						contractId: null,
+						eligibility: owner.health?.eligibility ?? null
+					}
+				]
+			: []),
+		// Keyed by address in the card, so a contract listed twice appears once.
+		...[...new Map(contracts.map((account) => [account.address, account])).values()]
+			.filter((account) => account.isParticipating || suspendedOf(account))
+			.map((account) => ({
+				address: account.address,
+				contractId: account.contractId,
+				eligibility: account.health?.eligibility ?? null
+			}))
+	];
 
 	function metrics(epoch: WalletEpoch): EpochSummary {
 		if (contractSet === 'unavailable')
@@ -211,7 +262,7 @@ export function summarizeWallet({
 				progress: 0
 			};
 	const incompleteHealth =
-		online.some((account) => account.voteLastValid === null) || votes.length !== online.length;
+		online.some((account) => account.voteLastValid === null) || heartbeats.length !== online.length;
 	const contractsReady =
 		ownerLookup === 'ok' &&
 		contractSet === 'ready' &&
@@ -291,16 +342,18 @@ export function summarizeWallet({
 		idleBalance: idle.reduce((total, account) => total + account.balance, 0),
 		keyDays: firstExpiry,
 		keyTone,
-		oldestVoteAt,
-		voteTone,
-		lastBlock: blocks.length ? Math.max(...blocks) : null,
-		lastBlockAt: blocks.length
-			? (accounts.find((account) => account.lastBlock === Math.max(...blocks))?.lastBlockAt ?? null)
-			: null,
+		heartbeat: {
+			tone: heartbeatTone,
+			shown: shownHeartbeat,
+			overdueCount,
+			unknownCount: online.length - heartbeats.length
+		},
+		suspendedCount,
+		eligibilityRows,
 		healthTone:
-			!online.length || keyTone === 'danger' || voteTone === 'danger'
+			!online.length || keyTone === 'danger' || suspendedCount > 0
 				? 'danger'
-				: keyTone === 'warn' || voteTone === 'warn' || idle.length > 0 || incompleteHealth
+				: keyTone === 'warn' || heartbeatTone === 'warn' || idle.length > 0 || incompleteHealth
 					? 'warn'
 					: 'ok',
 		tooEarly: online.length > 0 && currentMetrics.expected !== null && currentMetrics.expected < 50,

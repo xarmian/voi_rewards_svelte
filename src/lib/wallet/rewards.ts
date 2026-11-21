@@ -384,9 +384,7 @@ export function mergeRewardRows(
 						balance: account.balance,
 						isParticipating: account.online,
 						round: 0,
-						voteLastValid: null,
-						lastVoteAt: null,
-						lastBlock: null
+						voteLastValid: null
 					}
 				: null;
 			const summary = summarizeWallet({

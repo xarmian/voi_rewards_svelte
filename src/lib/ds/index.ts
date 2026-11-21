@@ -2,6 +2,7 @@ export { Card } from './Card';
 export { StatTile } from './StatTile';
 export { Sparkline } from './Sparkline';
 export { StatusPill } from './StatusPill';
+export { BlockRewardStatusPill } from './BlockRewardStatusPill';
 export { HealthItem } from './HealthItem';
 export { HealthRing } from './HealthRing';
 export { Button } from './Button';

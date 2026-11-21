@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
 const alerts = vi.hoisted(() => [] as { message: string; onretry?: () => void }[]);
@@ -42,7 +43,7 @@ const networkRows = (days = 8, end = '2026-11-07') =>
 	}));
 function fixture(): BlockRewardsState {
 	return {
-		status: ready({ registered: true, reasons: [], balance: 100_000_000_000 }),
+		status: ready({ registered: true, reasons: [], balance: 100_000_000_000, isContract: false }),
 		funding: ready({ funding: 'funded' as const, bonus: 5_000_000 }),
 		daily: ready([
 			{ day: '2026-10-09', count: 1, amount: 1_000_000 },
@@ -86,6 +87,7 @@ const unregistered = (codes: BlockRewardReason[], balance = 100_000_000_000) =>
 	ready({
 		registered: false,
 		balance,
+		isContract: codes.includes('contract'),
 		reasons: codes.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
 	});
 
@@ -210,7 +212,12 @@ describe('WalletBlockRewards', () => {
 		expect(tile(draw(), label)).toMatch(/\d+(\.\d+)?%/);
 		const certain = tile(
 			draw({
-				status: ready({ registered: true, reasons: [], balance: 70_000_000_000_000 }),
+				status: ready({
+					registered: true,
+					reasons: [],
+					balance: 70_000_000_000_000,
+					isContract: false
+				}),
 				onlineStake: ready(100_000_000_000_000)
 			}),
 			label
@@ -264,10 +271,34 @@ describe('WalletBlockRewards', () => {
 		expect(html).not.toContain(UNKNOWN_REGISTRATION);
 	});
 
+	it('shows a capable contract that is online and eligible as registered', () => {
+		const html = text(
+			draw(
+				{
+					status: ready({
+						registered: true,
+						reasons: [],
+						balance: 100_000_000_000,
+						isContract: true
+					})
+				},
+				{ isContract: true }
+			)
+		);
+		expect(html).toContain('Registered for real-time block rewards');
+		expect(html).not.toContain('Not registered');
+		expect(html).not.toContain(BLOCK_REWARD_STATUS_TEXT.contract);
+	});
+
+	it('passes the contract id to the status read so it can check the program', () => {
+		const source = readFileSync(new URL('./WalletBlockRewards.svelte', import.meta.url), 'utf8');
+		expect(source).toMatch(/loadBlockRewardStatus\(address, \{ isContract, contractId, force \}\)/);
+	});
+
 	it('does not show a status read for the other contract classification', () => {
 		const stale = {
 			state: 'stale' as const,
-			value: { registered: true, reasons: [], balance: 100_000_000_000 },
+			value: { registered: true, reasons: [], balance: 100_000_000_000, isContract: false },
 			asOf: 1
 		};
 		const reloading = draw({ status: stale }, { isContract: true });

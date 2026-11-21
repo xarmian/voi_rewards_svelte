@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { contractFixture, scheduleNow } from './contracts.fixtures';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), account: vi.fn(), decoded: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+	list: vi.fn(),
+	account: vi.fn(),
+	decoded: vi.fn(),
+	consensus: vi.fn()
+}));
 vi.mock('$lib/services/lockvest', () => ({ getLockContractsByOwner: mocks.list }));
 vi.mock('$lib/utils/algod', () => ({
 	algodClient: { getApplicationByID: () => ({ do: async () => ({ params: {} }) }) }
@@ -9,7 +14,7 @@ vi.mock('$lib/chain/lockContract', () => ({ decodeLockContractState: mocks.decod
 vi.mock('$lib/stores/accounts', () => ({
 	getAccountInfo: mocks.account,
 	requireAccountInfo: mocks.account,
-	getConsensusInfo: async () => undefined
+	getConsensusInfo: mocks.consensus
 }));
 vi.mock('./load', async (original) => {
 	const actual = await original<typeof import('./load')>();
@@ -206,4 +211,20 @@ it('starts the chart domain at the first plotted point when the clock is past a 
 		expect(Date.parse(month.date)).toBeLessThanOrEqual(end.getTime());
 	}
 	expect(scheduleDomain([], later)[0].getTime()).toBe(later);
+});
+it('carries each contract eligibility on its row and never reads walletDetails', async () => {
+	const eligibility = {
+		status: { registered: true, reasons: [] },
+		canMakeEligible: false
+	};
+	vi.mocked(readContract).mockImplementation(
+		async (account) => contractFixture(account.contractId, { eligibility }).details!
+	);
+	const result = await loadContracts('OWNER', 'OWNER');
+	expect(result.contracts.every((row) => row.details?.eligibility === eligibility)).toBe(true);
+	for (const row of result.contracts) {
+		expect(row).not.toHaveProperty('lastVoteAt');
+		expect(row).not.toHaveProperty('lastBlock');
+	}
+	expect(mocks.consensus).not.toHaveBeenCalled();
 });

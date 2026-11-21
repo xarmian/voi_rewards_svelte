@@ -14,4 +14,7 @@ it('pins the consensus and genesis block reward parameters', () => {
 	expect(constants.BLOCK_REWARDS_START_ROUND).toBe(23_944_225);
 	expect(constants.BLOCK_REWARD_NOTE_PREFIX).toBe('ProposerPayout for Round ');
 	expect(constants.INCENTIVE_KEYREG_FEE).toBe(2_000_000);
+	expect(constants.ABSENT_FACTOR).toBe(20);
+	expect(constants.HEARTBEAT_OVERDUE_FRACTION).toBe(0.5);
+	expect(constants.HEARTBEAT_OVERDUE_FLOOR_ROUNDS).toBe(1000);
 });

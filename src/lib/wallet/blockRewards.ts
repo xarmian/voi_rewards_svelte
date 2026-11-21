@@ -1,12 +1,15 @@
 import { FEE_SHARE_PERCENT } from '$lib/rewards/blockRewardConstants';
 import { readBonus, readFeeSink } from '$lib/rewards/blockRewardChain';
 import {
+	blockRewardContractOf,
 	blockRewardFunding,
 	blockRewardStatus,
 	type BlockRewardFunding,
 	type BlockRewardStatus
 } from '$lib/rewards/blockRewardStatus';
+import { contractIncentiveOf } from '$lib/chain/keyreg';
 import { requireAccountInfo } from '$lib/stores/accounts';
+import { algodClient } from '$lib/utils/algod';
 import { boundedRead } from './read';
 import { json } from './rewards';
 
@@ -155,14 +158,37 @@ export function mimirLagRounds(lastRound: number, days: NetworkBlockRewardDay[])
 	return rounds.length ? Math.max(0, lastRound - Math.max(...rounds)) : null;
 }
 
+/** A status read, with the classification it was read for (see currentStatus). */
+export type BlockRewardStatusRead = BlockRewardStatus & { balance: number; isContract: boolean };
+
+/**
+ * A contract's program is read to tell whether it is capable; a contract with no known id, or
+ * whose program cannot be read, counts as incapable.
+ */
 export async function loadBlockRewardStatus(
 	address: string,
-	opts: { isContract: boolean; force?: boolean }
-): Promise<BlockRewardStatus & { balance: number }> {
-	const account = await boundedRead(requireAccountInfo(address, { force: opts.force ?? false }));
+	opts: { isContract: boolean; contractId?: number | null; force?: boolean }
+): Promise<BlockRewardStatusRead> {
+	const contractId = opts.contractId ?? null;
+	const [account, incentive] = await Promise.all([
+		boundedRead(requireAccountInfo(address, { force: opts.force ?? false })),
+		!opts.isContract
+			? null
+			: contractId === null
+				? ('unverified' as const)
+				: contractIncentiveOf(
+						async () =>
+							(await boundedRead(algodClient.getApplicationByID(contractId).do())).params
+								?.approvalProgram
+					)
+	]);
 	const balance = Number(account.amount);
 	if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('Account balance unavailable');
-	return { ...blockRewardStatus(account, { isContract: opts.isContract }), balance };
+	return {
+		...blockRewardStatus(account, { contract: blockRewardContractOf(incentive) }),
+		balance,
+		isContract: opts.isContract
+	};
 }
 
 /** Funding is 'unknown' whenever either read fails; a failed read never reports 'paused'. */

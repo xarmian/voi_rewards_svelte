@@ -5,6 +5,7 @@
 	import DataTable from '../DataTable/DataTable.svelte';
 	import ChartFrame from '../ChartFrame/ChartFrame.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
+	import BlockRewardStatusPill from '../BlockRewardStatusPill/BlockRewardStatusPill.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import BarsVsExpected from '../charts/BarsVsExpected.svelte';
 	import LineChart from '../charts/LineChart.svelte';
@@ -83,12 +84,15 @@
 	let {
 		pageAddress,
 		isContract = false,
+		contractId = null,
 		ownerLookup = 'ok',
 		onretrylookup,
 		now
 	}: {
 		pageAddress: string;
 		isContract?: boolean;
+		/** The staking contract's application id, so its program can be checked; null when unknown. */
+		contractId?: number | null;
 		/** 'unavailable' when the page could not tell whether this address is a staking contract. */
 		ownerLookup?: 'ok' | 'unavailable';
 		onretrylookup?: () => void;
@@ -130,7 +134,7 @@
 	const pager = createBlockRewardPager((next) => (pages = next));
 	const blockReaders = {
 		status: createReadSource(
-			(address, force) => loadBlockRewardStatus(address, { isContract, force }),
+			(address, force) => loadBlockRewardStatus(address, { isContract, contractId, force }),
 			(result) => (blockSources.status = result)
 		),
 		funding: createReadSource(
@@ -177,6 +181,7 @@
 	$effect(() => {
 		const address = pageAddress;
 		void isContract;
+		void contractId;
 		untrack(() => {
 			resetPages(address);
 			for (const reader of Object.values(blockReaders)) void reader.load(address);
@@ -708,17 +713,10 @@
 						onretry={onretrylookup}
 					/>
 				{:else if blockStatus}
-					{#if blockStatus.registered}
-						<StatusPill tone="ok" label="Registered for real-time block rewards" />
-					{:else}
-						<StatusPill tone="warn" label="Not registered for real-time block rewards" />
-						<ul class="space-y-1 text-sm">
-							{#each blockStatus.reasons as reason (reason.code)}<li>{reason.text}</li>{/each}
-						</ul>
-						{#if canGoOnline}<a class="text-sm text-accent underline" href="#overview"
-								>Go online with the 2 VOI incentive fee</a
-							>{/if}
-					{/if}
+					<BlockRewardStatusPill status={blockStatus} />
+					{#if canGoOnline}<a class="text-sm text-accent underline" href="#overview"
+							>Go online with the 2 VOI incentive fee</a
+						>{/if}
 					<p class="text-label text-ink-muted">{BLOCK_REWARD_LOOKBACK_NOTE}</p>
 				{:else if statusSource.state === 'error'}
 					<InlineAlert
