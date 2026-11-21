@@ -6,9 +6,8 @@
 	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
-	import { Card, Popover } from 'flowbite-svelte';
+	import { Card } from 'flowbite-svelte';
 	import snapshotTSV from './snapshot_noescrow.txt?raw';
-	//@ts-ignore
 	import RangeSlider from 'svelte-range-slider-pips';
 
 	interface Snapshot {

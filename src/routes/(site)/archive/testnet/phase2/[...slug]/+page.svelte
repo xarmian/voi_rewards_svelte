@@ -3,13 +3,11 @@
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import QuestComponent from '$lib/component/QuestComponent.svelte';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import VoiLogoStatic from '$lib/assets/Voi_Logo_White_Transparent_Background.png';
 	import Time from 'svelte-time';
 	import InfoButton from '$lib/component/ui/InfoButton.svelte';
 	import { page } from '$app/stores';
-	//@ts-ignore
 	import RangeSlider from 'svelte-range-slider-pips';
 	import { Card } from 'flowbite-svelte';
 
@@ -18,7 +16,6 @@
 	export let data: PageData;
 	$: selectedWallet = data.props.wallet as string | undefined;
 	let searchText: string | undefined;
-	let projectId = data.props.projectId;
 	let isEligible = false;
 	let loaded = false;
 	let mounted = false;
@@ -52,7 +49,6 @@
 		}
 	});
 
-	let totalPoints = 0;
 	$: if (selectedWallet && mounted) {
 		updateEligibility(selectedWallet);
 	}
@@ -430,12 +426,3 @@
 		</div>
 	</div>
 {/if}
-
-<style>
-	.btn-primary {
-		@apply bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
-	}
-	.btn-secondary {
-		@apply bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-center;
-	}
-</style>
