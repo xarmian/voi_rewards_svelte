@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fetchWalletIdentity, parseWalletIdentity } from './identity';
 
-const avatar = 'https://cdn.example/avatar.png';
+const avatar = 'https://prod.cdn.highforge.io/avatar.png';
 const named = { address: 'A', name: ' shelly.of.voi ', metadata: { avatar } };
 const empty = { name: null, avatar: null };
 const ADDRESS = 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ';
@@ -73,10 +73,16 @@ it.each([
 	'https://xvoirewards.com/x.png',
 	'https://voirewards.com.evil.example/x.png',
 	'https://voirewards.co/x.png'
-])('keeps %s, which is a different host from the site', (avatarUrl) => {
+])('refuses %s, a host that is not on the avatar allowlist', (avatarUrl) => {
 	expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: avatarUrl } }]).avatar).toBe(
-		avatarUrl
+		null
 	);
+});
+
+it('keeps a valid name with an off-list avatar host and drops only the avatar', () => {
+	expect(
+		parseWalletIdentity('A', [{ ...named, metadata: { avatar: 'https://cdn.example/avatar.png' } }])
+	).toEqual({ name: 'shelly.of.voi', avatar: null });
 });
 
 it.each([
@@ -104,16 +110,16 @@ it('keeps an avatar on another host while a page host is set', () => {
 });
 
 it('accepts a 2048-character https avatar', () => {
-	const url = 'https://host.example/' + 'x'.repeat(2027);
+	const url = 'https://prod.cdn.highforge.io/' + 'x'.repeat(2018);
 	expect(url).toHaveLength(2048);
 	expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: url } }]).avatar).toBe(url);
 });
 
 it('returns the parsed href, so the host that was checked is the host the browser loads', () => {
 	for (const [raw, href] of [
-		['HTTPS://CDN.Example/a b.png', 'https://cdn.example/a%20b.png'],
-		['https://cdn.example', 'https://cdn.example/'],
-		['https://cdn.example:443/a.png', 'https://cdn.example/a.png']
+		['HTTPS://PROD.CDN.HighForge.IO/a b.png', 'https://prod.cdn.highforge.io/a%20b.png'],
+		['https://prod.cdn.highforge.io', 'https://prod.cdn.highforge.io/'],
+		['https://prod.cdn.highforge.io:443/a.png', 'https://prod.cdn.highforge.io/a.png']
 	])
 		expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: raw } }]).avatar).toBe(href);
 });
