@@ -89,7 +89,16 @@ test('the wallet load makes no epoch read and resolves while the epoch rows are 
 	expect(data.contracts.map((contract) => contract.address)).toEqual(['ESCROW']);
 	expect(data.contractSet).toBe('ready');
 	expect(data.tokens.state).toBe('ready');
-	expect(data.primary.estimatedRewardsPerWeek).toBe(0);
+	expect(data.children).toHaveLength(1);
+	for (const account of [data.primary, ...data.children]) {
+		for (const key of [
+			'estimatedRewardsPerDay',
+			'estimatedRewardsPerWeek',
+			'estimatedRewardsPerMonth'
+		]) {
+			expect(account).not.toHaveProperty(key);
+		}
+	}
 });
 
 test('the wallet summary has no epoch keys and the same health and holdings', () => {

@@ -173,7 +173,7 @@ export async function readContract(
 
 export { bounded };
 
-function legacy(account: WalletAccount, stake: number, pool: number): LegacyAccount {
+function legacy(account: WalletAccount, stake: number): LegacyAccount {
 	const share = stake > 0 ? account.balance / stake : 0;
 	const dailyBlocks = (86400 / 2.8) * share;
 	return {
@@ -181,10 +181,7 @@ function legacy(account: WalletAccount, stake: number, pool: number): LegacyAcco
 		blocksProduced24h: 0,
 		expectedBlocksPerDay: dailyBlocks,
 		expectedBlocksPerWeek: dailyBlocks * 7,
-		expectedBlocksPerMonth: dailyBlocks * 30.44,
-		estimatedRewardsPerDay: (share * pool) / 7,
-		estimatedRewardsPerWeek: share * pool,
-		estimatedRewardsPerMonth: (share * pool * 30.44) / 7
+		expectedBlocksPerMonth: dailyBlocks * 30.44
 	};
 }
 
@@ -292,9 +289,9 @@ export async function loadWallet(
 		owner,
 		contracts,
 		contractSet: locks === null ? 'unavailable' : 'ready',
-		primary: legacy(owner, stake, live?.value.pool ?? 0),
+		primary: legacy(owner, stake),
 		children: children
-			.map((account) => legacy(account, stake, live?.value.pool ?? 0))
+			.map((account) => legacy(account, stake))
 			.sort((a, b) => b.balance - a.balance),
 		current: live?.value ?? null,
 		history: history?.history ?? [],
