@@ -434,14 +434,14 @@ test('a partkeyinfo paste leaves the opt-in alone', () => {
 
 // A URI's fee can select the opt-in but never clears a tick: a minimum-fee URI pasted after the
 // user ticked "Pay 2 VOI" leaves the choice as it is.
-test('a pasted minimum-fee URI keeps a ticked opt-in on a capable contract', () => {
+test('a pasted minimum-fee URI keeps a ticked opt-in on a capable contract, with a notice', () => {
 	const context = applyPasted({
 		contractIncentive: 'capable',
 		pastedUriFee: 1000,
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.incentiveNotice).toBeNull();
+	expect(context.incentiveNotice).toMatch(/still selected/);
 });
 
 test('ticking then pasting a minimum-fee URI still sends the 2 VOI go-online fee', async () => {
@@ -461,15 +461,99 @@ test('ticking then pasting a minimum-fee URI still sends the 2 VOI go-online fee
 	expect(harness.setExtraTxns.mock.calls[0][0][0].payment).toBe(2_000_000);
 });
 
-test('a pasted minimum-fee URI keeps a ticked opt-in on a plain account', () => {
+// A plain account's contract check never runs, so its contractIncentive stays 'checking'.
+test('a pasted minimum-fee URI keeps a ticked opt-in on a plain account, with a notice', () => {
 	const context = applyPasted({
-		contractIncentive: 'capable',
+		contractIncentive: 'checking',
 		pastedUriFee: 1000,
 		payIncentiveFee: true,
 		isStakingContract: false
 	});
 	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toMatch(/still selected/);
+});
+
+test('a pasted 2 VOI fee selects the opt-in on a plain account', () => {
+	const context = applyPasted({
+		contractIncentive: 'checking',
+		pastedUriFee: 2_000_000,
+		payIncentiveFee: false,
+		isStakingContract: false
+	});
+	expect(context.payIncentiveFee).toBe(true);
 	expect(context.incentiveNotice).toBeNull();
+});
+
+test('a pasted fee just under 2 VOI keeps a ticked opt-in, with a notice', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1_999_999,
+		payIncentiveFee: true
+	});
+	expect(context.payIncentiveFee).toBe(true);
+	expect(context.incentiveNotice).toMatch(/still selected/);
+});
+
+test('changing the opt-in clears the paste notice', () => {
+	expect(source).toMatch(
+		/bind:checked=\{payIncentiveFee\}\s*on:change=\{\(\) => \(incentiveNotice = null\)\}/
+	);
+});
+
+// While a staking contract's program is being checked, a pasted 2 VOI fee is deferred, so a
+// Register Key click would capture the minimum payment before the box ticks.
+test('Register Key is disabled while a staking contract is being checked', () => {
+	const button = source.match(/<button\s+on:click=\{handleSubmit\}[^]*?>/)?.[0];
+	expect(button).toBeDefined();
+	expect(button).toMatch(
+		/disabled=\{[^}]*isStakingContract && contractIncentive === 'checking'[^}]*\}/
+	);
+});
+
+function submitHarness(state: { isStakingContract: boolean; contractIncentive: string }) {
+	const body = source.match(/async function handleSubmit\([^]*?\n\t\}/)?.[0];
+	expect(body).toBeDefined();
+	const registerStakingContractVoteKey = vi.fn();
+	const registerWalletVoteKey = vi.fn();
+	const context = createContext({
+		console: { log: () => {} },
+		isLoading: false,
+		error: null,
+		firstRound: 1,
+		lastRound: 2,
+		keyDilution: 1,
+		selectionKey: 's',
+		votingKey: 'v',
+		stateProofKey: 'p',
+		keyregSubmitError: () => null,
+		keyregPasteAccount: null,
+		currentAccount: 'CONTRACT',
+		parentWalletAddress: state.isStakingContract ? 'Z' : null,
+		registerStakingContractVoteKey,
+		registerWalletVoteKey,
+		...state
+	});
+	runInContext(ts.transpileModule(body!, {}).outputText, context);
+	return {
+		registerStakingContractVoteKey,
+		registerWalletVoteKey,
+		run: () => runInContext('handleSubmit()', context)
+	};
+}
+
+test('handleSubmit sends nothing while a staking contract is being checked', async () => {
+	const checking = submitHarness({ isStakingContract: true, contractIncentive: 'checking' });
+	await checking.run();
+	expect(checking.registerStakingContractVoteKey).not.toHaveBeenCalled();
+	const capable = submitHarness({ isStakingContract: true, contractIncentive: 'capable' });
+	await capable.run();
+	expect(capable.registerStakingContractVoteKey).toHaveBeenCalledOnce();
+});
+
+test('handleSubmit still sends for a plain account, whose check stays at checking', async () => {
+	const plain = submitHarness({ isStakingContract: false, contractIncentive: 'checking' });
+	await plain.run();
+	expect(plain.registerWalletVoteKey).toHaveBeenCalledOnce();
 });
 
 test('a pasted minimum-fee URI leaves an unticked opt-in off', () => {
