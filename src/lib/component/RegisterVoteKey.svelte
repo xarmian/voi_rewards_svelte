@@ -377,6 +377,9 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// Fixed at the click: the props may change during the awaits below.
+		const parent = parentWalletAddress;
+		const ctcInfo = Number(contractId);
 		// The keyreg account (the contract's application address), for the lock.
 		const account = currentAccount;
 		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
@@ -409,8 +412,7 @@
 		// (An upgrade between this read and confirmation cannot be caught from the client.)
 		if (payment !== MIN_KEYREG_FEE) {
 			const fresh = await contractIncentiveOf(
-				async () =>
-					(await algodClient.getApplicationByID(Number(contractId)).do()).params?.approvalProgram
+				async () => (await algodClient.getApplicationByID(ctcInfo).do()).params?.approvalProgram
 			);
 			if (fresh !== 'capable') {
 				// A failed read may be transient: keep the option available so a retry rechecks.
@@ -428,11 +430,7 @@
 				return;
 			}
 		}
-		const fundsError = await signerFundsError(
-			parentWalletAddress,
-			contractKeyregCost(payment),
-			'register'
-		);
+		const fundsError = await signerFundsError(parent, contractKeyregCost(payment), 'register');
 		if (fundsError) {
 			error = fundsError;
 			transactionStatus = 'idle';
@@ -442,8 +440,6 @@
 		// The participate app call, once built: its last valid round ends the lock.
 		let sent: algosdk.Transaction | null = null;
 		try {
-			const ctcInfo = Number(contractId);
-
 			const schema = {
 				name: 'Participate',
 				desc: 'Participate in the staking contract',
@@ -472,7 +468,7 @@
 					null,
 					schema,
 					{
-						addr: parentWalletAddress,
+						addr: parent,
 						sk: new Uint8Array(0)
 					},
 					true,
@@ -482,7 +478,7 @@
 			};
 
 			const ci = new CONTRACT(ctcInfo, algodClient, null, abi.custom, {
-				addr: parentWalletAddress,
+				addr: parent,
 				sk: new Uint8Array(0)
 			});
 
@@ -717,12 +713,15 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// Fixed at the click: the props may change during the awaits below.
+		const parent = parentWalletAddress;
+		const ctcInfo = Number(contractId);
 		// The keyreg account (the contract's application address), for the lock.
 		const account = currentAccount;
 		// Leave 'idle' before the first await, so the disabled button blocks a second click.
 		transactionStatus = 'building';
 		const fundsError = await signerFundsError(
-			parentWalletAddress,
+			parent,
 			contractKeyregCost(MIN_KEYREG_FEE),
 			'offline'
 		);
@@ -736,8 +735,6 @@
 		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
-			const ctcInfo = Number(contractId);
-
 			const schema = {
 				name: 'Participate',
 				desc: 'Participate in the staking contract',
@@ -766,7 +763,7 @@
 					null,
 					schema,
 					{
-						addr: parentWalletAddress,
+						addr: parent,
 						sk: new Uint8Array(0)
 					},
 					true,
@@ -776,7 +773,7 @@
 			};
 
 			const ci = new CONTRACT(ctcInfo, algodClient, null, abi.custom, {
-				addr: parentWalletAddress,
+				addr: parent,
 				sk: new Uint8Array(0)
 			});
 

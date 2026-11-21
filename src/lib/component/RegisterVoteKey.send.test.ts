@@ -708,7 +708,7 @@ test('the staking registration message names the amounts', async () => {
 	);
 	await harness.run();
 	expect(harness.context.error).toBe(
-		'This account (Z…Z) needs 3.002 VOI for this registration (2.002 VOI for the transaction plus its 1 VOI minimum balance) but holds 1 VOI. Add at least 2.002 VOI and try again. Nothing was sent.'
+		'The signing account (Z…Z) needs 3.002 VOI for this registration (2.002 VOI for the transaction plus its 1 VOI minimum balance) but holds 1 VOI. Add at least 2.002 VOI and try again. Nothing was sent.'
 	);
 });
 
@@ -738,6 +738,32 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 		expect(harness.context.error).toBe(OVERSPEND);
 		expect(harness.signAndSendTransactions).not.toHaveBeenCalled();
 		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
+
+test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])(
+	'%s builds for the contract and parent taken at the click, even if they change during the balance read',
+	async (name) => {
+		const harness = stakingSendHarness(name, { payIncentiveFee: false, contractCanPay: true });
+		harness.accountInformation.mockImplementation(() => ({
+			exclude: () => ({
+				do: async () => {
+					harness.context.contractId = 2;
+					harness.context.parentWalletAddress = 'Y';
+					return ENOUGH;
+				}
+			})
+		}));
+		await harness.run();
+		expect(harness.context.error).toBeNull();
+		const [CONTRACT] = harness.sends;
+		expect(CONTRACT).toHaveBeenCalled();
+		for (const call of CONTRACT.mock.calls) {
+			expect(call[0]).toBe(1);
+			expect(call.find((arg: unknown) => (arg as { addr?: unknown })?.addr)).toMatchObject({
+				addr: 'Z'
+			});
+		}
 	}
 );
 

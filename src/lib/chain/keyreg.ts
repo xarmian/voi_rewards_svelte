@@ -455,7 +455,7 @@ export function shortfallMessage(
 	action: 'register' | 'offline'
 ): string {
 	const purpose = action === 'offline' ? 'to go offline' : 'for this registration';
-	return `This account (${shortAddress(account)}) needs ${formatMicroVoi(s.needed)} VOI ${purpose} (${formatMicroVoi(s.cost)} VOI for the transaction plus its ${formatMicroVoi(s.minBalance)} VOI minimum balance) but holds ${formatMicroVoi(s.have)} VOI. Add at least ${formatMicroVoi(s.shortfall)} VOI and try again. Nothing was sent.`;
+	return `The signing account (${shortAddress(account)}) needs ${formatMicroVoi(s.needed)} VOI ${purpose} (${formatMicroVoi(s.cost)} VOI for the transaction plus its ${formatMicroVoi(s.minBalance)} VOI minimum balance) but holds ${formatMicroVoi(s.have)} VOI. Add at least ${formatMicroVoi(s.shortfall)} VOI and try again. Nothing was sent.`;
 }
 
 // The base64 txns of the participate group from CONTRACT.custom. A failed simulate comes back as

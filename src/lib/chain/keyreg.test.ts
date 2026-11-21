@@ -859,13 +859,13 @@ describe('shortfallMessage', () => {
 
 	it('describes a registration the account cannot pay for', () => {
 		expect(shortfallMessage(short, address, 'register')).toBe(
-			'This account (AAAA…HFKQ) needs 2.102 VOI for this registration (2.002 VOI for the transaction plus its 0.1 VOI minimum balance) but holds 1 VOI. Add at least 1.102 VOI and try again. Nothing was sent.'
+			'The signing account (AAAA…HFKQ) needs 2.102 VOI for this registration (2.002 VOI for the transaction plus its 0.1 VOI minimum balance) but holds 1 VOI. Add at least 1.102 VOI and try again. Nothing was sent.'
 		);
 	});
 
 	it('describes going offline the account cannot pay for', () => {
 		expect(shortfallMessage(short, address, 'offline')).toBe(
-			'This account (AAAA…HFKQ) needs 2.102 VOI to go offline (2.002 VOI for the transaction plus its 0.1 VOI minimum balance) but holds 1 VOI. Add at least 1.102 VOI and try again. Nothing was sent.'
+			'The signing account (AAAA…HFKQ) needs 2.102 VOI to go offline (2.002 VOI for the transaction plus its 0.1 VOI minimum balance) but holds 1 VOI. Add at least 1.102 VOI and try again. Nothing was sent.'
 		);
 	});
 });
