@@ -266,17 +266,24 @@
 		if (pastedUriFee !== null && incentiveFromUri(pastedUriFee, cannotPay)) {
 			payIncentiveFee = true;
 		}
-		incentiveNotice =
-			cannotPay && asksForFee
+		// Say when a kept tick is more than the URI asks for, so the box and the URI never disagree.
+		incentiveNotice = cannotPay
+			? asksForFee
 				? contractIncentive === 'unverified'
 					? "This URI asks for the 2 VOI incentive fee, but this contract's version couldn't be verified to pay it. It will register with the normal fee."
 					: 'This URI asks for the 2 VOI incentive fee, which this staking contract cannot pay. It will register with the normal fee.'
+				: null
+			: pastedUriFee !== null && !asksForFee && payIncentiveFee
+				? 'This URI asks for the normal fee. The 2 VOI incentive option is still selected: untick it to pay the normal fee.'
 				: null;
 	}
 
 	async function handleSubmit() {
 		// A paste still reading the clipboard would overwrite the keys mid-send.
 		if (isLoading) return;
+		// A 2 VOI fee pasted during the contract check applies once it resolves; a click now would
+		// capture the minimum payment. The button is disabled too; this covers a racing click.
+		if (isStakingContract && contractIncentive === 'checking') return;
 		error = null;
 		console.log('Submitting participation key details');
 
@@ -1026,6 +1033,7 @@
 					<input
 						type="checkbox"
 						bind:checked={payIncentiveFee}
+						on:change={() => (incentiveNotice = null)}
 						disabled={accountCannotPay || transactionStatus !== 'idle'}
 						aria-describedby="incentive-fee-help"
 						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
@@ -1138,6 +1146,7 @@
 						class="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
 						disabled={transactionStatus !== 'idle' ||
 							isLoading ||
+							(isStakingContract && contractIncentive === 'checking') ||
 							!firstRound ||
 							!lastRound ||
 							!keyDilution ||
