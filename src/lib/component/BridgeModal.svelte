@@ -18,6 +18,7 @@
 	import { onMount } from 'svelte';
 	import { exactNFD, getNFD, nfdReceiveAddress, searchNFDomains } from '$lib/utils/nfd';
 	import { searchEnvoi, getEnvoiNames } from '$lib/utils/envoi';
+	import { safeAvatarUrl } from '$lib/utils/avatarUrl';
 	import { algodClient, algodIndexer } from '$lib/utils/algod';
 	import { sendAndConfirm, type TrackedOutcome } from '$lib/chain/sendAndConfirm';
 	import { buildAssetTransfer, buildPayment } from '$lib/chain/txBuilders';
@@ -391,12 +392,12 @@
 	}
 
 	function getAvatarUrl(result: NFDResult): string | null {
-		if (!result.properties) return null;
-		// First try verified avatar, then userDefined avatar
-		if (result.properties.verified?.avatar) {
-			return result.properties.verified.avatar;
-		}
-		return result.properties.userDefined?.avatar || null;
+		// First try the verified avatar, then the userDefined one; an off-list verified avatar falls through.
+		return (
+			safeAvatarUrl(result.properties?.verified?.avatar) ??
+			safeAvatarUrl(result.properties?.userDefined?.avatar) ??
+			null
+		);
 	}
 
 	async function handleSubmit() {
@@ -1559,7 +1560,7 @@
 															<div
 																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 															>
-																{#if 'owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)}
+																{#if 'owner' in result && getAvatarUrl(result)}
 																	<img
 																		src={getAvatarUrl(result)}
 																		alt="Avatar"
@@ -1733,7 +1734,7 @@
 															<div
 																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 															>
-																{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
+																{#if ('owner' in result && getAvatarUrl(result)) || ('avatar' in result && result.avatar)}
 																	<img
 																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
 																		alt="Avatar"
@@ -1944,7 +1945,7 @@
 															<div
 																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 															>
-																{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
+																{#if ('owner' in result && getAvatarUrl(result)) || ('avatar' in result && result.avatar)}
 																	<img
 																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
 																		alt="Avatar"
