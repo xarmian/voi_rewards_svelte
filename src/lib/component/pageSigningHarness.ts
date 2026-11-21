@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
 import { vi } from 'vitest';
-import { MIN_KEYREG_FEE, participatePayment } from '$lib/chain/keyreg';
+import {
+	contractKeyregCost,
+	MIN_KEYREG_FEE,
+	participateGroupTxns,
+	participatePayment
+} from '$lib/chain/keyreg';
 import { pageAccountState, signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 export function handlerSource(component: string, names: string[]) {
 	const source = readFileSync(new URL(`./${component}.svelte`, import.meta.url), 'utf8');
@@ -115,6 +120,10 @@ export function signingHarness(component: string, name: string, captured = 'X') 
 		signTransactions: io,
 		signAndSendTransactions: io,
 		sendWalletKeyreg: io,
+		// RegisterVoteKey's signer funds check reads algod before any wallet prompt.
+		signerFundsError: io,
+		contractKeyregCost,
+		participateGroupTxns,
 		participatePayment,
 		MIN_KEYREG_FEE,
 		payIncentiveFee: false,

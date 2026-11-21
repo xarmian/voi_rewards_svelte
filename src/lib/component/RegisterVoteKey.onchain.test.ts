@@ -11,6 +11,7 @@ import {
 	keyregSendFailure,
 	MIN_KEYREG_FEE,
 	onChainKeyregOffer,
+	participateGroupTxns,
 	participatePayment,
 	sendWalletKeyreg
 } from '$lib/chain/keyreg';
@@ -94,6 +95,8 @@ function harness(opts: {
 	contractIncentive?: string;
 	reads?: unknown[];
 	recheck?: string;
+	// What the signer funds check returns (its own algod read is tested in the send tests).
+	fundsError?: string | null;
 }) {
 	const functions = [
 		'signerOrError',
@@ -141,6 +144,7 @@ function harness(opts: {
 		};
 	});
 	const contractIncentiveOf = vi.fn().mockResolvedValue(opts.recheck ?? 'capable');
+	const signerFundsError = vi.fn().mockResolvedValue(opts.fundsError ?? null);
 	const contractIncentive = opts.contractIncentive ?? (contract ? 'capable' : 'checking');
 	const signer = contract ? OWNER : WALLET;
 	const context = createContext({
@@ -191,6 +195,9 @@ function harness(opts: {
 		keyregSendFailure,
 		participatePayment,
 		contractIncentiveOf,
+		signerFundsError,
+		contractKeyregCost,
+		participateGroupTxns,
 		MIN_KEYREG_FEE,
 		NO_OFFER: { kind: 'none' },
 		BALANCE_RANGE,
@@ -211,6 +218,7 @@ function harness(opts: {
 		participate,
 		setExtraTxns,
 		contractIncentiveOf,
+		signerFundsError,
 		sends: [CONTRACT, participate, custom, setExtraTxns, signAndSendTransactions],
 		run: () => runInContext('registerOnChainKeys()', context) as Promise<void>,
 		call: (name: string) => runInContext(`${name}()`, context) as Promise<void>,
@@ -562,6 +570,24 @@ describe('a failure that cannot have landed does not lock', () => {
 		const h = harness(opts);
 		await h.run();
 		expect(h.context.error).toMatch(/nothing was sent/);
+		expect(lockOf(WALLET)).toBeNull();
+		expect(lockOf(CONTRACT_ACCOUNT)).toBeNull();
+	});
+
+	test.each([
+		['an account', false],
+		['a staking contract', true]
+	])('%s whose signer cannot pay sends nothing and ends idle', async (_, contract) => {
+		const h = harness({ contract, fundsError: 'short of funds' });
+		await h.run();
+		expect(h.signerFundsError).toHaveBeenCalledExactlyOnceWith(
+			contract ? OWNER : WALLET,
+			contract ? contractKeyregCost(INCENTIVE_KEYREG_FEE) : INCENTIVE_KEYREG_FEE,
+			'register'
+		);
+		expect(h.context.error).toBe('short of funds');
+		for (const call of h.sends) expect(call).not.toHaveBeenCalled();
+		expect(h.context.transactionStatus).toBe('idle');
 		expect(lockOf(WALLET)).toBeNull();
 		expect(lockOf(CONTRACT_ACCOUNT)).toBeNull();
 	});

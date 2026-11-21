@@ -33,8 +33,11 @@
 		type OnChainKeyregOffer,
 		type ParsedKeys,
 		parseKeyregInput,
+		participateGroupTxns,
 		participatePayment,
-		sendWalletKeyreg
+		sendWalletKeyreg,
+		shortfallMessage,
+		signerShortfall
 	} from '$lib/chain/keyreg';
 	import {
 		activeKeyregLock,
@@ -343,6 +346,23 @@
 		}
 	}
 
+	// Whether the signing account can pay `cost` (microVOI) and keep its minimum balance, read fresh
+	// from algod: the refusal message, or null to go ahead. A failed read fails closed.
+	async function signerFundsError(
+		address: string,
+		cost: number,
+		action: 'register' | 'offline'
+	): Promise<string | null> {
+		try {
+			const funds = await algodClient.accountInformation(address).exclude('all').do();
+			const short = signerShortfall(funds, cost);
+			return short ? shortfallMessage(short, address, action) : null;
+		} catch (err) {
+			console.error('Error reading the signing account balance:', err);
+			return "Couldn't read the signing account's balance from the network, so nothing was sent. Try again.";
+		}
+	}
+
 	// fixed: what registerOnChainKeys read from chain, sent instead of the form.
 	async function registerStakingContractVoteKey(fixed: FixedSend | null = null) {
 		console.log('Registering staking contract vote key');
@@ -357,6 +377,9 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// Fixed at the click: the props may change during the awaits below.
+		const parent = parentWalletAddress;
+		const ctcInfo = Number(contractId);
 		// The keyreg account (the contract's application address), for the lock.
 		const account = currentAccount;
 		// Leave 'idle' before the first await, so the disabled button blocks a second submit.
@@ -389,8 +412,7 @@
 		// (An upgrade between this read and confirmation cannot be caught from the client.)
 		if (payment !== MIN_KEYREG_FEE) {
 			const fresh = await contractIncentiveOf(
-				async () =>
-					(await algodClient.getApplicationByID(Number(contractId)).do()).params?.approvalProgram
+				async () => (await algodClient.getApplicationByID(ctcInfo).do()).params?.approvalProgram
 			);
 			if (fresh !== 'capable') {
 				// A failed read may be transient: keep the option available so a retry rechecks.
@@ -408,12 +430,16 @@
 				return;
 			}
 		}
+		const fundsError = await signerFundsError(parent, contractKeyregCost(payment), 'register');
+		if (fundsError) {
+			error = fundsError;
+			transactionStatus = 'idle';
+			return;
+		}
 
 		// The participate app call, once built: its last valid round ends the lock.
 		let sent: algosdk.Transaction | null = null;
 		try {
-			const ctcInfo = Number(contractId);
-
 			const schema = {
 				name: 'Participate',
 				desc: 'Participate in the staking contract',
@@ -442,7 +468,7 @@
 					null,
 					schema,
 					{
-						addr: parentWalletAddress,
+						addr: parent,
 						sk: new Uint8Array(0)
 					},
 					true,
@@ -452,7 +478,7 @@
 			};
 
 			const ci = new CONTRACT(ctcInfo, algodClient, null, abi.custom, {
-				addr: parentWalletAddress,
+				addr: parent,
 				sk: new Uint8Array(0)
 			});
 
@@ -476,7 +502,7 @@
 			const customR = await ci.custom();
 
 			transactionStatus = 'signing';
-			const txns: algosdk.Transaction[] = customR.txns.map((txn: string) =>
+			const txns: algosdk.Transaction[] = participateGroupTxns(customR).map((txn: string) =>
 				algosdk.decodeUnsignedTransaction(new Uint8Array(Buffer.from(txn, 'base64')))
 			);
 
@@ -517,6 +543,8 @@
 	async function registerWalletVoteKey(fixed: FixedSend | null = null) {
 		const signer = signerOrError();
 		if (!signer) return;
+		// The sender at the click: the prop may change during the awaits below.
+		const sender = walletAddress;
 		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
@@ -534,7 +562,7 @@
 
 			const tx = buildWalletKeyregTxn({
 				params,
-				sender: walletAddress,
+				sender,
 				votingKey: keys.votingKey,
 				selectionKey: keys.selectionKey,
 				stateProofKey: keys.stateProofKey,
@@ -543,6 +571,12 @@
 				keyDilution: keys.keyDilution,
 				fee
 			});
+			const fundsError = await signerFundsError(sender, Number(tx.fee), 'register');
+			if (fundsError) {
+				error = fundsError;
+				transactionStatus = 'idle';
+				return;
+			}
 			sent = tx;
 
 			transactionStatus = 'signing';
@@ -629,13 +663,21 @@
 		error = null;
 		const signer = signerOrError();
 		if (!signer) return;
+		// The sender at the click: the prop may change during the awaits below.
+		const sender = walletAddress;
 		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
 
 			// Going offline is a key registration with no keys (never nonParticipation; see TASK-78)
-			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
+			const tx = buildWalletKeyregTxn({ params, sender, offline: true });
+			const fundsError = await signerFundsError(sender, Number(tx.fee), 'offline');
+			if (fundsError) {
+				error = fundsError;
+				transactionStatus = 'idle';
+				return;
+			}
 			sent = tx;
 
 			transactionStatus = 'signing';
@@ -675,15 +717,27 @@
 			error = wrongSignerMessage();
 			return;
 		}
+		// Fixed at the click: the props may change during the awaits below.
+		const parent = parentWalletAddress;
+		const ctcInfo = Number(contractId);
 		// The keyreg account (the contract's application address), for the lock.
 		const account = currentAccount;
+		// Leave 'idle' before the first await, so the disabled button blocks a second click.
+		transactionStatus = 'building';
+		const fundsError = await signerFundsError(
+			parent,
+			contractKeyregCost(MIN_KEYREG_FEE),
+			'offline'
+		);
+		if (fundsError) {
+			error = fundsError;
+			transactionStatus = 'idle';
+			return;
+		}
 
 		// The participate app call, once built: its last valid round ends the lock.
 		let sent: algosdk.Transaction | null = null;
 		try {
-			transactionStatus = 'building';
-			const ctcInfo = Number(contractId);
-
 			const schema = {
 				name: 'Participate',
 				desc: 'Participate in the staking contract',
@@ -712,7 +766,7 @@
 					null,
 					schema,
 					{
-						addr: parentWalletAddress,
+						addr: parent,
 						sk: new Uint8Array(0)
 					},
 					true,
@@ -722,7 +776,7 @@
 			};
 
 			const ci = new CONTRACT(ctcInfo, algodClient, null, abi.custom, {
-				addr: parentWalletAddress,
+				addr: parent,
 				sk: new Uint8Array(0)
 			});
 
@@ -746,7 +800,7 @@
 			const customR = await ci.custom();
 
 			transactionStatus = 'signing';
-			const txns: algosdk.Transaction[] = customR.txns.map((txn: string) =>
+			const txns: algosdk.Transaction[] = participateGroupTxns(customR).map((txn: string) =>
 				algosdk.decodeUnsignedTransaction(new Uint8Array(Buffer.from(txn, 'base64')))
 			);
 

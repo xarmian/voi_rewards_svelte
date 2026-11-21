@@ -1,11 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
+import * as algosdk from 'algosdk';
 import {
+	buildWalletKeyregTxn,
+	contractKeyregCost,
 	incentiveFromUri,
+	incentiveKeyregFee,
 	keptTickNotice,
 	MIN_KEYREG_FEE,
-	participatePayment
+	participateGroupTxns,
+	participatePayment,
+	sendWalletKeyreg,
+	shortfallMessage,
+	signerShortfall
 } from '$lib/chain/keyreg';
 import { signerMatchesAccount, wrongSignerMessage } from '$lib/chain/signerGate';
 import { expect, test, vi } from 'vitest';
@@ -15,6 +23,31 @@ import { expect, test, vi } from 'vitest';
 // registration send must map one that may have landed to the "check the explorer" error with the
 // local transaction id, or the user retries and registers twice.
 const source = readFileSync(new URL('./RegisterVoteKey.svelte', import.meta.url), 'utf8');
+
+// The signing account's funds check every send runs before any wallet prompt; empty when absent.
+const fundsHelper = source.match(/async function signerFundsError\([^]*?\n\t\}/)?.[0] ?? '';
+
+// algod's account record for the signer, as the funds check reads it.
+function fundsReader(funds: { amount: bigint; minBalance: bigint } | Error) {
+	return vi.fn(() => ({
+		exclude: () => ({
+			do: async () => {
+				if (funds instanceof Error) throw funds;
+				return funds;
+			}
+		})
+	}));
+}
+const ENOUGH = { amount: 100_000_000_000n, minBalance: 100_000n };
+// The helpers the funds check and the staking group read use, and the Error they throw, so the
+// flows' instanceof check sees it.
+const fundsDeps = {
+	signerShortfall,
+	shortfallMessage,
+	contractKeyregCost,
+	participateGroupTxns,
+	Error
+};
 
 test('both staking-contract flows route a failed send through keyregSendFailure with the local txid', () => {
 	expect(source.match(/signAndSendTransactions\(\[txns\], signer\)/g)).toHaveLength(2);
@@ -42,6 +75,7 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 				expect(body).toBeDefined();
 				return body;
 			})
+			.concat(fundsHelper)
 			.join('\n');
 		for (const selected of ['X', 'Z']) {
 			const participate = vi.fn().mockResolvedValue({ obj: {} });
@@ -72,7 +106,8 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 				transactionStatus: 'idle',
 				CONTRACT,
 				abi: { custom: {} },
-				algodClient: {},
+				algodClient: { accountInformation: fundsReader(ENOUGH) },
+				...fundsDeps,
 				Buffer,
 				votingKey: '',
 				selectionKey: '',
@@ -120,10 +155,12 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 function stakingSendHarness(
 	name: string,
 	flags: { payIncentiveFee: boolean; contractCanPay: boolean },
-	recheck: string = 'capable'
+	recheck: string = 'capable',
+	funds: { amount: bigint; minBalance: bigint } | Error = ENOUGH
 ) {
 	const functions = ['signerOrError', name]
 		.map((fn) => source.match(new RegExp(`(?:async )?function ${fn}\\([^]*?\\n\\t\\}`))?.[0])
+		.concat(fundsHelper)
 		.join('\n');
 	const setExtraTxns = vi.fn();
 	const participate = vi.fn().mockResolvedValue({ obj: {} });
@@ -139,6 +176,7 @@ function stakingSendHarness(
 	});
 	const signAndSendTransactions = vi.fn().mockResolvedValue(true);
 	const contractIncentiveOf = vi.fn().mockResolvedValue(recheck);
+	const accountInformation = fundsReader(funds);
 	const context = createContext({
 		canSignTransactions: true,
 		capturePageSigner: () => ({ address: 'Z' }),
@@ -153,7 +191,8 @@ function stakingSendHarness(
 		transactionStatus: 'idle',
 		CONTRACT,
 		abi: { custom: {} },
-		algodClient: {},
+		algodClient: { accountInformation },
+		...fundsDeps,
 		Buffer,
 		votingKey: '',
 		selectionKey: '',
@@ -174,7 +213,10 @@ function stakingSendHarness(
 	return {
 		context,
 		contractIncentiveOf,
+		accountInformation,
+		custom,
 		participate,
+		signAndSendTransactions,
 		sends: [CONTRACT, participate, custom, setExtraTxns, signAndSendTransactions],
 		setExtraTxns,
 		run: () => runInContext(`${name}()`, context)
@@ -624,3 +666,267 @@ test('a pasted minimum-fee URI leaves an unticked opt-in off', () => {
 	expect(context.payIncentiveFee).toBe(false);
 	expect(context.incentiveNotice).toBeNull();
 });
+
+// A signer that can't cover the transaction plus its own minimum balance is refused before any
+// wallet prompt, with the amounts, instead of failing inside the wallet or the simulate.
+const SHORT = { amount: 1_000_000n, minBalance: 1_000_000n };
+const READ_FAILED =
+	"Couldn't read the signing account's balance from the network, so nothing was sent. Try again.";
+const SIMULATE_FAILED =
+	"Couldn't prepare the staking contract transaction, so nothing was sent: overspend (account CONTRACT)";
+
+test.each([
+	['registerStakingContractVoteKey', false, 'register', contractKeyregCost(MIN_KEYREG_FEE)],
+	['registerStakingContractVoteKey', true, 'register', contractKeyregCost(2_000_000)],
+	['goOfflineStakingContractVoteKey', false, 'offline', contractKeyregCost(MIN_KEYREG_FEE)]
+] as const)(
+	'%s (opted in: %s) sends nothing when the parent account cannot pay',
+	async (name, optedIn, action, cost) => {
+		const harness = stakingSendHarness(
+			name,
+			{ payIncentiveFee: optedIn, contractCanPay: true },
+			'capable',
+			SHORT
+		);
+		await harness.run();
+		expect(harness.accountInformation).toHaveBeenCalledExactlyOnceWith('Z');
+		expect(harness.context.error).toBe(
+			shortfallMessage(signerShortfall(SHORT, cost)!, 'Z', action)
+		);
+		expect(harness.context.error).toMatch(/Nothing was sent\.$/);
+		for (const call of harness.sends) expect(call).not.toHaveBeenCalled();
+		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
+
+test('the staking registration message names the amounts', async () => {
+	const harness = stakingSendHarness(
+		'registerStakingContractVoteKey',
+		{ payIncentiveFee: true, contractCanPay: true },
+		'capable',
+		SHORT
+	);
+	await harness.run();
+	expect(harness.context.error).toBe(
+		'The signing account (Z…Z) needs 3.002 VOI for this registration (2.002 VOI for the transaction plus its 1 VOI minimum balance) but holds 1 VOI. Add at least 2.002 VOI and try again. Nothing was sent.'
+	);
+});
+
+test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])(
+	'%s sends nothing when the parent account balance cannot be read',
+	async (name) => {
+		const harness = stakingSendHarness(
+			name,
+			{ payIncentiveFee: false, contractCanPay: true },
+			'capable',
+			new Error('algod down')
+		);
+		await harness.run();
+		expect(harness.context.error).toBe(READ_FAILED);
+		for (const call of harness.sends) expect(call).not.toHaveBeenCalled();
+		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
+
+test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])(
+	'%s shows a readable error when the participate group fails to simulate',
+	async (name) => {
+		const harness = stakingSendHarness(name, { payIncentiveFee: false, contractCanPay: true });
+		harness.custom.mockResolvedValueOnce({
+			success: false,
+			error: new Error('overspend (account CONTRACT)')
+		});
+		await harness.run();
+		expect(harness.context.error).not.toContain("reading 'map'");
+		expect(harness.context.error).toBe(SIMULATE_FAILED);
+		expect(harness.signAndSendTransactions).not.toHaveBeenCalled();
+		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
+
+test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])(
+	'%s builds for the contract and parent taken at the click, even if they change during the balance read',
+	async (name) => {
+		const harness = stakingSendHarness(name, { payIncentiveFee: false, contractCanPay: true });
+		harness.accountInformation.mockImplementation(() => ({
+			exclude: () => ({
+				do: async () => {
+					harness.context.contractId = 2;
+					harness.context.parentWalletAddress = 'Y';
+					return ENOUGH;
+				}
+			})
+		}));
+		await harness.run();
+		expect(harness.context.error).toBeNull();
+		const [CONTRACT] = harness.sends;
+		expect(CONTRACT).toHaveBeenCalled();
+		for (const call of CONTRACT.mock.calls) {
+			expect(call[0]).toBe(1);
+			expect(call.find((arg: unknown) => (arg as { addr?: unknown })?.addr)).toMatchObject({
+				addr: 'Z'
+			});
+		}
+	}
+);
+
+test('an opted-in registration re-checks, reads funds and builds for the contract and parent taken at the click', async () => {
+	const harness = stakingSendHarness('registerStakingContractVoteKey', {
+		payIncentiveFee: true,
+		contractCanPay: true
+	});
+	const getApplicationByID = vi.fn(() => ({
+		do: async () => ({ params: { approvalProgram: new Uint8Array([1]) } })
+	}));
+	(harness.context.algodClient as Record<string, unknown>).getApplicationByID = getApplicationByID;
+	harness.contractIncentiveOf.mockImplementation(async (read: () => Promise<unknown>) => {
+		harness.context.contractId = 2;
+		harness.context.parentWalletAddress = 'Y';
+		await read();
+		return 'capable';
+	});
+	await harness.run();
+	expect(harness.context.error).toBeNull();
+	expect(getApplicationByID).toHaveBeenCalledExactlyOnceWith(1);
+	expect(harness.accountInformation).toHaveBeenCalledExactlyOnceWith('Z');
+	const [CONTRACT] = harness.sends;
+	expect(CONTRACT).toHaveBeenCalled();
+	for (const call of CONTRACT.mock.calls) {
+		expect(call[0]).toBe(1);
+		expect(call.find((arg: unknown) => (arg as { addr?: unknown })?.addr)).toMatchObject({
+			addr: 'Z'
+		});
+	}
+});
+
+test('the staking flows take the participate group through participateGroupTxns', () => {
+	expect(source.match(/participateGroupTxns\(customR\)\.map\(/g)).toHaveLength(2);
+	expect(source).not.toMatch(/customR\.txns/);
+});
+
+const WALLET = algosdk.generateAccount().addr.toString();
+const walletParams = {
+	fee: 0n,
+	minFee: 1000n,
+	flatFee: false,
+	firstValid: 5_000_000n,
+	lastValid: 5_001_000n,
+	genesisID: 'voimain-v1.0',
+	genesisHash: new Uint8Array(32).fill(1)
+};
+
+function walletSendHarness(
+	name: string,
+	funds: { amount: bigint; minBalance: bigint } | Error,
+	payIncentiveFee = false
+) {
+	const functions = ['signerOrError', name]
+		.map((fn) => source.match(new RegExp(`(?:async )?function ${fn}\\([^]*?\\n\\t\\}`))?.[0])
+		.concat(fundsHelper)
+		.join('\n');
+	const accountInformation = fundsReader(funds);
+	const signAndSendTransactions = vi.fn().mockResolvedValue(true);
+	const context = createContext({
+		console: { log: vi.fn(), error: vi.fn() },
+		canSignTransactions: true,
+		capturePageSigner: () => ({ address: WALLET }),
+		signerMatchesAccount,
+		wrongSignerMessage,
+		pageAddress: WALLET,
+		walletAddress: WALLET,
+		currentAccount: WALLET,
+		parentWalletAddress: null,
+		contractId: null,
+		error: null,
+		transactionStatus: 'idle',
+		transactionId: null,
+		algodClient: {
+			accountInformation,
+			getTransactionParams: () => ({ do: async () => walletParams })
+		},
+		algosdk: { waitForConfirmation: vi.fn().mockResolvedValue({}) },
+		...fundsDeps,
+		buildWalletKeyregTxn,
+		sendWalletKeyreg,
+		incentiveKeyregFee,
+		signAndSendTransactions,
+		onSuccess: vi.fn(),
+		Buffer,
+		votingKey: Buffer.alloc(32, 1).toString('base64'),
+		selectionKey: Buffer.alloc(32, 2).toString('base64'),
+		stateProofKey: Buffer.alloc(64, 3).toString('base64'),
+		firstRound: '10',
+		lastRound: '20',
+		keyDilution: '5',
+		payIncentiveFee
+	});
+	runInContext(ts.transpileModule(functions, {}).outputText, context);
+	return {
+		context,
+		accountInformation,
+		signAndSendTransactions,
+		run: () => runInContext(`${name}()`, context) as Promise<void>
+	};
+}
+
+test.each([
+	['registerWalletVoteKey', false, 'register', 1000],
+	['registerWalletVoteKey', true, 'register', 2_000_000],
+	['goOfflineWalletVoteKey', false, 'offline', 1000]
+] as const)(
+	'%s (opted in: %s) sends nothing when the account cannot pay the fee plus its minimum balance',
+	async (name, optedIn, action, fee) => {
+		const funds = { amount: BigInt(fee) + 99_999n, minBalance: 100_000n };
+		const harness = walletSendHarness(name, funds, optedIn);
+		await harness.run();
+		expect(harness.accountInformation).toHaveBeenCalledExactlyOnceWith(WALLET);
+		expect(harness.context.error).toBe(
+			shortfallMessage(signerShortfall(funds, fee)!, WALLET, action)
+		);
+		expect(harness.context.error).toContain('Add at least 0.000001 VOI');
+		expect(harness.signAndSendTransactions).not.toHaveBeenCalled();
+		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
+
+test.each(['registerWalletVoteKey', 'goOfflineWalletVoteKey'])(
+	'%s checks and sends from the account taken at the click, even if it changes during the awaits',
+	async (name) => {
+		const harness = walletSendHarness(name, ENOUGH);
+		const other = algosdk.generateAccount().addr.toString();
+		const algod = harness.context.algodClient as { getTransactionParams: unknown };
+		algod.getTransactionParams = () => ({
+			do: async () => {
+				harness.context.walletAddress = other;
+				return walletParams;
+			}
+		});
+		await harness.run();
+		expect(harness.context.error).toBeNull();
+		expect(harness.accountInformation).toHaveBeenCalledExactlyOnceWith(WALLET);
+		const [[groups]] = harness.signAndSendTransactions.mock.calls;
+		expect(groups[0][0].sender.toString()).toBe(WALLET);
+	}
+);
+
+test.each(['registerWalletVoteKey', 'goOfflineWalletVoteKey'])(
+	'%s sends when the account holds exactly the fee plus its minimum balance',
+	async (name) => {
+		const harness = walletSendHarness(name, { amount: 101_000n, minBalance: 100_000n });
+		await harness.run();
+		expect(harness.context.error).toBeNull();
+		expect(harness.signAndSendTransactions).toHaveBeenCalledOnce();
+		expect(harness.context.transactionStatus).toBe('success');
+	}
+);
+
+test.each(['registerWalletVoteKey', 'goOfflineWalletVoteKey'])(
+	'%s sends nothing when the account balance cannot be read',
+	async (name) => {
+		const harness = walletSendHarness(name, new Error('algod down'));
+		await harness.run();
+		expect(harness.context.error).toBe(READ_FAILED);
+		expect(harness.signAndSendTransactions).not.toHaveBeenCalled();
+		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
