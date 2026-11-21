@@ -419,6 +419,78 @@ export function contractKeyregCost(payment: number): number {
 	return payment + PARTICIPATE_GROUP_FEES;
 }
 
+// microVOI as exact VOI, trailing zeros trimmed: 2_002_000 -> "2.002".
+export function formatMicroVoi(micro: bigint | number): string {
+	const value = BigInt(micro);
+	const abs = value < 0n ? -value : value;
+	const fraction = (abs % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+	return `${value < 0n ? '-' : ''}${abs / 1_000_000n}${fraction ? `.${fraction}` : ''}`;
+}
+
+export interface SignerShortfall {
+	needed: bigint;
+	have: bigint;
+	cost: bigint;
+	minBalance: bigint;
+	shortfall: bigint;
+}
+
+// What the signing account lacks to pay `cost` and keep its minimum balance (algod rejects a
+// transaction that leaves the sender below it), or null when it holds enough.
+export function signerShortfall(
+	funds: { amount: number | bigint; minBalance: number | bigint },
+	cost: number | bigint
+): SignerShortfall | null {
+	const have = BigInt(funds.amount);
+	const minBalance = BigInt(funds.minBalance);
+	const total = BigInt(cost);
+	const needed = total + minBalance;
+	if (have >= needed) return null;
+	return { needed, have, cost: total, minBalance, shortfall: needed - have };
+}
+
+export function shortfallMessage(
+	s: SignerShortfall,
+	account: string,
+	action: 'register' | 'offline'
+): string {
+	const purpose = action === 'offline' ? 'to go offline' : 'for this registration';
+	return `This account (${shortAddress(account)}) needs ${formatMicroVoi(s.needed)} VOI ${purpose} (${formatMicroVoi(s.cost)} VOI for the transaction plus its ${formatMicroVoi(s.minBalance)} VOI minimum balance) but holds ${formatMicroVoi(s.have)} VOI. Add at least ${formatMicroVoi(s.shortfall)} VOI and try again. Nothing was sent.`;
+}
+
+// The base64 txns of the participate group from CONTRACT.custom. A failed simulate comes back as
+// { success: false, error } with no txns; that becomes a readable error.
+export function participateGroupTxns(result: unknown): string[] {
+	const r = (typeof result === 'object' && result !== null ? result : {}) as {
+		success?: unknown;
+		txns?: unknown;
+		error?: unknown;
+	};
+	if (
+		r.success !== false &&
+		Array.isArray(r.txns) &&
+		r.txns.every((txn) => typeof txn === 'string')
+	) {
+		return r.txns;
+	}
+	const cause =
+		typeof r.error === 'string'
+			? r.error
+			: typeof (r.error as { message?: unknown } | null)?.message === 'string'
+				? (r.error as { message: string }).message
+				: '';
+	if (/overspend/i.test(cause)) {
+		throw new Error(
+			"The signing account doesn't hold enough VOI to cover this transaction and keep its minimum balance, so nothing was sent."
+		);
+	}
+	throw new Error(
+		cause
+			? `Couldn't prepare the staking contract transaction, so nothing was sent: ${cause}`
+			: "Couldn't prepare the staking contract transaction, so nothing was sent."
+	);
+}
+
 // The fee the opt-in selects; null is the network minimum (see keyregFee).
 export function incentiveKeyregFee(payIncentiveFee: boolean): number | null {
 	return payIncentiveFee ? INCENTIVE_KEYREG_FEE : null;

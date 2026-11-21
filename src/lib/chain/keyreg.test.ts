@@ -15,14 +15,18 @@ import {
 	keyregFee,
 	keyregSubmitError,
 	EXPIRING_SOON_SECONDS,
+	formatMicroVoi,
 	mayHaveLanded,
 	ONCHAIN_KEYREG_MIN_ROUNDS_LEFT,
 	onChainKeyregOffer,
 	parseKeyregInput,
+	participateGroupTxns,
 	participatePayment,
 	programHash,
 	KeyregUnconfirmedError,
-	sendWalletKeyreg
+	sendWalletKeyreg,
+	shortfallMessage,
+	signerShortfall
 } from './keyreg';
 import { FALLBACK_BLOCK_TIME } from '$lib/chain/blockTime';
 import {
@@ -800,5 +804,127 @@ describe('onChainKeyregOffer', () => {
 			kind: 'offer',
 			balanceInRange: true
 		});
+	});
+});
+
+describe('formatMicroVoi', () => {
+	it.each([
+		[0, '0'],
+		[1, '0.000001'],
+		[1_000_000, '1'],
+		[2_002_000, '2.002'],
+		[100_000, '0.1'],
+		[123_456_789, '123.456789']
+	])('formats %d microVOI as %s VOI', (micro, text) => {
+		expect(formatMicroVoi(micro)).toBe(text);
+		expect(formatMicroVoi(BigInt(micro))).toBe(text);
+	});
+
+	it('is exact beyond the safe integer range', () => {
+		expect(formatMicroVoi(10_000_000_000_000_000_001n)).toBe('10000000000000.000001');
+	});
+});
+
+describe('signerShortfall', () => {
+	it('is null when the account holds exactly the cost plus its minimum balance', () => {
+		expect(signerShortfall({ amount: 1_102_000, minBalance: 100_000 }, 1_002_000)).toBeNull();
+		expect(signerShortfall({ amount: 1_102_000n, minBalance: 100_000n }, 1_002_000)).toBeNull();
+	});
+
+	it('is null when the account holds more than needed', () => {
+		expect(signerShortfall({ amount: 5_000_000n, minBalance: 100_000n }, 1000)).toBeNull();
+	});
+
+	it('reports one microVOI short of the cost plus the minimum balance', () => {
+		for (const funds of [
+			{ amount: 1_101_999, minBalance: 100_000 },
+			{ amount: 1_101_999n, minBalance: 100_000n }
+		]) {
+			expect(signerShortfall(funds, 1_002_000)).toEqual({
+				needed: 1_102_000n,
+				have: 1_101_999n,
+				cost: 1_002_000n,
+				minBalance: 100_000n,
+				shortfall: 1n
+			});
+		}
+		expect(signerShortfall({ amount: 1_101_999n, minBalance: 100_000n }, 1_002_000n)).toEqual(
+			expect.objectContaining({ shortfall: 1n })
+		);
+	});
+});
+
+describe('shortfallMessage', () => {
+	const short = signerShortfall({ amount: 1_000_000n, minBalance: 100_000n }, 2_002_000)!;
+
+	it('describes a registration the account cannot pay for', () => {
+		expect(shortfallMessage(short, address, 'register')).toBe(
+			'This account (AAAA…HFKQ) needs 2.102 VOI for this registration (2.002 VOI for the transaction plus its 0.1 VOI minimum balance) but holds 1 VOI. Add at least 1.102 VOI and try again. Nothing was sent.'
+		);
+	});
+
+	it('describes going offline the account cannot pay for', () => {
+		expect(shortfallMessage(short, address, 'offline')).toBe(
+			'This account (AAAA…HFKQ) needs 2.102 VOI to go offline (2.002 VOI for the transaction plus its 0.1 VOI minimum balance) but holds 1 VOI. Add at least 1.102 VOI and try again. Nothing was sent.'
+		);
+	});
+});
+
+describe('participateGroupTxns', () => {
+	const OVERSPEND =
+		"The signing account doesn't hold enough VOI to cover this transaction and keep its minimum balance, so nothing was sent.";
+
+	it('returns the txns of a successful result', () => {
+		expect(participateGroupTxns({ success: true, txns: ['a', 'b'] })).toEqual(['a', 'b']);
+		expect(participateGroupTxns({ txns: ['a', 'b'] })).toEqual(['a', 'b']);
+	});
+
+	it('turns an overspend simulate failure into a readable message', () => {
+		const result = {
+			success: false,
+			error: new Error(
+				'Network request error. Received status 400: transaction rejected: overspend (account X, data {amount: 1})'
+			)
+		};
+		expect(() => participateGroupTxns(result)).toThrow(OVERSPEND);
+	});
+
+	it('turns any other failure into a readable message with its cause', () => {
+		expect(() =>
+			participateGroupTxns({ success: false, error: new Error('logic eval error') })
+		).toThrow(
+			"Couldn't prepare the staking contract transaction, so nothing was sent: logic eval error"
+		);
+	});
+
+	it('turns a failure with no message into a readable message', () => {
+		for (const result of [{ success: false }, undefined, null, {}, { txns: [1, 2] }]) {
+			let thrown: unknown;
+			try {
+				participateGroupTxns(result);
+			} catch (err) {
+				thrown = err;
+			}
+			expect(thrown).toBeInstanceOf(Error);
+			expect((thrown as Error).message).toBe(
+				"Couldn't prepare the staking contract transaction, so nothing was sent."
+			);
+		}
+	});
+
+	it('never surfaces the undefined txns crash', () => {
+		for (const result of [
+			{ success: false, error: new Error('overspend') },
+			{ success: false, error: new Error('other') },
+			{ success: false },
+			{ success: false, txns: ['a'] }
+		]) {
+			expect(() => participateGroupTxns(result)).toThrow(Error);
+			try {
+				participateGroupTxns(result);
+			} catch (err) {
+				expect((err as Error).message).not.toContain("reading 'map'");
+			}
+		}
 	});
 });
