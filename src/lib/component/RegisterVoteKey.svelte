@@ -359,7 +359,7 @@
 			return short ? shortfallMessage(short, address, action) : null;
 		} catch (err) {
 			console.error('Error reading the signing account balance:', err);
-			return "Couldn't read this account's balance from the network, so nothing was sent. Try again.";
+			return "Couldn't read the signing account's balance from the network, so nothing was sent. Try again.";
 		}
 	}
 
@@ -543,6 +543,8 @@
 	async function registerWalletVoteKey(fixed: FixedSend | null = null) {
 		const signer = signerOrError();
 		if (!signer) return;
+		// The sender at the click: the prop may change during the awaits below.
+		const sender = walletAddress;
 		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
@@ -560,7 +562,7 @@
 
 			const tx = buildWalletKeyregTxn({
 				params,
-				sender: walletAddress,
+				sender,
 				votingKey: keys.votingKey,
 				selectionKey: keys.selectionKey,
 				stateProofKey: keys.stateProofKey,
@@ -569,7 +571,7 @@
 				keyDilution: keys.keyDilution,
 				fee
 			});
-			const fundsError = await signerFundsError(walletAddress, Number(tx.fee), 'register');
+			const fundsError = await signerFundsError(sender, Number(tx.fee), 'register');
 			if (fundsError) {
 				error = fundsError;
 				transactionStatus = 'idle';
@@ -661,14 +663,16 @@
 		error = null;
 		const signer = signerOrError();
 		if (!signer) return;
+		// The sender at the click: the prop may change during the awaits below.
+		const sender = walletAddress;
 		let sent: algosdk.Transaction | null = null;
 		try {
 			transactionStatus = 'building';
 			const params = await algodClient.getTransactionParams().do();
 
 			// Going offline is a key registration with no keys (never nonParticipation; see TASK-78)
-			const tx = buildWalletKeyregTxn({ params, sender: walletAddress, offline: true });
-			const fundsError = await signerFundsError(walletAddress, Number(tx.fee), 'offline');
+			const tx = buildWalletKeyregTxn({ params, sender, offline: true });
+			const fundsError = await signerFundsError(sender, Number(tx.fee), 'offline');
 			if (fundsError) {
 				error = fundsError;
 				transactionStatus = 'idle';
@@ -734,7 +738,6 @@
 		// The participate app call, once built: its last valid round ends the lock.
 		let sent: algosdk.Transaction | null = null;
 		try {
-			transactionStatus = 'building';
 			const schema = {
 				name: 'Participate',
 				desc: 'Participate in the staking contract',

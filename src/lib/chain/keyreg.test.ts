@@ -871,22 +871,17 @@ describe('shortfallMessage', () => {
 });
 
 describe('participateGroupTxns', () => {
-	const OVERSPEND =
-		"The signing account doesn't hold enough VOI to cover this transaction and keep its minimum balance, so nothing was sent.";
-
 	it('returns the txns of a successful result', () => {
 		expect(participateGroupTxns({ success: true, txns: ['a', 'b'] })).toEqual(['a', 'b']);
 		expect(participateGroupTxns({ txns: ['a', 'b'] })).toEqual(['a', 'b']);
 	});
 
-	it('turns an overspend simulate failure into a readable message', () => {
-		const result = {
-			success: false,
-			error: new Error(
-				'Network request error. Received status 400: transaction rejected: overspend (account X, data {amount: 1})'
-			)
-		};
-		expect(() => participateGroupTxns(result)).toThrow(OVERSPEND);
+	it('keeps the network text of an overspend, which names the account that came up short', () => {
+		const cause =
+			'Network request error. Received status 400: transaction rejected: overspend (account X, data {amount: 1})';
+		expect(() => participateGroupTxns({ success: false, error: new Error(cause) })).toThrow(
+			`Couldn't prepare the staking contract transaction, so nothing was sent: ${cause}`
+		);
 	});
 
 	it('turns any other failure into a readable message with its cause', () => {
@@ -898,7 +893,15 @@ describe('participateGroupTxns', () => {
 	});
 
 	it('turns a failure with no message into a readable message', () => {
-		for (const result of [{ success: false }, undefined, null, {}, { txns: [1, 2] }]) {
+		for (const result of [
+			{ success: false },
+			undefined,
+			null,
+			{},
+			{ txns: [1, 2] },
+			{ txns: [] },
+			{ txns: ['a'] }
+		]) {
 			let thrown: unknown;
 			try {
 				participateGroupTxns(result);

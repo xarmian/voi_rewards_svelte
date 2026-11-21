@@ -671,9 +671,9 @@ test('a pasted minimum-fee URI leaves an unticked opt-in off', () => {
 // wallet prompt, with the amounts, instead of failing inside the wallet or the simulate.
 const SHORT = { amount: 1_000_000n, minBalance: 1_000_000n };
 const READ_FAILED =
-	"Couldn't read this account's balance from the network, so nothing was sent. Try again.";
-const OVERSPEND =
-	"The signing account doesn't hold enough VOI to cover this transaction and keep its minimum balance, so nothing was sent.";
+	"Couldn't read the signing account's balance from the network, so nothing was sent. Try again.";
+const SIMULATE_FAILED =
+	"Couldn't prepare the staking contract transaction, so nothing was sent: overspend (account CONTRACT)";
 
 test.each([
 	['registerStakingContractVoteKey', false, 'register', contractKeyregCost(MIN_KEYREG_FEE)],
@@ -732,10 +732,13 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 	'%s shows a readable error when the participate group fails to simulate',
 	async (name) => {
 		const harness = stakingSendHarness(name, { payIncentiveFee: false, contractCanPay: true });
-		harness.custom.mockResolvedValueOnce({ success: false, error: new Error('overspend') });
+		harness.custom.mockResolvedValueOnce({
+			success: false,
+			error: new Error('overspend (account CONTRACT)')
+		});
 		await harness.run();
 		expect(harness.context.error).not.toContain("reading 'map'");
-		expect(harness.context.error).toBe(OVERSPEND);
+		expect(harness.context.error).toBe(SIMULATE_FAILED);
 		expect(harness.signAndSendTransactions).not.toHaveBeenCalled();
 		expect(harness.context.transactionStatus).toBe('idle');
 	}
@@ -766,6 +769,35 @@ test.each(['registerStakingContractVoteKey', 'goOfflineStakingContractVoteKey'])
 		}
 	}
 );
+
+test('an opted-in registration re-checks, reads funds and builds for the contract and parent taken at the click', async () => {
+	const harness = stakingSendHarness('registerStakingContractVoteKey', {
+		payIncentiveFee: true,
+		contractCanPay: true
+	});
+	const getApplicationByID = vi.fn(() => ({
+		do: async () => ({ params: { approvalProgram: new Uint8Array([1]) } })
+	}));
+	(harness.context.algodClient as Record<string, unknown>).getApplicationByID = getApplicationByID;
+	harness.contractIncentiveOf.mockImplementation(async (read: () => Promise<unknown>) => {
+		harness.context.contractId = 2;
+		harness.context.parentWalletAddress = 'Y';
+		await read();
+		return 'capable';
+	});
+	await harness.run();
+	expect(harness.context.error).toBeNull();
+	expect(getApplicationByID).toHaveBeenCalledExactlyOnceWith(1);
+	expect(harness.accountInformation).toHaveBeenCalledExactlyOnceWith('Z');
+	const [CONTRACT] = harness.sends;
+	expect(CONTRACT).toHaveBeenCalled();
+	for (const call of CONTRACT.mock.calls) {
+		expect(call[0]).toBe(1);
+		expect(call.find((arg: unknown) => (arg as { addr?: unknown })?.addr)).toMatchObject({
+			addr: 'Z'
+		});
+	}
+});
 
 test('the staking flows take the participate group through participateGroupTxns', () => {
 	expect(source.match(/participateGroupTxns\(customR\)\.map\(/g)).toHaveLength(2);
@@ -854,6 +886,26 @@ test.each([
 		expect(harness.context.error).toContain('Add at least 0.000001 VOI');
 		expect(harness.signAndSendTransactions).not.toHaveBeenCalled();
 		expect(harness.context.transactionStatus).toBe('idle');
+	}
+);
+
+test.each(['registerWalletVoteKey', 'goOfflineWalletVoteKey'])(
+	'%s checks and sends from the account taken at the click, even if it changes during the awaits',
+	async (name) => {
+		const harness = walletSendHarness(name, ENOUGH);
+		const other = algosdk.generateAccount().addr.toString();
+		const algod = harness.context.algodClient as { getTransactionParams: unknown };
+		algod.getTransactionParams = () => ({
+			do: async () => {
+				harness.context.walletAddress = other;
+				return walletParams;
+			}
+		});
+		await harness.run();
+		expect(harness.context.error).toBeNull();
+		expect(harness.accountInformation).toHaveBeenCalledExactlyOnceWith(WALLET);
+		const [[groups]] = harness.signAndSendTransactions.mock.calls;
+		expect(groups[0][0].sender.toString()).toBe(WALLET);
 	}
 );
 

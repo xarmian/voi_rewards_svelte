@@ -458,8 +458,11 @@ export function shortfallMessage(
 	return `The signing account (${shortAddress(account)}) needs ${formatMicroVoi(s.needed)} VOI ${purpose} (${formatMicroVoi(s.cost)} VOI for the transaction plus its ${formatMicroVoi(s.minBalance)} VOI minimum balance) but holds ${formatMicroVoi(s.have)} VOI. Add at least ${formatMicroVoi(s.shortfall)} VOI and try again. Nothing was sent.`;
 }
 
-// The base64 txns of the participate group from CONTRACT.custom. A failed simulate comes back as
-// { success: false, error } with no txns; that becomes a readable error.
+// The base64 txns of the participate group from CONTRACT.custom: the payment, then the participate
+// call the callers sign as txns[1]. A failed simulate comes back as { success: false, error } with no
+// txns; that, or a group too short to hold the call, becomes a readable error. algod's own text is
+// kept: an overspend there names the account that came up short, which after the signer's balance
+// check is more likely the contract than the signer.
 export function participateGroupTxns(result: unknown): string[] {
 	const r = (typeof result === 'object' && result !== null ? result : {}) as {
 		success?: unknown;
@@ -469,6 +472,7 @@ export function participateGroupTxns(result: unknown): string[] {
 	if (
 		r.success !== false &&
 		Array.isArray(r.txns) &&
+		r.txns.length >= 2 &&
 		r.txns.every((txn) => typeof txn === 'string')
 	) {
 		return r.txns;
@@ -479,11 +483,6 @@ export function participateGroupTxns(result: unknown): string[] {
 			: typeof (r.error as { message?: unknown } | null)?.message === 'string'
 				? (r.error as { message: string }).message
 				: '';
-	if (/overspend/i.test(cause)) {
-		throw new Error(
-			"The signing account doesn't hold enough VOI to cover this transaction and keep its minimum balance, so nothing was sent."
-		);
-	}
 	throw new Error(
 		cause
 			? `Couldn't prepare the staking contract transaction, so nothing was sent: ${cause}`
