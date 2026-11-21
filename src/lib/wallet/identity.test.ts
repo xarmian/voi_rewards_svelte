@@ -40,28 +40,31 @@ it.each([
 	['relative with a plausible host', 'https:/cdn.example/x.png'],
 	['relative without slashes, plausible host', 'https:cdn.example/x.png'],
 	['leading whitespace', ' https://host.example/x.png'],
-	['IPv4 literal', 'https://127.0.0.1/x.png'],
-	['private IPv4 literal', 'https://192.168.1.1/x.png'],
-	['decimal IPv4 literal', 'https://2130706433/x.png'],
-	['IPv6 literal', 'https://[::1]/x.png'],
-	['host without a dot', 'https://intranet/x.png'],
-	['localhost', 'https://localhost/x.png'],
-	['.local host', 'https://printer.local/x.png'],
+	['IPv4 literal, not on the allowlist', 'https://127.0.0.1/x.png'],
+	['private IPv4 literal, not on the allowlist', 'https://192.168.1.1/x.png'],
+	['decimal IPv4 literal, not on the allowlist', 'https://2130706433/x.png'],
+	['IPv6 literal, not on the allowlist', 'https://[::1]/x.png'],
+	['host without a dot, not on the allowlist', 'https://intranet/x.png'],
+	['localhost, not on the allowlist', 'https://localhost/x.png'],
+	['.local host, not on the allowlist', 'https://printer.local/x.png'],
 	['explicit port', 'https://host.example:8443/x.png'],
-	['.localdomain host', 'https://localhost.localdomain/x.png'],
-	['.home.arpa host', 'https://router.home.arpa/x.png'],
-	['.internal host', 'https://api.internal/x.png'],
-	['the site itself', 'https://voirewards.com/api/x'],
-	['a subdomain of the site', 'https://www.voirewards.com/x.png'],
-	// WHATWG keeps a trailing dot in the hostname, so a suffix check on `.local` or `localhost` misses it.
-	['trailing dot on a local host', 'https://printer.local./a.png'],
-	['trailing dot on localhost', 'https://localhost./x.png'],
-	['trailing dot on a public-looking host', 'https://cdn.example./x.png'],
-	['percent-encoded trailing dot', 'https://foo.local%2e/x.png'],
-	['ideographic full stop', 'https://foo.local\u3002/x.png'],
-	['leading dot', 'https://.cdn.example/x.png'],
-	['empty label', 'https://cdn..example/x.png']
-])('rejects %s avatars while keeping the name', (_, value) => {
+	['.localdomain host, not on the allowlist', 'https://localhost.localdomain/x.png'],
+	['.home.arpa host, not on the allowlist', 'https://router.home.arpa/x.png'],
+	['.internal host, not on the allowlist', 'https://api.internal/x.png'],
+	['the site host, not on the allowlist', 'https://voirewards.com/api/x'],
+	['a subdomain of the site, not on the allowlist', 'https://www.voirewards.com/x.png'],
+	// WHATWG keeps a trailing dot in the hostname; the empty-label rule refuses it before the allowlist.
+	['trailing dot (empty label) on an off-list local host', 'https://printer.local./a.png'],
+	['trailing dot (empty label) on off-list localhost', 'https://localhost./x.png'],
+	['trailing dot (empty label) on an off-list public-looking host', 'https://cdn.example./x.png'],
+	['percent-encoded trailing dot (empty label), off-list host', 'https://foo.local%2e/x.png'],
+	[
+		'ideographic full stop as a trailing dot (empty label), off-list host',
+		'https://foo.local\u3002/x.png'
+	],
+	['leading dot (empty label), off-list host', 'https://.cdn.example/x.png'],
+	['empty label, off-list host', 'https://cdn..example/x.png']
+])('rejects an avatar (%s) while keeping the name', (_, value) => {
 	expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: value } }])).toEqual({
 		name: 'shelly.of.voi',
 		avatar: null
@@ -83,30 +86,6 @@ it('keeps a valid name with an off-list avatar host and drops only the avatar', 
 	expect(
 		parseWalletIdentity('A', [{ ...named, metadata: { avatar: 'https://cdn.example/avatar.png' } }])
 	).toEqual({ name: 'shelly.of.voi', avatar: null });
-});
-
-it.each([
-	'https://preview.example.test/x.png',
-	'https://PREVIEW.example.test/x.png',
-	'https://preview.example.test./x.png'
-])('refuses %s, the host of the page being viewed', (avatarUrl) => {
-	vi.stubGlobal('location', { hostname: 'preview.example.test' });
-	try {
-		expect(parseWalletIdentity('A', [{ ...named, metadata: { avatar: avatarUrl } }]).avatar).toBe(
-			null
-		);
-	} finally {
-		vi.unstubAllGlobals();
-	}
-});
-
-it('keeps an avatar on another host while a page host is set', () => {
-	vi.stubGlobal('location', { hostname: 'preview.example.test' });
-	try {
-		expect(parseWalletIdentity('A', [named]).avatar).toBe(avatar);
-	} finally {
-		vi.unstubAllGlobals();
-	}
 });
 
 it('accepts a 2048-character https avatar', () => {

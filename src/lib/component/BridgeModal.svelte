@@ -1560,7 +1560,7 @@
 															<div
 																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 															>
-																{#if 'owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)}
+																{#if 'owner' in result && getAvatarUrl(result)}
 																	<img
 																		src={getAvatarUrl(result)}
 																		alt="Avatar"
@@ -1734,7 +1734,7 @@
 															<div
 																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 															>
-																{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
+																{#if ('owner' in result && getAvatarUrl(result)) || ('avatar' in result && result.avatar)}
 																	<img
 																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
 																		alt="Avatar"
@@ -1945,7 +1945,7 @@
 															<div
 																class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
 															>
-																{#if ('owner' in result && (result.properties?.verified?.avatar || result.properties?.userDefined?.avatar)) || ('avatar' in result && result.avatar)}
+																{#if ('owner' in result && getAvatarUrl(result)) || ('avatar' in result && result.avatar)}
 																	<img
 																		src={'owner' in result ? getAvatarUrl(result) : result.avatar}
 																		alt="Avatar"
