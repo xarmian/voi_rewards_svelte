@@ -202,6 +202,12 @@
 				"warnings": 0
 			}
 		},
+		"src/lib/epochRewards/home/HomeRewards.svelte": {
+			"svelte/valid-compile": {
+				"errors": 12,
+				"warnings": 0
+			}
+		},
 		"src/lib/server/markets/pairs.ts": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 2,
@@ -243,12 +249,6 @@
 			},
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/HomeRewards.svelte": {
-			"svelte/valid-compile": {
-				"errors": 12,
 				"warnings": 0
 			}
 		},
@@ -492,7 +492,7 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/HomeRewards.svelte": {
+		"src/lib/epochRewards/home/HomeRewards.svelte": {
 			"svelte:state_referenced_locally": {
 				"errors": 0,
 				"warnings": 12

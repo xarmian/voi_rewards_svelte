@@ -31,3 +31,9 @@ export const liveEpochHistory: EpochHistorySource = {
 		return dataTable.fetchData(epochRange(epoch).id);
 	}
 };
+
+/**
+ * The source the home page reads. Module-internal on purpose: index.ts is in the layout
+ * chunk and this pulls in the client rewards cache. A snapshot source swaps in here.
+ */
+export const epochHistory: EpochHistorySource = liveEpochHistory;

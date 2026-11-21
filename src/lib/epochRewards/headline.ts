@@ -1,7 +1,8 @@
 import { epochRange } from './calendar';
 import { comma, compact, pct } from '$lib/ds/format';
 import { finite } from '$lib/home/headline';
-import type { DashboardData, Loaded } from '$lib/server/home';
+import type { Loaded } from '$lib/server/loaded';
+import type { EpochHomeData } from './home.server';
 
 export type Epoch = {
 	epoch_number: number;
@@ -97,7 +98,7 @@ export function accountsDetail(loaded: Loaded<number>): string | undefined {
 
 /** A retry can replace rows only until the user takes control of the epoch select. */
 export function rewardsRefreshMode(
-	initial: Pick<DashboardData['rewards'], 'state'>,
+	initial: Pick<EpochHomeData['rewards'], 'state'>,
 	hasSelectedEpoch: boolean
 ): 'all' | 'dates' | 'none' {
 	return initial.state === 'error' ? 'none' : hasSelectedEpoch ? 'dates' : 'all';

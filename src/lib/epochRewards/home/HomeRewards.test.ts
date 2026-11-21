@@ -3,9 +3,9 @@ import { afterEach, test, vi } from 'vitest';
 import { render } from 'svelte/server';
 import HomeRewards from './HomeRewards.svelte';
 import NicknameDialog from './NicknameDialog.svelte';
-import { favorites } from '../../stores/favorites';
+import { favorites } from '../../../stores/favorites';
 import { nicknames } from '$lib/stores/nicknames';
-import type { DashboardData } from '$lib/server/home';
+import type { EpochHomeData } from '../home.server';
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 // Epoch 104 proposer addresses and counts from phase1/data/snapshot.json.
 const data = [
@@ -398,7 +398,7 @@ const data = [
 		block_count: 1
 	}
 ];
-const initial: DashboardData['rewards'] = {
+const initial: EpochHomeData['rewards'] = {
 	state: 'ready',
 	value: {
 		rangeId: '20261021-20261027',
@@ -417,7 +417,7 @@ const initial: DashboardData['rewards'] = {
 		}
 	}
 };
-const html = (pending = false, value: DashboardData['rewards'] = initial) =>
+const html = (pending = false, value: EpochHomeData['rewards'] = initial) =>
 	render(HomeRewards, {
 		props: {
 			initial: value,

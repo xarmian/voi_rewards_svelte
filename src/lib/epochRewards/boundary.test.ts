@@ -68,13 +68,6 @@ function internals(text: string): string[] {
 	return [...hits];
 }
 
-/** 1b: these files move into the module (or onto its components), and these imports go with them. */
-const DEEP_1B: Record<string, string[]> = {
-	'src/lib/server/home.ts': ['headline', 'table'],
-	'src/routes/(site)/HomeTop.svelte': ['headline'],
-	'src/routes/(site)/HomeRewards.svelte': ['headline', 'table', 'balance']
-};
-
 test('code outside the module reaches epoch rewards only through its public entries', () => {
 	const violations: string[] = [];
 	for (const { path, text } of outside)
@@ -83,7 +76,7 @@ test('code outside the module reaches epoch rewards only through its public entr
 				violations.push(`${path}: ${spec} moved into $lib/epochRewards`);
 			if (!spec.startsWith('$lib/epochRewards/')) continue;
 			const entry = spec.slice('$lib/epochRewards/'.length);
-			if (entry === 'components' || DEEP_1B[path]?.includes(entry)) continue;
+			if (entry === 'components') continue;
 			if (entry === 'home.server' && path.startsWith('src/lib/server/')) continue;
 			if (entry === 'config' && isTest(path)) continue;
 			violations.push(`${path}: ${spec}`);
@@ -116,8 +109,6 @@ const homeSurfaces = (path: string) =>
  * this list; a new entry means new code bypassed the module.
  */
 const PENDING = {
-	// 1b: the home epoch load and the rewards table move into the module.
-	'1b': ['src/lib/server/home.ts', 'src/routes/(site)/HomeRewards.svelte'],
 	// PR 2: wallet, calculator, node and analytics surfaces.
 	'PR 2': [
 		'src/lib/component/CalculatorComponent.svelte',
@@ -138,11 +129,11 @@ const PENDING = {
 	]
 };
 
-test('the home and header surfaces reach no epoch internals outside the pending list', () => {
+test('the home and header surfaces reach no epoch internals', () => {
 	const hits = outside
 		.filter(({ path, text }) => !isTest(path) && homeSurfaces(path) && internals(text).length)
 		.map(({ path }) => path);
-	expect(hits).toEqual(PENDING['1b'].filter((path) => homeSurfaces(path)));
+	expect(hits).toEqual([]);
 });
 
 test('the set of files still reaching epoch internals only shrinks', () => {
@@ -151,4 +142,15 @@ test('the set of files still reaching epoch internals only shrinks', () => {
 		.map(({ path }) => path)
 		.sort();
 	expect(hits).toEqual(Object.values(PENDING).flat().sort());
+});
+
+test('the public entry pulls in neither the history source nor the server half', () => {
+	// index.ts is in the layout chunk (the header badge): the live source brings the
+	// client rewards cache, and home.server is server-only. Types are erased, so they may pass.
+	const index = readFileSync(join(root, moduleDir, 'index.ts'), 'utf8');
+	const values = [...index.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?from\s*'([^']+)'/gm)].map(
+		(match) => match[1]
+	);
+	expect(values.filter((spec) => /^\.\/(source|home\.server)$/.test(spec))).toEqual([]);
+	expect(values).toContain('./calendar');
 });

@@ -5,8 +5,8 @@
 	import type { SortState } from '$lib/ds/DataTable/types';
 	import { sortRows } from '$lib/ds/DataTable/sort';
 	import { MISSING, comma, pct, shortAddr, usd } from '$lib/ds/format';
-	import { epochRange } from '$lib/epochRewards';
-	import { rewardsRefreshMode } from '$lib/epochRewards/headline';
+	import { epochRange } from '../calendar';
+	import { rewardsRefreshMode } from '../headline';
 	import {
 		filterRewardRows,
 		rewardRows,
@@ -16,15 +16,16 @@
 		showAfterFavouritesChange,
 		type EpochResponse,
 		type RewardRow
-	} from '$lib/epochRewards/table';
-	import { estApr, fetchBalance } from '$lib/epochRewards/balance';
+	} from '../table';
+	import { estApr, fetchBalance } from '../balance';
+	import { epochHistory } from '../source';
+	import type { EpochHomeData } from '../home.server';
 	import { createNameResolver } from '$lib/home/names';
 	import type { DashboardData } from '$lib/server/home';
 	import { getTokensByEpoch } from '$lib/utils';
 	import { getEnvoiNames } from '$lib/utils/envoi';
 	import { nicknames } from '$lib/stores/nicknames';
-	import { dataTable } from '../../stores/dataTable';
-	import { favorites } from '../../stores/favorites';
+	import { favorites } from '../../../stores/favorites';
 	import NicknameDialog from './NicknameDialog.svelte';
 
 	let {
@@ -33,7 +34,7 @@
 		initialEpoch,
 		price
 	}: {
-		initial: DashboardData['rewards'];
+		initial: EpochHomeData['rewards'];
 		currentEpoch: number;
 		initialEpoch: number;
 		price: DashboardData['price'];
@@ -172,10 +173,9 @@
 	async function loadEpoch(selected: number, refresh = false) {
 		const request = ++requestId;
 		dataState = 'loading';
-		if (refresh) dataTable.clearCache();
 		try {
 			const [data, tokens] = await Promise.all([
-				dataTable.fetchData(epochRange(selected).id),
+				epochHistory.rows(selected, { refresh }),
 				getTokensByEpoch(selected)
 			]);
 			if (request !== requestId) return;

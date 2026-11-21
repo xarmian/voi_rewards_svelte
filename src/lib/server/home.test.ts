@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { load } from '../../routes/(site)/+page.server';
 import { config } from '$lib/config';
+import type { EpochHomeData } from '$lib/epochRewards';
 import { CRITICAL_TIMEOUT_MS, STAKE_TIMEOUT_MS, STREAM_TIMEOUT_MS, type HomeData } from './home';
 const now = new Date('2026-10-25T02:38:00Z');
 const rows = {
@@ -47,7 +48,17 @@ let fetcher: ReturnType<typeof vi.fn<typeof fetch>>;
 const run = (host = 'voirewards.com') => load({ fetch: fetcher, url: new URL(`https://${host}/`) });
 function dashboard(data: HomeData) {
 	if (data.page !== 'dashboard') throw new Error('Expected dashboard');
-	return data;
+	// Epoch rewards are on here, so the load carries every epoch field.
+	for (const key of [
+		'currentEpoch',
+		'rewardsEpoch',
+		'headline',
+		'rewards',
+		'aprHistory',
+		'currentStake'
+	] as const)
+		if (data[key] === undefined) throw new Error(`Expected ${key}`);
+	return data as HomeData & EpochHomeData;
 }
 beforeEach(() => {
 	vi.useFakeTimers();
