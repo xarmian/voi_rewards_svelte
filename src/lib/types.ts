@@ -1,3 +1,5 @@
+import type { Eligibility } from '$lib/wallet/nodeHealth';
+
 export interface PeerRecord {
 	id: number;
 	host_name: string;
@@ -59,14 +61,6 @@ export interface ContractDetails {
 		'vote-participation-key': string;
 		'state-proof-key': string;
 	};
-	consensusDetails?: {
-		first_block: number;
-		last_block: number;
-		last_vote_block: number;
-		last_vote_timestamp: string;
-		total_blocks: number;
-		vote_count: number;
-	};
 	participation?: {
 		'vote-first-valid': number;
 		'vote-last-valid': number;
@@ -78,6 +72,11 @@ export interface ContractDetails {
 	accountInfo?: {
 		round: number;
 		status: string;
+		incentiveEligible?: boolean;
+		/** microVOI. */
+		amount?: number;
 		participation?: { voteLastValid: number };
 	};
+	/** Real-time block reward status from the account and program already read; null if unread. */
+	eligibility?: Eligibility | null;
 }

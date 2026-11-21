@@ -8,6 +8,7 @@
 	import Card from '../Card/Card.svelte';
 	import DataTable from '../DataTable/DataTable.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
+	import BlockRewardStatusPill from '../BlockRewardStatusPill/BlockRewardStatusPill.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
 	import Button from '../Button/Button.svelte';
 	import CopyButton from '../CopyButton/CopyButton.svelte';
@@ -68,6 +69,10 @@
 			accountState.state === 'yours' &&
 			row.details.owner === pageAddress
 		);
+	}
+	/** The 2 VOI re-registration of keys already on chain; it opens the same key registration. */
+	function rowCanMakeEligible(row: ContractRow) {
+		return rowCanAct(row) && row.details?.eligibility?.canMakeEligible === true;
 	}
 	const hasActions = $derived(contracts.some((row) => rowCanAct(row)));
 	const unavailable = $derived(contracts.filter((row) => !row.details).length);
@@ -153,6 +158,7 @@
 		{ key: 'contract', header: 'Contract', priority: 1, cell: addressCell },
 		{ key: 'status', header: 'Status', priority: 1, cell: statusCell },
 		{ key: 'balance', header: 'Balance', priority: 1, numeric: true, cell: balanceCell },
+		{ key: 'eligibility', header: 'Eligibility', priority: 1, cell: eligibilityCell },
 		{ key: 'blocks', header: 'Blocks this epoch', priority: 3, numeric: true, cell: blocksCell },
 		{ key: 'key', header: 'Key expires', priority: 3, cell: keyCell },
 		{ key: 'next', header: 'Next unlock', priority: 3, cell: unlockCell }
@@ -182,6 +188,15 @@
 			sortable: true,
 			sortValue: (r) => r.balance,
 			cell: balanceCell
+		},
+		{
+			key: 'eligibility',
+			header: 'Eligibility',
+			priority: 1,
+			sortable: true,
+			sortValue: (r) =>
+				r.details?.eligibility ? (r.details.eligibility.status.registered ? 0 : 1) : null,
+			cell: eligibilityCell
 		},
 		{
 			key: 'locked',
@@ -260,6 +275,12 @@
 				: 'Not staking'}
 	/>
 {/snippet}
+{#snippet eligibilityCell(row: ContractRow)}
+	{#if row.details?.eligibility}<BlockRewardStatusPill
+			status={row.details.eligibility.status}
+			compact
+		/>{:else}Unavailable{/if}
+{/snippet}
 {#snippet balanceCell(row: ContractRow)}<span
 		title={row.balance === null ? undefined : `${row.balance} VOI`}>{amount(row.balance)}</span
 	>{/snippet}
@@ -302,6 +323,11 @@
 	<button type="button" role="menuitem" onclick={() => open(row, 'key')}
 		>{row.isParticipating ? 'Update' : 'Register'} participation key</button
 	>
+	{#if rowCanMakeEligible(row)}<button
+			type="button"
+			role="menuitem"
+			onclick={() => open(row, 'key')}>Make eligible (2 VOI)</button
+		>{/if}
 {/snippet}
 
 {#snippet detail(row: ContractRow)}
@@ -364,6 +390,11 @@
 					onclick={() => open(row, 'key')}
 					>{row.isParticipating ? 'Update' : 'Register'} participation key</Button
 				>
+				{#if rowCanMakeEligible(row)}<Button
+						variant="soft"
+						disabled={pendingAction !== null && pendingAction !== 'key'}
+						onclick={() => open(row, 'key')}>Make eligible (2 VOI)</Button
+					>{/if}
 			</div>{/if}
 	</div>
 {/snippet}

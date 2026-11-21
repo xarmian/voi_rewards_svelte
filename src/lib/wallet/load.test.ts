@@ -1,13 +1,24 @@
 import { render } from 'svelte/server';
 import WalletOverview from '$lib/ds/WalletOverview/WalletOverview.svelte';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { epochRange } from '$lib/epochs';
 const mocks = vi.hoisted(() => ({
 	rows: vi.fn(),
 	account: vi.fn(),
 	tokens: vi.fn(),
 	locks: vi.fn(),
-	app: vi.fn()
+	app: vi.fn(),
+	consensus: vi.fn(),
+	onlineStake: vi.fn(),
+	incentive: vi.fn()
+}));
+vi.mock('$lib/rewards/blockRewardChain', () => ({ readOnlineStake: mocks.onlineStake }));
+vi.mock('$lib/chain/keyreg', async (original) => ({
+	...(await original<typeof import('$lib/chain/keyreg')>()),
+	contractIncentiveOf: async (read: () => Promise<unknown>) => {
+		await read();
+		return mocks.incentive();
+	}
 }));
 vi.mock('$lib/utils/algod', () => ({
 	algodClient: { getApplicationByID: () => ({ do: mocks.app }) }
@@ -15,7 +26,7 @@ vi.mock('$lib/utils/algod', () => ({
 vi.mock('$lib/stores/accounts', () => ({
 	getAccountInfo: mocks.account,
 	requireAccountInfo: mocks.account,
-	getConsensusInfo: async () => ({ last_vote_timestamp: '2026-10-25T00:00:00Z', last_block: 99 }),
+	getConsensusInfo: mocks.consensus,
 	getSupplyInfo: async () => ({
 		'current-round': 100,
 		'online-money': 1e12,
@@ -36,10 +47,16 @@ vi.mock('../../stores/dataTable', () => ({
 		fetchData: mocks.rows
 	}
 }));
-import { loadWallet } from './load';
+import { loadWallet, readContract } from './load';
 import { summarizeWallet } from './summary';
 
 beforeEach(() => {
+	mocks.consensus.mockReset();
+	mocks.onlineStake.mockReset().mockResolvedValue(1e15);
+	mocks.incentive.mockReset().mockResolvedValue('incapable');
+	mocks.app
+		.mockReset()
+		.mockResolvedValue({ params: { globalState: [], approvalProgram: new Uint8Array([1]) } });
 	mocks.locks.mockResolvedValue([]);
 	mocks.account.mockResolvedValue({
 		amount: 1e9,
@@ -228,6 +245,8 @@ it.each(['app 404', 'app timeout'])(
 		mocks.account.mockImplementation(async (address: string) => ({
 			amount: address === 'OWNER' ? 1234e6 : 10000e6,
 			status: address === 'OWNER' ? 'Offline' : 'Online',
+			round: 100,
+			lastHeartbeat: 90,
 			participation: address === 'OWNER' ? undefined : { voteLastValid: 10000000 }
 		}));
 		const data = await loadWallet('OWNER', 'OWNER');
@@ -264,3 +283,78 @@ it.each(['app 404', 'app timeout'])(
 		expect(summary.withdrawable).toBeNull();
 	}
 );
+
+describe('node health reads', () => {
+	const eligibleOwner = {
+		amount: 1e12,
+		status: 'Online',
+		incentiveEligible: true,
+		round: 100_000,
+		lastProposed: 99_000,
+		lastHeartbeat: 95_000,
+		minBalance: 100000,
+		participation: { voteLastValid: 10_000_000 }
+	};
+
+	it('gives the owner eligibility and heartbeat health from its account record', async () => {
+		mocks.account.mockResolvedValue(eligibleOwner);
+		const data = await loadWallet('OWNER', 'OWNER');
+		expect(data.owner.health?.eligibility?.status).toEqual({ registered: true, reasons: [] });
+		expect(data.owner.health?.heartbeat).toMatchObject({
+			silentRounds: 1000,
+			overdueAfter: 10_000,
+			overdue: false
+		});
+		expect(mocks.onlineStake).toHaveBeenCalledTimes(1);
+	});
+
+	it('shows heartbeat ages with no verdict when online stake is unavailable', async () => {
+		mocks.account.mockResolvedValue(eligibleOwner);
+		mocks.onlineStake.mockRejectedValue(new Error('down'));
+		const data = await loadWallet('OWNER', 'OWNER');
+		expect(data.owner.health?.heartbeat).toMatchObject({ silentRounds: 1000, overdue: null });
+	});
+
+	it('carries contract eligibility from the program it already read', async () => {
+		mocks.locks.mockResolvedValue([{ contractAddress: 'ESCROW', contractId: 7 }]);
+		mocks.incentive.mockResolvedValue('capable');
+		mocks.account.mockResolvedValue({ ...eligibleOwner, incentiveEligible: false });
+		const data = await loadWallet('OWNER', 'OWNER');
+		const [contract] = data.contracts;
+		expect(mocks.app).toHaveBeenCalledTimes(1);
+		expect(contract.details?.accountInfo).toMatchObject({ incentiveEligible: false, amount: 1e12 });
+		expect(contract.details?.eligibility?.status.reasons.map((r) => r.code)).toEqual([
+			'not-opted-in'
+		]);
+		expect(contract.health?.eligibility).toBe(contract.details?.eligibility);
+		expect(contract.health?.heartbeat?.silentRounds).toBe(1000);
+	});
+
+	it('reads an unverified contract program as not registered with the contract reason', async () => {
+		mocks.incentive.mockResolvedValue('unverified');
+		mocks.account.mockResolvedValue(eligibleOwner);
+		const details = await readContract(
+			{
+				address: 'ESCROW',
+				contractId: 7,
+				balance: 0,
+				isParticipating: false,
+				round: 0,
+				voteLastValid: null
+			},
+			false
+		);
+		expect(details.eligibility?.status.reasons[0].code).toBe('contract');
+		expect(details.eligibility?.canMakeEligible).toBe(false);
+		expect(details).not.toHaveProperty('consensusDetails');
+	});
+
+	it.each([false, true])('never requests walletDetails (force %s)', async (force) => {
+		mocks.locks.mockResolvedValue([{ contractAddress: 'ESCROW', contractId: 7 }]);
+		mocks.account.mockResolvedValue(eligibleOwner);
+		await loadWallet('OWNER', 'OWNER', force);
+		expect(mocks.consensus).not.toHaveBeenCalled();
+		for (const [url] of vi.mocked(fetch).mock.calls)
+			expect(String(url)).not.toContain('walletDetails');
+	});
+});

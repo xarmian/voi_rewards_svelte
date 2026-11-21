@@ -8,6 +8,7 @@ import WalletContracts from './WalletContracts.svelte';
 import { sortRows } from '../DataTable/sort';
 import type { WalletContract } from '../../wallet/summary';
 import { contractFixture } from '../../wallet/contracts.fixtures';
+import { BLOCK_REWARD_STATUS_TEXT } from '$lib/rewards/blockRewardStatus';
 
 vi.mock('$lib/component/WithdrawModal.svelte', () => ({ default: () => {} }));
 vi.mock('$lib/component/RegisterVoteKey.svelte', () => ({ default: () => {} }));
@@ -19,8 +20,6 @@ const contracts = [
 		isParticipating: true,
 		round: 100,
 		voteLastValid: null,
-		lastVoteAt: null,
-		lastBlock: null,
 		details: {
 			owner: 'OWNER',
 			contractAddress: 'ESCROW',
@@ -468,6 +467,7 @@ it('full mode sort scalars use status, VOI balances, UTC timestamps, and expiry 
 		addressCell: null,
 		statusCell: null,
 		balanceCell: null,
+		eligibilityCell: null,
 		lockedCell: null,
 		availableCell: null,
 		keyCell: null,
@@ -487,8 +487,14 @@ it('full mode sort scalars use status, VOI balances, UTC timestamps, and expiry 
 		locked: 8,
 		available: 3.9,
 		next: row.details!.nextVestingDate!.getTime(),
-		key: 1
+		key: 1,
+		eligibility: null
 	});
+	const eligible = contractFixture(1, {
+		eligibility: { status: { registered: true, reasons: [] }, canMakeEligible: false }
+	});
+	const sortValue = definitions.find((c: { key: string }) => c.key === 'eligibility').sortValue;
+	expect(sortValue(eligible)).toBe(0);
 });
 
 it.each([
@@ -603,4 +609,88 @@ it('does not show a withdrawable total while the contract list is unavailable', 
 	}).body;
 	expect(html).toContain('Withdrawable balance unavailable');
 	expect(html).not.toContain('VOI withdrawable now');
+});
+
+const eligibility = (
+	reasons: import('$lib/rewards/blockRewardStatus').BlockRewardReason[],
+	canMakeEligible = false
+) => ({
+	status: {
+		registered: reasons.length === 0,
+		reasons: reasons.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
+	},
+	canMakeEligible
+});
+const withEligibility = (value: ReturnType<typeof eligibility>, owner = 'OWNER') =>
+	[
+		{
+			...contracts[0],
+			details: { ...contracts[0].details!, owner, eligibility: value }
+		}
+	] as WalletContract[];
+const drawRows = (
+	rows: WalletContract[],
+	opts: { mode?: 'overview' | 'full'; connected?: string | null } = {}
+) =>
+	render(WalletContracts, {
+		props: {
+			contracts: rows,
+			current: null,
+			pageAddress: 'OWNER',
+			accountState:
+				opts.connected === null
+					? { state: 'read-only' }
+					: pageAccountState('OWNER', [{ address: opts.connected ?? 'OWNER', app: 'kibisis' }]),
+			state: 'ready',
+			mode: opts.mode ?? 'full'
+		}
+	})
+		.body.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/&#39;/g, "'")
+		.replace(/\s+/g, ' ');
+
+it.each(['overview', 'full'] as const)('%s rows show the shared eligibility pill', (mode) => {
+	const registered = drawRows(withEligibility(eligibility([])), { mode, connected: null });
+	expect(registered).toContain('Eligibility');
+	expect(registered).toContain('Registered for real-time block rewards');
+	const not = drawRows(withEligibility(eligibility(['contract'])), { mode, connected: null });
+	expect(not).toContain('Not registered for real-time block rewards');
+	expect(not).toContain('Contract not upgraded');
+	expect(not).toContain(BLOCK_REWARD_STATUS_TEXT.contract);
+});
+
+it('a row whose details failed shows eligibility unavailable', () => {
+	expect(drawRows([{ ...contracts[0], details: null }], { connected: null })).toMatch(
+		/Eligibility.*Unavailable/
+	);
+});
+
+it('offers Make eligible only to the connected owner of a row with an offer', () => {
+	expect(drawRows(withEligibility(eligibility(['not-opted-in'], true)))).toContain(
+		'Make eligible (2 VOI)'
+	);
+	for (const text of [
+		drawRows(withEligibility(eligibility(['not-opted-in'], true)), { connected: null }),
+		drawRows(withEligibility(eligibility(['not-opted-in'], true)), { connected: 'OTHER' }),
+		drawRows(withEligibility(eligibility(['not-opted-in'], true), 'OTHER')),
+		drawRows(withEligibility(eligibility([]))),
+		drawRows(withEligibility(eligibility(['contract', 'not-opted-in'])))
+	])
+		expect(text).not.toContain('Make eligible');
+});
+
+it('Make eligible opens the existing key registration', async () => {
+	const menu = source.slice(
+		source.indexOf('{#snippet actions('),
+		source.indexOf('{#snippet detail(')
+	);
+	const detail = source.slice(source.indexOf('{#snippet detail('), source.indexOf('<Card title='));
+	for (const part of [menu, detail])
+		expect(part).toMatch(/onclick=\{\(\) => open\(row, 'key'\)\}\s*>?\s*Make eligible \(2 VOI\)/);
+	const { context, handlers, resolve } = harness();
+	const opening = handlers.open(context.contracts[0], 'key');
+	resolve();
+	await opening;
+	expect(context.showRegisterVoteKey).toBe(true);
 });

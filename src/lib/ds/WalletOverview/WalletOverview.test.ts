@@ -1,8 +1,11 @@
 import { pageAccountState } from '$lib/chain/signerGate';
-import { expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('$lib/component/RegisterVoteKey.svelte', () => ({ default: () => {} }));
 import { render } from 'svelte/server';
 import WalletOverview from './WalletOverview.svelte';
-import { summarizeWallet, type WalletContract } from '../../wallet/summary';
+import { summarizeWallet, type WalletAccount, type WalletContract } from '../../wallet/summary';
+import type { Eligibility, Heartbeat } from '../../wallet/nodeHealth';
+import { BLOCK_REWARD_STATUS_TEXT, type BlockRewardReason } from '$lib/rewards/blockRewardStatus';
 
 it.each([0, 1, 2])('leaves %i empty contracts out of the health ring', (emptyCount) => {
 	const online: WalletContract = {
@@ -13,8 +16,6 @@ it.each([0, 1, 2])('leaves %i empty contracts out of the health ring', (emptyCou
 		isParticipating: true,
 		round: 100,
 		voteLastValid: 10000000,
-		lastVoteAt: '2026-10-25T00:00:00Z',
-		lastBlock: 99,
 		details: null
 	};
 	const contracts = [
@@ -133,8 +134,6 @@ it.each([
 		isParticipating: false,
 		round: 0,
 		voteLastValid: null,
-		lastVoteAt: null,
-		lastBlock: null,
 		details: null
 	}));
 	const summary = summarizeWallet({
@@ -172,8 +171,6 @@ it.each([
 			isParticipating: false,
 			round: 0,
 			voteLastValid: null,
-			lastVoteAt: null,
-			lastBlock: null,
 			details: {
 				owner: 'OWNER',
 				availableForWithdrawal: 0,
@@ -215,8 +212,6 @@ it.each([
 			isParticipating: false,
 			round: 0,
 			voteLastValid: null,
-			lastVoteAt: null,
-			lastBlock: null,
 			details: {
 				owner: 'OWNER',
 				availableForWithdrawal: 0,
@@ -260,9 +255,7 @@ it('keeps the owner liquid balance visible while contract holdings are unavailab
 			balance: 1234,
 			isParticipating: false,
 			round: 100,
-			voteLastValid: null,
-			lastVoteAt: null,
-			lastBlock: null
+			voteLastValid: null
 		},
 		contracts: [],
 		contractSet: 'unavailable',
@@ -338,4 +331,155 @@ it('renders a Block rewards card after Next unlocks, with an unknown status when
 	expect(heading).toBeGreaterThan(html.indexOf('Next unlocks'));
 	expect(html).not.toContain('Real-time block reward registration status unavailable');
 	expect(draw('unavailable')).toContain('Real-time block reward registration status unavailable');
+});
+
+describe('node health eligibility and heartbeat', () => {
+	const NOW = Date.parse('2026-10-25T00:00:00Z');
+	const eligibility = (reasons: BlockRewardReason[], canMakeEligible = false): Eligibility => ({
+		status: {
+			registered: reasons.length === 0,
+			reasons: reasons.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }))
+		},
+		canMakeEligible
+	});
+	const heartbeat = (overrides: Partial<Heartbeat> = {}): Heartbeat => ({
+		lastProposedSeconds: 600,
+		lastHeartbeatSeconds: 7200,
+		silentRounds: 215,
+		overdueAfter: 10_000,
+		overdue: false,
+		...overrides
+	});
+	const ownerAccount = (overrides: Partial<WalletAccount> = {}): WalletAccount => ({
+		address: 'OWNER',
+		contractId: 0,
+		balance: 50_000,
+		isParticipating: true,
+		round: 100,
+		voteLastValid: 10_000_000,
+		health: { eligibility: eligibility(['not-opted-in'], true), heartbeat: heartbeat() },
+		...overrides
+	});
+	const contract = (overrides: Partial<WalletContract> = {}): WalletContract => ({
+		address: 'ESCROW',
+		contractId: 7,
+		balance: 40_000,
+		isParticipating: true,
+		round: 100,
+		voteLastValid: 10_000_000,
+		health: { eligibility: eligibility(['contract']), heartbeat: heartbeat() },
+		details: null,
+		...overrides
+	});
+	const draw = (
+		owner: WalletAccount | null,
+		contracts: WalletContract[],
+		state: 'yours' | 'read-only' = 'yours'
+	) => {
+		const html = render(WalletOverview, {
+			props: {
+				summary: summarizeWallet({
+					owner,
+					contracts,
+					current: null,
+					history: [],
+					state: 'ready',
+					now: NOW
+				}),
+				contracts,
+				current: null,
+				pageAddress: 'OWNER',
+				accountState:
+					state === 'yours'
+						? pageAccountState('OWNER', [{ address: 'OWNER', app: 'kibisis' }])
+						: { state: 'read-only' },
+				now: NOW
+			}
+		}).body.replace(/<!--[\s\S]*?-->/g, '');
+		const health = html.slice(0, html.indexOf('This epoch so far'));
+		return {
+			html: health,
+			text: health
+				.replace(/<[^>]+>/g, ' ')
+				.replace(/&#39;/g, "'")
+				.replace(/\s+/g, ' ')
+		};
+	};
+
+	it('shows the shared pill and reasons for the owner and each online contract', () => {
+		const { text } = draw(ownerAccount(), [contract()]);
+		expect(text).toContain('This account');
+		expect(text).toContain('Contract #7');
+		expect(text.match(/Not registered for real-time block rewards/g)).toHaveLength(2);
+		expect(text).toContain('Online without the 2 VOI incentive fee.');
+		expect(text).toContain(BLOCK_REWARD_STATUS_TEXT.contract);
+	});
+
+	it('no longer shows vote or last-block health', () => {
+		const { text } = draw(ownerAccount(), [contract()]);
+		expect(text).not.toMatch(/Voted|Oldest vote|last block|Last vote/);
+	});
+
+	it('shows the last proposed and last heartbeat ages', () => {
+		const { text } = draw(ownerAccount(), [contract()]);
+		expect(text).toContain('Last proposed 10m ago · last heartbeat 2h ago');
+		expect(text).not.toContain('Heartbeat overdue');
+	});
+
+	it('warns when a heartbeat is overdue, without promising a time', () => {
+		const late = contract({
+			health: {
+				eligibility: eligibility(['contract']),
+				heartbeat: heartbeat({ overdue: true, silentRounds: 20_000 })
+			}
+		});
+		const { text } = draw(ownerAccount(), [late]);
+		expect(text).toContain('Heartbeat overdue');
+		expect(text).toContain('may be suspended soon if it stays silent');
+		expect(text).toContain('Needs attention');
+	});
+
+	it('says staleness is unchecked when online stake was unavailable', () => {
+		const owner = ownerAccount({
+			health: {
+				eligibility: eligibility([]),
+				heartbeat: heartbeat({ overdue: null, overdueAfter: null })
+			}
+		});
+		const { text } = draw(owner, []);
+		expect(text).toContain('Last proposed 10m ago');
+		expect(text).toContain('Online stake unavailable');
+		expect(text).not.toContain('Heartbeat overdue');
+	});
+
+	it('flags suspended accounts as dangerous', () => {
+		const taken = contract({
+			isParticipating: false,
+			health: { eligibility: eligibility(['suspended']), heartbeat: null }
+		});
+		const { text } = draw(ownerAccount(), [taken]);
+		expect(text).toContain('1 account suspended');
+		expect(text).toContain('Taken offline for missing proposals (suspended).');
+	});
+
+	it('offers Make eligible on the owner row only when the page is yours and an offer exists', () => {
+		const offer = draw(ownerAccount(), [contract()]);
+		expect(offer.text.match(/Make eligible \(2 VOI\)/g)).toHaveLength(1);
+		expect(draw(ownerAccount(), [contract()], 'read-only').text).not.toContain('Make eligible');
+		const eligible = ownerAccount({
+			health: { eligibility: eligibility([]), heartbeat: heartbeat() }
+		});
+		expect(draw(eligible, []).text).not.toContain('Make eligible');
+		const noOffer = ownerAccount({
+			health: { eligibility: eligibility(['not-opted-in'], false), heartbeat: heartbeat() }
+		});
+		expect(draw(noOffer, []).text).not.toContain('Make eligible');
+	});
+
+	it('never puts the button on a contract entry, even one with an offer', () => {
+		const capable = contract({
+			health: { eligibility: eligibility(['not-opted-in'], true), heartbeat: heartbeat() }
+		});
+		expect(draw(null, [capable]).text).not.toContain('Make eligible');
+	});
 });

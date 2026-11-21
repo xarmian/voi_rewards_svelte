@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isEmptyContract, summarizeWallet, type WalletAccount, type WalletEpoch } from './summary';
+import type { AccountHealth, Eligibility, Heartbeat } from './nodeHealth';
+import { BLOCK_REWARD_STATUS_TEXT } from '$lib/rewards/blockRewardStatus';
 
 const owner: WalletAccount = {
 	address: 'OWNER',
@@ -7,10 +9,32 @@ const owner: WalletAccount = {
 	isParticipating: false,
 	contractId: 0,
 	voteLastValid: null,
-	round: 100,
-	lastVoteAt: null,
-	lastBlock: null
+	round: 100
 };
+const heartbeat = (overrides: Partial<Heartbeat> = {}): Heartbeat => ({
+	lastProposedSeconds: 280,
+	lastHeartbeatSeconds: 2800,
+	silentRounds: 100,
+	overdueAfter: 10_000,
+	overdue: false,
+	...overrides
+});
+const registered: Eligibility = {
+	status: { registered: true, reasons: [] },
+	canMakeEligible: false
+};
+const suspended: Eligibility = {
+	status: {
+		registered: false,
+		reasons: [{ code: 'suspended', text: BLOCK_REWARD_STATUS_TEXT.suspended }]
+	},
+	canMakeEligible: false
+};
+const health = (overrides: Partial<AccountHealth> = {}): AccountHealth => ({
+	eligibility: registered,
+	heartbeat: heartbeat(),
+	...overrides
+});
 const epoch: WalletEpoch = {
 	epoch: 104,
 	networkBlocks: 100000,
@@ -26,8 +50,7 @@ const online = (address: string): WalletAccount => ({
 	balance: 10000,
 	isParticipating: true,
 	voteLastValid: 100 + (86400 * 304) / 2.8,
-	lastVoteAt: '2026-10-25T00:00:00Z',
-	lastBlock: 99
+	health: health()
 });
 const summarize = (contracts: WalletAccount[], current = epoch, primary = owner) =>
 	summarizeWallet({
@@ -269,3 +292,105 @@ it('unknown ownership renders unavailable native split in Overview', async () =>
 	expect(text).toContain('Locked balance unavailable');
 	expect(text).toMatch(/Liquid: Unavailable/);
 }, 30000);
+
+describe('node health', () => {
+	it('carries no vote or last-block fields', () => {
+		const result = summarize([online('C0')]);
+		for (const key of ['oldestVoteAt', 'voteTone', 'lastBlock', 'lastBlockAt'])
+			expect(result).not.toHaveProperty(key);
+	});
+
+	it('reports the online account silent longest and is ok while none is overdue', () => {
+		const quiet = {
+			...online('C1'),
+			health: health({ heartbeat: heartbeat({ silentRounds: 900 }) })
+		};
+		const result = summarize([online('C0'), quiet], epoch, online('OWNER'));
+		expect(result.heartbeat.oldest?.silentRounds).toBe(900);
+		expect(result.heartbeat.tone).toBe('ok');
+		expect(result.heartbeat.overdueCount).toBe(0);
+		expect(result.healthTone).toBe('ok');
+	});
+
+	it('warns when an online account is overdue', () => {
+		const late = {
+			...online('C1'),
+			health: health({ heartbeat: heartbeat({ silentRounds: 20_000, overdue: true }) })
+		};
+		const result = summarize([online('C0'), late], epoch, online('OWNER'));
+		expect(result.heartbeat.overdueCount).toBe(1);
+		expect(result.heartbeat.tone).toBe('warn');
+		expect(result.healthTone).toBe('warn');
+	});
+
+	it('gives no verdict when online stake was unavailable', () => {
+		const unknown = {
+			...online('C0'),
+			health: health({ heartbeat: heartbeat({ overdue: null, overdueAfter: null }) })
+		};
+		const result = summarize([unknown], epoch, online('OWNER'));
+		expect(result.heartbeat.tone).toBe('neutral');
+		expect(result.heartbeat.overdueCount).toBe(0);
+	});
+
+	it('warns that health is incomplete when an online account was never seen', () => {
+		const unseen = { ...online('C0'), health: health({ heartbeat: null }) };
+		const result = summarize([unseen], epoch, online('OWNER'));
+		expect(result.heartbeat.unknownCount).toBe(1);
+		expect(result.healthTone).toBe('warn');
+	});
+
+	it('is dangerous when any account is suspended', () => {
+		const taken = {
+			...owner,
+			address: 'C1',
+			contractId: 1,
+			balance: 500,
+			health: health({ eligibility: suspended, heartbeat: null })
+		};
+		const result = summarize([online('C0'), taken], epoch, online('OWNER'));
+		expect(result.suspendedCount).toBe(1);
+		expect(result.healthTone).toBe('danger');
+	});
+
+	it('lists the owner, online contracts and suspended contracts for eligibility', () => {
+		const idle = {
+			...owner,
+			address: 'IDLE',
+			contractId: 3,
+			balance: 500,
+			health: health({ eligibility: null })
+		};
+		const taken = {
+			...owner,
+			address: 'TAKEN',
+			contractId: 2,
+			balance: 500,
+			health: health({ eligibility: suspended })
+		};
+		const result = summarize([{ ...online('C1'), contractId: 1 }, taken, idle], epoch, {
+			...owner,
+			health: health()
+		});
+		expect(result.eligibilityRows.map((row) => [row.address, row.contractId])).toEqual([
+			['OWNER', null],
+			['C1', 1],
+			['TAKEN', 2]
+		]);
+		expect(result.eligibilityRows[0].eligibility).toBe(registered);
+		expect(result.eligibilityRows[2].eligibility).toBe(suspended);
+	});
+
+	it('lists an online contract with unread eligibility as unavailable, not dropped', () => {
+		const unread = { ...online('C1'), health: health({ eligibility: null }) };
+		const result = summarizeWallet({
+			owner: null,
+			contracts: [unread],
+			current: epoch,
+			history: [],
+			state: 'ready',
+			now: 0
+		});
+		expect(result.eligibilityRows).toEqual([{ address: 'C1', contractId: 1, eligibility: null }]);
+	});
+});

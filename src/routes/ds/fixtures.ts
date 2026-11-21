@@ -1,3 +1,8 @@
+import {
+	BLOCK_REWARD_STATUS_TEXT,
+	type BlockRewardReason,
+	type BlockRewardStatus
+} from '$lib/rewards/blockRewardStatus';
 import type { DataState, Tone } from '$lib/ds';
 
 // Literal excerpts from phase1/data/snapshot.json; no runtime dependency on that file.
@@ -135,6 +140,17 @@ export const statusLabels: Record<Tone, string> = {
 	info: 'Live'
 };
 export const sizes = ['sm', 'md'] as const;
+const reasons = (codes: BlockRewardReason[]) =>
+	codes.map((code) => ({ code, text: BLOCK_REWARD_STATUS_TEXT[code] }));
+export const blockRewardStatuses: { name: string; status: BlockRewardStatus }[] = [
+	{ name: 'Registered', status: { registered: true, reasons: [] } },
+	{
+		name: 'Online without the fee, below range',
+		status: { registered: false, reasons: reasons(['not-opted-in', 'below-range']) }
+	},
+	{ name: 'Contract not upgraded', status: { registered: false, reasons: reasons(['contract']) } },
+	{ name: 'Suspended', status: { registered: false, reasons: reasons(['suspended']) } }
+];
 export const buttonVariants = ['primary', 'soft', 'ghost'] as const;
 export const sparklineTones = ['accent', 'hi', 'ok'] as const;
 export const ringTones = ['ok', 'warn', 'danger'] as const;

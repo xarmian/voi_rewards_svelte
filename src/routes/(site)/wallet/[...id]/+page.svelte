@@ -464,6 +464,7 @@
 						price={snapshot?.price ?? null}
 						pageAddress={walletId}
 						isContract={!!parentWalletId}
+						contractId={data.contractId ?? null}
 						{accountState}
 						asOf={snapshot?.asOf}
 						{now}

@@ -6,6 +6,8 @@
 	import HealthRing from '../HealthRing/HealthRing.svelte';
 	import HealthItem from '../HealthItem/HealthItem.svelte';
 	import StatusPill from '../StatusPill/StatusPill.svelte';
+	import BlockRewardStatusPill from '../BlockRewardStatusPill/BlockRewardStatusPill.svelte';
+	import Button from '../Button/Button.svelte';
 	import ChartFrame from '../ChartFrame/ChartFrame.svelte';
 	import BarsVsExpected from '../charts/BarsVsExpected.svelte';
 	import InlineAlert from '../InlineAlert/InlineAlert.svelte';
@@ -24,6 +26,7 @@
 		price = null,
 		pageAddress,
 		isContract = false,
+		contractId = null,
 		accountState,
 		asOf,
 		now,
@@ -37,6 +40,8 @@
 		pageAddress: string;
 		/** Whether the page address is a staking contract. */
 		isContract?: boolean;
+		/** The page contract's application id, when the page is a staking contract. */
+		contractId?: number | null;
 		accountState: PageAccountState<{ address: string; app: string; walletId?: string }>;
 		asOf?: string;
 		now: number;
@@ -76,6 +81,51 @@
 			timeZone: 'UTC'
 		}).format(new Date(value));
 	const maxYear = $derived(Math.max(1, ...summary.lockedByYear.map((year) => year.amount)));
+	const heartbeat = $derived(summary.heartbeat);
+	const plural = (count: number, word: string) =>
+		`${comma(count)} ${word}${count === 1 ? '' : 's'}`;
+	/** "Last proposed 10m ago" from an age in seconds; ages are at the fallback block time. */
+	function seen(label: string, missing: string, seconds: number | null) {
+		return seconds === null ? missing : `${label} ${ago(now - seconds * 1000, now)}`;
+	}
+	const heartbeatAges = $derived(
+		heartbeat.oldest
+			? `${seen('Last proposed', 'No proposal on record', heartbeat.oldest.lastProposedSeconds)} · ${seen('last heartbeat', 'no heartbeat on record', heartbeat.oldest.lastHeartbeatSeconds)}`
+			: null
+	);
+	const heartbeatDetail = $derived(
+		[
+			heartbeat.overdueCount > 0
+				? `${heartbeatAges} · ${plural(heartbeat.overdueCount, 'online account')} silent longer than expected. The node may be suspended soon if it stays silent.`
+				: heartbeat.oldest && heartbeat.tone === 'neutral'
+					? 'Online stake unavailable, so staleness is not checked.'
+					: heartbeat.oldest
+						? 'Longest silence among online accounts'
+						: 'No proposal or heartbeat on record for online accounts.',
+			heartbeat.oldest && heartbeat.unknownCount > 0
+				? `${comma(heartbeat.unknownCount)} with no proposal or heartbeat on record`
+				: ''
+		]
+			.filter(Boolean)
+			.join(' · ')
+	);
+	// The owner's 2 VOI re-registration opens the same key registration as the legacy node panel.
+	let RegisterVoteKey: typeof import('$lib/component/RegisterVoteKey.svelte').default | null =
+		$state(null);
+	let showRegisterVoteKey = $state(false);
+	let registerError = $state('');
+	async function makeEligible() {
+		registerError = '';
+		try {
+			RegisterVoteKey ??= (await import('$lib/component/RegisterVoteKey.svelte')).default;
+			if (accountState.state === 'yours') showRegisterVoteKey = true;
+		} catch {
+			registerError = 'Unable to open this action. Please try again.';
+		}
+	}
+	async function handleVoteKeySuccess(forceRefresh = false) {
+		if (forceRefresh) await onrefresh?.();
+	}
 	const holdings = $derived(summary.holdings);
 	const parts = $derived([
 		{ label: 'Locked', value: holdings.locked, color: 'bg-accent-fill' },
@@ -135,12 +185,19 @@
 									: `Estimated expiry ${date(now + summary.keyDays * 86400000)}`}
 							/>
 							<HealthItem
-								tone={summary.voteTone}
-								title={summary.oldestVoteAt
-									? `Voted ${ago(summary.oldestVoteAt, now)}`
-									: 'Last vote unavailable'}
-								detail={`Oldest vote among online accounts · last block ${summary.lastBlock === null ? 'unavailable' : `${summary.lastBlockAt ? ago(summary.lastBlockAt, now) + ' · ' : ''}#${comma(summary.lastBlock)}`}`}
+								tone={heartbeat.tone}
+								title={!heartbeatAges
+									? 'Heartbeat unavailable'
+									: heartbeat.overdueCount > 0
+										? 'Heartbeat overdue'
+										: heartbeatAges}
+								detail={heartbeatDetail}
 							/>
+							{#if summary.suspendedCount > 0}<HealthItem
+									tone="danger"
+									title={`${plural(summary.suspendedCount, 'account')} suspended`}
+									detail="Taken offline for missing proposals. Register keys again to come back online."
+								/>{/if}
 							<HealthItem
 								tone={summary.idleCount ? 'warn' : 'ok'}
 								title={`${comma(summary.idleCount)} ${summary.idleCount === 1 ? 'contract' : 'contracts'} not staking`}
@@ -149,6 +206,30 @@
 						</ul>
 					{/if}
 				</div>
+				{#if !loading && summary.eligibilityRows.length}
+					<h3 class="mt-5 text-label font-bold text-ink-muted">Real-time block rewards</h3>
+					<ul aria-label="Real-time block reward eligibility" class="mt-2 divide-y divide-line">
+						{#each summary.eligibilityRows as row (row.address)}
+							<li class="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1 py-2">
+								<span class="text-sm font-bold"
+									>{row.contractId === null ? 'This account' : `Contract #${row.contractId}`}</span
+								>
+								<div class="flex min-w-0 flex-col items-end gap-1">
+									{#if row.eligibility}<BlockRewardStatusPill
+											status={row.eligibility.status}
+											compact
+										/>{:else}<StatusPill tone="neutral" label="Unavailable" />{/if}
+									{#if row.contractId === null && row.address === pageAddress && accountState.state === 'yours' && row.eligibility?.canMakeEligible}<Button
+											variant="soft"
+											size="sm"
+											onclick={makeEligible}>Make eligible (2 VOI)</Button
+										>{/if}
+								</div>
+							</li>
+						{/each}
+					</ul>
+					{#if registerError}<InlineAlert message={registerError} />{/if}
+				{/if}
 			{/if}
 		</div>
 	</Card>
@@ -409,7 +490,20 @@
 	<WalletBlockRewards
 		{pageAddress}
 		{isContract}
+		{contractId}
 		ownerLookup={summary.ownerLookup === 'unavailable' ? 'unavailable' : 'ok'}
 		onretrylookup={onrefresh}
 	/>
 </div>
+{#if showRegisterVoteKey && RegisterVoteKey}
+	<!-- The on-chain offer exists only for an online account, so the account is online here. -->
+	<RegisterVoteKey
+		{pageAddress}
+		walletAddress={pageAddress}
+		parentWalletAddress={null}
+		contractId={null}
+		isOnline={true}
+		bind:showModal={showRegisterVoteKey}
+		onSuccess={handleVoteKeySuccess}
+	/>
+{/if}

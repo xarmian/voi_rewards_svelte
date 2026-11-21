@@ -11,3 +11,11 @@ export const BONUS_DECAY_PERCENT = 1;
 export const BALANCE_LOOKBACK_ROUNDS = 320;
 export const BLOCK_REWARDS_START_ROUND = 23_944_225;
 export const BLOCK_REWARD_NOTE_PREFIX = 'ProposerPayout for Round ';
+
+// go-algorand absenteeism: an online account is absent (and suspended) once
+// currentRound > lastSeen + ABSENT_FACTOR × totalOnlineStake ÷ accountStake.
+export const ABSENT_FACTOR = 20;
+// The heartbeat reads overdue at this fraction of the absenteeism window...
+export const HEARTBEAT_OVERDUE_FRACTION = 0.5;
+// ...but never sooner than this many rounds, so large accounts do not flicker.
+export const HEARTBEAT_OVERDUE_FLOOR_ROUNDS = 1000;
