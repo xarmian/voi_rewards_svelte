@@ -10,25 +10,21 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount, untrack } from 'svelte';
-	import {
-		Button,
-		Card,
-		CopyButton,
-		InlineAlert,
-		WalletSearchPage,
-		WalletRewards,
-		StatusPill,
-		Tabs,
-		WalletOverview,
-		WalletContractsPanel,
-		WalletAvatar,
-		createHashTabs,
-		shortAddr,
-		comma
-	} from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { CopyButton } from '$lib/ds/CopyButton';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { WalletSearchPage } from '$lib/ds/WalletSearchPage';
+	import { WalletRewards } from '$lib/ds/WalletRewards';
+	import { StatusPill } from '$lib/ds/StatusPill';
+	import { Tabs, createHashTabs } from '$lib/ds/Tabs';
+	import { WalletOverview } from '$lib/ds/WalletOverview';
+	import { WalletContractsPanel } from '$lib/ds/WalletContractsPanel';
+	import { WalletAvatar } from '$lib/ds/WalletAvatar';
+	import { shortAddr, comma } from '$lib/ds/format';
 	import { WALLET_TABS } from '$lib/ds/Tabs/hash';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
-	import type { DataState } from '$lib/ds';
+	import type { DataState } from '$lib/ds/types';
 	import { createWalletRouteSync } from '$lib/wallet/routeSync.svelte';
 	import { createWalletIdentity } from '$lib/wallet/identity.svelte';
 	import { summarizeWallet } from '$lib/wallet/summary';

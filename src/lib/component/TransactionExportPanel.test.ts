@@ -17,7 +17,10 @@ import * as arcReader from '$lib/services/arc200Export';
 import * as arcExport from '$lib/wallet/arc200Export';
 import * as nftReader from '$lib/services/arc72Export';
 import * as nftExport from '$lib/wallet/arc72Export';
-import * as ds from '$lib/ds';
+import * as button from '$lib/ds/Button';
+import * as card from '$lib/ds/Card';
+import * as inlineAlert from '$lib/ds/InlineAlert';
+import * as statusPill from '$lib/ds/StatusPill';
 import * as rewards from '$lib/chain/rewardSenders';
 import * as labels from '$lib/rewards/blockRewardLabels';
 import * as options from '$lib/wallet/transactionExport';
@@ -185,7 +188,10 @@ function renderSelection(
 		'$lib/wallet/arc200Export': arcExport,
 		'$lib/services/arc72Export': nftReader,
 		'$lib/wallet/arc72Export': nftExport,
-		'$lib/ds': ds,
+		'$lib/ds/Button': button,
+		'$lib/ds/Card': card,
+		'$lib/ds/InlineAlert': inlineAlert,
+		'$lib/ds/StatusPill': statusPill,
 		'$lib/chain/rewardSenders': rewards,
 		'$lib/rewards/blockRewardLabels': labels,
 		'$lib/wallet/transactionExport': options,

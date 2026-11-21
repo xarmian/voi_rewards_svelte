@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArchiveBanner } from '$lib/ds';
+	import { ArchiveBanner } from '$lib/ds/ArchiveBanner';
 	import WeeklyReports from '$lib/components/reports/WeeklyReports.svelte';
 </script>
 

@@ -1,5 +1,8 @@
 <script lang="ts">
-	import { Button, Card, Chip, DataTable, type Column } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { Chip } from '$lib/ds/Chip';
+	import { DataTable, type Column } from '$lib/ds/DataTable';
 	import { epochScheduleAmounts } from './inputs';
 	import { buildScheduleCsv, type ScheduleRow } from './schedule';
 	import { EPOCH_START_DATE, type EpochCalculator } from './state.svelte';

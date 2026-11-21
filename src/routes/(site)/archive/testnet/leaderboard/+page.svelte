@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArchiveBanner } from '$lib/ds';
+	import { ArchiveBanner } from '$lib/ds/ArchiveBanner';
 	import Leaderboard from './Leaderboard.svelte';
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { VRPhase2 } from '$lib/supabase';

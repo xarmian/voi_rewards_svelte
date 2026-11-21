@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { Button, Card, Chip, DataTable, InlineAlert } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { Chip } from '$lib/ds/Chip';
+	import { DataTable } from '$lib/ds/DataTable';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
 	import type { Column, SortState } from '$lib/ds/DataTable/types';
 	import type { DataState } from '$lib/ds/types';
 	import {

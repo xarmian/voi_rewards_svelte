@@ -1,5 +1,8 @@
 <script lang="ts">
-	import { Button, InlineAlert, StatTile, compact } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { StatTile } from '$lib/ds/StatTile';
+	import { compact } from '$lib/ds/format';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import CalculatorDisclaimer from '$lib/component/CalculatorDisclaimer.svelte';
 	import { estimateRewards } from '$lib/epochRewards/calculator/model';

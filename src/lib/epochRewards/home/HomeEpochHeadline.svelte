@@ -1,5 +1,8 @@
 <script lang="ts">
-	import { Card, ChartFrame, InlineAlert, LineChart } from '$lib/ds';
+	import { Card } from '$lib/ds/Card';
+	import { ChartFrame } from '$lib/ds/ChartFrame';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { LineChart } from '$lib/ds/charts';
 	import { ago, comma, MISSING, pct } from '$lib/ds/format';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';

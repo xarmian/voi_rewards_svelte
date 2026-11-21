@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
 	import { validateNodeCost } from './view';
 
 	// The calculator's "Monthly node cost" field, moved here unchanged; only the epoch estimate uses it.

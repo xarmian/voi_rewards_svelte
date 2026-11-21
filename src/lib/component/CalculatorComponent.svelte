@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Chip, InlineAlert, Tabs } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Chip } from '$lib/ds/Chip';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { Tabs } from '$lib/ds/Tabs';
 	import { createReadSource, type Source } from '$lib/wallet/read';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import { loadCalculatorBalance, loadCalculatorPrice } from '$lib/wallet/calculator';

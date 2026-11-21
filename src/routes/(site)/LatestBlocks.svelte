@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Card, Chip, InlineAlert, StatusPill } from '$lib/ds';
+	import { Card } from '$lib/ds/Card';
+	import { Chip } from '$lib/ds/Chip';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { StatusPill } from '$lib/ds/StatusPill';
 	import { ago, comma, shortAddr } from '$lib/ds/format';
 	import { createRecentBlocks, type RecentState } from '$lib/home/recent';
 	import { getEnvoiNames } from '$lib/utils/envoi';

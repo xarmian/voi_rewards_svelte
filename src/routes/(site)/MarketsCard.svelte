@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { Card, InlineAlert } from '$lib/ds';
+	import { Card } from '$lib/ds/Card';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
 	import { usd } from '$lib/ds/format';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import type { Markets } from '$lib/home/markets';

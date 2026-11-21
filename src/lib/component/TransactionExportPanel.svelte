@@ -4,7 +4,10 @@
 	import { ARC200_SOURCE_WARNING, ARC200_CAP_WARNING } from '$lib/wallet/arc200Export';
 	import { createArc72Reader } from '$lib/services/arc72Export';
 	import { ARC72_SOURCE_NOTE, ARC72_CAP_WARNING } from '$lib/wallet/arc72Export';
-	import { Button, Card, InlineAlert, StatusPill } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { StatusPill } from '$lib/ds/StatusPill';
 	import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 	import {
 		REALTIME_BLOCK_REWARDS_TESTING,

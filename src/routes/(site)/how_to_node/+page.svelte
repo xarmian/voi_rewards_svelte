@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Button, Card, Chip, SearchBox } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { Chip } from '$lib/ds/Chip';
+	import { SearchBox } from '$lib/ds/SearchBox';
 	import { guideGroups } from './guides';
 	import type { PageData } from './$types';
 

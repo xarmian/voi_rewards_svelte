@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArchiveBanner } from '$lib/ds';
+	import { ArchiveBanner } from '$lib/ds/ArchiveBanner';
 	import WalletSearch from '$lib/component/WalletSearch.svelte';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';

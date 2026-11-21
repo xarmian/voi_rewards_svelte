@@ -10,7 +10,11 @@
 		type TransactionSigner
 	} from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
-	import { Button, Card, CopyButton, InlineAlert, StatusPill } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { CopyButton } from '$lib/ds/CopyButton';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { StatusPill } from '$lib/ds/StatusPill';
 	import ResolvedAddress from '$lib/component/ResolvedAddress.svelte';
 	import { capturePlan, selectionDrifted, type VanityPlan } from '$lib/chain/vanityPlan';
 	import { hasThirdPartyScript, decideVanityStart, mnemonicAtRisk } from '$lib/chain/vanityGuard';

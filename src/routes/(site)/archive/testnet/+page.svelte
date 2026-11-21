@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-	import { Card } from '$lib/ds';
+	import { Card } from '$lib/ds/Card';
 </script>
 
 <svelte:head>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArchiveBanner } from '$lib/ds';
+	import { ArchiveBanner } from '$lib/ds/ArchiveBanner';
 	import { ariaSortFor } from '$lib/a11y/keyboard';
 	import { supabasePublicClient } from '$lib/supabase';
 	import type { PageData } from './$types';
