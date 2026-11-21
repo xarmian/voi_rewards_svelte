@@ -115,17 +115,17 @@ describe('owner and contracts roll-up', () => {
 		expect(result.onlineContracts).toBe(3);
 		expect(result.stakedOnline).toBe(30000);
 		expect(result.idleBalance).toBe(130000);
-		expect(result.current.blocks).toBe(3180);
-		expect(result.current.expected).toBe(3000);
-		expect(result.current.ratio).toBeCloseTo(1.06);
-		expect(result.current.reward).toBe(31800);
+		expect(result.current!.blocks).toBe(3180);
+		expect(result.current!.expected).toBe(3000);
+		expect(result.current!.ratio).toBeCloseTo(1.06);
+		expect(result.current!.reward).toBe(31800);
 	});
 	it('an account with no contracts still counts its own online stake and blocks once', () => {
 		const result = summarize([], { ...epoch, blocks: { OWNER: 1050 } }, online('OWNER'));
 		expect(result.contractCount).toBe(0);
 		expect(result.onlineAccounts).toBe(1);
-		expect(result.current.expected).toBe(1000);
-		expect(result.current.blocks).toBe(1050);
+		expect(result.current!.expected).toBe(1000);
+		expect(result.current!.blocks).toBe(1050);
 	});
 	it('an expired key is dangerous even while algod still marks the account online', () => {
 		const result = summarize([{ ...online('C0'), voteLastValid: 99 }]);
@@ -140,15 +140,15 @@ describe('owner and contracts roll-up', () => {
 			progress: 0.001
 		});
 		expect(early.tooEarly).toBe(true);
-		expect(early.current.reward).toBeNull();
+		expect(early.current!.reward).toBeNull();
 		const empty = summarize([online('C0')], {
 			...epoch,
 			networkBlocks: 0,
 			blocks: {},
 			progress: 0
 		});
-		expect(empty.current.ratio).toBeNull();
-		expect(empty.current.reward).toBeNull();
+		expect(empty.current!.ratio).toBeNull();
+		expect(empty.current!.reward).toBeNull();
 	});
 	it('only complete epochs enter the historical luck and reward totals', () => {
 		const result = summarizeWallet({
@@ -160,7 +160,7 @@ describe('owner and contracts roll-up', () => {
 			now: Date.parse('2026-10-25T00:00:00Z')
 		});
 		expect(result.history).toHaveLength(1);
-		expect(result.history[0].expected).toBe(1000);
+		expect(result.history![0].expected).toBe(1000);
 		expect(result.earnedHistory).toBe(21200);
 		expect(result.historyRatio).toBeCloseTo(1.06);
 	});
@@ -220,8 +220,8 @@ it('deduplicates an address used as both owner and contract for stake and blocks
 	const result = summarize([account], epoch, account);
 	expect(result.onlineAccounts).toBe(1);
 	expect(result.stakedOnline).toBe(10000);
-	expect(result.current.blocks).toBe(1060);
-	expect(result.current.expected).toBe(1000);
+	expect(result.current!.blocks).toBe(1060);
+	expect(result.current!.expected).toBe(1000);
 });
 it('excludes a contract-route owner from liquid holdings', () => {
 	const account = {

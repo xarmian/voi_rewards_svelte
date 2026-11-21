@@ -106,13 +106,13 @@ it.each([undefined, null, NaN, Infinity])(
 
 it('uses the live epoch rows for the current figure and keeps 12 complete epochs separately', async () => {
 	const data = await loadWallet('OWNER', 'OWNER');
-	expect(data.current.epoch).toBe(104);
-	expect(data.current.blocks.OWNER).toBe(4096);
-	expect(data.current.progress).toBeGreaterThan(0);
-	expect(data.current.progress).toBeLessThan(1);
+	expect(data.current!.epoch).toBe(104);
+	expect(data.current!.blocks.OWNER).toBe(4096);
+	expect(data.current!.progress).toBeGreaterThan(0);
+	expect(data.current!.progress).toBeLessThan(1);
 	expect(data.history).toHaveLength(12);
 	expect(data.history.every((epoch) => epoch.epoch < 104 && epoch.progress === 1)).toBe(true);
-	expect(data.current.onlineStake).toBe(1e6);
+	expect(data.current!.onlineStake).toBe(1e6);
 });
 it('a failed account read rejects rather than inventing a zero balance', async () => {
 	mocks.account.mockResolvedValue(undefined);
@@ -137,7 +137,7 @@ it('uses historical stake already in VOI for expected blocks', async () => {
 	);
 	const data = await loadWallet('OWNER', 'OWNER');
 	const summary = summarizeWallet({ ...data, state: 'ready', now: Date.now() });
-	expect(summary.history[0].expected).toBeCloseTo((100000 * 10000) / 725.2e6, 8);
+	expect(summary.history![0].expected).toBeCloseTo((100000 * 10000) / 725.2e6, 8);
 });
 
 it.each(['Offline', 'Online'])(
@@ -190,7 +190,7 @@ it.each(['Offline', 'Online'])(
 		}
 		expect(overview).not.toContain('aria-roledescription="chart"');
 		expect(summary.contractSet).toBe('unavailable');
-		expect(summary.current.blocks).toBeNull();
+		expect(summary.current!.blocks).toBeNull();
 		expect(summary.earnedHistory).toBeNull();
 		expect(overview).toContain('Withdrawable balance unavailable');
 		expect(overview).toContain('Retry');
@@ -235,7 +235,7 @@ it('a forced load refreshes live rows and retains cached completed epochs', asyn
 	expect(rowRequests).toBe(14);
 	expect(refreshed.history).toEqual(first.history);
 	expect(refreshed.historyState).toBe('ready');
-	expect(refreshed.current.blocks.OWNER).not.toBe(first.current.blocks.OWNER);
+	expect(refreshed.current!.blocks.OWNER).not.toBe(first.current!.blocks.OWNER);
 	realTable.clearCache();
 });
 
