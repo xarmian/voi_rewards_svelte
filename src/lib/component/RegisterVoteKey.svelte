@@ -97,9 +97,13 @@
 	let pastedUriFee: number | null = null;
 	// Shown when a pasted URI asked for the fee on an account that can't pay it.
 	let incentiveNotice: string | null = null;
-	// Whether the last paste was a URI asking for less than the 2 VOI fee.
-	let pasteAsksLess = false;
-	$: keptTickText = keptTickNotice(pasteAsksLess, payIncentiveFee, accountCannotPay);
+	// Whether the last paste kept a tick the box already had against a URI asking for less than
+	// the 2 VOI fee. The user changing the box ends it, so a deliberate tick gets no notice.
+	let keptByPaste = false;
+	$: keptTickText =
+		transactionStatus === 'idle'
+			? keptTickNotice(keptByPaste, payIncentiveFee, accountCannotPay)
+			: null;
 	// The keyreg account's record from algod and the account it was read for: read at mount and
 	// replaced by each one-click fresh read. For display only: the one-click reads again at the click.
 	let accountRecord: { account: string; info: OnChainAccount } | null = null;
@@ -259,8 +263,8 @@
 	// calls this again once it resolves.
 	function applyPastedIncentive() {
 		const asksForFee = pastedUriFee !== null && incentiveFromUri(pastedUriFee, false);
-		// Feeds keptTickNotice, which shows only while the box is ticked against this URI.
-		pasteAsksLess = pastedUriFee !== null && !asksForFee;
+		// A tick the box already had, kept against a URI asking for less (feeds keptTickNotice).
+		keptByPaste = payIncentiveFee && pastedUriFee !== null && !asksForFee;
 		if (isStakingContract && contractIncentive === 'checking') {
 			incentiveNotice = asksForFee
 				? 'This URI asks for the 2 VOI incentive fee. The fee choice will apply once the contract is checked.'
@@ -1035,6 +1039,7 @@
 					<input
 						type="checkbox"
 						bind:checked={payIncentiveFee}
+						on:change={() => (keptByPaste = false)}
 						disabled={accountCannotPay || transactionStatus !== 'idle'}
 						aria-describedby="incentive-fee-help"
 						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"

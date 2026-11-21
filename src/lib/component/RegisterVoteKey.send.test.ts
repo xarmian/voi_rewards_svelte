@@ -371,7 +371,7 @@ function applyPasted(state: {
 	pastedUriFee: number | null;
 	payIncentiveFee: boolean;
 	isStakingContract?: boolean;
-	pasteAsksLess?: boolean;
+	keptByPaste?: boolean;
 }) {
 	const body = source.match(/function applyPastedIncentive\([^]*?\n\t\}/)?.[0];
 	expect(body).toBeDefined();
@@ -381,7 +381,7 @@ function applyPasted(state: {
 		accountCannotPay: true,
 		incentiveFromUri,
 		incentiveNotice: null,
-		pasteAsksLess: false,
+		keptByPaste: false,
 		...state
 	});
 	runInContext(ts.transpileModule(body!, {}).outputText, context);
@@ -448,8 +448,11 @@ test('a pasted minimum-fee URI keeps a ticked opt-in on a capable contract, with
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.pasteAsksLess).toBe(true);
+	expect(context.keptByPaste).toBe(true);
 	expect(context.incentiveNotice).toBeNull();
+	expect(keptTickNotice(context.keptByPaste, context.payIncentiveFee, false)).toMatch(
+		/still selected/
+	);
 });
 
 test('ticking then pasting a minimum-fee URI still sends the 2 VOI go-online fee', async () => {
@@ -478,8 +481,11 @@ test('a pasted minimum-fee URI keeps a ticked opt-in on a plain account, with a 
 		isStakingContract: false
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.pasteAsksLess).toBe(true);
+	expect(context.keptByPaste).toBe(true);
 	expect(context.incentiveNotice).toBeNull();
+	expect(keptTickNotice(context.keptByPaste, context.payIncentiveFee, false)).toMatch(
+		/still selected/
+	);
 });
 
 test('a pasted 2 VOI fee selects the opt-in on a plain account', () => {
@@ -500,8 +506,11 @@ test('a pasted fee just under 2 VOI keeps a ticked opt-in, with a notice', () =>
 		payIncentiveFee: true
 	});
 	expect(context.payIncentiveFee).toBe(true);
-	expect(context.pasteAsksLess).toBe(true);
+	expect(context.keptByPaste).toBe(true);
 	expect(context.incentiveNotice).toBeNull();
+	expect(keptTickNotice(context.keptByPaste, context.payIncentiveFee, false)).toMatch(
+		/still selected/
+	);
 });
 
 // The kept-tick notice is derived from the tick, so whatever clears the box (the user, the
@@ -513,11 +522,29 @@ test('the kept-tick notice shows only while the box is ticked against a URI aski
 	expect(keptTickNotice(false, true, false)).toBeNull();
 });
 
-test('the component derives the kept-tick notice from the live tick and renders it', () => {
+test('the component derives the kept-tick notice from the live tick, only while idle, and renders it', () => {
 	expect(source).toMatch(
-		/\$: keptTickText = keptTickNotice\(pasteAsksLess, payIncentiveFee, accountCannotPay\);/
+		/\$: keptTickText =\s*transactionStatus === 'idle'\s*\?\s*keptTickNotice\(keptByPaste, payIncentiveFee, accountCannotPay\)\s*:\s*null;/
 	);
 	expect(source).toMatch(/\{#if keptTickText\}[^]*?\{keptTickText\}/);
+});
+
+// The usual opt-in flow: paste the node's minimum-fee URI, then tick the box on purpose. That
+// tick is the user's choice, not one a paste kept, so no notice argues with it.
+test('ticking after a minimum-fee paste gets no kept-tick notice', () => {
+	const context = applyPasted({
+		contractIncentive: 'capable',
+		pastedUriFee: 1000,
+		payIncentiveFee: false
+	});
+	expect(context.keptByPaste).toBe(false);
+	expect(keptTickNotice(context.keptByPaste, true, false)).toBeNull();
+});
+
+test('changing the box by hand ends the kept-tick state', () => {
+	expect(source).toMatch(
+		/bind:checked=\{payIncentiveFee\}\s*on:change=\{\(\) => \(keptByPaste = false\)\}/
+	);
 });
 
 test('a later 2 VOI URI or partkeyinfo paste ends the kept-tick state', () => {
@@ -526,9 +553,9 @@ test('a later 2 VOI URI or partkeyinfo paste ends the kept-tick state', () => {
 			contractIncentive: 'capable',
 			pastedUriFee,
 			payIncentiveFee: true,
-			pasteAsksLess: true
+			keptByPaste: true
 		});
-		expect(context.pasteAsksLess).toBe(false);
+		expect(context.keptByPaste).toBe(false);
 	}
 });
 
