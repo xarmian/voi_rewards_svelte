@@ -180,12 +180,6 @@
 				"warnings": 0
 			}
 		},
-		"src/routes/(site)/privacy/+page.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/routes/api/markets/+server.ts": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 2,
