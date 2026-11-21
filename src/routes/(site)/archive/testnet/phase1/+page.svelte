@@ -55,7 +55,7 @@
 
 	// If CSV is requested, trigger download
 	onMount(() => {
-		if (data.wantsCsv) {
+		if (data.wantsCsv && data.csvContent !== undefined) {
 			const blob = new Blob([data.csvContent], { type: 'text/csv' });
 			const url = window.URL.createObjectURL(blob);
 			const a = document.createElement('a');
@@ -236,10 +236,7 @@
 							Phase 1 Total
 						</h5>
 						<p class="font-normal text-gray-700 dark:text-gray-400 leading-tight text-lg">
-							{(
-								snapshot.find((s) => s.account === selectedWallet)?.voiBalance +
-								snapshot.find((s) => s.account === selectedWallet)?.viaBalance
-							).toLocaleString()} VOI/VIA
+							{totalBalance?.toLocaleString()} VOI/VIA
 						</p>
 					</div>
 					<InfoButton
