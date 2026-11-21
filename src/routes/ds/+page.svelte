@@ -7,7 +7,6 @@
 		Chip,
 		CopyButton,
 		DataTable,
-		EpochStepper,
 		MISSING,
 		type Column,
 		type SortState,
@@ -50,6 +49,7 @@
 		tones,
 		wallet
 	} from './fixtures';
+	import { EpochStepper } from '$lib/epochRewards/components';
 
 	let retries = $state(0);
 	const retry = () => {

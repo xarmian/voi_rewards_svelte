@@ -10,7 +10,7 @@ import {
 	type NormalizedTransaction
 } from './transactionExport';
 import { BLOCK_REWARD_NOTE_PREFIX, FEE_SINK_ADDRESS } from '$lib/rewards/blockRewardConstants';
-import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 
 const input: ExportInput = {
 	assets: { mode: 'native' },

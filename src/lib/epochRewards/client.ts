@@ -1,7 +1,9 @@
-// The module's client-side entry: epoch reads and pure helpers for the wallet, calculator and
-// node pages. It pulls in the client rewards cache, so the layout and header never import
-// it; they use index.ts.
+// The module's client-side entry: epoch reads and pure helpers for the wallet, calculator,
+// node and analytics pages. It pulls in the client rewards cache, so the layout and header
+// never import it; they use index.ts.
 export { startWalletEpochs } from './wallet/load';
+export { epochAnalytics } from './analytics/model';
+export type { EpochAnalytics } from './analytics/model';
 export { epochCalculator } from './calculator/state.svelte';
 export type { EpochCalculator } from './calculator/state.svelte';
 export { loadNodeEpochRewards, projectEpochRewards } from './node';

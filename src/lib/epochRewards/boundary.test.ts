@@ -111,12 +111,7 @@ const homeSurfaces = (path: string) =>
  */
 const PENDING = {
 	// PR 2: wallet, calculator, node and analytics surfaces.
-	'PR 2': [
-		'src/lib/component/PortfolioComponent.svelte',
-		'src/lib/component/TransactionExportPanel.svelte',
-		'src/lib/network/model.ts',
-		'src/lib/utils.ts'
-	],
+	'PR 2': ['src/lib/utils.ts'],
 	// PR 2 decides: the TestNet archive keeps its own reward pools.
 	archive: [
 		'src/routes/(site)/archive/testnet/relays/+page.svelte',

@@ -6,7 +6,8 @@ import {
 	accountsDetail,
 	rewardsRefreshMode
 } from './headline';
-import { extrapolateRewardPerBlock, getTokensByEpoch } from '$lib/utils';
+import { getTokensByEpoch } from '$lib/utils';
+import { extrapolateRewardPerBlock } from './pool';
 import { MISSING } from '$lib/ds/format';
 const now = new Date('2026-10-25T02:38:00Z');
 const epochs = [

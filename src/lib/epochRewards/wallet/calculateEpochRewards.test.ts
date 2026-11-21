@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+import { calculateEpochRewards } from './calculateEpochRewards';
+import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 
 interface Snapshot {
 	total_blocks?: number;

@@ -3,7 +3,8 @@
 	import InlineAlert from '$lib/ds/InlineAlert/InlineAlert.svelte';
 	import { comma as num } from '$lib/ds/format';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
-	import { freshnessText, type EpochResource } from './series';
+	import { freshnessText } from '$lib/network/series';
+	import type { EpochResource } from './series';
 	let {
 		resource,
 		loading,

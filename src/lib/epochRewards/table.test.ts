@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, vi } from 'vitest';
-import { extrapolateRewardPerBlock } from '$lib/utils';
+import { extrapolateRewardPerBlock } from './pool';
 import {
 	filterProposer,
 	filterRewardRows,

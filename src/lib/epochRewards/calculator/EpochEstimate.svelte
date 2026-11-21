@@ -2,7 +2,7 @@
 	import { Button, InlineAlert, StatTile, compact } from '$lib/ds';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
 	import { voiPrice } from '$lib/stores/price';
-	import { estimateRewards } from '$lib/rewards/calculatorModel';
+	import { estimateRewards } from '$lib/epochRewards/calculator/model';
 	import {
 		availability,
 		breakEvenTile,

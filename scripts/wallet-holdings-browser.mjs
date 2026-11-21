@@ -25,7 +25,7 @@ try {
 						return '\0fixture:tokens';
 					if (id.endsWith('/portfolio/accountDetails')) return '\0fixture:account';
 					if (id.endsWith('/stores/price')) return '\0fixture:price';
-					if (id.endsWith('/stores/dataTable') || id.endsWith('/stores/dataTable.ts'))
+					if (id.endsWith('/epochRewards/dataTable') || id.endsWith('/epochRewards/dataTable.ts'))
 						return '\0fixture:epochs';
 					if (id.endsWith('/utils/envoi')) return '\0fixture:envoi';
 

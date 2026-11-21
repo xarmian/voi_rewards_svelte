@@ -1,8 +1,9 @@
 import { finite } from '$lib/home/headline';
-import { calculateEpochRewards, REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+import { calculateEpochRewards } from './calculateEpochRewards';
+import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 import { getSupplyInfo } from '$lib/stores/accounts';
 import { getTokensByEpoch } from '$lib/utils';
-import { dataTable } from '../../../stores/dataTable';
+import { dataTable } from '../dataTable';
 import type { WalletAccount } from '$lib/wallet/summary';
 import { boundedRead, type Source } from '$lib/wallet/read';
 import { count, json, record, type RewardAccount } from '$lib/wallet/rewards';

@@ -37,7 +37,7 @@ vi.mock('$lib/stores/price', async () => {
 	return { fetchVoiPrice: async () => {}, voiPrice: writable({ price: 0.001, error: null }) };
 });
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: mocks.pool }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('./dataTable', () => ({
 	dataTable: { fetchDateRanges: mocks.dates, fetchData: mocks.rows }
 }));
 vi.mock('$lib/component/RegisterVoteKey.svelte', () => ({ default: () => {} }));

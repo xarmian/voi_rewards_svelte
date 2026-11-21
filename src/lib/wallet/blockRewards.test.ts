@@ -20,7 +20,7 @@ vi.mock('$lib/stores/accounts', () => ({
 	requireAccountInfo: vi.fn(),
 	onlineStakeStore: { getData: vi.fn(), refresh: vi.fn() }
 }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('$lib/epochRewards/dataTable', () => ({
 	dataTable: { fetchDateRanges: vi.fn(), fetchData: vi.fn() }
 }));
 vi.mock('$lib/rewards/blockRewardChain', () => ({ readBonus: vi.fn(), readFeeSink: vi.fn() }));

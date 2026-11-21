@@ -1,5 +1,5 @@
 import { getTokensByEpoch } from '$lib/utils';
-import { dataTable } from '../../stores/dataTable';
+import { dataTable } from './dataTable';
 
 const EPOCHS_PER_YEAR = 52;
 

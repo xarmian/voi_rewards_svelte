@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { epochRange } from '$lib/epochRewards';
-import { REWARDS_ADDRESSES } from '$lib/rewards/calculateEpochRewards';
+import { REWARDS_ADDRESSES } from '$lib/chain/rewardSenders';
 import {
 	validatePayouts,
 	mergeRewardRows,
@@ -21,10 +21,10 @@ vi.mock('$lib/stores/accounts', () => ({
 	requireAccountInfo: vi.fn(),
 	onlineStakeStore: { getData: vi.fn(), refresh: vi.fn() }
 }));
-vi.mock('../../../stores/dataTable', () => ({
+vi.mock('../dataTable', () => ({
 	dataTable: { fetchDateRanges: vi.fn(), fetchData: vi.fn() }
 }));
-import { dataTable } from '../../../stores/dataTable';
+import { dataTable } from '../dataTable';
 const address = 'PAGE';
 const now = epochRange(66).start.getTime();
 const epoch: RewardEpoch = {

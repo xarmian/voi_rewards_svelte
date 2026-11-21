@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
-import { get } from 'svelte/store';
+import { derived, get } from 'svelte/store';
 import { readFileSync } from 'node:fs';
 import Page from './+page.svelte';
 import { createNetwork } from '$lib/network/model';
+import { epochAnalytics } from '$lib/epochRewards/client';
 import epochs from '$lib/network/fixtures/epochs.json';
 import stake from '$lib/network/fixtures/online-stake-history.json';
 import prices from '$lib/network/fixtures/price-history-7d.json';
@@ -19,6 +20,10 @@ const plots = vi.hoisted(() => ({
 vi.mock('$lib/network/model', async (original) => {
 	const actual = await original<typeof import('$lib/network/model')>();
 	return { ...actual, createNetwork: vi.fn(actual.createNetwork) };
+});
+vi.mock('$lib/epochRewards/client', async (original) => {
+	const actual = await original<typeof import('$lib/epochRewards/client')>();
+	return { ...actual, epochAnalytics: vi.fn(actual.epochAnalytics) };
 });
 vi.mock('$lib/ds/charts/LineChart.svelte', async (original) => {
 	const actual = await original<typeof import('$lib/ds/charts/LineChart.svelte')>();
@@ -105,7 +110,24 @@ function setup(overrides: { price?: unknown; tx?: unknown; fail?: string } = {})
 			return Response.json(overrides.tx ?? transactions);
 		throw new Error(`Unexpected request ${path}`);
 	});
-	const model = createNetwork({ fetch: fetcher, now: () => now });
+	// The page's two models on one fetcher, read as one: the epoch read starts first, as on the page.
+	const network = createNetwork({ fetch: fetcher, now: () => now });
+	const epochModel = epochAnalytics({ fetch: fetcher, now: () => now })!;
+	const model = {
+		network,
+		epochModel,
+		subscribe: derived([network, epochModel], ([n, e]) => ({
+			...n,
+			epochs: e.epochs,
+			range: e.range,
+			announcement: e.announcement
+		})).subscribe,
+		load: () => Promise.all([epochModel.load(), network.load()]),
+		retry: (key: 'epochs' | Parameters<typeof network.retry>[0]) =>
+			key === 'epochs' ? epochModel.retry() : network.retry(key),
+		setRange: epochModel.setRange,
+		setPeriod: network.setPeriod
+	};
 	return { model, fetcher };
 }
 function section(html: string, title: string) {
@@ -115,8 +137,9 @@ function section(html: string, title: string) {
 			.find((s) => s.includes(`>${title}</h2>`)) ?? ''
 	);
 }
-const htmlFor = (model: ReturnType<typeof createNetwork>) => {
-	vi.mocked(createNetwork).mockReturnValueOnce(model);
+const htmlFor = (model: ReturnType<typeof setup>['model']) => {
+	vi.mocked(createNetwork).mockReturnValueOnce(model.network);
+	vi.mocked(epochAnalytics).mockReturnValueOnce(model.epochModel);
 	return render(Page).body.replace(/<!--[\s\S]*?-->/g, '');
 };
 
@@ -298,7 +321,9 @@ it('uses unavailable and empty states for absent account counts and an invalid s
 });
 
 it('binds segmented controls to the tested range and period handlers with 44px targets', () => {
-	const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+	const page = ['./+page.svelte', '../../../lib/epochRewards/analytics/EpochAprChart.svelte']
+		.map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
+		.join('\n');
 	expect(page).toContain('onchange={model.setRange}');
 	expect(page).toContain('onchange={model.setPeriod}');
 	expect(page).toContain('min-height: 44px');

@@ -59,7 +59,7 @@ const source = [
 	.map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
 	.join('\n');
 test('shared calculator uses the design system, original model and view helpers', () => {
-	for (const module of ['$lib/ds', '$lib/rewards/calculatorModel', './calculatorView']) {
+	for (const module of ['$lib/ds', '$lib/epochRewards/calculator/model', './calculatorView']) {
 		expect(source).toContain(`from '${module}'`);
 	}
 	for (const prop of ['walletAddress', 'childAccounts', 'primaryAccountInfo']) {

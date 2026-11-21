@@ -32,7 +32,7 @@ async function storeSnapshot() {
 		import('svelte/store'),
 		import('$lib/stores/price'),
 		import('$lib/stores/accounts'),
-		import('../stores/dataTable'),
+		import('$lib/epochRewards/dataTable'),
 		import('$lib/stores/loadingStore'),
 		import('../stores/collection')
 	]);

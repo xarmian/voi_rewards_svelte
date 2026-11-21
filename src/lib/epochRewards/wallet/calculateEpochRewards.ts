@@ -1,8 +1,3 @@
-export const REWARDS_ADDRESSES = [
-	'62TIVJSZOS4DRSSYYDDZELQAGFYQC5JWKCHRBPPYKTZN2OOOXTGLB5ZJ4E',
-	'CAGQDUFUPI6WAQCIQZHPHMX2Z7KACAKZWOMI4R72JV24U4AVAJTGCHA2BE'
-] as const;
-
 interface EpochRewardSnapshot {
 	total_blocks?: number | null;
 	ballast_blocks?: number | null;

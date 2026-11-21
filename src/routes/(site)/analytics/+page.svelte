@@ -3,15 +3,20 @@
 	import ChartFrame from '$lib/ds/ChartFrame/ChartFrame.svelte';
 	import LineChart from '$lib/ds/charts/LineChart.svelte';
 	import Tabs from '$lib/ds/Tabs/Tabs.svelte';
-	import StakeSplit from '$lib/network/StakeSplit.svelte';
 	import RealtimeTestingBadge from '$lib/ds/RealtimeTestingBadge/RealtimeTestingBadge.svelte';
 	import { compact, comma as num } from '$lib/ds/format';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import { chainStatus } from '$lib/stores/chainStatus';
 	import { createNetwork } from '$lib/network/model';
-	import { epochRange, freshnessText, type Resource } from '$lib/network/series';
+	import { domain, freshness, status, timeAxis } from '$lib/network/view';
+	import { epochAnalytics } from '$lib/epochRewards/client';
+	import {
+		EpochAccountsChart,
+		EpochAnalyticsLede,
+		EpochAprChart,
+		StakeSplit
+	} from '$lib/epochRewards/components';
 	import type { DataState } from '$lib/ds/types';
-	import type { XSpec } from '$lib/ds/charts/types';
 	import { createReadSource, type Source } from '$lib/wallet/read';
 	import {
 		loadNetworkBlockRewardsDaily,
@@ -21,7 +26,10 @@
 	import { blockRewardDayRows, blockRewardSummary, shareText } from '$lib/network/blockRewards';
 
 	const model = createNetwork();
+	const epochs = epochAnalytics();
 	onMount(() => {
+		// The epoch read starts first, as it did when one model held every resource.
+		void epochs?.load();
 		void model.load();
 	});
 	let blockSource: Source<NetworkBlockRewardDay[]> = $state({ state: 'loading' });
@@ -43,43 +51,9 @@
 				? blockSource.state
 				: 'empty'
 	);
-	const aprRows = $derived(epochRange($model.epochs?.rows ?? [], $model.range));
-	const accountRows = $derived(epochRange($model.epochs?.rows ?? [], '26'));
 	const stakeRows = $derived($model.stake?.rows ?? []);
 	const priceRows = $derived($model.price?.rows ?? []);
 	const txRows = $derived($model.transactions?.rows ?? []);
-	const current = $derived($model.epochs?.current);
-	const previous = $derived($model.epochs?.previous);
-	const pct = (value: number) => `${num(value, 2)}%`;
-	const available = (value: number | null | undefined, format: (n: number) => string = String) =>
-		value == null ? 'Unavailable' : format(value);
-	const freshness = (resource: Resource<unknown> | null) =>
-		resource ? freshnessText(resource) : undefined;
-	function status(
-		resource: Resource<unknown> | null,
-		busy: boolean,
-		values: (number | null)[]
-	): DataState {
-		if (busy) return 'loading';
-		if (!resource) return 'error';
-		if (resource.status === 'ready' && !values.some((v) => v !== null)) return 'empty';
-		return resource.status;
-	}
-	function domain(values: (number | null)[], log = false): [number, number] {
-		const finite = values.filter(
-			(v): v is number => v !== null && Number.isFinite(v) && (!log || v > 0)
-		);
-		if (!finite.length) return log ? [1, 10] : [0, 1];
-		const max = Math.max(...finite);
-		if (!log) return [0, max > 0 ? max * 1.1 : 1];
-		const min = Math.min(...finite);
-		return [min / 1.05, max * 1.05];
-	}
-	function timeAxis(rows: { date: string }[]): XSpec {
-		const start = new Date(`${rows[0]?.date ?? '1970-01-01'}T00:00:00Z`);
-		const end = new Date(`${rows.at(-1)?.date ?? '1970-01-02'}T00:00:00Z`);
-		return { kind: 'time', domain: [start, end > start ? end : new Date(+start + 86400000)] };
-	}
 	const txState = $derived(
 		status(
 			$model.transactions,
@@ -92,7 +66,9 @@
 <svelte:head
 	><title>Network | voirewards</title><meta
 		name="description"
-		content="Voi network rewards, online stake, rewarded accounts, VOI price and transaction activity."
+		content={epochs
+			? 'Voi network rewards, online stake, rewarded accounts, VOI price and transaction activity.'
+			: 'Voi online stake, real-time block rewards, VOI price and transaction activity.'}
 	/></svelte:head
 >
 
@@ -103,81 +79,10 @@
 			{$chainStatus.round === null ? 'Block unavailable' : `Block ${num($chainStatus.round)}`} · Chain
 			status is context; each resource has its own data time below.
 		</p>
-		<p class="mt-3 text-body text-ink-muted">
-			Follow rewards by epoch, then the stake competing for them.
-		</p>
+		{#if epochs}<EpochAnalyticsLede />{/if}
 	</div>
 
-	<ChartFrame
-		title="APR by epoch"
-		summary={`Annual percentage rate in percent for ${aprRows.length} epochs. Current epoch ${current?.epoch ?? 'unavailable'} is in progress: ${available(current?.apr, pct)}. Previous completed: ${available(previous?.apr, pct)}.`}
-		state={status(
-			$model.epochs,
-			$model.busy.epochs,
-			aprRows.map((r) => r.apr)
-		)}
-		onretry={() => void model.retry('epochs')}
-		freshnessText={freshness($model.epochs)}
-		data={{
-			columns: ['Epoch', 'APR (%)', 'Status'],
-			rows: aprRows.map((r) => [r.epoch, r.apr ?? 'Unavailable', r.status]),
-			caption:
-				'Annual percentage rate (APR, %) by epoch. The current epoch is in progress and its values are provisional. Missing observations remain gaps.'
-		}}
-		x={{ kind: 'band', values: aprRows.map((r) => r.epoch) }}
-		y={{ domain: domain(aprRows.map((r) => r.apr)), format: (n) => `${compact(n)}%` }}
-		height={230}
-	>
-		{#snippet actions()}
-			<div class="space-y-3">
-				<dl
-					class="flex flex-wrap gap-x-6 gap-y-2 text-sm"
-					aria-busy={$model.busy.epochs ? 'true' : undefined}
-				>
-					<div>
-						<dt class="text-ink-muted">
-							{current ? `Epoch ${current.epoch} · in progress` : 'Current epoch'}
-						</dt>
-						<dd class="num min-h-8 text-h2">
-							{#if $model.busy.epochs}<span class="block h-8 w-24 rounded-ds-xs bg-grid"
-									><span class="sr-only">Loading current APR…</span></span
-								>{:else}{available(current?.apr, pct)}{/if}
-						</dd>
-					</div>
-					<div>
-						<dt class="text-ink-muted">
-							Previous completed{previous ? ` · ${previous.epoch}` : ''}
-						</dt>
-						<dd class="num min-h-8 font-bold">
-							{#if $model.busy.epochs}<span class="block h-8 w-24 rounded-ds-xs bg-grid"
-									><span class="sr-only">Loading previous APR…</span></span
-								>{:else}{available(previous?.apr, pct)}{/if}
-						</dd>
-					</div>
-				</dl>
-				<Tabs
-					variant="segmented"
-					label="APR epoch range"
-					options={[
-						{ value: '12', label: '12' },
-						{ value: '26', label: '26' },
-						{ value: 'all', label: 'All' }
-					]}
-					value={$model.range}
-					onchange={model.setRange}
-				/>
-			</div>
-		{/snippet}
-		{#snippet children(ctx)}
-			<LineChart
-				{ctx}
-				points={aprRows.map((r) => ({ x: r.epoch, y: r.apr ?? NaN }))}
-				area={false}
-				format={(value) => `${pct(value)}${aprRows.at(-1)?.inProgress ? ' · in progress' : ''}`}
-			/>
-		{/snippet}
-	</ChartFrame>
-	<p class="sr-only" aria-live="polite" aria-atomic="true">{$model.announcement}</p>
+	{#if epochs}<EpochAprChart model={epochs} />{/if}
 
 	<ChartFrame
 		title="Online stake"
@@ -239,39 +144,15 @@
 			/>{/snippet}
 	</ChartFrame>
 
-	<ChartFrame
-		title="Accounts earning by epoch"
-		summary="Number of rewarded accounts by epoch over the last 26 available epochs. These are rewarded accounts, not accounts online now."
-		state={status(
-			$model.epochs,
-			$model.busy.epochs,
-			accountRows.map((r) => r.accounts)
-		)}
-		onretry={() => void model.retry('epochs')}
-		freshnessText={freshness($model.epochs)}
-		data={{
-			columns: ['Epoch', 'Rewarded accounts'],
-			rows: accountRows.map((r) => [r.epoch, r.accounts ?? 'Unavailable']),
-			caption:
-				'Rewarded accounts (participating_wallets), last 26 epochs. These are rewarded accounts, not accounts online now. Missing counts remain unavailable; the current epoch is provisional.'
-		}}
-		x={{ kind: 'band', values: accountRows.map((r) => r.epoch) }}
-		y={{ domain: domain(accountRows.map((r) => r.accounts)), format: compact }}
-		height={230}
-	>
-		{#snippet children(ctx)}<LineChart
-				{ctx}
-				points={accountRows.map((r) => ({ x: r.epoch, y: r.accounts ?? NaN }))}
-				area={false}
-				format={(v) => `${num(v)} accounts`}
-			/>{/snippet}
-	</ChartFrame>
+	{#if epochs}<EpochAccountsChart model={epochs} />{/if}
 
-	<StakeSplit
-		resource={$model.epochs}
-		loading={$model.busy.epochs}
-		onretry={() => void model.retry('epochs')}
-	/>
+	{#if epochs}
+		<StakeSplit
+			resource={$epochs?.epochs ?? null}
+			loading={$epochs?.busy ?? true}
+			onretry={() => void epochs.retry()}
+		/>
+	{/if}
 
 	<ChartFrame
 		title="VOI price"

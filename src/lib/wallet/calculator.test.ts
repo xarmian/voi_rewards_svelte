@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 vi.mock('$lib/stores/accounts', () => ({ requireAccountInfo: vi.fn(), getSupplyInfo: vi.fn() }));
-vi.mock('../../stores/dataTable', () => ({
+vi.mock('$lib/epochRewards/dataTable', () => ({
 	dataTable: { fetchDateRanges: vi.fn(), fetchData: vi.fn() }
 }));
 vi.mock('$lib/utils', () => ({ getTokensByEpoch: vi.fn(async () => 1400) }));
@@ -13,7 +13,7 @@ vi.mock('$lib/stores/price', async () => {
 	};
 });
 import { requireAccountInfo, getSupplyInfo } from '$lib/stores/accounts';
-import { dataTable } from '../../stores/dataTable';
+import { dataTable } from '$lib/epochRewards/dataTable';
 import { voiPrice, fetchVoiPrice } from '$lib/stores/price';
 import { loadCalculatorBalance, loadCalculatorPrice } from './calculator';
 import { loadCalculatorInputs } from '$lib/epochRewards/calculator/inputs';
