@@ -112,6 +112,20 @@ test('the epoch cost field, estimate and schedule render under their old titles'
 	expect(schedule).toBeGreaterThan(blocks);
 });
 
+test('the epoch estimate keeps its four disclaimer lines, once', () => {
+	for (const walletAddress of [undefined, 'Y']) {
+		const shown = text(render(CalculatorComponent, { props: { walletAddress } }).body);
+		for (const line of [
+			'* Calculations assume current network conditions and weekly compounding of rewards.',
+			'* Actual rewards and rates may vary based on network participation and other factors.',
+			'* This tool is for entertainment purposes only. It is not financial advice.',
+			'Market price timestamp unavailable.'
+		])
+			expect(shown.split(line)).toHaveLength(2);
+		expect(shown).not.toContain('* Calculations assume current network conditions. ');
+	}
+});
+
 test('the calculator page keeps its node rewards and costs subtitle', () => {
 	expect(text(render(CalculatorPage).body)).toContain(
 		'Estimate your node rewards and costs at your chosen stake and VOI price.'

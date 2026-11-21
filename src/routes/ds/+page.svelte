@@ -49,6 +49,7 @@
 		tones,
 		wallet
 	} from './fixtures';
+	import { EPOCH_REWARDS_ENABLED } from '$lib/epochRewards';
 	import { EpochStepper } from '$lib/epochRewards/components';
 
 	let retries = $state(0);
@@ -687,43 +688,45 @@
 				{/each}
 			</div>
 		</section>
-		<section aria-labelledby="gallery-epoch-stepper">
-			<h2 id="gallery-epoch-stepper" class="mb-4 text-h2">EpochStepper</h2>
-			<div class="grid gap-bento">
-				<Card title="Current epoch · URL sync" headingLevel={3} id="gallery-current-epoch">
-					<EpochStepper
-						bind:epoch={currentEpoch}
-						min={1}
-						max={104}
-						rangeLabel={epochRange}
-						syncUrl
-						id="gallery-epoch-current"
-					/>
-					<p class="mt-2 text-label text-ink-muted">Selected: {currentEpoch}</p>
-				</Card>
-				<Card title="First epoch" headingLevel={3} id="gallery-first-epoch">
-					<EpochStepper
-						bind:epoch={firstEpoch}
-						min={1}
-						max={104}
-						rangeLabel={epochRange}
-						id="gallery-epoch-first"
-					/>
-					<p class="mt-2 text-label text-ink-muted">Selected: {firstEpoch}</p>
-				</Card>
-				<Card title="Epoch without jump" headingLevel={3} id="gallery-simple-epoch">
-					<EpochStepper
-						bind:epoch={simpleEpoch}
-						min={1}
-						max={104}
-						rangeLabel={epochRange}
-						jump={false}
-						id="gallery-epoch-simple"
-					/>
-					<p class="mt-2 text-label text-ink-muted">Selected: {simpleEpoch}</p>
-				</Card>
-			</div>
-		</section>
+		{#if EPOCH_REWARDS_ENABLED}
+			<section aria-labelledby="gallery-epoch-stepper">
+				<h2 id="gallery-epoch-stepper" class="mb-4 text-h2">EpochStepper</h2>
+				<div class="grid gap-bento">
+					<Card title="Current epoch · URL sync" headingLevel={3} id="gallery-current-epoch">
+						<EpochStepper
+							bind:epoch={currentEpoch}
+							min={1}
+							max={104}
+							rangeLabel={epochRange}
+							syncUrl
+							id="gallery-epoch-current"
+						/>
+						<p class="mt-2 text-label text-ink-muted">Selected: {currentEpoch}</p>
+					</Card>
+					<Card title="First epoch" headingLevel={3} id="gallery-first-epoch">
+						<EpochStepper
+							bind:epoch={firstEpoch}
+							min={1}
+							max={104}
+							rangeLabel={epochRange}
+							id="gallery-epoch-first"
+						/>
+						<p class="mt-2 text-label text-ink-muted">Selected: {firstEpoch}</p>
+					</Card>
+					<Card title="Epoch without jump" headingLevel={3} id="gallery-simple-epoch">
+						<EpochStepper
+							bind:epoch={simpleEpoch}
+							min={1}
+							max={104}
+							rangeLabel={epochRange}
+							jump={false}
+							id="gallery-epoch-simple"
+						/>
+						<p class="mt-2 text-label text-ink-muted">Selected: {simpleEpoch}</p>
+					</Card>
+				</div>
+			</section>
+		{/if}
 
 		<section class="rounded-card bg-surface p-card shadow-card">
 			<h2 class="text-h2">Colour</h2>

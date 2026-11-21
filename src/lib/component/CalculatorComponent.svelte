@@ -9,6 +9,7 @@
 	import { voiPrice } from '$lib/stores/price';
 	import { isPriceStale, priceLabel, validateCustomPrice, validateStake } from './calculatorView';
 	import CalculatorBlockRewards from './CalculatorBlockRewards.svelte';
+	import CalculatorDisclaimer from './CalculatorDisclaimer.svelte';
 
 	export let walletAddress: string | undefined = undefined;
 	export let childAccounts: unknown[] = [];
@@ -415,6 +416,7 @@
 		stake={stakeError ? null : Number(calculationAmount)}
 		price={hasPrice ? effectivePrice : null}
 	/>
+	{#if !epochCalc}<CalculatorDisclaimer wording="block" />{/if}
 
 	{#if epochCalc}<EpochSchedule calc={epochCalc} />{/if}
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button, InlineAlert, StatTile, compact } from '$lib/ds';
 	import { retryKeepingFocus } from '$lib/ds/retryFocus';
-	import { voiPrice } from '$lib/stores/price';
+	import CalculatorDisclaimer from '$lib/component/CalculatorDisclaimer.svelte';
 	import { estimateRewards } from '$lib/epochRewards/calculator/model';
 	import {
 		availability,
@@ -274,17 +274,5 @@
 		>
 			At this stake the estimated monthly rewards are below your monthly node cost.
 		</p>{/if}
-	<div
-		class="space-y-2 rounded-card border border-line bg-surface-2 p-card text-label text-ink-muted"
-	>
-		<p>* Calculations assume current network conditions and weekly compounding of rewards.</p>
-		<p>* Actual rewards and rates may vary based on network participation and other factors.</p>
-		<p>* This tool is for entertainment purposes only. It is not financial advice.</p>
-		<p>
-			{#if $voiPrice.lastUpdated}Data as of {$voiPrice.lastUpdated.toLocaleString('en-US', {
-					timeZone: 'UTC',
-					timeZoneName: 'short'
-				})} (market price).{:else}Market price timestamp unavailable.{/if}
-		</p>
-	</div>
+	<CalculatorDisclaimer wording="epoch" />
 </section>
