@@ -13,15 +13,40 @@ afterEach(() => {
 });
 
 const balances = [
-	{ name: 'ARC token', symbol: 'ARC', balance: '2000000', decimals: 6, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 123 },
-	{ name: 'ASA token', symbol: 'ASA', balance: '3000000', decimals: 6, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'asa', contractId: 456 }
+	{
+		name: 'ARC token',
+		symbol: 'ARC',
+		balance: '2000000',
+		decimals: 6,
+		imageUrl: '',
+		usdValue: null,
+		verified: 1,
+		accountId: 'wallet',
+		assetType: 'arc200',
+		contractId: 123
+	},
+	{
+		name: 'ASA token',
+		symbol: 'ASA',
+		balance: '3000000',
+		decimals: 6,
+		imageUrl: '',
+		usdValue: null,
+		verified: 1,
+		accountId: 'wallet',
+		assetType: 'asa',
+		contractId: 456
+	}
 ];
 
 function fakeFetch(approvals: 'ok' | 'reject' | '500' = 'ok', balancesStatus = 200): typeof fetch {
 	return async (input) => {
 		const url = new URL(String(input));
 		if (url.pathname === '/account/assets') {
-			return Response.json({ balances, 'next-token': null, 'total-count': 2, 'current-round': 100 }, { status: balancesStatus });
+			return Response.json(
+				{ balances, 'next-token': null, 'total-count': 2, 'current-round': 100 },
+				{ status: balancesStatus }
+			);
 		}
 		assert.equal(url.pathname, '/arc200/approvals');
 		if (approvals === 'reject') throw new Error('approvals network error');
@@ -30,28 +55,45 @@ function fakeFetch(approvals: 'ok' | 'reject' | '500' = 'ok', balancesStatus = 2
 }
 
 function assertBalanceTokens(tokens: Awaited<ReturnType<typeof fetchFungibleTokens>>['tokens']) {
-	assert.deepEqual(tokens.map((token) => ({ id: token.id, balance: token.balance, balanceRaw: token.balanceRaw, type: token.type })), [
-		{ id: '123', balance: 2000000, balanceRaw: '2000000', type: 'arc200' },
-		{ id: '456', balance: 3000000, balanceRaw: '3000000', type: 'vsa' }
-	]);
+	assert.deepEqual(
+		tokens.map((token) => ({
+			id: token.id,
+			balance: token.balance,
+			balanceRaw: token.balanceRaw,
+			type: token.type
+		})),
+		[
+			{ id: '123', balance: 2000000, balanceRaw: '2000000', type: 'arc200' },
+			{ id: '456', balance: 3000000, balanceRaw: '3000000', type: 'vsa' }
+		]
+	);
 }
 
 test('pool failure preserves balance tokens and reports partial enrichment', async () => {
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
-		getLiquidityPools: async () => { throw new Error('pools unavailable'); }, fetch: fakeFetch()
+		getLiquidityPools: async () => {
+			throw new Error('pools unavailable');
+		},
+		fetch: fakeFetch()
 	});
 	assertBalanceTokens(result.tokens);
 	assert.equal(result.partial, true);
 });
 
 test('both approvals network failures preserve balance tokens and report partial enrichment', async () => {
-	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools: async () => [], fetch: fakeFetch('reject') });
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [],
+		fetch: fakeFetch('reject')
+	});
 	assertBalanceTokens(result.tokens);
 	assert.equal(result.partial, true);
 });
 
 test('non-ok approvals preserve balance tokens and report partial enrichment', async () => {
-	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools: async () => [], fetch: fakeFetch('500') });
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [],
+		fetch: fakeFetch('500')
+	});
 	assertBalanceTokens(result.tokens);
 	assert.equal(result.partial, true);
 });
@@ -83,11 +125,20 @@ for (const failure of ['500', 'reject', '200 empty'] as const) {
 }
 
 test('a balances 500 rejects instead of returning an empty list', async () => {
-	await assert.rejects(fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools: async () => [], fetch: fakeFetch('ok', 500) }), /Failed to fetch token balances/);
+	await assert.rejects(
+		fetchFungibleTokens('wallet', 0.0002, {
+			getLiquidityPools: async () => [],
+			fetch: fakeFetch('ok', 500)
+		}),
+		/Failed to fetch token balances/
+	);
 });
 
 test('successful sources return balance tokens without partial enrichment', async () => {
-	const result = await fetchFungibleTokens('wallet', 0.0002, { getLiquidityPools: async () => [], fetch: fakeFetch() });
+	const result = await fetchFungibleTokens('wallet', 0.0002, {
+		getLiquidityPools: async () => [],
+		fetch: fakeFetch()
+	});
 	assertBalanceTokens(result.tokens);
 	assert.equal(result.partial, false);
 });
@@ -107,7 +158,12 @@ function lpPool(provider = 'humble'): PoolInfo {
 
 for (const failure of ['500', 'reject'] as const) {
 	test(`Nomadex escrow ARC200 ${failure} preserves tokens and reports partial`, async () => {
-		vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => ({ amount: 10_000_000n }) }) as unknown as ReturnType<typeof algodClient.accountInformation>);
+		vi.spyOn(algodClient, 'accountInformation').mockImplementation(
+			() =>
+				({ do: async () => ({ amount: 10_000_000n }) }) as unknown as ReturnType<
+					typeof algodClient.accountInformation
+				>
+		);
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
 			getLiquidityPools: async () => [lpPool('nomadex')],
 			fetch: async (input) => {
@@ -124,11 +180,20 @@ for (const failure of ['500', 'reject'] as const) {
 }
 
 test('Nomadex Algod escrow fallback preserves tokens and reports partial', async () => {
-	vi.spyOn(algodClient, 'accountInformation').mockImplementation(() => ({ do: async () => { throw new Error('Algod unavailable'); } }) as unknown as ReturnType<typeof algodClient.accountInformation>);
+	vi.spyOn(algodClient, 'accountInformation').mockImplementation(
+		() =>
+			({
+				do: async () => {
+					throw new Error('Algod unavailable');
+				}
+			}) as unknown as ReturnType<typeof algodClient.accountInformation>
+	);
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools: async () => [lpPool('nomadex')],
-		fetch: async (input) => new URL(String(input)).pathname === '/arc200/balances'
-			? Response.json({ balances: [{ balance: '-10000000' }] }) : fakeFetch()(input)
+		fetch: async (input) =>
+			new URL(String(input)).pathname === '/arc200/balances'
+				? Response.json({ balances: [{ balance: '-10000000' }] })
+				: fakeFetch()(input)
 	});
 	assertBalanceTokens(result.tokens);
 	assert.equal(result.partial, true);
@@ -138,15 +203,18 @@ for (const failure of ['non-finite', 'throw'] as const) {
 	test(`LP calculation ${failure} uses zero values and reports partial`, async () => {
 		let reads = 0;
 		const pool = lpPool();
-		Object.defineProperty(pool, 'supply', { get() {
-			if (++reads === 1) {
-				if (failure === 'throw') throw new Error('invalid supply');
-				return 'invalid';
+		Object.defineProperty(pool, 'supply', {
+			get() {
+				if (++reads === 1) {
+					if (failure === 'throw') throw new Error('invalid supply');
+					return 'invalid';
+				}
+				return '10000000';
 			}
-			return '10000000';
-		} });
+		});
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
-			getLiquidityPools: async () => [pool], fetch: fakeFetch()
+			getLiquidityPools: async () => [pool],
+			fetch: fakeFetch()
 		});
 		assertBalanceTokens(result.tokens);
 		assert.equal(result.tokens[0].value, 0);
@@ -158,9 +226,10 @@ for (const failure of ['non-finite', 'throw'] as const) {
 test('NaN USD price uses zero values and reports partial', async () => {
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools: async () => [],
-		fetch: async (input) => new URL(String(input)).pathname === '/account/assets'
-			? Response.json({ balances: [{ ...balances[0], usdValue: 'invalid' }], 'next-token': null })
-			: fakeFetch()(input)
+		fetch: async (input) =>
+			new URL(String(input)).pathname === '/account/assets'
+				? Response.json({ balances: [{ ...balances[0], usdValue: 'invalid' }], 'next-token': null })
+				: fakeFetch()(input)
 	});
 	assert.equal(result.tokens[0].value, 0);
 	assert.equal(result.tokens[0].usdValue, 0);
@@ -172,9 +241,10 @@ test("a missing USD price ('null', '' or null) is not partial", async () => {
 	for (const usdValue of ['null', '', null]) {
 		const result = await fetchFungibleTokens('wallet', 0.0002, {
 			getLiquidityPools: async () => [],
-			fetch: async (input) => new URL(String(input)).pathname === '/account/assets'
-				? Response.json({ balances: [{ ...balances[0], usdValue }], 'next-token': null })
-				: fakeFetch()(input)
+			fetch: async (input) =>
+				new URL(String(input)).pathname === '/account/assets'
+					? Response.json({ balances: [{ ...balances[0], usdValue }], 'next-token': null })
+					: fakeFetch()(input)
 		});
 		assert.equal(result.partial, false, `usdValue ${JSON.stringify(usdValue)}`);
 	}
@@ -267,7 +337,10 @@ function nomadexSources(
 			});
 		}
 		assert.equal(url.pathname, '/arc200/balances');
-		assert.equal(url.searchParams.get('accountId'), algosdk.getApplicationAddress(poolId).toString());
+		assert.equal(
+			url.searchParams.get('accountId'),
+			algosdk.getApplicationAddress(poolId).toString()
+		);
 		const contractId = url.searchParams.get('contractId');
 		if (contractId === String(poolId) && options.supplyFailure)
 			return new Response(null, { status: 500 });
@@ -604,8 +677,20 @@ test('a Humble LP takes side decimals from the pool when the holder lacks the to
 					pools: [
 						{
 							poolId: 40180060,
-							tokenA: { id: 390001, type: 'ARC200', symbol: 'wVOI', balance: '87625948837', decimals: 6 },
-							tokenB: { id: 40153368, type: 'ARC200', symbol: 'aBTC', balance: '26640', decimals: 8 },
+							tokenA: {
+								id: 390001,
+								type: 'ARC200',
+								symbol: 'wVOI',
+								balance: '87625948837',
+								decimals: 6
+							},
+							tokenB: {
+								id: 40153368,
+								type: 'ARC200',
+								symbol: 'aBTC',
+								balance: '26640',
+								decimals: 8
+							},
 							exchange: 'humble',
 							escrowAddress: 'ESCROW',
 							outstandingLpAmount: '47278775'
@@ -614,13 +699,29 @@ test('a Humble LP takes side decimals from the pool when the holder lacks the to
 				})
 	);
 	const held = [
-		{ name: 'Humble LP', symbol: 'HLP', balance: '31238745', decimals: 6, imageUrl: '', usdValue: null, verified: 0, accountId: 'wallet', assetType: 'arc200', contractId: 40180060 }
+		{
+			name: 'Humble LP',
+			symbol: 'HLP',
+			balance: '31238745',
+			decimals: 6,
+			imageUrl: '',
+			usdValue: null,
+			verified: 0,
+			accountId: 'wallet',
+			assetType: 'arc200',
+			contractId: 40180060
+		}
 	];
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools,
 		fetch: async (input) =>
 			new URL(String(input)).pathname === '/account/assets'
-				? Response.json({ balances: held, 'next-token': null, 'total-count': 1, 'current-round': 100 })
+				? Response.json({
+						balances: held,
+						'next-token': null,
+						'total-count': 1,
+						'current-round': 100
+					})
 				: Response.json({ approvals: [] })
 	});
 	const lp = result.tokens.find((token) => token.id === '40180060');
@@ -642,7 +743,20 @@ test('a token only in a Nomadex pool gets no Humble swap link', async () => {
 		fetch: async (input) =>
 			new URL(String(input)).pathname === '/account/assets'
 				? Response.json({
-						balances: [{ name: 'T', symbol: 'T', balance: '1', decimals: 0, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 777 }],
+						balances: [
+							{
+								name: 'T',
+								symbol: 'T',
+								balance: '1',
+								decimals: 0,
+								imageUrl: '',
+								usdValue: null,
+								verified: 1,
+								accountId: 'wallet',
+								assetType: 'arc200',
+								contractId: 777
+							}
+						],
 						'next-token': null,
 						'total-count': 1,
 						'current-round': 100
@@ -662,8 +776,20 @@ test('a Humble LP resolves its tokens from balances and a token links to its Hum
 					pools: [
 						{
 							poolId: 777,
-							tokenA: { id: 390001, type: 'ARC200', symbol: 'wVOI', balance: '5000000', decimals: 6 },
-							tokenB: { id: 401384, type: 'ARC200', symbol: 'ROCKET', balance: '9000000000000000000', decimals: 18 },
+							tokenA: {
+								id: 390001,
+								type: 'ARC200',
+								symbol: 'wVOI',
+								balance: '5000000',
+								decimals: 6
+							},
+							tokenB: {
+								id: 401384,
+								type: 'ARC200',
+								symbol: 'ROCKET',
+								balance: '9000000000000000000',
+								decimals: 18
+							},
 							exchange: 'humble',
 							escrowAddress: 'ESCROW',
 							outstandingLpAmount: '1000000'
@@ -672,14 +798,41 @@ test('a Humble LP resolves its tokens from balances and a token links to its Hum
 				})
 	);
 	const held = [
-		{ name: 'Humble LP', symbol: 'HLP', balance: '100000', decimals: 6, imageUrl: '', usdValue: null, verified: 0, accountId: 'wallet', assetType: 'arc200', contractId: 777 },
-		{ name: 'Rocket', symbol: 'ROCKET', balance: '1000000000000000000', decimals: 18, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 401384 }
+		{
+			name: 'Humble LP',
+			symbol: 'HLP',
+			balance: '100000',
+			decimals: 6,
+			imageUrl: '',
+			usdValue: null,
+			verified: 0,
+			accountId: 'wallet',
+			assetType: 'arc200',
+			contractId: 777
+		},
+		{
+			name: 'Rocket',
+			symbol: 'ROCKET',
+			balance: '1000000000000000000',
+			decimals: 18,
+			imageUrl: '',
+			usdValue: null,
+			verified: 1,
+			accountId: 'wallet',
+			assetType: 'arc200',
+			contractId: 401384
+		}
 	];
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools,
 		fetch: async (input) =>
 			new URL(String(input)).pathname === '/account/assets'
-				? Response.json({ balances: held, 'next-token': null, 'total-count': 2, 'current-round': 100 })
+				? Response.json({
+						balances: held,
+						'next-token': null,
+						'total-count': 2,
+						'current-round': 100
+					})
 				: Response.json({ approvals: [] })
 	});
 	const lp = result.tokens.find((token) => token.id === '777');
@@ -705,17 +858,49 @@ test('a token in an emptied Humble pool and a live one links to the live pool', 
 			? Response.json({ pools: [] })
 			: Response.json({
 					pools: [
-						{ poolId: 395555, tokenA: { ...gm, balance: '0' }, tokenB: { ...wvoi, balance: '0' }, exchange: 'humble', escrowAddress: 'A', outstandingLpAmount: '0' },
-						{ poolId: 395554, tokenA: { ...wvoi, balance: '5' }, tokenB: { ...gm, balance: '7' }, exchange: 'humble', escrowAddress: 'B', outstandingLpAmount: '6949611087' }
+						{
+							poolId: 395555,
+							tokenA: { ...gm, balance: '0' },
+							tokenB: { ...wvoi, balance: '0' },
+							exchange: 'humble',
+							escrowAddress: 'A',
+							outstandingLpAmount: '0'
+						},
+						{
+							poolId: 395554,
+							tokenA: { ...wvoi, balance: '5' },
+							tokenB: { ...gm, balance: '7' },
+							exchange: 'humble',
+							escrowAddress: 'B',
+							outstandingLpAmount: '6949611087'
+						}
 					]
 				})
 	);
-	const held = [{ name: 'GM', symbol: 'GM', balance: '100', decimals: 2, imageUrl: '', usdValue: null, verified: 1, accountId: 'wallet', assetType: 'arc200', contractId: 300279 }];
+	const held = [
+		{
+			name: 'GM',
+			symbol: 'GM',
+			balance: '100',
+			decimals: 2,
+			imageUrl: '',
+			usdValue: null,
+			verified: 1,
+			accountId: 'wallet',
+			assetType: 'arc200',
+			contractId: 300279
+		}
+	];
 	const result = await fetchFungibleTokens('wallet', 0.0002, {
 		getLiquidityPools,
 		fetch: async (input) =>
 			new URL(String(input)).pathname === '/account/assets'
-				? Response.json({ balances: held, 'next-token': null, 'total-count': 1, 'current-round': 100 })
+				? Response.json({
+						balances: held,
+						'next-token': null,
+						'total-count': 1,
+						'current-round': 100
+					})
 				: Response.json({ approvals: [] })
 	});
 	assert.equal(result.tokens.find((token) => token.id === '300279')?.poolId, '395554');

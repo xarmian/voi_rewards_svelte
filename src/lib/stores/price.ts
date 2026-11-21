@@ -30,33 +30,41 @@ export async function fetchVoiPriceWith(
 	// TASK-30: refresh starts a new fetch; ordinary callers join the newest request.
 	if (!refresh && inFlight) return inFlight;
 	const currentPrice = get(voiPrice);
-	if (currentPrice.price > 0 && fetchedAt !== null && Date.now() - fetchedAt < VOI_PRICE_TTL_MS && !refresh) return;
+	if (
+		currentPrice.price > 0 &&
+		fetchedAt !== null &&
+		Date.now() - fetchedAt < VOI_PRICE_TTL_MS &&
+		!refresh
+	)
+		return;
 
 	const sequence = ++requestSequence;
-	inFlight = Promise.resolve().then(async () => {
-		try {
-			// TASK-91: the same cross-venue VWAP as /api/markets voiUsd, so the site shows one VOI price.
-			const response = await fetchFn('/api/voi-price');
-			if (!response.ok) throw new Error('Failed to fetch VOI price');
-			const data = await response.json();
-			const price = Number(data?.price);
-			// The endpoint answers price 0 when it has no data: that is unavailable, never $0.
-			if (!Number.isFinite(price) || price <= 0) throw new Error('VOI price unavailable');
-			const lastUpdated = new Date(data.lastUpdated);
-			// TASK-30: an older request cannot replace a newer price or error.
-			if (sequence === requestSequence)
-				updateVoiPrice(price, Number.isFinite(lastUpdated.getTime()) ? lastUpdated : new Date());
-		} catch (error) {
-			console.error('Error fetching VOI price:', error);
-			if (sequence === requestSequence) {
-				voiPrice.update((current) => ({
-					...current,
-					error: error instanceof Error ? error.message : String(error)
-				}));
+	inFlight = Promise.resolve()
+		.then(async () => {
+			try {
+				// TASK-91: the same cross-venue VWAP as /api/markets voiUsd, so the site shows one VOI price.
+				const response = await fetchFn('/api/voi-price');
+				if (!response.ok) throw new Error('Failed to fetch VOI price');
+				const data = await response.json();
+				const price = Number(data?.price);
+				// The endpoint answers price 0 when it has no data: that is unavailable, never $0.
+				if (!Number.isFinite(price) || price <= 0) throw new Error('VOI price unavailable');
+				const lastUpdated = new Date(data.lastUpdated);
+				// TASK-30: an older request cannot replace a newer price or error.
+				if (sequence === requestSequence)
+					updateVoiPrice(price, Number.isFinite(lastUpdated.getTime()) ? lastUpdated : new Date());
+			} catch (error) {
+				console.error('Error fetching VOI price:', error);
+				if (sequence === requestSequence) {
+					voiPrice.update((current) => ({
+						...current,
+						error: error instanceof Error ? error.message : String(error)
+					}));
+				}
 			}
-		}
-	}).finally(() => {
-		if (sequence === requestSequence) inFlight = null;
-	});
+		})
+		.finally(() => {
+			if (sequence === requestSequence) inFlight = null;
+		});
 	return inFlight;
 }

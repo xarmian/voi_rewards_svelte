@@ -60,15 +60,43 @@ describe('external-data lists key through rowKeys', () => {
 	const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	it.each([
 		// file, collection, index name, keys variable, how keys is declared
-		['components/reports/TransparencyReport.svelte', 'data.community_ecosystem_payments', 'i', 'paymentKeys', 'const paymentKeys = $derived('],
-		['components/reports/GrantsReport.svelte', 'data.grants_submitted_in_progress', 'i', 'grantKeys', 'const grantKeys = $derived('],
-		['component/SendTokenModal.svelte', 'availableTokens', 'i', 'tokenKeys', '$: tokenKeys = rowKeys('],
+		[
+			'components/reports/TransparencyReport.svelte',
+			'data.community_ecosystem_payments',
+			'i',
+			'paymentKeys',
+			'const paymentKeys = $derived('
+		],
+		[
+			'components/reports/GrantsReport.svelte',
+			'data.grants_submitted_in_progress',
+			'i',
+			'grantKeys',
+			'const grantKeys = $derived('
+		],
+		[
+			'component/SendTokenModal.svelte',
+			'availableTokens',
+			'i',
+			'tokenKeys',
+			'$: tokenKeys = rowKeys('
+		],
 		['ds/DataTable/DataTable.svelte', 'shown', 'index', 'shownKeys', 'const shownKeys = $derived('],
-		['../routes/(site)/directory/[...category]/+page.svelte', 'filteredProjects', 'i', 'projectKeys', 'let projectKeys = $derived(']
+		[
+			'../routes/(site)/directory/[...category]/+page.svelte',
+			'filteredProjects',
+			'i',
+			'projectKeys',
+			'let projectKeys = $derived('
+		]
 	])('%s', (file, list, index, keys, decl) => {
 		const src = read(file);
-		expect(src).toMatch(new RegExp(`\\{#each ${esc(list)} as \\w+, ${index} \\(${keys}\\[${index}\\]\\)\\}`));
+		expect(src).toMatch(
+			new RegExp(`\\{#each ${esc(list)} as \\w+, ${index} \\(${keys}\\[${index}\\]\\)\\}`)
+		);
 		expect(src).toContain(decl);
-		expect(src).toMatch(new RegExp(`${esc(keys)} = (\\$derived\\(\\s*)?rowKeys\\(\\s*${esc(list)},`));
+		expect(src).toMatch(
+			new RegExp(`${esc(keys)} = (\\$derived\\(\\s*)?rowKeys\\(\\s*${esc(list)},`)
+		);
 	});
 });
