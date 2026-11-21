@@ -55,7 +55,7 @@
 	}
 
 	// Fetch pool analytics from new API
-	async function fetchPoolAnalytics(poolId: number) {
+	async function fetchPoolAnalytics(poolId: number | undefined) {
 		if (!poolId) return;
 		try {
 			const response = await fetch(`/api/pool-analytics?poolId=${poolId}`);
