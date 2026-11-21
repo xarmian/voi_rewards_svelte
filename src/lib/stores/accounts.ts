@@ -57,7 +57,8 @@ function createOnlineStakeStore() {
 	async function fetchData(): Promise<OnlineStakeData[] | null> {
 		try {
 			const response = await fetch(`${config.proposalApiBaseUrl}?action=online-stake-history`);
-			if (!response.ok) throw new Error(`Failed to fetch online stake history: HTTP ${response.status}`);
+			if (!response.ok)
+				throw new Error(`Failed to fetch online stake history: HTTP ${response.status}`);
 			const data = await response.json();
 			if (!Array.isArray(data)) throw new Error('Invalid online stake history');
 			update(() => ({
@@ -77,8 +78,11 @@ function createOnlineStakeStore() {
 			currentValue = store;
 		})();
 
-		if (currentValue?.lastFetched && Array.isArray(currentValue.data) &&
-			Date.now() - currentValue.lastFetched <= CACHE_DURATION) {
+		if (
+			currentValue?.lastFetched &&
+			Array.isArray(currentValue.data) &&
+			Date.now() - currentValue.lastFetched <= CACHE_DURATION
+		) {
 			return currentValue.data;
 		}
 
@@ -126,20 +130,24 @@ export async function getConsensusInfo(
 	forceRefresh: boolean = false
 ): Promise<ConsensusDetails | undefined> {
 	if (!address) return;
-	return consensusCache.get(address, async () => {
-		try {
-			const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
-			const response = await fetch(url, { cache: 'no-store' });
-			if (!response.ok) {
-				throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
+	return consensusCache.get(
+		address,
+		async () => {
+			try {
+				const url = `${config.proposalApiBaseUrl}?action=walletDetails&wallet=${address}`;
+				const response = await fetch(url, { cache: 'no-store' });
+				if (!response.ok) {
+					throw new Error(`Failed to fetch consensus info: ${response.statusText}`);
+				}
+				const data: ConsensusDetails = await response.json();
+				return data;
+			} catch (error) {
+				console.error('Error fetching consensus info:', error);
+				return undefined;
 			}
-			const data: ConsensusDetails = await response.json();
-			return data;
-		} catch (error) {
-			console.error('Error fetching consensus info:', error);
-			return undefined;
-		}
-	}, { force: forceRefresh });
+		},
+		{ force: forceRefresh }
+	);
 }
 
 export async function getAccountInfo(
@@ -147,25 +155,28 @@ export async function getAccountInfo(
 	forceRefresh: boolean = false
 ): Promise<algosdk.modelsv2.Account | undefined> {
 	if (!address) return;
-	return accountCache.get(address, async () => {
-		try {
-			return await algodClient.accountInformation(address).do();
-		} catch (error) {
-			console.error('Error fetching account info:', error);
-			return undefined;
-		}
-	}, { force: forceRefresh });
+	return accountCache.get(
+		address,
+		async () => {
+			try {
+				return await algodClient.accountInformation(address).do();
+			} catch (error) {
+				console.error('Error fetching account info:', error);
+				return undefined;
+			}
+		},
+		{ force: forceRefresh }
+	);
 }
 
 export async function requireAccountInfo(
 	address: string,
 	{ force = false } = {}
 ): Promise<algosdk.modelsv2.Account> {
-	return accountCache.get(
-		address,
-		() => algodClient.accountInformation(address).do(),
-		{ force, strict: true }
-	);
+	return accountCache.get(address, () => algodClient.accountInformation(address).do(), {
+		force,
+		strict: true
+	});
 }
 
 export async function getSupplyInfo(): Promise<SupplyInfo | null> {

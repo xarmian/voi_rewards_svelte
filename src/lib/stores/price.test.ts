@@ -18,7 +18,9 @@ function assertPreviousPriceWithError() {
 }
 
 test('a rejected refresh preserves the last price and timestamp', async () => {
-	await fetchVoiPriceWith(async () => { throw new Error('network unavailable'); }, true);
+	await fetchVoiPriceWith(async () => {
+		throw new Error('network unavailable');
+	}, true);
 	assertPreviousPriceWithError();
 	assert.equal(get(voiPrice).error, 'network unavailable');
 });
@@ -29,14 +31,22 @@ test('a 500 refresh preserves the last price and timestamp', async () => {
 });
 
 test('invalid prices and empty responses preserve the last price and timestamp', async () => {
-	for (const response of [priceResponse(0), priceResponse(-3), priceResponse('n/a'), Response.json({}), new Response(null)]) {
+	for (const response of [
+		priceResponse(0),
+		priceResponse(-3),
+		priceResponse('n/a'),
+		Response.json({}),
+		new Response(null)
+	]) {
 		await fetchVoiPriceWith(async () => response, true);
 		assertPreviousPriceWithError();
 	}
 });
 
 test('a successful refresh sets the new price and date and clears an error', async () => {
-	await fetchVoiPriceWith(async () => { throw new Error('offline'); }, true);
+	await fetchVoiPriceWith(async () => {
+		throw new Error('offline');
+	}, true);
 	await fetchVoiPriceWith(async () => priceResponse(), true);
 	assert.deepEqual(get(voiPrice), { price: 0.0003, lastUpdated: new Date(newDate), error: null });
 });
@@ -46,19 +56,25 @@ test('a refresh never emits a zero price', async () => {
 	const unsubscribe = voiPrice.subscribe((value) => prices.push(value.price));
 	try {
 		await fetchVoiPriceWith(async () => priceResponse(), true);
-		await fetchVoiPriceWith(async () => { throw new Error('offline'); }, true);
+		await fetchVoiPriceWith(async () => {
+			throw new Error('offline');
+		}, true);
 		assert.ok(prices.length >= 2);
-		assert.ok(prices.every((price) => price > 0), JSON.stringify(prices));
+		assert.ok(
+			prices.every((price) => price > 0),
+			JSON.stringify(prices)
+		);
 	} finally {
 		unsubscribe();
 	}
 });
 
 test('an already-set price skips a fetch unless refreshed', async () => {
-	await fetchVoiPriceWith(async () => { assert.fail('should not fetch'); });
+	await fetchVoiPriceWith(async () => {
+		assert.fail('should not fetch');
+	});
 	assert.equal(get(voiPrice).price, 0.0002);
 });
-
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -77,7 +93,9 @@ test.each(['older first', 'newer first', 'older rejects'])(
 		const first = fetchVoiPriceWith(fetchFn, true);
 		const forced = fetchVoiPriceWith(fetchFn, true);
 		let joinedSettled = false;
-		const joined = fetchVoiPriceWith(fetchFn).then(() => { joinedSettled = true; });
+		const joined = fetchVoiPriceWith(fetchFn).then(() => {
+			joinedSettled = true;
+		});
 		try {
 			await Promise.resolve();
 			expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -87,7 +105,9 @@ test.each(['older first', 'newer first', 'older rejects'])(
 				expect(get(voiPrice).price).toBe(0.0002);
 				expect(joinedSettled).toBe(false);
 				let laterSettled = false;
-				const later = fetchVoiPriceWith(fetchFn).then(() => { laterSettled = true; });
+				const later = fetchVoiPriceWith(fetchFn).then(() => {
+					laterSettled = true;
+				});
 				await Promise.resolve();
 				expect(laterSettled).toBe(false);
 				resolveNew(priceResponse());
@@ -101,7 +121,9 @@ test.each(['older first', 'newer first', 'older rejects'])(
 			}
 			await Promise.all([first, forced, joined]);
 			expect(get(voiPrice)).toEqual({
-				price: 0.0003, lastUpdated: new Date(newDate), error: null
+				price: 0.0003,
+				lastUpdated: new Date(newDate),
+				error: null
 			});
 			expect(fetchFn).toHaveBeenCalledTimes(2);
 		} finally {
@@ -131,7 +153,11 @@ test('TASK-91 reads the site-wide VWAP from /api/voi-price', async () => {
 	const fetchFn = vi.fn(async () => priceResponse(0.000123587));
 	await fetchVoiPriceWith(fetchFn, true);
 	expect(fetchFn).toHaveBeenCalledWith('/api/voi-price');
-	assert.deepEqual(get(voiPrice), { price: 0.000123587, lastUpdated: new Date(newDate), error: null });
+	assert.deepEqual(get(voiPrice), {
+		price: 0.000123587,
+		lastUpdated: new Date(newDate),
+		error: null
+	});
 });
 
 test('TASK-91 an endpoint price of 0 on a cold store is unavailable, not a $0 price', async () => {

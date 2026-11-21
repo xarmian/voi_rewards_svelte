@@ -48,7 +48,10 @@ function getTokenInfo(
 	};
 }
 
-async function fetchAllAssetBalances(walletAddress: string, fetchFn: typeof fetch): Promise<UnifiedAssetsResponse> {
+async function fetchAllAssetBalances(
+	walletAddress: string,
+	fetchFn: typeof fetch
+): Promise<UnifiedAssetsResponse> {
 	const baseUrl = `https://voi-mainnet-mimirapi.nftnavigator.xyz/account/assets`;
 	const allBalances: UnifiedAssetBalance[] = [];
 	let nextToken: string | null = null;
@@ -186,7 +189,9 @@ export async function fetchFungibleTokens(
 				fetchApprovals(
 					`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?spender=${walletAddress}`
 				),
-				fetchApprovals(`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?owner=${walletAddress}`)
+				fetchApprovals(
+					`https://voi-mainnet-mimirapi.voirewards.com/arc200/approvals?owner=${walletAddress}`
+				)
 			]);
 
 		// Create maps for easy lookup
@@ -530,7 +535,9 @@ export async function fetchFungibleTokens(
 		return { tokens, partial };
 	} catch (err) {
 		console.error('Error fetching fungible tokens:', err);
-		throw new Error(`Failed to fetch token balances: ${err instanceof Error ? err.message : String(err)}`);
+		throw new Error(
+			`Failed to fetch token balances: ${err instanceof Error ? err.message : String(err)}`
+		);
 	}
 }
 

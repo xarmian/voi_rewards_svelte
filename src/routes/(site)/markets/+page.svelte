@@ -29,7 +29,6 @@
 	import { onMount } from 'svelte';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
 	import type { PageData } from './$types';
-	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import PriceChart from '$lib/components/PriceChart.svelte';
@@ -54,7 +53,6 @@
 		clampCandlesByMAD
 	} from '$lib/utils/price-conversion';
 	import {
-		convertVOItoOHLCV,
 		createVOITokenPair,
 		shouldUseVOIData,
 		getDefaultChartType,
@@ -98,13 +96,11 @@
 		serverDataToken = resolvedToken.symbol || 'VOI';
 	}
 	let selectedPool: TokenPair | null = null;
-	let poolsLoading = false;
 
 	// Token overview and analytics state. Seeded by +page.ts so hydration does not refetch it, but
 	// never for VOI: VOI's overview runs without token info, and SSR must match (TASK-27 r1).
 	let tokenInfo: any =
 		data.resolvedToken?.id && data.resolvedToken.symbol !== 'VOI' ? (data.tokenInfo ?? null) : null;
-	let tokenInfoLoading = false; // For VOI market data compatibility
 
 	// Enhanced UI state
 	let commandPaletteOpen = false;
@@ -168,7 +164,6 @@
 			return;
 		}
 
-		tokenInfoLoading = true;
 		try {
 			const response = await fetch(`/api/token-info?tokenId=${tokenId}`);
 			const data = await response.json();
@@ -188,8 +183,6 @@
 		} catch (error) {
 			console.error('Failed to fetch token info:', error);
 			tokenInfo = null;
-		} finally {
-			tokenInfoLoading = false;
 		}
 	}
 
@@ -389,41 +382,6 @@
 		}
 	}
 
-	// Handle pool selection
-	function handlePoolSelect(event: CustomEvent<TokenPair | null>) {
-		selectedPool = event.detail;
-
-		// Fetch chart data for the selected pool, or default VOI data if null
-		if (selectedPool) {
-			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', chartSettings.resolution);
-			// Update pool in URL
-			if (browser) {
-				const url = new URL($page.url);
-				url.searchParams.set('pool', String(selectedPool.poolId));
-				if (selectedToken) url.searchParams.set('token', selectedToken.symbol);
-				goto(url.toString(), {
-					keepFocus: true,
-					noScroll: true,
-					replaceState: true,
-					invalidateAll: false
-				});
-			}
-		} else if (selectedToken?.symbol.toUpperCase() === 'VOI') {
-			// Clear pool selection for VOI - show aggregated data
-			fetchUnifiedChartData('VOI', chartSettings.resolution);
-			if (browser) {
-				const url = new URL($page.url);
-				url.searchParams.delete('pool');
-				goto(url.toString(), {
-					keepFocus: true,
-					noScroll: true,
-					replaceState: true,
-					invalidateAll: false
-				});
-			}
-		}
-	}
-
 	// Sorting state - default to TVL descending (largest first)
 	let sortColumn = 'tvl';
 	let sortDirection: 'asc' | 'desc' = 'desc';
@@ -547,7 +505,7 @@
 			}
 			// Map to line data for PriceChart
 			if (isCurrent()) {
-				priceHistory = (candles || []).map((c: any) => ({ time: c.time, value: c.close }));
+				priceHistory = (candles || []).map((c: OHLCVData) => ({ time: c.time, value: c.close }));
 				pairChart = applyPairResult(pairChart, candles, converted);
 			}
 		} catch (e) {
@@ -564,10 +522,6 @@
 	}
 
 	// Unified Chart State (using selectedPool instead of selectedTokenPair)
-	let unifiedVolumeData: VolumeData[] = [];
-	let chartTokenPair: TokenPair | null = null;
-	let chartLoading = false;
-	let chartError = '';
 	let chartSettings: ChartSettings = {
 		chartType: 'line',
 		resolution: '1h',
@@ -698,16 +652,11 @@
 	}
 
 	// Unified Chart Functions
-	let fetchSeq = 0;
 	async function fetchUnifiedChartData(
 		token: string,
 		resolution: Resolution,
 		tradingPairId?: number
 	) {
-		chartLoading = true;
-		chartError = '';
-		const seq = ++fetchSeq;
-
 		try {
 			// If a specific token pair or pool is selected, always fetch OHLCV from MIMIR
 			if (selectedPool) {
@@ -781,12 +730,6 @@
 						console.warn('USD conversion failed, showing VOI quote', e);
 					}
 				}
-
-				// Apply final results if latest
-				if (seq === fetchSeq) {
-					unifiedVolumeData = localVolumes;
-					chartTokenPair = localChartPair;
-				}
 			} else if (token === 'VOI' || token.toUpperCase() === 'VOI') {
 				// Fetch VOI OHLCV data from VOI/aUSDC pool in MIMIR
 				const voiPair = createVOITokenPair();
@@ -800,23 +743,11 @@
 				const response = await fetch(`/api/ohlcv?${params}`);
 				const data = await response.json();
 
-				let localCandles: OHLCVData[] = [];
-				let localVolumes: VolumeData[] = [];
-				let localChartPair = { ...voiPair };
-
 				if (data.error) {
 					throw new Error(data.error);
 				}
 
-				if (data.candles && data.candles.length > 0) {
-					localCandles = data.candles;
-					localVolumes = data.volumes || [];
-
-					// Convert to USD display if needed (aUSDC ≈ USD)
-					if (displayInUSD) {
-						localChartPair = { ...localChartPair, quoteSymbol: 'USD', quoteDecimals: 2 };
-					}
-				} else {
+				if (!(data.candles && data.candles.length > 0)) {
 					// Fallback: try to get price-history data if no OHLCV available
 					const period = resolution === '1d' || resolution === '4h' ? '7d' : '24h';
 					const fallbackResponse = await fetch(
@@ -827,46 +758,12 @@
 					if (voiPriceHistory.error) {
 						throw new Error(voiPriceHistory.error);
 					}
-
-					if (Array.isArray(voiPriceHistory) && voiPriceHistory.length > 0) {
-						localCandles = voiPriceHistory.map((point: any) => {
-							const t = point.time;
-							const time =
-								typeof t === 'number'
-									? t
-									: typeof t === 'string' && /^\d+$/.test(t)
-										? parseInt(t, 10)
-										: Math.floor(new Date(t).getTime() / 1000);
-							return {
-								time,
-								open: point.value,
-								high: point.value,
-								low: point.value,
-								close: point.value,
-								volume: 0
-							};
-						});
-						localVolumes = [];
-						// Update pair to reflect USD source
-						localChartPair = { ...voiPair, quoteSymbol: 'USD', quoteDecimals: 2 };
-					}
-				}
-
-				if (seq === fetchSeq) {
-					unifiedVolumeData = localVolumes;
-					chartTokenPair = localChartPair;
 				}
 			} else {
 				throw new Error('No token pair selected');
 			}
 		} catch (error) {
 			console.error('Error fetching chart data:', error);
-			chartError = error instanceof Error ? error.message : 'Failed to load chart data';
-			unifiedVolumeData = [];
-		} finally {
-			if (seq === fetchSeq) {
-				chartLoading = false;
-			}
 		}
 	}
 
@@ -898,24 +795,10 @@
 		);
 	}
 
-	function handleUnifiedResolutionChange(event: CustomEvent<Resolution>) {
-		chartSettings = { ...chartSettings, resolution: event.detail };
-		const tokenSymbol = selectedToken?.symbol || 'VOI';
-		if (shouldUseVOIData(tokenSymbol)) {
-			fetchUnifiedChartData(tokenSymbol, event.detail, selectedTradingPairId ?? undefined);
-		} else if (selectedPool) {
-			fetchUnifiedChartData(tokenSymbol, event.detail);
-		}
-	}
-
-	function handleUnifiedChartTypeChange(event: CustomEvent<'candlestick' | 'line'>) {
-		chartSettings = { ...chartSettings, chartType: event.detail };
-	}
-
 	// React to USD/VOI toggle by refetching chart with current resolution
 	$: if (browser) {
 		// Trigger refetch when displayInUSD changes and we have a pool or VOI context
-		displayInUSD; // dependency for reactive statement
+		void displayInUSD; // dependency for reactive statement
 		if (selectedPool) {
 			fetchUnifiedChartData(selectedToken?.symbol || 'VOI', chartSettings.resolution);
 		} else if (

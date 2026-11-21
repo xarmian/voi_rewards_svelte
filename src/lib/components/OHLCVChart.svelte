@@ -22,6 +22,7 @@
 	} from '$lib/markets/chartTheme';
 	import {
 		createChart,
+		type AutoscaleInfo,
 		type IChartApi,
 		type ISeriesApi,
 		type CandlestickData,
@@ -128,13 +129,13 @@
 		});
 	}
 
-	function toUnixSeconds(t: any): number {
+	function toUnixSeconds(t: Time): number {
 		if (typeof t === 'number') return t;
 		if (t && typeof t === 'object' && 'year' in t && 'month' in t && 'day' in t) {
 			const { year, month, day } = t as { year: number; month: number; day: number };
 			return Math.floor(new Date(year, month - 1, day).getTime() / 1000);
 		}
-		const dt = new Date(t as any);
+		const dt = new Date(t);
 		return Math.floor(dt.getTime() / 1000) || 0;
 	}
 
@@ -145,7 +146,7 @@
 				tickMarkFormatter: formatAxisTick
 			},
 			localization: {
-				timeFormatter: (time: any) => {
+				timeFormatter: (time: Time) => {
 					const ts = toUnixSeconds(time);
 					return formatTimeByResolution(ts, settings.resolution);
 				}
@@ -297,13 +298,13 @@
 
 		// Configure price format based on token pair and clamp autoscale to non-negative
 		const precision = Math.max(tokenPair.quoteDecimals - tokenPair.baseDecimals + 2, 2);
-		(mainSeries as any).applyOptions({
+		mainSeries.applyOptions({
 			priceFormat: {
 				type: 'price',
 				precision: Math.min(precision, 8),
 				minMove: Math.pow(10, -precision)
 			},
-			autoscaleInfoProvider: (original: () => any) => {
+			autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
 				const info = typeof original === 'function' ? original() : null;
 				if (!info || !info.priceRange) return info;
 				const pr = info.priceRange;
@@ -345,9 +346,7 @@
 		const sortedData = displayedData;
 		// Dynamically adjust price precision based on value range
 		try {
-			const lows = sortedData.map((d) => (Number.isFinite(d.low) ? d.low : d.close));
 			const highs = sortedData.map((d) => (Number.isFinite(d.high) ? d.high : d.close));
-			const minVal = Math.min(...lows);
 			const maxVal = Math.max(...highs);
 			let dynamicPrecision = 2;
 			if (maxVal < 1) dynamicPrecision = 6;
@@ -438,11 +437,6 @@
 				bottom: settings.showVolume ? 0.4 : 0.1
 			}
 		});
-	}
-
-	function toggleQuoteCurrency() {
-		quoteCurrency = quoteCurrency === 'VOI' ? 'USD' : 'VOI';
-		dispatch('quoteChange', quoteCurrency);
 	}
 
 	onMount(() => {

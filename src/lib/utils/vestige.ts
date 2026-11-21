@@ -45,14 +45,42 @@ export interface VestigeProtocol {
 	tvl: number;
 }
 
+// A Vestige pool in our market data format (built by convertVestigePoolToMarket).
+export interface VestigeMarket {
+	trading_pair_id: number;
+	exchange: string;
+	pair: string;
+	type: string;
+	network: string;
+	url: string | null;
+	pool_url: string | null;
+	base_token_id: number;
+	quote_token_id: number;
+	base_decimals: number;
+	quote_decimals: number;
+	price: number;
+	volume_24h: number;
+	tvl: number;
+	high_24h: null;
+	low_24h: null;
+	price_change_24h: null;
+	price_change_percentage_24h: null;
+	lastUpdated: string;
+	vestige_pool_id: number;
+	application_id: number;
+	fee: number;
+	asset_1_supply: number;
+	asset_2_supply: number;
+}
+
 interface VestigePoolsResponse {
 	count: number;
 	results: VestigePool[];
 }
 
-interface VestigeAssetsResponse extends Array<VestigeAsset> {}
+type VestigeAssetsResponse = Array<VestigeAsset>;
 
-interface VestigeProtocolsResponse extends Array<VestigeProtocol> {}
+type VestigeProtocolsResponse = Array<VestigeProtocol>;
 
 // Cache for protocols to avoid repeated API calls
 let protocolsCache: VestigeProtocol[] | null = null;
@@ -216,7 +244,7 @@ export async function convertVestigePoolToMarket(
 	priceMap?: Map<string, number>, // Optional USD prices for assets
 	onFailure?: () => void,
 	signal?: AbortSignal
-): Promise<any> {
+): Promise<VestigeMarket | null> {
 	// Get asset information
 	const asset1 = assets.find((a) => a.id === pool.asset_1_id);
 	const asset2 = assets.find((a) => a.id === pool.asset_2_id);
@@ -334,7 +362,7 @@ export async function fetchVestigeMarketsForAsset(
 	priceMap?: Map<string, number>,
 	onFailure?: () => void,
 	signal?: AbortSignal
-): Promise<any[]> {
+): Promise<VestigeMarket[]> {
 	try {
 		// Fetch pools for this asset
 		const pools = await fetchVestigePoolsByAsset(assetId, onFailure, signal);
@@ -361,7 +389,9 @@ export async function fetchVestigeMarketsForAsset(
 		);
 
 		// Filter out null results and markets with zero/unrealistic prices
-		const validMarkets = markets.filter((market) => market !== null && market.price > 0);
+		const validMarkets = markets.filter(
+			(market): market is VestigeMarket => market !== null && market.price > 0
+		);
 
 		return validMarkets;
 	} catch (error) {
