@@ -99,6 +99,7 @@ test.each(paths)(
 		c.signTransactions = sign;
 		c.signAndSendTransactions = sign;
 		c.algodClient = { getTransactionParams: () => ({ do: async () => ({}) }) };
+		c.signerFundsError = async () => null;
 		c.algosdk = {
 			...c.algosdk,
 			decodeUnsignedTransaction: () => txn,
