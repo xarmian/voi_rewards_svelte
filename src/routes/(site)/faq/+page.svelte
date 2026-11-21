@@ -1,7 +1,10 @@
 <script lang="ts">
 	import Markdown from 'svelte-markdown';
 	import ExternalLink from '$lib/components/ExternalLink.svelte';
-	import { Button, Card, CopyButton, InlineAlert } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { CopyButton } from '$lib/ds/CopyButton';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import type { PageData } from './$types';

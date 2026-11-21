@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { StatTile } from '$lib/ds';
+	import { StatTile } from '$lib/ds/StatTile';
 	import { comma } from '$lib/ds/format';
 	import type { Loaded } from '$lib/server/loaded';
 	import { accountsDetail, headlineValues } from '../headline';

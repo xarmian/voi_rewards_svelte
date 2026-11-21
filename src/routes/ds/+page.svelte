@@ -1,30 +1,20 @@
 <script lang="ts">
-	import {
-		Button,
-		Header,
-		Footer,
-		Card,
-		Chip,
-		CopyButton,
-		DataTable,
-		MISSING,
-		type Column,
-		type SortState,
-		HealthItem,
-		HealthRing,
-		InlineAlert,
-		Sparkline,
-		StatTile,
-		StatusPill,
-		BlockRewardStatusPill,
-		ThemeToggle,
-		ago,
-		comma,
-		compact,
-		pct,
-		shortAddr,
-		usd
-	} from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Header } from '$lib/ds/Header';
+	import { Footer } from '$lib/ds/Footer';
+	import { Card } from '$lib/ds/Card';
+	import { Chip } from '$lib/ds/Chip';
+	import { CopyButton } from '$lib/ds/CopyButton';
+	import { DataTable, type Column, type SortState } from '$lib/ds/DataTable';
+	import { MISSING, ago, comma, compact, pct, shortAddr, usd } from '$lib/ds/format';
+	import { HealthItem } from '$lib/ds/HealthItem';
+	import { HealthRing } from '$lib/ds/HealthRing';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { Sparkline } from '$lib/ds/Sparkline';
+	import { StatTile } from '$lib/ds/StatTile';
+	import { StatusPill } from '$lib/ds/StatusPill';
+	import { BlockRewardStatusPill } from '$lib/ds/BlockRewardStatusPill';
+	import { ThemeToggle } from '$lib/ds/ThemeToggle';
 	import {
 		aprHistory,
 		asOf,
@@ -175,17 +165,11 @@
 		{ key: 'key_expiry', header: 'Key expires', priority: 3, cell: contractKey },
 		{ key: 'next_vesting', header: 'Next unlock', priority: 3, cell: contractUnlock }
 	];
-	import {
-		Tabs,
-		createHashTabs,
-		SearchBox,
-		createResolver,
-		ChartFrame,
-		LineChart,
-		BarsVsExpected,
-		ArchiveBanner,
-		type ChartData
-	} from '$lib/ds';
+	import { Tabs, createHashTabs } from '$lib/ds/Tabs';
+	import { SearchBox, createResolver } from '$lib/ds/SearchBox';
+	import { ChartFrame } from '$lib/ds/ChartFrame';
+	import { LineChart, BarsVsExpected, type ChartData } from '$lib/ds/charts';
+	import { ArchiveBanner } from '$lib/ds/ArchiveBanner';
 	import { WALLET_TABS } from '$lib/ds/Tabs/hash';
 	import { annotationsFor } from '$lib/data/chartEvents';
 	import {

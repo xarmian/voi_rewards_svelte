@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { Button } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
 	import { shortAddr } from '$lib/ds/format';
 	import { nicknames } from '$lib/stores/nicknames';
 	let { address, onclose }: { address: string | null; onclose: () => void } = $props();

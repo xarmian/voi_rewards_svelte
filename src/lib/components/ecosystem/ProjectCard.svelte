@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { IProject } from '$lib/data/types';
-	import { Card, Chip } from '$lib/ds';
+	import { Card } from '$lib/ds/Card';
+	import { Chip } from '$lib/ds/Chip';
 
 	let { project, categoryHref }: { project: IProject; categoryHref: string } = $props();
 </script>

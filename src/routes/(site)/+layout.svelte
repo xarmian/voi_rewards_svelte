@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { Header, Footer, navCurrent } from '$lib/ds';
+	import { Header, navCurrent } from '$lib/ds/Header';
+	import { Footer } from '$lib/ds/Footer';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { headerEpoch } from '$lib/epochRewards';
 

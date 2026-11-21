@@ -1,4 +1,4 @@
-import { describe, test, vi } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { createResolver, isAddress } from './resolve';
 const address = 'G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ';
@@ -14,6 +14,11 @@ function memory(initial: Record<string, string> = {}) {
 const search = async () => [
 	{ address, name: 'name.voi', metadata: { avatar: '/avatar.png' }, cached: true }
 ];
+// The first resolve() awaits the resolver's lazy algosdk import; load it before the timed tests so
+// a slow first import during a busy full run cannot push a test past its timeout.
+beforeAll(async () => {
+	await import('algosdk');
+});
 describe('resolution', () => {
 	test('addresses use a trimmed shape check', () => {
 		assert.equal(isAddress(address), true);

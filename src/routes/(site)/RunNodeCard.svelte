@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Card } from '$lib/ds';
+	import { Card } from '$lib/ds/Card';
 	const links = [
 		{ href: '/how_to_node', title: 'Setup guides', detail: 'Pick a guide for your platform' },
 		{ href: '/calculator', title: 'Rewards calculator', detail: 'What will my stake earn?' },

@@ -55,5 +55,31 @@ export default defineConfig(
 			'svelte/prefer-svelte-reactivity': 'off',
 			'svelte/require-each-key': 'off'
 		}
+	},
+	{
+		// The barrel re-exports every component; one import of it keeps them all in the bundle.
+		files: ['src/**/*.ts', 'src/**/*.js', 'src/**/*.svelte'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: ['$lib/ds', '$lib/ds/index', '$lib/ds/index.ts', '$lib/ds/index.js'].map(
+						(name) => ({
+							name,
+							message:
+								'Import from the component module ($lib/ds/<Name>) so unused design-system code tree-shakes.'
+						})
+					),
+					patterns: [
+						{
+							// Relative spellings of the barrel from outside src/lib/ds.
+							regex: '^(\\.\\.?/)+(lib/)?ds(/index(\\.[jt]s)?)?$',
+							message:
+								'Import from the component module ($lib/ds/<Name>) so unused design-system code tree-shakes.'
+						}
+					]
+				}
+			]
+		}
 	}
 );

@@ -24,7 +24,8 @@
 		convertsPairToUsd,
 		type ChartMarket
 	} from '$lib/markets/chartSelection';
-	import { InlineAlert, Tabs } from '$lib/ds';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { Tabs } from '$lib/ds/Tabs';
 	import { onMount } from 'svelte';
 	import { createMarketDataLoader, type MarketDataState } from '$lib/markets/marketDataLoader';
 	import type { PageData } from './$types';

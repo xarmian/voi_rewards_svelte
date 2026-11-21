@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Card, InlineAlert, Tabs } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Card } from '$lib/ds/Card';
+	import { InlineAlert } from '$lib/ds/InlineAlert';
+	import { Tabs } from '$lib/ds/Tabs';
 	import ProjectCard from '$lib/components/ecosystem/ProjectCard.svelte';
 	import { rowKeys } from '$lib/utils/rowKeys';
 	import type { PageData } from './$types';

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Button, Chip } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Chip } from '$lib/ds/Chip';
 	import TokenSelector from '$lib/components/TokenSelector.svelte';
 	import { formatPrice } from '$lib/markets/format';
 	import { quoteAsOfLabel } from '$lib/markets/framing';

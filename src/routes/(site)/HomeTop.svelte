@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
-	import { SearchBox, StatTile } from '$lib/ds';
+	import { SearchBox } from '$lib/ds/SearchBox';
+	import { StatTile } from '$lib/ds/StatTile';
 	import { comma, MISSING } from '$lib/ds/format';
 	import { epochHomeData } from '$lib/epochRewards';
 	import { EpochAprLede, HomeEpochHeadline, HomeEpochTiles } from '$lib/epochRewards/components';

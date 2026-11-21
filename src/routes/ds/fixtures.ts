@@ -3,7 +3,7 @@ import {
 	type BlockRewardReason,
 	type BlockRewardStatus
 } from '$lib/rewards/blockRewardStatus';
-import type { DataState, Tone } from '$lib/ds';
+import type { DataState, Tone } from '$lib/ds/types';
 
 // Literal excerpts from phase1/data/snapshot.json; no runtime dependency on that file.
 export const network = {

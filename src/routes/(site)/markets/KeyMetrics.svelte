@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { StatTile } from '$lib/ds';
+	import { StatTile } from '$lib/ds/StatTile';
 	import { formatCurrency, formatNumber } from '$lib/markets/format';
 	import type { UniqueToken } from '../../api/tokens/+server';
 

@@ -8,7 +8,7 @@ vi.mock('$lib/rewards/blockRewardLabels', async (original) => ({
 	}
 }));
 import RealtimeTestingBadge from './RealtimeTestingBadge.svelte';
-import { RealtimeTestingBadge as exported } from '$lib/ds';
+import { RealtimeTestingBadge as exported } from '$lib/ds/RealtimeTestingBadge';
 
 beforeEach(() => {
 	flag.testing = true;

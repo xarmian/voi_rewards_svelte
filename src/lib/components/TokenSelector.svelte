@@ -2,7 +2,8 @@
 	import { createEventDispatcher, tick, untrack } from 'svelte';
 	import { leavesWidget, nextOptionIndex } from '$lib/a11y/keyboard';
 	import { slide } from 'svelte/transition';
-	import { Button, Chip } from '$lib/ds';
+	import { Button } from '$lib/ds/Button';
+	import { Chip } from '$lib/ds/Chip';
 	import type { UniqueToken } from '../../routes/api/tokens/+server';
 
 	const dispatch = createEventDispatcher<{
