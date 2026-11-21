@@ -286,14 +286,6 @@
 			"svelte:a11y_consider_explicit_label": {
 				"errors": 0,
 				"warnings": 1
-			},
-			"ts:2322": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:2532": {
-				"errors": 2,
-				"warnings": 0
 			}
 		},
 		"src/routes/(site)/archive/testnet/phase2/[...slug]/+page.svelte": {
@@ -304,14 +296,6 @@
 			"svelte:css_unused_selector": {
 				"errors": 0,
 				"warnings": 4
-			},
-			"ts:18048": {
-				"errors": 1,
-				"warnings": 0
-			},
-			"ts:7053": {
-				"errors": 4,
-				"warnings": 0
 			}
 		}
 	}
