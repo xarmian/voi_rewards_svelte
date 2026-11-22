@@ -404,7 +404,7 @@ serve(async (req: Request) => {
 
 	try {
 		// Fetch data from all sources in parallel
-		const [mexcData, humbleData, tinymanData, pactfiData] = await Promise.all([
+		const [, humbleData] = await Promise.all([
 			fetchMEXCData(),
 			fetchHumbleData(),
 			fetchTinymanData(),
