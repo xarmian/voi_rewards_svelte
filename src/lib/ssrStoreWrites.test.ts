@@ -3,7 +3,7 @@
 // component on the server with props that satisfy its reactive load trigger, then asserts that nothing was fetched
 // and that every module-level store still holds its initial value.
 import assert from 'node:assert/strict';
-import { isDeepStrictEqual } from 'node:util';
+import { inspect, isDeepStrictEqual } from 'node:util';
 import { afterEach, beforeEach, test as baseTest, vi } from 'vitest';
 import type { Readable } from 'svelte/store';
 import type { Component } from 'svelte';
@@ -54,8 +54,19 @@ async function storeSnapshot() {
 		viewCollection: collection.viewCollection,
 		pinnedFlows: flows.pinnedFlows
 	};
-	return Object.fromEntries(Object.entries(stores).map(([name, store]) => [name, get(store)]));
+	// Printed, not kept by reference, so a value mutated in place still compares unequal.
+	return Object.fromEntries(
+		Object.entries(stores).map(([name, store]) => [name, inspect(get(store), PRINT)])
+	);
 }
+
+const PRINT = {
+	depth: Infinity,
+	maxArrayLength: Infinity,
+	maxStringLength: Infinity,
+	breakLength: Infinity,
+	sorted: true
+};
 
 // A fresh module graph per case: the wallet components import algosdk and the wallet libraries cold.
 // The wallet-page case alone takes 13 to 16 seconds on an idle box and 25 to 50 inside a full
@@ -82,10 +93,19 @@ function sameHandle(set: Set<Handle>, id: unknown): Handle | undefined {
 function trackTimers() {
 	vi.stubGlobal(
 		'setTimeout',
-		(fn: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+		(fn: (...args: unknown[]) => unknown, ms?: number, ...args: unknown[]) => {
+			// A callback that returns a promise stays pending until it settles.
 			const handle: Handle = realSetTimeout(() => {
-				pendingTimeouts.delete(handle);
-				fn(...args);
+				let result: unknown;
+				try {
+					result = fn(...args);
+				} finally {
+					if (result instanceof Promise) {
+						result.finally(() => pendingTimeouts.delete(handle)).catch(() => {});
+					} else {
+						pendingTimeouts.delete(handle);
+					}
+				}
 			}, ms);
 			pendingTimeouts.add(handle);
 			return handle;
@@ -128,7 +148,8 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-const QUIET_MS = 100;
+// Long enough to cover an await between a load's start and its fetch, such as a cold import.
+const QUIET_MS = 500;
 const SETTLE_LIMIT_MS = 15_000;
 
 // Waits until no timer the render scheduled is pending and neither the fetch log nor the stores
