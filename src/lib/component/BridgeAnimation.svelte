@@ -42,7 +42,7 @@
 
 				<!-- Animated bubbles during bridging -->
 				{#if status === 'bridging'}
-					{#each bubbles as bubble}
+					{#each bubbles}
 						<div class="bubble {isMovingRight ? 'move-left-to-right' : 'move-right-to-left'}"></div>
 					{/each}
 				{/if}

@@ -177,15 +177,6 @@
 		}).format(num / 1_000_000); // Convert from microVOI to VOI
 	}
 
-	const LoadingOverlay = ({ height = 'h-full' }: { height?: string }) => `
-        <div class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center ${height}">
-            <div class="flex flex-col items-center gap-3">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400"></div>
-                <span class="text-sm text-gray-600 dark:text-gray-300">Loading...</span>
-            </div>
-        </div>
-    `;
-
 	onDestroy(() => {
 		//stopCountdown();
 	});
@@ -306,7 +297,16 @@
 	<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 relative">
 		{#if isLoading}
 			<div transition:fade={{ duration: 150 }}>
-				{@html LoadingOverlay({})}
+				<div
+					class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center h-full"
+				>
+					<div class="flex flex-col items-center gap-3">
+						<div
+							class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400"
+						></div>
+						<span class="text-sm text-gray-600 dark:text-gray-300">Loading...</span>
+					</div>
+				</div>
 			</div>
 		{/if}
 

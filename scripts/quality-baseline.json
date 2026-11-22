@@ -1,11 +1,5 @@
 {
 	"eslint": {
-		"src/lib/component/BridgeAnimation.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/BridgeModal.svelte": {
 			"@typescript-eslint/no-unused-vars": {
 				"errors": 2,
@@ -54,12 +48,6 @@
 		},
 		"src/lib/component/ui/Modal.svelte": {
 			"svelte/no-unused-svelte-ignore": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/StakingComponent.svelte": {
-			"svelte/no-at-html-tags": {
 				"errors": 1,
 				"warnings": 0
 			}
