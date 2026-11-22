@@ -15,6 +15,13 @@ interface TokenInfo {
 	algoAssetId: number | null;
 }
 
+// The asset params this route reads: total supply, unit name and decimals.
+interface AssetParams {
+	t?: number;
+	un?: string;
+	dc?: number;
+}
+
 // Get token total supply
 async function getTokenTotalSupply(
 	tokenId: number
@@ -48,7 +55,7 @@ async function getTokenTotalSupply(
 			.single();
 
 		if (!assetError && assetData && assetData.params) {
-			const params = assetData.params as any;
+			const params = assetData.params as AssetParams;
 			return { value: params.t || null, failed: arc200Failed }; // total supply
 		}
 
@@ -133,7 +140,7 @@ export const GET: RequestHandler = async ({ url }) => {
 						.single();
 
 					if (!assetError && assetData && assetData.params) {
-						const params = assetData.params as any;
+						const params = assetData.params as AssetParams;
 						const [equivalents, totalSupply] = await Promise.all([
 							getTokenEquivalents(targetTokenId),
 							getTokenTotalSupply(targetTokenId)

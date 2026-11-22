@@ -61,7 +61,7 @@ export function resolveSymbolUsd(
 	}
 
 	// Step 3: First pass - direct VOI pairs
-	for (const [key, priceInfo] of poolPrices) {
+	for (const priceInfo of poolPrices.values()) {
 		if (priceInfo.tokenB === 'VOI' && !priceInVoi.has(priceInfo.tokenA)) {
 			priceInVoi.set(priceInfo.tokenA, priceInfo.price);
 		}
@@ -76,7 +76,7 @@ export function resolveSymbolUsd(
 		foundNew = false;
 		iterations++;
 
-		for (const [key, priceInfo] of poolPrices) {
+		for (const priceInfo of poolPrices.values()) {
 			const { tokenA, tokenB, price } = priceInfo;
 
 			// If we know tokenB price but not tokenA, calculate tokenA price

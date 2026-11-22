@@ -2,11 +2,32 @@ import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { supabasePrivateClient } from '$lib/server/supabase';
 import type { MimirClient } from '$lib/tokens/equivalents';
 
+// A cross-chain market row, from the latest market_snapshots row of a trading pair.
+export interface CrossChainMarketRow {
+	trading_pair_id: number;
+	exchange: string;
+	pair: string;
+	type: string;
+	network: string;
+	url: null;
+	pool_url: null;
+	base_token_id: number;
+	quote_token_id: null;
+	price: number;
+	volume_24h: number | null;
+	tvl: number | null;
+	high_24h: number | null;
+	low_24h: number | null;
+	price_change_24h: number | null;
+	price_change_percentage_24h: number | null;
+	lastUpdated: string;
+}
+
 // Cross-chain market snapshots, ONLY for VOI (any equivalent is VOI 0 or wVOI 390001). Never throws.
 export async function fetchCrossChainSnapshots(
 	equivalentIds: number[],
 	onFailure: () => void
-): Promise<any[]> {
+): Promise<CrossChainMarketRow[]> {
 	const voiIds = [0, 390001];
 	if (!equivalentIds.some((id) => voiIds.includes(id))) return [];
 	try {

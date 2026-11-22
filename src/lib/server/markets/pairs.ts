@@ -1,11 +1,26 @@
 import { isRetiredExchange } from '$lib/markets/retired';
+import type { PoolCatalog } from '$lib/supabase';
 
 export type MarketPair = ReturnType<typeof normalizePairs>[number];
 
-export function normalizePairs(poolRows: unknown[] | null, equivalentIds: number[]) {
+// The pool_catalog columns read here; the route selects `*`, which includes `exchange`.
+type PoolCatalogRow = Pick<
+	PoolCatalog,
+	| 'pool_id'
+	| 'token_a_id'
+	| 'token_a_symbol'
+	| 'token_a_decimals'
+	| 'token_a_type'
+	| 'token_b_id'
+	| 'token_b_symbol'
+	| 'token_b_decimals'
+	| 'token_b_type'
+> & { exchange: string | null };
+
+export function normalizePairs(poolRows: PoolCatalogRow[] | null, equivalentIds: number[]) {
 	// Deduplicate pools by pool_id (same pool might match multiple equivalent token IDs)
 	const seenPoolIds = new Set<number>();
-	const pools = (poolRows || []).filter((pool: any) => {
+	const pools = (poolRows || []).filter((pool) => {
 		if (isRetiredExchange(pool.exchange)) return false;
 		if (seenPoolIds.has(pool.pool_id)) return false;
 		seenPoolIds.add(pool.pool_id);
@@ -13,7 +28,7 @@ export function normalizePairs(poolRows: unknown[] | null, equivalentIds: number
 	});
 
 	// Normalize pairs with selected token as base
-	return pools.map((pool: any) => {
+	return pools.map((pool) => {
 		// Check if token_b is one of our equivalent IDs (meaning it should be the base)
 		const isTokenBBase = equivalentIds.includes(pool.token_b_id);
 		const baseSide = isTokenBBase

@@ -3,13 +3,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
 import { mergeCandleRows } from '$lib/server/ohlcvMerge';
-import type {
-	Resolution,
-	OHLCVRequest,
-	OHLCVData,
-	VolumeData,
-	PriceCandle
-} from '$lib/types/ohlcv.types';
+import type { Resolution, OHLCVData, VolumeData, PriceCandle } from '$lib/types/ohlcv.types';
 
 // VOI native token can be represented by either token ID 0 or 390001 (wVOI)
 const VOI_TOKEN_IDS = [0, 390001];

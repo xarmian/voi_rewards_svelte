@@ -6,11 +6,13 @@ import { fetchCirculatingSupply } from '$lib/utils/voi';
 import { mimirClient as supabaseMimirClient } from '$lib/mimir';
 import { getTokenEquivalents } from '$lib/tokens/equivalents';
 import { fetchVestigeMarketsForAsset } from '$lib/utils/vestige';
+import type { VestigeMarket } from '$lib/utils/vestige';
 import { fetchPoolAggregates } from '$lib/server/poolAggregates';
 import { resolveVoiUsd } from '$lib/server/voiUsdReference';
 import type { VoiUsdStatus } from '$lib/server/voiUsdReference';
 
 import { fetchCrossChainSnapshots, fetchAlgoAssetId } from '$lib/server/markets/sources';
+import type { CrossChainMarketRow } from '$lib/server/markets/sources';
 import { normalizePairs } from '$lib/server/markets/pairs';
 import { latestSwapsByPool, resolveSymbolUsd, vestigePriceMap } from '$lib/server/markets/priceMap';
 import { isRetiredExchange } from '$lib/markets/retired';
@@ -57,7 +59,11 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		const onFailure = () => {
 			degraded = true;
 		};
-		let marketData: any[] = [];
+		let marketData: (
+			| ReturnType<typeof composeDexMarketRow>
+			| CrossChainMarketRow
+			| VestigeMarket
+		)[] = [];
 		let voiUsd: number | null = null;
 		// null = no VOI/USD conversion was attempted (no pools), so nothing to flag
 		let voiUsdStatus: VoiUsdStatus | null = null;
@@ -141,7 +147,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		);
 
 		// 6) Fetch Vestige (Algorand) markets if token has algo_asset_id
-		let vestigeMarkets: any[] = [];
+		let vestigeMarkets: VestigeMarket[] = [];
 		try {
 			if (algoAssetId) {
 				const priceMapForVestige = vestigePriceMap(symbolUsd);
