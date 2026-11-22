@@ -439,12 +439,15 @@ describe('TASK-32 relays server load', () => {
 		expect(() => stringify(result)).not.toThrow();
 	});
 
-	it('still throws when the max date query fails', async () => {
+	it('answers 503, not 500, when the max date query fails', async () => {
 		const { load } = await import('./(site)/archive/testnet/relays/+page.server');
 		const maxDate = query();
 		mocks.from.mockReturnValueOnce(maxDate.builder);
 		maxDate.resolve(null, { message: 'boom' });
-		await expect(load({} as never)).rejects.toThrow('Failed to fetch max date');
+		await expect(load({} as never)).rejects.toMatchObject({
+			status: 503,
+			body: { message: 'Relay data is unavailable. Try again in a moment.' }
+		});
 	});
 });
 
