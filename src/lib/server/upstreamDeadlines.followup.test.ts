@@ -190,10 +190,10 @@ it('leaderboard returns its error data by the deadline when vr_phase2 stalls', a
 	expectAborted('vr_phase2');
 });
 
-it('relays fails its load by the deadline when vr_relay_peers stalls', async () => {
+it('relays answers 503 by the deadline when vr_relay_peers stalls', async () => {
 	stalled = 'vr_relay_peers';
 	const { outcome } = await settle(() => Promise.resolve(relaysLoad(event('/relays') as never)));
-	expect(outcome?.error).toBeInstanceOf(Error);
+	expect(outcome?.error).toMatchObject({ status: 503 });
 	expectAborted('vr_relay_peers');
 });
 
