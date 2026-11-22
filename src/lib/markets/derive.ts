@@ -93,6 +93,15 @@ export function circulatingMarketCap(
 		: null;
 }
 
+// The fields the markets page reads from /api/token-info's `info` (TokenInfo in its server route).
+export type MarketTokenInfo = {
+	tokenId: number;
+	symbol: string;
+	decimals: number;
+	imageUrl: string | null;
+	totalSupply: number | null;
+};
+
 export function tokenTotalSupplyAdjusted(
 	tokenInfo: { totalSupply?: number | null; decimals?: number | null } | null | undefined
 ) {

@@ -1,4 +1,5 @@
 import type { PageLoad } from './$types';
+import type { MarketTokenInfo } from '$lib/markets/derive';
 
 export const load: PageLoad = async ({ fetch, url }) => {
 	// Read token from URL; support numeric ID or symbol. Default to VOI (id=0).
@@ -7,7 +8,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	let ogImageUrl: string | null = null;
 	let tokenSymbolResolved = 'VOI';
 	let tokenIdResolved: number = 0;
-	let tokenInfo: Record<string, unknown> | null = null;
+	let tokenInfo: MarketTokenInfo | null = null;
 
 	const fetchJson = async (path: string) => (await fetch(path)).json();
 	const fetchTokenAnalytics = async (tokenId: number) => {

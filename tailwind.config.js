@@ -1,3 +1,5 @@
+import flowbitePlugin from 'flowbite/plugin';
+
 // Semantic colour from a src/lib/ds/tokens.css channel variable (DESIGN-SYSTEM.md §1.1).
 const token = (name) => `rgb(var(--c-${name}) / <alpha-value>)`;
 
@@ -15,7 +17,7 @@ export default {
 		'./node_modules/layerchart/**/*.{svelte,js}'
 	],
 
-	plugins: [require('flowbite/plugin')],
+	plugins: [flowbitePlugin],
 
 	darkMode: 'class',
 

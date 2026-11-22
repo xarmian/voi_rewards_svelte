@@ -52,16 +52,6 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/component/WalletSearch.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
-				"warnings": 0
-			},
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/ui/Modal.svelte": {
 			"svelte/no-unused-svelte-ignore": {
 				"errors": 1,
@@ -71,12 +61,6 @@
 		"src/lib/component/ui/StakingComponent.svelte": {
 			"svelte/no-at-html-tags": {
 				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/TokenMetricsBar.svelte": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
 				"warnings": 0
 			}
 		},
@@ -99,12 +83,6 @@
 			}
 		},
 		"src/lib/server/markets/sources.ts": {
-			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/markets/+page.svelte": {
 			"@typescript-eslint/no-explicit-any": {
 				"errors": 1,
 				"warnings": 0
@@ -152,12 +130,6 @@
 		},
 		"supabase/functions/fetch-market-data/index.ts": {
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"tailwind.config.js": {
-			"@typescript-eslint/no-require-imports": {
 				"errors": 1,
 				"warnings": 0
 			}

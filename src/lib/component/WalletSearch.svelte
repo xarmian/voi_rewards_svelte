@@ -3,12 +3,7 @@
 </script>
 
 <script lang="ts">
-	import {
-		getEnvoiAddresses,
-		searchEnvoi,
-		type EnvoiSearchResult,
-		getEnvoiNames
-	} from '$lib/utils/envoi';
+	import { searchEnvoi, type EnvoiSearchResult, getEnvoiNames } from '$lib/utils/envoi';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onMount, onDestroy } from 'svelte';
 	import { SearchOutline } from 'flowbite-svelte-icons';
@@ -27,7 +22,7 @@
 	let addressList: EnvoiSearchResult[] = [];
 	let selectedAddressIndex = -1;
 	let windowDefined = false;
-	let componentElement: any;
+	let componentElement: HTMLDivElement;
 	let dropdownList: HTMLUListElement;
 	let isInputFocused = false;
 	export let onSubmit: (address: string, index?: number) => void;
@@ -135,7 +130,7 @@
 	}
 
 	function handleClickOutside(event: MouseEvent) {
-		if (!componentElement.contains(event.target)) {
+		if (!componentElement.contains(event.target as Node | null)) {
 			addressList = [];
 		} else {
 			handleInput();
@@ -219,7 +214,7 @@
 		}
 	}
 
-	function init(el: any) {
+	function init(el: HTMLElement) {
 		el.focus();
 	}
 
