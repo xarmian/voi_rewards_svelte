@@ -15,8 +15,6 @@
 	import CalculatorDisclaimer from './CalculatorDisclaimer.svelte';
 
 	export let walletAddress: string | undefined = undefined;
-	export let childAccounts: unknown[] = [];
-	export let primaryAccountInfo: unknown | undefined = undefined;
 
 	let nodeCost: number | undefined = 10;
 	let calculationAmount: number | undefined = 0;

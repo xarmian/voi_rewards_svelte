@@ -59,7 +59,6 @@
 		href: `#${id}`
 	}));
 	let snapshot = $state<WalletSnapshot | null>(null);
-	let primaryAccountInfo = $state<LegacyAccount | null>(null);
 	let childAccounts = $state<LegacyAccount[]>([]);
 	let loadState = $state<DataState>('loading');
 	let refreshFailed = $state(false);
@@ -197,7 +196,6 @@
 		const request = ++sequence;
 		if (loadedAddress !== requestedAddress || loadedOwner !== address) {
 			snapshot = null;
-			primaryAccountInfo = null;
 			childAccounts = [];
 		}
 		loadState = 'loading';
@@ -211,7 +209,6 @@
 			)
 				return;
 			snapshot = result;
-			primaryAccountInfo = result.primary;
 			childAccounts = result.children;
 			loadedAddress = requestedAddress;
 			loadedOwner = address;
@@ -528,13 +525,7 @@
 							/>
 						</div>{/if}
 				{:else if tabs.current === 'calculator'}
-					<Card title="Calculator"
-						><CalculatorComponent
-							walletAddress={walletId}
-							{childAccounts}
-							{primaryAccountInfo}
-						/></Card
-					>
+					<Card title="Calculator"><CalculatorComponent walletAddress={walletId} /></Card>
 				{/if}
 				<div
 					class="mt-5 flex flex-wrap items-center justify-between gap-3 text-label text-ink-muted"
