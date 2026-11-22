@@ -74,26 +74,8 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/CommandPalette.svelte": {
-			"svelte/no-unused-svelte-ignore": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/components/OHLCVChart.svelte": {
-			"svelte/valid-compile": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/components/TokenMetricsBar.svelte": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/ds/Header/MobileMenu.svelte": {
-			"svelte/no-unused-svelte-ignore": {
 				"errors": 2,
 				"warnings": 0
 			}
@@ -124,12 +106,6 @@
 		},
 		"src/lib/server/markets/sources.ts": {
 			"@typescript-eslint/no-explicit-any": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/routes/(site)/archive/testnet/phase1/+page.svelte": {
-			"svelte/valid-compile": {
 				"errors": 1,
 				"warnings": 0
 			}
@@ -206,22 +182,10 @@
 				"warnings": 0
 			}
 		},
-		"src/lib/components/OHLCVChart.svelte": {
-			"svelte:element_invalid_self_closing_tag": {
-				"errors": 0,
-				"warnings": 1
-			}
-		},
 		"src/lib/epochRewards/home/HomeRewards.svelte": {
 			"svelte:state_referenced_locally": {
 				"errors": 0,
 				"warnings": 12
-			}
-		},
-		"src/routes/(site)/archive/testnet/phase1/+page.svelte": {
-			"svelte:a11y_consider_explicit_label": {
-				"errors": 0,
-				"warnings": 1
 			}
 		}
 	}

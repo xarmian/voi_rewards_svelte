@@ -617,7 +617,7 @@
 		onkeydown={handleInspectionKey}
 	>
 		<div class="plot relative w-full" style:--plot-height={`${height}px`}>
-			<div bind:this={chartContainer} class="absolute inset-0 bg-surface" />
+			<div bind:this={chartContainer} class="absolute inset-0 bg-surface"></div>
 			{#if loading && data.length === 0}
 				<div role="status" class="absolute inset-0 flex items-center justify-center text-ink-muted">
 					Loading chart data...
