@@ -44,23 +44,23 @@
 		initialEpoch: number;
 		price: DashboardData['price'];
 	} = $props();
+	// Seed values read once; the effect below re-applies a new `initial` itself.
+	const seed = untrack(() => initial);
+	const seedEpoch = untrack(() => initialEpoch);
 	type Row = RewardRow & {
 		name?: string;
 		nickname?: string;
 		nodes?: { node_name: string | null }[];
 	};
-	let epoch = $state(initialEpoch);
-	let response = $state(initial.state === 'error' ? null : initial.value.data);
+	let epoch = $state(seedEpoch);
+	let response = $state(seed.state === 'error' ? null : seed.value.data);
 	let pool = $state<number | null>(
-		initial.state === 'error' ? null : initial.value.params.block_reward_pool
+		seed.state === 'error' ? null : seed.value.params.block_reward_pool
 	);
-	let asOf = $state(initial.state === 'stale' ? initial.asOf : undefined);
-	let dataState = $state<'ready' | 'loading' | 'stale' | 'error'>(initial.state);
+	let asOf = $state(seed.state === 'stale' ? seed.asOf : undefined);
+	let dataState = $state<'ready' | 'loading' | 'stale' | 'error'>(seed.state);
 	let clock = $state(
-		rewardsClock(
-			initial.state === 'error' ? undefined : initial.value.data.max_timestamp,
-			Date.now()
-		)
+		rewardsClock(seed.state === 'error' ? undefined : seed.value.data.max_timestamp, Date.now())
 	);
 	let priceValue = $state<number | null>(null);
 	let names = $state<Record<string, string>>({});
@@ -74,8 +74,8 @@
 	// Balances load when a row's details first open (TASK-96), not for every rendered row.
 	const openDetails = new Set<string>();
 	let balanceGeneration = 0;
-	let appliedInitial = initial;
-	let lastRequested = initialEpoch;
+	let appliedInitial = seed;
+	let lastRequested = seedEpoch;
 	let hasSelectedEpoch = false;
 	let requestId = 0;
 	const nameResolver = createNameResolver(getEnvoiNames);
