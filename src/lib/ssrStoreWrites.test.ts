@@ -101,7 +101,8 @@ function trackTimers() {
 					result = fn(...args);
 				} finally {
 					if (result instanceof Promise) {
-						result.finally(() => pendingTimeouts.delete(handle)).catch(() => {});
+						// Left unhandled on purpose: a rejection here reaches the runner as before.
+						void result.finally(() => pendingTimeouts.delete(handle));
 					} else {
 						pendingTimeouts.delete(handle);
 					}
