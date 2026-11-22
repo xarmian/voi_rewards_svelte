@@ -82,12 +82,12 @@
 	}
 
 	// Helper function to determine if token is native VOI
-	function isNativeToken(token: any): boolean {
+	function isNativeToken(token: { type?: string }): boolean {
 		return token.type === 'native';
 	}
 
 	// Helper function to determine if token is ARC-200
-	function isARC200Token(token: any): boolean {
+	function isARC200Token(token: { type?: string }): boolean {
 		return token.type === 'arc200';
 	}
 

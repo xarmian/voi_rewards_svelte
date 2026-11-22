@@ -8,17 +8,17 @@
 	import { decimalToBaseUnits } from '$lib/chain/baseUnits';
 	import { Modal, Button, Select, Input, Label } from 'flowbite-svelte';
 	import type { Recipient } from '$lib/types/recipients';
-	import { getEnvoiAddresses, getEnvoiNames } from '$lib/utils/envoi';
 	import algosdk from 'algosdk';
 	import {
 		buildHolderRecipients,
 		countValidHolders,
 		filterHolders
 	} from '$lib/utils/arc200Holders';
+	import type { HolderBalance } from '$lib/utils/arc200Holders';
 
 	export let open = false;
 	export let onClose = () => {};
-	export let onConfirm = (recipients: Recipient[]) => {};
+	export let onConfirm: (recipients: Recipient[]) => void = () => {};
 
 	const zeroAddress = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 
@@ -71,7 +71,7 @@
 	let arc200MinimumBalance = '';
 
 	// Track qualified holders when minimum balance changes
-	let arc200TokenData: any = null;
+	let arc200TokenData: { balances: HolderBalance[] } | null = null;
 
 	function calculateQualifiedHolders() {
 		if (!arc200TokenData || !arc200TokenData.balances) {
@@ -107,6 +107,13 @@
 		calculateQualifiedHolders();
 	}
 
+	// A row of an imported JSON holder file: { balances: [{ accountId | address, balance }] }.
+	interface JsonBalanceRow {
+		accountId?: unknown;
+		address?: unknown;
+		balance?: unknown;
+	}
+
 	interface NFTToken {
 		contractId: number;
 		tokenId: string;
@@ -118,7 +125,6 @@
 		'mint-round': number;
 	}
 
-	$: selectedRowsCount = selectedRows.size;
 	$: validRowsCount = parsedData.filter((row) => {
 		const address = row.cells[addressColumnIndex];
 		if (!address) return false;
@@ -256,8 +262,8 @@
 			// Support JSON object with balances: [{ accountId, contractId, balance }]
 			if (jsonData && typeof jsonData === 'object' && Array.isArray(jsonData.balances)) {
 				return jsonData.balances
-					.filter((b: any) => b && (b.accountId || b.address))
-					.map((b: any) => {
+					.filter((b: JsonBalanceRow | null) => b && (b.accountId || b.address))
+					.map((b: JsonBalanceRow) => {
 						const address = String(b.accountId || b.address);
 						const balance = b.balance !== undefined && b.balance !== null ? String(b.balance) : '';
 						const cells = [address, balance];
@@ -1094,7 +1100,7 @@
 							Address Column
 						</label>
 						<Select class="w-full" bind:value={addressColumnIndex}>
-							{#each Array(columnCount) as _, i}
+							{#each Array(columnCount), i}
 								<option value={i}>Column {i + 1}</option>
 							{/each}
 						</Select>
@@ -1108,7 +1114,7 @@
 						</label>
 						<Select class="w-full" bind:value={amountColumnIndex}>
 							<option value={-1}>None</option>
-							{#each Array(columnCount) as _, i}
+							{#each Array(columnCount), i}
 								{#if i !== addressColumnIndex}
 									<option value={i}>Column {i + 1}</option>
 								{/if}
@@ -1643,7 +1649,7 @@
 											/>
 										</div>
 									</th>
-									{#each Array(columnCount) as _, i}
+									{#each Array(columnCount), i}
 										<th class="px-4 py-3 font-medium bg-gray-50 dark:bg-gray-900/50">
 											<div class="flex items-center gap-2">
 												<span>Column {i + 1}</span>
@@ -1678,7 +1684,7 @@
 												{/if}
 											</div>
 										</td>
-										{#each Array(columnCount) as _, j}
+										{#each Array(columnCount), j}
 											<td class="px-4 py-3 font-mono">
 												{#if j === addressColumnIndex && row.cells[j]}
 													<div class="flex flex-col gap-1">

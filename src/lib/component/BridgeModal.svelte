@@ -227,7 +227,6 @@
 	}
 
 	let searchResults: (NFDResult | ResolvedName)[] = [];
-	let isSearching = false;
 	let showSearchResults = false;
 	let searchTimeout: number | undefined;
 	$: isValidDestination = Boolean(destinationAddress);
@@ -299,7 +298,6 @@
 		searchResults = [];
 		showSearchResults = false;
 		selectedSearchIndex = -1;
-		isSearching = false;
 
 		if (state.address) {
 			try {
@@ -336,7 +334,6 @@
 
 		searchTimeout = window.setTimeout(async () => {
 			if (!isCurrent()) return;
-			isSearching = true;
 			try {
 				const results = direction
 					? await searchNFDomains(input)
@@ -358,14 +355,6 @@
 				const failed = { ...state, error: 'Could not resolve this name. Please try again.' };
 				if (direction) algorandDestination = failed;
 				else voiDestination = failed;
-			} finally {
-				// Only the current query may stop its loading indicator.
-				if (
-					direction === isVoiToAlgorand &&
-					input === (direction ? algorandDestination : voiDestination).text
-				) {
-					isSearching = false;
-				}
 			}
 		}, 300);
 	}
@@ -708,7 +697,6 @@
 		showSearchResults = false;
 		showConnectedWallets = false;
 		selectedSearchIndex = -1;
-		isSearching = false;
 		depositController?.abort();
 		qrMonitorActive = false;
 		pendingController?.abort();
@@ -736,7 +724,6 @@
 		showSearchResults = false;
 		showConnectedWallets = false;
 		selectedSearchIndex = -1;
-		isSearching = false;
 		depositSessions.clear();
 		qrMonitorKey = undefined;
 		depositController?.abort();
@@ -755,7 +742,6 @@
 		showSearchResults = false;
 		showConnectedWallets = false;
 		selectedSearchIndex = -1;
-		isSearching = false;
 		depositController?.abort();
 		qrMonitorActive = false;
 		monitorController?.abort();
@@ -961,7 +947,6 @@
 		}
 
 		searchTimeout = window.setTimeout(async () => {
-			isSearching = true;
 			try {
 				const results = await searchNFDomains(input);
 				sourceSearchResults = results;
@@ -969,8 +954,6 @@
 			} catch (error) {
 				console.error('Error searching names:', error);
 				sourceSearchResults = [];
-			} finally {
-				isSearching = false;
 			}
 		}, 300);
 	}
@@ -1831,7 +1814,7 @@
 											class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 md:max-h-60"
 										>
 											<ul class="max-h-48 overflow-auto py-1">
-												{#each uniqueConnectedWallets as address, i}
+												{#each uniqueConnectedWallets as address}
 													<li>
 														<button
 															class="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"

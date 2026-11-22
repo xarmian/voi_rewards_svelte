@@ -842,8 +842,8 @@
 		return `${address.slice(0, 4)}...${address.slice(-4)}`;
 	}
 
-	function sanitizeNumberInput(event, setter) {
-		const cleaned = event.target.value.replace(/,/g, '');
+	function sanitizeNumberInput(event: Event, setter: (val: string) => void) {
+		const cleaned = (event.target as HTMLInputElement).value.replace(/,/g, '');
 		setter(cleaned);
 	}
 </script>

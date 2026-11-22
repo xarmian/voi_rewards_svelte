@@ -248,11 +248,13 @@
 	}
 
 	$: {
+		/* eslint-disable @typescript-eslint/no-unused-expressions -- reactive dependencies for $: */
 		fromAddress;
 		toAddress;
 		note;
 		showFeeTransactions;
 		showLPExchangeDetails;
+		/* eslint-enable @typescript-eslint/no-unused-expressions */
 		applyFilters();
 	}
 
