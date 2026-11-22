@@ -10,7 +10,7 @@
 
 	interface Props {
 		selectedToken: UniqueToken | null;
-		tokenInfo: { imageUrl?: string } | null;
+		tokenInfo: { imageUrl?: string | null } | null;
 		data: PageData;
 		realMarketData: PageData['marketData'];
 		fetchingMarketData: boolean;

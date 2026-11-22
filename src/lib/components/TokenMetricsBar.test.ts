@@ -26,7 +26,7 @@ it.each([
 					quoteDecimals: 6,
 					poolId: 22
 				},
-				marketData: [{ trading_pair_id: 22, volume_24h: volume }],
+				marketData: [{ pair: 'VOI/USDC', trading_pair_id: 22, volume_24h: volume }],
 				quoteSymbol: 'USD'
 			}
 		});

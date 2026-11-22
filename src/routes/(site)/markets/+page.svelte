@@ -5,7 +5,8 @@
 		circulatingMarketCap as getCirculatingMarketCap,
 		tokenTotalSupplyAdjusted as getTokenTotalSupplyAdjusted,
 		fullyDilutedMarketCap as getFullyDilutedMarketCap,
-		filterMarkets as getFilteredMarkets
+		filterMarkets as getFilteredMarkets,
+		type MarketTokenInfo
 	} from '$lib/markets/derive';
 	import {
 		createVoiUsdReference,
@@ -99,7 +100,7 @@
 
 	// Token overview and analytics state. Seeded by +page.ts so hydration does not refetch it, but
 	// never for VOI: VOI's overview runs without token info, and SSR must match (TASK-27 r1).
-	let tokenInfo: any =
+	let tokenInfo: MarketTokenInfo | null =
 		data.resolvedToken?.id && data.resolvedToken.symbol !== 'VOI' ? (data.tokenInfo ?? null) : null;
 
 	// Enhanced UI state

@@ -10,9 +10,29 @@
 		metrics: { swapCount24h: number | null; uniqueTraders24h: number | null };
 	};
 
+	// The fields read from /api/token-analytics (TokenAnalytics in its server route). The route
+	// sends no totalSupply today, so the token view falls back to tokenSupplyData.
+	type TokenAnalytics = {
+		volume: { volume24h: number | null; volume7d: number | null; volume30d: number | null };
+		tvl: { totalTvl: number | null; poolCount: number | null };
+		totalSupply?: number | null;
+	};
+
+	// The fields read from each /api/markets row.
+	type MarketRow = {
+		pair: string;
+		trading_pair_id?: number;
+		price?: number | null;
+		price_change_percentage_24h?: number | null;
+		volume_24h?: number | null;
+		tvl?: number | null;
+		high_24h?: number | null;
+		low_24h?: number | null;
+	};
+
 	export let selectedToken: UniqueToken | null = null;
 	export let selectedPool: TokenPair | null = null;
-	export let marketData: any[] = [];
+	export let marketData: MarketRow[] = [];
 	export let aggregates: Partial<MarketDataState['aggregates']> = {};
 	export let circulatingSupply: Partial<NonNullable<MarketDataState['circulatingSupply']>> | null =
 		{};
@@ -22,7 +42,7 @@
 	export let quoteSymbol: string | null = null; // Effective quote symbol for displayed prices
 
 	// Token analytics data from our new API
-	let tokenAnalytics: any = null;
+	let tokenAnalytics: TokenAnalytics | null = null;
 	let poolAnalytics: PoolAnalytics | null = null;
 
 	// Token supply data (legacy - now included in token analytics)
@@ -95,8 +115,8 @@
 
 			// Calculate 24h change from market data
 			const priceChanges = marketData
-				.filter((m) => m.price_change_percentage_24h != null)
-				.map((m) => m.price_change_percentage_24h);
+				.map((m) => m.price_change_percentage_24h)
+				.filter((change): change is number => change != null);
 			const avgPriceChange =
 				priceChanges.length > 0
 					? priceChanges.reduce((sum, change) => sum + change, 0) / priceChanges.length
@@ -159,7 +179,9 @@
 				high24h: poolMarketData?.high_24h || high24h,
 				low24h: poolMarketData?.low_24h || (low24h === Infinity ? 0 : low24h),
 				poolShare:
-					aggregates.totalVolume && volume24h > 0 ? (volume24h / aggregates.totalVolume) * 100 : 0,
+					aggregates.totalVolume && volume24h != null && volume24h > 0
+						? (volume24h / aggregates.totalVolume) * 100
+						: 0,
 				fullyDilutedMarketCap,
 				// Add pool-specific metrics from analytics
 				swapCount24h: poolAnalytics?.metrics?.swapCount24h || 0,
