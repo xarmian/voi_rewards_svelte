@@ -25,6 +25,7 @@
 		convertsPairToUsd,
 		type ChartMarket
 	} from '$lib/markets/chartSelection';
+	import { readPriceHistory } from '$lib/markets/priceHistory';
 	import { InlineAlert } from '$lib/ds/InlineAlert';
 	import { Tabs } from '$lib/ds/Tabs';
 	import { onMount } from 'svelte';
@@ -431,7 +432,7 @@
 		const response = await fetch(
 			`/api/price-history?period=${period}${selectedTradingPairId ? `&trading_pair_id=${selectedTradingPairId}` : ''}&token=${selectedToken?.symbol || 'VOI'}`
 		);
-		priceHistory = await response.json();
+		priceHistory = await readPriceHistory(response);
 	}
 
 	// Read through a function: at the top level of a reactive block TypeScript narrows selectedToken.

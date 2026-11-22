@@ -1,5 +1,6 @@
 import type { PageLoad } from './$types';
 import type { MarketTokenInfo } from '$lib/markets/derive';
+import { readPriceHistory } from '$lib/markets/priceHistory';
 
 export const load: PageLoad = async ({ fetch, url }) => {
 	// Read token from URL; support numeric ID or symbol. Default to VOI (id=0).
@@ -61,7 +62,10 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	const [marketData, priceHistory, tokenAnalytics] = await Promise.all([
 		marketDataPromise,
 		// TASK-92: the chart and the price fallback take [], so a failed price history no longer fails the page.
-		fetchJson(`/api/price-history?period=24h&token=${tokenSymbolResolved}`).catch(() => []),
+		// An error response is [] too: the endpoint answers 500 with { error }, which the chart cannot render.
+		fetch(`/api/price-history?period=24h&token=${tokenSymbolResolved}`)
+			.then(readPriceHistory)
+			.catch(() => []),
 		tokenAnalyticsPromise
 	]);
 
