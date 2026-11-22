@@ -1,3 +1,4 @@
+import { error } from '@sveltejs/kit';
 import { supabasePublicClient } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
 import { UPSTREAM_TIMEOUT_MS } from '$lib/server/fetchWithTimeout';
@@ -64,8 +65,9 @@ export const load: PageServerLoad = async () => {
 		.abortSignal(AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
 		.single();
 
+	// The week list ends at the latest peer date, so there is nothing to show without it.
 	if (maxDateError) {
-		throw new Error('Failed to fetch max date');
+		error(503, 'Relay data is unavailable. Try again in a moment.');
 	}
 
 	const startDate = '2024-10-30';
