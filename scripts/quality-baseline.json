@@ -1,19 +1,7 @@
 {
 	"eslint": {
-		"src/lib/component/BridgeAnimation.svelte": {
-			"@typescript-eslint/no-unused-vars": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
 		"src/lib/component/BridgeModal.svelte": {
 			"@typescript-eslint/no-unused-vars": {
-				"errors": 2,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/CalculatorComponent.svelte": {
-			"svelte/valid-compile": {
 				"errors": 2,
 				"warnings": 0
 			}
@@ -49,18 +37,6 @@
 		"src/lib/component/TokenTransfersModal.svelte": {
 			"@typescript-eslint/no-unused-expressions": {
 				"errors": 5,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/Modal.svelte": {
-			"svelte/no-unused-svelte-ignore": {
-				"errors": 1,
-				"warnings": 0
-			}
-		},
-		"src/lib/component/ui/StakingComponent.svelte": {
-			"svelte/no-at-html-tags": {
-				"errors": 1,
 				"warnings": 0
 			}
 		},
@@ -136,12 +112,6 @@
 		}
 	},
 	"svelte-check": {
-		"src/lib/component/CalculatorComponent.svelte": {
-			"svelte:export_let_unused": {
-				"errors": 0,
-				"warnings": 2
-			}
-		},
 		"src/lib/component/RegisterVoteKey.svelte": {
 			"ts:7006": {
 				"errors": 5,

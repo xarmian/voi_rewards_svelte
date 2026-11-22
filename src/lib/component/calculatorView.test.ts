@@ -63,8 +63,9 @@ test('shared calculator uses the design system, original model and view helpers'
 		expect(source).toContain(`from '${module}'`);
 	}
 	expect(source).toMatch(/from '\$lib\/ds\/\w+'/);
-	for (const prop of ['walletAddress', 'childAccounts', 'primaryAccountInfo']) {
-		expect(source).toMatch(new RegExp(`export let ${prop}\\b`));
+	expect(source).toMatch(/export let walletAddress\b/);
+	for (const prop of ['childAccounts', 'primaryAccountInfo']) {
+		expect(source).not.toMatch(new RegExp(`export let ${prop}\\b`));
 	}
 });
 test('calculator removes recommendations, legacy palette and whole-component loading/error replacements', () => {
