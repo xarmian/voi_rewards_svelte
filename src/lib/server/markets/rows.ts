@@ -107,15 +107,13 @@ export function composeDexMarketRow(
 		price_change_24h: null,
 		price_change_percentage_24h: priceChangePct,
 		lastUpdated: new Date().toISOString()
-	} as any;
+	};
 
 	return result;
 }
 
-export function sortByVolume(marketData: unknown[] | null) {
-	return (marketData || [])
-		.map((m: any) => m)
-		.sort((a: any, b: any) => (b.volume_24h || 0) - (a.volume_24h || 0));
+export function sortByVolume<T extends { volume_24h?: number | null }>(marketData: T[] | null) {
+	return (marketData || []).map((m) => m).sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
 }
 
 export function marketAggregates(

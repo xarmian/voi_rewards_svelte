@@ -11,9 +11,7 @@
 	import { algodClient } from '$lib/utils/algod';
 	import algosdk from 'algosdk';
 	import { buildAssetTransfer } from '$lib/chain/txBuilders';
-	import { createEventDispatcher } from 'svelte';
 
-	const dispatch = createEventDispatcher();
 	$: accountState = pageAccountState(accountAddress, $connectedWallets);
 	$: canSignTransactions = accountState.state === 'yours';
 

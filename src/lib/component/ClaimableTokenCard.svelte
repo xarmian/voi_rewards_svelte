@@ -9,7 +9,6 @@
 	import { arc200TransferFrom } from '$lib/utils/arc200';
 	import { signTransactions, connectedWallets, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import algosdk from 'algosdk';
-	import { algodClient } from '$lib/utils/algod';
 
 	const dispatch = createEventDispatcher();
 

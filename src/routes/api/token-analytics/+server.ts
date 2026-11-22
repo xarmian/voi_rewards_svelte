@@ -35,6 +35,12 @@ interface TokenAnalytics {
 	};
 }
 
+// The asset params this route reads: unit name and decimals.
+interface AssetParams {
+	un?: string;
+	dc?: number;
+}
+
 // Get token basic info
 async function getTokenInfo(tokenId: number): Promise<{
 	symbol: string;
@@ -79,7 +85,7 @@ async function getTokenInfo(tokenId: number): Promise<{
 			.maybeSingle();
 
 		if (!assetError && assetData && assetData.params) {
-			const params = assetData.params as any;
+			const params = assetData.params as AssetParams;
 			return {
 				symbol: params.un || 'UNKNOWN',
 				decimals: params.dc || 0,

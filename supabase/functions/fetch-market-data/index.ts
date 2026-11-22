@@ -105,8 +105,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Constants
 const SOURCE_TIMEOUT_MS = 10_000;
-const MEXC_ACCOUNT = 'CVYHPHOWCIOCVTS4QEUFPFROILQBVFR6HKSJKPTDWN4TDQ7QYAWPKMCVCM';
-const ALGOD_SERVER_VOI = 'https://mainnet-api.voi.nodely.dev';
 
 // Define the Uniswap V3 Pool ABI inline since we can't import it
 const IUniswapV3PoolABI = [
@@ -134,40 +132,6 @@ async function fetchHistoricalPrice(tradingPairId: number): Promise<number | nul
 		return data && data.length > 0 ? data[0].price : null;
 	} catch (error) {
 		console.error('Error fetching historical price:', error);
-		return null;
-	}
-}
-
-async function fetchMEXCData(): Promise<MarketSnapshot | null> {
-	try {
-		// Fetch MEXC price data
-		const mexcResponse = await fetch('https://api.mexc.com/api/v3/ticker/24hr?symbol=VOIUSDT');
-		const mexcData = await mexcResponse.json();
-
-		// Fetch MEXC TVL from Algorand account
-		const accountResponse = await fetch(`${ALGOD_SERVER_VOI}/v2/accounts/${MEXC_ACCOUNT}`);
-		if (!accountResponse.ok) {
-			throw new Error(`Failed to fetch account data: ${accountResponse.statusText}`);
-		}
-		const accountData = await accountResponse.json();
-
-		// Calculate TVL: account balance * current price
-		const balance = accountData.amount / 1e6; // Convert from microVOI to VOI
-		const price = parseFloat(mexcData.lastPrice);
-		const tvl = balance * price;
-
-		return {
-			trading_pair_id: 1, // MEXC VOI/USDT pair
-			price: price,
-			volume_24h: parseFloat(mexcData.quoteVolume), // Using quote volume (USDT)
-			tvl: tvl,
-			high_24h: parseFloat(mexcData.highPrice),
-			low_24h: parseFloat(mexcData.lowPrice),
-			price_change_24h: parseFloat(mexcData.priceChange),
-			price_change_percentage_24h: parseFloat(mexcData.priceChangePercent) * 100
-		};
-	} catch (error) {
-		console.error('Error fetching MEXC data:', error);
 		return null;
 	}
 }
@@ -440,7 +404,6 @@ async function fetchUniswapData(): Promise<MarketSnapshot | null> {
 serve(
 	createHandler({
 		sources: [
-			// { name: 'MEXC', fetch: fetchMEXCData },
 			{ name: 'Tinyman', fetch: fetchTinymanData },
 			{ name: 'PactFi', fetch: fetchPactFiData },
 			{ name: 'Uniswap', fetch: fetchUniswapData }

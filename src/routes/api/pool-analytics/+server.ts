@@ -44,8 +44,17 @@ interface PoolAnalytics {
 	};
 }
 
+// A pool from get_arc200_pools, with the fields this route reads.
+interface Arc200Pool {
+	tokenA: PoolToken;
+	tokenB: PoolToken;
+	escrowAddress: string;
+	outstandingLpAmount: string;
+	'current-round'?: number;
+}
+
 // Get pool data using the get_arc200_pools function
-async function getPoolData(poolId: number): Promise<any> {
+async function getPoolData(poolId: number): Promise<{ pool: Arc200Pool | null; failed: boolean }> {
 	try {
 		const { data, error } = await supabaseMimirClient
 			.rpc('get_arc200_pools', {
@@ -72,7 +81,7 @@ async function getPoolData(poolId: number): Promise<any> {
 }
 
 // Calculate average swap fee for the pool
-async function calculateAverageFee(poolId: number): Promise<number | null> {
+async function calculateAverageFee(): Promise<number | null> {
 	// This would require additional pool configuration data
 	// For now, return null as fee data isn't in the provided schema
 	// Could be enhanced with pool configuration data
@@ -113,7 +122,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		const reserves = poolLatestReserves(agg);
 		const reserveA = reserves?.reserveA || parseFloat(poolData.tokenA.balance);
 		const reserveB = reserves?.reserveB || parseFloat(poolData.tokenB.balance);
-		const averageFee = await calculateAverageFee(poolId);
+		const averageFee = await calculateAverageFee();
 
 		// Calculate price ratio (tokenB/tokenA)
 		const priceRatio = reserveA > 0 ? reserveB / reserveA : null;
