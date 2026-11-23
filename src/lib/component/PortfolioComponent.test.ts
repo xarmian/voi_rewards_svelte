@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+import * as bridgeAvailability from '$lib/chain/bridgeAvailability';
 import * as signerGate from '$lib/chain/signerGate';
 
 const source = readFileSync(new URL('./PortfolioComponent.svelte', import.meta.url), 'utf8');
 
-function componentScript(loadComponent: (path: string) => Promise<unknown>) {
+function componentScript(
+	loadComponent: (path: string) => Promise<unknown>,
+	overrides: Record<string, unknown> = {}
+) {
 	const script = source
 		.split('<script lang="ts">')[1]
 		.split('</script>')[0]
@@ -21,7 +25,9 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 		$voiPrice: { price: 0 },
 		browser: false,
 		console: { error },
-		loadComponent
+		loadComponent,
+		...bridgeAvailability,
+		...overrides
 	});
 	runInContext(
 		ts.transpileModule(script, {
@@ -56,14 +62,20 @@ function componentScript(loadComponent: (path: string) => Promise<unknown>) {
 // Sending needs a known balance: the Send handler refuses to open until the account part has loaded.
 const loadedAccount = `walletAddress = 'Y'; accountPart = { status: 'loaded', value: { balance: 5_000_000, status: 'Online', minBalance: 100000, pendingRewards: 0, round: 1 } }`;
 
-for (const [label, component, state, setup] of [
+for (const [label, component, state, setup, text = label] of [
 	['Send', 'SendTokenModal', 'showSendVoiModal', loadedAccount],
-	['Bridge', 'BridgeModal', 'showBridgeModal', "walletAddress = 'Y'; "],
+	[
+		'Bridge',
+		'BridgeModal',
+		'showBridgeModal',
+		"walletAddress = 'Y'; ",
+		"\\{BRIDGE_ENABLED \\? 'Bridge' : 'Bridge status'\\}"
+	],
 	['History', 'TokenTransfersModal', 'showVoiTransfersModal', '']
 ]) {
 	// Read the actual button binding so an unwired handler cannot make this pass.
 	const handler = source.match(
-		new RegExp(`on:click=\\{([^}]+)\\}[^>]*>\\s*<i\\b[^>]*></i>\\s*${label}\\s*<`)
+		new RegExp(`on:click=\\{([^}]+)\\}[^>]*>\\s*<i\\b[^>]*></i>\\s*${text}\\s*<`)
 	)?.[1];
 
 	test(`${label} loads only on opening and reuses the component on the second open`, async () => {
@@ -131,3 +143,80 @@ for (const name of ['openSendVoiModal', 'openBridgeModal']) {
 		}
 	});
 }
+
+// The markup gate around the Bridge button, read from the source so the test runs the real condition.
+const bridgeGate = source.match(/\{#if ([^}]+)\}<button\s+on:click=\{openBridgeModal\}/)?.[1];
+const bridgeRead = source.match(/^\t\$: if \(!showBridgeModal\)[^;]+;$/m)?.[0];
+const bridgeRecord = (wallet: string) =>
+	JSON.stringify([
+		{
+			kind: 'bridge',
+			wallet,
+			txIds: ['T'],
+			firstTxId: 'T',
+			lastValid: 100,
+			recipients: [{ address: 'BRIDGE', amount: '1' }],
+			symbol: 'VOI',
+			createdAt: 1
+		}
+	]);
+
+function bridgeOffered(saved: Record<string, string>, overrides: Record<string, unknown> = {}) {
+	const values = new Map(Object.entries(saved));
+	vi.stubGlobal('localStorage', {
+		getItem: (name: string) => values.get(name) ?? null,
+		setItem: (name: string, value: string) => void values.set(name, value),
+		removeItem: (name: string) => void values.delete(name)
+	});
+	const { run } = componentScript(vi.fn(), { browser: true, ...overrides });
+	expect(bridgeGate).toBeDefined();
+	expect(bridgeRead).toBeDefined();
+	// The vm runs reactive statements once, so replay the component's own read as Svelte would.
+	const set = (code: string) => run(`${code}; ${bridgeRead}`);
+	set("walletAddress = 'Y'");
+	return { offered: () => run(`(${bridgeGate})`), set, values };
+}
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
+test('with bridging off, no Bridge button is offered without a bridge in flight', () => {
+	const { offered } = bridgeOffered({
+		'voirewards:pending-sends:Z': bridgeRecord('Z')
+	});
+	expect(offered(), 'another wallet has the bridge').toBe(false);
+});
+
+test('a wallet with a bridge in flight is offered Bridge status', () => {
+	const { offered } = bridgeOffered({ 'voirewards:pending-sends:Y': bridgeRecord('Y') });
+	expect(offered()).toBe(true);
+	expect(source).toMatch(
+		/title=\{BRIDGE_ENABLED \? 'Bridge VOI' : 'Check a bridge transfer in progress'\}/
+	);
+});
+
+test('the Bridge status button goes away once the tracker clears the record', () => {
+	const { offered, set, values } = bridgeOffered({
+		'voirewards:pending-sends:Y': bridgeRecord('Y')
+	});
+	expect(offered()).toBe(true);
+	set('showBridgeModal = true');
+	values.delete('voirewards:pending-sends:Y');
+	expect(offered(), 'the open modal keeps its button until it closes').toBe(true);
+	set('showBridgeModal = false');
+	expect(offered()).toBe(false);
+});
+
+test('the Bridge status button is only for the connected account', () => {
+	const { offered } = bridgeOffered(
+		{ 'voirewards:pending-sends:Y': bridgeRecord('Y') },
+		{ $connectedWallets: [] }
+	);
+	expect(offered()).toBe(false);
+});
+
+test('with bridging on, the Bridge button is offered as before', () => {
+	const { offered } = bridgeOffered({}, { BRIDGE_ENABLED: true });
+	expect(offered()).toBe(true);
+});

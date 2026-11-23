@@ -26,6 +26,7 @@
 	import { connectedWallets, signTransactions, capturePageSigner } from '$lib/chain/wallet.svelte';
 	import type { TransactionSigner } from '$lib/chain/wallet.svelte';
 	import { browser } from '$app/environment';
+	import { BRIDGE_ENABLED, hasPendingBridge } from '$lib/chain/bridgeAvailability';
 	import algosdk from 'algosdk';
 	export let parentWalletAddress: string | null = null;
 	export let walletAddress: string | undefined = undefined;
@@ -101,6 +102,11 @@
 	let SendTokenModal: typeof import('./SendTokenModal.svelte').default | null = null;
 	let TokenTransfersModal: typeof import('./TokenTransfersModal.svelte').default | null = null;
 	let BridgeModal: typeof import('./BridgeModal.svelte').default | null = null;
+	// With bridging off, only a wallet with a bridge in flight gets a button, to check on it.
+	// Read again when the modal closes, so the button goes once the tracker clears the record.
+	let bridgePending = false;
+	$: if (!showBridgeModal)
+		bridgePending = browser && !!walletAddress && hasPendingBridge(walletAddress);
 
 	// Claimable tokens summary variables
 	let claimableTokensSummary: Array<{
@@ -552,13 +558,13 @@
 			<i class="fas fa-paper-plane"></i>
 			Send
 		</button>{/if}
-	{#if pageAccountState(walletAddress, $connectedWallets).state === 'yours'}<button
+	{#if pageAccountState(walletAddress, $connectedWallets).state === 'yours' && (BRIDGE_ENABLED || bridgePending)}<button
 			on:click={openBridgeModal}
 			class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-600"
-			title="Bridge VOI"
+			title={BRIDGE_ENABLED ? 'Bridge VOI' : 'Check a bridge transfer in progress'}
 		>
 			<i class="fas fa-bridge"></i>
-			Bridge
+			{BRIDGE_ENABLED ? 'Bridge' : 'Bridge status'}
 		</button>{/if}
 	<button
 		on:click={openVoiTransfersModal}

@@ -27,6 +27,7 @@
 	import { pollUntil } from '$lib/chain/singleFlightPoll';
 	import { checkDestinationConfirmation, checkAlgorandDeposit } from '$lib/chain/bridgeMonitor';
 	import type { ExpectedBridgeConfirmation } from '$lib/chain/bridgeConfirmation';
+	import { BRIDGE_ENABLED } from '$lib/chain/bridgeAvailability';
 	import {
 		createPendingTracker,
 		type PendingSendEntry,
@@ -1269,8 +1270,11 @@
 						<button
 							type="button"
 							class="inline-flex items-center px-4 py-1.5 text-xl font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50 dark:disabled:hover:bg-blue-900/30 disabled:hover:border-blue-200 dark:disabled:hover:border-blue-800"
-							on:click={() => bridgeStatus === 'idle' && (showTokenSelector = !showTokenSelector)}
-							disabled={bridgeStatus !== 'idle'}
+							on:click={() =>
+								BRIDGE_ENABLED &&
+								bridgeStatus === 'idle' &&
+								(showTokenSelector = !showTokenSelector)}
+							disabled={!BRIDGE_ENABLED || bridgeStatus !== 'idle'}
 						>
 							<div class="flex items-center space-x-2">
 								<span>{selectedToken.name}</span>
@@ -1402,7 +1406,21 @@
 							{/each}
 						</section>
 					{/if}
-					{#if canSignTransactions}
+					{#if !BRIDGE_ENABLED}
+						<section
+							aria-label="Bridging turned off"
+							class="space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm"
+						>
+							<p class="text-gray-900 dark:text-white">Bridging from voirewards is turned off.</p>
+							{#if restoredBridgeEntries.length === 0}
+								<p class="text-gray-700 dark:text-gray-300">No bridge transfers are in progress.</p>
+							{:else}
+								<p class="text-gray-700 dark:text-gray-300">
+									Transfers you already started are shown above.
+								</p>
+							{/if}
+						</section>
+					{:else if canSignTransactions}
 						<!-- Bridge Direction Selection -->
 						<div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
 							<div class="relative w-full md:w-1/2 group">
@@ -2217,9 +2235,9 @@
 						on:click={requestClose}
 						class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
 					>
-						Cancel
+						{BRIDGE_ENABLED ? 'Cancel' : 'Close'}
 					</button>
-					{#if canSignTransactions}<button
+					{#if BRIDGE_ENABLED && canSignTransactions}<button
 							on:click={handleSubmit}
 							disabled={submitButtonDisabled}
 							title={submitButtonTooltip}
@@ -2231,27 +2249,27 @@
 			{:else}
 				<div class="flex justify-end space-x-3 md:space-x-4">
 					{#if bridgeStatus === 'completed'}
-						<button
-							on:click={() => {
-								resetBridgeState();
-								amount = '';
-								algorandDestination = { ...emptyDestination };
-								voiDestination = { ...emptyDestination };
-								resolvedName = null;
-								showSearchResults = false;
-								searchResults = [];
-								// Also reset source address state if it exists
-								algorandSourceAddress = '';
-								algorandSourceResolvedName = null;
-								isValidSourceAddress = false;
-								showSourceSearchResults = false;
-								sourceSearchResults = [];
-								algorandSourceBalance = null;
-							}}
-							class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
-						>
-							Bridge Again
-						</button>
+						{#if BRIDGE_ENABLED}<button
+								on:click={() => {
+									resetBridgeState();
+									amount = '';
+									algorandDestination = { ...emptyDestination };
+									voiDestination = { ...emptyDestination };
+									resolvedName = null;
+									showSearchResults = false;
+									searchResults = [];
+									// Also reset source address state if it exists
+									algorandSourceAddress = '';
+									algorandSourceResolvedName = null;
+									isValidSourceAddress = false;
+									showSourceSearchResults = false;
+									sourceSearchResults = [];
+									algorandSourceBalance = null;
+								}}
+								class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
+							>
+								Bridge Again
+							</button>{/if}
 						<button
 							on:click={requestClose}
 							class="px-3 py-2 md:px-4 md:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
