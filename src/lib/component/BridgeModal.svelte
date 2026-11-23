@@ -1270,8 +1270,11 @@
 						<button
 							type="button"
 							class="inline-flex items-center px-4 py-1.5 text-xl font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50 dark:disabled:hover:bg-blue-900/30 disabled:hover:border-blue-200 dark:disabled:hover:border-blue-800"
-							on:click={() => bridgeStatus === 'idle' && (showTokenSelector = !showTokenSelector)}
-							disabled={bridgeStatus !== 'idle'}
+							on:click={() =>
+								BRIDGE_ENABLED &&
+								bridgeStatus === 'idle' &&
+								(showTokenSelector = !showTokenSelector)}
+							disabled={!BRIDGE_ENABLED || bridgeStatus !== 'idle'}
 						>
 							<div class="flex items-center space-x-2">
 								<span>{selectedToken.name}</span>

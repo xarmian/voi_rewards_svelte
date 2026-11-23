@@ -141,3 +141,17 @@ test('the pending tracker runs whether or not bridging is on', () => {
 		/BRIDGE_ENABLED[^\n]*syncTracker/
 	);
 });
+
+test('with bridging off the token picker cannot open', () => {
+	const picker = between('<!-- Fixed Header -->', '{#if showTokenSelector}');
+	expect(picker).toContain("disabled={!BRIDGE_ENABLED || bridgeStatus !== 'idle'}");
+	const click = picker.match(/on:click=\{\(\) =>([\s\S]*?)\}\n/)?.[1];
+	expect(click, 'the picker click handler').toBeDefined();
+	const run = (BRIDGE_ENABLED: boolean) => {
+		const state = { BRIDGE_ENABLED, bridgeStatus: 'idle', showTokenSelector: false };
+		runInContext(`with (state) { ${click} }`, createContext({ state }));
+		return state.showTokenSelector;
+	};
+	expect(run(false)).toBe(false);
+	expect(run(true)).toBe(true);
+});
