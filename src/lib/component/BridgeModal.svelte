@@ -1408,12 +1408,13 @@
 							aria-label="Bridging turned off"
 							class="space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm"
 						>
-							<p class="text-gray-900 dark:text-white">
-								Bridging from voirewards is turned off. Transfers you already started are shown
-								above.
-							</p>
+							<p class="text-gray-900 dark:text-white">Bridging from voirewards is turned off.</p>
 							{#if restoredBridgeEntries.length === 0}
 								<p class="text-gray-700 dark:text-gray-300">No bridge transfers are in progress.</p>
+							{:else}
+								<p class="text-gray-700 dark:text-gray-300">
+									Transfers you already started are shown above.
+								</p>
 							{/if}
 						</section>
 					{:else if canSignTransactions}

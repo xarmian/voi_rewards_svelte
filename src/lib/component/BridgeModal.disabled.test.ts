@@ -70,8 +70,8 @@ const idle = (overrides: Record<string, unknown>) =>
 		...overrides
 	});
 const form = '<!-- Bridge Direction Selection -->';
-const notice =
-	'Bridging from voirewards is turned off. Transfers you already started are shown above.';
+const notice = 'Bridging from voirewards is turned off.';
+const above = 'Transfers you already started are shown above.';
 const none = 'No bridge transfers are in progress.';
 
 test('with bridging off the idle view has no form but keeps restored bridges', () => {
@@ -79,6 +79,7 @@ test('with bridging off the idle view has no form but keeps restored bridges', (
 	expect(view).toContain('Awaiting confirmation');
 	expect(view).toContain('{entry.record.symbol} to {recipient.address}');
 	expect(view).toContain(notice);
+	expect(view).toContain(above);
 	expect(view).not.toContain(none);
 	for (const part of [form, 'for="destinationAddress"', '<!-- QR Code Modal -->', 'Opt-in to aVOI'])
 		expect(view, `${part} belongs to the new-bridge form`).not.toContain(part);
@@ -89,6 +90,7 @@ test('with bridging off and nothing in flight the idle view says so', () => {
 	expect(view).not.toContain('Awaiting confirmation');
 	expect(view).toContain(notice);
 	expect(view).toContain(none);
+	expect(view, 'nothing is listed above').not.toContain(above);
 	expect(view).not.toContain(form);
 });
 
